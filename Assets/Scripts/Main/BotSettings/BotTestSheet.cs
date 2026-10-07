@@ -16,6 +16,9 @@ using UnityEngine.UI;
 /// R16: every call carries a <see cref="BotTestTicket"/> (sequence, bot, profile, workflow) captured at send — a late
 /// answer never touches another screen's reply, history or busy latch, and «тест пройден» is written only under the
 /// ticket's own bot (<see cref="BotTestResultPolicy"/>). The ID line names the tested version (R15 promptVersion).
+/// V11: the screen ends on Hide (not on the next Show), only a LIVE bot's answer lands on it, and the target is
+/// re-decided from the bot as it is now whenever the sheet repaints or sends — a logout or BotSettings.OnEnable's
+/// get/status probe can unbind the channel under the open sheet.
 /// </summary>
 public static class BotTestSheet
 {
@@ -51,8 +54,8 @@ public static class BotTestSheet
     private static bool eventsBound;
 
     // R16: the sheet is ONE static surface reused for every bot, and a test call outlives the screen that sent it
-    // (the coroutine runs on the always-active host). Every Show and every send bumps the sequence; a result whose
-    // ticket is not the current one belongs to a screen that is gone.
+    // (the coroutine runs on the always-active host). Every Show, every Hide (V11) and every send bumps the sequence;
+    // a result whose ticket is not the current one belongs to a screen that is gone.
     private static int screenSeq;
     private static readonly Dictionary<string, int> recordedSeq = new();   // newest ticket whose verdict was written, per bot
 
@@ -80,23 +83,31 @@ public static class BotTestSheet
         replyTmp.text = "";
         metaTmp.text = "";
         correlationTmp.text = "";
-        target = BotTestTarget.Resolve(bot.whatsappProfileId, bot.whatsappWorkflowId, bot.telegramProfileId, bot.telegramWorkflowId);
-        RefreshReadiness();
+        RefreshReadiness();                // resolves the target too
         RenderRecent();
         Paint();
         PopupUI.Show(panel);
         HandoffSyncService.Existing?.RefreshStatus();     // the ledger rows arrive through Changed → RenderRecent
     }
 
+    /// <summary>V11: «Закрыть» / Android Back ENDS the screen — an answer still in flight belongs to a screen that is
+    /// gone (its verdict is still written under its own bot). The sequence, not <see cref="IsShowing"/>, carries this:
+    /// the panel stays active through PopupUI's 0.16 s exit tween. Hide never clears <c>busy</c> — Show does — so a
+    /// hidden sheet can never send.</summary>
     public static void Hide()
     {
-        if (panel != null && panel.activeSelf) PopupUI.Hide(panel);
+        if (panel == null || !panel.activeSelf) return;
+        screenSeq++;
+        PopupUI.Hide(panel);
     }
 
     // ---- readiness -------------------------------------------------------------------------
 
     private static void RefreshReadiness()
     {
+        // V11: never the target captured at Show — a logout or the BotSettings.OnEnable get/status probe writes the
+        // «-1» sentinel into the bot under the open sheet (null for a deleted bot).
+        target = bot != null ? BotTestTarget.Resolve(bot.whatsappProfileId, bot.whatsappWorkflowId, bot.telegramProfileId, bot.telegramWorkflowId) : null;
         int items = 0, documents = 0;
         string description = "";
         try
@@ -139,6 +150,7 @@ public static class BotTestSheet
         if (busy || field == null) return;
         string text = (field.text ?? "").Trim();
         if (text.Length == 0) return;
+        RefreshReadiness();                // V11: re-decide the target right before using it (and repaint what it says)
         if (target == null) { replyTmp.text = BotReadinessCopy.ChannelNo; return; }
         busy = true;
         field.DeactivateInputField();
@@ -172,6 +184,9 @@ public static class BotTestSheet
         {
             // A stale answer: the screen, its history and its busy latch belong to a newer request.
             if (outcome.Verdict.HasValue && IsShowing && ticket.BotName == botName) RefreshReadiness();
+            // V11: this screen's own request, but its bot was deleted under the open sheet — nothing here can be tested
+            // any more; close it rather than leave it «Бот думает…» with the latch held.
+            if (ticket.Seq == screenSeq && !alive && IsShowing) Hide();
             return;
         }
         busy = false;

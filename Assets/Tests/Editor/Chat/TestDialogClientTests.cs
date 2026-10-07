@@ -143,6 +143,14 @@ public class TestDialogClientTests
         Assert.IsTrue(MethodBody(sheet, "private static void RecordVerdict").Contains("PlayerPrefs.SetInt(ticket.BotName + LastTestKeySuffix, outcome.Verdict.Value)"),
             "the verdict is written under the ticket's own bot");
         Assert.IsTrue(MethodBody(sheet, "public static void Show").Contains("screenSeq++"), "opening the sheet retires everything still in flight");
+        // V11: the screen ends on «Закрыть»/Back, not on the next Show, and the target is re-decided, never kept from Show
+        Assert.IsTrue(MethodBody(sheet, "public static void Hide").Contains("screenSeq++"), "closing the sheet retires everything still in flight");
+        Assert.IsTrue(MethodBody(sheet, "private static void RefreshReadiness").Contains("BotTestTarget.Resolve("), "the readiness re-decides the target from the bot as it is now");
+        int refresh = send.IndexOf("RefreshReadiness();", System.StringComparison.Ordinal);
+        int noTarget = send.IndexOf("if (target == null)", System.StringComparison.Ordinal);
+        Assert.IsTrue(refresh >= 0 && noTarget > refresh, "a send re-decides the target before it uses it");
+        Assert.IsTrue(MethodBody(Src("Scripts/Main/BotReadiness.cs"), "public static BotTestOutcome Decide").Contains("ticket.Seq == currentSeq && botAlive"),
+            "the screen belongs to a live bot");
         Assert.IsTrue(MethodBody(Src("Scripts/Main/Bot.cs"), "public void DeleteBot").Contains("BotTestSheet.LastTestKeySuffix"),
             "a deleted bot leaves no «тест пройден» behind");
     }

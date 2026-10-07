@@ -1,0 +1,81 @@
+V11 — BEFORE the fix (HEAD 1fd3157e + the new behavioural tests only; Unity 6000.3.9f1 headless EditMode)
+command: Tools/run-tests-headless.sh 'BotTestSheetLateResultTests|TestDialogClientTests'
+date: 2026-10-07T16:06:29Z
+
+run: result=Failed(Child) total=28 passed=17 failed=11 inconclusive=0 skipped=0
+Failed  BotTestSheetLateResultTests.ChannelUnboundUnderTheOpenSheet_AnswerIsShown_ButTheNextSendIsRefusedLocally("whatsapp")
+        the readiness re-decides the channel: <color=#5981D6>• Канал подключён</color>
+        <color=#5981D6>• Режим подтверждён</color>
+        <color=#79869A>• Знаний нет: добавьте описание, товары или прайс-лист</color>
+        <color=#79869A>• Тест ещё не запускали</color>
+          Expected: True
+          But was:  False
+Failed  BotTestSheetLateResultTests.ChannelUnboundUnderTheOpenSheet_AnswerIsShown_ButTheNextSendIsRefusedLocally("telegram")
+        the readiness re-decides the channel: <color=#5981D6>• Канал подключён</color>
+        <color=#5981D6>• Режим подтверждён</color>
+        <color=#79869A>• Знаний нет: добавьте описание, товары или прайс-лист</color>
+        <color=#79869A>• Тест ещё не запускали</color>
+          Expected: True
+          But was:  False
+Failed  BotTestSheetLateResultTests.ChannelUnboundWhileTheSheetIsIdle_SendIsRefusedLocally("whatsapp")
+        nothing is sent to the unbound profile/workflow
+          Expected: 0
+          But was:  1
+Failed  BotTestSheetLateResultTests.ChannelUnboundWhileTheSheetIsIdle_SendIsRefusedLocally("telegram")
+        nothing is sent to the unbound profile/workflow
+          Expected: 0
+          But was:  1
+Failed  BotTestSheetLateResultTests.DeletedOrRetargetedBot_GetsNoVerdictFromALateAnswer
+        V11: a closed screen of a deleted bot is never repainted by its late answer
+          Expected string length 11 but was 1. Strings differ at index 0.
+          Expected: "Бот думает…"
+          But was:  "r"
+          -----------^
+Failed  BotTestSheetLateResultTests.HideEndsTheScreen_ALateAnswerAfterHideTouchesNothing
+        the closed screen is not repainted by the late answer
+          Expected string length 11 but was 1. Strings differ at index 0.
+          Expected: "Бот думает…"
+          But was:  "r"
+          -----------^
+Passed  BotTestSheetLateResultTests.LateBotSideFailureOfBotA_DoesNotFailBotB
+Passed  BotTestSheetLateResultTests.LateReplyOfBotA_AfterSwitchingToBotB_CountsForAOnly
+Passed  BotTestSheetLateResultTests.NormalPath_ReplyHistoryAndPass_Unchanged
+Failed  BotTestSheetLateResultTests.OrphanedScreen_ClosesOnTheResult("whatsapp")
+        a deleted bot's answer never lands on the screen
+          Expected string length 11 but was 1. Strings differ at index 0.
+          Expected: "Бот думает…"
+          But was:  "r"
+          -----------^
+Failed  BotTestSheetLateResultTests.OrphanedScreen_ClosesOnTheResult("telegram")
+        a deleted bot's answer never lands on the screen
+          Expected string length 11 but was 1. Strings differ at index 0.
+          Expected: "Бот думает…"
+          But was:  "r"
+          -----------^
+Failed  BotTestSheetLateResultTests.Policy_DeletedBot_NeverAppliesToScreen
+        the screen belongs to a live bot: a deleted bot's answer never lands on it
+          Expected: False
+          But was:  True
+Passed  BotTestSheetLateResultTests.SameBotReopened_OldAnswerStaysOutOfTheNewConversation_AndNeverOverwritesANewerVerdict
+Passed  BotTestSheetLateResultTests.StaleAnswer_DoesNotReleaseTheCurrentRequestsBusyLatch
+Passed  BotTestSheetLateResultTests.TransportOrAuthFailure_IsNoVerdict
+Failed  BotTestSheetLateResultTests.WhatsAppUnboundUnderTheOpenSheet_TheNextTestGoesThroughTelegram
+        String lengths are both 8. Strings differ at index 0.
+          Expected: "telegram"
+          But was:  "whatsapp"
+          -----------^
+Passed  TestDialogClientTests.AppendTurn_KeepsTheLastTenTurnsNewestLast
+Passed  TestDialogClientTests.ClassifyFailure_NamesEveryReason
+Passed  TestDialogClientTests.Parse_HandoffEnvelope_ReportsTheActionAsData
+Passed  TestDialogClientTests.Parse_SuccessEnvelope_IsOkAndNeverSent
+Passed  TestDialogClientTests.Policy_NoVerdict_ForADeletedOrRetargetedBot_OrOverANewerVerdict
+Passed  TestDialogClientTests.Policy_StaleTicket_KeepsItsOwnVerdict_ButNeverTheScreen
+Passed  TestDialogClientTests.Policy_VerdictOnlyFromTheBotItself
+Passed  TestDialogClientTests.PromptVersion_ParsesAndNamesTheTestedVersion
+Passed  TestDialogClientTests.Target_PrefersTheConnectedChannel_NoneWhenNeither
+Failed  TestDialogClientTests.Wiring_ResultBelongsToTheTicketNotToTheScreen
+        closing the sheet retires everything still in flight
+          Expected: True
+          But was:  False
+Passed  TestDialogClientTests.Wiring_SheetArmsBusyBeforeTheCall_AndPassesOnlyOnARealReply
+Passed  TestDialogClientTests.Wiring_TransportOnlyThroughAuthorizedRequest

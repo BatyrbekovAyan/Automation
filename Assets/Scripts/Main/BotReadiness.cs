@@ -131,7 +131,11 @@ public readonly struct BotTestTicket
 /// <summary>What one returned test result may change (R16).</summary>
 public readonly struct BotTestOutcome
 {
-    public readonly bool ApplyToScreen;   // the sheet still shows the request's screen: reply, history and busy may change
+    /// <summary>The sheet still shows the request's own screen AND its bot still exists: reply, history and busy may
+    /// change. V11: the screen ends on Hide (not on the next Show), and a deleted bot's answer never lands on it. A live
+    /// bot whose target changed under the open sheet still gets its answer shown (the owner's own question, the same
+    /// bot) — the target check belongs to the verdict only; refusing the answer would leave the sheet «Бот думает…».</summary>
+    public readonly bool ApplyToScreen;
     public readonly int? Verdict;         // 1 passed / 0 failed, written under the TICKET's bot; null = no verdict
 
     public BotTestOutcome(bool applyToScreen, int? verdict) { ApplyToScreen = applyToScreen; Verdict = verdict; }
@@ -150,7 +154,7 @@ public static class BotTestResultPolicy
         return botSide ? 0 : (int?)null;
     }
 
-    /// <param name="currentSeq">the sheet's sequence now — bumped by every Show and every send</param>
+    /// <param name="currentSeq">the sheet's sequence now — bumped by every Show, every Hide and every send</param>
     /// <param name="botAlive">the ticket's Bot still exists (Unity-null once deleted)</param>
     /// <param name="currentTarget">the ticket's bot's target NOW (null when no channel is connected)</param>
     /// <param name="lastRecordedSeq">the newest ticket whose verdict was already written for this bot (0 = none)</param>
@@ -161,7 +165,7 @@ public static class BotTestResultPolicy
             && currentTarget.ProfileId == ticket.ProfileId && currentTarget.WorkflowId == ticket.WorkflowId;
         bool newest = ticket.Seq > lastRecordedSeq;
         bool writable = verdict.HasValue && sameTarget && newest && !string.IsNullOrEmpty(ticket.BotName);
-        return new BotTestOutcome(ticket.Seq == currentSeq, writable ? verdict : null);
+        return new BotTestOutcome(ticket.Seq == currentSeq && botAlive, writable ? verdict : null);
     }
 }
 

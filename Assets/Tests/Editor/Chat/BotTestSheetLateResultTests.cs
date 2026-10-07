@@ -11,6 +11,9 @@ using UnityEngine;
 /// response delay. A late answer for bot A must not touch bot B's screen, history, busy latch or «тест пройден»;
 /// the verdict is written only under the ticket's own bot, only on a bot-side outcome, never for a deleted or
 /// re-targeted bot, and an older answer never overwrites a newer verdict.
+/// V11 (iteration 2026-09-28): «Закрыть» ends the screen, only a LIVE bot's answer lands on it, and the target is
+/// re-decided from the bot as it is now. EditMode does not tick DOTween, so the panel stays active after Hide —
+/// assertions read the reply, the parked requests, the verdict and <see cref="PopupUI.HasOpenPopup"/>, never IsShowing.
 /// </summary>
 public class BotTestSheetLateResultTests
 {
@@ -189,6 +192,7 @@ public class BotTestSheetLateResultTests
         UnityEngine.Object.DestroyImmediate(a.gameObject);
         parked[0].done(Ok("r"));
         Assert.AreEqual(-1, Verdict("A"), "a deleted bot gets no verdict (no orphan key)");
+        Assert.AreEqual(BotReadinessCopy.Sending, Reply, "V11: a closed screen of a deleted bot is never repainted by its late answer");
 
         Show(c);
         Submit("q");
@@ -196,6 +200,144 @@ public class BotTestSheetLateResultTests
         c.whatsappWorkflowId = "wfC0000002";          // re-authorised: another workflow answers now
         parked[1].done(Ok("r"));
         Assert.AreEqual(-1, Verdict("C"), "an answer about the old workflow is not a verdict about the new one");
+        Assert.AreEqual(BotReadinessCopy.Sending, Reply, "V11: the screen was closed — the answer does not land on it");
+    }
+
+    // ---- V11 (iteration 2026-09-28): Hide ends the screen; the screen belongs to a LIVE bot; the target is re-decided ----
+
+    private Bot MakeTelegramBot(string suffix)
+    {
+        var bot = MakeBot(suffix);
+        bot.whatsappProfileId = "-1";
+        bot.whatsappWorkflowId = "-1";
+        bot.telegramProfileId = "tg-" + suffix;
+        bot.telegramWorkflowId = "wt" + suffix + "0000001";
+        return bot;
+    }
+
+    private Bot MakeBotOn(string channel, string suffix) => channel == "telegram" ? MakeTelegramBot(suffix) : MakeBot(suffix);
+
+    /// <summary>What a logout / the BotSettings.OnEnable get/status probe does to the bot under the open sheet
+    /// (Manager.DeleteWhatsappProfile / DeleteTelegramProfile write the «-1» sentinel into the Bot).</summary>
+    private static void Unbind(Bot bot, string channel)
+    {
+        if (channel == "telegram") bot.telegramProfileId = "-1";
+        else bot.whatsappProfileId = "-1";
+    }
+
+    private static void CloseEveryPopup() { while (PopupUI.TryCloseTop()) { } }
+
+    [Test]
+    public void HideEndsTheScreen_ALateAnswerAfterHideTouchesNothing()
+    {
+        var a = MakeBot("A");
+        Show(a);
+        Submit("q");
+        BotTestSheet.Hide();
+
+        parked[0].done(Ok("r"));
+
+        Assert.AreEqual(1, Verdict("A"), "the verdict is the bot's own and is still written after «Закрыть»");
+        Assert.AreEqual(BotReadinessCopy.Sending, Reply, "the closed screen is not repainted by the late answer");
+        Submit("q2");
+        Assert.AreEqual(1, parked.Count, "the closed screen's busy latch is not released: nothing is sent from it");
+    }
+
+    [Test]
+    public void Policy_DeletedBot_NeverAppliesToScreen()
+    {
+        var ticket = new BotTestTicket(2, "A", "p", "w");
+        var gone = BotTestResultPolicy.Decide(ticket, 2, false, null, 0, Ok("r"));
+        Assert.IsFalse(gone.ApplyToScreen, "the screen belongs to a live bot: a deleted bot's answer never lands on it");
+        Assert.IsNull(gone.Verdict);
+        foreach (string kind in new[] { TestDialogResult.KindGenerationFailed, TestDialogResult.KindNetwork })
+            Assert.IsFalse(BotTestResultPolicy.Decide(ticket, 2, false, null, 0, Fail(kind)).ApplyToScreen, kind);
+
+        var alive = BotTestResultPolicy.Decide(ticket, 2, true, BotTestTarget.Resolve("p", "w", "-1", "-1"), 0, Ok("r"));
+        Assert.IsTrue(alive.ApplyToScreen, "control: the live bot's own screen takes its answer");
+        Assert.AreEqual(1, alive.Verdict);
+
+        var retargeted = BotTestResultPolicy.Decide(ticket, 2, true, BotTestTarget.Resolve("p", "wf-B", "-1", "-1"), 0, Ok("r"));
+        Assert.IsTrue(retargeted.ApplyToScreen, "deliberate: the same live bot's answer to the owner's own question is shown — refusing it would leave the sheet «Бот думает…» forever");
+        Assert.IsNull(retargeted.Verdict, "but it is no verdict about the workflow that answers now");
+
+        var tg = new BotTestTicket(4, "B", "tg-B", "wtB");
+        Assert.IsFalse(BotTestResultPolicy.Decide(tg, 4, false, null, 0, Ok("r")).ApplyToScreen, "Telegram-only bot, deleted");
+        Assert.IsTrue(BotTestResultPolicy.Decide(tg, 4, true, BotTestTarget.Resolve("-1", "-1", "tg-B", "wtB"), 0, Ok("r")).ApplyToScreen, "Telegram-only bot, alive");
+    }
+
+    [TestCase("whatsapp")]
+    [TestCase("telegram")]
+    public void OrphanedScreen_ClosesOnTheResult(string channel)
+    {
+        CloseEveryPopup();
+        var a = MakeBotOn(channel, "A");
+        Show(a);
+        Submit("q");
+        Assert.AreEqual(channel, parked[0].request.channel);
+        Assert.IsTrue(PopupUI.HasOpenPopup, "precondition: the sheet is open");
+        UnityEngine.Object.DestroyImmediate(a.gameObject);   // the bot is gone while its own sheet is still showing
+
+        parked[0].done(Ok("r"));
+
+        Assert.AreEqual(BotReadinessCopy.Sending, Reply, "a deleted bot's answer never lands on the screen");
+        Assert.AreEqual(-1, Verdict("A"), "no orphan verdict");
+        Assert.IsFalse(PopupUI.HasOpenPopup, "the sheet of a bot that no longer exists closes instead of waiting «Бот думает…» forever");
+    }
+
+    [TestCase("whatsapp")]
+    [TestCase("telegram")]
+    public void ChannelUnboundUnderTheOpenSheet_AnswerIsShown_ButTheNextSendIsRefusedLocally(string channel)
+    {
+        var a = MakeBotOn(channel, "A");
+        Show(a);
+        Submit("q");
+        Unbind(a, channel);            // the request is in flight; the channel is unbound under the open sheet
+
+        parked[0].done(Ok("r"));
+
+        Assert.AreEqual("r", Reply, "the same live bot answered the owner's own question — shown on purpose");
+        Assert.AreEqual(-1, Verdict("A"), "no verdict about a channel that is gone");
+        Assert.IsTrue(TestLineIs(Readiness, BotReadinessCopy.ChannelNo), "the readiness re-decides the channel: " + Readiness);
+        Submit("q2");
+        Assert.AreEqual(1, parked.Count, "no request to the unbound profile/workflow");
+        Assert.AreEqual(BotReadinessCopy.ChannelNo, Reply);
+    }
+
+    [TestCase("whatsapp")]
+    [TestCase("telegram")]
+    public void ChannelUnboundWhileTheSheetIsIdle_SendIsRefusedLocally(string channel)
+    {
+        var a = MakeBotOn(channel, "A");
+        Show(a);
+        Unbind(a, channel);            // the BotSettings.OnEnable probe lands after the sheet opened, before the owner sends
+
+        Submit("q");
+
+        Assert.AreEqual(0, parked.Count, "nothing is sent to the unbound profile/workflow");
+        Assert.AreEqual(BotReadinessCopy.ChannelNo, Reply);
+        Assert.IsTrue(TestLineIs(Readiness, BotReadinessCopy.ChannelNo), Readiness);
+    }
+
+    [Test]
+    public void WhatsAppUnboundUnderTheOpenSheet_TheNextTestGoesThroughTelegram()
+    {
+        var a = MakeBot("A");
+        a.telegramProfileId = "tg-A";
+        a.telegramWorkflowId = "wtA0000001";
+        Show(a);
+        Submit("q");
+        Assert.AreEqual("whatsapp", parked[0].request.channel, "WhatsApp first while both are connected");
+        Unbind(a, "whatsapp");
+        parked[0].done(Ok("r"));
+        Assert.AreEqual(-1, Verdict("A"), "the answer came from the WhatsApp workflow that no longer answers");
+        Assert.IsTrue(TestLineIs(Readiness, BotReadinessCopy.Channel), "Telegram still carries the bot: " + Readiness);
+
+        Submit("q2");
+        Assert.AreEqual(2, parked.Count);
+        Assert.AreEqual("telegram", parked[1].request.channel);
+        Assert.AreEqual("tg-A", parked[1].request.profileId);
+        Assert.AreEqual("wtA0000001", parked[1].request.workflowId);
     }
 
     [Test]
