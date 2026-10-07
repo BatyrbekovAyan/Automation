@@ -1,0 +1,258 @@
+V9 (panel) — after: apply-suggest-v2.py (Prep clientLang, Assemble STAGE5-LANG + ТРИВИАЛЬНЫЕ narrowing, Validate/Validate 2 STAGE5-LANG-VALIDATE)
+$ python3 Tools/n8n/apply-suggest-v2.py; python3 Tools/n8n/apply-suggest-v2.py; python3 Tools/n8n/apply-suggest-v2.py --check
+patched  9PTyYcelRQI7bGDb-Suggest_Replies.json / up to date  9PTyYcelRQI7bGDb-Suggest_Replies.json / suggest v2: OK
+
+$ python3 Tools/n8n/tests/test_suggest_lang.py
+PASS [WA] Prep names the client language from its newest message
+PASS [WA] Assemble: the Kazakh rule rides the prompt for a Kazakh client only, after the niche block
+PASS [WA] strict Validate: Russian cards for a Kazakh client fail the set (→ the one retry), with the reason
+PASS [WA] strict Validate: Russian and mixed clients keep today's verdicts
+PASS [WA] lenient Validate 2: Russian cards are dropped when a Kazakh one remains, never an error
+PASS [TG] Prep names the client language from its newest message
+PASS [TG] Assemble: the Kazakh rule rides the prompt for a Kazakh client only, after the niche block
+PASS [TG] strict Validate: Russian cards for a Kazakh client fail the set (→ the one retry), with the reason
+PASS [TG] strict Validate: Russian and mixed clients keep today's verdicts
+PASS [TG] lenient Validate 2: Russian cards are dropped when a Kazakh one remains, never an error
+PASS ТРИВИАЛЬНЫЕ agrees with ВОЗДЕРЖАНИЕ: thanks keep 4 cards, an emotional reaction is not a thank-you
+
+11 pass, 0 fail
+exit=0
+
+$ python3 Tools/n8n/tests/run_all.py
+OK   test_auth_refresh.py: 12 pass, 0 fail
+OK   test_billing_identity.py: 14 pass, 0 fail
+OK   test_claim.py: 16 pass, 0 fail
+OK   test_create_seed.py: 52 pass, 0 fail
+OK   test_harness_selfcheck.py: 2 pass, 0 fail
+OK   test_legacy_generators.py: 5 pass, 0 fail
+OK   test_reply_lost_send.py: 5 pass, 0 fail
+OK   test_reply_memory.py: 44 pass, 0 fail
+OK   test_reply_mode.py: 43 pass, 0 fail
+OK   test_reply_order.py: 44 pass, 0 fail
+OK   test_reply_reconcile.py: 66 pass, 0 fail
+OK   test_sql_comment_injection.py: 36 pass, 0 fail
+OK   test_suggest_catalog.py: 24 pass, 0 fail
+OK   test_suggest_lang.py: 11 pass, 0 fail
+OK   test_suggest_query.py: 37 pass, 0 fail
+OK   test_test_dialog.py: 17 pass, 0 fail
+OK   test_upload.py: 22 pass, 0 fail
+OK   test_verify_deployed.py: 26 pass, 0 fail
+OK   test_verify_parity.py: 36 pass, 0 fail
+OK   test_verify_sql_comments.py: 53 pass, 0 fail
+
+$ verify-telegram-parity.py → ALL PARITY ASSERTS PASSED; verify-panel-prompts.js → PASS; inject-panel-prompts.py --check (and a re-run) → up-to-date, the STAGE5-LANG block after PANEL-NICHE-PUSH-END survives; verify-sql-comments.py → OK
+
+--- staging (bootstrap re-import → verify-deployed exit 0, Suggest Replies OK)
+  OK      9PTyYcelRQI7bGDb 9PTyYcelRQI7bGDb-Suggest_Replies.json  active=True names=True graph=True published=True
+
+$ python3 Tools/n8n/staging/e2e-suggest.py
+PASS  knowledge_budget_and_server_time_reach_the_prompt (15s) — S1/S2/S7: the composed prompt carries the item DESCRIPTION, the contacts after a long description, the server clock in the bot's zone — and never the phone's clock
+      http=200 tz=bot now='2026-10-07 18:05, среда' flags=['description_truncated'] desc_in_fenced=True addr_in_fenced=True phone_clock_leaked=False
+PASS  short_follow_up_recovers_subject_and_exact_match [llm] (10s) — S4: «а сколько стоит?» after the exact model — the retrieval query carries the subject, the article is matched EXACTLY in the price list, the cards quote that price
+      http=200 query='[клиент] Нужен масляный фильтр 90915-YZZE1 на Camry 2019\n[бизнес] Есть, оригинал' tokens=['90915-YZZE1'] exact_row=True cards=['Цена масляного фильтра 90915-YZZE1 для Toyota Camr', 'Если хотите, могу оформить заказ на масляный фильт', 'Для вас есть аналог масляного фильтра, который мож', 'Дайте мне немного времени, чтобы уточнить цену и н']
+PASS  asked_item_keeps_its_conditions_in_a_long_catalog (4s) — R12: in a catalog over the 3000-char budget the ASKED bouquet reaches ДАННЫЕ with its whole description («Доставка … оплачивается отдельно»), the rest is cut with «…», and the prompt carries the rule
+      http=200 catalog_len=2970 asked_whole=True flags=['item_description_truncated'] rule='КАТАЛОГ СОКРАЩЁН: в ДАННЫЕ попала не вся информация о позици'
+PASS  exact_match_newest_article_leads (12s) — R13: after a reply listing an old code and prices, «а NEW12345?» puts NEW12345 first in the tokens and its price-list row first in exactMatches — three newer rows with an old price do not push it out, and a bare 15000 is not 150000
+      http=200/200 tokens=['NEW12345', 'AN-8201', 'P83165'] exact_head='Свеча NEW12345 Iridium Toyota — 9900 тг\n' tokens2=['15000', 'NEW12345'] exact2='Свеча NEW12345 Iridium Toyota — 9900 тг'
+PASS  burst_merge_keeps_the_newest_question (10s) — V8: history turns clamped at 500 + the whole burst (an old turn > 500, then «А NEW12345 есть?») — the deployed Prep keeps the new question newest and once, its article leads the tokens and its price-list row leads exactMatches; a multi-line turn is not doubled
+      http=200/200 trail_tail='бности машины\nА NEW12345 есть?' tokens=['NEW12345', 'OLD54321'] exact_head='Свеча NEW12345 Iridium Toyota ' multi_line_trail='Здравствуйте!\nНужен фильтр AB-11111 на Camry\nи масло 5w30\nа сколько?'
+PASS  kazakh_client_gets_kazakh_cards [llm] (8s) — V9 (panel): a Kazakh question — Prep names clientLang=kz, the prompt carries «ЯЗЫК КЛИЕНТА — КАЗАХСКИЙ» after the niche block, the strict Validate refuses a Russian card (→ the retry) and no Russian card reaches the owner when a Kazakh one exists; a mixed message is not enforced
+      http=200/200 lang=kz/mixed first_validate_ok=True violation='' kazakh_cards=4/4 russian_cards=[]
+PASS  emotional_reaction_abstains [llm] (5s) — V9 (panel): «ахаха ну ты даёшь, красавчик 😂» on a selling niche is not a thank-you — the abstain envelope (ВОЗДЕРЖАНИЕ, owner gate N2_banter_abstain), while «спасибо» still gets cards
+      http=200/200 banter_abstain=True banter_cards=[] thanks_cards=4 thanks_abstain=None
+PASS  same_request_key_is_counted_once (11s) — S3: a retry with the SAME request key (timeout / re-open) does not increment the daily counter; a new key does
+      counts after 1st/retry/new = 1/1/2 (retry must not add, a new key adds 1), keys=2
+PASS  authenticated_refusals_are_named (3s) — S8: an expired subscription and an unknown account answer with their KIND for a token-bearing caller; a bad body answers bad_request
+      expired=subscription unknown=unknown_account bad=bad_request
+PASS  legacy_caller_keeps_opaque_error (0s) — S8/N-4: a token-less legacy call (compat window) still gets only generation_failed — no account oracle
+      http=200 error=generation_failed
+PASS  execution_deadline_is_set (0s) — S3: the workflow carries a 20-s server deadline shorter than the client's 22 s
+      executionTimeout=20 (client waits 22 s)
+11 pass, 0 fail
+
+--- MEASUREMENT (paid, staging gpt-4o-mini): eval set v1.1, harness h3 — the SAME set and evaluator before and after
+$ python3 Tools/n8n/eval/run-eval.py --skip-auto --only pn_ --repeat 8 --repeat-all --label v9p-{before,after}-x8
+summary pass/flaky/fail: before 9/1/2  after 11/1/0  (error runs 0/0)
+  pn_personal_congrats     8/8 → 8/8   median ms 1292 → 1676
+  pn_emotional_reaction    0/8 → 8/8   median ms 2662 → 1445
+  pn_go_to_cinema          8/8 → 8/8   median ms 1126 → 1251
+  pn_thanks_in_business    8/8 → 8/8   median ms 2475 → 3046
+  pn_price_question        8/8 → 7/8   median ms 2802 → 3327
+  pn_kz_question           5/8 → 8/8   median ms 3494 → 4659   cards: kz 19/32 ru 13/32 → kz 32/32 ru 0/32
+  pn_autoparts_no_car      0/8 → 8/8   median ms 3144 → 3666
+  pn_installment_kaspi     8/8 → 8/8   median ms 3183 → 4195
+  pn_mixed_lang            8/8 → 8/8   median ms 3564 → 3985   cards: kz 7/32 ru 25/32 → kz 17/32 ru 15/32
+  pn_complaint             8/8 → 8/8   median ms 3825 → 3500
+  pn_spam                  8/8 → 8/8   median ms 1041 → 1340
+  pn_media_only            8/8 → 8/8   median ms 2062 → 1422
+  pn_autoparts_no_car 0/8 before: the composed prompt+data are byte-identical to d7796c32, where it passed 3/3 (model drift, not V8);
+  pn_price_question 7/8 after: the one failed card says «18,000 тг» — a grounded price the h3 check misreads (comma separator), an evaluator artifact
+
+--- probe-suggest-replies.py checks, repeated (probe_repeat: same payloads/checks), time-separated: before = HEAD (V8) imported, after = V9
+before x8:
+{
+ "J2_hours_closed_now": {
+  "n": 8,
+  "struct_fail": 0,
+  "not_claiming_open": "8/8",
+  "mentions_reopen": "0/8"
+ },
+ "P_autoparts_intake": {
+  "n": 8,
+  "struct_fail": 0,
+  "card1_clarifies": "7/8",
+  "card1_asks_car": "7/8",
+  "no_price_before_car_known": "7/8"
+ },
+ "A_absent_item": {
+  "n": 8,
+  "struct_fail": 0,
+  "no_flat_stock_denial": "3/8"
+ },
+ "G_kazakh_mirror": {
+  "n": 8,
+  "struct_fail": 0,
+  "whole_cards_kazakh": "8/8",
+  "every_card_kazakh_v9": "8/8",
+  "max_one_greeting": "1/8"
+ },
+ "F_trivial_thanks_variants": {
+  "n": 8,
+  "struct_fail": 0,
+  "four_variant_cards": "8/8",
+  "distinct_titles": "8/8",
+  "not_echoing_spasibo": "3/8",
+  "no_sales_pitch_on_thanks": "8/8"
+ },
+ "N2_banter_abstain": {
+  "n": 8,
+  "abstain": "8/8"
+ },
+ "N4_banter_kaspi_abstain": {
+  "n": 8,
+  "abstain": "6/8"
+ }
+}
+after x8:
+{
+ "J2_hours_closed_now": {
+  "n": 8,
+  "struct_fail": 0,
+  "not_claiming_open": "8/8",
+  "mentions_reopen": "2/8"
+ },
+ "P_autoparts_intake": {
+  "n": 8,
+  "struct_fail": 0,
+  "card1_clarifies": "5/8",
+  "card1_asks_car": "5/8",
+  "no_price_before_car_known": "5/8"
+ },
+ "A_absent_item": {
+  "n": 8,
+  "struct_fail": 0,
+  "no_flat_stock_denial": "6/8"
+ },
+ "G_kazakh_mirror": {
+  "n": 8,
+  "struct_fail": 0,
+  "whole_cards_kazakh": "8/8",
+  "every_card_kazakh_v9": "8/8",
+  "max_one_greeting": "2/8"
+ },
+ "F_trivial_thanks_variants": {
+  "n": 8,
+  "struct_fail": 0,
+  "four_variant_cards": "8/8",
+  "distinct_titles": "8/8",
+  "not_echoing_spasibo": "6/8",
+  "no_sales_pitch_on_thanks": "8/8"
+ },
+ "N2_banter_abstain": {
+  "n": 8,
+  "abstain": "8/8"
+ },
+ "N4_banter_kaspi_abstain": {
+  "n": 8,
+  "abstain": "8/8"
+ }
+}
+before x16:
+{
+ "P_autoparts_intake": {
+  "n": 16,
+  "struct_fail": 0,
+  "card1_clarifies": "8/16",
+  "card1_asks_car": "8/16",
+  "no_price_before_car_known": "8/16"
+ },
+ "F_trivial_thanks_variants": {
+  "n": 16,
+  "struct_fail": 0,
+  "four_variant_cards": "16/16",
+  "distinct_titles": "16/16",
+  "not_echoing_spasibo": "8/16",
+  "no_sales_pitch_on_thanks": "16/16"
+ }
+}
+after x16:
+{
+ "P_autoparts_intake": {
+  "n": 16,
+  "struct_fail": 0,
+  "card1_clarifies": "4/16",
+  "card1_asks_car": "4/16",
+  "no_price_before_car_known": "4/16"
+ },
+ "F_trivial_thanks_variants": {
+  "n": 16,
+  "struct_fail": 0,
+  "four_variant_cards": "16/16",
+  "distinct_titles": "16/16",
+  "not_echoing_spasibo": "8/16",
+  "no_sales_pitch_on_thanks": "16/16"
+ }
+}
+
+--- INTERLEAVED A/B in one time window (A = HEAD code on a temporary staging-only webhook SuggestRepliesAB, B = V9; order shuffled per pair; temporary workflow deleted)
+{
+ "n": 20,
+ "results": {
+  "A_head": {
+   "P_autoparts_intake": {
+    "card1_clarifies": 9,
+    "card1_asks_car": 9,
+    "no_price_before_car_known": 9
+   },
+   "F_trivial_thanks_variants": {
+    "four_variant_cards": 17,
+    "distinct_titles": 17,
+    "not_echoing_spasibo": 6,
+    "no_sales_pitch_on_thanks": 17
+   },
+   "eval:pn_autoparts_no_car": {
+    "cards_first_clarifies": 9,
+    "cards_first_no_price": 9
+   }
+  },
+  "B_v9": {
+   "P_autoparts_intake": {
+    "card1_clarifies": 12,
+    "card1_asks_car": 12,
+    "no_price_before_car_known": 12
+   },
+   "F_trivial_thanks_variants": {
+    "four_variant_cards": 17,
+    "distinct_titles": 17,
+    "not_echoing_spasibo": 8,
+    "no_sales_pitch_on_thanks": 17
+   },
+   "eval:pn_autoparts_no_car": {
+    "cards_first_clarifies": 15,
+    "cards_first_no_price": 15
+   }
+  }
+ }
+}
+temporary workflow 9q2CcjSoKxYKHzwT deleted
+Reading: the time-separated P_autoparts dip (15/24 → 9/24) does not survive the same-window A/B (A 9/20, B 12/20; eval pn_autoparts_no_car A 9/20, B 15/20) — drift between runs, not the change. Thanks keep 4 cards (17/20 both), «not echoing спасибо» 6 → 8/20, no sales pitch 17/20 both.

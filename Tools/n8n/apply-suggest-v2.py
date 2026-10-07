@@ -13,10 +13,15 @@
              V8 (2026-09-28): the history × burst merge (the BATCH-03 legacy section, now owned between STAGE5-MERGE
              markers) aligns the clamped history turns and the unclamped burst lines in conversation ORDER — a turn
              > 500, a multi-line turn or a bare media caption no longer lands after the newest question.
+             V9 (2026-09-28, panel part): `clientLang` from the newest client message (kz / mixed / ru).
   Gate     — the daily counter is idempotent per request key (a timeout retry is not a second request).
   RAG      — the vector-store nodes fail OPEN (a search error is not «позиции нет»); an `Exact Match`
              Postgres lookup runs only when SKU-like tokens exist.
   Assemble — knowledge block + incompleteness flags, exact matches, RAG-error notice, zone hedge.
+             V9: «ЯЗЫК КЛИЕНТА — КАЗАХСКИЙ» after the niche block for a Kazakh client; ТРИВИАЛЬНЫЕ no longer overrides
+             ВОЗДЕРЖАНИЕ (an emotional reaction without a request is not a thank-you).
+  Validate — V9: a Kazakh client's Russian card fails the set before the one retry (strict); Validate 2 drops Russian
+             cards when a Kazakh one remains, never an error (lenient) — the same asymmetry as the titles.
   Build Response — for an authenticated caller the refusal kind rides the wire (subscription / daily
              cap / unknown account / bad request); legacy callers keep the opaque generation_failed.
   Settings — executionTimeout 20 s (needs EXECUTIONS_TIMEOUT on the instance).
@@ -138,6 +143,22 @@ const newestFirst = (parts, max) => {
 };
 const trailParts = newestFirst(runParts, TRAIL_BUDGET);   // a long series keeps its NEWEST messages (also lastClientMessage)
 const trailingText = trailParts.join('\n');
+// V9 (2026-09-28): the client's language, from its NEWEST message (the run when that one has no letters — an emoji):
+// 'kz' = a Kazakh-specific letter and no Russian-only word, 'mixed' = both, 'ru' = no Kazakh-specific letter (Kazakh
+// written without them — «Салем, бар ма?» — stays unenforced: the СТИЛЬ rule still asks for the client's language).
+// Only 'kz' is enforced (Assemble's rule + the strict Validate); a mixed message keeps today's behaviour.
+const KZ_LETTER = /[әғқңөұүһі]/i;
+const RU_ONLY = new Set(['сколько', 'что', 'как', 'есть', 'это', 'можно', 'нужно', 'нужен', 'нужна', 'нужны', 'где', 'когда', 'почему',
+  'пожалуйста', 'спасибо', 'здравствуйте', 'привет', 'вы', 'вас', 'мне', 'меня', 'мы', 'я', 'и', 'в', 'на', 'за', 'с', 'по', 'для', 'из',
+  'или', 'но', 'еще', 'ещё', 'какой', 'какая', 'какие', 'цена', 'стоит', 'стоимость', 'если', 'уже', 'только', 'очень', 'хочу', 'будет',
+  'ли', 'вот', 'тоже', 'сейчас', 'сегодня', 'завтра']);
+const langOf = (s) => {
+  const words = String(s || '').toLowerCase().match(/\p{L}+/gu) || [];
+  if (!words.some(w => KZ_LETTER.test(w))) return 'ru';
+  return words.some(w => RU_ONLY.has(w)) ? 'mixed' : 'kz';
+};
+const newestTurn = trailParts.length ? trailParts[trailParts.length - 1] : '';
+const clientLang = langOf(/\p{L}/u.test(newestTurn) ? newestTurn : trailingText);
 const FOLLOW_UP = /^(а |и |ну |да,? |ок,? |хорошо,? )?(сколько|скок|цена|стоит|почём|почем|есть|наличи|можно|когда|где|какой|какая|какие|такой|такая|это|эта|этот|его|её|их|подойд|подход|доставк|срок)/i;
 const wordCount = trailingText.trim().split(/\s+/).filter(Boolean).length;
 const isShort = trailingText.trim().length <= 40 || wordCount <= 4 || FOLLOW_UP.test(trailingText.trim());
@@ -296,13 +317,22 @@ PREP_RETURN_OLD = """return [{ json: {
   botWaId, botTgId, channel, businessTypeId, businessName, ownerPrompt, catalog, businessKnowledge, now, pickStats,
   steerTowardText, lastIncomingText, messages, queryText, skipRag
 } }];"""
-PREP_RETURN_NEW = """return [{ json: {
+PREP_RETURN_V1 = """return [{ json: {
   v: 1, requestSeq, invalid, appUserId,
   profileId: String(b.profileId || ''),
   chatId: String(b.chatId || ''),
   botWaId, botTgId, channel, businessTypeId, businessName, ownerPrompt, catalog, businessKnowledge, now: serverNow, pickStats,
   steerTowardText, lastIncomingText, messages, queryText, trailingText, skipRag,
   knowledgeFlags: flags, contactsText, documentsCount, knowledgeVersion, tz, tzSource, exactTokens, requestKey
+} }];"""
+# V9: + clientLang (Assemble's language rule, the validators)
+PREP_RETURN_NEW = """return [{ json: {
+  v: 1, requestSeq, invalid, appUserId,
+  profileId: String(b.profileId || ''),
+  chatId: String(b.chatId || ''),
+  botWaId, botTgId, channel, businessTypeId, businessName, ownerPrompt, catalog, businessKnowledge, now: serverNow, pickStats,
+  steerTowardText, lastIncomingText, messages, queryText, trailingText, skipRag,
+  knowledgeFlags: flags, contactsText, documentsCount, knowledgeVersion, tz, tzSource, exactTokens, requestKey, clientLang
 } }];"""
 
 # V1 (2026-09-28): an SQL comment never names a parameter as `$` + digit — pg-promise fills `$N` inside comments too
@@ -431,6 +461,57 @@ ASSEMBLE_FENCED_NEW = """  exactMatches: exactMatches,
   documents: p.documentsCount || 0
 };"""
 
+# V9 (iteration 2026-09-28, panel part): ТРИВИАЛЬНЫЕ ended with «воздержание только для сообщений не по адресу бизнеса»,
+# which contradicted ВОЗДЕРЖАНИЕ's own example (the owner's N2_banter_abstain gate, 68e1f3eb) — gpt-4o-mini followed the
+# LAST rule and answered «ахаха ну ты даёшь, красавчик 😂» like a thank-you. Narrowed to agree; the policy is unchanged.
+TRIVIAL_TAIL_OLD = "Это ответ клиенту бизнеса, НЕ повод для пустого массива — воздержание только для сообщений не по адресу бизнеса.');"
+TRIVIAL_TAIL_NEW = ("Благодарность, «ок» и подтверждение — ответ клиенту бизнеса, НЕ повод для пустого массива. Но шутка, комплимент или "
+                    "эмоциональная реакция без вопроса, просьбы и благодарности («ахаха ну ты даёшь, красавчик 😂») — не благодарность: "
+                    "для неё действует ВОЗДЕРЖАНИЕ, карточек нет.');")
+# V9: the СТИЛЬ rule (the client's language) sat mid-prompt, before the niche block's Russian quotes and the Russian ДАННЫЕ,
+# and nothing enforced it — a Kazakh question got four Russian cards. For a Kazakh client: a rule AFTER the niche block…
+NICHE_PUSH_END = "// PANEL-NICHE-PUSH-END\n"
+ASSEMBLE_LANG_BEGIN, ASSEMBLE_LANG_END = "// STAGE5-LANG-BEGIN", "// STAGE5-LANG-END"
+ASSEMBLE_LANG = """// STAGE5-LANG-BEGIN (generated by Tools/n8n/apply-suggest-v2.py — edit there)
+if (p.clientLang === 'kz') { L.push(''); L.push('ЯЗЫК КЛИЕНТА — КАЗАХСКИЙ: text КАЖДОЙ карточки целиком по-казахски (цифры, артикулы и названия позиций из ДАННЫЕ — как есть; русские формулировки из правил выше и из НИШИ передай по смыслу по-казахски); label — по-русски, это заголовок для владельца. Карточка с русским text будет отклонена.'); }
+// STAGE5-LANG-END
+"""
+# …and the validators: STRICT before the one retry (a Russian card fails the set, the reason reaches LLM Retry), LENIENT
+# after it (Russian cards are dropped when a Kazakh one remains, otherwise all are kept — never an error): the same
+# asymmetry as the titles. A card is «Russian» when it has no Kazakh-specific letter in three or more Cyrillic words, so a
+# short «Бар, 35000 тг» does not fail a set.
+VALIDATE_LANG_BEGIN, VALIDATE_LANG_END = "// STAGE5-LANG-VALIDATE-BEGIN", "// STAGE5-LANG-VALIDATE-END"
+LANG_HELPERS = """// STAGE5-LANG-VALIDATE-BEGIN (generated by Tools/n8n/apply-suggest-v2.py — edit there)
+// V9: a Kazakh client (Prep.clientLang) gets Kazakh card texts; label stays Russian (owner-facing)
+let clientLang = 'ru';
+try { clientLang = String($('Prep').first().json.clientLang || 'ru'); } catch (e) { clientLang = 'ru'; }
+const notKazakh = (s) => !/[әғқңөұүһі]/i.test(String(s)) && (String(s).match(/[а-яё]+/gi) || []).length >= 3;
+"""
+VALIDATE_OLD = """const ok = abstain || (parsedOk && items.length >= 1 && items.length <= 4 && allValid && distinct);
+let violation = '';
+if (!ok) {
+  if (!parsedOk) violation = 'ответ не распознан';
+  else if (items.length > 4) violation = 'больше 4 вариантов, получено ' + items.length;
+  else if (!allValid) violation = 'ход вне списка, пустой текст или пустой заголовок';
+  else violation = 'заголовки повторяются — все label должны быть разными';
+}"""
+VALIDATE_NEW = LANG_HELPERS + """const langOk = clientLang !== 'kz' || !items.some(i => notKazakh(i.text));
+const ok = abstain || (parsedOk && items.length >= 1 && items.length <= 4 && allValid && distinct && langOk);
+let violation = '';
+if (!ok) {
+  if (!parsedOk) violation = 'ответ не распознан';
+  else if (items.length > 4) violation = 'больше 4 вариантов, получено ' + items.length;
+  else if (!allValid) violation = 'ход вне списка, пустой текст или пустой заголовок';
+  else if (!distinct) violation = 'заголовки повторяются — все label должны быть разными';
+  else violation = 'карточки не на языке клиента: клиент пишет по-казахски — text КАЖДОЙ карточки целиком по-казахски (label по-русски)';
+}
+// STAGE5-LANG-VALIDATE-END"""
+VALIDATE2_OLD = "items = kept.slice(0, 4);\n"
+VALIDATE2_NEW = LANG_HELPERS + """if (clientLang === 'kz') { const kz = kept.filter(i => !notKazakh(i.text)); if (kz.length) kept.splice(0, kept.length, ...kz); }
+items = kept.slice(0, 4);
+// STAGE5-LANG-VALIDATE-END
+"""
+
 BUILD_OLD = """if (j.invalid || !j.ok) {
   // Task 17a: a subscription/cap refusal reuses the EXISTING error envelope the client
   // already renders, and NOTHING MORE. The gate's `gateReason` deliberately does NOT ride
@@ -468,6 +549,13 @@ def node(wf, name):
     return next((n for n in wf["nodes"] if n["name"] == name), None)
 
 
+def splice(js, begin, end, block):
+    """Replace the marker-wrapped region [begin … end] of `js` with `block` (which carries both markers)."""
+    a, b_ = js.index(begin), js.index(end) + len(end)
+    body = block[:block.index(end) + len(end)]
+    return js[:a] + body + js[b_:]
+
+
 def set_edges(wf, src, outputs):
     want = {"main": [[{"node": t, "type": "main", "index": 0} for t in outs] for outs in outputs]}
     if wf["connections"].get(src) != want:
@@ -500,6 +588,8 @@ def patch():
         new = new.replace(anchor, PREP_BLOCK + "\n" + anchor)
     if PREP_RETURN_OLD in new:
         new = new.replace(PREP_RETURN_OLD, PREP_RETURN_NEW)
+    if PREP_RETURN_V1 in new:                       # V9: an already-migrated Prep gains clientLang
+        new = new.replace(PREP_RETURN_V1, PREP_RETURN_NEW)
     # V8: the history × burst merge (owned between markers; the legacy hand-written text is replaced exactly once)
     if MERGE_BEGIN in new:
         a, b_ = new.index(MERGE_BEGIN), new.index(MERGE_END) + len(MERGE_END)
@@ -560,11 +650,33 @@ def patch():
         new = new.replace(ASSEMBLE_TIME_OLD, ASSEMBLE_TIME_NEW)
     if ASSEMBLE_FENCED_OLD in new:
         new = new.replace(ASSEMBLE_FENCED_OLD, ASSEMBLE_FENCED_NEW)
-    for frag in ("STAGE5-ASSEMBLE-BEGIN", CATALOG_LINE_V2, "серверные часы", "exactMatches: exactMatches"):
+    # V9 (panel): ТРИВИАЛЬНЫЕ agrees with ВОЗДЕРЖАНИЕ; the Kazakh rule right after the niche block
+    if TRIVIAL_TAIL_OLD in new:
+        new = new.replace(TRIVIAL_TAIL_OLD, TRIVIAL_TAIL_NEW)
+    if ASSEMBLE_LANG_BEGIN in new:
+        new = splice(new, ASSEMBLE_LANG_BEGIN, ASSEMBLE_LANG_END, ASSEMBLE_LANG)
+    else:
+        assert new.count(NICHE_PUSH_END) == 1, "Assemble: the PANEL-NICHE-PUSH-END marker (inject-panel-prompts.py) is missing"
+        new = new.replace(NICHE_PUSH_END, NICHE_PUSH_END + ASSEMBLE_LANG)
+    for frag in ("STAGE5-ASSEMBLE-BEGIN", CATALOG_LINE_V2, "серверные часы", "exactMatches: exactMatches", TRIVIAL_TAIL_NEW, ASSEMBLE_LANG):
         assert frag in new, f"Assemble: {frag} missing"
+    assert TRIVIAL_TAIL_OLD not in new and new.index(NICHE_PUSH_END) < new.index(ASSEMBLE_LANG_BEGIN), "Assemble: V9 shape"
     if new != js:
         asm["parameters"]["jsCode"] = new
         ch = True
+    # V9 (panel): the language is enforced — strict before the retry, lenient after it
+    for name, old_, block in (("Validate", VALIDATE_OLD, VALIDATE_NEW), ("Validate 2", VALIDATE2_OLD, VALIDATE2_NEW)):
+        vn = node(wf, name)
+        js = vn["parameters"]["jsCode"]
+        if VALIDATE_LANG_BEGIN in js:
+            new = splice(js, VALIDATE_LANG_BEGIN, VALIDATE_LANG_END, block)
+        else:
+            assert js.count(old_) == 1, f"{name}: the V9 anchor is not where it is expected"
+            new = js.replace(old_, block)
+        assert block in new, f"{name}: V9 block missing"
+        if new != js:
+            vn["parameters"]["jsCode"] = new
+            ch = True
     # Build Response
     br = node(wf, "Build Response")
     js = br["parameters"]["jsCode"]
@@ -590,6 +702,8 @@ def check():
         and node(wf, "Suggestion Gate")["parameters"]["query"] == GATE_SQL and node(wf, "Exact Match") is not None \
         and node(wf, "Exact Match")["parameters"]["query"] == EXACT_SQL and "STAGE5-ASSEMBLE-BEGIN" in node(wf, "Assemble")["parameters"]["jsCode"] and CATALOG_LINE_V2 in node(wf, "Assemble")["parameters"]["jsCode"] \
         and "S8 (stage 5)" in node(wf, "Build Response")["parameters"]["jsCode"] and wf.get("settings", {}).get("executionTimeout") == EXECUTION_TIMEOUT_SEC \
+        and TRIVIAL_TAIL_NEW in node(wf, "Assemble")["parameters"]["jsCode"] and ASSEMBLE_LANG in node(wf, "Assemble")["parameters"]["jsCode"] \
+        and VALIDATE_NEW in node(wf, "Validate")["parameters"]["jsCode"] and VALIDATE2_NEW in node(wf, "Validate 2")["parameters"]["jsCode"] \
         and all(node(wf, n).get("onError") == "continueRegularOutput" for n in ("Retrieve RAG", "Retrieve RAG TG"))
     return ok
 

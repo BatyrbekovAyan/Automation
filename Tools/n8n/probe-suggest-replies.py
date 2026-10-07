@@ -139,6 +139,8 @@ PROBES = [
         [m("client", "сәлеметсіз бе, 25 раушан гүлінен жасалған букет қанша тұрады?")]), [
         ("whole_cards_kazakh", lambda c: sum(
             1 for x in c if re.search(r"[әіңғүұқөһ]", x["text"].lower())) >= 3),
+        # V9: the strict Validate refuses a Russian card for a Kazakh client, Validate 2 drops it after the retry
+        ("every_card_kazakh_v9", lambda c: all(re.search(r"[әіңғүұқөһ]", x["text"].lower()) for x in c)),
         ("max_one_greeting", lambda c: sum(
             1 for x in c if re.match(r"^(сәлем|салем|здравствуй|добрый)", x["text"].strip().lower())) <= 1),
     ]),
@@ -180,6 +182,10 @@ ABSTAIN_PROBES = [
         [m("client", "братан ну что, идём сегодня на футбол вечером? все наши собираются")])),
     ("N2_banter_abstain", base("flowers", "Цветы Астана", FLOWER_CAT,
         [m("client", "ахахах ну ты дал, красавчик 😂")])),
+    # V9 (2026-09-28): the same banter on a SELLING niche — before the ТРИВИАЛЬНЫЕ narrowing gpt-4o-mini read it as a
+    # thank-you and kaspi_seller added a sale («Ждем вас в магазине на Kaspi!»), eval pn_emotional_reaction 0/3
+    ("N4_banter_kaspi_abstain", base("kaspi_seller", "TechStore KZ", KASPI_CAT,
+        [m("client", "ахаха ну ты даёшь, красавчик 😂")])),
     ("N3_wrong_recipient_abstain", base("kaspi_seller", "TechStore KZ", KASPI_CAT,
         [m("client", "ой, извините, это сообщение не вам")])),
 ]

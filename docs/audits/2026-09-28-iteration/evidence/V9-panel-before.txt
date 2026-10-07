@@ -1,0 +1,44 @@
+V9 (panel) — before: HEAD f868f1e0 canonical Suggest Replies (new Tools/n8n/tests/test_suggest_lang.py)
+$ python3 Tools/n8n/tests/test_suggest_lang.py
+FAIL [WA] Prep names the client language from its newest message
+      - kz question → None
+      - mixed question → None
+      - russian question → None
+      - a Kazakh question after a Russian turn → None
+      - a Russian question after a Kazakh one → None
+      - an emoji after a Kazakh question keeps the run's language → None
+FAIL [WA] Assemble: the Kazakh rule rides the prompt for a Kazakh client only, after the niche block
+      - no Kazakh rule for a Kazakh client
+      - the rule must keep label Russian (owner-facing): ''
+      - EXCEPTION ValueError: substring not found
+FAIL [WA] strict Validate: Russian cards for a Kazakh client fail the set (→ the one retry), with the reason
+      - ok=True violation=''
+      - one Russian card among Kazakh ones must still fail: ok=True
+PASS [WA] strict Validate: Russian and mixed clients keep today's verdicts
+FAIL [WA] lenient Validate 2: Russian cards are dropped when a Kazakh one remains, never an error
+      - items=[{'text': 'Сәлеметсіз бе! iPhone 11 экранын ауыстыру 35000 тг, нақты баға диагностикадан кейін.', 'label': 'Цена', 'move': 'Ответ'}, {'text': 'Телефоныңыздың моделін нақтылап жібересіз бе?', 'label': 'Модель', 'move': 'Уточнить'}, {'text': 'Можете привезти сегодня, мастер посмотрит.', 'label': 'Привезти', 'move': 'К заказу'}, {'text': 'Проверю наличие экрана и напишу через 15 минут.', 'label': 'Пауза', 'move': 'Отложить'}]
+      - title dedupe + language filter: [{'text': 'Сәлеметсіз бе! iPhone 11 экранын ауыстыру 35000 тг, нақты баға диагностикадан кейін.', 'label': 'Цена', 'move': 'Ответ'}, {'text': 'Можете привезти сегодня, мастер посмотрит.', 'label': 'Привезти', 'move': 'К заказу'}]
+FAIL [TG] Prep names the client language from its newest message
+      - kz question → None
+      - mixed question → None
+      - russian question → None
+      - a Kazakh question after a Russian turn → None
+      - a Russian question after a Kazakh one → None
+      - an emoji after a Kazakh question keeps the run's language → None
+FAIL [TG] Assemble: the Kazakh rule rides the prompt for a Kazakh client only, after the niche block
+      - no Kazakh rule for a Kazakh client
+      - the rule must keep label Russian (owner-facing): ''
+      - EXCEPTION ValueError: substring not found
+FAIL [TG] strict Validate: Russian cards for a Kazakh client fail the set (→ the one retry), with the reason
+      - ok=True violation=''
+      - one Russian card among Kazakh ones must still fail: ok=True
+PASS [TG] strict Validate: Russian and mixed clients keep today's verdicts
+FAIL [TG] lenient Validate 2: Russian cards are dropped when a Kazakh one remains, never an error
+      - items=[{'text': 'Сәлеметсіз бе! iPhone 11 экранын ауыстыру 35000 тг, нақты баға диагностикадан кейін.', 'label': 'Цена', 'move': 'Ответ'}, {'text': 'Телефоныңыздың моделін нақтылап жібересіз бе?', 'label': 'Модель', 'move': 'Уточнить'}, {'text': 'Можете привезти сегодня, мастер посмотрит.', 'label': 'Привезти', 'move': 'К заказу'}, {'text': 'Проверю наличие экрана и напишу через 15 минут.', 'label': 'Пауза', 'move': 'Отложить'}]
+      - title dedupe + language filter: [{'text': 'Сәлеметсіз бе! iPhone 11 экранын ауыстыру 35000 тг, нақты баға диагностикадан кейін.', 'label': 'Цена', 'move': 'Ответ'}, {'text': 'Можете привезти сегодня, мастер посмотрит.', 'label': 'Привезти', 'move': 'К заказу'}]
+FAIL ТРИВИАЛЬНЫЕ agrees with ВОЗДЕРЖАНИЕ: thanks keep 4 cards, an emotional reaction is not a thank-you
+      - the old tail «воздержание только для сообщений не по адресу бизнеса» still overrides ВОЗДЕРЖАНИЕ
+      - the reaction must route to ВОЗДЕРЖАНИЕ: 'ТРИВИАЛЬНЫЕ СООБЩЕНИЯ: на «спасибо»/«ок»/подтверждение дай 4 коротких варианта разного тона и длины. Первое слово каждой карточки — НЕ «Спасибо» (благодарит клиент, а не ты). Содержание — ответ НА благодарность: «пожалуйста», «рады помочь», «обращайтесь», тёплое завершение диалога. НЕ предлагай товары, цены и акции в ответ на «спасибо»; мягкий следующий шаг уместен, только если сделка уже в процессе («Ждём вас завтра к 12:00»). Это ответ клиенту бизнеса, НЕ повод для пустого массива — воздержание только для сообщений не по адресу бизнеса.'
+
+2 pass, 9 fail
+exit=1

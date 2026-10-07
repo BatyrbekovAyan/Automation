@@ -193,6 +193,44 @@ def burst_merge(ctx):
         psql(f"delete from documents where metadata->>'fileId' = '{tag}';")
 
 
+KZ_LETTER = re.compile(r"[әғқңөұүһі]", re.I)
+
+
+@scenario("kazakh_client_gets_kazakh_cards [llm]", "V9 (panel): a Kazakh question — Prep names clientLang=kz, the prompt carries «ЯЗЫК КЛИЕНТА — КАЗАХСКИЙ» after the niche block, the strict Validate refuses a Russian card (→ the retry) and no Russian card reaches the owner when a Kazakh one exists; a mixed message is not enforced")
+def kazakh_cards(ctx):
+    owner, pid = owner_for(ctx)
+    know = knowledge([{"kind": "service", "name": "Замена экрана iPhone 11", "price": "35000 тг", "description": "Оригинальный дисплей, 2 часа"}],
+                     {"phone": "+7 777 000 11 22"}, "Ремонт телефонов", "Asia/Almaty", 0)
+    st, d, ex = call(owner, payload(owner, pid, [m("client", "iPhone 11 экранын ауыстыру қанша тұрады?")], know=know, bot_wa="-1", vertical="phone_repair"))
+    prep = node_output(ex, "Prep") or {}
+    sysp = (node_output(ex, "Assemble") or {}).get("systemPrompt", "")
+    v1 = node_output(ex, "Validate") or {}
+    cards = (d or {}).get("suggestions") or []
+    russian = [c.get("text", "") for c in cards if not KZ_LETTER.search(c.get("text", "")) and len(re.findall(r"[а-яё]+", c.get("text", ""), re.I)) >= 3]
+    kazakh = [c for c in cards if KZ_LETTER.search(c.get("text", ""))]
+    st2, d2, ex2 = call(owner, payload(owner, pid, [m("client", "Сәлем! экран бар ма, сколько за замену?")], know=know, bot_wa="-1", vertical="phone_repair"))
+    prep2 = node_output(ex2, "Prep") or {}
+    sysp2 = (node_output(ex2, "Assemble") or {}).get("systemPrompt", "")
+    ok = (st == 200 and prep.get("clientLang") == "kz" and "ЯЗЫК КЛИЕНТА — КАЗАХСКИЙ" in sysp and sysp.index("НИША (") < sysp.index("ЯЗЫК КЛИЕНТА")
+          and bool(kazakh) and not russian and st2 == 200 and prep2.get("clientLang") == "mixed" and "ЯЗЫК КЛИЕНТА" not in sysp2)
+    return ok, (f"http={st}/{st2} lang={prep.get('clientLang')}/{prep2.get('clientLang')} first_validate_ok={v1.get('ok')} "
+                f"violation={v1.get('violation', '')[:40]!r} kazakh_cards={len(kazakh)}/{len(cards)} russian_cards={russian[:1]}")
+
+
+@scenario("emotional_reaction_abstains [llm]", "V9 (panel): «ахаха ну ты даёшь, красавчик 😂» on a selling niche is not a thank-you — the abstain envelope (ВОЗДЕРЖАНИЕ, owner gate N2_banter_abstain), while «спасибо» still gets cards")
+def banter_abstains(ctx):
+    owner, pid = owner_for(ctx)
+    know = knowledge([{"kind": "product", "name": "Наушники JBL Tune 510", "price": "18990 тг", "description": ""}], {}, "Магазин электроники на Kaspi", "Asia/Almaty", 0)
+    st, d, ex = call(owner, payload(owner, pid, [m("client", "ахаха ну ты даёшь, красавчик 😂")], know=know, bot_wa="-1", vertical="kaspi_seller"))
+    trivial = next((l for l in (node_output(ex, "Assemble") or {}).get("systemPrompt", "").split("\n") if l.startswith("ТРИВИАЛЬНЫЕ")), "")
+    msgs = [m("client", "наушники JBL есть?", 1), m("business", "Да, 18990 тг.", 2), m("client", "спасибо", 3)]
+    st2, d2, _ = call(owner, payload(owner, pid, msgs, know=know, bot_wa="-1", vertical="kaspi_seller"))
+    ok = (st == 200 and d.get("abstain") is True and not (d.get("suggestions") or []) and "эмоциональная реакция" in trivial
+          and st2 == 200 and not d2.get("abstain") and 1 <= len(d2.get("suggestions") or []) <= 4)
+    return ok, (f"http={st}/{st2} banter_abstain={d.get('abstain')} banter_cards={[c.get('text', '')[:40] for c in (d.get('suggestions') or [])]} "
+                f"thanks_cards={len(d2.get('suggestions') or [])} thanks_abstain={d2.get('abstain')}")
+
+
 @scenario("same_request_key_is_counted_once", "S3: a retry with the SAME request key (timeout / re-open) does not increment the daily counter; a new key does")
 def idempotent_count(ctx):
     owner, pid = owner_for(ctx)
