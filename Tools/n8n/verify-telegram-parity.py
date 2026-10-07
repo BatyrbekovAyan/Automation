@@ -256,8 +256,9 @@ CANON_WAPPI_CRED = "EuhhqAaV56DpoqAN"        # httpHeaderAuth ("WappiAuthToken")
 # CANON_POSTGRES_CRED reuses PG_EXECUTEQUERY_CRED (vvRrFiEXzLVqKjOx), already defined above —
 # single source of truth rather than a second literal that could drift from it.
 
-API_NODE_NAMES = ("Get Sample Workflow", "Create Workflow", "Activate Created Workflow",
-                  "Delete Unseeded Workflow")   # R8 (2026-09-27, apply-reply-mode-v2.py): an unseeded clone is deleted
+# R8-deletefail (2026-09-28, apply-reply-mode-v2.py): `Delete Unseeded Workflow` is RETIRED — the seed gate now stands
+# before the clone is created, so a refused create has no clone to delete (verify-reply-mode.py pins the topology).
+API_NODE_NAMES = ("Get Sample Workflow", "Create Workflow", "Activate Created Workflow")
 WAPPI_NODE_NAMES = ("Set Wappi Webhook", "Set Wappi Webhook Types", "Delete Refused Profile")
 POSTGRES_NODE_NAMES = (
     "Restamp RAG Chunks", "Ensure Subscriber", "Count Channels",

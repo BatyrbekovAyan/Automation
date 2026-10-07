@@ -10,18 +10,28 @@ Set Reply Mode (SCLcpn6DMDG3Z4VN):
   * Shape Response — `{success:true, chatId, requestedVersion, allApplied, applied:[...], written}` or
     `{success:false,error:"db_error"}` with HTTP 500; malformed body → HTTP 400 (was 200 + success:false).
 Create WhatsApp/Telegram workflow:
-  * `Seed Reply Mode` between `Get Created Workflow Id` and `Activate Created Workflow`: the profile's
-    initial '*' row lands BEFORE the clone can auto-reply (the gate reads absence as «reply»). Only
-    a client that states `ReplyMode` (semi|auto) writes; a legacy client keeps the old semantics.
-  * R8 (2026-09-27): activation is gated on a POSITIVE marker. The seed statement answers one row
-    `seeded = true` whenever it completed (retried up to 3× on failure); `Seed Saved?` lets the clone
-    go live only on that marker — or when the create is not «Вместе» (auto / legacy: absence IS their
-    mode, a seed failure must not refuse them). Otherwise `Delete Unseeded Workflow` removes the clone
-    (never activated, no Wappi webhook, not bound) and `Respond Reply Mode Not Saved` answers
+  * `Seed Reply Mode` writes the profile's initial '*' row BEFORE the clone can auto-reply (the gate reads
+    absence as «reply»). Only a client that states `ReplyMode` (semi|auto) writes; a legacy client keeps
+    the old semantics.
+  * R8 (2026-09-27): going live is gated on a POSITIVE marker. The seed statement answers one row
+    `seeded = true` whenever it completed (retried up to 3× on failure); `Seed Saved?` lets the create go
+    on only on that marker — or when the create is not «Вместе» (auto / legacy: absence IS their mode, a
+    seed failure must not refuse them). Otherwise `Respond Reply Mode Not Saved` answers
     {success:false, error:"reply_mode_not_saved"} — the client's existing failure contract (no "id").
     Why a marker and not continueErrorOutput: an error thrown outside the query runner passes the INPUT
     item on output 0 (n8n-core), and an empty result becomes {} under alwaysOutputData — both would
-    still reach Activate. Behaviour pinned by tests/test_create_seed.py.
+    still go on.
+  * R8-deletefail (iteration 2026-09-28): the seed + gate stand BEFORE `Get Sample Workflow`, i.e. before
+    the clone exists — every entry into the clone chain (`Register Profile`, the legacy `If Has
+    AppUserID?` false branch) goes through them, and `Seed Saved?`[0] is the only way to the template.
+    The seed's parameters never depended on the clone. Until then the seed ran after `Create Workflow`
+    and a refusal had to DELETE the clone (`Delete Unseeded Workflow`, continue on error, no retry); when
+    that DELETE failed as well, the clone — the owner's business data in its systemMessage — stayed
+    unbound, its id in no answer and no `bot_profiles` row, unreachable for SetWorkflowState (ids in the
+    token's `w` only) and for every sweep. Now a seed failure never creates a clone at all; the retired
+    node is removed. Closing criterion: «a reply-mode seed failure never creates a clone» — a failure
+    AFTER Create, and a re-authorisation that creates a second clone, are a separate finding (F1).
+    Behaviour pinned by tests/test_create_seed.py; topology by verify-reply-mode.py.
 
     python3 Tools/n8n/apply-reply-mode-v2.py            # patch in place (re-runnable)
     python3 Tools/n8n/apply-reply-mode-v2.py --check
@@ -147,8 +157,10 @@ select true as seeded, (select count(*) from seed)::int as written;"""
 SEED_FLAGS = {"alwaysOutputData": True, "onError": "continueRegularOutput",
               "retryOnFail": True, "maxTries": 3, "waitBetweenTries": 1000}
 SEED_GATE_EXPR = "={{ $json.seeded === true || String($('Unity Webhook').first().json.body.ReplyMode || '') !== 'semi' }}"
-DELETE_URL = "=https://n8n.choosereply.com/api/v1/workflows/{{ $('Get Created Workflow Id').first().json.id }}"
 NOT_SAVED_ERROR = "reply_mode_not_saved"
+# R8-deletefail: the compensating DELETE of an unseeded clone — gone, since no clone exists before the seed.
+RETIRED_NODES = ("Delete Unseeded Workflow",)
+CLONE_CHAIN = "Get Sample Workflow"     # the first node of the clone chain (template read → Set Fields → Create)
 
 
 def nid(*parts):
@@ -216,27 +228,28 @@ def patch_set_reply_mode():
     return changed
 
 
-def seed_gate_nodes(fname, seed, act):
-    """R8: the marker gate and the fail-closed branch, fully specified (ids are uuid5 → stable across runs)."""
-    x, y = seed["position"]
+def seed_positions(sample):
+    """Canvas seats of the seed chain: under the line, right before the template read (cosmetic, but deterministic)."""
+    x, y = sample["position"]
+    return {"Seed Reply Mode": [x - 300, y + 220], "Seed Saved?": [x - 124, y + 220],
+            "Respond Reply Mode Not Saved": [x + 52, y + 400]}
+
+
+def seed_gate_nodes(fname, seats):
+    """R8: the marker gate and the fail-closed answer, fully specified (ids are uuid5 → stable across runs)."""
     gate = {"parameters": {"conditions": {"options": {"caseSensitive": True, "leftValue": "", "typeValidation": "loose", "version": 2},
                                           "conditions": [{"id": nid(fname, "seed-gate", "cond"), "leftValue": SEED_GATE_EXPR, "rightValue": "",
                                                           "operator": {"type": "boolean", "operation": "true", "singleValue": True}}],
                                           "combinator": "and"}, "options": {}},
             "id": nid(fname, "seed-gate"), "name": "Seed Saved?", "type": "n8n-nodes-base.if", "typeVersion": 2.2,
-            "position": [x + 176, y]}
-    delete = {"parameters": {"method": "DELETE", "url": DELETE_URL, "authentication": "genericCredentialType",
-                             "genericAuthType": "httpHeaderAuth", "options": {"timeout": 30000}},
-              "id": nid(fname, "seed-delete"), "name": "Delete Unseeded Workflow", "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2,
-              "position": [x + 352, y + 180], "credentials": json.loads(json.dumps(act["credentials"])),
-              "alwaysOutputData": True, "onError": "continueRegularOutput"}
+            "position": seats["Seed Saved?"]}
     respond = {"parameters": {"assignments": {"assignments": [
                    {"id": nid(fname, "seed-respond", "success"), "name": "success", "value": False, "type": "boolean"},
                    {"id": nid(fname, "seed-respond", "error"), "name": "error", "value": NOT_SAVED_ERROR, "type": "string"}]},
                    "options": {}},
                "id": nid(fname, "seed-respond"), "name": "Respond Reply Mode Not Saved", "type": "n8n-nodes-base.set", "typeVersion": 3.4,
-               "position": [x + 528, y + 180]}
-    return gate, delete, respond
+               "position": seats["Respond Reply Mode Not Saved"]}
+    return gate, respond
 
 
 def ensure_node(wf, spec):
@@ -261,19 +274,49 @@ def set_edges(wf, src, outputs):
     return False
 
 
+def retire_nodes(wf, names):
+    """Remove retired nodes, their outgoing connections and every edge pointing at them."""
+    changed = False
+    before = len(wf["nodes"])
+    wf["nodes"] = [n for n in wf["nodes"] if n["name"] not in names]
+    changed |= len(wf["nodes"]) != before
+    for name in names:
+        changed |= wf["connections"].pop(name, None) is not None
+    for c in wf["connections"].values():
+        for i, out in enumerate(c.get("main", []) or []):
+            keep = [e for e in (out or []) if e["node"] not in names]
+            if keep != (out or []):
+                c["main"][i] = keep
+                changed = True
+    return changed
+
+
+def route_entries_through_seed(wf):
+    """Every main edge into the clone chain, except the gate's own, enters the seed instead (R8-deletefail)."""
+    changed = False
+    for src, c in wf["connections"].items():
+        if src == "Seed Saved?":
+            continue
+        for out in c.get("main", []) or []:
+            for e in out or []:
+                if e["node"] == CLONE_CHAIN:
+                    e["node"] = "Seed Reply Mode"
+                    changed = True
+    return changed
+
+
 def patch_create(fname, profile_field):
     path = os.path.join(WF, fname)
     wf = json.load(open(path, encoding="utf-8"))
     changed = False
-    gci = node(wf, "Get Created Workflow Id")
     act = node(wf, "Activate Created Workflow")
+    seats = seed_positions(node(wf, CLONE_CHAIN))
     params = "={{ [ $('Unity Webhook').first().json.body." + profile_field + ", String($('Unity Webhook').first().json.body.ReplyMode || ''), String($('Unity Webhook').first().json.body.ReplyModeVersion || '0') ] }}"
     seed = node(wf, "Seed Reply Mode")
     if seed is None:
         seed = {"parameters": {"operation": "executeQuery", "query": SEED_SQL, "options": {"queryReplacement": params}},
                 "id": nid(fname, "seed"), "name": "Seed Reply Mode", "type": "n8n-nodes-base.postgres", "typeVersion": 2.6,
-                "position": [gci["position"][0] + 200, gci["position"][1] + 220],
-                "credentials": {"postgres": dict(PG_CRED)}}
+                "position": seats["Seed Reply Mode"], "credentials": {"postgres": dict(PG_CRED)}}
         wf["nodes"].append(seed)
         changed = True
     else:
@@ -287,12 +330,19 @@ def patch_create(fname, profile_field):
             changed = True
     want_url = "=https://n8n.choosereply.com/api/v1/workflows/{{ $('Get Created Workflow Id').first().json.id }}/activate"
     changed = set_param(act, "url", want_url, changed)
-    for spec in seed_gate_nodes(fname, seed, act):
+    for spec in seed_gate_nodes(fname, seats):
         changed = ensure_node(wf, spec) or changed
-    changed = set_edges(wf, "Get Created Workflow Id", ["Seed Reply Mode"]) or changed
+    changed = retire_nodes(wf, RETIRED_NODES) or changed
+    # R8-deletefail: the seed + gate move in FRONT of the clone chain; the created clone goes straight to activation.
+    changed = route_entries_through_seed(wf) or changed
     changed = set_edges(wf, "Seed Reply Mode", ["Seed Saved?"]) or changed
-    changed = set_edges(wf, "Seed Saved?", ["Activate Created Workflow", "Delete Unseeded Workflow"]) or changed
-    changed = set_edges(wf, "Delete Unseeded Workflow", ["Respond Reply Mode Not Saved"]) or changed
+    changed = set_edges(wf, "Seed Saved?", [CLONE_CHAIN, "Respond Reply Mode Not Saved"]) or changed
+    changed = set_edges(wf, "Get Created Workflow Id", ["Activate Created Workflow"]) or changed
+    for name, seat in seats.items():
+        n = node(wf, name)
+        if n["position"] != seat:
+            n["position"] = seat
+            changed = True
     if changed:
         with open(path, "w", encoding="utf-8") as fh:
             json.dump(wf, fh, indent=2, ensure_ascii=False)
@@ -311,12 +361,17 @@ def check():
         s = node(wf, "Seed Reply Mode")
         gate = node(wf, "Seed Saved?")
         topology = {src: [[c["node"] for c in out] for out in wf["connections"].get(src, {}).get("main", [])]
-                    for src in ("Seed Reply Mode", "Seed Saved?", "Delete Unseeded Workflow")}
+                    for src in ("Seed Reply Mode", "Seed Saved?", "Get Created Workflow Id")}
+        into = lambda dst: sorted((src, i) for src, c in wf["connections"].items() for i, out in enumerate(c.get("main", []) or [])
+                                  for e in (out or []) if e["node"] == dst)
         if s is None or s["parameters"]["query"] != SEED_SQL or any(s.get(k) != v for k, v in SEED_FLAGS.items()) \
                 or gate is None or gate["parameters"]["conditions"]["conditions"][0]["leftValue"] != SEED_GATE_EXPR \
                 or topology != {"Seed Reply Mode": [["Seed Saved?"]],
-                                "Seed Saved?": [["Activate Created Workflow"], ["Delete Unseeded Workflow"]],
-                                "Delete Unseeded Workflow": [["Respond Reply Mode Not Saved"]]}:
+                                "Seed Saved?": [[CLONE_CHAIN], ["Respond Reply Mode Not Saved"]],
+                                "Get Created Workflow Id": [["Activate Created Workflow"]]} \
+                or into("Seed Reply Mode") != [("If Has AppUserID?", 1), ("Register Profile", 0)] \
+                or into(CLONE_CHAIN) != [("Seed Saved?", 0)] \
+                or any(node(wf, n) is not None or n in wf["connections"] for n in RETIRED_NODES):
             bad.append(f)
     return bad
 

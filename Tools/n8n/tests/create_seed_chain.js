@@ -1,6 +1,10 @@
-// Behavioural driver for R8 (iteration 2026-09-27): runs the canonical Create WhatsApp/Telegram graph from its JSON,
-// starting at `Seed Reply Mode`, under the outcomes a Postgres node can really have, and reports what the clone went
-// through (activated? Wappi webhook set? bound? deleted?) and what the webhook (responseMode: lastNode) answered.
+// Behavioural driver for R8 (iteration 2026-09-27; R8-deletefail, iteration 2026-09-28): runs the canonical Create
+// WhatsApp/Telegram graph from its JSON, starting at the node the scenario names (`start`, default `Register Profile` —
+// the slot-allowed branch; `If Has AppUserID?` for a legacy body without AppUserID), under the outcomes a Postgres node
+// can really have, and reports what the clone went through (created? activated? Wappi webhook set? bound? deleted?) and
+// what the webhook (responseMode: lastNode) answered. The clone's id is NOT injected: `Create Workflow` answers the
+// scenario's `createdId` (or `http['Create Workflow']`) and the real `Get Created Workflow Id` Set node reads it, so a
+// run that never created a clone cannot resolve one either.
 //
 // The seed node is executed the way n8n-core 2.36.7 executes a node (workflow-execute.js): retryOnFail/maxTries
 // (2..5, default 3) re-run it on a thrown error AND on a first item carrying json.error; after the last try a thrown
@@ -13,10 +17,11 @@
 //   {throw:'msg'}       an error raised outside the query runner (credentials, expression, pool)
 //   {noItems:true}      the node returned no items at all
 // Downstream: If (n8n's own expression engine) and Set are evaluated; HTTP Request and Postgres are side effects —
-// recorded (method + evaluated URL), never executed. n8n executionOrder v1: children run depth-first, sorted by
-// canvas position.
+// recorded (method + evaluated URL), never executed; an HTTP node answers `http[<node name>]` (e.g. a failed DELETE
+// under continueRegularOutput is `{error:{…}}`), `Create Workflow` defaults to `{id: createdId}`. n8n executionOrder
+// v1: children run depth-first, sorted by canvas position. A graph that loops is stopped (`stoppedAt`).
 //
-//   node create_seed_chain.js <Create.json> < {scenario: {body, createdId, seed:[…]}}  -> {scenario: report}
+//   node create_seed_chain.js <Create.json> < {scenario: {body, createdId, seed:[…], start?, http?}}  -> {scenario: report}
 'use strict';
 const fs = require('fs');
 const os = require('os');
@@ -43,6 +48,9 @@ function condOk(c, ctx) {
   const op = c.operator || {};
   if (op.type === 'boolean' && op.operation === 'true') return left === true;
   if (op.type === 'boolean' && op.operation === 'false') return left === false;
+  // n8n If v2 string/notEmpty (loose type validation): undefined, null and '' are empty
+  if (op.type === 'string' && op.operation === 'notEmpty') return left !== undefined && left !== null && String(left) !== '';
+  if (op.type === 'string' && op.operation === 'empty') return left === undefined || left === null || String(left) === '';
   throw new Error('driver: unsupported operator ' + JSON.stringify(op));
 }
 
@@ -54,8 +62,9 @@ function runScenario(wf, sc) {
   const out = {
     'Unity Webhook': [[{ json: { body: sc.body, headers: {}, params: {}, query: {} } }]],
     'Auth Gate': [[{ json: { crAuth: { ok: true, installId: 'install-r8' } } }]],
-    'Get Created Workflow Id': [[{ json: { id: sc.createdId } }]],
   };
+  const http = Object.assign({ 'Create Workflow': { id: sc.createdId } }, sc.http || {});
+  let steps = 0;
   const $ = (name) => {
     if (!out[name]) throw new TypeError(`node ${name} has not run`);
     const items = out[name][0] || [];
@@ -115,6 +124,7 @@ function runScenario(wf, sc) {
   function exec(name, items) {
     const n = byName[name];
     if (!n) throw new Error('driver: no node ' + name);
+    if (++steps > 200) throw new Error('driver: the graph loops (' + trace.slice(-6).join(' -> ') + ')');
     trace.push(name);
     const ctx = (it) => ({ json: it.json, $ });
     let outputs;
@@ -146,7 +156,7 @@ function runScenario(wf, sc) {
         break;
       case 'n8n-nodes-base.httpRequest':
         effects.push({ node: name, method: n.parameters.method || 'GET', url: evalExpr(n.parameters.url, ctx(items[0])) });
-        outputs = [[{ json: (sc.http || {})[name] || {} }]];
+        outputs = [[{ json: http[name] || {} }]];
         break;
       default:
         throw new Error('driver: unsupported node type ' + n.type + ' (' + name + ')');
@@ -162,7 +172,8 @@ function runScenario(wf, sc) {
   }
 
   try {
-    exec('Seed Reply Mode', out['Get Created Workflow Id'][0]);
+    // the start node's input: what its real predecessor emits (Retire Same Bot Slot / Vertical Prompt) — never read
+    exec(sc.start || 'Register Profile', [{ json: { success: true } }]);
   } catch (e) {
     stoppedAt = { node: trace[trace.length - 1], message: e.message };
   }

@@ -668,7 +668,7 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.6,
       "position": [
-        1876,
+        688,
         892
       ],
       "credentials": {
@@ -737,44 +737,9 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        2052,
+        864,
         892
       ]
-    },
-    {
-      "parameters": {
-        "method": "DELETE",
-        "url": "=https://n8n.choosereply.com/api/v1/workflows/{{ $('Get Created Workflow Id').first().json.id }}",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth",
-        "options": {
-          "timeout": 30000
-        }
-      },
-      "id": "21a742ff-bb0e-5d41-b684-9417cf6d78f9",
-      "name": "Delete Unseeded Workflow",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        2228,
-        1072
-      ],
-      "credentials": {
-        "n8nApi": {
-          "id": "X1k4igOAG65Fb3oz",
-          "name": "n8n account"
-        },
-        "httpBearerAuth": {
-          "id": "nfU8CbYjPssGjEZA",
-          "name": "Bearer Auth account"
-        },
-        "httpHeaderAuth": {
-          "id": "RV7m661NMLPXEcvm",
-          "name": "n8nAPIKey"
-        }
-      },
-      "alwaysOutputData": true,
-      "onError": "continueRegularOutput"
     },
     {
       "parameters": {
@@ -801,7 +766,7 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        2404,
+        1040,
         1072
       ]
     }
@@ -855,7 +820,7 @@
       "main": [
         [
           {
-            "node": "Seed Reply Mode",
+            "node": "Activate Created Workflow",
             "type": "main",
             "index": 0
           }
@@ -928,7 +893,7 @@
         ],
         [
           {
-            "node": "Get Sample Workflow",
+            "node": "Seed Reply Mode",
             "type": "main",
             "index": 0
           }
@@ -990,7 +955,7 @@
       "main": [
         [
           {
-            "node": "Get Sample Workflow",
+            "node": "Seed Reply Mode",
             "type": "main",
             "index": 0
           }
@@ -1085,22 +1050,11 @@
       "main": [
         [
           {
-            "node": "Activate Created Workflow",
+            "node": "Get Sample Workflow",
             "type": "main",
             "index": 0
           }
         ],
-        [
-          {
-            "node": "Delete Unseeded Workflow",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Delete Unseeded Workflow": {
-      "main": [
         [
           {
             "node": "Respond Reply Mode Not Saved",

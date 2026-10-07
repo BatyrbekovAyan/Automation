@@ -6,11 +6,13 @@ Pins:
     statement over every requested profile, guarded `where reply_mode_flags.version < excluded.version`,
     reporting applied/suppressed/version per profile; Shape Response never turns a DB error into
     success; malformed body → HTTP 400; the response code is driven by the shaped `_status`.
-  * Create WhatsApp/Telegram: `Seed Reply Mode` sits strictly BETWEEN `Get Created Workflow Id` and
-    `Activate Created Workflow` (initial mode before any auto-reply is possible), writes only when the
-    client states `ReplyMode`, and is version-guarded; Activate resolves the id by node name. R8: the
-    activation is gated by `Seed Saved?` on the statement's positive `seeded` marker; the false branch
-    deletes the clone and answers reply_mode_not_saved (behaviour: tests/test_create_seed.py).
+  * Create WhatsApp/Telegram: `Seed Reply Mode` writes the initial mode only when the client states
+    `ReplyMode`, version-guarded, and answers a positive `seeded` marker; `Seed Saved?` gates on it. R8-deletefail
+    (iteration 2026-09-28): the gate stands BEFORE the clone exists — the seed's only predecessors are the two
+    entries into the clone chain (`Register Profile`[0], `If Has AppUserID?`[1]), `Seed Saved?`[0] is the ONLY way
+    into `Get Sample Workflow`, and with that one edge cut `Create Workflow` is unreachable from `Unity Webhook`; the
+    false branch answers reply_mode_not_saved directly (nothing to delete: no compensating `Delete Unseeded Workflow`,
+    whose own failure orphaned the clone). Activate resolves the id by node name (behaviour: tests/test_create_seed.py).
   * Bot templates: Read Reply Mode's coalesce(absence → false) is UNCHANGED (locked semantics).
 
     python3 Tools/n8n/verify-reply-mode.py [--dir DIR]
@@ -90,38 +92,71 @@ def check_resume_side_effects(q, f="Set Reply Mode"):
         f"{f}: a request created after the decision must keep the chat paused (R4)"
 
 
-def check_create(f, field):
-    wf = load(f)
+ENTRIES_INTO_CLONE_CHAIN = {("If Has AppUserID?", 1), ("Register Profile", 0)}   # legacy (no AppUserID) / slot-allowed
+
+
+def predecessors(wf, dst):
+    """Every (source, output index) whose main output connects to `dst`."""
+    return {(src, i) for src, c in wf["connections"].items() for i, out in enumerate(c.get("main", []) or [])
+            for e in (out or []) if e["node"] == dst}
+
+
+def reachable(wf, start, cut=()):
+    """Node names reachable from `start` over main edges, with the (source, output index) edges in `cut` removed."""
+    seen, todo = set(), [start]
+    while todo:
+        n = todo.pop()
+        if n in seen:
+            continue
+        seen.add(n)
+        for i, out in enumerate(wf["connections"].get(n, {}).get("main", []) or []):
+            if (n, i) not in cut:
+                todo.extend(e["node"] for e in (out or []))
+    return seen
+
+
+def check_create(f, field, wf=None):
+    wf = wf if wf is not None else load(f)
     seed = node(wf, "Seed Reply Mode")
     q = sql(seed["parameters"]["query"])
     assert "insert into reply_mode_flags" in q and "$2 in ('semi', 'auto')" in q and "where reply_mode_flags.version < excluded.version" in q, \
         f"{f}: Seed Reply Mode must write only a stated mode, version-guarded"
     assert "$1 <> '-1'" in q, f"{f}: seed must skip the unauthed sentinel"
     assert field in seed["parameters"]["options"]["queryReplacement"] and "ReplyMode" in seed["parameters"]["options"]["queryReplacement"]
-    assert edge(wf, "Get Created Workflow Id") == [{"node": "Seed Reply Mode", "type": "main", "index": 0}], f"{f}: seed must follow Get Created Workflow Id"
-    # R8 (2026-09-27): activation only on the statement's POSITIVE marker. The seed continues on error (so a failure
-    # can be answered), which is exactly why nothing may connect it straight to Activate: a Postgres error item, an
-    # error thrown outside the query runner (the INPUT item passes on) and an empty result ({}) all flow on output 0.
+    # R8 (2026-09-27): going live only on the statement's POSITIVE marker. The seed continues on error (so a failure
+    # can be answered), which is exactly why nothing may connect it straight onward: a Postgres error item, an error
+    # thrown outside the query runner (the INPUT item passes on) and an empty result ({}) all flow on output 0.
     assert "select true as seeded" in q and "returning 1" in q, f"{f}: the seed must answer a positive `seeded` marker once it completed (R8)"
     assert seed.get("retryOnFail") is True and seed.get("maxTries", 0) >= 2, f"{f}: a transient seed failure must be retried (R8)"
     assert edge(wf, "Seed Reply Mode") == [{"node": "Seed Saved?", "type": "main", "index": 0}], \
-        f"{f}: the seed must feed the marker gate, never Activate directly (R8)"
+        f"{f}: the seed must feed the marker gate, never the clone chain directly (R8)"
     gate = node(wf, "Seed Saved?")["parameters"]["conditions"]
     lv = gate["conditions"][0]["leftValue"]
     assert len(gate["conditions"]) == 1 and gate["conditions"][0]["operator"]["operation"] == "true" \
         and "$json.seeded === true" in lv and "!== 'semi'" in lv, f"{f}: Seed Saved? must pass only on the marker (or a non-«Вместе» create): {lv!r}"
-    assert edge(wf, "Seed Saved?", 0) == [{"node": "Activate Created Workflow", "type": "main", "index": 0}], f"{f}: activation must come AFTER the saved marker"
-    assert edge(wf, "Seed Saved?", 1) == [{"node": "Delete Unseeded Workflow", "type": "main", "index": 0}], f"{f}: an unseeded clone must be deleted (R8)"
-    dele = node(wf, "Delete Unseeded Workflow")
-    assert dele["parameters"]["method"] == "DELETE" and dele["parameters"]["url"].endswith("/api/v1/workflows/{{ $('Get Created Workflow Id').first().json.id }}"), \
-        f"{f}: Delete Unseeded Workflow must DELETE the created clone by id"
-    assert edge(wf, "Delete Unseeded Workflow") == [{"node": "Respond Reply Mode Not Saved", "type": "main", "index": 0}]
+    # R8-deletefail (2026-09-28): the gate stands BEFORE the clone exists, so a failed seed never creates one.
+    assert predecessors(wf, "Seed Reply Mode") == ENTRIES_INTO_CLONE_CHAIN, \
+        f"{f}: the seed must be entered from exactly {sorted(ENTRIES_INTO_CLONE_CHAIN)} — an entry wired past it skips the '*' row " \
+        f"(«Авто» silently unseeded): {sorted(predecessors(wf, 'Seed Reply Mode'))}"
+    assert edge(wf, "Seed Saved?", 0) == [{"node": "Get Sample Workflow", "type": "main", "index": 0}], \
+        f"{f}: the clone chain (template read → Create) must start only AFTER the saved marker (R8-deletefail)"
+    assert predecessors(wf, "Get Sample Workflow") == {("Seed Saved?", 0)}, \
+        f"{f}: Seed Saved?[0] must be the ONLY way into Get Sample Workflow: {sorted(predecessors(wf, 'Get Sample Workflow'))}"
+    assert "Create Workflow" in reachable(wf, "Unity Webhook") \
+        and "Create Workflow" not in reachable(wf, "Unity Webhook", cut={("Seed Saved?", 0)}), \
+        f"{f}: Create Workflow must be reachable from Unity Webhook ONLY through Seed Saved?[0] (R8-deletefail)"
+    assert edge(wf, "Get Created Workflow Id") == [{"node": "Activate Created Workflow", "type": "main", "index": 0}], \
+        f"{f}: the created clone goes straight to activation (the seed already ran)"
+    assert not any(n["name"] == "Delete Unseeded Workflow" for n in wf["nodes"]) and "Delete Unseeded Workflow" not in wf["connections"], \
+        f"{f}: no compensating DELETE may remain — a refused create has no clone to delete (R8-deletefail)"
+    assert edge(wf, "Seed Saved?", 1) == [{"node": "Respond Reply Mode Not Saved", "type": "main", "index": 0}], \
+        f"{f}: an unsaved «Вместе» mode must be answered reply_mode_not_saved"
     assert not wf["connections"].get("Respond Reply Mode Not Saved", {}).get("main", [[]])[0], f"{f}: the refusal must be the LAST node (responseMode lastNode)"
     body = {a["name"]: a["value"] for a in node(wf, "Respond Reply Mode Not Saved")["parameters"]["assignments"]["assignments"]}
     assert body == {"success": False, "error": "reply_mode_not_saved"}, f"{f}: refusal body must carry no id: {body}"
     act = node(wf, "Activate Created Workflow")["parameters"]["url"]
-    assert "$('Get Created Workflow Id').first().json.id" in act, f"{f}: Activate must resolve the id by node name (the seed node drops the item)"
-    print(f"OK  {f} (initial reply mode seeded before activation; activation only on the saved marker)")
+    assert "$('Get Created Workflow Id').first().json.id" in act, f"{f}: Activate must resolve the id by node name"
+    print(f"OK  {f} (initial reply mode seeded before the clone exists; a clone only on the saved marker)")
 
 
 def check_gate_read():

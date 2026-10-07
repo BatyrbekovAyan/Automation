@@ -639,7 +639,33 @@ def clones_for(pid):
             return found
 
 
-@scenario("create_seed_failure_keeps_clone_inactive", "R8: a «Вместе» create whose reply-mode seed fails (a real Postgres failure on staging, scoped to this profile) answers reply_mode_not_saved, leaves NO clone (not active, not bound, no Wappi webhook); the retry once the DB is back creates exactly ONE live clone with the '*' row — WhatsApp and Telegram")
+CREATE_WORKFLOW_IDS = {"CreateWhatsappWorkflow": "XuvOp7TxOImOAmlj", "CreateTelegramWorkflow": "Uz6HBBUpAiUqVysB"}
+
+
+def newest_execution(workflow_id, since_id):
+    """The newest execution of `workflow_id` after `since_id`, with its run data (None when there is none yet)."""
+    for _ in range(20):
+        st, page = http("GET", f"{BASE}/api/v1/executions?workflowId={workflow_id}&limit=5&includeData=false",
+                        headers={"X-N8N-API-KEY": SEC.get("apiKey", "")})
+        rows = [e for e in (page or {}).get("data", []) if int(e["id"]) > since_id and e.get("finished")]
+        if rows:
+            eid = max(int(e["id"]) for e in rows)
+            return http("GET", f"{BASE}/api/v1/executions/{eid}?includeData=true", headers={"X-N8N-API-KEY": SEC.get("apiKey", "")})[1]
+        time.sleep(0.5)
+    return None
+
+
+def newest_execution_id(workflow_id):
+    st, page = http("GET", f"{BASE}/api/v1/executions?workflowId={workflow_id}&limit=1&includeData=false",
+                    headers={"X-N8N-API-KEY": SEC.get("apiKey", "")})
+    return max([int(e["id"]) for e in (page or {}).get("data", [])] or [0])
+
+
+def ran_nodes(exec_data):
+    return set(((exec_data or {}).get("data") or {}).get("resultData", {}).get("runData", {}) or {})
+
+
+@scenario("create_seed_failure_keeps_clone_inactive", "R8 + R8-deletefail: a «Вместе» create whose reply-mode seed fails (a real Postgres failure on staging, scoped to this profile) answers reply_mode_not_saved and never CREATES a clone (the execution reads no template and runs no Create Workflow, so nothing is active, bound, hooked or left to delete); the retry once the DB is back creates exactly ONE live clone with the '*' row — WhatsApp and Telegram")
 def s_create_seed_failure(ctx):
     res = {}
     for ch, form, field in (("wa", "CreateWhatsappWorkflow", "WhatsappProfileId"), ("tg", "CreateTelegramWorkflow", "TelegramProfileId")):
@@ -652,7 +678,9 @@ def s_create_seed_failure(ctx):
         pg(f"alter table reply_mode_flags add constraint {con} check (profile_id <> '{pid}') not valid;")   # staging only, this profile only
         try:
             since = mock_total()
+            exec_since = newest_execution_id(CREATE_WORKFLOW_IDS[form])
             st1, d1 = hook_form(form, o.token, {**base, "ReplyModeVersion": "150"})
+            ran1 = ran_nodes(newest_execution(CREATE_WORKFLOW_IDS[form], exec_since))
             hooks1 = [c for c in mock_calls(since, "webhook/url/set")[0] if pid in json.dumps(c)]
             bound1 = pg(f"select coalesce(workflow_id, '-') from bot_profiles where profile_id = '{pid}';")
             clones1 = clones_for(pid)
@@ -668,8 +696,13 @@ def s_create_seed_failure(ctx):
         for left, _ in clones_for(pid):          # a regressed graph leaves the failed create's clone behind: staging API cleanup
             http("DELETE", f"{BASE}/api/v1/workflows/{left}", headers={"X-N8N-API-KEY": SEC.get("apiKey", "")})
         res[ch] = {"failed_create": (st1, d1), "wappi_webhook_calls": len(hooks1), "bound": bound1, "clones_after_failure": clones1,
+                   "failed_execution": {n: (n in ran1) for n in ("Seed Reply Mode", "Get Sample Workflow", "Create Workflow",
+                                                                 "Respond Reply Mode Not Saved")},
                    "retry": (st2, wid), "clones_after_retry": clones2, "row": row, "cleanup_delete": st3}
+    # R8-deletefail: the clone is never created — told apart from «created, then deleted» by the execution's own run data
+    never_created = {"Seed Reply Mode": True, "Get Sample Workflow": False, "Create Workflow": False, "Respond Reply Mode Not Saved": True}
     ok = all(r["failed_create"] == (200, {"success": False, "error": "reply_mode_not_saved"}) and r["wappi_webhook_calls"] == 0
+             and r["failed_execution"] == never_created
              and r["bound"] in ("", "-") and r["clones_after_failure"] == [] and r["retry"][0] == 200 and r["retry"][1]
              and r["clones_after_retry"] == [(r["retry"][1], True)] and r["row"] == "true|151" and r["cleanup_delete"] == 200
              for r in res.values())

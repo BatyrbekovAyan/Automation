@@ -1,0 +1,92 @@
+# R8-deletefail — BEFORE (HEAD dc2484bc, canonical Create WA/TG unchanged; new tests applied)
+# 2026-10-07T07:53:15Z  python3 Tools/n8n/tests/test_create_seed.py
+
+PASS R8 [WA] A1: the seed statement answers seeded=true for a new «Вместе» row and writes it
+PASS R8 [WA] A2: a legacy body (no ReplyMode) and a stale version complete with seeded=true and write nothing new
+PASS R8 [WA] A3: a failing write yields no marker (the statement errors)
+FAIL R8 [WA] B: a seed failure never creates a «Вместе» clone (no template read, no Create) and answers reply_mode_not_saved; ok/transient/auto/legacy go live
+      - semi:query_error: a failed seed still created a clone (template read=True, Create Workflow=1): trace=['Register Profile', 'Get Sample Workflow', 'Set Fields', 'Create Workflow', 'Get Created Workflow Id', 'Seed Reply Mode', 'Seed Saved?', 'Delete Unseeded Workflow', 'Respond Reply Mode Not Saved']
+      - semi:thrown: a failed seed still created a clone (template read=True, Create Workflow=1): trace=['Register Profile', 'Get Sample Workflow', 'Set Fields', 'Create Workflow', 'Get Created Workflow Id', 'Seed Reply Mode', 'Seed Saved?', 'Delete Unseeded Workflow', 'Respond Reply Mode Not Saved']
+      - semi:empty: a failed seed still created a clone (template read=True, Create Workflow=1): trace=['Register Profile', 'Get Sample Workflow', 'Set Fields', 'Create Workflow', 'Get Created Workflow Id', 'Seed Reply Mode', 'Seed Saved?', 'Delete Unseeded Workflow', 'Respond Reply Mode Not Saved']
+PASS R8 [WA] C: the checks reject the naive continueErrorOutput variant (a thrown error still goes live there)
+PASS R8-deletefail [WA] D register/semi:query_error:delete_ok: no clone is ever lost
+PASS R8-deletefail [WA] D register/semi:thrown:delete_ok: no clone is ever lost
+PASS R8-deletefail [WA] D register/semi:empty:delete_ok: no clone is ever lost
+PASS R8-deletefail [WA] D register/semi:ok: no clone is ever lost
+PASS R8-deletefail [WA] D register/semi:transient: no clone is ever lost
+PASS R8-deletefail [WA] D register/auto:thrown: no clone is ever lost
+PASS R8-deletefail [WA] D register/legacy:thrown: no clone is ever lost
+FAIL R8-deletefail [WA] D register/semi:query_error:delete_failed: no clone is ever lost
+      - LOST clone (1): trace=Register Profile -> Get Sample Workflow -> Set Fields -> Create Workflow -> Get Created Workflow Id -> Seed Reply Mode -> Seed Saved? -> Delete Unseeded Workflow -> Respond Reply Mode Not Saved
+FAIL R8-deletefail [WA] D register/semi:thrown:delete_failed: no clone is ever lost
+      - LOST clone (1): trace=Register Profile -> Get Sample Workflow -> Set Fields -> Create Workflow -> Get Created Workflow Id -> Seed Reply Mode -> Seed Saved? -> Delete Unseeded Workflow -> Respond Reply Mode Not Saved
+FAIL R8-deletefail [WA] D register/semi:empty:delete_failed: no clone is ever lost
+      - LOST clone (1): trace=Register Profile -> Get Sample Workflow -> Set Fields -> Create Workflow -> Get Created Workflow Id -> Seed Reply Mode -> Seed Saved? -> Delete Unseeded Workflow -> Respond Reply Mode Not Saved
+PASS R8-deletefail [WA] D legacy/semi:query_error:delete_ok: no clone is ever lost
+PASS R8-deletefail [WA] D legacy/semi:thrown:delete_ok: no clone is ever lost
+PASS R8-deletefail [WA] D legacy/semi:empty:delete_ok: no clone is ever lost
+PASS R8-deletefail [WA] D legacy/semi:ok: no clone is ever lost
+PASS R8-deletefail [WA] D legacy/semi:transient: no clone is ever lost
+PASS R8-deletefail [WA] D legacy/auto:thrown: no clone is ever lost
+PASS R8-deletefail [WA] D legacy/legacy:thrown: no clone is ever lost
+FAIL R8-deletefail [WA] D legacy/semi:query_error:delete_failed: no clone is ever lost
+      - LOST clone (1): trace=If Has AppUserID? -> Get Sample Workflow -> Set Fields -> Create Workflow -> Get Created Workflow Id -> Seed Reply Mode -> Seed Saved? -> Delete Unseeded Workflow -> Respond Reply Mode Not Saved
+FAIL R8-deletefail [WA] D legacy/semi:thrown:delete_failed: no clone is ever lost
+      - LOST clone (1): trace=If Has AppUserID? -> Get Sample Workflow -> Set Fields -> Create Workflow -> Get Created Workflow Id -> Seed Reply Mode -> Seed Saved? -> Delete Unseeded Workflow -> Respond Reply Mode Not Saved
+FAIL R8-deletefail [WA] D legacy/semi:empty:delete_failed: no clone is ever lost
+      - LOST clone (1): trace=If Has AppUserID? -> Get Sample Workflow -> Set Fields -> Create Workflow -> Get Created Workflow Id -> Seed Reply Mode -> Seed Saved? -> Delete Unseeded Workflow -> Respond Reply Mode Not Saved
+FAIL R8-deletefail [WA] E: verify-reply-mode accepts the canonical graph and rejects a clone chain reachable around the gate
+      - canonical graph rejected: XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json: the seed must be entered from exactly [('If Has AppUserID?', 1), ('Register Profile', 0)] — an entry wired past it skips the '*' row («Авто» silently unseeded): [('Get Created Workflow Id', 0)]
+      - legacy branch bypass: mutation did not apply
+PASS R8 [TG] A1: the seed statement answers seeded=true for a new «Вместе» row and writes it
+PASS R8 [TG] A2: a legacy body (no ReplyMode) and a stale version complete with seeded=true and write nothing new
+PASS R8 [TG] A3: a failing write yields no marker (the statement errors)
+FAIL R8 [TG] B: a seed failure never creates a «Вместе» clone (no template read, no Create) and answers reply_mode_not_saved; ok/transient/auto/legacy go live
+      - semi:query_error: a failed seed still created a clone (template read=True, Create Workflow=1): trace=['Register Profile', 'Get Sample Workflow', 'Set Fields', 'Create Workflow', 'Get Created Workflow Id', 'Seed Reply Mode', 'Seed Saved?', 'Delete Unseeded Workflow', 'Respond Reply Mode Not Saved']
+      - semi:thrown: a failed seed still created a clone (template read=True, Create Workflow=1): trace=['Register Profile', 'Get Sample Workflow', 'Set Fields', 'Create Workflow', 'Get Created Workflow Id', 'Seed Reply Mode', 'Seed Saved?', 'Delete Unseeded Workflow', 'Respond Reply Mode Not Saved']
+      - semi:empty: a failed seed still created a clone (template read=True, Create Workflow=1): trace=['Register Profile', 'Get Sample Workflow', 'Set Fields', 'Create Workflow', 'Get Created Workflow Id', 'Seed Reply Mode', 'Seed Saved?', 'Delete Unseeded Workflow', 'Respond Reply Mode Not Saved']
+PASS R8 [TG] C: the checks reject the naive continueErrorOutput variant (a thrown error still goes live there)
+PASS R8-deletefail [TG] D register/semi:query_error:delete_ok: no clone is ever lost
+PASS R8-deletefail [TG] D register/semi:thrown:delete_ok: no clone is ever lost
+PASS R8-deletefail [TG] D register/semi:empty:delete_ok: no clone is ever lost
+PASS R8-deletefail [TG] D register/semi:ok: no clone is ever lost
+PASS R8-deletefail [TG] D register/semi:transient: no clone is ever lost
+PASS R8-deletefail [TG] D register/auto:thrown: no clone is ever lost
+PASS R8-deletefail [TG] D register/legacy:thrown: no clone is ever lost
+FAIL R8-deletefail [TG] D register/semi:query_error:delete_failed: no clone is ever lost
+      - LOST clone (1): trace=Register Profile -> Get Sample Workflow -> Set Fields -> Create Workflow -> Get Created Workflow Id -> Seed Reply Mode -> Seed Saved? -> Delete Unseeded Workflow -> Respond Reply Mode Not Saved
+FAIL R8-deletefail [TG] D register/semi:thrown:delete_failed: no clone is ever lost
+      - LOST clone (1): trace=Register Profile -> Get Sample Workflow -> Set Fields -> Create Workflow -> Get Created Workflow Id -> Seed Reply Mode -> Seed Saved? -> Delete Unseeded Workflow -> Respond Reply Mode Not Saved
+FAIL R8-deletefail [TG] D register/semi:empty:delete_failed: no clone is ever lost
+      - LOST clone (1): trace=Register Profile -> Get Sample Workflow -> Set Fields -> Create Workflow -> Get Created Workflow Id -> Seed Reply Mode -> Seed Saved? -> Delete Unseeded Workflow -> Respond Reply Mode Not Saved
+PASS R8-deletefail [TG] D legacy/semi:query_error:delete_ok: no clone is ever lost
+PASS R8-deletefail [TG] D legacy/semi:thrown:delete_ok: no clone is ever lost
+PASS R8-deletefail [TG] D legacy/semi:empty:delete_ok: no clone is ever lost
+PASS R8-deletefail [TG] D legacy/semi:ok: no clone is ever lost
+PASS R8-deletefail [TG] D legacy/semi:transient: no clone is ever lost
+PASS R8-deletefail [TG] D legacy/auto:thrown: no clone is ever lost
+PASS R8-deletefail [TG] D legacy/legacy:thrown: no clone is ever lost
+FAIL R8-deletefail [TG] D legacy/semi:query_error:delete_failed: no clone is ever lost
+      - LOST clone (1): trace=If Has AppUserID? -> Get Sample Workflow -> Set Fields -> Create Workflow -> Get Created Workflow Id -> Seed Reply Mode -> Seed Saved? -> Delete Unseeded Workflow -> Respond Reply Mode Not Saved
+FAIL R8-deletefail [TG] D legacy/semi:thrown:delete_failed: no clone is ever lost
+      - LOST clone (1): trace=If Has AppUserID? -> Get Sample Workflow -> Set Fields -> Create Workflow -> Get Created Workflow Id -> Seed Reply Mode -> Seed Saved? -> Delete Unseeded Workflow -> Respond Reply Mode Not Saved
+FAIL R8-deletefail [TG] D legacy/semi:empty:delete_failed: no clone is ever lost
+      - LOST clone (1): trace=If Has AppUserID? -> Get Sample Workflow -> Set Fields -> Create Workflow -> Get Created Workflow Id -> Seed Reply Mode -> Seed Saved? -> Delete Unseeded Workflow -> Respond Reply Mode Not Saved
+FAIL R8-deletefail [TG] E: verify-reply-mode accepts the canonical graph and rejects a clone chain reachable around the gate
+      - canonical graph rejected: Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json: the seed must be entered from exactly [('If Has AppUserID?', 1), ('Register Profile', 0)] — an entry wired past it skips the '*' row («Авто» silently unseeded): [('Get Created Workflow Id', 0)]
+      - legacy branch bypass: mutation did not apply
+
+36 pass, 16 fail
+exit=1
+
+# python3 Tools/n8n/verify-reply-mode.py (new structural tripwire)
+OK  SCLcpn6DMDG3Z4VN-Set_Reply_Mode.json (versioned atomic upsert, per-profile report, 400/500 codes)
+REPLY MODE FAIL: XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json: the seed must be entered from exactly [('If Has AppUserID?', 1), ('Register Profile', 0)] — an entry wired past it skips the '*' row («Авто» silently unseeded): [('Get Created Workflow Id', 0)]
+exit=1
+
+# STAGING (canonical HEAD Create WA/TG imported via bootstrap.py; new execution-data check):
+# python3 Tools/n8n/staging/e2e-auth.py --only create_seed_failure
+FAIL  create_seed_failure_keeps_clone_inactive (11.2s) — R8 + R8-deletefail: a «Вместе» create whose reply-mode seed fails (a real Postgres failure on staging, scoped to this profile) answers reply_mode_not_saved and never CREATES a clone (the execution reads no template and runs no Create Workflow, so nothing is active, bound, hooked or left to delete); the retry once the DB is back creates exactly ONE live clone with the '*' row — WhatsApp and Telegram
+      {"wa": {"failed_create": [200, {"success": false, "error": "reply_mode_not_saved"}], "wappi_webhook_calls": 0, "bound": "-", "clones_after_failure": [], "failed_execution": {"Seed Reply Mode": true, "Get Sample Workflow": true, "Create Workflow": true, "Respond Reply Mode Not Saved": true}, "retry": [200, "gAhuN80FJJSv8ELI"], "clones_after_retry": [["gAhuN80FJJSv8ELI", true]], "row": "true|151", "cleanup_delete": 200}, "tg": {"failed_create": [200, {"success": false, "error": "reply_mode_not_saved"}], "wappi_webhook_calls": 0, "bound": "-", "clones_after_failure": [], "failed_execution": {"Seed Reply Mode": true, "Get Sample Workflow": true, "Create Workflow": true, "Respond Reply Mode Not Saved": true}, "retry": [200, "pvseQKxGZEfM9zK3"], "clones_after_retry": [["pvseQKxGZEfM9zK3", true]], "row": "true|151", "cleanup_delete": 200}}
+
+0 pass, 1 fail
