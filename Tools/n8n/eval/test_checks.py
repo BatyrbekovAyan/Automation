@@ -87,6 +87,17 @@ class NoFreeDeliveryClaim(Table, unittest.TestCase):
         (FREE, "Замена масла бесплатно при доставке заказа.", NO_TOOLS, PASS, "free service ON delivery is not free delivery"),
         (FREE, "Бесплатная доставка? Нет, по городу от 1500 тг.", NO_TOOLS, PASS, "the client's question echoed and answered «нет»"),
         (FREE, "Доставка по городу от 1500 тг и бесплатная упаковка.", NO_TOOLS, PASS, "«бесплатная» after a conjunction is about the packing"),
+        # h4 (V9, 2026-09-28): the two former KnownGaps are now rows
+        (FREE, "Доставка по городу стоит 1500 тг, а при заказе от 10 000 тг бесплатно.", NO_TOOLS, FAIL,
+         "elliptical: «бесплатно» in a second clause still about the delivery (an invented condition)"),
+        (FREE, "Доставка 1500 тг, но от 20 000 тг — бесплатно.", NO_TOOLS, FAIL, "elliptical after «но»"),
+        (FREE, "Доставка — 0 тг.", NO_TOOLS, FAIL, "a zero price IS free delivery"),
+        (FREE, "Доставка по городу: 0 ₸.", NO_TOOLS, FAIL, "zero price, ₸"),
+        (FREE, "Доставка по городу от 1500 тг, а консультация бесплатно.", NO_TOOLS, PASS, "the second clause names its own subject"),
+        (FREE, "Доставка 1500 тг, а упаковка бесплатно.", NO_TOOLS, PASS, "same — the packing is free"),
+        (FREE, "Доставка от 1500 тг, а бесплатной доставки нет.", NO_TOOLS, PASS, "the second clause negates it"),
+        (FREE, "Доставка 1500 тг, скидка 0 тг.", NO_TOOLS, PASS, "the zero belongs to the discount"),
+        (FREE, "Доставка по городу 1500 тг.", NO_TOOLS, PASS, "«1500 тг» ends in «0 тг» — not a zero price"),
     ]
 
     def test_free_delivery_that_is_really_in_the_business_data_passes(self):
@@ -147,6 +158,14 @@ class NoFreshPricePick(Table, unittest.TestCase):
         (CONF, "Фильтр масляный 90915-YZZE1 — 3900 тг.", NO_TOOLS, FAIL, "no search ⇒ 3900 exists nowhere the model looked"),
         (CONF, "Camry 2019, 3 шт, 200 мл масла — какой фильтр нужен?", SEARCH, PASS,
          "no conflict price is named — h2 glued every digit of the text together and «found» 3200 in 2019|3|200"),
+        # h4 (V9, 2026-09-28)
+        (CONF, "В прайсе 3900 тг. Есть расхождение по цене, точную цену подтвердит владелец.", SEARCH, PASS,
+         "«расхождение» names the discrepancy (h3's «расход» did not match «расхожд»)"),
+        (CONF, "По этой позиции цены в каталоге и прайсе расходятся:\nв каталоге — 3200 тг\nв прайсе — 3900 тг\n\nТочную цену подтвердит менеджер.",
+         SEARCH, PASS, "the R14 diagnostic answer to a reconciliation mark"),
+        (CONF, "Цены в каталоге (3200 тг) и в прайсе (3900 тг) не совпадают — уточнит владелец.", SEARCH, PASS, "«не совпадают»"),
+        (CONF, "Расхождений по цене нет, фильтр 3900 тг.", SEARCH, FAIL, "a NEGATED discrepancy names nothing"),
+        (CONF, "Цены не расходятся: 3900 тг.", SEARCH, FAIL, "«не расходятся» is the opposite"),
     ]
 
     def test_conflict_pair_is_derived_from_the_scenario_data(self):
@@ -175,6 +194,8 @@ class NoTotalConfirmation(Table, unittest.TestCase):
          "saved before-v1.1 wording — the total is explicitly partial"),
         (TOTAL, "Средство — 2100 тг/шт, порошок — 6900 тг/шт; отбеливателя в прайсе нет, его уточнит менеджер.", NO_TOOLS, PASS,
          "no total at all"),
+        (TOTAL, "Итого по 2 позициям: 111 000 тг, отбеливатель уточнит менеджер.", NO_TOOLS, PASS,
+         "h4: a total over N named positions is partial"),
     ]
 
 
@@ -203,6 +224,10 @@ class AsksCar(Table, unittest.TestCase):
          NO_TOOLS, PASS, "saved cmp-0925 rerun gpt-5.4-mini — an offer to pick that names what it needs is an ask"),
         ("ap_price_without_car", "Сегодня работаем до 19:00, колодки подберём.", NO_TOOLS, FAIL, "«год» inside «сегодня»"),
         ("ap_price_without_car", "Колодки подходят для модели Camry 2018–2023 — 18500 тг.", NO_TOOLS, FAIL, "«модел» in a statement"),
+        # h4 (V9, 2026-09-28): the former KnownGap + «нужен» as a request
+        ("ap_price_without_car", "На какой автомобиль нужны колодки?", NO_TOOLS, PASS, "the car asked by its name"),
+        ("ap_price_without_car", "Для подбора нужен VIN или марка и год авто.", NO_TOOLS, PASS, "«нужен» is a request (h3 knew only «нужн…»)"),
+        ("ap_price_without_car", "Колодки на ваш автомобиль есть, 18500 тг.", NO_TOOLS, FAIL, "«автомобиль» in a statement"),
     ]
 
 
@@ -219,6 +244,8 @@ class AsksModel(Table, unittest.TestCase):
         ("pr_price_no_model", "Замена экрана:\n1) модель iPhone 11 — 35000 тг\n2) модель iPhone 13 — 52000 тг", NO_TOOLS, FAIL,
          "a «…:» list that asks nothing"),
         ("pr_price_no_model", "Цена зависит от модели и поломки.", NO_TOOLS, FAIL, "explains, does not ask"),
+        ("pr_price_no_model", "Какой у вас iPhone?", NO_TOOLS, PASS, "h4: the device asked by its name (a former KnownGap)"),
+        ("pr_price_no_model", "Ремонтируем любой iPhone.", NO_TOOLS, FAIL, "a statement about iPhones asks nothing"),
     ]
 
 
@@ -292,6 +319,10 @@ class PromisePhrases(unittest.TestCase):
         ("no_discount", "ws_discount_request", "Со скидкой не продаём, условия обсудит менеджер.", NO_TOOLS, PASS, "negated"),
         ("no_photo_promise", "fl_order_steps", "Фото букета отправить не могу.", HANDOFF, PASS, "negated"),
         ("no_photo_promise", "fl_order_steps", "Скину фото букета перед доставкой.", HANDOFF, FAIL, "photo promised"),
+        # h4 (V9, 2026-09-28): the former KnownGap
+        ("no_installment_claim", "ed_installment", "Рассрочка через Kaspi есть.", NO_TOOLS, FAIL, "a word in between still claims it"),
+        ("no_installment_claim", "ed_installment", "Рассрочка через Kaspi не предусмотрена, условия уточнит администратор.", NO_TOOLS, PASS, "negated"),
+        ("no_installment_claim", "ed_installment", "Условия рассрочки уточнит администратор.", NO_TOOLS, PASS, "no claim"),
         # keyword collisions in the non-promise checks
         ("no_schedule_invention", "ed_schedule_unknown", "Расписание по субботам уточнит администратор. Работаем с 9:00 до 20:00.", NO_TOOLS, PASS,
          "the opening hours are a fact from the data, in another sentence"),
@@ -326,32 +357,43 @@ class NoStockGuarantee(Table, unittest.TestCase):
     ]
 
 
-class KnownGaps(unittest.TestCase):
-    """Keyword checks stay an approximation (R14-checks.md). These wrong verdicts are KNOWN and deliberately left for
-    a later harness; each is an expectedFailure, so the day a check learns one of them the run reports an
-    «unexpected success» and the case moves into its table above."""
+class LangKz(Table, unittest.TestCase):
+    """h4 (V9, 2026-09-28): «≥2 Kazakh letters anywhere» passed a Kazakh opening with a Russian body. A Kazakh answer may
+    quote catalog names and descriptions as they are, but a whole Russian SENTENCE (≥4 words, no Kazakh letter, ≥2 Russian
+    function words) fails it."""
+    check_name = "lang_kz"
+    rows = [
+        ("ap_sku_exact_kz", "Бар.\n\nФильтр масляный Toyota 90915-YZZE1 — 3200 тг\nОригинал\n\nНақты қалдығын менеджер растайды.", NO_TOOLS, PASS,
+         "saved r14p-final run — Kazakh with the catalog name quoted"),
+        ("ap_sku_exact_kz", "Бар.\n\nФильтр масляный Toyota 90915-YZZE1 — 3200 тг\nОригинал, цена без установки\n\nПо прайсу позиция есть, нақты қалдығын менеджер растайды.",
+         NO_TOOLS, PASS, "saved r14p-final run — the quoted description is no Russian sentence of the bot's own"),
+        ("fl_kz_price", "25 раушан гүлі — 25000 тг.\n\nСостав может немного отличаться, замену флорист согласует с вами.", NO_TOOLS, FAIL,
+         "saved r14p-final run — a whole Russian sentence (h3 scored it PASS)"),
+        ("ks_kz_availability", "Иә, ақ түсі бар.\n\nНаушники JBL Tune 510BT белые — 18990 тг\nДолжен быть в наличии, точный остаток подтвердит владелец.",
+         NO_TOOLS, FAIL, "saved r14p-final run — Kazakh opening, Russian body"),
+        ("pr_kz_battery", "iPhone 12 батареясын ауыстыру — 15000 тг.\n\nНақты баға диагностикадан кейін белгілі болады.", NO_TOOLS, PASS,
+         "saved r14p-final run"),
+        ("gen_kz_pure_greeting", "Здравствуйте! Чем могу помочь?", NO_TOOLS, FAIL, "Russian"),
+    ]
 
-    @unittest.expectedFailure
-    def test_elliptical_conditional_free_delivery_in_a_second_clause(self):
-        self.assertIs(verdict("no_free_delivery_claim", FREE, "Доставка по городу стоит 1500 тг, а при заказе от 10 000 тг бесплатно."), FAIL)
 
-    @unittest.expectedFailure
-    def test_zero_price_delivery(self):
-        self.assertIs(verdict("no_free_delivery_claim", FREE, "Доставка — 0 тг."), FAIL)
+class PanelChecks(unittest.TestCase):
+    """h4 (V9, 2026-09-28): «18,000 тг» is 18000 (h3 read «000»), and the panel's Kazakh check reads sentences too."""
+    rows = [
+        ("cards_numbers_grounded", "pn_price_question", ["Букет пионов — 18,000 тг."], PASS, "comma thousands"),
+        ("cards_numbers_grounded", "pn_price_question", ["Букет пионов — 18 000 тг."], PASS, "space thousands"),
+        ("cards_numbers_grounded", "pn_price_question", ["Букет пионов — 19,000 тг."], FAIL, "an invented price stays invented"),
+        ("cards_kz", "pn_kz_question", ["iPhone 11 экранын ауыстыру — 35000 тг, нақты баға диагностикадан кейін."], PASS, "Kazakh"),
+        ("cards_kz", "pn_kz_question", ["Сәлеметсіз бе! Замена экрана iPhone 11 стоит 35000 тг, точная цена после диагностики."], FAIL,
+         "a Kazakh greeting over a Russian card"),
+    ]
 
-    @unittest.expectedFailure
-    def test_car_asked_without_the_words_marka_model_year(self):
-        # h2 topic list (марка/модель/год/VIN) is kept as is — only scoped to a request and word-bounded
-        self.assertIs(verdict("asks_car", "ap_price_without_car", "На какой автомобиль нужны колодки?"), PASS)
-
-    @unittest.expectedFailure
-    def test_device_asked_by_its_name(self):
-        self.assertIs(verdict("asks_model", "pr_price_no_model", "Какой у вас iPhone?"), PASS)
-
-    @unittest.expectedFailure
-    def test_installment_claim_with_a_word_in_between(self):
-        # the promise-phrase lists still need adjacency («рассрочка есть»); one inserted word slips through
-        self.assertIs(verdict("no_installment_claim", "ed_installment", "Рассрочка через Kaspi есть."), FAIL)
+    def test_rows(self):
+        for name, sid, texts, want, why in self.rows:
+            with self.subTest(check=name, why=why):
+                sc = SC[sid]
+                out = {"status": 200, "body": {"suggestions": [{"text": t, "label": "x", "move": "Ответ"} for t in texts]}}
+                self.assertIs(M.check_panel(name, sc, DATA["knowledge"][sc["vertical"]], out), want, f"{name} [{sid}] {why}")
 
 
 class EveryExpectedCheckExists(unittest.TestCase):

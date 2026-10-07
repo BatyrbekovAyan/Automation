@@ -231,6 +231,30 @@ def banter_abstains(ctx):
                 f"thanks_cards={len(d2.get('suggestions') or [])} thanks_abstain={d2.get('abstain')}")
 
 
+@scenario("price_conflict_marked_for_the_panel", "V9 (price reconciliation): a price-list row naming the catalog's article at 3900 against the catalog's 3200 reaches the panel's ДАННЫЕ with «[Сверка с каталогом: … Цены расходятся.]» under it and the prompt carries «РАСХОЖДЕНИЕ ЦЕН»; a corrected catalog (3900) — no mark, no rule")
+def price_conflict_panel(ctx):
+    owner, pid = owner_for(ctx)
+    tag = f"e2e-{ctx.run_id}"
+    psql(f"insert into documents (content, metadata) values ('Фильтр масляный 90915-YZZE1 — 3900 тг, оригинал', '{{\"botWaId\": \"{STG_WA}\", \"fileId\": \"{tag}\"}}'::jsonb);")
+    try:
+        msgs = [m("client", "Camry 2019, фильтр масляный 90915-YZZE1 сколько?", 1)]
+        out = []
+        for price in ("3200 тг", "3900 тг"):
+            items = [{"kind": "product", "name": "Фильтр масляный Toyota 90915-YZZE1", "price": price, "description": "Оригинал"}]
+            st, d, ex = call(owner, payload(owner, pid, msgs, know=knowledge(items, {}, "Запчасти для Toyota", "Asia/Almaty", 1)))
+            asm = node_output(ex, "Assemble") or {}
+            fenced = json.loads(asm["fencedData"].split("\n", 1)[1]) if asm.get("fencedData") else {}
+            exact = fenced.get("exactMatches", "")
+            out.append((st, exact, "РАСХОЖДЕНИЕ ЦЕН" in (asm.get("systemPrompt") or ""), (node_output(ex, "Prep") or {}).get("catalogItems")))
+        (st1, exact1, rule1, items1), (st2, exact2, rule2, _) = out
+        mark1 = [l for l in exact1.split("\n") if l.startswith("[Сверка с каталогом:")]
+        ok = (st1 == 200 and len(mark1) == 1 and "3200" in mark1[0] and "3900" in mark1[0] and "Цены расходятся" in mark1[0] and rule1
+              and bool(items1) and st2 == 200 and "[Сверка с каталогом:" not in exact2 and not rule2 and "3900" in exact2)
+        return ok, f"http={st1}/{st2} mark={mark1[:1]} rule={rule1}/{rule2} catalogItems={items1} exact2={exact2[:60]!r}"
+    finally:
+        psql(f"delete from documents where metadata->>'fileId' = '{tag}';")
+
+
 @scenario("same_request_key_is_counted_once", "S3: a retry with the SAME request key (timeout / re-open) does not increment the daily counter; a new key does")
 def idempotent_count(ctx):
     owner, pid = owner_for(ctx)

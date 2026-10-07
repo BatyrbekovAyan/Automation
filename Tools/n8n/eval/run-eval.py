@@ -9,7 +9,10 @@ spread and cost — never a single «100 %» run.
                     completions proxy (Tools/n8n/staging/workflows/stgEvalRunner001) with the
                     template's model/params and the agent's two tools simulated by the runner:
                     `create_handoff` (returns the scenario's `tool` verdict) and the price-list
-                    search (returns the vertical's documents). finish_reason / usage are recorded.
+                    search (returns the vertical's documents — and, when the template at --prompts-ref routes
+                    the search through the Price List Search sub-workflow (V9, 2026-09-28), runs THAT
+                    workflow's own `Reconcile Prices` Code over them, so a before/after measures the real
+                    pipeline). finish_reason / usage are recorded.
   panel scenarios — POSTed to the staging /webhook/SuggestReplies with the v1.5 knowledge object.
 
     python3 Tools/n8n/eval/run-eval.py --label after                  # working-tree prompts
@@ -45,6 +48,7 @@ BASE = os.environ.get("N8N_STAGING_BASE", "http://localhost:5678").rstrip("/")
 CREATE_WA = "Tools/n8n/workflows/XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json"
 BOT_WA = "Tools/n8n/workflows/4wYitz5ek30SVNlT-WhatsApp_Bot.json"
 STAGING_SUGGEST = "Tools/n8n/workflows-staging/9PTyYcelRQI7bGDb-Suggest_Replies.json"
+PRICE_SEARCH = "Tools/n8n/workflows/crPriceSearch001-Price_List_Search.json"
 KZ = set("әіңғүұқөһӘІҢҒҮҰҚӨҺ")
 # USD per 1M tokens (input, cached input, output) — OpenAI Standard tier as published on
 # developers.openai.com/api/docs/pricing, read 2026-09-25. Reasoning tokens are billed as output.
@@ -102,14 +106,45 @@ def compose(vertical_prompt, business_type, owner_prompt, business, products, se
             f"About Business: {business}\n\nProducts:\n{products}\n\nServices:\n{services}")
 
 
+def search_code(ref, bot_wf):
+    """V9: the template's price-list tool is either n8n's retrieve-as-tool (the hits reach the model verbatim) or the
+    Price List Search sub-workflow — then the hits pass through ITS `Reconcile Prices` Code at the same ref."""
+    tool = next(n for n in bot_wf["nodes"] if n["name"] == "Supabase Vector Store")
+    if tool["type"] != "@n8n/n8n-nodes-langchain.toolWorkflow" or tool["parameters"]["workflowId"]["value"] != "crPriceSearch001":
+        return None
+    sub = json.loads(file_at(ref, PRICE_SEARCH))
+    return next(n for n in sub["nodes"] if n["name"] == "Reconcile Prices")["parameters"]["jsCode"]
+
+
 def model_params(ref):
     wf = json.loads(file_at(ref, BOT_WA))
     n = next(n for n in wf["nodes"] if n["name"] == "OpenAI")
     o = n["parameters"].get("options", {})
-    tool_desc = next(n for n in wf["nodes"] if n["name"] == "Supabase Vector Store")["parameters"]["toolDescription"]
+    tp = next(n for n in wf["nodes"] if n["name"] == "Supabase Vector Store")["parameters"]
+    tool_desc = tp.get("toolDescription") or tp.get("description")   # retrieve-as-tool | toolWorkflow (the same text)
     handoff_desc = next(n for n in wf["nodes"] if n["name"] == "Create Handoff")["parameters"]["description"]
     return {"model": n["parameters"]["model"]["value"], "temperature": o.get("temperature", 0.2), "frequency_penalty": o.get("frequencyPenalty", 0),
-            "max_tokens": o.get("maxTokens", 200), "search_desc": tool_desc, "handoff_desc": handoff_desc}
+            "max_tokens": o.get("maxTokens", 200), "search_desc": tool_desc, "handoff_desc": handoff_desc, "search_code": search_code(ref, wf)}
+
+
+_HARNESS = None
+
+
+def simulate_search(docs, system, mp):
+    """The price-list search as the model receives it: the scenario's documents (the vector store's top hits), reconciled
+    by the measured ref's own Code node when the template routes there — executed, never re-implemented here."""
+    hits = list(docs[:5])
+    if not mp.get("search_code"):
+        return {"documents": hits}
+    global _HARNESS
+    if _HARNESS is None:
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("harness", os.path.join(N8N, "tests", "harness.py"))
+        _HARNESS = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(_HARNESS)
+    named = {"Guard": {"ok": True, "query": "", "filterKey": "botWaId", "botId": "evalScenario0001", "prompt": system},
+             "Search Price Lists": [{"document": {"pageContent": d, "metadata": {}}, "score": 0.8} for d in hits] or [{}]}
+    return _HARNESS.run_js(mp["search_code"], {"json": {}}, named)[0]["json"]
 
 
 TOOLS = lambda mp: [
@@ -166,7 +201,7 @@ def run_auto(sc, know, mp, prompts, max_tokens, effort=None, drop=()):
                     result = {"ok": True, "handoff_id": 1, "created": True, "status": "open", "note": "Заявка записана, владелец получит уведомление."} if verdict.get("ok", True) \
                         else {"ok": False, "error": "db_error", "note": "Заявку записать не удалось — не обещай клиенту передачу; предложи контакт из данных бизнеса."}
                 else:
-                    result = {"documents": docs[:5]}
+                    result = simulate_search(docs, system, mp)
                 messages.append({"role": "tool", "tool_call_id": tc["id"], "content": json.dumps(result, ensure_ascii=False)})
             continue
         text = msg.get("content") or ""
@@ -218,7 +253,8 @@ def latency_stats(xs):
 
 
 # ---- deterministic checks -------------------------------------------------------------------
-AMOUNT = re.compile(r"(\d[\d\s]{2,})\s?(тг|₸|тенге|теңге)", re.I)
+# h4: «18,000 тг» / «18.000 тг» are 18000 (h3 read «000»)
+AMOUNT = re.compile(r"(\d{1,3}(?:[,.\s]\d{3})+(?!\d)|\d[\d\s]{2,})\s?(тг|₸|тенге|теңге)", re.I)
 
 
 def digits(s): return re.sub(r"\D", "", s or "")
@@ -228,8 +264,9 @@ def knowledge_text(sc, know):
     return " ".join([sc.get("business_override", know["business"]), know["products"], know["services"], " ".join(sc.get("docs_override", know["docs"])), sc.get("owner_prompt", "")])
 
 
-HARNESS_VERSION = ("h3 (2026-09-27, R14: scoped negation + data-aware free delivery, price conflict by parsed numbers and search, "
-                   "asks-in-a-request, firm totals, no digit gluing; checks pinned by test_checks.py)")
+HARNESS_VERSION = ("h4 (2026-10-07, V9: «расхождение» + negated conflict, zero-price / elliptical free delivery, «итого по N "
+                   "позициям» partial, «нужен» / the car or device by name, a word inside the installment claim, Kazakh = no "
+                   "Russian sentence, «18,000»; on top of h3 2026-09-27 R14; checks pinned by test_checks.py)")
 
 
 def client_text(sc):
@@ -264,7 +301,7 @@ def sentences(text):
 
 
 # numbers are read one at a time: «3 900» = 3900, «50 мың» = 50000; «2019, 3 шт, 200» is 2019, 3 and 200
-NUM = re.compile(r"(?<!\d)(\d{1,3}(?:[   ]\d{3})+(?!\d)|\d+)(?:\s?(мың|тыс\.?|тысяч\w*|млн|миллион\w*))?", re.I)
+NUM = re.compile(r"(?<!\d)(\d{1,3}(?:[   ,]\d{3})+(?!\d)|\d+)(?:\s?(мың|тыс\.?|тысяч\w*|млн|миллион\w*))?", re.I)
 
 
 def numbers(text):
@@ -314,6 +351,26 @@ def affirmed(low, pattern):
     return any(not _negated(s, m) for s in sentences(low) for m in re.finditer(pattern, s))
 
 
+# h4: an elliptical second clause that carries only «бесплатно» («Доставка 1500 тг, а при заказе от 10 000 тг бесплатно») is
+# still about the delivery — unless it names a subject of its own («…, а консультация бесплатно») or negates it
+_OWN_SUBJECT = re.compile(r"диагностик|консультац|пробн|урок|замер|примерк|упаковк|открытк|установк|сборк|подбор|осмотр|замен|выезд"
+                          r"|обслуживан|настройк|сервис|гарант")
+
+
+def _elliptical_free(s):
+    d = re.search(_DELIVERY, s)
+    if not d:
+        return False
+    rest = s[d.end():]
+    for m in re.finditer(r"[,;—–]\s*(?:а|но|однако)\b[^,;]*?\bбесплатн\w*", rest):
+        clause = m.group(0)
+        tail = re.split(r"[,;.!?]", rest[m.end():], maxsplit=1)[0]
+        if _OWN_SUBJECT.search(clause) or re.search(_DELIVERY, clause) or re.search(r"\b(?:не|нет|ни)\b", clause + " " + tail):
+            continue
+        return True
+    return False
+
+
 def free_delivery_claim(text):
     """True = the text PROMISES free delivery somewhere (an unnegated claim phrase in some sentence). The one
     question that is not a claim is an echo answered «нет» right after it: «Бесплатная доставка? Нет, от 1500 тг»."""
@@ -326,6 +383,11 @@ def free_delivery_claim(text):
             existential = re.search(r"бесплатной|доставки", m.group(0)) and re.search(r"\bнет\b", s[m.end():])
             if not (_negated(s, m) or existential):
                 return True
+        # h4: a ZERO price in the delivery's own clause («Доставка — 0 тг»)
+        if any(re.search(_DELIVERY + r"[^0-9]{0,30}?(?<!\d)0\s?(?:тг|₸|тенге|теңге)", c) for c in re.split(r"[,;]", s)):
+            return True
+        if _elliptical_free(s):
+            return True
     return False
 
 
@@ -372,17 +434,20 @@ def conflict_prices(sc, know):
 
 
 _PRICE_WORD = re.compile(r"цен|стоимост")
-_CONFLICT_STRONG = re.compile(r"расход|не совпада")
+_CONFLICT_STRONG = re.compile(r"расхо(?:д|жд)\w*")   # h4: «расхождение» too; «не совпада…» is checked apart (its «не» IS the claim)
 _CONFLICT_WEAK = re.compile(r"отлича|различа|разн|друг(?:ая|ую|ой|ое)\b|две цены|по-разному")
 _SOURCE_WORD = re.compile(r"каталог|прайс|источник|файл|списк|баз[аеуы]\b")
 _VERIFY = r"(?:уточн|подтверд|подтвержд|сверит|сверя|провер)"
 
 
 def conflict_named(low):
-    """The answer says the prices DISAGREE: «цены расходятся / не совпадают», or a weaker «отличается / другая /
-    две цены» together with the sources («в каталоге цена другая»). «В каталоге и в прайсе позиция есть» names
-    two sources, not a discrepancy; «цена разная в зависимости от партии» invents a reason."""
-    return any(_PRICE_WORD.search(s) and (_CONFLICT_STRONG.search(s) or (_CONFLICT_WEAK.search(s) and _SOURCE_WORD.search(s)))
+    """The answer says the prices DISAGREE: «цены расходятся / расхождение / не совпадают», or a weaker «отличается / другая
+    / две цены» together with the sources («в каталоге цена другая»). «В каталоге и в прайсе позиция есть» names two
+    sources, not a discrepancy; «цена разная в зависимости от партии» invents a reason; h4: a NEGATED one («расхождений
+    нет», «цены не расходятся») names nothing."""
+    def strong(s):
+        return any(not _negated(s, m) for m in _CONFLICT_STRONG.finditer(s)) or re.search(r"\bне совпада", s) is not None
+    return any(_PRICE_WORD.search(s) and (strong(s) or (_CONFLICT_WEAK.search(s) and _SOURCE_WORD.search(s)))
                for s in sentences(low))
 
 
@@ -431,9 +496,10 @@ def fresh_price_pick(sc, know, text, calls):
 
 # -- «asks …»: the topic word has to be ASKED, not merely present ----------------------------------------------
 _REQUEST = re.compile(r"\?|подскажите|напишите|уточните|укажите|скажите|сообщите|пришлите|назовите|отправьте|оставьте"
-                      r"|\bнужн\w*|для кого|\bкак(?:ой|ая|ое|ие|ую|ом|их)\b|могу(?:\s+\S+){0,2}\s+подобрать|\bподберу\b")
-ASKS_CAR = r"\bмарк(?:а|и|у|ой|е)?\b|\bмодел\w*|\bгод(?:а|у|ом|ы)?\b|\bvin\b|\bвин\b"
-ASKS_MODEL = r"\bмодел\w*|какой (?:у вас )?телефон|какое устройство"
+                      r"|\bнуж(?:н\w*|ен)\b|для кого|\bкак(?:ой|ая|ое|ие|ую|ом|их)\b|могу(?:\s+\S+){0,2}\s+подобрать|\bподберу\b")
+ASKS_CAR = r"\bмарк(?:а|и|у|ой|е)?\b|\bмодел\w*|\bгод(?:а|у|ом|ы)?\b|\bvin\b|\bвин\b|\bавтомобил\w*|\bмашин\w*|\bавто\b"   # h4: + the car by name
+ASKS_MODEL = (r"\bмодел\w*|какой (?:у вас )?телефон|какое устройство"
+              r"|как(?:ой|ая|ое) (?:у вас )?(?:iphone|айфон|samsung|самсунг|xiaomi|redmi|huawei|смартфон|ноутбук|планшет)\b")   # h4: the device by name
 ASKS_FOR_WHOM = r"для кого|\bреб[её]н\w*|\bвзросл\w*|\bцел(?:ь|и)\b|\bент\b|ielts|\bуров(?:ень|ня|ню|нем)\b|\bвозраст\w*"
 ASKS_ORDER = r"номер\w* заказа|\bтелефон\w*"
 
@@ -458,7 +524,7 @@ def asks(low, topic):
 
 # -- totals --------------------------------------------------------------------------------------------------
 _TOTAL_WORD = re.compile(r"\bитог\w*|\bвсего\b|\bсумм\w*|\bобщ\w* (?:стоимост|сумм)\w*")
-_PARTIAL = re.compile(r"по (?:подтвержд|известн|найденн|имеющ|доступн)\w* позици|без уч[её]та|не включ|\bкроме\b")
+_PARTIAL = re.compile(r"по (?:подтвержд|известн|найденн|имеющ|доступн)\w* позици|по \d+ позици|без уч[её]та|не включ|\bкроме\b")   # h4: «итого по 2 позициям»
 
 
 def confirms_total(low):
@@ -479,6 +545,24 @@ def invented_terms(low, allowed_digits):
     for m in re.finditer(r"(\d+)\s?(%|мес\b|месяц)", low):
         if m.group(1) not in allowed_digits: return True
     return False
+
+
+# h4: «≥2 Kazakh letters anywhere» passed a Kazakh opening over a Russian body. A Kazakh answer may quote catalog names
+# and descriptions as they are, but a whole Russian SENTENCE (≥4 words, no Kazakh letter, ≥2 Russian function words) fails it.
+RU_FUNCTION = {"и", "в", "с", "на", "по", "для", "может", "будет", "есть", "нет", "вас", "вам", "вы", "мы", "что", "как", "если", "после",
+               "можно", "нужно", "пожалуйста", "это", "у", "к", "от", "до", "или", "но", "также", "только", "должен", "должна", "он", "она"}
+RU_STEMS = ("точн", "уточн", "подтверд", "налич", "цен", "свяж", "оформ")
+
+
+def russian_sentence(s):
+    if any(c in KZ for c in s):
+        return False
+    words = re.findall(r"[^\W\d_]+", s.lower())
+    return len(words) >= 4 and sum(1 for w in words if w in RU_FUNCTION or w.startswith(RU_STEMS)) >= 2
+
+
+def kazakh(text):
+    return sum(c in KZ for c in text or "") >= 2 and not any(russian_sentence(x) for x in sentences(text))
 
 
 def check(name, sc, know, out):
@@ -505,7 +589,7 @@ def check(name, sc, know, out):
         "no_price": lambda: not AMOUNT.search(t),
         "numbers_grounded": lambda: all(digits(m.group(1)) in kset or amount_ok(int(digits(m.group(1)) or 0)) for m in AMOUNT.finditer(t)),
         "lang_ru": lambda: sum(c in KZ for c in t) == 0,
-        "lang_kz": lambda: sum(c in KZ for c in t) >= 2,
+        "lang_kz": lambda: kazakh(t),
         "no_markdown": lambda: "**" not in t and not re.search(r"^\s*#|\]\(http|^\s*\|", t, re.M),
         "no_closing_offer": lambda: not r(r"чем ещ[её] (могу )?помочь|чем еще (могу )?помочь|если будут (ещё|еще) вопросы"),
         "asks_car": lambda: asks(low, ASKS_CAR),
@@ -531,7 +615,7 @@ def check(name, sc, know, out):
         "asks_occasion_or_budget_or_offers": lambda: r(r"повод|бюджет|годовщин") or AMOUNT.search(t) is not None,
         "no_photo_promise": lambda: not affirmed(low, r"фото букета|пришл\w* фото|отправл\w* фото|скину фото"),
         "no_exact_time_confirmation": lambda: not affirmed(low, r"(ровно|точно) (в|к) \d|подтверждаю время|ждём вас (ровно|точно)"),
-        "no_installment_claim": lambda: not affirmed(low, r"рассрочк\w* (есть|доступн|возможн)|есть рассрочка|можно (оформить )?в рассрочку|оформим рассрочку"),
+        "no_installment_claim": lambda: not affirmed(low, r"рассрочк\w*(?:\s+\S+){0,2}?\s+(есть|доступн|возможн)|есть рассрочка|можно (оформить )?в рассрочку|оформим рассрочку"),
         "short": lambda: len(t) <= 220,
         "no_upsell_on_thanks": lambda: not r(r"акци|скидк|предлага\w* (также|ещё|еще)|обратите внимание|рекоменду"),
         "refuses_bypass": lambda: "kaspi" in low and not r(r"переведите|перевод\w* на карту|можно перевести|давайте напрямую"),
@@ -582,7 +666,7 @@ def check_panel(name, sc, know, out):
         "cards_no_upsell_on_thanks": lambda: not re.search(r"акци|скидк|рекоменду", low),
         "cards_numbers_grounded": lambda: all(digits(m.group(1)) in kset for m in AMOUNT.finditer(texts)),
         "cards_ru": lambda: sum(c in KZ for c in texts) == 0,
-        "cards_kz": lambda: sum(c in KZ for c in texts) >= 2,
+        "cards_kz": lambda: kazakh("\n".join(c.get("text", "") for c in cards)),
         "cards_first_clarifies": lambda: bool(cards) and cards[0].get("move") == "Уточнить",
         "cards_first_no_price": lambda: bool(cards) and not AMOUNT.search(cards[0].get("text", "")),
         "cards_no_invented_installment_terms": lambda: not invented_terms(low, allowed_digits),
@@ -682,6 +766,7 @@ def main():
                 c = by_check.setdefault(k, [0, 0]); c[1] += 1; c[0] += (1 if v else 0)
     summary = {"label": a.label, "prompts_ref": a.prompts_ref, "scenario_version": d["version"], "harness": HARNESS_VERSION, "model": mp["model"],
                "reasoning_effort": a.reasoning_effort, "dropped_params": a.drop_param, "panel_model": panel_model, "max_tokens": max_tokens,
+               "search_simulation": "Price List Search sub-workflow (Reconcile Prices at the ref)" if mp.get("search_code") else "raw documents (retrieve-as-tool)",
                "scenarios": len(results), "runs": total_runs, "pass_all": sum(1 for x in results if x["pass_rate"] == 1),
                "flaky": sum(1 for x in results if 0 < x["pass_rate"] < 1), "fail": sum(1 for x in results if x["pass_rate"] == 0),
                "error_runs": error_runs, "finish_reason_length_runs": length_cut, "prompt_tokens": usage_in, "cached_tokens": usage_cached,
@@ -698,7 +783,8 @@ def main():
           f"prompts: `{a.prompts_ref}` · auto model `{mp['model']}`{effort_txt} · panel model `{panel_model}` · max_tokens {max_tokens} · {summary['scenarios']} scenarios / {total_runs} runs · {summary['seconds']} s",
           f"pass {summary['pass_all']} · flaky {summary['flaky']} · fail {summary['fail']} · error runs {error_runs} · finish_reason=length in {length_cut} runs",
           f"auto-path tokens {usage_in} in (cached {usage_cached}) + {usage_out} out (reasoning {usage_reason}) ≈ ${cost} at ${p_in}/${p_cached}/${p_out} per 1M in/cached/out (panel usage is not returned by the webhook)",
-          f"latency (wall clock through staging): {lat_txt}", "",
+          f"latency (wall clock through staging): {lat_txt}",
+          f"simulated price-list search: {summary['search_simulation']}", "",
           "| scenario | vertical | mode | pass rate | failed checks |", "|---|---|---|---|---|"]
     for x in results:
         failed = sorted({k for r in x["runs"] for k, v in r["verdicts"].items() if v is False})

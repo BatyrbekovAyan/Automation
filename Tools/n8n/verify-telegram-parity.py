@@ -76,7 +76,10 @@ TG_BOT_NODE_NAMES = {
     "Pause Before Reading", "Ask to Send Text", "Input type2", "Count Output Words",
     "Count Input Words", "Download Audio", "Listening Pause", "Chat Memory", "If",
     "Read Reply Mode", "Suppressed?",
-    "OpenAI", "Supabase Vector Store", "Retrieve Answer", "OpenAI Embedding",
+    # «Supabase Vector Store» is the price-list TOOL — since V9 (2026-09-28, build-price-search.py) a toolWorkflow into the
+    # Price List Search sub-workflow (the hits are reconciled with the catalog there); its embedding sub-node moved with
+    # the search — −1 («OpenAI Embedding»)
+    "OpenAI", "Supabase Vector Store", "Retrieve Answer",
     "Debounce Wait", "Fetch Recent", "Latest+Combine", "Is Latest?",
     "Count Dialog", "Quota Decision", "If Quota Allows",
     "Outcome",   # audit stage 0.5 terminal outcome stamp (apply-outcome-stamps.py)
@@ -180,10 +183,13 @@ def check_telegram_bot():
     assert skey.rstrip().endswith("chatId }}"), f"{f}: sessionKey does not end with chatId: {skey}"
     assert ".from }}" not in skey, f"{f}: sessionKey still references .from: {skey}"
 
-    # (vii) vector-store retrieval filter key unchanged (botTgId).
+    # (vii) the price-list search filters by botTgId and the clone's own id (V9: the tool hands both to crPriceSearch001).
     sup = node(ns, "Supabase Vector Store")
-    mv = sup["parameters"]["options"]["metadata"]["metadataValues"]
-    assert len(mv) == 1 and mv[0]["name"] == "botTgId", f"{f}: retrieve filter key not single botTgId: {mv}"
+    assert sup["type"] == "@n8n/n8n-nodes-langchain.toolWorkflow" and sup["parameters"]["workflowId"]["value"] == "crPriceSearch001", \
+        f"{f}: the price-list tool does not go through crPriceSearch001"
+    inputs = sup["parameters"]["workflowInputs"]["value"]
+    assert inputs.get("filterKey") == "botTgId" and inputs.get("botId") == "={{ $workflow.id }}", \
+        f"{f}: retrieve filter not botTgId + this clone's id: {inputs}"
 
     print(f"OK  {f}")
 

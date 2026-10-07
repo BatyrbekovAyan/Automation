@@ -1,0 +1,234 @@
+V9 (price reconciliation at search time) — AFTER: build-price-search.py (+ build-test-dialog.py, apply-suggest-v2.py), gates, tests
+
+$ python3 Tools/n8n/build-price-search.py; python3 Tools/n8n/build-price-search.py; python3 Tools/n8n/build-price-search.py --check
+up to date crPriceSearch001-Price_List_Search.json
+up to date 4wYitz5ek30SVNlT-WhatsApp_Bot.json
+up to date 4VN3gsFaC2HUYmcc-Telegram_Bot.json
+up to date 0DP79STI3pafXO9B-Set_Workflow_State.json
+price search: OK
+$ python3 Tools/n8n/build-test-dialog.py --check; python3 Tools/n8n/apply-suggest-v2.py; python3 Tools/n8n/apply-suggest-v2.py --check
+test dialog: OK
+up to date  9PTyYcelRQI7bGDb-Suggest_Replies.json
+suggest v2: OK
+
+$ python3 Tools/n8n/tests/test_price_search.py
+PASS sub-workflow: Guard → Valid? → Search Price Lists (the bot's own documents, fail-open) → Reconcile Prices
+PASS [WA] template: the price-list tool goes through the sub-workflow with the clone's own id, key and PUBLISHED prompt
+PASS [TG] template: the price-list tool goes through the sub-workflow with the clone's own id, key and PUBLISHED prompt
+PASS Test Dialog: its tool is the same sub-workflow, fed with the bot's id/key (Validate) and the published prompt it read (Compose)
+PASS Guard: a search runs only for a real bot id under botWaId / botTgId
+PASS ap_source_conflict: one mark under the price-list row — the item, 3200 and 3900, «Цены расходятся»
+PASS base documents of every vertical, at their own catalog prices, come back byte for byte
+PASS price-list shapes the converter / OCR / PDF / free text produce: a different price is marked
+PASS all price columns are compared: опт/розн — no mark when either equals the catalog, both named when neither does
+PASS ambiguous prices («от», a range) get the catalog price only — never «Цены расходятся»
+PASS no mark: price on the next line, a longer code, a bare year, an analogue mention or column, no article, «договорная»
+PASS grades, sizes and specs are not articles; an accessory with the same model code is only a soft mark
+PASS adversarial (own review): analogue rows, promo prices, joined specs, two amounts — never a false «Цены расходятся»
+PASS catalog prices with a unit (тг/шт, тг/мес) take part; a different unit is not a conflict
+PASS a three-row chunk: only the conflicting row is marked; variants at the line price are no conflict
+PASS idempotent: a second pass is byte-identical, a forged mark line is dropped, a corrected catalog clears the mark
+PASS fuzz: 400 random price-list rows — never throws, only INSERTS mark lines, idempotent, nothing without a catalog
+PASS search failure, an invalid call and an empty result never read as «позиции нет»
+PASS [WA] panel: RAG and exact-match rows are reconciled with the SAME function and the prompt says what a mark means
+PASS [TG] panel: RAG and exact-match rows are reconciled with the SAME function and the prompt says what a mark means
+PASS ONE function: the sub-workflow and the panel carry the generator's RECONCILE_JS byte for byte
+PASS Set Workflow State refuses to touch the price search
+PASS staging derivation: the price search reads the staging documents stub (no embeddings there), never the real project
+PASS eval runner: the simulated search runs the canonical Reconcile Prices when the measured template routes to it
+
+24 pass, 0 fail
+exit=0
+
+$ python3 Tools/n8n/eval/test_checks.py  (h4)
+Ran 18 tests in 0.073s
+
+OK
+
+$ python3 Tools/n8n/verify_rag.py all
+/Applications/Xcode.app/Contents/Developer/usr/bin/python3: can't open file '/Users/ayan/Projects/Automation/Tools/n8n/verify_rag.py all': [Errno 2] No such file or directory
+$ python3 Tools/n8n/verify-telegram-parity.py
+ALL PARITY ASSERTS PASSED
+$ python3 Tools/n8n/verify-history-handoff.py
+ALL HISTORY/HANDOFF ASSERTS PASSED
+$ python3 Tools/n8n/verify-reply-pipeline.py
+ALL REPLY PIPELINE ASSERTS PASSED
+$ python3 Tools/n8n/verify-reply-mode.py
+ALL REPLY MODE ASSERTS PASSED
+$ python3 Tools/n8n/verify-auth-gate.py
+ALL AUTH GATE ASSERTS PASSED
+$ python3 Tools/n8n/verify-message-batching.py
+ALL BATCHING ASSERTS PASSED
+$ python3 Tools/n8n/verify-sql-comments.py
+OK  76 Postgres node(s) in 28 workflow file(s): no placeholder outside code, no {{ }}, no modifier, no leading =
+$ python3 Tools/n8n/apply-reply-pipeline-v2.py --check
+reply pipeline v2: OK
+$ python3 Tools/n8n/apply-history-handoff.py --check
+history/handoff: OK
+$ python3 Tools/n8n/apply-reply-mode-v2.py --check
+reply-mode v2: OK
+$ python3 Tools/n8n/apply-auth-gate.py --check
+auth gate: OK
+$ python3 Tools/n8n/apply-outcome-stamps.py --check
+outcome stamps: OK
+$ python3 Tools/n8n/build-handoff-workflows.py --check
+handoff workflows: OK
+$ python3 Tools/n8n/build-auth-workflows.py --check
+auth workflows: up to date
+$ python3 Tools/n8n/inject-panel-prompts.py --check
+9PTyYcelRQI7bGDb-Suggest_Replies.json: up-to-date
+
+$ node Tools/n8n/verify-panel-prompts.js
+PASS
+
+================================================================================
+STAGING (n8n 2.36.7 + task runners, private Postgres, Wappi mock) — bootstrap re-import, verify-deployed
+$ python3 Tools/n8n/staging/bootstrap.py --bot wa:stgwa001 --bot tg:stgtg001   (twice: first with the v1 rules, then after the own adversarial pass)
+$ python3 Tools/n8n/verify-deployed.py --base http://localhost:5678
+base http://localhost:5678: canonical 27 (diff 0), clones 2 (behind template 0), archived clones 0 (not counted), other 2
+  OK      0DP79STI3pafXO9B 0DP79STI3pafXO9B-Set_Workflow_State.json  active=True names=True graph=True published=True
+  OK      4VN3gsFaC2HUYmcc 4VN3gsFaC2HUYmcc-Telegram_Bot.json  active=False names=True graph=True published=None
+  OK      4wYitz5ek30SVNlT 4wYitz5ek30SVNlT-WhatsApp_Bot.json  active=False names=True graph=True published=None
+  OK      9PTyYcelRQI7bGDb 9PTyYcelRQI7bGDb-Suggest_Replies.json  active=True names=True graph=True published=True
+  OK      crPriceSearch001 crPriceSearch001-Price_List_Search.json  active=True names=True graph=True published=True
+  OK      crTestDialog0001 crTestDialog0001-Test_Dialog.json  active=True names=True graph=True published=True
+  clone   stgtg40da979c774 'STAGING TG stgtg001' [telegram] active=True nodes=60 graph=63d5618f0990 published=63d5618f0990 sticky=None AT-CANONICAL
+  clone   stgwab77f282533c 'STAGING WA stgwa001' [whatsapp] active=True nodes=60 graph=2f26b8306e59 published=2f26b8306e59 sticky=None AT-CANONICAL
+
+--- first import (v1 rules), real model (gpt-5.4-mini on the staging bots, gpt-4o-mini on the panel) — the V9 scenarios
+PASS  price_conflict_marked_for_the_panel (8s) — V9 (price reconciliation): a price-list row naming the catalog's article at 3900 against the catalog's 3200 reaches the panel's ДАННЫЕ with «[Сверка с каталогом: … Цены расходятся.]» under it and the prompt carries «РАСХОЖДЕНИЕ ЦЕН»; a corrected catalog (3900) — no mark, no rule
+      http=200/200 mark=['[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1» — 3200 тг, в прайсе — 3900 тг. Цены расходятся.]'] rule=True/False catalogItems=[{'kind': 'product', 'name': 'Фильтр масляный Toyota 90915-YZZE1', 'price': '3200 тг'}] exact2='Фильтр масляный 90915-YZZE1 — 3900 тг, оригинал'
+PASS  test_dialog_price_conflict_is_named [llm] (6s) — V9: the Test Dialog's price-list tool is the reconciling sub-workflow fed with the PUBLISHED prompt it read — a price-list row at 3900 against the catalog's 3200 is answered as a discrepancy, never as 3900 alone
+      {'status': 200, 'reply': 'Фильтр масляный 90915-YZZE1 — 3900 тг, оригинал.  \nВ каталоге есть расхождение: 3200 тг и 3900 тг.', 'tool_result_reached_the_model': True, 'discrepancy_named': True}
+(before the batch: the same scenarios run alone, WA+TG + Test Dialog + panel — all PASS, recorded in the session; the bot replies:)
+  [wa] «Фильтр масляный Toyota 90915-YZZE1 — 3900 тг, оригинал. В каталоге есть расхождение: 3200 тг и 3900 тг.»
+  [tg] «Фильтр масляный 90915-YZZE1 для Camry 2019: 3900 тг — по прайсу, 3200 тг — в каталоге. Цены расходятся, оба варианта указаны как оригинал»
+  [test dialog] «Фильтр масляный 90915-YZZE1 — 3900 тг, оригинал. В каталоге есть расхождение: 3200 тг и 3900 тг.»
+  every tool result carried: «… — 3900 тг, оригинал
+[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1» — 3200 тг, в прайсе — 3900 тг. Цены расходятся.]»
+
+--- regression batch on the first import (sequential): e2e-suggest, e2e-test-dialog, e2e-reply, …
+===== e2e-suggest 19:43:14
+12 pass, 0 fail
+===== e2e-suggest exit=0 19:44:20
+===== e2e-test-dialog 19:44:20
+7 pass, 0 fail
+===== e2e-test-dialog exit=0 19:45:00
+===== e2e-reply 19:45:00
+===== e2e-reply exit=143 19:51:25
+===== e2e-handoff 19:51:25
+PASS  dup_parallel_once[wa] (28s) — A4: the same event delivered twice IN PARALLEL → one send, one 'duplicate' stamp
+PASS  dup_parallel_once[tg] (27s) — A4: the same event delivered twice IN PARALLEL → one send, one 'duplicate' stamp
+PASS  dup_sequential_once[wa] (30s) — A4: the same event re-delivered 1 s later (first run still in flight) → one se
+PASS  dup_sequential_once[tg] (28s) — A4: the same event re-delivered 1 s later (first run still in flight) → one se
+PASS  restart_stale_claim_reclaims[wa] (32s) — A4: a claim older than 10 min (n8n died mid-flight) is re-claimed on re
+PASS  restart_stale_claim_reclaims[tg] (30s) — A4: a claim older than 10 min (n8n died mid-flight) is re-claimed on re
+PASS  two_chats_parallel_independent[wa] (28s) — A4: two DIFFERENT chats at the same moment → two sends (the lease i
+PASS  two_chats_parallel_independent[tg] (28s) — A4: two DIFFERENT chats at the same moment → two sends (the lease i
+PASS  newer_incoming_during_llm_supersedes[wa] (32s) — A3: a NEWER client message while the answer is being generated 
+PASS  newer_incoming_during_llm_supersedes[tg] (28s) — A3: a NEWER client message while the answer is being generated 
+FAIL  owner_reply_before_send_cancels[wa] (12s) — A3: the OWNER answers while the bot is composing → no auto-send, c
+FAIL  owner_reply_before_send_cancels[tg] (12s) — A3: the OWNER answers while the bot is composing → no auto-send, c
+FAIL  auto_off_mid_flight_cancels[wa] (12s) — A3: «Вместе» switched on while the answer is being generated →
+FAIL  auto_off_mid_flight_cancels[tg] (12s) — A3: «Вместе» switched on while the answer is being generated →
+FAIL  typing_failure_still_sends[wa] (11s) — A7: the typing indicator fails (HTTP 500) → the reply is still sent
+FAIL  typing_failure_still_sends[tg] (11s) — A7: the typing indicator fails (HTTP 500) → the reply is still sent
+FAIL  expired_lock_does_not_block[wa] (11s) — A4: a lease left behind by a dead run (expired) does not block the next 
+FAIL  expired_lock_does_not_block[tg] (11s) — A4: a lease left behind by a dead run (expired) does not block the next 
+STOPPED at this point: from owner_reply_before_send_cancels on, every run ends generation_failed — the staging OpenAI account ran out of credits:
+$ curl -s -X POST http://localhost:5678/webhook/EvalRun -d {"request":{"model":"gpt-5.4-mini",…"ping"}}
+{"status":429,"body":{"error":{"message":"You have no credits remaining. …","type":"insufficient_quota","code":"credit_balance_exhausted"}}}
+(execution data of those runs: the OpenAI sub-node error «The service is receiving too many requests from you», the price-list tool never called;
+ e2e-handoff / e2e-clone-update / e2e.py were not run — every one of them drives the model.)
+
+--- second import (after the own adversarial pass), model-free
+$ python3 Tools/n8n/staging/e2e-test-dialog.py --only price_search_subworkflow
+      {'status': 200, 'documents': ['Колодки тормозные 04465-02220 — 18500 тг', 'Фильтр масляный 90915-YZZE1 — 3900 тг, оригинал\n[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1» — 3200 тг, в прайсе — 3900 тг. Цены расходятся.]'], 'sentinel_id': {'documents': []}}
+   cleanup: deleted rows: 2
+
+1 pass, 0 fail
+(e2e-suggest price_conflict_marked_for_the_panel on the second import: the run is CANCELLED at the Retrieve RAG embeddings call — OpenAI 429 — before Assemble; it passed on the first import, see above)
+
+================================================================================
+V9 (price reconciliation at search time) — own adversarial pass over the implemented design (2026-10-07)
+
+README: «Дизайн "во время поиска" ещё не атакован — после реализации обязательна отдельная состязательная проверка.»
+This file is the implementer's own attack on the design and the matching rules, done after the first green run; every
+finding below was turned into a test row (tests/test_price_search.py) BEFORE the rule was changed. It does not replace an
+independent adversarial review by a separate reviewer — that is still owed (see the group report).
+
+A. Matching rules — attacks that produced a WRONG «Цены расходятся» on the first implementation (all fixed, all pinned)
+  1. An analogue row naming the OEM number in brackets: «Фильтр JS Asakashi (аналог) 90915-YZZE1 — 1400 тг» → was a strong
+     conflict (the analogue's price vs the original's catalog price). Fix: «)»/«»»/quotes allowed between the analogue word
+     and the article (→ not the row's item, no mark).
+  2. An analogue word on the article's own part of the row: «Аналог фильтра Toyota 90915-YZZE1 от JS — 1400 тг» → was strong.
+     Fix: ANALOG_WORD on the text since the previous article / up to the price → the soft «may be another item» mark only.
+  3. A promo price: «… — 3900 тг, по акции 3200 тг» → was a conflict on the FIRST amount. Fix: the catalog price anywhere
+     among the article's amounts = no conflict.
+  4. Two amounts after the article that are not opt/retail columns: «— 3900 тг, доставка 1500 тг» → was strong. Fix: more
+     than one amount = AMBIGUOUS (soft mark with the catalog price only).
+  5. A -/ joined spec: catalog «Ноутбук HP 16GB/512GB», row «Ноутбук Lenovo 16GB/512GB — 350000 тг» → was strong (the spec
+     read as an article, the head noun «ноутбук» on the row). Fix: SPEC_PART — every part a number or number+unit, one
+     with a unit → not an article.
+  Held on the first run (pinned as well): a model code inside a URL slug (the whole slug is one token), a header row
+  without a price, the refuter's 5W-30 / 205/55R16 / accessory «Чехол для JBL 510BT» (soft only), a code inside a longer
+  code, a bare year, «от»/ranges (soft only), `]` in a name, forged mark lines in a document.
+
+B. Fuzz (in the test): 400 random rows from 40 adversarial fragments — never throws; only INSERTS whole mark lines (every
+   original line survives, in order); the second pass is byte-identical; without a catalog nothing but forged full mark
+   lines is removed.
+
+C. Design-level attacks (reasoned, checked on staging where possible)
+  1. Wrong catalog source: the tool passes `$('AI Agent').params.options.systemMessage` — the RUNNING (published) version's
+     parameters, not a draft and not an API read. Staging e2e price_conflict_reaches_the_agent_marked [wa][tg]: the
+     published prompt was edited to carry the catalog; the agent's ai_tool output in the saved execution carried the mark.
+  2. Cross-bot leak: botId is `$workflow.id` (the model fills only `input`); the Guard refuses '-1' / '' / a non-id /
+     another filter key (pinned) — '-1' would match every bot's shared unauthed chunks.
+  3. A missing sub-workflow at runtime (deploy order): the tool would error and the agent answer without documents.
+     Deploy MUST import + publish crPriceSearch001 before the templates / clones and Test Dialog are updated (recorded for
+     the release package; not testable locally beyond staging bootstrap order, where it is published with the canonical set).
+  4. callerPolicy: the sub-workflow keeps n8n's default (callers of the same owner) — the clones are created through the
+     owner's API key, the Test Dialog is the owner's workflow; staging (same owner) runs it from both.
+  5. Data exposure: the model used to receive each hit's metadata (bot / file ids); it now receives the row text only.
+  6. Payload size: the prompt travels as a sub-workflow input (≤100 000 chars accepted by the Guard); the sub-workflow saves
+     NO successful execution (prompt + prices are not kept), errors are kept.
+  7. Panel legacy client (no knowledge object): the «• name — price» lines are parsed (pinned [WA]/[TG]); a legacy catalog cut
+     by the client mid-line loses only that line (its price no longer parses).
+  8. Stale marks: impossible by construction — nothing is stored; a mark exists only while catalog and row disagree.
+  Known limits (documented, not fixed in v1): items WITHOUT an article-like token are not reconciled (phone_repair /
+  flowers / education / most kaspi catalogs — name matching is v2); a price on the line AFTER the article's line is not
+  attributed; the Test Dialog's owner-facing «Sources» list shows the raw snippets (the tool result the model gets is
+  reconciled).
+
+================================================================================
+Simulated price-list search, eval set v1.1 (2026-09-22: absent-item check names the item; harness h2): before = --prompts-ref 5b0a222d (search: raw documents), after = worktree (search: sub-workflow)
+prompt map identical before/after: True | tool description identical: True
+  CHANGED ap_source_conflict:
+    before: {"documents": ["Фильтр масляный 90915-YZZE1 — 3900 тг, оригинал"]}
+    after:  {"documents": ["Фильтр масляный 90915-YZZE1 — 3900 тг, оригинал\n[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1» — 3200 тг, в прайсе — 3900 тг. Цены расходятся.]"]}
+auto scenarios: 51; tool result changed: 1; byte-identical: 50
+
+================================================================================
+$ python3 Tools/n8n/tests/run_all.py   (after every change in this commit)
+OK   test_auth_refresh.py: 12 pass, 0 fail
+OK   test_billing_identity.py: 14 pass, 0 fail
+OK   test_claim.py: 16 pass, 0 fail
+OK   test_create_seed.py: 52 pass, 0 fail
+OK   test_harness_selfcheck.py: 2 pass, 0 fail
+OK   test_legacy_generators.py: 5 pass, 0 fail
+OK   test_price_search.py: 24 pass, 0 fail
+OK   test_reply_lost_send.py: 5 pass, 0 fail
+OK   test_reply_memory.py: 44 pass, 0 fail
+OK   test_reply_mode.py: 43 pass, 0 fail
+OK   test_reply_order.py: 44 pass, 0 fail
+OK   test_reply_reconcile.py: 66 pass, 0 fail
+OK   test_sql_comment_injection.py: 36 pass, 0 fail
+OK   test_suggest_catalog.py: 24 pass, 0 fail
+OK   test_suggest_lang.py: 11 pass, 0 fail
+OK   test_suggest_query.py: 37 pass, 0 fail
+OK   test_test_dialog.py: 17 pass, 0 fail
+OK   test_upload.py: 22 pass, 0 fail
+OK   test_verify_deployed.py: 27 pass, 0 fail
+OK   test_verify_parity.py: 38 pass, 0 fail
+OK   test_verify_sql_comments.py: 53 pass, 0 fail
+exit=0

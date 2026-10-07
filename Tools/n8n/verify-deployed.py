@@ -151,6 +151,7 @@ def main():
             wf = json.loads(derive.derive_file(text) if derive else text)
             if derive:
                 derive.isolate_supabase_writers(wf)   # staging copies never write to the real Supabase (R3, derive-staging.py)
+                derive.isolate_supabase_readers(wf)   # … and the price search reads the staging stub (V9, derive-staging.py)
             canon[wf["id"]] = (f, wf)
     live = {w["id"]: w for w in uc.list_workflows(base)}
     report = {"base": base, "canonical": [], "clones": [], "archived": [], "unknown": []}

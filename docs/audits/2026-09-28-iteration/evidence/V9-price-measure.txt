@@ -1,0 +1,52 @@
+V9 — measurement (staging only). Status 2026-10-07: the PAID before/after is BLOCKED — the staging OpenAI account has no credits
+(credit_balance_exhausted, probed through the staging EvalRun proxy; adding credits is the owner's action). What could be measured without
+the model is below; the paid commands to run once credits are restored are at the end.
+
+1) Evaluator h4 (Tools/n8n/eval/run-eval.py + test_checks.py) — the ruler first
+$ python3 Tools/n8n/eval/test_checks.py   BEFORE (h3, the new rows): 15 wrong verdicts (see V9-price-before.txt, second half)
+$ python3 Tools/n8n/eval/test_checks.py   AFTER (h4):
+Ran 18 tests in 0.114s
+
+OK
+   the five KnownGaps expectedFailures are now ordinary rows (zero-price + elliptical free delivery, the car / the device by name,
+   a word inside the installment claim) + «расхождение» / negated conflict, «итого по N позициям», «нужен», Kazakh = no Russian sentence,
+   «18,000 тг»; each new rule has a negative row (a consultation that is free, «скидка 0 тг», «1500 тг», «Ремонтируем любой iPhone», …).
+
+2) h4 recount of the SAVED runs, both sides (rescore.py — same answers, new ruler; never overwrites the h3 files):
+$ python3 Tools/n8n/eval/rescore.py results/r14p-final-v1.1.json results/r14p-final-x5-auto.json results/v9p-before-x8.json results/v9p-after-x8.json
+r14p-final-v1.1.h4: 59/1/3 -> 56/4/3 (pass/flaky/fail), 3 verdict changes, panel carried 0
+   fl_kz_price                  run 1 lang_kz                        True  -> False | 25 раушан гүлі — 25000 тг. / Состав может немного отличаться, замену флорист с
+   ks_kz_availability           run 2 lang_kz                        True  -> False | Иә, ақ түсі бар. / Наушники JBL Tune 510BT белые — 18990 тг / Должен быть в наличии, т�
+   ed_kz_parent                 run 2 lang_kz                        True  -> False | ЕНТ-ге дайындық — 55 000 тг/ай / Математика және физика кіреді / Пробный урок 
+r14p-final-x5-auto.h4: 7/6/1 -> 6/7/1 (pass/flaky/fail), 2 verdict changes, panel carried 0
+   ks_kz_availability           run 2 lang_kz                        True  -> False | Иә, ақ түсі бар. / Наушники JBL Tune 510BT белые — 18990 тг / Должен быть в наличии, т�
+   ks_kz_availability           run 5 lang_kz                        True  -> False | Иә, ақ түсі бар. / Наушники JBL Tune 510BT белые — 18990 тг / Оформить можно на стран�
+v9p-before-x8.h4: 9/1/2 -> 9/1/2 (pass/flaky/fail), 1 verdict changes, panel carried 0
+   pn_kz_question               run 2 cards_kz                       True  -> False | {"v": 1, "requestSeq": 1, "suggestions": [{"text": "iPhone 11 экранын ауыстыру 35000 тг тұрады. Ремонтқ�
+v9p-after-x8.h4: 11/1/0 -> 12/0/0 (pass/flaky/fail), 1 verdict changes, panel carried 0
+   pn_price_question            run 4 cards_numbers_grounded         False -> True  | {"v": 1, "requestSeq": 1, "suggestions": [{"text": "Букет пионов стоит 18,000 тг. Если хотите, могу п
+   → h4 is stricter where h3 was blind (Russian sentences in Kazakh answers) and fairer where it was wrong («18,000 тг»);
+     ap_source_conflict stays FAIL in every saved run under h4 (each named 3900 alone) — the fix has to move the model, not the ruler.
+
+Simulated price-list search, eval set v1.1 (2026-09-22: absent-item check names the item; harness h2): before = --prompts-ref 5b0a222d (search: raw documents), after = worktree (search: sub-workflow)
+prompt map identical before/after: True | tool description identical: True
+  CHANGED ap_source_conflict:
+    before: {"documents": ["Фильтр масляный 90915-YZZE1 — 3900 тг, оригинал"]}
+    after:  {"documents": ["Фильтр масляный 90915-YZZE1 — 3900 тг, оригинал\n[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1» — 3200 тг, в прайсе — 3900 тг. Цены расходятся.]"]}
+auto scenarios: 51; tool result changed: 1; byte-identical: 50
+   ⇒ for 50 of the 51 auto scenarios the model sees byte-identical input before and after; only ap_source_conflict can move.
+
+3) Real-model evidence gathered BEFORE the credits ran out (staging, the deployed pipeline end to end, not the simulator):
+   bot WA, bot TG, Test Dialog — 3/3 replies named the discrepancy (3200 and 3900 / «расхождение»), see V9-price-after.txt;
+   the R14 diagnostic (docs/audits/2026-09-27-iteration/evidence/R14-prompts-conflict-diagnostic.txt) measured the same mark format 6/6
+   on the vertical prompt (before: 0/6). This is indicative only — NOT the ×8 before/after on one set and one ruler the README asks for.
+
+4) OWED once credits are restored (staging only; before = HEAD before this fix, after = the committed fix; same set v1.1, same ruler h4):
+   python3 Tools/n8n/eval/run-eval.py --skip-panel --only ap_source_conflict --repeat 8 --repeat-all --prompts-ref 5b0a222d --label v9c-before-x8
+   python3 Tools/n8n/eval/run-eval.py --skip-panel --only ap_source_conflict --repeat 8 --repeat-all --label v9c-after-x8
+   python3 Tools/n8n/eval/run-eval.py --skip-panel --repeat 3 --repeat-all --prompts-ref 5b0a222d --label v9c-before-auto-x3
+   python3 Tools/n8n/eval/run-eval.py --skip-panel --repeat 3 --repeat-all --label v9c-after-auto-x3
+   python3 Tools/n8n/eval/run-eval.py --skip-auto --only pn_ --repeat 8 --repeat-all --label v9c-after-panel-x8   (vs v9p-after-x8.h4)
+   (the summary of each run names its simulated search: «raw documents (retrieve-as-tool)» before, «Price List Search sub-workflow» after);
+   and the staging e2e that the exhausted account interrupted: e2e-reply (from owner_reply_before_send_cancels on), e2e-handoff,
+   e2e-clone-update, e2e.py, plus e2e-suggest price_conflict_marked_for_the_panel on the second import.

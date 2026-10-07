@@ -239,6 +239,89 @@ def s_inactive(ctx):
     return ok, {"status": st, "reply": reply[:160], "promptVersion": pv, "draft": wf["versionId"]}
 
 
+@scenario("test_dialog_price_conflict_is_named [llm]", "V9: the Test Dialog's price-list tool is the reconciling sub-workflow fed with the PUBLISHED prompt it read — a price-list row at 3900 against the catalog's 3200 is answered as a discrepancy, never as 3900 alone")
+def s_price_conflict(ctx):
+    t = Target(ctx, "tpc")
+    tag = f"tpc-{ctx.run_id}"
+    psql(f"insert into documents (content, metadata) values ('Фильтр масляный 90915-YZZE1 — 3900 тг, оригинал', "
+         f"'{{\"botWaId\": \"{t.wf_id}\", \"fileId\": \"{tag}\"}}'::jsonb);")
+    try:
+        with BotVersions(t.wf_id) as bv:
+            wf = bv.put(bv.base_prompt + "\n\nProducts:\nProduct1: Фильтр масляный Toyota 90915-YZZE1\nProduct1 Price: 3200 тг\n"
+                        "Product1 Description: Оригинал\n\nServices:\n", publish=True)
+            if wf.get("activeVersionId") != wf.get("versionId"):
+                bv.set_active(False)
+                bv.set_active(True)
+            st, d = t.test("Camry 2019, фильтр масляный 90915-YZZE1 сколько?")
+    finally:
+        psql(f"delete from documents where metadata->>'fileId' = '{tag}';")
+    reply = (d.get("reply") if isinstance(d, dict) else str(d)) or ""
+    flat = reply.replace(" ", "").replace("\u00a0", "")
+    reached = "3900" in flat                                   # 3900 exists only in the price list: the tool ran
+    named = "3200" in flat or "расход" in reply.lower()
+    ok = st == 200 and isinstance(d, dict) and d.get("success") is True and reached and named
+    return ok, {"status": st, "reply": reply[:220], "tool_result_reached_the_model": reached, "discrepancy_named": named}
+
+
+def price_search_probe(run_id):
+    """A TEMPORARY staging-only workflow (webhook → Execute Workflow crPriceSearch001 → last node) — runs the deployed
+    sub-workflow on the real n8n with the inputs the bot's tool passes, no model involved; deleted after use."""
+    inputs = {"query": "={{ $json.body.query }}", "botId": "={{ $json.body.botId }}", "filterKey": "={{ $json.body.filterKey }}",
+              "prompt": "={{ $json.body.prompt }}"}
+    schema = [{"id": k, "displayName": k, "required": False, "defaultMatch": False, "display": True, "canBeUsedToMatch": True,
+               "type": "string", "removed": False} for k in inputs]
+    path = f"v9-price-probe-{run_id}"
+    wf = {"name": f"STAGING probe price search {run_id}", "settings": {"executionOrder": "v1"}, "connections": {
+              "Webhook": {"main": [[{"node": "Call Price Search", "type": "main", "index": 0}]]}},
+          "nodes": [{"parameters": {"httpMethod": "POST", "path": path, "responseMode": "lastNode", "options": {}}, "id": "probe-webhook",
+                     "name": "Webhook", "type": "n8n-nodes-base.webhook", "typeVersion": 2, "position": [0, 0], "webhookId": path},
+                    {"parameters": {"workflowId": {"__rl": True, "value": "crPriceSearch001", "mode": "id"},
+                                    "workflowInputs": {"mappingMode": "defineBelow", "value": inputs, "matchingColumns": [], "schema": schema,
+                                                       "attemptToConvertTypes": False, "convertFieldsToString": False}, "options": {}},
+                     "id": "probe-call", "name": "Call Price Search", "type": "n8n-nodes-base.executeWorkflow", "typeVersion": 1.2,
+                     "position": [220, 0]}]}
+    st, created = rest("POST", "/workflows", wf)
+    if st != 200:
+        raise RuntimeError(f"probe create {st}: {str(created)[:200]}")
+    wid = created["id"]
+    st, _ = rest("POST", f"/workflows/{wid}/activate")
+    if st != 200:
+        rest("DELETE", f"/workflows/{wid}")
+        raise RuntimeError(f"probe activate {st}")
+    return wid, f"{BASE}/webhook/{path}"
+
+
+@scenario("price_search_subworkflow_runs_on_n8n", "V9: the deployed Price List Search (Guard → the bot's own rows → Reconcile Prices) on the real n8n task runner, called with the tool's inputs — no model: a 3900 row against a 3200 catalog comes back marked, the catalog price unmarked, a foreign bot's row and a '-1' id never searched")
+def s_price_search(ctx):
+    t = Target(ctx, "tps")
+    tag = f"tps-{ctx.run_id}"
+    rows = [("Фильтр масляный 90915-YZZE1 — 3900 тг, оригинал", t.wf_id), ("Колодки тормозные 04465-02220 — 18500 тг", t.wf_id),
+            ("Фильтр масляный 90915-YZZE1 — 1 тг, чужой бот", "wfForeignBot0001")]
+    for content, bot in rows:
+        psql(f"insert into documents (content, metadata) values ('{content}', '{{\"botWaId\": \"{bot}\", \"fileId\": \"{tag}\"}}'::jsonb);")
+    prompt = ("Business Type: Автозапчасти\n\nAbout Business: x\n\nProducts:\nProduct1: Фильтр масляный Toyota 90915-YZZE1\nProduct1 Price: 3200 тг\n"
+              "Product1 Description: Оригинал\n\nProduct2: Колодки тормозные передние Toyota 04465-02220\nProduct2 Price: 18500 тг\n"
+              "Product2 Description: Оригинал\n\nServices:\n")
+    wid = None
+    try:
+        wid, url = price_search_probe(ctx.run_id)
+        body = {"query": "фильтр 90915-YZZE1", "botId": t.wf_id, "filterKey": "botWaId", "prompt": prompt}
+        st, d = http("POST", url, body, timeout=60)
+        st2, d2 = http("POST", url, dict(body, botId="-1"), timeout=60)
+    finally:
+        if wid:
+            rest("POST", f"/workflows/{wid}/deactivate")
+            rest("DELETE", f"/workflows/{wid}")
+        psql(f"delete from documents where metadata->>'fileId' = '{tag}';")
+    docs = (d or {}).get("documents") if isinstance(d, dict) else None
+    docs = docs or []
+    marked = [x for x in docs if "90915-YZZE1 — 3900" in x]
+    ok = st == 200 and len(docs) == 2 and len(marked) == 1 and "[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1» — 3200 тг, в прайсе — 3900 тг. Цены расходятся.]" in marked[0] \
+        and any(x == "Колодки тормозные 04465-02220 — 18500 тг" for x in docs) and not any("чужой" in x for x in docs) \
+        and st2 == 200 and isinstance(d2, dict) and d2.get("documents") == []
+    return ok, {"status": st, "documents": docs, "sentinel_id": d2}
+
+
 @scenario("handoffs_status_lists_last_outcomes_owner_scoped", "7.3: op status returns the ledger's last states for the owner's profiles (chat tail only), 403 for a foreign install")
 def s_status(ctx):
     t = Target(ctx, "ts")

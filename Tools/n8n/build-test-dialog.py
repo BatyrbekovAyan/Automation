@@ -31,6 +31,10 @@ _spec.loader.exec_module(auth)
 _spec2 = importlib.util.spec_from_file_location("hh", os.path.join(HERE, "apply-history-handoff.py"))
 hh = importlib.util.module_from_spec(_spec2)
 _spec2.loader.exec_module(hh)
+# V9 (iteration 2026-09-28): the price-list tool is the SAME reconciling sub-workflow the bot clones call
+_spec3 = importlib.util.spec_from_file_location("price_search", os.path.join(HERE, "build-price-search.py"))
+ps = importlib.util.module_from_spec(_spec3)
+_spec3.loader.exec_module(ps)
 TEST_ID, TEST_NAME = "crTestDialog0001", "Test Dialog"
 DRY_ID, DRY_NAME = "crHandoffDry0001", "Handoff Request (dry)"
 ADMIN_CRED = {"id": "__HDR_CRED__", "name": "n8n Admin API"}          # bound per instance (deploy substitutes; staging remaps by name)
@@ -138,16 +142,11 @@ def tool_node():
 def vector_node(name, mode, pos):
     p = {"mode": mode, "tableName": {"__rl": True, "value": "documents", "mode": "list", "cachedResultName": "documents"},
          "options": {"queryName": "match_documents", "metadata": {"metadataValues": [{"name": "={{ $('Validate').first().json.filterKey }}", "value": "={{ $('Validate').first().json.workflowId }}"}]}}}
-    if mode == "load":
-        p.update({"prompt": "={{ $('Validate').first().json.text }}", "topK": 5, "includeDocumentMetadata": True})
-    else:
-        p.update({"toolDescription": "Retrieve product details, prices, services, and any uploaded catalog or document content for this business. Use whenever the customer asks about products, pricing, availability, or specifics that may be in uploaded documents.",
-                  "topK": 10, "useReranker": False})
+    p.update({"prompt": "={{ $('Validate').first().json.text }}", "topK": 5, "includeDocumentMetadata": True})
     n = {"parameters": p, "id": nid(TEST_ID, name), "name": name, "type": "@n8n/n8n-nodes-langchain.vectorStoreSupabase", "typeVersion": 1.3,
          "position": pos, "credentials": {"supabaseApi": dict(SUPABASE_CRED)}}
-    if mode == "load":
-        n["alwaysOutputData"] = True
-        n["onError"] = "continueRegularOutput"
+    n["alwaysOutputData"] = True
+    n["onError"] = "continueRegularOutput"
     return n
 
 
@@ -178,9 +177,10 @@ def build_test():
     n.append({"parameters": {"model": {"__rl": True, "mode": "list", "value": "gpt-5.4-mini"}, "options": {"frequencyPenalty": 0.2, "maxTokens": 200, "responseFormat": "text", "temperature": 0.2, "maxRetries": 2}},
               "id": nid(TEST_ID, "llm"), "name": "OpenAI", "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi", "typeVersion": 1.2, "position": [2200, 320],
               "credentials": {"openAiApi": dict(OPENAI_CRED)}})
-    n.append(vector_node("Supabase Vector Store", "retrieve-as-tool", [2380, 420]))
-    n.append({"parameters": {"model": "text-embedding-3-small"}, "id": nid(TEST_ID, "emb2"), "name": "OpenAI Embedding Tool", "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
-              "typeVersion": 1.2, "position": [2380, 600], "credentials": {"openAiApi": dict(OPENAI_CRED)}})
+    # V9: the agent's price-list search reconciles every hit with the catalog of the prompt Compose read (the bot's
+    # published version) — the bot's own id and filter key from Validate
+    n.append(ps.tool_node("={{ $('Validate').first().json.workflowId }}", "={{ $('Validate').first().json.filterKey }}",
+                          "={{ $('Compose').first().json.systemMessage }}", nid(TEST_ID, "Supabase Vector Store"), [2380, 420]))
     n.append(tool_node())
     n.append(auth.postgres("Read Actions", READ_ACTIONS_SQL, "={{ [ $('Validate').first().json.runId ] }}", [2420, 100]))
     n.append(auth.code("Build Response", RESPOND_JS, [2640, 100]))
@@ -194,7 +194,6 @@ def build_test():
     auth.edge(c, "Probe Documents", "Sources"); auth.edge(c, "Sources", "AI Agent")
     auth.edge(c, "AI Agent", "Read Actions"); auth.edge(c, "Read Actions", "Build Response"); auth.edge(c, "Build Response", "Respond")
     c["OpenAI Embedding"] = {"ai_embedding": [[{"node": "Probe Documents", "type": "ai_embedding", "index": 0}]]}
-    c["OpenAI Embedding Tool"] = {"ai_embedding": [[{"node": "Supabase Vector Store", "type": "ai_embedding", "index": 0}]]}
     c["OpenAI"] = {"ai_languageModel": [[{"node": "AI Agent", "type": "ai_languageModel", "index": 0}]]}
     c["Supabase Vector Store"] = {"ai_tool": [[{"node": "AI Agent", "type": "ai_tool", "index": 0}]]}
     c["Create Handoff"] = {"ai_tool": [[{"node": "AI Agent", "type": "ai_tool", "index": 0}]]}

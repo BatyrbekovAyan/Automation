@@ -35,19 +35,32 @@ RETRIEVE_FILTER_KEY = {
 }
 
 
+PRICE_SEARCH = "crPriceSearch001-Price_List_Search.json"
+
+
 def check_bot(f):
     wf = load(f); ns = wf["nodes"]
     assert find(ns, ts="rerankerCohere") is None, f"{f}: Cohere reranker still present"
     assert "Reranker Cohere" not in wf["connections"], f"{f}: Cohere connection not pruned"
+    # V9 (2026-09-28): the price-list tool is the Price List Search sub-workflow (the hits are reconciled with the catalog
+    # before the model sees them) — a retrieve-as-tool here would hand the model un-reconciled rows again
+    assert not any(n["type"].endswith("vectorStoreSupabase") for n in ns), f"{f}: an un-reconciled vector-store search is back in the template"
     sup = find(ns, name="Supabase Vector Store")
-    assert sup["parameters"]["useReranker"] is False, f"{f}: useReranker not False"
-    assert sup["parameters"]["topK"] == 10, f"{f}: topK not 10"
-    assert "product" in sup["parameters"]["toolDescription"].lower(), f"{f}: toolDescription not sharpened"
-    mv = sup["parameters"].get("options", {}).get("metadata", {}).get("metadataValues", [])
-    assert len(mv) == 1 and mv[0]["name"] == RETRIEVE_FILTER_KEY[f], f"{f}: retrieve filter key wrong: {mv}"
-    assert "$workflow.id" in mv[0]["value"], f"{f}: retrieve filter not self-scoped to $workflow.id"
-    emb = find(ns, name="OpenAI Embedding")
-    assert "3-small" in json.dumps(emb["parameters"].get("model", "")), f"{f}: retrieve embed model not pinned"
+    assert sup["type"] == "@n8n/n8n-nodes-langchain.toolWorkflow" and sup["parameters"]["workflowId"]["value"] == "crPriceSearch001", \
+        f"{f}: the price-list tool does not go through crPriceSearch001: {sup['type']}"
+    assert "product" in sup["parameters"]["description"].lower(), f"{f}: toolDescription not sharpened"
+    inputs = sup["parameters"]["workflowInputs"]["value"]
+    assert inputs.get("filterKey") == RETRIEVE_FILTER_KEY[f], f"{f}: retrieve filter key wrong: {inputs.get('filterKey')}"
+    assert inputs.get("botId") == "={{ $workflow.id }}", f"{f}: retrieve filter not self-scoped to $workflow.id: {inputs.get('botId')}"
+    # the search itself (shared by both templates): self-scoped filter, topK 10, the pinned embedding model, no reranker
+    sub = load(PRICE_SEARCH); sns = sub["nodes"]
+    srch = find(sns, name="Search Price Lists")
+    assert srch["parameters"]["topK"] == 10, f"{PRICE_SEARCH}: topK not 10"
+    assert not srch["parameters"].get("useReranker") and find(sns, ts="rerankerCohere") is None, f"{PRICE_SEARCH}: reranker present"
+    mv = srch["parameters"].get("options", {}).get("metadata", {}).get("metadataValues", [])
+    assert mv == [{"name": "={{ $json.filterKey }}", "value": "={{ $json.botId }}"}], f"{PRICE_SEARCH}: filter not taken from the caller: {mv}"
+    emb = find(sns, name="OpenAI Embedding")
+    assert "3-small" in json.dumps(emb["parameters"].get("model", "")), f"{PRICE_SEARCH}: retrieve embed model not pinned"
     mem = find(ns, name="Chat Memory")
     assert "||" not in mem["parameters"]["sessionKey"], f"{f}: dead || still in sessionKey"
     assert "+ ':' +" in mem["parameters"]["sessionKey"], f"{f}: sessionKey not namespaced"

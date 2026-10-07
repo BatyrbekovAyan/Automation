@@ -254,9 +254,10 @@ with Case('D1 draft moved in the editor (positions only) while the published gra
 
 def staged(d, w):
     """A canonical workflow exactly as derive-staging.py deploys it to staging: hosts derived AND (R3, 2026-09-27)
-    the Supabase writers neutralised."""
+    the Supabase writers neutralised AND (V9, 2026-09-28) the price search reading the staging documents stub."""
     x = json.loads(d.derive_file(json.dumps(w, ensure_ascii=False)))
     d.isolate_supabase_writers(x)
+    d.isolate_supabase_readers(x)
     return x
 
 
@@ -279,6 +280,14 @@ with Case('R3 NEG staging base: an Upload File copy that still WRITES to the rea
     inst[upload_id] = deployed(json.loads(d.derive_file(json.dumps(CANON[upload_id], ensure_ascii=False))), active=True)
     code, out, rep = verify(inst, base='http://localhost:5678')
     c.check(code == 2 and canon_row(rep, upload_id)['status'] != 'OK', f'exit {code}: {canon_row(rep, upload_id)}')
+
+with Case('V9 NEG staging base: a Price List Search copy still searching the real Supabase project (reader not redirected) -> DIFF, exit 2') as c:
+    d = derive_module()
+    inst = {wid: deployed(staged(d, w), active=wid not in TEMPLATE_IDS.values()) for wid, w in CANON.items()}
+    search_id = 'crPriceSearch001'
+    inst[search_id] = deployed(json.loads(d.derive_file(json.dumps(CANON[search_id], ensure_ascii=False))), active=True)
+    code, out, rep = verify(inst, base='http://localhost:5678')
+    c.check(code == 2 and canon_row(rep, search_id)['status'] != 'OK', f'exit {code}: {canon_row(rep, search_id)}')
 
 # ---------------------------------------------------------------------------------------------- negative cases
 with Case('D1 NEG forged correct sticky on a drifted clone graph -> BEHIND, «sticky claims … graph is …», exit 2') as c:

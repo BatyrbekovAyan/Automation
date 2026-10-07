@@ -138,6 +138,43 @@ def isolate_supabase_writers(wf):
     return replaced
 
 
+PRICE_SEARCH_ID = "crPriceSearch001"
+STAGING_PRICE_SEARCH_SQL = """-- STAGING ONLY (derive-staging.py): the staging `documents` stub has no embeddings, so the price-list search returns
+-- the bot's own rows instead — newest first, the same top 10, in the shape the vector store's load mode emits. The first
+-- parameter is the metadata key (botWaId / botTgId), the second the bot's workflow id; a sentinel id matches nothing.
+select json_build_object('pageContent', content, 'metadata', metadata) as document
+from documents
+where metadata->>$1 = $2 and $2 not in ('-1', '')
+order by id desc
+limit 10;"""
+
+
+def isolate_supabase_readers(wf):
+    """V9 (2026-09-28): the price-list search (crPriceSearch001) is what reconciles a price-list row with the catalog, and
+    a staging run has to SEE that — but its vector search reads the real Supabase project (no staging bot id owns a chunk
+    there) and the staging `documents` stub carries no embeddings. So, in the staging copy of THAT workflow only, the
+    search reads the stub through the staging Postgres (same output shape, same filter by key + bot id) and its
+    embedding sub-node goes. Every other retrieval keeps reading the real project read-only (README)."""
+    if wf.get("id") != PRICE_SEARCH_ID:
+        return []
+    nodes, conns = wf.get("nodes", []), wf.get("connections", {})
+    n = next((x for x in nodes if x["name"] == "Search Price Lists" and x["type"] == "@n8n/n8n-nodes-langchain.vectorStoreSupabase"), None)
+    if n is None:
+        return []
+    subs = {src for src, outs in conns.items() for kind, lists in outs.items()
+            if kind != "main" and any(c["node"] == n["name"] for out in lists for c in out)}
+    nodes[nodes.index(n)] = {"parameters": {"operation": "executeQuery", "query": STAGING_PRICE_SEARCH_SQL,
+                                            "options": {"queryReplacement": "={{ [ $json.filterKey, $json.botId ] }}"}},
+                             "id": n["id"], "name": n["name"], "type": "n8n-nodes-base.postgres", "typeVersion": 2.6,
+                             "position": n["position"], "credentials": {"postgres": {"id": "vvRrFiEXzLVqKjOx", "name": "Postgres"}},
+                             "alwaysOutputData": True, "onError": "continueRegularOutput",
+                             "notes": "STAGING: price-list search reads the staging documents stub (derive-staging.py)"}
+    wf["nodes"] = [x for x in nodes if x["name"] not in subs]
+    for s_name in subs:
+        conns.pop(s_name, None)
+    return [n["name"] + f" (+{len(subs)} sub-nodes)"]
+
+
 def supabase_writers_left(wf):
     return [n["name"] for n in wf.get("nodes", [])
             if (n["type"] == "@n8n/n8n-nodes-langchain.vectorStoreSupabase" and (n.get("parameters") or {}).get("mode") in ("insert", "update"))
@@ -180,6 +217,9 @@ def main():
         isolated_writers = isolate_supabase_writers(wf)
         if isolated_writers:
             print(f"staging isolation: {f}: {isolated_writers}")
+        redirected = isolate_supabase_readers(wf)
+        if redirected:
+            print(f"staging price search: {f}: {redirected}")
         for node in wf.get("nodes", []):
             remap(node, creds, missing)
         wf["active"] = False

@@ -169,6 +169,28 @@ with Case(f'D2 a ROLLBACK of the hotfix (Create WA/TG from {HOTFIX}^, no Retire)
         rc, out = run_parity('--dir', str(d))
     c.check(rc == 1 and 'Retire Refused Profile' in out, f'exit {rc}:\n{out[-900:]}')
 
+TG_BOT = '4VN3gsFaC2HUYmcc-Telegram_Bot.json'
+
+
+def m_tool_filter_wa(w):                       # the Telegram tool searching under the WhatsApp key: another bot's chunks
+    nd(w, 'Supabase Vector Store')['parameters']['workflowInputs']['value']['filterKey'] = 'botWaId'
+
+
+def m_tool_unreconciled(w):                    # V9 rollback: n8n's retrieve-as-tool again (hits reach the model verbatim)
+    t = nd(w, 'Supabase Vector Store')
+    t['type'] = '@n8n/n8n-nodes-langchain.vectorStoreSupabase'
+    t['parameters'] = {'mode': 'retrieve-as-tool', 'toolDescription': 'x', 'topK': 10, 'useReranker': False,
+                       'options': {'metadata': {'metadataValues': [{'name': 'botTgId', 'value': '={{ $workflow.id }}'}]}}}
+
+
+for fn, title in ((m_tool_filter_wa, 'the Telegram price-list tool filtering under botWaId'),
+                  (m_tool_unreconciled, 'the Telegram price-list tool rolled back to retrieve-as-tool (no reconciliation)')):
+    with Case(f'V9 NEG {title} is detected') as c:
+        with canon_copy() as d:
+            mutate(d, TG_BOT, fn)
+            rc, out = run_parity('--dir', str(d))
+        c.check(rc == 1 and ('crPriceSearch001' in out or 'retrieve filter' in out), f'exit {rc}:\n{out[-600:]}')
+
 CONTROL_RC, CONTROL_OUT = run_parity()
 for fn in MUTATIONS:
     for ch, (fname, own, other) in CREATE.items():

@@ -14,10 +14,14 @@
              markers) aligns the clamped history turns and the unclamped burst lines in conversation ORDER — a turn
              > 500, a multi-line turn or a bare media caption no longer lands after the newest question.
              V9 (2026-09-28, panel part): `clientLang` from the newest client message (kz / mixed / ru).
+             V9 (price reconciliation): `catalogItems` — the v1.5 items as {kind, name, price} for Assemble's check.
   Gate     — the daily counter is idempotent per request key (a timeout retry is not a second request).
   RAG      — the vector-store nodes fail OPEN (a search error is not «позиции нет»); an `Exact Match`
              Postgres lookup runs only when SKU-like tokens exist.
   Assemble — knowledge block + incompleteness flags, exact matches, RAG-error notice, zone hedge.
+             V9 (price reconciliation, build-price-search.py's RECONCILE_JS — the SAME function the bot's and the
+             Test Dialog's search run): every RAG / exact-match row naming a catalog article at another price gets a
+             «[Сверка с каталогом: …]» line, and «РАСХОЖДЕНИЕ ЦЕН» tells the model what that line means.
              V9: «ЯЗЫК КЛИЕНТА — КАЗАХСКИЙ» after the niche block for a Kazakh client; ТРИВИАЛЬНЫЕ no longer overrides
              ВОЗДЕРЖАНИЕ (an emotional reaction without a request is not a thank-you).
   Validate — V9: a Kazakh client's Russian card fails the set before the one retry (strict); Validate 2 drops Russian
@@ -29,12 +33,16 @@
     python3 Tools/n8n/apply-suggest-v2.py            # patch workflows/ in place (re-runnable)
     python3 Tools/n8n/apply-suggest-v2.py --check
 """
+import importlib.util
 import json
 import os
 import sys
 import uuid
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+_ps_spec = importlib.util.spec_from_file_location("price_search", os.path.join(HERE, "build-price-search.py"))
+ps = importlib.util.module_from_spec(_ps_spec)
+_ps_spec.loader.exec_module(ps)
 WF = os.path.join(HERE, "workflows")
 FNAME = "9PTyYcelRQI7bGDb-Suggest_Replies.json"
 PG_CRED = {"id": "vvRrFiEXzLVqKjOx", "name": "Postgres"}
@@ -192,6 +200,9 @@ const ITEM_DESC_MAX = 600;          // = SuggestionKnowledge.MaxDescriptionChars
 const LEGACY_CATALOG_MAX = 2500;    // = N8nSuggestionsProvider.MaxCatalogChars: a legacy catalog that long was clamped by the client
 const cut = (s, max) => s.length <= max ? s : s.slice(0, max - 1).trimEnd() + '…';
 let contactsText = '', documentsCount = 0, knowledgeVersion = '';
+// V9: the catalog as data for Assemble's price check (every item, never budget-cut); a legacy client → null, Assemble
+// reads its «• name — price» text instead
+let catalogItems = null;
 let catalog = String(b.catalog || '');
 let businessKnowledge = String(b.businessKnowledge || '');
 if (K) {
@@ -279,6 +290,8 @@ if (K) {
   businessKnowledge = (desc ? 'About Business:\n' + desc : '') + (contactsText ? '\n\nКонтакты:\n' + contactsText : '');
   documentsCount = Number(K.documents) || 0;
   knowledgeVersion = t(K.version, 32);
+  catalogItems = (Array.isArray(K.items) ? K.items : []).filter(x => x && t(x.name, 120))
+    .map(x => ({ kind: x.kind === 'service' ? 'service' : 'product', name: t(x.name, 120), price: t(x.price, 40) }));
 } else {
   // legacy client: the contacts block is the TAIL of businessKnowledge — protect it, trim the description
   const raw = businessKnowledge;
@@ -326,13 +339,23 @@ PREP_RETURN_V1 = """return [{ json: {
   knowledgeFlags: flags, contactsText, documentsCount, knowledgeVersion, tz, tzSource, exactTokens, requestKey
 } }];"""
 # V9: + clientLang (Assemble's language rule, the validators)
-PREP_RETURN_NEW = """return [{ json: {
+PREP_RETURN_V2 = """return [{ json: {
   v: 1, requestSeq, invalid, appUserId,
   profileId: String(b.profileId || ''),
   chatId: String(b.chatId || ''),
   botWaId, botTgId, channel, businessTypeId, businessName, ownerPrompt, catalog, businessKnowledge, now: serverNow, pickStats,
   steerTowardText, lastIncomingText, messages, queryText, trailingText, skipRag,
   knowledgeFlags: flags, contactsText, documentsCount, knowledgeVersion, tz, tzSource, exactTokens, requestKey, clientLang
+} }];"""
+# V9 (price reconciliation): + catalogItems
+PREP_RETURN_NEW = """return [{ json: {
+  v: 1, requestSeq, invalid, appUserId,
+  profileId: String(b.profileId || ''),
+  chatId: String(b.chatId || ''),
+  botWaId, botTgId, channel, businessTypeId, businessName, ownerPrompt, catalog, businessKnowledge, now: serverNow, pickStats,
+  steerTowardText, lastIncomingText, messages, queryText, trailingText, skipRag,
+  knowledgeFlags: flags, contactsText, documentsCount, knowledgeVersion, tz, tzSource, exactTokens, requestKey, clientLang,
+  catalogItems
 } }];"""
 
 # V1 (2026-09-28): an SQL comment never names a parameter as `$` + digit — pg-promise fills `$N` inside comments too
@@ -413,7 +436,13 @@ if (!p.skipRag) {
   }
   ragChunks = parts.join('\\n---\\n').slice(0, 4000);
 }"""
+ASSEMBLE_BEGIN, ASSEMBLE_END = "// STAGE5-ASSEMBLE-BEGIN", "// STAGE5-ASSEMBLE-END"
 ASSEMBLE_RAG_NEW = """// STAGE5-ASSEMBLE-BEGIN (generated by Tools/n8n/apply-suggest-v2.py — edit there)
+""" + ps.RECONCILE_JS + """
+// V9: the catalog the owner keeps in the app (a legacy client: its «• name — price» lines) checks every price-list row
+const priceCatalog = Array.isArray(p.catalogItems) ? PriceReconcile.catalogFromItems(p.catalogItems) : PriceReconcile.catalogFromLegacy(p.catalog);
+let priceMarks = 0;
+const reconciled = (c) => { const r = PriceReconcile.reconcileText(c, priceCatalog); priceMarks += r.marks.length; return r.text; };
 let ragChunks = '', ragError = false, exactMatches = '';
 if (!p.skipRag) {
   const parts = [];
@@ -421,14 +450,14 @@ if (!p.skipRag) {
   for (const it of [...pull('Retrieve RAG'), ...pull('Retrieve RAG TG')]) {
     if (it && it.json && it.json.error) { ragError = true; continue; }   // the search failed — not «позиции нет»
     const c = it && it.json && it.json.document && it.json.document.pageContent;
-    if (c && String(c).trim()) parts.push(String(c).trim());
+    if (c && String(c).trim()) parts.push(reconciled(String(c).trim()));
   }
   ragChunks = parts.join('\\n---\\n').slice(0, 4000);
   const exact = [];
   for (const it of pull('Exact Match')) {
     if (it && it.json && it.json.error) { ragError = true; continue; }
     const c = it && it.json && it.json.content;
-    if (c && String(c).trim()) exact.push(String(c).trim());
+    if (c && String(c).trim()) exact.push(reconciled(String(c).trim()));
   }
   exactMatches = exact.join('\\n---\\n').slice(0, 2000);
 }
@@ -446,6 +475,16 @@ if (kflags.includes('description_truncated')) { L.push('ОПИСАНИЕ БИЗ�
 if (ragError) { L.push('ПОИСК ПО ДОКУМЕНТАМ НЕДОСТУПЕН: выдержки из прайса не получены из-за ошибки поиска — это НЕ значит, что позиции нет; про наличие и цену из файлов отвечай «Уточнить» или «Отложить».'); }
 if (exactMatches) { L.push('ТОЧНЫЕ СОВПАДЕНИЯ: в блоке exactMatches — строки прайса, где артикул/модель из вопроса найдены дословно; цену и артикул бери оттуда, не из похожих строк.'); }
 if (p.tzSource === 'default') { L.push('ЧАСОВОЙ ПОЯС БИЗНЕСА НЕ ЗАДАН: время в ДАННЫЕ приблизительное (по умолчанию Азия/Алматы) — «сейчас открыты/закрыты» утверждай осторожно, лучше «Уточнить».'); }"""
+
+# V9 (price reconciliation): what a «[Сверка с каталогом: …]» line under a price-list row means (the panel's ДАННЫЕ carry it
+# only when a row and the catalog disagree on an article's price, or the row's price could not be pinned)
+PRICE_RULE_BEGIN, PRICE_RULE_END = "// STAGE5-PRICE-RULE-BEGIN", "// STAGE5-PRICE-RULE-END"
+PRICE_RULE_ANCHOR = """if (exactMatches) { L.push('ТОЧНЫЕ СОВПАДЕНИЯ: в блоке exactMatches — строки прайса, где артикул/модель из вопроса найдены дословно; цену и артикул бери оттуда, не из похожих строк.'); }
+"""
+PRICE_RULE = """// STAGE5-PRICE-RULE-BEGIN (generated by Tools/n8n/apply-suggest-v2.py — edit there)
+if (priceMarks) { L.push('РАСХОЖДЕНИЕ ЦЕН: под строкой прайса стоит пометка «[Сверка с каталогом: …]» — для этой позиции каталог и прайс называют разные цены (или цену строки не удалось сопоставить с каталогом). Ни одну из цен не называй окончательной и «свежую» сам не выбирай: карточка «Уточнить» или «Отложить» (цену подтвердишь), можно назвать обе цены, указав источник каждой.'); }
+// STAGE5-PRICE-RULE-END
+"""
 
 ASSEMBLE_TIME_OLD = """if (p.now) { L.push(''); L.push('ВРЕМЯ: сейчас ' + p.now + ' (локальное время владельца). Вопросы вида «вы сейчас работаете» сверяй с часами работы из ДАННЫЕ; если часов в ДАННЫЕ нет — «Уточнить» или «Отложить».'); }"""
 ASSEMBLE_TIME_NEW = """if (p.now) { L.push(''); L.push('ВРЕМЯ: сейчас ' + p.now + ' (время бизнеса, серверные часы, зона ' + (p.tz || 'Asia/Almaty') + '). Вопросы вида «вы сейчас работаете» сверяй с часами работы из ДАННЫЕ; если часов в ДАННЫЕ нет — «Уточнить» или «Отложить».'); }"""
@@ -590,6 +629,8 @@ def patch():
         new = new.replace(PREP_RETURN_OLD, PREP_RETURN_NEW)
     if PREP_RETURN_V1 in new:                       # V9: an already-migrated Prep gains clientLang
         new = new.replace(PREP_RETURN_V1, PREP_RETURN_NEW)
+    if PREP_RETURN_V2 in new:                       # V9 (price reconciliation): … and catalogItems
+        new = new.replace(PREP_RETURN_V2, PREP_RETURN_NEW)
     # V8: the history × burst merge (owned between markers; the legacy hand-written text is replaced exactly once)
     if MERGE_BEGIN in new:
         a, b_ = new.index(MERGE_BEGIN), new.index(MERGE_END) + len(MERGE_END)
@@ -642,10 +683,17 @@ def patch():
     new = js
     if ASSEMBLE_RAG_OLD in new:
         new = new.replace(ASSEMBLE_RAG_OLD, ASSEMBLE_RAG_NEW)
+    elif ASSEMBLE_BEGIN in new:                     # V9 (price reconciliation): the owned block is re-spliced
+        new = splice(new, ASSEMBLE_BEGIN, ASSEMBLE_END, ASSEMBLE_RAG_NEW)
     if ASSEMBLE_PROMPT_OLD in new and "КАТАЛОГ СОКРАЩЁН" not in new:
         new = new.replace(ASSEMBLE_PROMPT_OLD, ASSEMBLE_PROMPT_NEW)
     if CATALOG_LINE_V1 in new:                      # R12: an already-migrated Assemble carries the V1 rule
         new = new.replace(CATALOG_LINE_V1, CATALOG_LINE_V2)
+    if PRICE_RULE_BEGIN in new:
+        new = splice(new, PRICE_RULE_BEGIN, PRICE_RULE_END, PRICE_RULE)
+    else:
+        assert new.count(PRICE_RULE_ANCHOR) == 1, "Assemble: the ТОЧНЫЕ СОВПАДЕНИЯ rule (the price rule's anchor) is missing"
+        new = new.replace(PRICE_RULE_ANCHOR, PRICE_RULE_ANCHOR + PRICE_RULE)
     if ASSEMBLE_TIME_OLD in new:
         new = new.replace(ASSEMBLE_TIME_OLD, ASSEMBLE_TIME_NEW)
     if ASSEMBLE_FENCED_OLD in new:
@@ -658,7 +706,8 @@ def patch():
     else:
         assert new.count(NICHE_PUSH_END) == 1, "Assemble: the PANEL-NICHE-PUSH-END marker (inject-panel-prompts.py) is missing"
         new = new.replace(NICHE_PUSH_END, NICHE_PUSH_END + ASSEMBLE_LANG)
-    for frag in ("STAGE5-ASSEMBLE-BEGIN", CATALOG_LINE_V2, "серверные часы", "exactMatches: exactMatches", TRIVIAL_TAIL_NEW, ASSEMBLE_LANG):
+    for frag in ("STAGE5-ASSEMBLE-BEGIN", CATALOG_LINE_V2, "серверные часы", "exactMatches: exactMatches", TRIVIAL_TAIL_NEW, ASSEMBLE_LANG,
+                 ASSEMBLE_RAG_NEW, PRICE_RULE_ANCHOR + PRICE_RULE):
         assert frag in new, f"Assemble: {frag} missing"
     assert TRIVIAL_TAIL_OLD not in new and new.index(NICHE_PUSH_END) < new.index(ASSEMBLE_LANG_BEGIN), "Assemble: V9 shape"
     if new != js:
@@ -703,6 +752,7 @@ def check():
         and node(wf, "Exact Match")["parameters"]["query"] == EXACT_SQL and "STAGE5-ASSEMBLE-BEGIN" in node(wf, "Assemble")["parameters"]["jsCode"] and CATALOG_LINE_V2 in node(wf, "Assemble")["parameters"]["jsCode"] \
         and "S8 (stage 5)" in node(wf, "Build Response")["parameters"]["jsCode"] and wf.get("settings", {}).get("executionTimeout") == EXECUTION_TIMEOUT_SEC \
         and TRIVIAL_TAIL_NEW in node(wf, "Assemble")["parameters"]["jsCode"] and ASSEMBLE_LANG in node(wf, "Assemble")["parameters"]["jsCode"] \
+        and ASSEMBLE_RAG_NEW in node(wf, "Assemble")["parameters"]["jsCode"] and PRICE_RULE_ANCHOR + PRICE_RULE in node(wf, "Assemble")["parameters"]["jsCode"] \
         and VALIDATE_NEW in node(wf, "Validate")["parameters"]["jsCode"] and VALIDATE2_NEW in node(wf, "Validate 2")["parameters"]["jsCode"] \
         and all(node(wf, n).get("onError") == "continueRegularOutput" for n in ("Retrieve RAG", "Retrieve RAG TG"))
     return ok

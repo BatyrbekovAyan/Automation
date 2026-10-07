@@ -85,6 +85,7 @@ PROTECTED_IDS = [
     "crHandoffsApi001",  # Handoffs — the app's pending list / take / done (A5, 2026-09-17)
     "crTestDialog0001",  # Test Dialog — the owner's safe test (stage 7.1, 2026-09-22)
     "crHandoffDry0001",  # Handoff Request (dry) — the test dialog's tool target (stage 7.1, 2026-09-22)
+    "crPriceSearch001",  # Price List Search — the bots' / test dialog's reconciling price-list tool (V9, 2026-09-28)
 ]
 
 

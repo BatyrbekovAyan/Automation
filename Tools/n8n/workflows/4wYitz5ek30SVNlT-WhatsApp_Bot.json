@@ -760,42 +760,75 @@
     },
     {
       "parameters": {
-        "mode": "retrieve-as-tool",
-        "toolDescription": "Retrieve product details, prices, services, and any uploaded catalog or document content for this business. Use whenever the customer asks about products, pricing, availability, or specifics that may be in uploaded documents.",
-        "tableName": {
+        "description": "Retrieve product details, prices, services, and any uploaded catalog or document content for this business. Use whenever the customer asks about products, pricing, availability, or specifics that may be in uploaded documents.",
+        "workflowId": {
           "__rl": true,
-          "value": "documents",
-          "mode": "list",
-          "cachedResultName": "documents"
+          "value": "crPriceSearch001",
+          "mode": "id"
         },
-        "topK": 10,
-        "useReranker": false,
-        "options": {
-          "queryName": "match_documents",
-          "metadata": {
-            "metadataValues": [
-              {
-                "name": "botWaId",
-                "value": "={{ $workflow.id }}"
-              }
-            ]
-          }
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "query": "={{ $fromAI('input', 'Query to search for. Required', 'string') }}",
+            "botId": "={{ $workflow.id }}",
+            "filterKey": "botWaId",
+            "prompt": "={{ $('AI Agent').params.options.systemMessage }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "query",
+              "displayName": "query",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "botId",
+              "displayName": "botId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "filterKey",
+              "displayName": "filterKey",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "prompt",
+              "displayName": "prompt",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
         }
       },
-      "type": "@n8n/n8n-nodes-langchain.vectorStoreSupabase",
-      "typeVersion": 1.3,
+      "id": "27d2c21f-f412-4bce-84c4-104b3ce3f367",
+      "name": "Supabase Vector Store",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
       "position": [
         -2096,
         32
-      ],
-      "id": "27d2c21f-f412-4bce-84c4-104b3ce3f367",
-      "name": "Supabase Vector Store",
-      "credentials": {
-        "supabaseApi": {
-          "id": "ifCYb9DhUxoCq3pu",
-          "name": "Supabase"
-        }
-      }
+      ]
     },
     {
       "parameters": {
@@ -819,26 +852,6 @@
         -160
       ],
       "typeVersion": 3.4
-    },
-    {
-      "parameters": {
-        "options": {},
-        "model": "text-embedding-3-small"
-      },
-      "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
-      "typeVersion": 1.2,
-      "position": [
-        -2096,
-        176
-      ],
-      "id": "67901179-fe62-4c41-bcda-6e0a985710a3",
-      "name": "OpenAI Embedding",
-      "credentials": {
-        "openAiApi": {
-          "id": "XVjhR1xlWrIgJjKz",
-          "name": "OpenAi account"
-        }
-      }
     },
     {
       "parameters": {
@@ -2166,17 +2179,6 @@
           {
             "node": "Final Fetch",
             "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "OpenAI Embedding": {
-      "ai_embedding": [
-        [
-          {
-            "node": "Supabase Vector Store",
-            "type": "ai_embedding",
             "index": 0
           }
         ]

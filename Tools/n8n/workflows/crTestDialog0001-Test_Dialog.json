@@ -370,61 +370,75 @@
     },
     {
       "parameters": {
-        "mode": "retrieve-as-tool",
-        "tableName": {
+        "description": "Retrieve product details, prices, services, and any uploaded catalog or document content for this business. Use whenever the customer asks about products, pricing, availability, or specifics that may be in uploaded documents.",
+        "workflowId": {
           "__rl": true,
-          "value": "documents",
-          "mode": "list",
-          "cachedResultName": "documents"
+          "value": "crPriceSearch001",
+          "mode": "id"
         },
-        "options": {
-          "queryName": "match_documents",
-          "metadata": {
-            "metadataValues": [
-              {
-                "name": "={{ $('Validate').first().json.filterKey }}",
-                "value": "={{ $('Validate').first().json.workflowId }}"
-              }
-            ]
-          }
-        },
-        "toolDescription": "Retrieve product details, prices, services, and any uploaded catalog or document content for this business. Use whenever the customer asks about products, pricing, availability, or specifics that may be in uploaded documents.",
-        "topK": 10,
-        "useReranker": false
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "query": "={{ $fromAI('input', 'Query to search for. Required', 'string') }}",
+            "botId": "={{ $('Validate').first().json.workflowId }}",
+            "filterKey": "={{ $('Validate').first().json.filterKey }}",
+            "prompt": "={{ $('Compose').first().json.systemMessage }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "query",
+              "displayName": "query",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "botId",
+              "displayName": "botId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "filterKey",
+              "displayName": "filterKey",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "prompt",
+              "displayName": "prompt",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
       },
       "id": "442993b7-03ad-5b93-9644-ce36c1fbe992",
       "name": "Supabase Vector Store",
-      "type": "@n8n/n8n-nodes-langchain.vectorStoreSupabase",
-      "typeVersion": 1.3,
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
       "position": [
         2380,
         420
-      ],
-      "credentials": {
-        "supabaseApi": {
-          "id": "ifCYb9DhUxoCq3pu",
-          "name": "Supabase"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "model": "text-embedding-3-small"
-      },
-      "id": "6a6c8e4e-f87a-5dcf-bb7d-247d35ac5d1b",
-      "name": "OpenAI Embedding Tool",
-      "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
-      "typeVersion": 1.2,
-      "position": [
-        2380,
-        600
-      ],
-      "credentials": {
-        "openAiApi": {
-          "id": "XVjhR1xlWrIgJjKz",
-          "name": "OpenAi account"
-        }
-      }
+      ]
     },
     {
       "parameters": {
@@ -735,17 +749,6 @@
         [
           {
             "node": "Probe Documents",
-            "type": "ai_embedding",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "OpenAI Embedding Tool": {
-      "ai_embedding": [
-        [
-          {
-            "node": "Supabase Vector Store",
             "type": "ai_embedding",
             "index": 0
           }

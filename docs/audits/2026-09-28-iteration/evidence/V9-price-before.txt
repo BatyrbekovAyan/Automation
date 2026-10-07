@@ -1,0 +1,236 @@
+V9 (price reconciliation at search time) — BEFORE: canonical workflows at HEAD 5b0a222d (generator written, not run)
+$ python3 Tools/n8n/tests/test_price_search.py
+FAIL sub-workflow: Guard → Valid? → Search Price Lists (the bot's own documents, fail-open) → Reconcile Prices
+      - crPriceSearch001-Price_List_Search.json missing
+FAIL [WA] template: the price-list tool goes through the sub-workflow with the clone's own id, key and PUBLISHED prompt
+      - type @n8n/n8n-nodes-langchain.vectorStoreSupabase
+      - EXCEPTION KeyError: 'workflowId'
+FAIL [TG] template: the price-list tool goes through the sub-workflow with the clone's own id, key and PUBLISHED prompt
+      - type @n8n/n8n-nodes-langchain.vectorStoreSupabase
+      - EXCEPTION KeyError: 'workflowId'
+FAIL Test Dialog: its tool is the same sub-workflow, fed with the bot's id/key (Validate) and the published prompt it read (Compose)
+      - type @n8n/n8n-nodes-langchain.vectorStoreSupabase
+      - ids {}
+      - prompt None
+      - wiring
+FAIL Guard: a search runs only for a real bot id under botWaId / botTgId
+      - EXCEPTION RuntimeError: node failed: node:internal/streams/writable:480
+      throw new ERR_INVALID_ARG_TYPE(
+            ^
+
+TypeError [ERR_INVALID_ARG_TYPE]: The "chunk" argument must be of type string or an instance of Buffer, TypedArray, or DataView. Received undefined
+    at _write (node:internal/streams/writable:480:13)
+    at Writable.write (node:internal/streams/writable:508:10)
+    at [eval]:12:50 {
+  code: 'ERR_INVALID_ARG_TYPE'
+}
+
+Node.js v25.9.0
+FAIL ap_source_conflict: one mark under the price-list row — the item, 3200 and 3900, «Цены расходятся»
+      - EXCEPTION RuntimeError: node failed: node:internal/streams/writable:480
+      throw new ERR_INVALID_ARG_TYPE(
+            ^
+
+TypeError [ERR_INVALID_ARG_TYPE]: The "chunk" argument must be of type string or an instance of Buffer, TypedArray, or DataView. Received undefined
+    at _write (node:internal/streams/writable:480:13)
+    at Writable.write (node:internal/streams/writable:508:10)
+    at [eval]:12:50 {
+  code: 'ERR_INVALID_ARG_TYPE'
+}
+
+Node.js v25.9.0
+FAIL base documents of every vertical, at their own catalog prices, come back byte for byte
+      - EXCEPTION RuntimeError: node failed: node:internal/streams/writable:480
+      throw new ERR_INVALID_ARG_TYPE(
+            ^
+
+TypeError [ERR_INVALID_ARG_TYPE]: The "chunk" argument must be of type string or an instance of Buffer, TypedArray, or DataView. Received undefined
+    at _write (node:internal/streams/writable:480:13)
+    at Writable.write (node:internal/streams/writable:508:10)
+    at [eval]:12:50 {
+  code: 'ERR_INVALID_ARG_TYPE'
+}
+
+Node.js v25.9.0
+FAIL price-list shapes the converter / OCR / PDF / free text produce: a different price is marked
+      - EXCEPTION RuntimeError: node failed: node:internal/streams/writable:480
+      throw new ERR_INVALID_ARG_TYPE(
+            ^
+
+TypeError [ERR_INVALID_ARG_TYPE]: The "chunk" argument must be of type string or an instance of Buffer, TypedArray, or DataView. Received undefined
+    at _write (node:internal/streams/writable:480:13)
+    at Writable.write (node:internal/streams/writable:508:10)
+    at [eval]:12:50 {
+  code: 'ERR_INVALID_ARG_TYPE'
+}
+
+Node.js v25.9.0
+FAIL all price columns are compared: опт/розн — no mark when either equals the catalog, both named when neither does
+      - EXCEPTION RuntimeError: node failed: node:internal/streams/writable:480
+      throw new ERR_INVALID_ARG_TYPE(
+            ^
+
+TypeError [ERR_INVALID_ARG_TYPE]: The "chunk" argument must be of type string or an instance of Buffer, TypedArray, or DataView. Received undefined
+    at _write (node:internal/streams/writable:480:13)
+    at Writable.write (node:internal/streams/writable:508:10)
+    at [eval]:12:50 {
+  code: 'ERR_INVALID_ARG_TYPE'
+}
+
+Node.js v25.9.0
+FAIL ambiguous prices («от», a range) get the catalog price only — never «Цены расходятся»
+      - EXCEPTION RuntimeError: node failed: node:internal/streams/writable:480
+      throw new ERR_INVALID_ARG_TYPE(
+            ^
+
+TypeError [ERR_INVALID_ARG_TYPE]: The "chunk" argument must be of type string or an instance of Buffer, TypedArray, or DataView. Received undefined
+    at _write (node:internal/streams/writable:480:13)
+    at Writable.write (node:internal/streams/writable:508:10)
+    at [eval]:12:50 {
+  code: 'ERR_INVALID_ARG_TYPE'
+}
+
+Node.js v25.9.0
+FAIL no mark: price on the next line, a longer code, a bare year, an analogue mention or column, no article, «договорная»
+      - EXCEPTION RuntimeError: node failed: node:internal/streams/writable:480
+      throw new ERR_INVALID_ARG_TYPE(
+            ^
+
+TypeError [ERR_INVALID_ARG_TYPE]: The "chunk" argument must be of type string or an instance of Buffer, TypedArray, or DataView. Received undefined
+    at _write (node:internal/streams/writable:480:13)
+    at Writable.write (node:internal/streams/writable:508:10)
+    at [eval]:12:50 {
+  code: 'ERR_INVALID_ARG_TYPE'
+}
+
+Node.js v25.9.0
+FAIL grades, sizes and specs are not articles; an accessory with the same model code is only a soft mark
+      - EXCEPTION RuntimeError: node failed: node:internal/streams/writable:480
+      throw new ERR_INVALID_ARG_TYPE(
+            ^
+
+TypeError [ERR_INVALID_ARG_TYPE]: The "chunk" argument must be of type string or an instance of Buffer, TypedArray, or DataView. Received undefined
+    at _write (node:internal/streams/writable:480:13)
+    at Writable.write (node:internal/streams/writable:508:10)
+    at [eval]:12:50 {
+  code: 'ERR_INVALID_ARG_TYPE'
+}
+
+Node.js v25.9.0
+FAIL catalog prices with a unit (тг/шт, тг/мес) take part; a different unit is not a conflict
+      - EXCEPTION RuntimeError: node failed: node:internal/streams/writable:480
+      throw new ERR_INVALID_ARG_TYPE(
+            ^
+
+TypeError [ERR_INVALID_ARG_TYPE]: The "chunk" argument must be of type string or an instance of Buffer, TypedArray, or DataView. Received undefined
+    at _write (node:internal/streams/writable:480:13)
+    at Writable.write (node:internal/streams/writable:508:10)
+    at [eval]:12:50 {
+  code: 'ERR_INVALID_ARG_TYPE'
+}
+
+Node.js v25.9.0
+FAIL a three-row chunk: only the conflicting row is marked; variants at the line price are no conflict
+      - EXCEPTION RuntimeError: node failed: node:internal/streams/writable:480
+      throw new ERR_INVALID_ARG_TYPE(
+            ^
+
+TypeError [ERR_INVALID_ARG_TYPE]: The "chunk" argument must be of type string or an instance of Buffer, TypedArray, or DataView. Received undefined
+    at _write (node:internal/streams/writable:480:13)
+    at Writable.write (node:internal/streams/writable:508:10)
+    at [eval]:12:50 {
+  code: 'ERR_INVALID_ARG_TYPE'
+}
+
+Node.js v25.9.0
+FAIL idempotent: a second pass is byte-identical, a forged mark line is dropped, a corrected catalog clears the mark
+      - EXCEPTION RuntimeError: node failed: node:internal/streams/writable:480
+      throw new ERR_INVALID_ARG_TYPE(
+            ^
+
+TypeError [ERR_INVALID_ARG_TYPE]: The "chunk" argument must be of type string or an instance of Buffer, TypedArray, or DataView. Received undefined
+    at _write (node:internal/streams/writable:480:13)
+    at Writable.write (node:internal/streams/writable:508:10)
+    at [eval]:12:50 {
+  code: 'ERR_INVALID_ARG_TYPE'
+}
+
+Node.js v25.9.0
+FAIL search failure, an invalid call and an empty result never read as «позиции нет»
+      - EXCEPTION RuntimeError: node failed: node:internal/streams/writable:480
+      throw new ERR_INVALID_ARG_TYPE(
+            ^
+
+TypeError [ERR_INVALID_ARG_TYPE]: The "chunk" argument must be of type string or an instance of Buffer, TypedArray, or DataView. Received undefined
+    at _write (node:internal/streams/writable:480:13)
+    at Writable.write (node:internal/streams/writable:508:10)
+    at [eval]:12:50 {
+  code: 'ERR_INVALID_ARG_TYPE'
+}
+
+Node.js v25.9.0
+FAIL [WA] panel: RAG and exact-match rows are reconciled with the SAME function and the prompt says what a mark means
+      - Prep catalogItems: None
+      - 'Фильтр масляный 90915-YZZE1 — 3900 тг, оригинал' / 'Фильтр масляный 90915-YZZE1 — 3900 тг, оригинал'
+      - rule
+      - legacy client catalog: 'Фильтр масляный 90915-YZZE1 — 3900 тг, оригинал'
+FAIL [TG] panel: RAG and exact-match rows are reconciled with the SAME function and the prompt says what a mark means
+      - Prep catalogItems: None
+      - 'Фильтр масляный 90915-YZZE1 — 3900 тг, оригинал' / 'Фильтр масляный 90915-YZZE1 — 3900 тг, оригинал'
+      - rule
+      - legacy client catalog: 'Фильтр масляный 90915-YZZE1 — 3900 тг, оригинал'
+FAIL ONE function: the sub-workflow and the panel carry the generator's RECONCILE_JS byte for byte
+      - sub-workflow
+      - panel Assemble
+FAIL Set Workflow State refuses to touch the price search
+      - {'ok': True, 'id': 'crPriceSearch001', 'action': 'deactivate'}
+FAIL staging derivation: the price search reads the staging documents stub (no embeddings there), never the real project
+      - EXCEPTION AttributeError: module 'derive' has no attribute 'isolate_supabase_readers'
+FAIL eval runner: the simulated search runs the canonical Reconcile Prices when the measured template routes to it
+      - EXCEPTION AttributeError: module 'run_eval' has no attribute 'simulate_search'
+
+0 pass, 22 fail
+exit=1
+
+--- what the model gets on HEAD (structural + the n8n operation, no generator involved)
+4wYitz5ek30SVNlT-WhatsApp_Bot.json → @n8n/n8n-nodes-langchain.vectorStoreSupabase mode= retrieve-as-tool — the tool result is n8n retrieveAsToolOperation: JSON.stringify(document) per hit, no node in between
+4VN3gsFaC2HUYmcc-Telegram_Bot.json → @n8n/n8n-nodes-langchain.vectorStoreSupabase mode= retrieve-as-tool — the tool result is n8n retrieveAsToolOperation: JSON.stringify(document) per hit, no node in between
+crTestDialog0001-Test_Dialog.json → @n8n/n8n-nodes-langchain.vectorStoreSupabase mode= retrieve-as-tool — the tool result is n8n retrieveAsToolOperation: JSON.stringify(document) per hit, no node in between
+Suggest Replies Assemble mentions «Сверка»/«РАСХОЖДЕНИЕ»: False False
+ap_source_conflict: catalog «Product1 Price: 3200 тг», the search returns verbatim: ['Фильтр масляный 90915-YZZE1 — 3900 тг, оригинал']
+
+================================================================================
+h4 evaluator — BEFORE (run-eval.py at HEAD, the new table rows)
+$ python3 Tools/n8n/eval/test_checks.py
+FAIL: test_rows (__main__.AsksCar) (check='asks_car', why='the car asked by its name', text='На какой автомобиль нужны колодки?')
+AssertionError: False is not True : asks_car [ap_price_without_car] the car asked by its name: want PASS, got False
+FAIL: test_rows (__main__.AsksCar) (check='asks_car', why='«нужен» is a request (h3 knew only «нужн…»)', text='Для подбора нужен VIN или марка и год авто.')
+AssertionError: False is not True : asks_car [ap_price_without_car] «нужен» is a request (h3 knew only «нужн…»): want PASS, got False
+FAIL: test_rows (__main__.AsksModel) (check='asks_model', why='h4: the device asked by its name (a former KnownGap)', text='Какой у вас iPhone?')
+AssertionError: False is not True : asks_model [pr_price_no_model] h4: the device asked by its name (a former KnownGap): want PASS, got False
+FAIL: test_rows (__main__.LangKz) (check='lang_kz', why='saved r14p-final run — a whole Russian sentence (h3 scored it PASS)', text='25 раушан гүлі — 25000 тг.\n\nСостав может немного отличаться, замену флорист согласует с вами.')
+AssertionError: True is not False : lang_kz [fl_kz_price] saved r14p-final run — a whole Russian sentence (h3 scored it PASS): want FAIL, got True
+FAIL: test_rows (__main__.LangKz) (check='lang_kz', why='saved r14p-final run — Kazakh opening, Russian body', text='Иә, ақ түсі бар.\n\nНаушники JBL Tune 510BT белые — 18990 тг\nДолжен быть в наличии, точный остаток подтвердит владелец.')
+AssertionError: True is not False : lang_kz [ks_kz_availability] saved r14p-final run — Kazakh opening, Russian body: want FAIL, got True
+FAIL: test_rows (__main__.NoFreeDeliveryClaim) (check='no_free_delivery_claim', why='elliptical: «бесплатно» in a second clause still about the delivery (an invented condition)', text='Доставка по городу стоит 1500 тг, а при заказе от 10 000 тг бесплатно.')
+AssertionError: True is not False : no_free_delivery_claim [gen_owner_pref_vs_fact] elliptical: «бесплатно» in a second clause still about the delivery (an invented condition): want FAIL, got True
+FAIL: test_rows (__main__.NoFreeDeliveryClaim) (check='no_free_delivery_claim', why='elliptical after «но»', text='Доставка 1500 тг, но от 20 000 тг — бесплатно.')
+AssertionError: True is not False : no_free_delivery_claim [gen_owner_pref_vs_fact] elliptical after «но»: want FAIL, got True
+FAIL: test_rows (__main__.NoFreeDeliveryClaim) (check='no_free_delivery_claim', why='a zero price IS free delivery', text='Доставка — 0 тг.')
+AssertionError: True is not False : no_free_delivery_claim [gen_owner_pref_vs_fact] a zero price IS free delivery: want FAIL, got True
+FAIL: test_rows (__main__.NoFreeDeliveryClaim) (check='no_free_delivery_claim', why='zero price, ₸', text='Доставка по городу: 0 ₸.')
+AssertionError: True is not False : no_free_delivery_claim [gen_owner_pref_vs_fact] zero price, ₸: want FAIL, got True
+FAIL: test_rows (__main__.NoFreshPricePick) (check='no_fresh_price_pick', why="«расхождение» names the discrepancy (h3's «расход» did not match «расхожд»)", text='В прайсе 3900 тг. Есть расхождение по цене, точную цену подтвердит владелец.')
+AssertionError: False is not True : no_fresh_price_pick [ap_source_conflict] «расхождение» names the discrepancy (h3's «расход» did not match «расхожд»): want PASS, got False
+FAIL: test_rows (__main__.NoFreshPricePick) (check='no_fresh_price_pick', why='«не расходятся» is the opposite', text='Цены не расходятся: 3900 тг.')
+AssertionError: True is not False : no_fresh_price_pick [ap_source_conflict] «не расходятся» is the opposite: want FAIL, got True
+FAIL: test_rows (__main__.NoTotalConfirmation) (check='no_total_confirmation', why='h4: a total over N named positions is partial', text='Итого по 2 позициям: 111 000 тг, отбеливатель уточнит менеджер.')
+AssertionError: False is not True : no_total_confirmation [ws_list_of_items] h4: a total over N named positions is partial: want PASS, got False
+FAIL: test_rows (__main__.PanelChecks) (check='cards_numbers_grounded', why='comma thousands')
+AssertionError: False is not True : cards_numbers_grounded [pn_price_question] comma thousands
+FAIL: test_rows (__main__.PanelChecks) (check='cards_kz', why='a Kazakh greeting over a Russian card')
+AssertionError: True is not False : cards_kz [pn_kz_question] a Kazakh greeting over a Russian card
+FAIL: test_rows (__main__.PromisePhrases) (check='no_installment_claim', why='a word in between still claims it', text='Рассрочка через Kaspi есть.')
+AssertionError: True is not False : no_installment_claim [ed_installment] a word in between still claims it: want FAIL
+Ran 18 tests in 0.104s
+FAILED (failures=15)

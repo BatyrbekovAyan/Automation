@@ -490,6 +490,69 @@ def media_ask(ctx, ch):
     return ok, {"executions": [(r["id"], r["status"], r["outcome"], r["last"]) for r in rows], "sends": len(sends), "body": body[:80], "ledger": led}
 
 
+_td = None
+
+
+def test_dialog_module():
+    """e2e-test-dialog.py's BotVersions (edit a staging bot's PUBLISHED prompt, restore it) — loaded on first use."""
+    global _td
+    if _td is None:
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("e2e_test_dialog", os.path.join(HERE, "e2e-test-dialog.py"))
+        _td = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(_td)
+    return _td
+
+
+def tool_outputs(exec_data, node):
+    """What an AI sub-node handed the agent (its ai_tool output items) in every run of one execution."""
+    out = []
+    for run in ((exec_data.get("data") or {}).get("resultData", {}).get("runData", {}).get(node, []) or []):
+        for br in (run.get("data") or {}).get("ai_tool") or []:
+            for it in br or []:
+                out.append(it.get("json") or {})
+    return out
+
+
+V9_CATALOG = ("\n\nProducts:\nProduct1: Фильтр масляный Toyota 90915-YZZE1\nProduct1 Price: 3200 тг\nProduct1 Description: Оригинал\n\n"
+              "Services:\n")
+V9_ROW = "Фильтр масляный 90915-YZZE1 — 3900 тг, оригинал"
+V9_QUESTION = "Camry 2019, фильтр масляный 90915-YZZE1 сколько?"
+
+
+@for_channels("price_conflict_reaches_the_agent_marked [llm]", "V9: the clone's price-list tool runs the Price List Search sub-workflow with the clone's PUBLISHED prompt — a price-list row at 3900 against its catalog's 3200 reaches the agent with «[Сверка с каталогом: … Цены расходятся.]», and the reply does not pick 3900 alone")
+def price_conflict(ctx, ch):
+    b = Bot(ctx, ch, "v9pc")
+    key = "botWaId" if ch == "wa" else "botTgId"
+    tag = f"v9pc-{ctx.run_id}-{ch}"
+    psql(f"insert into documents (content, metadata) values ('{V9_ROW}', '{{\"{key}\": \"{b.wf_id}\", \"fileId\": \"{tag}\"}}'::jsonb);")
+    try:
+        with test_dialog_module().BotVersions(b.wf_id) as bv:
+            wf = bv.put(bv.base_prompt + V9_CATALOG, publish=True)
+            if wf.get("activeVersionId") != wf.get("versionId"):
+                bv.set_active(False)
+                bv.set_active(True)
+                wf = bv.read()
+            premise = "Product1 Price: 3200" in test_dialog_module().agent_prompt((wf.get("activeVersion") or {}).get("nodes"))
+            t = int(time.time())
+            mid = f"v9pc-{ctx.run_id}"
+            b.history([{"id": mid, "body": V9_QUESTION, "time": t, "fromMe": False, "type": "chat"}])
+            b.post(mid, V9_QUESTION, t)
+            rows = b.settle(1, wait_s=180)
+    finally:
+        psql(f"delete from documents where metadata->>'fileId' = '{tag}';")
+    data = rows[0]["data"] if rows else {}
+    docs = [d for o in tool_outputs(data, "Supabase Vector Store") for d in (o.get("documents") or [])]
+    marked = any(V9_ROW in d and "[Сверка с каталогом:" in d and "3200" in d and "3900" in d and "Цены расходятся" in d for d in docs)
+    sends = b.sends()
+    body = (sends[0].get("body") or {}).get("body", "") if sends else ""
+    flat = body.replace(" ", "").replace("\u00a0", "")
+    picked = "3900" in flat and "3200" not in flat and "расход" not in body.lower()
+    ok = premise and marked and len(sends) == 1 and not picked
+    return ok, {"premise_published_catalog": premise, "tool_calls": len(tool_outputs(data, "Supabase Vector Store")), "marked": marked,
+                "documents": [d[:160] for d in docs][:2], "sends": len(sends), "reply": body[:200], "picked_3900_alone": picked}
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--only")
