@@ -48,6 +48,8 @@ public class ReplyModeSyncService : MonoBehaviour
     private ReplyModeSyncQueue.Model _model;
     private bool _looping;
     private float _bootedAt;
+    private readonly HashSet<string> _held = new HashSet<string>();   // bots whose server deletion is in flight (V12)
+    private string _sendingBot;                                         // the bot whose batch is on the wire right now
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void Boot()
@@ -116,7 +118,28 @@ public class ReplyModeSyncService : MonoBehaviour
     public void ForgetBot(string botId)
     {
         ReplyModeSyncQueue.ForgetBot(_model, botId);
+        _held.Remove(botId ?? "");
         Persist();
+    }
+
+    /// <summary>
+    /// V12: the bot's server deletion is in flight — send nothing for it meanwhile (a send landing after Delete Bot
+    /// Files would recreate the reply_mode_flags rows it removed). The queue is NOT forgotten yet: if the server keeps
+    /// the bot, <see cref="Release"/> resumes the owner's unconfirmed choices (forgetting them early would paint them
+    /// as confirmed — R5). In memory only: a restart mid-deletion leaves the bot on the phone, unheld.
+    /// </summary>
+    public void Hold(string botId)
+    {
+        if (!string.IsNullOrEmpty(botId)) _held.Add(botId);
+    }
+
+    /// <summary>V12: a batch for this bot is on the wire (a hold stops the NEXT send, not one already sent).</summary>
+    public bool IsSending(string botId) => _sendingBot != null && _sendingBot == botId;
+
+    /// <summary>V12: the server kept the bot (retry / refused) — its queued choices go out again.</summary>
+    public void Release(string botId)
+    {
+        if (_held.Remove(botId ?? "")) Kick();
     }
 
     /// <summary>The full local wipe: the in-memory queue would otherwise re-persist itself after PlayerPrefs.DeleteAll.</summary>
@@ -166,10 +189,11 @@ public class ReplyModeSyncService : MonoBehaviour
             while (true)
             {
                 var due = ReplyModeSyncQueue.Due(_model, NowMs());
+                due.RemoveAll(e => _held.Contains(e.botId));      // V12: a bot being deleted sends nothing
                 if (due.Count == 0)
                 {
                     bool anyPending = false;
-                    foreach (var e in _model.entries) if (e.IsPending) { anyPending = true; break; }
+                    foreach (var e in _model.entries) if (e.IsPending && !_held.Contains(e.botId)) { anyPending = true; break; }
                     if (!anyPending) yield break;                 // queue drained: the next Desire re-kicks
                     yield return new WaitForSecondsRealtime(1f);  // waiting for a backoff to elapse
                     continue;
@@ -198,9 +222,17 @@ public class ReplyModeSyncService : MonoBehaviour
         // R4-clock: the body is built INSIDE the factory — the decision's age is measured when each attempt leaves
         // (after the session wait, and again for the retry after a 401 refresh), never once up front.
         UnityWebRequest www = null;
-        yield return AuthorizedRequest.Send(() => AuthorizedRequest.JsonPost(url,
-                Manager.BuildReplyModePayload(ids, chatId, suppressed, sentVersion, ReplyModeSyncQueue.DecisionAgeMs(decidedAtMs, NowMs())),
-                RequestTimeoutSeconds), r => www = r);
+        _sendingBot = first.botId;
+        try
+        {
+            yield return AuthorizedRequest.Send(() => AuthorizedRequest.JsonPost(url,
+                    Manager.BuildReplyModePayload(ids, chatId, suppressed, sentVersion, ReplyModeSyncQueue.DecisionAgeMs(decidedAtMs, NowMs())),
+                    RequestTimeoutSeconds), r => www = r);
+        }
+        finally
+        {
+            _sendingBot = null;
+        }
         using var scope = www;
 
         bool parsed = ReplyModeSyncResponse.TryParse(www.downloadHandler?.text, out var res);

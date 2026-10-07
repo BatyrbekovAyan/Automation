@@ -6,7 +6,8 @@ using UnityEngine;
 /// <summary>
 /// Disk half of «Удалить все данные» (Profile → Аккаунт). PlayerPrefs are wiped
 /// separately via PlayerPrefs.DeleteAll (per-chat SemiAuto keys are not
-/// enumerable), and server/scene teardown goes through Bot.DeleteBot — this
+/// enumerable), the server teardown goes through Manager.DeleteBotOnServer and the scene
+/// teardown through Bot.DeleteBotLocally — this
 /// class only knows which local files hold user data. Target list is pure so
 /// tests can pin the wipe surface.
 /// </summary>

@@ -103,14 +103,27 @@ def check_proxy():
     # never a proof for a bind).
     assert "const PAIR_OPS = new Set(['qr', 'auth.code', 'tg.auth.phone', 'tg.auth.code', 'tg.auth.2fa'])" in br and "claimPairing = !owned && PAIR_OPS.has(op)" in br, \
         "Build Request must flag pairing ops on a claim-pending profile"
-    assert edges(wf, "Op valid?", 0) == [{"node": "Claim Pairing?", "type": "main", "index": 0}], "Op valid? must route through Claim Pairing?"
+    # V12 (2026-10-07): profile.delete / profile.logout pass the DATABASE ownership check (Profile Owner) before the
+    # transport — a token up to 12 h old must not unlink a profile another install has since claimed.
+    assert "const OWNER_OPS = new Set(['profile.delete', 'profile.logout'])" in br and "ownerCheck: OWNER_OPS.has(op)" in br, \
+        "V12: Build Request must flag profile.delete / profile.logout for the database ownership check"
+    assert edges(wf, "Op valid?", 0) == [{"node": "Owner Check?", "type": "main", "index": 0}], "V12: Op valid? must route through Owner Check?"
+    assert node(wf, "Owner Check?")["parameters"]["conditions"]["conditions"][0]["leftValue"] == "={{ $json.ownerCheck === true }}", "V12: Owner Check? condition"
+    assert edges(wf, "Owner Check?", 0) == [{"node": "Profile Owner", "type": "main", "index": 0}] and \
+        edges(wf, "Owner Check?", 1) == [{"node": "Claim Pairing?", "type": "main", "index": 0}], "V12: Owner Check? routing"
+    po = node(wf, "Profile Owner")["parameters"]["query"]
+    assert "bp.owner_id = $2" in po and "i.revoked_at is null" in po and "as allowed" in po, "V12: Profile Owner must require this (unrevoked) install's row"
+    assert edges(wf, "Profile Owner") == [{"node": "Profile Owned?", "type": "main", "index": 0}] and \
+        edges(wf, "Profile Owned?", 0) == [{"node": "Wappi Call", "type": "main", "index": 0}] and \
+        edges(wf, "Profile Owned?", 1) == [{"node": "Respond Profile Refused", "type": "main", "index": 0}], "V12: Profile Owned? routing"
+    assert node(wf, "Profile Owned?")["parameters"]["conditions"]["conditions"][0]["leftValue"] == "={{ $json.allowed === true }}", "V12: Profile Owned? condition"
     assert edges(wf, "Claim Pairing?", 0) == [{"node": "Record Claim Pairing", "type": "main", "index": 0}] and edges(wf, "Claim Pairing?", 1) == [{"node": "Wappi Call", "type": "main", "index": 0}]
     assert edges(wf, "Record Claim Pairing") == [{"node": "Pairing Recorded?", "type": "main", "index": 0}]
     assert edges(wf, "Pairing Recorded?", 0) == [{"node": "Wappi Call", "type": "main", "index": 0}] and edges(wf, "Pairing Recorded?", 1) == [{"node": "Respond Claim Not Pending", "type": "main", "index": 0}]
     rq = node(wf, "Record Claim Pairing")["parameters"]["query"]
     assert "owner_id is null" in rq and "claim_pending_by = $2" in rq and "claim_pending_at > now() - interval '1 day'" in rq, "Record Claim Pairing must require this install's fresh claim on an owner-less profile"
     into_call = sorted(src for src, outs in wf["connections"].items() for out in outs.get("main", []) for c in out if c["node"] == "Wappi Call")
-    assert into_call == ["Claim Pairing?", "Pairing Recorded?"], f"Wappi Call must be reachable only past the pairing check: {into_call}"
+    assert into_call == ["Claim Pairing?", "Pairing Recorded?", "Profile Owned?"], f"Wappi Call must be reachable only past the pairing / V12 owner checks: {into_call}"
     assert call["parameters"]["options"]["response"]["response"]["fullResponse"] is True, "Wappi Call must return fullResponse"
     assert call["credentials"]["httpHeaderAuth"]["name"] == "WappiAuthToken", "Wappi Call must use the server-side Wappi credential"
     assert wf["settings"].get("saveDataSuccessExecution") == "none", "proxy must not store successful executions"
@@ -238,6 +251,85 @@ def check_create():
         print(f"OK  {f} (workflow id + owner bound to the profile)")
 
 
+def reachable(wf, start, cut=None):
+    """Node names reachable from `start` along main edges, never following the edge `cut` = (src, output index)."""
+    seen, todo = set(), [start]
+    while todo:
+        n = todo.pop()
+        for i, out in enumerate(wf["connections"].get(n, {}).get("main", [])):
+            if cut and (n, i) == cut:
+                continue
+            for c in out:
+                if c["node"] not in seen:
+                    seen.add(c["node"])
+                    todo.append(c["node"])
+    return seen
+
+
+def check_delete_ownership(mig):
+    """V12 (iteration 2026-09-28, 2026-10-07): the two DELETING webhooks decide ownership in the database — the token's
+    lists hold LIVE rows only (a retired bot's owner was refused its own delete) and live 12 h (a stale token could name a
+    profile another install has since claimed). Delete Bot Files: every deleting node lies behind Owned?(0); success only
+    on real counters; the stored originals go first. Set Workflow State: delete/deactivate behind Owned?(0) via Owner Item,
+    activate on the token rule, the delete idempotent."""
+    E = lambda n: {"node": n, "type": "main", "index": 0}
+    dbf = load("lmjYsdNcQA2IE5rl-Delete_Bot_Files.json")
+    for w, label, params in ((dbf, "Delete Bot Files", mig.DBF_OWNERSHIP_PARAMS),
+                             (load("0DP79STI3pafXO9B-Set_Workflow_State.json"), "Set Workflow State", mig.SWS_OWNERSHIP_PARAMS)):
+        do = node(w, "Delete Ownership")
+        assert do["parameters"]["query"] == mig.DELETE_OWNERSHIP_SQL and do["parameters"]["options"]["queryReplacement"] == params, \
+            f"V12: {label} Delete Ownership is stale against apply-auth-gate.py"
+        assert do.get("onError") == "continueRegularOutput" and do.get("alwaysOutputData") is True, f"V12: {label}: a DB fault must reach Owned? as an item (503)"
+        assert node(w, "Owned?")["parameters"]["conditions"]["conditions"][0]["leftValue"] == mig.OWNED, f"V12: {label} Owned? must test allowed === true"
+        assert edges(w, "Delete Ownership") == [E("Owned?")] and edges(w, "Owned?", 1) == [E("Respond Owner Refused")], f"V12: {label} Owned? routing"
+        rr = node(w, "Respond Owner Refused")["parameters"]
+        assert rr["options"].get("responseCode") == mig.OWNER_REFUSED_CODE and rr["responseBody"] == mig.OWNER_REFUSED_BODY, \
+            f"V12: {label}: a refusal is 403, a DB fault 503 (the client treats 403 as final)"
+    # Delete Bot Files: the gate decides nothing about ids; every deleting node behind Owned?(0)
+    assert mig.GATED["lmjYsdNcQA2IE5rl-Delete_Bot_Files.json"]["rule"] == {"legacy": True}, "V12: Delete Bot Files' gate must not decide ownership from the token"
+    assert edges(dbf, "Authorized?", 0) == [E("Delete Ownership")], f"V12: Delete Bot Files' Authorized? must feed ONLY Delete Ownership: {edges(dbf, 'Authorized?', 0)}"
+    assert edges(dbf, "Owned?", 0) == [E("List Bot Originals")], "V12: Delete Bot Files' Owned?(0) must feed List Bot Originals"
+    deleting = {"Retire Bot Profiles", "Delete Bot Chunks", "Delete Chat Memory", "Delete Stored Original", "Respond"}
+    leak = deleting & reachable(dbf, "Webhook", cut=("Owned?", 0))
+    assert not leak, f"V12: {sorted(leak)} reachable without Owned?(0)"
+    for n, cond_value in (("Originals Deleted?", mig.ORIGINALS_DELETED), ("Deletion Settled?", mig.DELETION_SETTLED), ("Has Original?", mig.HAS_ORIGINAL)):
+        assert node(dbf, n)["parameters"]["conditions"]["conditions"][0]["leftValue"] == cond_value, f"V12: {n} condition is stale"
+    assert node(dbf, "Split File Ids")["parameters"]["jsCode"] == mig.SPLIT_FILE_IDS_JS and node(dbf, "Originals Settled")["parameters"]["jsCode"] == mig.ORIGINALS_SETTLED_JS, \
+        "V12: Split File Ids / Originals Settled are stale"
+    assert edges(dbf, "Originals Deleted?", 0) == [E("Retire Bot Profiles")] and edges(dbf, "Originals Deleted?", 1) == [E("Respond Delete Failed")], \
+        "V12: the stored originals must be settled BEFORE anything else is deleted"
+    assert edges(dbf, "Delete Chat Memory") == [E("Deletion Settled?")] and edges(dbf, "Deletion Settled?", 0) == [E("Respond")] and \
+        edges(dbf, "Deletion Settled?", 1) == [E("Respond Delete Failed")] and edges(dbf, "Respond") == [], \
+        "V12: Delete Bot Files answers success only past Deletion Settled? (and nothing runs after the answer)"
+    for n in ("Retire Bot Profiles", "Delete Bot Chunks", "Delete Chat Memory", "List Bot Originals"):
+        assert node(dbf, n).get("onError") == "continueRegularOutput" and node(dbf, n).get("alwaysOutputData") is True, \
+            f"V12: {n}: an error must reach the verdict as an item, never a bare execution failure"
+    resp = node(dbf, "Delete Stored Original")["parameters"]["options"].get("response", {}).get("response", {})
+    assert resp.get("fullResponse") is True and resp.get("neverError") is True, "V12: Delete Stored Original must report its status"
+    assert node(dbf, "Respond Delete Failed")["parameters"]["options"].get("responseCode") == 503, "V12: a failed delete is 503 (the client retries)"
+    # Set Workflow State
+    sws = load("0DP79STI3pafXO9B-Set_Workflow_State.json")
+    assert mig.GATED["0DP79STI3pafXO9B-Set_Workflow_State.json"]["rule"] == {"legacy": True}, "V12: Set Workflow State's gate must not decide ownership from the token"
+    assert edges(sws, "Authorized?", 0) == [E("Ownership Route?")], f"V12: Set Workflow State's Authorized? must feed ONLY Ownership Route?: {edges(sws, 'Authorized?', 0)}"
+    route = node(sws, "Ownership Route?")["parameters"]["conditions"]["conditions"][0]["leftValue"]
+    assert route == mig.OWNERSHIP_ROUTE and "'activate'" not in route, "V12: only deactivate/delete may be routed to Delete Ownership (activate stays on the token rule)"
+    assert node(sws, "Token Owns?")["parameters"]["conditions"]["conditions"][0]["leftValue"] == mig.TOKEN_OWNS, "V12: Token Owns? is stale"
+    assert edges(sws, "Ownership Route?", 0) == [E("Delete Ownership")] and edges(sws, "Ownership Route?", 1) == [E("Token Owns?")], "V12: Ownership Route? routing"
+    assert edges(sws, "Owned?", 0) == [E("Owner Item")] and edges(sws, "Owner Item") == [E("Validate")] and \
+        node(sws, "Owner Item")["parameters"]["jsCode"] == mig.OWNER_ITEM_JS, "V12: Owned?(0) must hand Validate the request again (Owner Item)"
+    assert edges(sws, "Token Owns?", 0) == [E("Validate")] and edges(sws, "Token Owns?", 1) == [E("Respond Forbidden")] and \
+        node(sws, "Respond Forbidden")["parameters"]["options"].get("responseCode") == 403, "V12: Token Owns? routing"
+    into_validate = sorted(src for src, outs in sws["connections"].items() for out in outs.get("main", []) for c in out if c["node"] == "Validate")
+    assert into_validate == ["Owner Item", "Token Owns?"], f"V12: Validate reachable only past an ownership decision: {into_validate}"
+    dw = node(sws, "Delete Workflow")
+    r = dw["parameters"]["options"].get("response", {}).get("response", {})
+    assert r.get("fullResponse") is True and r.get("neverError") is True and dw.get("onError") == "continueRegularOutput", "V12: Delete Workflow must report its status"
+    assert node(sws, "Workflow Gone?")["parameters"]["conditions"]["conditions"][0]["leftValue"] == mig.WORKFLOW_GONE and \
+        edges(sws, "Delete Workflow") == [E("Workflow Gone?")] and edges(sws, "Workflow Gone?", 0) == [E("Respond OK")] and \
+        edges(sws, "Workflow Gone?", 1) == [E("Respond Delete Failed")], "V12: the delete must be idempotent (404 = gone) and report a failure"
+    print("OK  Delete Bot Files / Set Workflow State (V12: database ownership, honest answer, idempotent delete)")
+
+
 def check_protected():
     wf = load("0DP79STI3pafXO9B-Set_Workflow_State.json")
     js = node(wf, "Validate")["parameters"]["jsCode"]
@@ -252,7 +344,7 @@ def main():
     WF = ap.parse_args().dir
     mig = load_migration()
     try:
-        check_gated(mig); check_proxy(); check_session(); check_bots(); check_files(mig); check_create(); check_protected()
+        check_gated(mig); check_proxy(); check_session(); check_bots(); check_files(mig); check_create(); check_delete_ownership(mig); check_protected()
     except AssertionError as e:
         print(f"AUTH GATE FAIL: {e}")
         sys.exit(1)

@@ -25,7 +25,11 @@ AUTH = os.path.join(HERE, "auth")
 PG_CRED = {"id": "vvRrFiEXzLVqKjOx", "name": "Postgres"}
 
 GATED = {
-    "0DP79STI3pafXO9B-Set_Workflow_State.json":     {"rule": {"workflows": ["workflowId"], "legacy": True}},
+    # V12 (iteration 2026-09-28): the two DELETING webhooks no longer take ownership from the token's lists — those carry
+    # LIVE rows only, so the owner of a bot the sweep retired was refused its own delete, and a stale token could still
+    # name a profile another install has since claimed. Their gate verifies the token; Delete Ownership decides in SQL
+    # (patch_delete_bot_files / patch_set_workflow_state). Activate keeps the token rule, as an explicit If (Token Owns?).
+    "0DP79STI3pafXO9B-Set_Workflow_State.json":     {"rule": {"legacy": True}},
     "SCLcpn6DMDG3Z4VN-Set_Reply_Mode.json":         {"rule": {"profiles": ["profileIds"], "legacy": True}},
     "9PTyYcelRQI7bGDb-Suggest_Replies.json":        {"rule": {"profiles": ["profileId"], "workflows": ["botWaId", "botTgId"], "appUser": ["appUserId"], "legacy": True}},
     "2htWSV5IHO8E2CgB-Dashboard_Outcomes.json":     {"rule": {"profiles": ["profileIds"], "legacy": True}},
@@ -36,8 +40,9 @@ GATED = {
     "KoTuIlk4LMrlvnWI-Upload_File.json":            {"rule": {"workflows": ["whatsappWorkflowId", "telegramWorkflowId"], "legacy": True}},
     "ZTqpumOpL1rNDOp6-Delete_File.json":            {"rule": {"legacy": True}},
     # R2: DeleteBotFiles' appUserId is audit-only (the retire goes by profile id) — as a gated field it would lock a
-    # billing-conflicted install (u = null) out of deleting its own bot.
-    "lmjYsdNcQA2IE5rl-Delete_Bot_Files.json":       {"rule": {"profiles": ["waProfileId", "tgProfileId"], "workflows": ["botWaId", "botTgId"], "legacy": True}},
+    # billing-conflicted install (u = null) out of deleting its own bot. V12: its profile/workflow ids are decided by
+    # Delete Ownership (the database), see above.
+    "lmjYsdNcQA2IE5rl-Delete_Bot_Files.json":       {"rule": {"legacy": True}},
     # R2: in session mode Create must name the token's own billing id — an empty AppUserID used to skip Ensure
     # Subscriber / Count Channels / Register Profile and let the dialog quota fail open.
     "XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json": {"webhook": "Unity Webhook", "rule": {"profiles": ["WhatsappProfileId"], "workflows": ["TelegramWorkflowId"], "appUser": ["AppUserID"], "appUserRequired": ["AppUserID"], "legacy": True}},
@@ -160,6 +165,112 @@ where nullif($1, '') is not null and $1 <> '-1'
 on conflict (profile_id) do update set workflow_id = excluded.workflow_id,
   owner_id = coalesce(bot_profiles.owner_id, excluded.owner_id),
   claimed_at = coalesce(bot_profiles.claimed_at, excluded.claimed_at), deleted_at = null;"""
+
+
+# V12 (iteration 2026-09-28): ownership for a DELETING call (Delete Bot Files, Set Workflow State delete/deactivate) is
+# decided in the database by ONE statement, generated into both workflows. Not from the token: its lists hold LIVE rows
+# only (the owner of a retired bot was refused its own delete) and live for 12 h (a stale token still named a profile
+# another install had since claimed by code — M5). Not a new token claim either: every other gate would have to ignore
+# it. The ids are checked in exactly the form the deleting nodes read them (a JSON string; the sentinels are '' and '-1'
+# as in the gate) — M3: a 'null', a number or a missing field is no id and proves nothing.
+DELETE_OWNERSHIP_SQL = """-- V12: may this install delete these ids? Decided here, never from the token's lists (live rows only, up to 12 h
+-- old). A session may delete when its install is not revoked and EVERY id the delete will use is a string that belongs
+-- to a bot_profiles row whose owner is this install, retired or not (a workflow id: the row it is bound to). A row
+-- without an owner (never claimed) is never proof; at least one real id must be named. A token-less legacy call keeps
+-- the old behaviour while the compat window is open. Read-only. `reason` says why a refusal happened: owned_elsewhere
+-- (another install owns one of the ids) or unproven. Parameters, in order: gate mode, install id, JSON array of the
+-- profile ids, JSON array of the workflow ids.
+with ids as (
+  select 'p'::text as kind, v #>> '{}' as id, jsonb_typeof(v) as t from jsonb_array_elements($3::jsonb) v
+  union all
+  select 'w'::text, v #>> '{}', jsonb_typeof(v) from jsonb_array_elements($4::jsonb) v
+), named as (
+  select kind, id from ids where t = 'string' and id not in ('', '-1')
+), verdict as (
+  select case
+    when $1 = 'legacy' then 'ok'
+    when $1 is distinct from 'session' or coalesce($2, '') = '' then 'unproven'
+    when not exists (select 1 from installs i where i.install_id = $2 and i.revoked_at is null) then 'unproven'
+    when exists (select 1 from ids where t <> 'string') then 'unproven'
+    when not exists (select 1 from named) then 'unproven'
+    when not exists (select 1 from named n where not exists (
+           select 1 from bot_profiles bp where bp.owner_id = $2
+              and ((n.kind = 'p' and bp.profile_id = n.id) or (n.kind = 'w' and bp.workflow_id = n.id)))) then 'ok'
+    when exists (select 1 from named n join bot_profiles bp
+                   on (n.kind = 'p' and bp.profile_id = n.id) or (n.kind = 'w' and bp.workflow_id = n.id)
+                 where bp.owner_id is not null and bp.owner_id <> $2) then 'owned_elsewhere'
+    else 'unproven' end as v
+)
+select (v = 'ok') as allowed, case when v = 'ok' then null else v end as reason from verdict;"""
+
+DBF_OWNERSHIP_PARAMS = ("={{ [ $json.crAuth.mode, ($json.crAuth.installId || ''), "
+                        "JSON.stringify([ ($json.body || {}).waProfileId ?? null, ($json.body || {}).tgProfileId ?? null ]), "
+                        "JSON.stringify([ ($json.body || {}).botWaId ?? null, ($json.body || {}).botTgId ?? null ]) ] }}")
+# Set Workflow State's Validate trims the id before it reaches the admin API: the check sees the same trimmed string.
+SWS_OWNERSHIP_PARAMS = ("={{ [ $json.crAuth.mode, ($json.crAuth.installId || ''), '[]', "
+                        "JSON.stringify([ typeof ($json.body || {}).workflowId === 'string' ? $json.body.workflowId.trim() : "
+                        "(($json.body || {}).workflowId ?? null) ]) ] }}")
+OWNED = "={{ $json.allowed === true }}"
+OWNER_REFUSED_BODY = ("={{ { \"success\": false, \"error\": $json.allowed === false ? \"forbidden\" : \"db_unavailable\", "
+                      "\"reason\": $json.allowed === false ? ($json.reason || \"unproven\") : null } }}")
+OWNER_REFUSED_CODE = "={{ $json.allowed === false ? 403 : 503 }}"     # a DB fault is 503 — for the client a 403 is final
+
+# V12 / M1: Delete Bot Files answers success only when the deletes really happened, and the stored originals go FIRST:
+# they used to be deleted after the response from file ids the chunk delete returned, so a storage failure was never
+# seen and a retry (the chunks already gone) could not find the files again.
+LIST_ORIGINALS_SQL = """-- V12: the deleted bot's stored price-list originals, listed BEFORE anything is deleted (the storage delete runs
+-- first; a failure stops the chain with the chunks still in place, so the retry finds the same files). Read-only.
+-- Parameters, in order: the bot's WhatsApp and Telegram workflow ids (the sentinels match nothing).
+select coalesce(array_agg(distinct d.metadata->>'fileId') filter (where coalesce(d.metadata->>'fileId', '') <> ''), '{}'::text[]) as "fileIds"
+from documents d
+where (d.metadata->>'botWaId' = $1 and $1 not in ('-1', ''))
+   or (d.metadata->>'botTgId' = $2 and $2 not in ('-1', ''));"""
+LIST_ORIGINALS_PARAMS = ("={{ [ String(($('Webhook').first().json.body || {}).botWaId ?? '-1'), "
+                         "String(($('Webhook').first().json.body || {}).botTgId ?? '-1') ] }}")
+SPLIT_FILE_IDS_JS = """// DELETE BOT FILES / Split File Ids (generated by Tools/n8n/apply-auth-gate.py, V12): one item per stored original to
+// delete, or ONE marker item when there is none ({none}) or the listing failed ({listError}) — the chain goes on to
+// Originals Settled either way (a node with no input items would end the execution without an answer).
+const row = $('List Bot Originals').first().json || {};
+if (!Array.isArray(row.fileIds)) return [{ json: { listError: true } }];
+const ids = row.fileIds.filter((f) => typeof f === 'string' && f !== '');
+return ids.length ? ids.map((fileId) => ({ json: { fileId } })) : [{ json: { none: true } }];"""
+HAS_ORIGINAL = "={{ typeof $json.fileId === 'string' && $json.fileId !== '' }}"
+ORIGINALS_SETTLED_JS = """// DELETE BOT FILES / Originals Settled (generated by Tools/n8n/apply-auth-gate.py, V12): did every stored original go?
+// 200/204 = deleted, 404 (or the storage API's 400 «not_found») = already gone; no response, any other status or a failed
+// listing = NOT settled. Re-emits the gate's item (the request body) for the deleting statements downstream.
+const gate = $('Auth Gate').first().json;
+let error = null, deleted = 0;
+for (const it of $input.all()) {
+  const r = it.json || {};
+  if (r.none) continue;
+  if (r.listError) { error = error || 'db_unavailable'; continue; }
+  const s = Number(r.statusCode);
+  const b = (r.body && typeof r.body === 'object') ? r.body : {};
+  const gone = s === 200 || s === 204 || s === 404 || (s === 400 && (String(b.statusCode) === '404' || b.error === 'not_found'));
+  if (r.error || !gone) error = error || 'storage_unavailable'; else deleted += 1;
+}
+return [{ json: { ...gate, originals: { ok: !error, error, deleted } }, pairedItem: { item: 0 } }];"""
+# A token-less legacy client never reads the answer and cannot retry: a storage failure does not stop ITS delete.
+ORIGINALS_DELETED = "={{ $json.originals.ok === true || $json.crAuth.mode !== 'session' }}"
+# Spelled out field by field: n8n's expression sandbox rewrites a computed member access (`$json[k]`).
+DELETION_SETTLED = ("={{ typeof $('Retire Bot Profiles').first().json.retiredProfiles === 'number' && "
+                    "typeof $('Delete Bot Chunks').first().json.deletedChunks === 'number' && "
+                    + " && ".join(f"typeof $json.{k} === 'number'" for k in ("deletedMemoryRows", "deletedOutcomes", "deletedReplyFlags",
+                                                                           "deletedHistoryEvents", "deletedHandoffs", "deletedReplyEvents",
+                                                                           "deletedChatStates")) + " }}")
+DELETE_FAILED_BODY = "={{ { \"success\": false, \"error\": ($json.originals && $json.originals.error) || \"db_unavailable\" } }}"
+
+# Set Workflow State: which calls the database decides, the token rule kept for everything else (activate), the item
+# Validate needs back after the SQL row, and an idempotent delete (404 = already gone; F1 / a hand-deleted clone).
+OWNERSHIP_ROUTE = ("={{ $json.crAuth.mode === 'session' && ['deactivate', 'delete'].includes(String(($json.body || {}).action ?? '').trim()) }}")
+TOKEN_OWNS = ("={{ $json.crAuth.mode !== 'session' || ((v) => v === undefined || v === null || v === '' || v === '-1' || "
+              "(typeof v === 'string' && ($json.crAuth.workflows || []).includes(v)))(($json.body || {}).workflowId) }}")
+TOKEN_REFUSED_BODY = "={{ { \"success\": false, \"error\": \"unauthorized\", \"reason\": \"forbidden:workflowId\" } }}"
+OWNER_ITEM_JS = """// SET WORKFLOW STATE / Owner Item (generated by Tools/n8n/apply-auth-gate.py, V12): Delete Ownership allowed this call —
+// hand Validate the request again (after the SQL node `$json` is its verdict row, not the body).
+return [{ json: $('Auth Gate').first().json, pairedItem: { item: 0 } }];"""
+WORKFLOW_GONE = "={{ [200, 404].includes(Number($json.statusCode)) }}"
+WORKFLOW_DELETE_FAILED_BODY = "={{ { \"success\": false, \"error\": \"delete_failed\", \"status\": $json.statusCode ?? null } }}"
 
 
 def nid(*parts):
@@ -357,6 +468,147 @@ def patch_delete_file(wf):
     return changed
 
 
+def if_spec(scope, name, left, position):
+    return {"parameters": {"conditions": {"options": {"caseSensitive": True, "leftValue": "", "typeValidation": "loose", "version": 2},
+                                          "conditions": [{"id": nid(scope, name, "cond"), "leftValue": left, "rightValue": "",
+                                                          "operator": {"type": "boolean", "operation": "true", "singleValue": True}}],
+                                          "combinator": "and"}, "options": {}},
+            "id": nid(scope, name), "name": name, "type": "n8n-nodes-base.if", "typeVersion": 2.2, "position": position}
+
+
+def respond_spec(scope, name, body, code, position):
+    return {"parameters": {"respondWith": "json", "responseBody": body, "options": {"responseCode": code}},
+            "id": nid(scope, name), "name": name, "type": "n8n-nodes-base.respondToWebhook", "typeVersion": 1.5, "position": position}
+
+
+def pg_spec(scope, name, query, params, position):
+    return {"parameters": {"operation": "executeQuery", "query": query, "options": {"queryReplacement": params}},
+            "id": nid(scope, name), "name": name, "type": "n8n-nodes-base.postgres", "typeVersion": 2.6, "position": position,
+            "credentials": {"postgres": dict(PG_CRED)}, "alwaysOutputData": True, "onError": "continueRegularOutput"}
+
+
+def wire(wf, want):
+    changed = False
+    for src, outs in want.items():
+        conns = {"main": [[{"node": t, "type": "main", "index": 0} for t in out] for out in outs]}
+        if wf["connections"].get(src) != conns:
+            wf["connections"][src] = conns
+            changed = True
+    return changed
+
+
+def set_keys(n, **kv):
+    changed = False
+    for k, v in kv.items():
+        if n.get(k) != v:
+            n[k] = v
+            changed = True
+    return changed
+
+
+def report_status(n, timeout=None):
+    """An HTTP node whose status the next node judges: full response, never an error for a non-2xx."""
+    opts = n["parameters"].setdefault("options", {})
+    want = {"response": {"fullResponse": True, "neverError": True}}
+    changed = False
+    if opts.get("response") != want:
+        opts["response"] = want
+        changed = True
+    if timeout is not None and opts.get("timeout") != timeout:
+        opts["timeout"] = timeout
+        changed = True
+    return changed | set_keys(n, onError="continueRegularOutput")
+
+
+def patch_delete_bot_files(wf):
+    """V12: ownership in the database, the stored originals first, success only on real counters.
+      Authorized? -> Delete Ownership -> Owned? --true--> List Bot Originals -> Split File Ids -> Has Original?
+          --true--> Delete Stored Original -> Originals Settled ; --false--> Originals Settled
+        Originals Settled -> Originals Deleted? --true--> Retire Bot Profiles -> Delete Bot Chunks -> Delete Chat Memory
+          -> Deletion Settled? --true--> Respond ; --false--> Respond Delete Failed (503)
+        Originals Deleted? --false--> Respond Delete Failed (503) ; Owned? --false--> Respond Owner Refused (403 / 503)"""
+    x, y = node(wf, "Authorized?")["position"]
+    S = "dbf"
+    changed = ensure_node(wf, pg_spec(S, "Delete Ownership", DELETE_OWNERSHIP_SQL, DBF_OWNERSHIP_PARAMS, [x + 220, y - 200]))
+    changed |= ensure_node(wf, if_spec(S, "Owned?", OWNED, [x + 440, y - 200]))
+    changed |= ensure_node(wf, respond_spec(S, "Respond Owner Refused", OWNER_REFUSED_BODY, OWNER_REFUSED_CODE, [x + 660, y]))
+    changed |= ensure_node(wf, pg_spec(S, "List Bot Originals", LIST_ORIGINALS_SQL, LIST_ORIGINALS_PARAMS, [x + 660, y - 200]))
+    split = node(wf, "Split File Ids")
+    if split["parameters"].get("jsCode") != SPLIT_FILE_IDS_JS:
+        split["parameters"]["jsCode"] = SPLIT_FILE_IDS_JS
+        changed = True
+    changed |= set_keys(split, position=[x + 880, y - 200])
+    changed |= ensure_node(wf, if_spec(S, "Has Original?", HAS_ORIGINAL, [x + 1100, y - 200]))
+    dso = node(wf, "Delete Stored Original")
+    changed |= report_status(dso) | set_keys(dso, position=[x + 1320, y - 300])
+    changed |= ensure_node(wf, {"parameters": {"jsCode": ORIGINALS_SETTLED_JS}, "id": nid(S, "Originals Settled"), "name": "Originals Settled",
+                                "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [x + 1540, y - 200]})
+    changed |= ensure_node(wf, if_spec(S, "Originals Deleted?", ORIGINALS_DELETED, [x + 1760, y - 200]))
+    for name, dx in (("Retire Bot Profiles", 1980), ("Delete Bot Chunks", 2200), ("Delete Chat Memory", 2420)):
+        changed |= set_keys(node(wf, name), alwaysOutputData=True, onError="continueRegularOutput", position=[x + dx, y - 200])
+    changed |= ensure_node(wf, if_spec(S, "Deletion Settled?", DELETION_SETTLED, [x + 2640, y - 200]))
+    changed |= ensure_node(wf, respond_spec(S, "Respond Delete Failed", DELETE_FAILED_BODY, 503, [x + 2860, y]))
+    changed |= set_keys(node(wf, "Respond"), position=[x + 2860, y - 200])
+    changed |= wire(wf, {
+        "Authorized?": [["Delete Ownership"], [node_deny(wf)]],
+        "Delete Ownership": [["Owned?"]],
+        "Owned?": [["List Bot Originals"], ["Respond Owner Refused"]],
+        "List Bot Originals": [["Split File Ids"]],
+        "Split File Ids": [["Has Original?"]],
+        "Has Original?": [["Delete Stored Original"], ["Originals Settled"]],
+        "Delete Stored Original": [["Originals Settled"]],
+        "Originals Settled": [["Originals Deleted?"]],
+        "Originals Deleted?": [["Retire Bot Profiles"], ["Respond Delete Failed"]],
+        "Retire Bot Profiles": [["Delete Bot Chunks"]],
+        "Delete Bot Chunks": [["Delete Chat Memory"]],
+        "Delete Chat Memory": [["Deletion Settled?"]],
+        "Deletion Settled?": [["Respond"], ["Respond Delete Failed"]],
+    })
+    if "Respond" in wf["connections"]:      # the storage delete used to hang off the response
+        del wf["connections"]["Respond"]
+        changed = True
+    return changed
+
+
+def node_deny(wf):
+    return "Respond Unauthorized" if node(wf, "Respond Unauthorized") else "Respond 401"
+
+
+def patch_set_workflow_state(wf):
+    """V12: delete/deactivate in session mode are decided by Delete Ownership; activate keeps the token rule (Token Owns?,
+    the gate's own check for this one field); the delete is idempotent and a real failure is reported.
+      Authorized? -> Ownership Route? --true--> Delete Ownership -> Owned? --true--> Owner Item -> Validate
+                                      --false-> Token Owns? --true--> Validate ; --false--> Respond Forbidden (403)
+      Owned? --false--> Respond Owner Refused (403 / 503)
+      Delete Workflow -> Workflow Gone? --true--> Respond OK ; --false--> Respond Delete Failed (502)"""
+    x, y = node(wf, "Authorized?")["position"]
+    S = "sws"
+    changed = ensure_node(wf, if_spec(S, "Ownership Route?", OWNERSHIP_ROUTE, [x + 220, y]))
+    changed |= ensure_node(wf, pg_spec(S, "Delete Ownership", DELETE_OWNERSHIP_SQL, SWS_OWNERSHIP_PARAMS, [x + 440, y - 200]))
+    changed |= ensure_node(wf, if_spec(S, "Owned?", OWNED, [x + 660, y - 200]))
+    changed |= ensure_node(wf, {"parameters": {"jsCode": OWNER_ITEM_JS}, "id": nid(S, "Owner Item"), "name": "Owner Item",
+                                "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [x + 880, y - 200]})
+    changed |= ensure_node(wf, respond_spec(S, "Respond Owner Refused", OWNER_REFUSED_BODY, OWNER_REFUSED_CODE, [x + 880, y - 400]))
+    changed |= ensure_node(wf, if_spec(S, "Token Owns?", TOKEN_OWNS, [x + 440, y + 200]))
+    changed |= ensure_node(wf, respond_spec(S, "Respond Forbidden", TOKEN_REFUSED_BODY, 403, [x + 660, y + 400]))
+    dw = node(wf, "Delete Workflow")
+    changed |= report_status(dw, timeout=20000)
+    dx, dy = dw["position"]
+    changed |= ensure_node(wf, if_spec(S, "Workflow Gone?", WORKFLOW_GONE, [dx + 220, dy]))
+    changed |= ensure_node(wf, respond_spec(S, "Respond Delete Failed", WORKFLOW_DELETE_FAILED_BODY, 502, [dx + 440, dy - 160]))
+    changed |= wire(wf, {
+        "Authorized?": [["Ownership Route?"], [node_deny(wf)]],
+        "Ownership Route?": [["Delete Ownership"], ["Token Owns?"]],
+        "Delete Ownership": [["Owned?"]],
+        "Owned?": [["Owner Item"], ["Respond Owner Refused"]],
+        "Owner Item": [["Validate"]],
+        "Token Owns?": [["Validate"], ["Respond Forbidden"]],
+        "Delete Workflow": [["Workflow Gone?"]],
+        "Workflow Gone?": [["Respond OK"], ["Respond Delete Failed"]],
+    })
+    return changed
+
+
 def patch_create(wf, profile_field, channel):
     """Bind the created clone's id (and the creating install) to the profile row."""
     src = node(wf, "Restamp RAG Chunks")
@@ -408,6 +660,10 @@ def check_all():
             bad.append(fname + " (upload field check / registry)")
         elif fname.startswith("ZTqpumOpL1rNDOp6") and patch_delete_file(json.loads(json.dumps(wf))):
             bad.append(fname + " (owner-scoped delete)")
+        elif fname.startswith("lmjYsdNcQA2IE5rl") and patch_delete_bot_files(json.loads(json.dumps(wf))):
+            bad.append(fname + " (V12 database ownership / honest answer)")
+        elif fname.startswith("0DP79STI3pafXO9B") and patch_set_workflow_state(json.loads(json.dumps(wf))):
+            bad.append(fname + " (V12 database ownership / idempotent delete)")
     for fname in BOTS:
         wf = json.load(open(os.path.join(WF, fname), encoding="utf-8"))
         if not any(c.get("id") == "c0a11bac-0000-4000-8000-0000000000a1" for c in node(wf, "If")["parameters"]["conditions"]["conditions"]):
@@ -426,6 +682,10 @@ def main():
             changed |= patch_upload(wf)
         if fname.startswith("ZTqpumOpL1rNDOp6"):
             changed |= patch_delete_file(wf)
+        if fname.startswith("lmjYsdNcQA2IE5rl"):
+            changed |= patch_delete_bot_files(wf)
+        if fname.startswith("0DP79STI3pafXO9B"):
+            changed |= patch_set_workflow_state(wf)
         if fname.startswith("XuvOp7TxOImOAmlj"):
             changed |= patch_create(wf, "WhatsappProfileId", "whatsapp")
         if fname.startswith("Uz6HBBUpAiUqVysB"):

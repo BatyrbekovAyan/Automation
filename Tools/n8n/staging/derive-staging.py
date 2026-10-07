@@ -86,6 +86,12 @@ STAGING_DOCS_SQL = """-- STAGING ONLY (derive-staging.py): stands in for the Sup
 insert into documents (content, metadata) values ($1, $2::jsonb) returning id;"""
 
 
+STAGING_STORAGE_DELETE_JS = """// STAGING ONLY (derive-staging.py): stands in for a Supabase Storage DELETE — nothing is sent; each item gets the
+// full response a successful delete gives (fullResponse + neverError: statusCode 200), so the status-judging node after
+// it (Delete Bot Files' Originals Settled) sees a settled delete.
+return $input.all().map((it, i) => ({ json: { ...it.json, statusCode: 200, body: { message: 'staging: not sent' } }, pairedItem: { item: i } }));"""
+
+
 def _expr_body(v):
     """'={{ X }}' -> '(X)'; a literal -> its JSON literal (for composing one staging expression)."""
     if isinstance(v, str) and v.startswith("={{") and v.rstrip().endswith("}}"):
@@ -107,7 +113,15 @@ def isolate_supabase_writers(wf):
     replaced = []
     for n in list(nodes):
         p = n.get("parameters") or {}
-        if n["type"] == "n8n-nodes-base.httpRequest" and SUPABASE_STORAGE in str(p.get("url", "")) and str(p.get("method", "GET")).upper() != "GET":
+        if n["type"] == "n8n-nodes-base.httpRequest" and SUPABASE_STORAGE in str(p.get("url", "")) and str(p.get("method", "GET")).upper() == "DELETE":
+            # V12 (2026-10-07): Delete Bot Files judges each storage delete by its status before it deletes anything else
+            # (Originals Settled) — a NoOp would answer «no status» = failure. The stand-in answers what a successful
+            # delete does; it still sends nothing anywhere.
+            nodes[nodes.index(n)] = {"parameters": {"jsCode": STAGING_STORAGE_DELETE_JS}, "id": n["id"], "name": n["name"],
+                                     "type": "n8n-nodes-base.code", "typeVersion": 2, "position": n["position"],
+                                     "notes": "STAGING: Supabase Storage delete neutralised by derive-staging.py (answers 200)"}
+            replaced.append(n["name"])
+        elif n["type"] == "n8n-nodes-base.httpRequest" and SUPABASE_STORAGE in str(p.get("url", "")) and str(p.get("method", "GET")).upper() != "GET":
             nodes[nodes.index(n)] = {"parameters": {}, "id": n["id"], "name": n["name"], "type": "n8n-nodes-base.noOp", "typeVersion": 1,
                                      "position": n["position"], "notes": "STAGING: Supabase Storage write neutralised by derive-staging.py"}
             replaced.append(n["name"])

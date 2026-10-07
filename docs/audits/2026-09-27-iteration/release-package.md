@@ -49,10 +49,17 @@ workflow — `deploy-canonical.py` (dry-run → `--apply --yes`, точка от
   только если ВСЕ известные id его workflow — из токена). Выкладываются только вместе с R3: именно R3 делает Register Upload
   достижимым. Миграций нет; перед выкладкой read-only убедиться, что на проде есть индекс `documents_metadata_file_id_idx`
   (`Tools/n8n/supabase/2026-07-02-harden-rag-store.sql`) — обе проверки читают `documents` по `fileId`.
+- **V12** (итерация 2026-09-28, 2026-10-07: удаление бота владельцем после окончания триала, чистка клонов): SQL
+  `Tools/n8n/sql/2026-10-07-retired-clone-deactivate.sql` ДО Profile Lifecycle Sweep; Delete Bot Files, Wappi Proxy и Sweep —
+  `deploy-canonical.py` (он теперь сам подставляет id `n8n Admin API` из живого Set Workflow State вместо `__HDR_CRED__` и
+  не выкладывает workflow без него — это касается и Test Dialog); Set Workflow State — `build-client-webhooks.py --update`.
+  Сервер раньше нового клиента (клиент удаляет бота только по вердикту сервера и полагается на 503-vs-403 и идемпотентный
+  delete). Данные ботов, удалённых Sweep'ом, хранятся (решение владельца); бэкфилла нет — живых клонов нет.
 - Точный список к выкладке брать из `verify-deployed.py --base <prod>` (строки DIFF) — он же критерий готовности.
 
 Затрагиваемые группы: Auth Session, Wappi Proxy, все gated вебхуки, оба шаблона ботов, Create/Edit WA+TG, Suggest Replies,
-Upload File, Delete File, Delete Bot Files, Dashboard Outcomes, Get Usage, Set Reply Mode, Handoffs, Handoff Notifier, Test Dialog.
+Upload File, Delete File, Delete Bot Files, Dashboard Outcomes, Get Usage, Set Reply Mode, Handoffs, Handoff Notifier, Test Dialog,
+Profile Lifecycle Sweep (V12).
 
 ## 3. Read-back
 

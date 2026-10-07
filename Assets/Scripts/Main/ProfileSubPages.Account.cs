@@ -1,3 +1,5 @@
+using System.Collections;
+using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -12,6 +14,8 @@ public partial class ProfileSubPages
     [SerializeField] private TextMeshProUGUI accountEmail;
     [SerializeField] private Button accountEditButton;
     [SerializeField] private Button accountDeleteButton;
+
+    private bool _wiping;
 
     private void WireAccount()
     {
@@ -41,20 +45,78 @@ public partial class ProfileSubPages
 
     private void RunWipe()
     {
-        // 1. Per-bot teardown through the canonical path — the only code that
-        //    also kills Wappi profiles, n8n workflows, Supabase chunks, the
-        //    paired BotSettings, and the bot's cache dir. Backwards: DeleteBot
-        //    destroys the paired BotSettings by sibling index.
-        Transform botsRoot = Manager.Instance != null ? Manager.Instance.BotsRoot : null;
-        if (botsRoot != null)
+        if (_wiping || Manager.Instance == null) return;
+        StartCoroutine(RunWipeRoutine());
+    }
+
+    // V12 (iteration 2026-09-28): every bot leaves the phone only on its server verdict (Manager.DeleteBotOnServer) —
+    // the wipe used to call the old one-call delete, which wiped locally and never read the server's answer, so a
+    // refused delete left the bot's memory and clone on the server with no way back to them from the app.
+    //   * Done / NothingOnServer → that bot goes now (its server data is gone);
+    //   * Retry → the wipe STOPS («повторите»): the bots still on the server keep their ids, nothing else is wiped;
+    //   * Refused → the bot is collected; after the loop ONE question offers «Удалить только с телефона» for all of
+    //     them (owner decision 2026-10-07) — a bot another install now owns must never block the wipe forever.
+    // The prefs and the disk go only after every bot is settled (FinishWipe).
+    private IEnumerator RunWipeRoutine()
+    {
+        _wiping = true;
+        var refused = new List<Bot>();
+        int ownedElsewhere = 0;
+        Transform botsRoot = Manager.Instance.BotsRoot;
+        var bots = new List<Bot>();
+        // Backwards (by sibling index): DeleteBotLocally destroys the paired BotSettings by index, so several local
+        // deletions in one frame (bots that never reached the server need no network) must run from the end.
+        for (int i = botsRoot != null ? botsRoot.childCount - 1 : -1; i >= 0; i--)
         {
-            for (int i = botsRoot.childCount - 1; i >= 0; i--)
-            {
-                var bot = botsRoot.GetChild(i).GetComponent<Bot>();
-                if (bot != null) bot.DeleteBot();
-            }
+            var bot = botsRoot.GetChild(i).GetComponent<Bot>();
+            if (bot != null) bots.Add(bot);
         }
 
+        Manager.Instance.LoadingPanel.SetActive(true);
+        foreach (var bot in bots)
+        {
+            if (bot == null) continue;
+            var outcome = BotServerDeletion.Outcome.Retry;
+            yield return Manager.Instance.DeleteBotOnServer(bot, o => outcome = o, showLoading: false);
+            if (outcome.Verdict == BotServerDeletion.Verdict.Retry)
+            {
+                Manager.Instance.LoadingPanel.SetActive(false);
+                _wiping = false;
+                ShowConfirm(BotDeletionCopy.WipeRetryTitle, BotDeletionCopy.WipeRetryBody, BotDeletionCopy.RetryAction, RunWipe);
+                yield break;
+            }
+            if (outcome.Verdict == BotServerDeletion.Verdict.Refused)
+            {
+                refused.Add(bot);
+                if (outcome.Reason == BotServerDeletion.ReasonOwnedElsewhere) ownedElsewhere++;
+                continue;
+            }
+            bot.DeleteBotLocally();
+        }
+        Manager.Instance.LoadingPanel.SetActive(false);
+        _wiping = false;
+
+        if (refused.Count == 0)
+        {
+            FinishWipe();
+            yield break;
+        }
+        ShowConfirm(BotDeletionCopy.RefusedTitle, BotDeletionCopy.WipeRefusedBody(refused.Count, ownedElsewhere == refused.Count),
+                    BotDeletionCopy.PhoneOnlyAction, () => DeleteRefusedLocallyThenFinish(refused), longAction: true);
+    }
+
+    // The owner chose «Удалить только с телефона» for the bots the server refused. Same frame, so backwards by sibling
+    // index (the list was collected that way).
+    private void DeleteRefusedLocallyThenFinish(List<Bot> refused)
+    {
+        foreach (var bot in refused)
+            if (bot != null) bot.DeleteBotLocally();
+        FinishWipe();
+    }
+
+    private void FinishWipe()
+    {
+        // 1. Bots: settled by RunWipeRoutine (each on its server verdict) before this runs.
         // 2. Prefs: DeleteAll is the only complete option — per-chat SemiAuto
         //    keys and historical orphans cannot be enumerated. The reply-mode queue
         //    lives in memory too and re-persists itself on its next write: empty it

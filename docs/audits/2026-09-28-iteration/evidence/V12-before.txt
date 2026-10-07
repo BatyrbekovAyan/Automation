@@ -1,0 +1,60 @@
+# V12 before — HEAD 630039ea, 2026-10-07T18:28:37Z
+# python3 Tools/n8n/tests/test_retired_delete.py   (server: gates, ownership, honest answer, sweep, proxy, deploy)
+FAIL V12 D1 (whatsapp): the owner of a bot the sweep retired deletes its files and memory; a neighbour is untouched
+      - the gate must not decide ownership from the live token: {'ok': False, 'mode': 'session', 'reason': 'forbidden:waProfileId', 'installId': 'inst-A', 'appUserId': '$RCAnonymousID:0123456789abcdef0123456789abcdef', 'profiles': [], 'workflows': [], 'claimPending': []}
+      - Authorized?(0) [{'node': 'Retire Bot Profiles', 'type': 'main', 'index': 0}]
+      - EXCEPTION StopIteration: 
+FAIL V12 D1 (telegram): the owner of a bot the sweep retired deletes its files and memory; a neighbour is untouched
+      - the gate must not decide ownership from the live token: {'ok': False, 'mode': 'session', 'reason': 'forbidden:tgProfileId', 'installId': 'inst-A', 'appUserId': '$RCAnonymousID:0123456789abcdef0123456789abcdef', 'profiles': [], 'workflows': [], 'claimPending': []}
+      - Authorized?(0) [{'node': 'Retire Bot Profiles', 'type': 'main', 'index': 0}]
+      - EXCEPTION StopIteration: 
+FAIL V12 D2: Set Workflow State — delete/deactivate of the owner's retired clone go to Delete Ownership and pass; activate never does
+      - delete: {'ok': False, 'mode': 'session', 'reason': 'forbidden:workflowId', 'installId': 'inst-A', 'appUserId': '$RCAnonymousID:0123456789abcdef0123456789abcdef', 'profiles': [], 'workflows': [], 'claimPending': []}
+      - EXCEPTION StopIteration: 
+FAIL V12 D3: Delete Ownership refuses what the caller cannot prove it owns; reasons say why
+      - EXCEPTION StopIteration: 
+FAIL V12 M5: a STALE token whose profile another install has since claimed deletes nothing (files, workflow, Wappi profile)
+      - EXCEPTION StopIteration: 
+FAIL V12 proxy: profile.delete / profile.logout are decided by the database (own live or retired row), other ops are not
+      - profile.delete own live: {'ok': True, '_status': 200, 'op': 'profile.delete', 'channel': 'whatsapp', 'profileId': 'wa-A', 'method': 'POST', 'url': 'https://wappi.pro/api/profile/delete', 'query': {'profile_id': 'wa-A'}, 'jsonBody': {}, 'sendBody': False, 'timeout': 30000, 'claimPairing': False} None
+      - EXCEPTION AttributeError: 'NoneType' object has no attribute 'get'
+FAIL V12 D4 (whatsapp): a live bot (session) and a token-less legacy call in the compat window still delete
+      - EXCEPTION StopIteration: 
+FAIL V12 D4 (telegram): a live bot (session) and a token-less legacy call in the compat window still delete
+      - EXCEPTION StopIteration: 
+FAIL V12 M1: Delete Bot Files says success only on real counters; storage first, its failure is 503 and nothing else ran
+      - EXCEPTION StopIteration: 
+FAIL V12 D5: Set Workflow State delete is idempotent (200/404 = gone) and reports a real failure (502)
+      - Delete Workflow {'name': 'Delete Workflow', 'type': 'n8n-nodes-base.httpRequest', 'typeVersion': 4.2, 'position': [880, -140], 'parameters': {'method': 'DELETE', 'url': '=http://localhost:5678/api/v1/workflows/{{ $json.id }}', 'authentication': 'genericCredentialType', 'genericAuthType': 'httpHeaderAuth', 'options': {'timeout': 20000}}, 'credentials': {'httpHeaderAuth': {'id': '__HDR_CRED__', 'name': 'n8n Admin API'}}, 'id': '72400534-5d42-4efc-9f6c-6ec209fdc3d9'}
+      - EXCEPTION StopIteration: 
+FAIL V12 S1: the sweep deactivates the clone of a profile IT retired, once; never liveness/app_delete, a live workflow or a protected id
+      - EXCEPTION RuntimeError: psql died: ERROR:  column "clone_deactivated_id" of relation "bot_profiles" does not exist
+LINE 1: ...wner_id, workflow_id, deleted_at, deleted_reason, clone_deac...
+                                                             ^
+
+FAIL V12 deploy: deploy-canonical binds the n8n Admin API credential from the live Set Workflow State, and refuses without it
+      - EXCEPTION AttributeError: module 'deploy_canonical_py' has no attribute 'admin_credential_id'
+FAIL V12 N1: verify-auth-gate.py rejects copies that route around the database ownership
+      - EXCEPTION StopIteration: 
+
+0 pass, 13 fail
+
+# Client (Unity EditMode, headless, client code = HEAD): Tools/run-tests-headless.sh 'BotDeletionWiringTests'
+================ EditMode test results (headless) ================
+  result=Failed(Child)  total=5  passed=1  failed=4  skipped=0  inconclusive=0
+  Failing / inconclusive tests:
+    - BotDeletionWiringTests.FullWipe_ClearsPrefsOnlyAfterEveryBotIsSettled
+    - BotDeletionWiringTests.LocalWipe_TalksToNoServer_AndTheOldOneCallDeleteIsGone
+    - BotDeletionWiringTests.ServerHalf_UnlinksTheProfileFirst_ReadsEveryAnswer_AndHoldsTheQueue
+    - BotDeletionWiringTests.SettingsDelete_RemovesTheBotOnlyOnTheVerdict_OrTheOwnersPhoneOnlyChoice
+=================================================================
+NOT GREEN ❌  (unity exit=2).
+PASSED BotDeletionWiringTests.DeletePopup_BodyClearsTheButtons_InThePrefab
+FAILED BotDeletionWiringTests.FullWipe_ClearsPrefsOnlyAfterEveryBotIsSettled
+         private void FinishWipe not found
+FAILED BotDeletionWiringTests.LocalWipe_TalksToNoServer_AndTheOldOneCallDeleteIsGone
+         the one-call delete (local wipe + unread fire-and-forget server calls) must be gone — nothing may delete a bot locally without a verdict
+FAILED BotDeletionWiringTests.ServerHalf_UnlinksTheProfileFirst_ReadsEveryAnswer_AndHoldsTheQueue
+         the fire-and-forget DeleteBotFiles routine (answer only logged) must be gone
+FAILED BotDeletionWiringTests.SettingsDelete_RemovesTheBotOnlyOnTheVerdict_OrTheOwnersPhoneOnlyChoice
+         exactly one local delete — inside FinishDeleteLocally

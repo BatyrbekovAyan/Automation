@@ -235,10 +235,12 @@ public class Bot : MonoBehaviour
         if (Manager.openBotSettings != null) Manager.openBotSettings.OpenGeneralTab();
     }
 
-    // Made public so BotSettings' in-page Delete flow can reuse the exact
-    // same teardown (PlayerPrefs cleanup + profile/workflow deletes + destroy
-    // both the Bot card and its paired BotSettings GameObject).
-    public void DeleteBot()
+    // The LOCAL half of a bot deletion: PlayerPrefs, caches, in-flight uploads, the reply-mode queue, the Bot card
+    // and its paired BotSettings. V12 (iteration 2026-09-28): it talks to no server and is reached only from a
+    // verdict — Manager.DeleteBotOnServer answered Done / NothingOnServer, or the owner, told that the server refused,
+    // chose «Удалить только с телефона» (BotSettings.FinishDeleteLocally, ProfileSubPages.RunWipeRoutine). It used to
+    // be DeleteBot(), which wiped the phone first and fired the server calls without reading one answer.
+    public void DeleteBotLocally()
     {
         if (PlayerPrefs.HasKey(transform.name + "Name"))
         {
@@ -331,19 +333,10 @@ public class Bot : MonoBehaviour
             ChatManager.Instance.PurgeCacheForBot(transform.name);
         }
 
-        // R5: the reply-mode queue resumes on every launch — a deleted bot's undelivered
-        // choices must go first, or a resumed send would recreate the reply_mode_flags
-        // rows the server-side wipe below removes.
+        // R5: the reply-mode queue resumes on every launch — a deleted bot's undelivered choices go with it, or a
+        // resumed send would recreate the reply_mode_flags rows the server-side delete removed. (V12: the queue held
+        // this bot while Manager.DeleteBotOnServer ran; forgetting it also drops the hold.)
         ReplyModeSyncService.Existing?.ForgetBot(transform.name);
-
-        // Sweep the bot's server-side trace from Supabase BEFORE the ids stop
-        // meaning anything — RAG chunks are tagged by the workflow ids, and the
-        // bot_profiles slot rows are keyed by the profile ids; nothing could
-        // clean either up after the bot is gone.
-        Manager.Instance.DeleteBotFilesOnServer(whatsappWorkflowId, telegramWorkflowId,
-                                                whatsappProfileId, telegramProfileId);
-
-        Manager.Instance.DeleteProfilesAndWorkflows(whatsappProfileId, telegramProfileId, whatsappWorkflowId, telegramWorkflowId);
 
         Destroy(Manager.BotSettingsParentStatic.transform.GetChild(transform.GetSiblingIndex()).gameObject);
 
@@ -351,12 +344,12 @@ public class Bot : MonoBehaviour
         // still a live child of BotsParent for the rest of the frame — and EVERY "has bots"
         // fact in the app is a childCount read (BotsPage.RefreshEmptyState, FirstStepsCard,
         // ChatManager.ComputeCurrentEmptyState). BotsPage's OnEnable refresh — the one the
-        // in-settings delete relies on, since ConfirmDeleteBot re-activates the page just
+        // in-settings delete relies on, since FinishDeleteLocally re-activates the page just
         // before calling here — runs inside that same frame, so it counted the phantom card
         // and left the «Первые шаги» banner up (and the empty state hidden) until the next
         // tab switch. Detach first: the roster is then truthful the instant the delete happens,
         // whichever order the readers run in. Safe for the one caller that deletes in a loop —
-        // ProfileSubPages.RunWipe walks BotsParent BACKWARDS, so shrinking childCount here
+        // ProfileSubPages.RunWipeRoutine deletes BACKWARDS (by sibling index), so shrinking childCount here
         // cannot skip a sibling, and the paired BotSettings clones stay index-aligned because
         // they are only Destroy()ed (never detached).
         Transform botsRoot = transform.parent;

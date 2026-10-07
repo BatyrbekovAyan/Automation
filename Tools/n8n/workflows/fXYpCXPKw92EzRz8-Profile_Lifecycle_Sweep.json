@@ -737,6 +737,274 @@
         }
       },
       "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- V12 (iteration 2026-09-28): clones of bots THIS sweep retired (trial or subscription over) that are not yet\n-- confirmed inactive. Never a liveness row (that retirement is inferred from Wappi's list; a false positive must not\n-- switch off a working bot), never app_delete (the app deletes its clone), never a workflow a LIVE row still drives,\n-- never a protected infra id. clone_deactivated_id holds the workflow last confirmed inactive: a failed call is picked\n-- again next run, a deactivated one never. Read-only; at most 50 per run, oldest retirement first.\nselect bp.profile_id, bp.workflow_id, bp.deleted_reason\nfrom bot_profiles bp\nwhere bp.deleted_at is not null\n  and bp.deleted_reason in ('trial_expiry', 'churn_grace')\n  and bp.workflow_id ~ '^[A-Za-z0-9]+$' and length(bp.workflow_id) between 8 and 36\n  and bp.workflow_id not in ('0DP79STI3pafXO9B', '2htWSV5IHO8E2CgB', '2islisFH7jjLoPQM', '3qax5J9u2qsT9Vao', '4VN3gsFaC2HUYmcc', '4wYitz5ek30SVNlT', '9PTyYcelRQI7bGDb', 'KoTuIlk4LMrlvnWI', 'SCLcpn6DMDG3Z4VN', 'TwWPW3gIyjZS3foR', 'Uz6HBBUpAiUqVysB', 'XuvOp7TxOImOAmlj', 'ZGYr6srzS3rSSXHp', 'ZTqpumOpL1rNDOp6', 'crAuthSession001', 'crHandoffDry0001', 'crHandoffNtfy001', 'crHandoffReq0001', 'crHandoffsApi001', 'crPriceSearch001', 'crTestDialog0001', 'crWappiProxy0001', 'fXYpCXPKw92EzRz8', 'hHwvfOvTCS42pXnq', 'jtbssfzXbOxwTK4k', 'lmjYsdNcQA2IE5rl', 'olmqWMfcFpCEcpiE')\n  and bp.clone_deactivated_id is distinct from bp.workflow_id\n  and not exists (select 1 from bot_profiles live where live.workflow_id = bp.workflow_id and live.deleted_at is null)\norder by bp.deleted_at\nlimit 50;",
+        "options": {}
+      },
+      "id": "42fd16d0-d093-57eb-9e0a-bb66d78eb21a",
+      "name": "Retired Clones",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -460,
+        760
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "vvRrFiEXzLVqKjOx",
+          "name": "Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "47af221d-7d9e-5072-9abf-3aa07cd80a4d",
+              "leftValue": "={{ $('Sweep Config').first().json.dryRun }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "dc0944ff-fe9d-5dcb-9377-eba6382f0b25",
+      "name": "Clone Dry Run?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -260,
+        760
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "ac903888-8a4c-5ed3-9019-c45fd2e7542a",
+              "name": "dryRun",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "55e7e582-e709-5cb5-9ed6-26832f9bd0cc",
+              "name": "action",
+              "value": "would_deactivate_clone",
+              "type": "string"
+            },
+            {
+              "id": "79de3d62-8cb5-5fbd-8cf2-016e521ef4eb",
+              "name": "profileId",
+              "value": "={{ $json.profile_id }}",
+              "type": "string"
+            },
+            {
+              "id": "f70bb166-b8a5-5ead-bb92-4050a85a3ae1",
+              "name": "workflowId",
+              "value": "={{ $json.workflow_id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "e4d077cb-897d-590c-8879-48aeaaa9d3cb",
+      "name": "Log Would Deactivate",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -260,
+        920
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "ff83cb73-2f41-56b4-8e16-82067daa586b",
+              "leftValue": "={{ ((id) => typeof id === 'string' && id.length >= 8 && id.length <= 36 && /^[A-Za-z0-9]+$/.test(id) && ![\"0DP79STI3pafXO9B\", \"2htWSV5IHO8E2CgB\", \"2islisFH7jjLoPQM\", \"3qax5J9u2qsT9Vao\", \"4VN3gsFaC2HUYmcc\", \"4wYitz5ek30SVNlT\", \"9PTyYcelRQI7bGDb\", \"KoTuIlk4LMrlvnWI\", \"SCLcpn6DMDG3Z4VN\", \"TwWPW3gIyjZS3foR\", \"Uz6HBBUpAiUqVysB\", \"XuvOp7TxOImOAmlj\", \"ZGYr6srzS3rSSXHp\", \"ZTqpumOpL1rNDOp6\", \"crAuthSession001\", \"crHandoffDry0001\", \"crHandoffNtfy001\", \"crHandoffReq0001\", \"crHandoffsApi001\", \"crPriceSearch001\", \"crTestDialog0001\", \"crWappiProxy0001\", \"fXYpCXPKw92EzRz8\", \"hHwvfOvTCS42pXnq\", \"jtbssfzXbOxwTK4k\", \"lmjYsdNcQA2IE5rl\", \"olmqWMfcFpCEcpiE\"].includes(id))($json.workflow_id) }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "d0092f05-7efc-58c1-b251-5b0c2724da66",
+      "name": "Has Clone?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -40,
+        760
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=http://localhost:5678/api/v1/workflows/{{ $json.workflow_id }}/deactivate",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "{}",
+        "options": {
+          "timeout": 20000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "6b06db2b-f3a1-5257-92f1-108dcd01a740",
+      "name": "Deactivate Clone",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        160,
+        760
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__HDR_CRED__",
+          "name": "n8n Admin API"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "a99b690c-9388-5948-91fc-25fa84751372",
+              "leftValue": "={{ [200, 404].includes(Number($json.statusCode)) }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "4b861e14-a3cd-5a1e-9fce-1d71db8226fc",
+      "name": "Clone Off?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        360,
+        760
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- V12: the clone this row is bound to is confirmed inactive (or gone) — remember WHICH one, so it is never called\n-- again and a later re-bound clone is still picked. Parameters, in order: profile id, workflow id.\nupdate bot_profiles set clone_deactivated_id = $2\nwhere profile_id = $1 and workflow_id = $2\nreturning profile_id, workflow_id;",
+        "options": {
+          "queryReplacement": "={{ [ $('Retired Clones').item.json.profile_id, $('Retired Clones').item.json.workflow_id ] }}"
+        }
+      },
+      "id": "57a5e735-3e95-58b4-a611-8854ac245c9e",
+      "name": "Stamp Clone Deactivated",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        560,
+        680
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "vvRrFiEXzLVqKjOx",
+          "name": "Postgres"
+        }
+      },
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "0db17e7d-119e-5954-8bae-01eb8191d378",
+              "name": "profileId",
+              "value": "={{ $('Retired Clones').item.json.profile_id }}",
+              "type": "string"
+            },
+            {
+              "id": "d7d4569c-5f84-5066-85ec-1e53df91ec1b",
+              "name": "workflowId",
+              "value": "={{ $('Retired Clones').item.json.workflow_id }}",
+              "type": "string"
+            },
+            {
+              "id": "331e11ef-123a-58a9-8914-67f0e1d066ea",
+              "name": "deactivated",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "835cda02-bac6-5aea-b6c4-2fb4d2e7e7e5",
+              "name": "statusCode",
+              "value": "={{ $json.statusCode ?? null }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "22fb56cc-9f3f-5aaa-b50b-07ce2e4656d2",
+      "name": "Stamp Clone Kept",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        560,
+        840
+      ]
     }
   ],
   "connections": {
@@ -761,6 +1029,11 @@
           },
           {
             "node": "List WA Profiles",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Retired Clones",
             "type": "main",
             "index": 0
           }
@@ -954,6 +1227,75 @@
         [
           {
             "node": "Stamp Mark Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Retired Clones": {
+      "main": [
+        [
+          {
+            "node": "Clone Dry Run?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clone Dry Run?": {
+      "main": [
+        [
+          {
+            "node": "Log Would Deactivate",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Has Clone?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Clone?": {
+      "main": [
+        [
+          {
+            "node": "Deactivate Clone",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Deactivate Clone": {
+      "main": [
+        [
+          {
+            "node": "Clone Off?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clone Off?": {
+      "main": [
+        [
+          {
+            "node": "Stamp Clone Deactivated",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Stamp Clone Kept",
             "type": "main",
             "index": 0
           }

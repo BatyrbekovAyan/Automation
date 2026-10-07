@@ -151,7 +151,7 @@ public class TestDialogClientTests
         Assert.IsTrue(refresh >= 0 && noTarget > refresh, "a send re-decides the target before it uses it");
         Assert.IsTrue(MethodBody(Src("Scripts/Main/BotReadiness.cs"), "public static BotTestOutcome Decide").Contains("ticket.Seq == currentSeq && botAlive"),
             "the screen belongs to a live bot");
-        Assert.IsTrue(MethodBody(Src("Scripts/Main/Bot.cs"), "public void DeleteBot").Contains("BotTestSheet.LastTestKeySuffix"),
+        Assert.IsTrue(MethodBody(Src("Scripts/Main/Bot.cs"), "public void DeleteBotLocally").Contains("BotTestSheet.LastTestKeySuffix"),
             "a deleted bot leaves no «тест пройден» behind");
     }
 

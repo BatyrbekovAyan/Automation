@@ -53,6 +53,8 @@ public partial class ProfileSubPages : MonoBehaviour
 
     private Canvas _rootCanvas;
     private Action _pendingConfirmAction;
+    private float _confirmActionFontSize;        // the authored size, read on the first ShowConfirm
+    private TextWrappingModes? _confirmActionWrap;   // … and its authored wrapping
     private Tween _activeSlide;
     private TextMeshProUGUI _toastLabel;
     private Tween _toastTween;
@@ -181,12 +183,30 @@ public partial class ProfileSubPages : MonoBehaviour
         if (card != null) PopupUI.AbsorbEvents(card);
     }
 
-    private void ShowConfirm(string title, string message, string actionLabel, Action onConfirm)
+    // longAction: a label wider than its half of the button row («Удалить только с телефона», V12) wraps to two lines
+    // and shrinks as far as needed; every other call keeps the authored single-line size.
+    private void ShowConfirm(string title, string message, string actionLabel, Action onConfirm, bool longAction = false)
     {
         _pendingConfirmAction = onConfirm;
         if (confirmTitle != null) confirmTitle.text = title;
         if (confirmMessage != null) confirmMessage.text = message;
-        if (confirmActionLabel != null) confirmActionLabel.text = actionLabel;
+        if (confirmActionLabel != null)
+        {
+            if (_confirmActionFontSize <= 0f) _confirmActionFontSize = confirmActionLabel.fontSize;
+            _confirmActionWrap ??= confirmActionLabel.textWrappingMode;
+            confirmActionLabel.text = actionLabel;
+            confirmActionLabel.textWrappingMode = longAction ? TextWrappingModes.Normal : _confirmActionWrap.Value;
+            confirmActionLabel.enableAutoSizing = longAction;
+            if (longAction)
+            {
+                confirmActionLabel.fontSizeMin = 28f;
+                confirmActionLabel.fontSizeMax = _confirmActionFontSize;
+            }
+            else
+            {
+                confirmActionLabel.fontSize = _confirmActionFontSize;
+            }
+        }
         PopupUI.Show(confirmPopup);
     }
 

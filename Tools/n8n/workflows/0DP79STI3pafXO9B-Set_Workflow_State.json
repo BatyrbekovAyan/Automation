@@ -113,7 +113,13 @@
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "options": {
-          "timeout": 20000
+          "timeout": 20000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
         }
       },
       "credentials": {
@@ -122,7 +128,8 @@
           "name": "n8n Admin API"
         }
       },
-      "id": "72400534-5d42-4efc-9f6c-6ec209fdc3d9"
+      "id": "72400534-5d42-4efc-9f6c-6ec209fdc3d9",
+      "onError": "continueRegularOutput"
     },
     {
       "name": "Toggle Workflow",
@@ -187,7 +194,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// crAuth GATE — generated into every client webhook by Tools/n8n/apply-auth-gate.py from\n// Tools/n8n/auth/gate.js (+ token.js). Edit the sources, re-run the migration; never the copies.\n//\n// Verifies the Bearer capability token WITHOUT a database round-trip (HMAC, see token.js), then\n// checks that every id the request names is owned by the token's install:\n//   RULE.profiles  — body fields whose value(s) must be ⊆ claims.p   (sentinels ''/'-1' pass)\n//   RULE.workflows — body fields whose value(s) must be ⊆ claims.w   (sentinels ''/'-1' pass)\n//   RULE.appUser   — body fields that must EQUAL claims.u; a token WITHOUT a billing identity (u = null: the\n//                    id is held by another install or was not bindable) can name none (R2, 2026-09-27)\n//   RULE.appUserRequired — appUser fields that may not be empty/sentinel in session mode (Create WA/TG: an\n//                    empty AppUserID skipped the channel count and let the dialog quota fail open)\n//   RULE.legacy    — true: a request WITHOUT a token is admitted in `legacy` mode while\n//                    CR_AUTH_COMPAT_UNTIL lies in the future (old clients); false: 401\n// Output: the webhook item re-emitted — json AND binary: a Code node drops whatever it does not return,\n// and a multipart upload's parts (Unity WWWForm files even its text fields there) live in `binary`\n// (R3, 2026-09-27) — with `crAuth` = { ok, mode, reason, installId, appUserId, profiles, workflows,\n// claimPending } so downstream nodes can read the verified identity. The gate sees `body` only, so\n// ids that arrive as multipart parts are checked by the workflow after it decodes them.\n// CRAUTH-TOKEN-BEGIN\nconst crAuth = (() => {\n  const crypto = require('crypto');\n  const b64u = (buf) => Buffer.from(buf).toString('base64').replace(/\\+/g, '-').replace(/\\//g, '_').replace(/=+$/, '');\n  const unb64u = (s) => Buffer.from(String(s).replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((String(s).length + 3) % 4), 'base64');\n  const isIdList = (a) => Array.isArray(a) && a.every((x) => typeof x === 'string' && x.length > 0 && x.length <= 128);\n  function sign(payload, secret) {\n    if (!secret) throw new Error('crAuth: no signing secret');\n    const p = b64u(JSON.stringify(payload));\n    const sig = crypto.createHmac('sha256', secret).update('v1.' + p).digest();\n    return 'v1.' + p + '.' + b64u(sig);\n  }\n  function verify(token, secrets, nowSec) {\n    if (typeof token !== 'string' || !token) return { ok: false, reason: 'missing' };\n    const parts = token.split('.');\n    if (parts.length !== 3 || parts[0] !== 'v1' || !parts[1] || !parts[2]) return { ok: false, reason: 'malformed' };\n    const given = unb64u(parts[2]);\n    let good = false;\n    for (const sec of (secrets || []).filter(Boolean)) {\n      const exp = crypto.createHmac('sha256', sec).update(parts[0] + '.' + parts[1]).digest();\n      if (exp.length === given.length && crypto.timingSafeEqual(exp, given)) { good = true; break; }\n    }\n    if (!good) return { ok: false, reason: 'bad_signature' };\n    let c;\n    try { c = JSON.parse(unb64u(parts[1]).toString('utf8')); } catch (e) { return { ok: false, reason: 'malformed' }; }\n    if (!c || typeof c !== 'object' || typeof c.i !== 'string' || !c.i || !isIdList(c.p) || !isIdList(c.w)) return { ok: false, reason: 'malformed' };\n    if (typeof c.e !== 'number' || !(c.e > nowSec)) return { ok: false, reason: 'expired' };\n    if (c.c !== undefined && !isIdList(c.c)) return { ok: false, reason: 'malformed' };\n    return { ok: true, claims: { i: c.i, u: (typeof c.u === 'string' && c.u) ? c.u : null, p: c.p, w: c.w, c: c.c || [], e: c.e, n: (typeof c.n === 'number') ? c.n : 1 } };\n  }\n  function sha256Hex(s) { return crypto.createHash('sha256').update(String(s)).digest('hex'); }\n  function randomSecret(bytes) { return b64u(crypto.randomBytes(bytes || 32)); }\n  function bearer(headers) {\n    const h = headers || {};\n    const a = String(h.authorization || h.Authorization || '');\n    return a.startsWith('Bearer ') ? a.slice(7).trim() : '';\n  }\n  return { sign, verify, sha256Hex, randomSecret, bearer, b64u, unb64u };\n})();\n// CRAUTH-TOKEN-END\nconst RULE = {\"workflows\": [\"workflowId\"], \"legacy\": true};\nconst inItem = $input.first();\nconst wh = inItem.json;\nconst secrets = [$env.CR_AUTH_SECRET, $env.CR_AUTH_SECRET_PREV];\nconst compatUntil = Date.parse($env.CR_AUTH_COMPAT_UNTIL || '') || 0;\nconst nowMs = Date.now();\nconst token = crAuth.bearer(wh.headers);\nlet mode = 'session', claims = null, deny = null;\nif (!token) {\n  if (RULE.legacy && compatUntil > nowMs) mode = 'legacy';\n  else deny = 'unauthorized:missing';\n} else {\n  const v = crAuth.verify(token, secrets, Math.floor(nowMs / 1000));\n  if (!v.ok) deny = 'unauthorized:' + v.reason; else claims = v.claims;\n}\nconst body = (wh.body && typeof wh.body === 'object') ? wh.body : {};\nconst isSentinel = (x) => x === undefined || x === null || x === '' || x === '-1';\nconst listOf = (v) => (Array.isArray(v) ? v : [v]);\nconst owned = (set, v) => listOf(v).every((x) => isSentinel(x) || (typeof x === 'string' && set.includes(x)));\nif (!deny && mode === 'session') {\n  for (const f of RULE.profiles || []) if (!owned(claims.p, body[f])) { deny = 'forbidden:' + f; break; }\n  if (!deny) for (const f of RULE.workflows || []) if (!owned(claims.w, body[f])) { deny = 'forbidden:' + f; break; }\n  if (!deny) for (const f of RULE.appUser || []) {\n    const v = body[f];\n    if (isSentinel(v)) {\n      if ((RULE.appUserRequired || []).includes(f)) { deny = 'forbidden:' + f; break; }\n      continue;\n    }\n    if (!claims.u || String(v) !== claims.u) { deny = 'forbidden:' + f; break; }\n  }\n}\nreturn [{ json: { ...wh, crAuth: {\n  ok: !deny, mode, reason: deny,\n  installId: claims ? claims.i : null, appUserId: claims ? claims.u : null,\n  profiles: claims ? claims.p : [], workflows: claims ? claims.w : [], claimPending: claims ? (claims.c || []) : [],\n} }, ...(inItem.binary ? { binary: inItem.binary } : {}), pairedItem: { item: 0 } }];\n"
+        "jsCode": "// crAuth GATE — generated into every client webhook by Tools/n8n/apply-auth-gate.py from\n// Tools/n8n/auth/gate.js (+ token.js). Edit the sources, re-run the migration; never the copies.\n//\n// Verifies the Bearer capability token WITHOUT a database round-trip (HMAC, see token.js), then\n// checks that every id the request names is owned by the token's install:\n//   RULE.profiles  — body fields whose value(s) must be ⊆ claims.p   (sentinels ''/'-1' pass)\n//   RULE.workflows — body fields whose value(s) must be ⊆ claims.w   (sentinels ''/'-1' pass)\n//   RULE.appUser   — body fields that must EQUAL claims.u; a token WITHOUT a billing identity (u = null: the\n//                    id is held by another install or was not bindable) can name none (R2, 2026-09-27)\n//   RULE.appUserRequired — appUser fields that may not be empty/sentinel in session mode (Create WA/TG: an\n//                    empty AppUserID skipped the channel count and let the dialog quota fail open)\n//   RULE.legacy    — true: a request WITHOUT a token is admitted in `legacy` mode while\n//                    CR_AUTH_COMPAT_UNTIL lies in the future (old clients); false: 401\n// Output: the webhook item re-emitted — json AND binary: a Code node drops whatever it does not return,\n// and a multipart upload's parts (Unity WWWForm files even its text fields there) live in `binary`\n// (R3, 2026-09-27) — with `crAuth` = { ok, mode, reason, installId, appUserId, profiles, workflows,\n// claimPending } so downstream nodes can read the verified identity. The gate sees `body` only, so\n// ids that arrive as multipart parts are checked by the workflow after it decodes them.\n// CRAUTH-TOKEN-BEGIN\nconst crAuth = (() => {\n  const crypto = require('crypto');\n  const b64u = (buf) => Buffer.from(buf).toString('base64').replace(/\\+/g, '-').replace(/\\//g, '_').replace(/=+$/, '');\n  const unb64u = (s) => Buffer.from(String(s).replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((String(s).length + 3) % 4), 'base64');\n  const isIdList = (a) => Array.isArray(a) && a.every((x) => typeof x === 'string' && x.length > 0 && x.length <= 128);\n  function sign(payload, secret) {\n    if (!secret) throw new Error('crAuth: no signing secret');\n    const p = b64u(JSON.stringify(payload));\n    const sig = crypto.createHmac('sha256', secret).update('v1.' + p).digest();\n    return 'v1.' + p + '.' + b64u(sig);\n  }\n  function verify(token, secrets, nowSec) {\n    if (typeof token !== 'string' || !token) return { ok: false, reason: 'missing' };\n    const parts = token.split('.');\n    if (parts.length !== 3 || parts[0] !== 'v1' || !parts[1] || !parts[2]) return { ok: false, reason: 'malformed' };\n    const given = unb64u(parts[2]);\n    let good = false;\n    for (const sec of (secrets || []).filter(Boolean)) {\n      const exp = crypto.createHmac('sha256', sec).update(parts[0] + '.' + parts[1]).digest();\n      if (exp.length === given.length && crypto.timingSafeEqual(exp, given)) { good = true; break; }\n    }\n    if (!good) return { ok: false, reason: 'bad_signature' };\n    let c;\n    try { c = JSON.parse(unb64u(parts[1]).toString('utf8')); } catch (e) { return { ok: false, reason: 'malformed' }; }\n    if (!c || typeof c !== 'object' || typeof c.i !== 'string' || !c.i || !isIdList(c.p) || !isIdList(c.w)) return { ok: false, reason: 'malformed' };\n    if (typeof c.e !== 'number' || !(c.e > nowSec)) return { ok: false, reason: 'expired' };\n    if (c.c !== undefined && !isIdList(c.c)) return { ok: false, reason: 'malformed' };\n    return { ok: true, claims: { i: c.i, u: (typeof c.u === 'string' && c.u) ? c.u : null, p: c.p, w: c.w, c: c.c || [], e: c.e, n: (typeof c.n === 'number') ? c.n : 1 } };\n  }\n  function sha256Hex(s) { return crypto.createHash('sha256').update(String(s)).digest('hex'); }\n  function randomSecret(bytes) { return b64u(crypto.randomBytes(bytes || 32)); }\n  function bearer(headers) {\n    const h = headers || {};\n    const a = String(h.authorization || h.Authorization || '');\n    return a.startsWith('Bearer ') ? a.slice(7).trim() : '';\n  }\n  return { sign, verify, sha256Hex, randomSecret, bearer, b64u, unb64u };\n})();\n// CRAUTH-TOKEN-END\nconst RULE = {\"legacy\": true};\nconst inItem = $input.first();\nconst wh = inItem.json;\nconst secrets = [$env.CR_AUTH_SECRET, $env.CR_AUTH_SECRET_PREV];\nconst compatUntil = Date.parse($env.CR_AUTH_COMPAT_UNTIL || '') || 0;\nconst nowMs = Date.now();\nconst token = crAuth.bearer(wh.headers);\nlet mode = 'session', claims = null, deny = null;\nif (!token) {\n  if (RULE.legacy && compatUntil > nowMs) mode = 'legacy';\n  else deny = 'unauthorized:missing';\n} else {\n  const v = crAuth.verify(token, secrets, Math.floor(nowMs / 1000));\n  if (!v.ok) deny = 'unauthorized:' + v.reason; else claims = v.claims;\n}\nconst body = (wh.body && typeof wh.body === 'object') ? wh.body : {};\nconst isSentinel = (x) => x === undefined || x === null || x === '' || x === '-1';\nconst listOf = (v) => (Array.isArray(v) ? v : [v]);\nconst owned = (set, v) => listOf(v).every((x) => isSentinel(x) || (typeof x === 'string' && set.includes(x)));\nif (!deny && mode === 'session') {\n  for (const f of RULE.profiles || []) if (!owned(claims.p, body[f])) { deny = 'forbidden:' + f; break; }\n  if (!deny) for (const f of RULE.workflows || []) if (!owned(claims.w, body[f])) { deny = 'forbidden:' + f; break; }\n  if (!deny) for (const f of RULE.appUser || []) {\n    const v = body[f];\n    if (isSentinel(v)) {\n      if ((RULE.appUserRequired || []).includes(f)) { deny = 'forbidden:' + f; break; }\n      continue;\n    }\n    if (!claims.u || String(v) !== claims.u) { deny = 'forbidden:' + f; break; }\n  }\n}\nreturn [{ json: { ...wh, crAuth: {\n  ok: !deny, mode, reason: deny,\n  installId: claims ? claims.i : null, appUserId: claims ? claims.u : null,\n  profiles: claims ? claims.p : [], workflows: claims ? claims.w : [], claimPending: claims ? (claims.c || []) : [],\n} }, ...(inItem.binary ? { binary: inItem.binary } : {}), pairedItem: { item: 0 } }];\n"
       },
       "id": "9bf81141-39f2-5026-a685-634be9fe9aed",
       "name": "Auth Gate",
@@ -247,6 +254,231 @@
       "position": [
         600,
         460
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "179eb740-b425-50b6-acda-7f7e61c3a592",
+              "leftValue": "={{ $json.crAuth.mode === 'session' && ['deactivate', 'delete'].includes(String(($json.body || {}).action ?? '').trim()) }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "47dc713c-17d8-5b69-b009-18d0314375e3",
+      "name": "Ownership Route?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        620,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- V12: may this install delete these ids? Decided here, never from the token's lists (live rows only, up to 12 h\n-- old). A session may delete when its install is not revoked and EVERY id the delete will use is a string that belongs\n-- to a bot_profiles row whose owner is this install, retired or not (a workflow id: the row it is bound to). A row\n-- without an owner (never claimed) is never proof; at least one real id must be named. A token-less legacy call keeps\n-- the old behaviour while the compat window is open. Read-only. `reason` says why a refusal happened: owned_elsewhere\n-- (another install owns one of the ids) or unproven. Parameters, in order: gate mode, install id, JSON array of the\n-- profile ids, JSON array of the workflow ids.\nwith ids as (\n  select 'p'::text as kind, v #>> '{}' as id, jsonb_typeof(v) as t from jsonb_array_elements($3::jsonb) v\n  union all\n  select 'w'::text, v #>> '{}', jsonb_typeof(v) from jsonb_array_elements($4::jsonb) v\n), named as (\n  select kind, id from ids where t = 'string' and id not in ('', '-1')\n), verdict as (\n  select case\n    when $1 = 'legacy' then 'ok'\n    when $1 is distinct from 'session' or coalesce($2, '') = '' then 'unproven'\n    when not exists (select 1 from installs i where i.install_id = $2 and i.revoked_at is null) then 'unproven'\n    when exists (select 1 from ids where t <> 'string') then 'unproven'\n    when not exists (select 1 from named) then 'unproven'\n    when not exists (select 1 from named n where not exists (\n           select 1 from bot_profiles bp where bp.owner_id = $2\n              and ((n.kind = 'p' and bp.profile_id = n.id) or (n.kind = 'w' and bp.workflow_id = n.id)))) then 'ok'\n    when exists (select 1 from named n join bot_profiles bp\n                   on (n.kind = 'p' and bp.profile_id = n.id) or (n.kind = 'w' and bp.workflow_id = n.id)\n                 where bp.owner_id is not null and bp.owner_id <> $2) then 'owned_elsewhere'\n    else 'unproven' end as v\n)\nselect (v = 'ok') as allowed, case when v = 'ok' then null else v end as reason from verdict;",
+        "options": {
+          "queryReplacement": "={{ [ $json.crAuth.mode, ($json.crAuth.installId || ''), '[]', JSON.stringify([ typeof ($json.body || {}).workflowId === 'string' ? $json.body.workflowId.trim() : (($json.body || {}).workflowId ?? null) ]) ] }}"
+        }
+      },
+      "id": "6b52ed97-f05e-5c65-918c-01a5ffeaa3ef",
+      "name": "Delete Ownership",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        840,
+        60
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "vvRrFiEXzLVqKjOx",
+          "name": "Postgres"
+        }
+      },
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "186826dc-11ea-5e6f-8877-40aa87b92017",
+              "leftValue": "={{ $json.allowed === true }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "f4809f6f-7328-5145-b01a-56c8f03a93d2",
+      "name": "Owned?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1060,
+        60
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// SET WORKFLOW STATE / Owner Item (generated by Tools/n8n/apply-auth-gate.py, V12): Delete Ownership allowed this call —\n// hand Validate the request again (after the SQL node `$json` is its verdict row, not the body).\nreturn [{ json: $('Auth Gate').first().json, pairedItem: { item: 0 } }];"
+      },
+      "id": "8eeec0c5-f2c8-5d5a-b1b2-798d75ec231e",
+      "name": "Owner Item",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1280,
+        60
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"success\": false, \"error\": $json.allowed === false ? \"forbidden\" : \"db_unavailable\", \"reason\": $json.allowed === false ? ($json.reason || \"unproven\") : null } }}",
+        "options": {
+          "responseCode": "={{ $json.allowed === false ? 403 : 503 }}"
+        }
+      },
+      "id": "7dd20ee1-4fa9-51df-8aac-85988ae57e1e",
+      "name": "Respond Owner Refused",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1280,
+        -140
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "71f92447-8e7a-55c0-bdbd-9f401ea3f56a",
+              "leftValue": "={{ $json.crAuth.mode !== 'session' || ((v) => v === undefined || v === null || v === '' || v === '-1' || (typeof v === 'string' && ($json.crAuth.workflows || []).includes(v)))(($json.body || {}).workflowId) }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "853ed5da-186e-5b78-9b29-fc89ee3c03de",
+      "name": "Token Owns?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        840,
+        460
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"success\": false, \"error\": \"unauthorized\", \"reason\": \"forbidden:workflowId\" } }}",
+        "options": {
+          "responseCode": 403
+        }
+      },
+      "id": "1e5dd136-f85e-5c38-8014-0f0204d0ba20",
+      "name": "Respond Forbidden",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1060,
+        660
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "f6737a8d-fd35-5712-8fb5-2d2362b95257",
+              "leftValue": "={{ [200, 404].includes(Number($json.statusCode)) }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "ed4893bd-039b-5d92-a312-eff45e48000d",
+      "name": "Workflow Gone?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1100,
+        -140
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"success\": false, \"error\": \"delete_failed\", \"status\": $json.statusCode ?? null } }}",
+        "options": {
+          "responseCode": 502
+        }
+      },
+      "id": "0f9be284-6b0b-502e-9b10-40d35dcd6d33",
+      "name": "Respond Delete Failed",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1320,
+        -300
       ]
     }
   ],
@@ -313,7 +545,7 @@
       "main": [
         [
           {
-            "node": "Respond OK",
+            "node": "Workflow Gone?",
             "type": "main",
             "index": 0
           }
@@ -346,7 +578,7 @@
       "main": [
         [
           {
-            "node": "Validate",
+            "node": "Ownership Route?",
             "type": "main",
             "index": 0
           }
@@ -354,6 +586,100 @@
         [
           {
             "node": "Respond 401",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ownership Route?": {
+      "main": [
+        [
+          {
+            "node": "Delete Ownership",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Token Owns?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delete Ownership": {
+      "main": [
+        [
+          {
+            "node": "Owned?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Owned?": {
+      "main": [
+        [
+          {
+            "node": "Owner Item",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Owner Refused",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Owner Item": {
+      "main": [
+        [
+          {
+            "node": "Validate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Token Owns?": {
+      "main": [
+        [
+          {
+            "node": "Validate",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Forbidden",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Workflow Gone?": {
+      "main": [
+        [
+          {
+            "node": "Respond OK",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Delete Failed",
             "type": "main",
             "index": 0
           }

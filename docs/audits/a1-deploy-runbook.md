@@ -48,6 +48,24 @@ docker compose up -d n8n && docker compose logs --tail 20 n8n
    **Canary для формы outgoing-событий:** документация Wappi не показывает пример `outgoing_message_*`; реализация опирается на форму входящего (`wh_type`, `id`, `chatId`/`to`, `body`, `type`, `time`). Первый реальный outgoing-ивент на проде проверить по `Outcome` (`recorded_owner_phone` / `outgoing_known`, а не `other:*`) и по строке в `chat_history_events`; при расхождении — поправить `RECORD_OUTGOING_PARAMS` в `apply-history-handoff.py` (один узел). клоны «13»/«15» — управляемое обновление по имени узлов (этап 7.5). До обновления клонов старые клоны продолжают работать по прежней схеме (без журнала `reply_events`) — таблицы аддитивны.
    Post-check шаблонов: `python3 Tools/n8n/verify-reply-pipeline.py` на экспортах с прода; smoke на тестовом владельце — одно входящее ⇒ одна строка `reply_events.state='sent'` с `transport_message_id`.
    **Этап 7 (2026-09-22):** + SQL `2026-09-22-test-dialog.sql`; + workflows `crTestDialog0001` (Test Dialog, `/webhook/TestDialog`, credential `n8n Admin API` — тот же `__HDR_CRED__`, что у Set Workflow State) и `crHandoffDry0001` (sub-workflow, только опубликовать); Handoffs получил op `status`; Set Workflow State защищает оба новых id. Клоны «13»/«15» обновляются `Tools/n8n/update-clones.py` (dry-run → `--apply --yes --only <id>`; печатает `versionId` до обновления как точку отката; читает результат назад), read-back всего инстанса — `Tools/n8n/verify-deployed.py --json …`.
+   **V12 (итерация 2026-09-28, 2026-10-07) — удаление бота владельцем и чистка клонов; СЕРВЕР раньше клиента:**
+   SQL `2026-10-07-retired-clone-deactivate.sql` (колонка `bot_profiles.clone_deactivated_id`; до Sweep). Workflows:
+   Delete Bot Files (`lmjYsdNcQA2IE5rl`) и Wappi Proxy (`crWappiProxy0001`) — `deploy-canonical.py --only <id>`;
+   Set Workflow State (`0DP79STI3pafXO9B`) — `build-client-webhooks.py --update` (placeholder-workflow);
+   Profile Lifecycle Sweep (`fXYpCXPKw92EzRz8`) — `deploy-canonical.py --only fXYpCXPKw92EzRz8`: инструмент сам
+   подставляет id credential `n8n Admin API` из живого Set Workflow State вместо `__HDR_CRED__` и отказывается без него
+   (так же теперь и Test Dialog). Миграция токена не нужна (token.js/gate.js не менялись). Post-check: `verify-deployed.py`
+   (инвентарь: активные клоны, привязанные к удалённым строкам, после первого прогона Sweep — 0; бэкфилл не нужен, живых
+   клонов на 2026-10-06 нет). Smoke: удаление бота с истёкшим триалом session-клиентом → 200 + счётчики; чужой
+   токен → 403; повторное удаление удалённого клона → 200. Новый клиент (часть c — удаление только по вердикту
+   сервера, «Удалить только с телефона») выпускать ПОСЛЕ сервера: он полагается на 503-vs-403 и идемпотентный delete.
+   Данные ботов, удалённых Sweep'ом, ХРАНЯТСЯ (решение владельца 2026-10-07); автоудаление — отдельное решение.
+   Остатки V12: строки без владельца (legacy, никогда не заявленные) и бот после переустановки без claim удаляются
+   только по запросу в поддержку (приложение честно говорит это и даёт «Удалить только с телефона»); ложное
+   срабатывание liveness-ветки Sweep не удаляет ещё живой профиль Wappi; определённый отказ Wappi на `profile/delete`
+   живого профиля даёт продолжение удаления (профиль может остаться привязанным — серверной сети для `app_delete` нет);
+   F1 (лишние клоны при повторной авторизации) и M4 (бесконечный `claim.start` у «зомби»-бота после окончания
+   триала) — отдельные находки.
 7. **Клиент** — релиз iOS/Android с A1; **до отправки** прогнать `Tools/store/inspect-artifact.sh <aab|ipa>` — артефакт
    без `wappiAuthToken`.
 8. **Canary** — тестовый владелец: свежая установка → создание бота через прокси → чат → удаление; существующий бот

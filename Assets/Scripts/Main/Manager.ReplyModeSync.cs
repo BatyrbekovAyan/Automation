@@ -7,9 +7,9 @@ using UnityEngine.Networking;
 // SUP-02 (client half) — writes the semi-auto suppression flag to the server.
 //
 // Second partial of the Manager god-object (Manager.cs gained the `partial` keyword, C2).
-// Mirrors the fire-and-forget webhook precedent DeleteBotFilesOnServer/DeleteBotFilesRoutine:
-// a POST to an unauthenticated /webhook/* endpoint that never blocks the UI, never retries,
-// and only logs on failure. The pure builders (BuildReplyModePayload / AuthedProfileIds) are
+// Began as a fire-and-forget POST (the precedent of the old DeleteBotFiles call, itself replaced by the
+// verdict-reading Manager.DeleteBotOnServer in V12); since A2 delivery is ReplyModeSyncService's queue
+// and this partial only composes the body. The pure builders (BuildReplyModePayload / AuthedProfileIds) are
 // EditMode-tested (ReplyModeSyncPayloadTests) — no live n8n/DB needed.
 //
 // The three write sites (bot-default flip, per-chat toggle, re-assert-on-open heal) and the

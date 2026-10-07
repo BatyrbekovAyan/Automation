@@ -156,11 +156,23 @@ public class ReplyModeSyncWiringTests
     [Test]
     public void DeletedBots_LeaveNothingInTheQueue()
     {
-        string del = MethodBody(Src("Scripts/Main/Bot.cs"), "public void DeleteBot");
-        int forget = del.IndexOf("ReplyModeSyncService.Existing?.ForgetBot(transform.name)", System.StringComparison.Ordinal);
-        int server = del.IndexOf("DeleteBotFilesOnServer(", System.StringComparison.Ordinal);
-        Assert.IsTrue(forget >= 0 && forget < server, "a deleted bot's queued desires must be dropped before its server rows are wiped (a resumed send would recreate them)");
-        string wipe = MethodBody(Src("Scripts/Main/ProfileSubPages.Account.cs"), "private void RunWipe");
+        // V12: the server half runs FIRST and its verdict decides — so the queue is HELD (nothing sent) from before the
+        // first server call, released if the bot stays, and forgotten by the local wipe once it goes. Forgetting it
+        // before the verdict would paint a kept bot's unconfirmed choice as confirmed (R5); not holding it would let a
+        // send recreate the reply_mode_flags rows Delete Bot Files removes.
+        string server = MethodBody(Src("Scripts/Main/Manager.cs"), "public IEnumerator DeleteBotOnServer");
+        int hold = server.IndexOf("ReplyModeSyncService.Existing?.Hold(", System.StringComparison.Ordinal);
+        int firstCall = server.IndexOf("WappiProxy.Send(", System.StringComparison.Ordinal);
+        Assert.IsTrue(hold >= 0 && hold < firstCall, "the queue must be held before the first server call");
+        int drain = server.IndexOf(".IsSending(botId)", System.StringComparison.Ordinal);
+        Assert.IsTrue(drain > hold && drain < firstCall, "a batch already on the wire must land before the server wipes its rows");
+        Assert.IsTrue(server.Contains("ReplyModeSyncService.Existing?.Release("), "a bot the server keeps gets its queue back");
+        Assert.IsFalse(server.Contains("ForgetBot("), "the queue is never forgotten before the verdict");
+        string local = MethodBody(Src("Scripts/Main/Bot.cs"), "public void DeleteBotLocally");
+        Assert.IsTrue(local.Contains("ReplyModeSyncService.Existing?.ForgetBot(transform.name)"), "a deleted bot's queued desires go with it");
+        string loop = MethodBody(Src("Scripts/Chat/ReplyModeSyncService.cs"), "private IEnumerator Loop");
+        Assert.IsTrue(loop.Contains("due.RemoveAll(e => _held.Contains(e.botId))"), "a held bot's entries are never sent");
+        string wipe = MethodBody(Src("Scripts/Main/ProfileSubPages.Account.cs"), "private void FinishWipe");
         Assert.IsTrue(wipe.Contains("ReplyModeSyncService.Existing?.ForgetAll()"), "the full wipe must empty the in-memory queue too (it re-persists itself)");
     }
 }

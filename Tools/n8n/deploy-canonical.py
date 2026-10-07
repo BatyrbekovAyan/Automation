@@ -7,7 +7,9 @@ and a READ-BACK after every PUT (graph hash == canonical, activeVersionId == ver
 Scope: workflows that already exist on the instance (DIFF in verify-deployed.py). New workflows are
 imported with `n8n import:workflow` (ids must be preserved) — not here. The two placeholder workflows
 (Set Workflow State `__HDR_CRED__`, Support Message `__TG_CRED__`/`__CHAT_ID__`) are deployed by
-build-client-webhooks.py --update and are SKIPPED here unless --include-placeholders. A workflow whose Postgres SQL
+build-client-webhooks.py --update and are SKIPPED here unless --include-placeholders. Any OTHER workflow carrying the
+`n8n Admin API` placeholder (Test Dialog, the Profile Lifecycle Sweep since V12) is PUT with it bound to the id the live
+Set Workflow State uses, and refused when that id cannot be read (V12, 2026-10-07). A workflow whose Postgres SQL
 fails verify-sql-comments.py (V1: a parameter that could leave its literal) is refused before the first request.
     python3 Tools/n8n/deploy-canonical.py                       # dry-run on prod: what differs, what would be PUT
     python3 Tools/n8n/deploy-canonical.py --only <id> --apply --yes
@@ -33,6 +35,33 @@ sql_guard = importlib.util.module_from_spec(_gspec)
 _gspec.loader.exec_module(sql_guard)
 
 PLACEHOLDER_IDS = {"0DP79STI3pafXO9B", "olmqWMfcFpCEcpiE"}   # build-client-webhooks.py --update owns these
+ADMIN_PLACEHOLDER = "__HDR_CRED__"
+SET_STATE_ID = "0DP79STI3pafXO9B"
+
+
+def admin_credential_id(base):
+    """V12 (iteration 2026-09-28): the instance's `n8n Admin API` credential id, read from the LIVE Set Workflow State
+    (build-client-webhooks.py created and bound it there). Test Dialog and — since V12 — the Profile Lifecycle Sweep
+    carry the committed placeholder; PUT unbound, their admin calls would reference a credential that does not exist.
+    None when it cannot be read: the caller refuses the workflow instead of deploying it unbound."""
+    st, live = uc.call(base, "GET", f"/workflows/{SET_STATE_ID}")
+    if st != 200 or not isinstance(live, dict):
+        return None
+    for n in live.get("nodes") or []:
+        ref = (n.get("credentials") or {}).get("httpHeaderAuth") or {}
+        if ref.get("name") == "n8n Admin API" and ref.get("id") and ref["id"] != ADMIN_PLACEHOLDER:
+            return ref["id"]
+    return None
+
+
+def bind_admin_credential(body, cred_id):
+    """A copy of the PUT body with every `n8n Admin API` placeholder bound to the live credential id."""
+    out = copy.deepcopy(body)
+    for n in out.get("nodes") or []:
+        ref = (n.get("credentials") or {}).get("httpHeaderAuth")
+        if isinstance(ref, dict) and ref.get("id") == ADMIN_PLACEHOLDER:
+            ref["id"] = cred_id
+    return out
 
 
 def canonical_files():
@@ -106,7 +135,15 @@ def main():
         if not a.apply:
             summary["would_update"] += 1
             continue
-        st, resp = uc.call(base, "PUT", f"/workflows/{wid}", body_from(canon))
+        body = body_from(canon)
+        if ADMIN_PLACEHOLDER in json.dumps(body):
+            cred = admin_credential_id(base)
+            if not cred:
+                summary["failed"] += 1
+                print(f"    REFUSED: {ADMIN_PLACEHOLDER} cannot be bound (no live `n8n Admin API` on Set Workflow State) — not PUT unbound")
+                continue
+            body = bind_admin_credential(body, cred)
+        st, resp = uc.call(base, "PUT", f"/workflows/{wid}", body)
         if st != 200:
             summary["failed"] += 1
             print(f"    PUT failed {st}: {str(resp)[:300]}")

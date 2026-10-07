@@ -32,7 +32,7 @@ public partial class ChatManager
 
     /// <summary>
     /// Deletes the cache subtree for a bot. If that bot was active, falls back
-    /// to the first remaining bot or fires NoBotsExist. Called by Bot.DeleteBot.
+    /// to the first remaining bot or fires NoBotsExist. Called by Bot.DeleteBotLocally.
     /// </summary>
     public void PurgeCacheForBot(string botId)
     {

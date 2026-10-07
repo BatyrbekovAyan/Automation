@@ -81,7 +81,7 @@ public static class UploadedFilesStore
         return true;
     }
 
-    // Removes every entry of this type for the bot (used by Bot.DeleteBot teardown).
+    // Removes every entry of this type for the bot (used by Bot.DeleteBotLocally teardown).
     public static void Clear(string botName, string contentType)
     {
         if (string.IsNullOrEmpty(botName) || string.IsNullOrEmpty(contentType))
@@ -96,7 +96,7 @@ public static class UploadedFilesStore
     }
 
     // Writes the list contiguously from index 0 and deletes any orphan tail keys
-    // left by a shrink, mirroring how Bot.DeleteBot clears list items before the count.
+    // left by a shrink, mirroring how Bot.DeleteBotLocally clears list items before the count.
     private static void Persist(string botName, string contentType, List<UploadedFileEntry> list)
     {
         string prefix = ItemPrefix(botName, contentType);

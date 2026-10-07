@@ -61,7 +61,7 @@ public static class PendingProfileLedger
     private static void ClearIfMatches(string idKey, string savedKey, string profileId)
     {
         // Only the recorded profile may settle its own entry — an unrelated
-        // delete (e.g. Bot.DeleteBot on an old profile) must not wipe a
+        // delete (e.g. Manager.DeleteBotOnServer on an old profile) must not wipe a
         // pending entry that still needs sweeping.
         if (!PlayerPrefs.GetString(idKey, NoProfile).Equals(profileId)) return;
 

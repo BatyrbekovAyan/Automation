@@ -455,6 +455,9 @@ const AUTH_OPS = new Set(['status', 'qr', 'auth.code', 'tg.auth.phone', 'tg.auth
 // 12-hour token is not enough: the claim may have been taken over since). V2: the pairing is a precondition, never a
 // proof of ownership — the profile is bound only by the code sent into its own chat (Auth Session claim.verify).
 const PAIR_OPS = new Set(['qr', 'auth.code', 'tg.auth.phone', 'tg.auth.code', 'tg.auth.2fa']);
+// V12 (iteration 2026-09-28): the ops that DESTROY a profile's link are decided by the database (Profile Owner): the
+// token's list is up to 12 h old, and a profile another install has since claimed by code must not be unlinked by it.
+const OWNER_OPS = new Set(['profile.delete', 'profile.logout']);
 const OPS = {
   'profile.add':       { m: 'POST', path: 'profile/add', q: { name: ['name', NAME] }, noProfile: true, needsBilling: true },
   'profile.delete':    { m: 'POST', path: 'profile/delete', q: { profile_id: 'pid' } },
@@ -516,7 +519,7 @@ let path = spec.path;
 if (spec.kind) { const kind = String(b.kind || ''); if (!path[kind]) return deny(400, 'bad_param', 'kind'); path = path[kind]; }
 else if (typeof path === 'object') path = path[channel];
 return [{ json: { ok: true, _status: 200, op, channel, profileId: pid, method: spec.m, url: BASE[channel] + path, query,
-  jsonBody: spec.body ? body : {}, sendBody: !!spec.body, timeout: spec.timeout || 30000, claimPairing }, pairedItem: { item: 0 } }];
+  jsonBody: spec.body ? body : {}, sendBody: !!spec.body, timeout: spec.timeout || 30000, claimPairing, ownerCheck: OWNER_OPS.has(op) }, pairedItem: { item: 0 } }];
 """
 
 RECORD_CLAIM_PAIRING_SQL = """-- R1: the claimant starts a pairing of a profile it is claiming. Recorded ONLY while this install holds the
@@ -530,6 +533,13 @@ update bot_profiles set claim_pair_by = $2,
 where profile_id = $1 and owner_id is null and deleted_at is null
   and claim_pending_by = $2 and claim_pending_at > now() - interval '1 day'
 returning profile_id;"""
+
+PROFILE_OWNER_SQL = """-- V12 (iteration 2026-09-28): a profile.delete / profile.logout unlinks the owner's WhatsApp or Telegram, so it runs
+-- only for a profile whose bot_profiles row belongs to THIS install now (retired or not) and an install that is not
+-- revoked — never on the token's word alone (up to 12 h old: the profile may have been claimed by another install).
+-- Read-only. Parameters, in order: profile id, install id.
+select exists (select 1 from bot_profiles bp join installs i on i.install_id = bp.owner_id
+               where bp.profile_id = $1 and bp.owner_id = $2 and i.revoked_at is null) as allowed;"""
 
 COMPOSE_RESPONSE_JS = r"""// WAPPI PROXY / Compose Response: pass Wappi's status + JSON body through unchanged (generated)
 const r = $input.first().json || {};
@@ -612,7 +622,16 @@ def build_proxy():
     edge(c, "Webhook", "Auth Gate"); edge(c, "Auth Gate", "Authorized?")
     edge(c, "Authorized?", "Build Request", 0); edge(c, "Authorized?", "Respond 401", 1)
     edge(c, "Build Request", "Op valid?")
-    edge(c, "Op valid?", "Claim Pairing?", 0); edge(c, "Op valid?", "Respond Rejected", 1)
+    # V12: profile.delete / profile.logout pass the database ownership check first (never pairing ops, so straight on).
+    n.append(if_true("Owner Check?", "={{ $json.ownerCheck === true }}", [990, 300]))
+    n.append(postgres("Profile Owner", PROFILE_OWNER_SQL, "={{ [ $json.profileId, $('Auth Gate').first().json.crAuth.installId || '' ] }}", [990, 500]))
+    n.append(if_true("Profile Owned?", "={{ $json.allowed === true }}", [1100, 500]))
+    n.append(respond("Respond Profile Refused", [1320, 600], body="={{ { success: false, error: $json.allowed === false ? 'forbidden' : 'db_unavailable', detail: 'profile_id' } }}",
+                     code_expr="={{ $json.allowed === false ? 403 : 503 }}"))
+    edge(c, "Op valid?", "Owner Check?", 0); edge(c, "Op valid?", "Respond Rejected", 1)
+    edge(c, "Owner Check?", "Profile Owner", 0); edge(c, "Owner Check?", "Claim Pairing?", 1)
+    edge(c, "Profile Owner", "Profile Owned?")
+    edge(c, "Profile Owned?", "Wappi Call", 0); edge(c, "Profile Owned?", "Respond Profile Refused", 1)
     edge(c, "Claim Pairing?", "Record Claim Pairing", 0); edge(c, "Claim Pairing?", "Wappi Call", 1)
     edge(c, "Record Claim Pairing", "Pairing Recorded?")
     edge(c, "Pairing Recorded?", "Wappi Call", 0); edge(c, "Pairing Recorded?", "Respond Claim Not Pending", 1)

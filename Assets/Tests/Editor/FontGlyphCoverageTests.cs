@@ -300,6 +300,7 @@ public class FontGlyphCoverageTests
             typeof(SuggestionErrorCopy),// S8 per-kind error headings of the suggestions panel (2026-09-17)
             typeof(ReplyOutcomeCopy),   // stage 7.3 ledger-state labels (2026-09-22)
             typeof(BotReadinessCopy),   // stage 7.1/7.2 test-dialog + readiness copy (2026-09-22)
+            typeof(BotDeletionCopy),    // V12 refused / failed bot deletion (2026-10-07)
         };
         foreach (var t in constTypes)
             foreach (var f in t.GetFields(BindingFlags.Public | BindingFlags.Static))
@@ -353,6 +354,10 @@ public class FontGlyphCoverageTests
         yield return ("SubscriptionPageRows.TopUpRowText", SubscriptionPageRows.TopUpRowText());
         yield return ("SubscriptionPageRows.ReserveLine", SubscriptionPageRows.ReserveLine(2000));
         yield return ("SubscriptionPageRows.ReserveLine(1)", SubscriptionPageRows.ReserveLine(1));
+        yield return ("BotDeletionCopy.RefusedBody(owned_elsewhere)", BotDeletionCopy.RefusedBody(BotServerDeletion.ReasonOwnedElsewhere));
+        yield return ("BotDeletionCopy.RefusedBody(unproven)", BotDeletionCopy.RefusedBody(BotServerDeletion.ReasonUnproven));
+        yield return ("BotDeletionCopy.WipeRefusedBody(1, elsewhere)", BotDeletionCopy.WipeRefusedBody(1, true));
+        yield return ("BotDeletionCopy.WipeRefusedBody(5, mixed)", BotDeletionCopy.WipeRefusedBody(5, false));
         // R15: the test sheet's ID line names the tested version of the bot
         yield return ("BotReadinessCopy.CorrelationLine(published)", BotReadinessCopy.CorrelationLine("1546",
             BotReadinessCopy.VersionNote(TestDialogPromptVersion.SourcePublished, "a4ad53ce-e6c3", true)));

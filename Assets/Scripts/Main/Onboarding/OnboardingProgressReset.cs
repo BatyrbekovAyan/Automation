@@ -5,7 +5,7 @@ using UnityEngine;
 ///
 /// The checklist describes the first bot (<see cref="FirstStepsCard"/> reads BotsParent
 /// child 0), but its milestone latches are GLOBAL PlayerPrefs keys living outside the
-/// per-bot "BotN…" namespace (<see cref="OnboardingKeys"/>). <c>Bot.DeleteBot</c> only
+/// per-bot "BotN…" namespace (<see cref="OnboardingKeys"/>). <c>Bot.DeleteBotLocally</c> only
 /// clears that namespace, so the latches used to outlive the bot that earned them:
 /// deleting the only bot and creating another re-showed the card with the deleted bot's
 /// rows already checked.
@@ -45,9 +45,9 @@ public static class OnboardingProgressReset
     }
 
     /// <summary>
-    /// <c>Bot.DeleteBot</c> entry point: clears the latches when the deleted bot was the
+    /// <c>Bot.DeleteBotLocally</c> entry point: clears the latches when the deleted bot was the
     /// last one. <paramref name="remainingBots"/> is the count AFTER the deleted card has
-    /// left BotsParent (Bot.DeleteBot detaches before <c>Destroy</c> precisely so this
+    /// left BotsParent (Bot.DeleteBotLocally detaches before <c>Destroy</c> precisely so this
     /// count is truthful in the same frame).
     /// </summary>
     public static void OnBotDeleted(int remainingBots)

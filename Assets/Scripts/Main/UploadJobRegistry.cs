@@ -128,7 +128,7 @@ public class UploadJobRegistry
     /// Drops a deleted bot's jobs and FLAGS them cancelled. The flag is the part
     /// that matters: their upload coroutines run on UploadCenter and are not
     /// stopped by delisting, so without it a completion arriving after
-    /// Bot.DeleteBot would re-create the PlayerPrefs keys the delete just removed.
+    /// Bot.DeleteBotLocally would re-create the PlayerPrefs keys the delete just removed.
     /// </summary>
     public void RemoveForBot(string botName)
     {

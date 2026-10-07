@@ -325,73 +325,7 @@ public partial class BotSettings : MonoBehaviour
     }
 
     //////////////////////////////////////// DELETE BOT ////////////////////////////////////////
-    //
-    // DeleteBotButton lives inside the BotSettings page and, when tapped,
-    // shows DeleteConfirmPopup. Confirm reuses Bot.DeleteBot() (the exact
-    // teardown path used by the bot-card delete on the Bots list) so both
-    // entry points stay consistent.
-
-    private void WireDeleteBot()
-    {
-        if (deleteBotButton != null)
-            deleteBotButton.onClick.AddListener(OpenDeleteBotPopup);
-        if (deleteConfirmButton != null)
-            PopupUI.WireFingerUp(deleteConfirmButton, ConfirmDeleteBot);
-        if (deleteCancelButton != null)
-            PopupUI.WireFingerUp(deleteCancelButton, CancelDeleteBot);
-    }
-
-    private void OpenDeleteBotPopup()
-    {
-        if (deleteConfirmPopup != null) PopupUI.Show(deleteConfirmPopup);
-    }
-
-    private void CancelDeleteBot()
-    {
-        if (deleteConfirmPopup != null) PopupUI.Hide(deleteConfirmPopup);
-    }
-
-    private void ConfirmDeleteBot()
-    {
-        // Bot.DeleteBot() destroys this whole BotSettings GameObject
-        // synchronously below, so starting the animated PopupUI.Hide tweens
-        // (backdrop DOFade + card DOScale) would leave DOTween chasing
-        // destroyed RectTransform/Image targets next frame. Snap the popup
-        // off instead — the user never sees it, the page is gone.
-        if (deleteConfirmPopup != null) deleteConfirmPopup.SetActive(false);
-
-        var openBot = Manager.openBot;
-        if (openBot == null) return;
-
-        // Return to the Bots list before destruction. Bot.DeleteBot()
-        // destroys both the Bot GameObject and this BotSettings instance,
-        // so any code must run before that point.
-        if (Manager.BotSettingsParentStatic != null)
-        {
-            var parentGo = Manager.BotSettingsParentStatic.transform.parent != null
-                ? Manager.BotSettingsParentStatic.transform.parent.gameObject
-                : Manager.BotSettingsParentStatic;
-            parentGo.SetActive(false);
-        }
-        if (BotsPage.Instance != null)
-        {
-            // Slide-in pushed BotsPage left for the parallax depth effect.
-            // The normal back path animates it back to X=0 via
-            // SlideOutToBotsPage, but Delete skips that animation, so restore
-            // the centered position explicitly before reactivating — otherwise
-            // the list reappears shifted ~30% of screen width to the left.
-            var botsPageRt = BotsPage.Instance.GetComponent<RectTransform>();
-            if (botsPageRt != null)
-                botsPageRt.anchoredPosition = new Vector2(0f, botsPageRt.anchoredPosition.y);
-            BotsPage.Instance.gameObject.SetActive(true);
-        }
-
-        var bot = openBot.GetComponent<Bot>();
-        Manager.openBot = null;
-        Manager.openBotSettings = null;
-
-        if (bot != null) bot.DeleteBot();
-    }
+    // The delete flow lives in the BotSettings.Delete partial (V12: the bot goes only on the server's verdict).
 
     public void OnEnable()
     {

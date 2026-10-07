@@ -80,7 +80,7 @@ public class UploadCenter : MonoBehaviour
     /// <summary>Drops a failed row the user dismissed with the ✕.</summary>
     public void Dismiss(UploadJob job) => Jobs.Remove(job);
 
-    /// <summary>Called from Bot.DeleteBot — a late completion must not resurrect a deleted bot's keys.</summary>
+    /// <summary>Called from Bot.DeleteBotLocally — a late completion must not resurrect a deleted bot's keys.</summary>
     public void CancelForBot(string botName) => Jobs.RemoveForBot(botName);
 
     private IEnumerator RunUpload(UploadJob job)
@@ -161,7 +161,7 @@ public class UploadCenter : MonoBehaviour
         // The bot can be deleted (or the row dismissed) while these bytes are on
         // the wire. Delisting the job does NOT stop this coroutine — it lives on
         // UploadCenter — so without this check the writes below would re-create
-        // the very PlayerPrefs keys Bot.DeleteBot just removed. The ledger entry
+        // the very PlayerPrefs keys Bot.DeleteBotLocally just removed. The ledger entry
         // is deliberately left behind: the launch sweep reclaims the chunks.
         if (job.Cancelled || Manager.Instance == null || Manager.Instance.FindBotByName(job.BotName) == null)
         {

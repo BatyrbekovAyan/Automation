@@ -2070,7 +2070,7 @@ public partial class Manager : MonoBehaviour
             // wizard (CreateBotFromForm). Stamp the same 300s per-channel window here on a late Telegram
             // auth so the shared SyncingState cover fires when the user opens the newly-authed Telegram
             // channel — mirrors the wizard stamp at Manager.cs:1490-1497 and reuses the already-tested
-            // {bot}TelegramSyncUntil key (ChatManager.SyncUntilSuffixFor(Telegram); Bot.DeleteBot clears it).
+            // {bot}TelegramSyncUntil key (ChatManager.SyncUntilSuffixFor(Telegram); Bot.DeleteBotLocally clears it).
             //
             // COVER PARITY (D17, round-5 owner scope-override — SUPERSEDES the 08-28 Telegram-only parity
             // decision): stamp on late auth of EITHER channel so the post-creation sync cover fires for both
@@ -3337,45 +3337,88 @@ public partial class Manager : MonoBehaviour
         SaveSettings();
     }
 
-    public void DeleteProfilesAndWorkflows(string whatsappProfileId, string telegramProfileId, string whatsappWorkflowId, string telegramWorkflowId)
+    // V12 (iteration 2026-09-28): the SERVER half of a bot deletion, whose verdict decides what happens on the phone —
+    // the bot is removed locally (Bot.DeleteBotLocally) only on Done / NothingOnServer, or when the owner, told the
+    // truth about a final refusal, chooses «Удалить только с телефона». It used to be fire-and-forget: the local wipe
+    // ran first and not one answer was read, so a refused delete (403) left the memory, the history and the clone on
+    // the server with nothing in the app to delete them from. Runs on Manager (the caller may be torn down after it).
+    //   1. the Wappi profile unlink FIRST, while its row is still the owner's live row (a temporary failure here stops
+    //      everything: retired before the unlink, the profile could never be reached again — the refuter's M2);
+    //   2. Delete Bot Files (memory, history, files, slot rows) — the server decides ownership in its database;
+    //   3. the clones (an already-deleted clone answers 200 — idempotent).
+    // The reply-mode queue holds the bot meanwhile (no send may recreate a row the delete removes); a bot that stays
+    // gets it back, a deleted one is forgotten by DeleteBotLocally.
+    public IEnumerator DeleteBotOnServer(Bot bot, Action<BotServerDeletion.Outcome> done, bool showLoading = true)
     {
-        StartCoroutine(DeleteWhatsappProfile(whatsappProfileId, true));
-        StartCoroutine(DeleteTelegramProfile(telegramProfileId, true));
+        string botId = bot != null ? bot.name : "";
+        string waProfile = bot != null ? bot.whatsappProfileId : null;
+        string tgProfile = bot != null ? bot.telegramProfileId : null;
+        string waWorkflow = bot != null ? bot.whatsappWorkflowId : null;
+        string tgWorkflow = bot != null ? bot.telegramWorkflowId : null;
+        if (!BotServerDeletion.HasServerTrace(waWorkflow, tgWorkflow, waProfile, tgProfile))
+        {
+            done?.Invoke(BotServerDeletion.Outcome.NothingOnServer);
+            yield break;
+        }
 
-        StartCoroutine(DeleteWhatsappWorkflow(whatsappWorkflowId, true));
-        StartCoroutine(DeleteTelegramWorkflow(telegramWorkflowId, true));
+        ReplyModeSyncService.Existing?.Hold(botId);
+        if (showLoading) LoadingPanel.SetActive(true);
+        // The hold stops the NEXT send; a batch already on the wire must land before the server wipes its rows
+        // (bounded by twice the send's own timeout: a refresh retry is one more request).
+        float drainUntil = Time.realtimeSinceStartup + 2 * ReplyModeSyncService.RequestTimeoutSeconds;
+        while (ReplyModeSyncService.Existing != null && ReplyModeSyncService.Existing.IsSending(botId)
+               && Time.realtimeSinceStartup < drainUntil)
+            yield return null;
+        BotServerDeletion.Outcome? stop = null;
+
+        foreach (var (profileId, channel) in new[] { (waProfile, ChatChannel.WhatsApp), (tgProfile, ChatChannel.Telegram) })
+        {
+            if (stop.HasValue || BotServerDeletion.IsSentinel(profileId)) continue;
+            UnityWebRequest unlink = null;
+            yield return WappiProxy.Send(WappiProxy.Op.ProfileDelete, channel, new { profile_id = profileId }, r => unlink = r);
+            using (unlink)
+            {
+                var step = BotServerDeletion.ClassifyProfileDelete(unlink.responseCode);
+                stop = BotServerDeletion.StopAt(step, unlink.downloadHandler?.text);
+                if (step == BotServerDeletion.Step.Ok) ClearPendingProfile(profileId, channel);
+            }
+        }
+
+        string filesBody = DeleteBotFilesPayload.Compose(waWorkflow, tgWorkflow, waProfile, tgProfile, BillingIdentity.AppUserId);
+        if (!stop.HasValue && filesBody != null)
+        {
+            string url = $"{n8nBaseUrl}/webhook/DeleteBotFiles";
+            UnityWebRequest files = null;
+            yield return AuthorizedRequest.Send(() => AuthorizedRequest.JsonPost(url, filesBody, 60), r => files = r);
+            using (files)
+                stop = BotServerDeletion.StopAt(BotServerDeletion.ClassifyServerDelete(files.responseCode, files.downloadHandler?.text),
+                                                files.downloadHandler?.text);
+        }
+
+        foreach (string workflowId in new[] { waWorkflow, tgWorkflow })
+        {
+            if (stop.HasValue || BotServerDeletion.IsSentinel(workflowId)) continue;
+            UnityWebRequest clone = null;
+            yield return AuthorizedRequest.Send(() => NewWorkflowStateRequest(workflowId, WorkflowStateRequest.Delete), r => clone = r);
+            using (clone)
+                stop = BotServerDeletion.StopAt(BotServerDeletion.ClassifyServerDelete(clone.responseCode, clone.downloadHandler?.text),
+                                                clone.downloadHandler?.text);
+        }
+
+        var outcome = stop ?? BotServerDeletion.Outcome.Done;
+        if (showLoading) LoadingPanel.SetActive(false);
+        if (!outcome.RemovesBot)
+        {
+            ReplyModeSyncService.Existing?.Release(botId);
+            Debug.LogWarning($"[DeleteBotOnServer] {botId}: {outcome.Verdict} ({outcome.Reason}) — the bot stays on the phone");
+        }
+        done?.Invoke(outcome);
     }
 
-    // Server-side sweep of a deleted bot: the n8n DeleteBotFiles webhook removes
-    // every RAG chunk tagged with the bot's workflow ids (including legacy chunks
-    // with no fileId) plus each file's stored original in the price-lists bucket,
-    // and — since 2026-08-27 — retires the bot's bot_profiles rows by profile id so
-    // the channel slots free up immediately (the scheduled sweeps never reconcile
-    // status='active' owners, so without this send a paying owner's deleted bot
-    // held its slot forever). Runs on Manager because the calling Bot destroys
-    // itself — a coroutine on the Bot would die with it.
-    public void DeleteBotFilesOnServer(string whatsappWorkflowId, string telegramWorkflowId,
-                                       string whatsappProfileId, string telegramProfileId)
+    private static void ClearPendingProfile(string profileId, ChatChannel channel)
     {
-        string body = DeleteBotFilesPayload.Compose(
-            whatsappWorkflowId, telegramWorkflowId,
-            whatsappProfileId, telegramProfileId,
-            BillingIdentity.AppUserId);
-        if (body == null) return; // never-authed bot — nothing exists server-side
-
-        StartCoroutine(DeleteBotFilesRoutine(body));
-    }
-
-    private IEnumerator DeleteBotFilesRoutine(string body)
-    {
-        string url = $"{n8nBaseUrl}/webhook/DeleteBotFiles";
-
-        UnityWebRequest request = null;
-        yield return AuthorizedRequest.Send(() => AuthorizedRequest.JsonPost(url, body, 30), r => request = r);
-        using var requestScope = request;
-
-        if (request.result != UnityWebRequest.Result.Success)
-            Debug.LogError($"[DeleteBotFiles] [{request.responseCode}] {url}: {request.error}\n{request.downloadHandler?.text}");
+        if (channel == ChatChannel.Telegram) PendingProfileLedger.ClearTelegramIfMatches(profileId);
+        else PendingProfileLedger.ClearWhatsappIfMatches(profileId);
     }
 
 

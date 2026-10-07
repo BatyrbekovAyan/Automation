@@ -86,7 +86,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// WAPPI PROXY / Build Request (generated — see build-auth-workflows.py). Allow-listed operations\n// only: every op maps to ONE Wappi endpoint with validated parameters; the profile named by the\n// request must be owned by the token's install (or be a pending legacy claim for the auth ops).\nconst g = $input.first().json;\nconst claims = g.crAuth || {};\nconst b = (g.body && typeof g.body === 'object') ? g.body : {};\nconst BASE = { whatsapp: 'https://wappi.pro/api/', telegram: 'https://wappi.pro/tapi/' };\nconst ID = /^[A-Za-z0-9@._:+\\-]{1,128}$/;\nconst PHONE = /^\\d{7,15}$/;\nconst NAME = /^[\\p{L}\\p{N} _\\-.]{1,64}$/u;\nconst AUTH_OPS = new Set(['status', 'qr', 'auth.code', 'tg.auth.phone', 'tg.auth.code', 'tg.auth.2fa']);\n// R1: the ops that START or advance a pairing. On a claim-pending (not owned) profile they run only after\n// Record Claim Pairing has confirmed, in the database, that THIS install still holds the fresh claim (a `c` in a\n// 12-hour token is not enough: the claim may have been taken over since). V2: the pairing is a precondition, never a\n// proof of ownership — the profile is bound only by the code sent into its own chat (Auth Session claim.verify).\nconst PAIR_OPS = new Set(['qr', 'auth.code', 'tg.auth.phone', 'tg.auth.code', 'tg.auth.2fa']);\nconst OPS = {\n  'profile.add':       { m: 'POST', path: 'profile/add', q: { name: ['name', NAME] }, noProfile: true, needsBilling: true },\n  'profile.delete':    { m: 'POST', path: 'profile/delete', q: { profile_id: 'pid' } },\n  'profile.logout':    { m: 'GET',  path: 'profile/logout', q: { profile_id: 'pid' } },\n  'status':            { m: 'GET',  path: 'sync/get/status', q: { profile_id: 'pid' } },\n  'qr':                { m: 'GET',  path: { whatsapp: 'sync/qr/get', telegram: 'sync/auth/qr' }, q: { profile_id: 'pid' } },\n  'auth.code':         { m: 'GET',  path: 'sync/auth/code', q: { profile_id: 'pid', phone: ['phone', PHONE] }, only: 'whatsapp' },\n  'tg.auth.phone':     { m: 'POST', path: 'sync/auth/phone', q: { profile_id: 'pid' }, body: { phone: ['phone', PHONE] }, only: 'telegram' },\n  'tg.auth.code':      { m: 'POST', path: 'sync/auth/code', q: { profile_id: 'pid' }, body: { auth_code: ['auth_code', /^\\d{4,8}$/] }, only: 'telegram' },\n  'tg.auth.2fa':       { m: 'POST', path: 'sync/auth/2fa', q: { profile_id: 'pid' }, body: { pwd_code: ['pwd_code', 'text', 256] }, only: 'telegram' },\n  'chats.filter':      { m: 'GET',  path: 'sync/chats/filter', q: { profile_id: 'pid' } },\n  'messages.get':      { m: 'GET',  path: 'sync/messages/get', q: { profile_id: 'pid', chat_id: ['chat_id', ID], limit: ['limit', 'int', 200, 15], offset: ['offset', 'int', 100000, 0] } },\n  'messages.id.get':   { m: 'GET',  path: 'sync/messages/id/get', q: { profile_id: 'pid', message_id: ['message_id', ID] } },\n  'media.download':    { m: 'GET',  path: 'sync/message/media/download', q: { profile_id: 'pid', message_id: ['message_id', ID] }, timeout: 60000 },\n  'message.send':      { m: 'POST', path: 'sync/message/send', q: { profile_id: 'pid' }, body: { recipient: ['recipient', ID], body: ['body', 'text', 8192], quoted_message_id: ['quoted_message_id', ID, 'opt'] } },\n  'message.reply':     { m: 'POST', path: 'sync/message/reply', q: { profile_id: 'pid' }, body: { recipient: ['recipient', ID, 'opt'], body: ['body', 'text', 8192], message_id: ['message_id', ID] }, only: 'telegram' },\n  'message.mark_read': { m: 'POST', path: 'sync/message/mark/read', q: { profile_id: 'pid', mark_all: ['mark_all', 'bool', 'opt'] }, body: { message_id: ['message_id', ID] } },\n  'chat.delete':       { m: 'POST', path: 'sync/chat/delete', q: { profile_id: 'pid' }, body: { recipient: ['recipient', ID] } },\n  'message.reaction':  { m: 'POST', path: 'sync/message/reaction', q: { profile_id: 'pid' }, body: { body: ['body', 'text', 64], message_id: ['message_id', ID], recipient: ['recipient', ID, 'opt'] } },\n  'media.send':        { m: 'POST', path: { img: 'sync/message/img/send', video: 'sync/message/video/send', document: 'sync/message/document/send' }, q: { profile_id: 'pid' },\n                         body: { recipient: ['recipient', ID], caption: ['caption', 'text', 1024, 'opt'], file_name: ['file_name', 'text', 255, 'opt'], b64_file: ['b64_file', 'text', 24 * 1024 * 1024] }, kind: true, timeout: 300000 },\n};\nconst deny = (status, error, detail) => [{ json: { ok: false, _status: status, error, detail: detail || null, op: String(b.op || '') }, pairedItem: { item: 0 } }];\nconst op = typeof b.op === 'string' ? b.op : '';\nconst spec = OPS[op];\nif (!spec) return deny(400, 'unknown_op');\nconst channel = (b.channel === 'telegram') ? 'telegram' : 'whatsapp';\nif (spec.only && spec.only !== channel) return deny(400, 'op_channel_mismatch');\nconst pid = typeof b.profile_id === 'string' ? b.profile_id : '';\nlet claimPairing = false;\nif (!spec.noProfile) {\n  if (!ID.test(pid)) return deny(400, 'bad_param', 'profile_id');\n  const owned = (claims.profiles || []).includes(pid);\n  const pending = AUTH_OPS.has(op) && (claims.claimPending || []).includes(pid);\n  if (!owned && !pending) return deny(403, 'forbidden', 'profile_id');\n  claimPairing = !owned && PAIR_OPS.has(op);\n}\nif (spec.needsBilling && !claims.appUserId) return deny(409, 'no_billing_identity');\nconst take = (dest, key, rule) => {\n  if (rule === 'pid') { dest[key] = pid; return null; }\n  const [field, kind, a, bb] = rule;\n  const opt = rule.includes('opt');\n  const v = b[field];\n  if (v === undefined || v === null || v === '') {\n    if (kind === 'int' && bb !== undefined) { dest[key] = bb; return null; }   // int rules carry a default\n    if (opt) return null;\n    return 'missing:' + field;\n  }\n  if (kind === 'int') { const n = Number.parseInt(v, 10); if (!Number.isFinite(n) || n < 0 || n > a) return 'bad:' + field; dest[key] = n; return null; }\n  if (kind === 'bool') { if (v === true || v === 'true') dest[key] = 'true'; return null; }   // absent when false (byte-parity with the old queries)\n  if (kind === 'text') { if (typeof v !== 'string' || v.length > a) return 'bad:' + field; dest[key] = v; return null; }\n  if (kind instanceof RegExp) { if (typeof v !== 'string' || !kind.test(v)) return 'bad:' + field; dest[key] = v; return null; }\n  return 'bad:' + field;\n};\nconst query = {}, body = {};\nfor (const [k, rule] of Object.entries(spec.q || {})) { const e = take(query, k, rule); if (e) return deny(400, 'bad_param', e); }\nfor (const [k, rule] of Object.entries(spec.body || {})) { const e = take(body, k, rule); if (e) return deny(400, 'bad_param', e); }\nlet path = spec.path;\nif (spec.kind) { const kind = String(b.kind || ''); if (!path[kind]) return deny(400, 'bad_param', 'kind'); path = path[kind]; }\nelse if (typeof path === 'object') path = path[channel];\nreturn [{ json: { ok: true, _status: 200, op, channel, profileId: pid, method: spec.m, url: BASE[channel] + path, query,\n  jsonBody: spec.body ? body : {}, sendBody: !!spec.body, timeout: spec.timeout || 30000, claimPairing }, pairedItem: { item: 0 } }];\n"
+        "jsCode": "// WAPPI PROXY / Build Request (generated — see build-auth-workflows.py). Allow-listed operations\n// only: every op maps to ONE Wappi endpoint with validated parameters; the profile named by the\n// request must be owned by the token's install (or be a pending legacy claim for the auth ops).\nconst g = $input.first().json;\nconst claims = g.crAuth || {};\nconst b = (g.body && typeof g.body === 'object') ? g.body : {};\nconst BASE = { whatsapp: 'https://wappi.pro/api/', telegram: 'https://wappi.pro/tapi/' };\nconst ID = /^[A-Za-z0-9@._:+\\-]{1,128}$/;\nconst PHONE = /^\\d{7,15}$/;\nconst NAME = /^[\\p{L}\\p{N} _\\-.]{1,64}$/u;\nconst AUTH_OPS = new Set(['status', 'qr', 'auth.code', 'tg.auth.phone', 'tg.auth.code', 'tg.auth.2fa']);\n// R1: the ops that START or advance a pairing. On a claim-pending (not owned) profile they run only after\n// Record Claim Pairing has confirmed, in the database, that THIS install still holds the fresh claim (a `c` in a\n// 12-hour token is not enough: the claim may have been taken over since). V2: the pairing is a precondition, never a\n// proof of ownership — the profile is bound only by the code sent into its own chat (Auth Session claim.verify).\nconst PAIR_OPS = new Set(['qr', 'auth.code', 'tg.auth.phone', 'tg.auth.code', 'tg.auth.2fa']);\n// V12 (iteration 2026-09-28): the ops that DESTROY a profile's link are decided by the database (Profile Owner): the\n// token's list is up to 12 h old, and a profile another install has since claimed by code must not be unlinked by it.\nconst OWNER_OPS = new Set(['profile.delete', 'profile.logout']);\nconst OPS = {\n  'profile.add':       { m: 'POST', path: 'profile/add', q: { name: ['name', NAME] }, noProfile: true, needsBilling: true },\n  'profile.delete':    { m: 'POST', path: 'profile/delete', q: { profile_id: 'pid' } },\n  'profile.logout':    { m: 'GET',  path: 'profile/logout', q: { profile_id: 'pid' } },\n  'status':            { m: 'GET',  path: 'sync/get/status', q: { profile_id: 'pid' } },\n  'qr':                { m: 'GET',  path: { whatsapp: 'sync/qr/get', telegram: 'sync/auth/qr' }, q: { profile_id: 'pid' } },\n  'auth.code':         { m: 'GET',  path: 'sync/auth/code', q: { profile_id: 'pid', phone: ['phone', PHONE] }, only: 'whatsapp' },\n  'tg.auth.phone':     { m: 'POST', path: 'sync/auth/phone', q: { profile_id: 'pid' }, body: { phone: ['phone', PHONE] }, only: 'telegram' },\n  'tg.auth.code':      { m: 'POST', path: 'sync/auth/code', q: { profile_id: 'pid' }, body: { auth_code: ['auth_code', /^\\d{4,8}$/] }, only: 'telegram' },\n  'tg.auth.2fa':       { m: 'POST', path: 'sync/auth/2fa', q: { profile_id: 'pid' }, body: { pwd_code: ['pwd_code', 'text', 256] }, only: 'telegram' },\n  'chats.filter':      { m: 'GET',  path: 'sync/chats/filter', q: { profile_id: 'pid' } },\n  'messages.get':      { m: 'GET',  path: 'sync/messages/get', q: { profile_id: 'pid', chat_id: ['chat_id', ID], limit: ['limit', 'int', 200, 15], offset: ['offset', 'int', 100000, 0] } },\n  'messages.id.get':   { m: 'GET',  path: 'sync/messages/id/get', q: { profile_id: 'pid', message_id: ['message_id', ID] } },\n  'media.download':    { m: 'GET',  path: 'sync/message/media/download', q: { profile_id: 'pid', message_id: ['message_id', ID] }, timeout: 60000 },\n  'message.send':      { m: 'POST', path: 'sync/message/send', q: { profile_id: 'pid' }, body: { recipient: ['recipient', ID], body: ['body', 'text', 8192], quoted_message_id: ['quoted_message_id', ID, 'opt'] } },\n  'message.reply':     { m: 'POST', path: 'sync/message/reply', q: { profile_id: 'pid' }, body: { recipient: ['recipient', ID, 'opt'], body: ['body', 'text', 8192], message_id: ['message_id', ID] }, only: 'telegram' },\n  'message.mark_read': { m: 'POST', path: 'sync/message/mark/read', q: { profile_id: 'pid', mark_all: ['mark_all', 'bool', 'opt'] }, body: { message_id: ['message_id', ID] } },\n  'chat.delete':       { m: 'POST', path: 'sync/chat/delete', q: { profile_id: 'pid' }, body: { recipient: ['recipient', ID] } },\n  'message.reaction':  { m: 'POST', path: 'sync/message/reaction', q: { profile_id: 'pid' }, body: { body: ['body', 'text', 64], message_id: ['message_id', ID], recipient: ['recipient', ID, 'opt'] } },\n  'media.send':        { m: 'POST', path: { img: 'sync/message/img/send', video: 'sync/message/video/send', document: 'sync/message/document/send' }, q: { profile_id: 'pid' },\n                         body: { recipient: ['recipient', ID], caption: ['caption', 'text', 1024, 'opt'], file_name: ['file_name', 'text', 255, 'opt'], b64_file: ['b64_file', 'text', 24 * 1024 * 1024] }, kind: true, timeout: 300000 },\n};\nconst deny = (status, error, detail) => [{ json: { ok: false, _status: status, error, detail: detail || null, op: String(b.op || '') }, pairedItem: { item: 0 } }];\nconst op = typeof b.op === 'string' ? b.op : '';\nconst spec = OPS[op];\nif (!spec) return deny(400, 'unknown_op');\nconst channel = (b.channel === 'telegram') ? 'telegram' : 'whatsapp';\nif (spec.only && spec.only !== channel) return deny(400, 'op_channel_mismatch');\nconst pid = typeof b.profile_id === 'string' ? b.profile_id : '';\nlet claimPairing = false;\nif (!spec.noProfile) {\n  if (!ID.test(pid)) return deny(400, 'bad_param', 'profile_id');\n  const owned = (claims.profiles || []).includes(pid);\n  const pending = AUTH_OPS.has(op) && (claims.claimPending || []).includes(pid);\n  if (!owned && !pending) return deny(403, 'forbidden', 'profile_id');\n  claimPairing = !owned && PAIR_OPS.has(op);\n}\nif (spec.needsBilling && !claims.appUserId) return deny(409, 'no_billing_identity');\nconst take = (dest, key, rule) => {\n  if (rule === 'pid') { dest[key] = pid; return null; }\n  const [field, kind, a, bb] = rule;\n  const opt = rule.includes('opt');\n  const v = b[field];\n  if (v === undefined || v === null || v === '') {\n    if (kind === 'int' && bb !== undefined) { dest[key] = bb; return null; }   // int rules carry a default\n    if (opt) return null;\n    return 'missing:' + field;\n  }\n  if (kind === 'int') { const n = Number.parseInt(v, 10); if (!Number.isFinite(n) || n < 0 || n > a) return 'bad:' + field; dest[key] = n; return null; }\n  if (kind === 'bool') { if (v === true || v === 'true') dest[key] = 'true'; return null; }   // absent when false (byte-parity with the old queries)\n  if (kind === 'text') { if (typeof v !== 'string' || v.length > a) return 'bad:' + field; dest[key] = v; return null; }\n  if (kind instanceof RegExp) { if (typeof v !== 'string' || !kind.test(v)) return 'bad:' + field; dest[key] = v; return null; }\n  return 'bad:' + field;\n};\nconst query = {}, body = {};\nfor (const [k, rule] of Object.entries(spec.q || {})) { const e = take(query, k, rule); if (e) return deny(400, 'bad_param', e); }\nfor (const [k, rule] of Object.entries(spec.body || {})) { const e = take(body, k, rule); if (e) return deny(400, 'bad_param', e); }\nlet path = spec.path;\nif (spec.kind) { const kind = String(b.kind || ''); if (!path[kind]) return deny(400, 'bad_param', 'kind'); path = path[kind]; }\nelse if (typeof path === 'object') path = path[channel];\nreturn [{ json: { ok: true, _status: 200, op, channel, profileId: pid, method: spec.m, url: BASE[channel] + path, query,\n  jsonBody: spec.body ? body : {}, sendBody: !!spec.body, timeout: spec.timeout || 30000, claimPairing, ownerCheck: OWNER_OPS.has(op) }, pairedItem: { item: 0 } }];\n"
       },
       "id": "ea52ee06-8726-5108-a8d3-91b2f7072f65",
       "name": "Build Request",
@@ -436,6 +436,116 @@
           },
           "conditions": [
             {
+              "id": "5fa561d4-3305-5838-81a4-84b4c92dc041",
+              "leftValue": "={{ $json.ownerCheck === true }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "e928772c-f5ad-5e56-a579-8d2e2d267798",
+      "name": "Owner Check?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        990,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- V12 (iteration 2026-09-28): a profile.delete / profile.logout unlinks the owner's WhatsApp or Telegram, so it runs\n-- only for a profile whose bot_profiles row belongs to THIS install now (retired or not) and an install that is not\n-- revoked — never on the token's word alone (up to 12 h old: the profile may have been claimed by another install).\n-- Read-only. Parameters, in order: profile id, install id.\nselect exists (select 1 from bot_profiles bp join installs i on i.install_id = bp.owner_id\n               where bp.profile_id = $1 and bp.owner_id = $2 and i.revoked_at is null) as allowed;",
+        "options": {
+          "queryReplacement": "={{ [ $json.profileId, $('Auth Gate').first().json.crAuth.installId || '' ] }}"
+        }
+      },
+      "id": "fefd5c32-4760-59d8-950d-6b7914e42184",
+      "name": "Profile Owner",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        990,
+        500
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "vvRrFiEXzLVqKjOx",
+          "name": "Postgres"
+        }
+      },
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "ed3b23a9-4162-5d17-9b44-9aacc56b6860",
+              "leftValue": "={{ $json.allowed === true }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "1466d1ce-a4e1-596c-8fa0-6d5431dd83ad",
+      "name": "Profile Owned?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1100,
+        500
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { success: false, error: $json.allowed === false ? 'forbidden' : 'db_unavailable', detail: 'profile_id' } }}",
+        "options": {
+          "responseCode": "={{ $json.allowed === false ? 403 : 503 }}"
+        }
+      },
+      "id": "2b9bcbad-8895-5ea4-a11d-03beca7d98d4",
+      "name": "Respond Profile Refused",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1320,
+        600
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
               "id": "0e92ffb6-5be8-5988-8a47-af638238d901",
               "leftValue": "={{ ['message.send', 'message.reply', 'media.send'].includes($('Build Request').first().json.op) && Number($('Wappi Call').first().json.statusCode) === 200 && !!($('Wappi Call').first().json.body && $('Wappi Call').first().json.body.message_id) }}",
               "rightValue": "",
@@ -541,7 +651,7 @@
       "main": [
         [
           {
-            "node": "Claim Pairing?",
+            "node": "Owner Check?",
             "type": "main",
             "index": 0
           }
@@ -549,6 +659,53 @@
         [
           {
             "node": "Respond Rejected",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Owner Check?": {
+      "main": [
+        [
+          {
+            "node": "Profile Owner",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Claim Pairing?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Profile Owner": {
+      "main": [
+        [
+          {
+            "node": "Profile Owned?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Profile Owned?": {
+      "main": [
+        [
+          {
+            "node": "Wappi Call",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Profile Refused",
             "type": "main",
             "index": 0
           }

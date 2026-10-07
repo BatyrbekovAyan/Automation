@@ -865,6 +865,154 @@ def s_upload(ctx):
                 f"own compat delete={st13} {d13}; own upload delete={st14} {d14}; own chunks left|rows marked={own_left!r}")
 
 
+def admin_api(method, path, body=None):
+    return http(method, f"{BASE}/api/v1{path}", body, headers={"X-N8N-API-KEY": SEC.get("apiKey", "")})
+
+
+def create_bot_clones(ctx, owner, tag):
+    """A «Вместе» bot with BOTH channels through the real Create WA/TG handlers (trial plan: 3 channels)."""
+    wa = owner.profiles[0]
+    tg = owner.add_profile("telegram")
+    base = {"Name": f"e2e-{tag}-{ctx['run_id']}", "BusinessType": "Цветы", "BusinessTypeId": "flowers", "Business": "", "Prompt": "",
+            "ProductsList": "", "ServicesList": "", "AppUserID": owner.app_user_id, "BotKey": f"Bot-{tag}-{ctx['run_id']}",
+            "ReplyMode": "semi", "ReplyModeVersion": "150"}
+    st1, d1 = hook_form("CreateWhatsappWorkflow", owner.token, {**base, "WhatsappProfileId": wa, "TelegramWorkflowId": "-1"})
+    wwa = (d1 or {}).get("id") if isinstance(d1, dict) else None
+    owner.refresh()
+    st2, d2 = hook_form("CreateTelegramWorkflow", owner.token, {**base, "TelegramProfileId": tg, "WhatsappWorkflowId": wwa or "-1"})
+    wtg = (d2 or {}).get("id") if isinstance(d2, dict) else None
+    owner.refresh()
+    return wa, tg, wwa, wtg, (st1, st2)
+
+
+def seed_bot_rows(pid, wid, key, file_id):
+    pg(f"insert into n8n_chat_histories (session_id, message) values ('{pid}:77001@c.us', '{{\"type\":\"human\",\"content\":\"v12\"}}'::jsonb);"
+       f"insert into chat_history_events (profile_id, chat_id, message_id, source, body, msg_type, sent_at) values ('{pid}', '77001@c.us', 'v12-{pid}', 'client', 'v12', 'chat', now());"
+       f"insert into documents (content, metadata) values ('v12 price', '{{\"{key}\": \"{wid}\", \"fileId\": \"{file_id}\"}}'::jsonb);")
+
+
+def bot_rows_left(pid, wid, key):
+    return pg(f"select (select count(*) from n8n_chat_histories where split_part(session_id, ':', 1) = '{pid}') || '|' || "
+              f"(select count(*) from chat_history_events where profile_id = '{pid}') || '|' || "
+              f"(select count(*) from documents where metadata->>'{key}' = '{wid}') || '|' || "
+              f"(select count(*) from reply_mode_flags where profile_id = '{pid}');")
+
+
+@scenario("retired_bot_owner_can_delete", "V12: the owner of a bot the sweep retired (trial over: its rows deleted, its token lists nothing) deletes its memory, history and files (200, real counters) and both clones (200; a repeat is 200 — idempotent); activating the retired clone and another install naming the same ids are 403 (reason owned_elsewhere) — WhatsApp and Telegram")
+def s_retired_delete(ctx):
+    o = fresh_owner(ctx, "rd")
+    wa, tg, wwa, wtg, created = create_bot_clones(ctx, o, "rd")
+    if not (wwa and wtg):
+        return False, f"setup: create {created} wa={wwa} tg={wtg}"
+    fid = str(uuid.uuid4())
+    seed_bot_rows(wa, wwa, "botWaId", fid)
+    seed_bot_rows(tg, wtg, "botTgId", fid)
+    pg(f"update bot_profiles set deleted_at = now(), deleted_reason = 'trial_expiry' where profile_id in ('{wa}', '{tg}');")
+    tok = o.refresh()
+    body = {"botWaId": wwa, "botTgId": wtg, "waProfileId": wa, "tgProfileId": tg, "appUserId": o.app_user_id}
+    x = Owner("rdx", ctx["run_id"])                                   # another install naming the same ids
+    foreign_dbf, dx = hook("DeleteBotFiles", x.token, body)
+    foreign_sws = hook("SetWorkflowState", x.token, {"workflowId": wwa, "action": "delete"})[0]
+    activate = hook("SetWorkflowState", o.token, {"workflowId": wwa, "action": "activate"})[0]
+    before = (bot_rows_left(wa, wwa, "botWaId"), bot_rows_left(tg, wtg, "botTgId"))
+    own_dbf, d = hook("DeleteBotFiles", o.token, body)
+    after = (bot_rows_left(wa, wwa, "botWaId"), bot_rows_left(tg, wtg, "botTgId"))
+    deletes = [hook("SetWorkflowState", o.token, {"workflowId": w, "action": "delete"})[0] for w in (wwa, wwa, wtg)]
+    gone = [admin_api("GET", f"/workflows/{w}")[0] for w in (wwa, wtg)]
+    ok = (not tok.get("profiles") and not tok.get("workflows")
+          and foreign_dbf == 403 and (dx or {}).get("reason") == "owned_elsewhere" and foreign_sws == 403 and activate == 403
+          and before == ("1|1|1|1", "1|1|1|1")
+          and own_dbf == 200 and isinstance(d, dict) and d.get("success") is True and (d.get("deletedMemoryRows") or 0) >= 2
+          and isinstance(d.get("deletedChatStates"), int) and after == ("0|0|0|0", "0|0|0|0")
+          and deletes == [200, 200, 200] and gone == [404, 404])
+    return ok, (f"token after retire={tok.get('profiles')}/{tok.get('workflows')} foreign dbf={foreign_dbf} {dx} foreign sws={foreign_sws} "
+                f"activate retired={activate} rows before={before} own dbf={own_dbf} {d} rows after={after} deletes={deletes} GET={gone}")
+
+
+@scenario("stale_token_cannot_unlink_a_claimed_profile", "V12 / M5: a token issued while install A owned a profile still lists it after install B took the profile over — A's profile.delete / profile.logout (proxy), DeleteBotFiles and SetWorkflowState(delete) are all refused (403) and the transport is never called; B's own profile.delete passes — WhatsApp and Telegram")
+def s_stale_token(ctx):
+    a = fresh_owner(ctx, "st")
+    b = Owner("stb", ctx["run_id"])
+    wa, tg, wwa, wtg, created = create_bot_clones(ctx, a, "st")
+    if not (wwa and wtg):
+        return False, f"setup: create {created}"
+    stale = a.token                                                   # lists wa, tg, wwa, wtg
+    pg(f"update bot_profiles set owner_id = '{b.install_id}' where profile_id in ('{wa}', '{tg}');")   # claimed by code
+    b.refresh()
+    since = mock_total()
+    res = {}
+    for ch, pid in (("whatsapp", wa), ("telegram", tg)):
+        res[f"{ch} delete"] = proxy(stale, {"op": "profile.delete", "channel": ch, "profile_id": pid})[0]
+        res[f"{ch} logout"] = proxy(stale, {"op": "profile.logout", "channel": ch, "profile_id": pid})[0]
+    calls = [c for c in mock_calls(since, "profile/")[0] if wa in json.dumps(c) or tg in json.dumps(c)]
+    res["dbf"] = hook("DeleteBotFiles", stale, {"botWaId": wwa, "botTgId": wtg, "waProfileId": wa, "tgProfileId": tg, "appUserId": a.app_user_id})[0]
+    res["sws"] = hook("SetWorkflowState", stale, {"workflowId": wwa, "action": "delete"})[0]
+    res["b delete"] = proxy(b.token, {"op": "profile.delete", "channel": "whatsapp", "profile_id": wa})[0]
+    for w in (wwa, wtg):
+        hook("SetWorkflowState", b.token, {"workflowId": w, "action": "delete"})
+    ok = all(v == 403 for k, v in res.items() if k != "b delete") and not calls and res["b delete"] == 200
+    return ok, f"{res} transport calls for A's stale token: {len(calls)}"
+
+
+def sweep_clone_probe(run_id):
+    """A TEMPORARY staging-only workflow: webhook → the DERIVED sweep's own clone branch (Sweep Config + Retired Clones …
+    Stamp, credentials already remapped by derive-staging) — runs exactly those nodes on the real n8n; deleted after use."""
+    src = json.load(open(os.path.join(N8N_DIR, "workflows-staging", "fXYpCXPKw92EzRz8-Profile_Lifecycle_Sweep.json"), encoding="utf-8"))
+    keep = {"Sweep Config", "Retired Clones", "Clone Dry Run?", "Log Would Deactivate", "Has Clone?", "Deactivate Clone", "Clone Off?",
+            "Stamp Clone Deactivated", "Stamp Clone Kept"}
+    nodes = [n for n in src["nodes"] if n["name"] in keep]
+    conns = {k: v for k, v in src["connections"].items() if k in keep and k != "Sweep Config"}
+    conns["Sweep Config"] = {"main": [[{"node": "Retired Clones", "type": "main", "index": 0}]]}
+    path = f"v12-sweep-probe-{run_id}"
+    nodes.append({"parameters": {"httpMethod": "POST", "path": path, "responseMode": "onReceived", "options": {}}, "id": "probe-webhook",
+                  "name": "Webhook", "type": "n8n-nodes-base.webhook", "typeVersion": 2, "position": [-900, 900], "webhookId": path})
+    conns["Webhook"] = {"main": [[{"node": "Sweep Config", "type": "main", "index": 0}]]}
+    st, created = admin_api("POST", "/workflows", {"name": f"STAGING probe sweep clones {run_id}", "settings": {"executionOrder": "v1"},
+                                                   "nodes": nodes, "connections": conns})
+    if st != 200:
+        raise RuntimeError(f"probe create {st}: {str(created)[:300]}")
+    wid = created["id"]
+    if admin_api("POST", f"/workflows/{wid}/activate")[0] != 200:
+        admin_api("DELETE", f"/workflows/{wid}")
+        raise RuntimeError("probe activate failed")
+    return wid, f"{BASE}/webhook/{path}"
+
+
+def run_probe(wid, url):
+    since = newest_execution_id(wid)
+    http("POST", url, {})
+    return newest_execution(wid, since)
+
+
+@scenario("sweep_deactivates_retired_clone", "V12: the sweep's clone branch (the derived canonical nodes, run on the real n8n) deactivates the clone of a bot IT retired (trial_expiry), stamps it and never calls it again; a liveness-retired bot's clone stays ACTIVE; nothing is deleted — WhatsApp and Telegram")
+def s_sweep_clone(ctx):
+    o = fresh_owner(ctx, "sw")
+    wa, tg, wwa, wtg, created = create_bot_clones(ctx, o, "sw")
+    if not (wwa and wtg):
+        return False, f"setup: create {created}"
+    pg(f"update bot_profiles set deleted_at = now(), deleted_reason = 'trial_expiry' where profile_id = '{wa}';"
+       f"update bot_profiles set deleted_at = now(), deleted_reason = 'liveness' where profile_id = '{tg}';")
+    active = lambda w: (admin_api("GET", f"/workflows/{w}")[1] or {}).get("active")
+    pre = (active(wwa), active(wtg))
+    wid = None
+    try:
+        wid, url = sweep_clone_probe(ctx["run_id"])
+        e1 = run_probe(wid, url)
+        mid = (active(wwa), active(wtg), pg(f"select coalesce(clone_deactivated_id, '-') from bot_profiles where profile_id = '{wa}';"))
+        e2 = run_probe(wid, url)
+        ran2 = ran_nodes(e2)
+    finally:
+        if wid:
+            admin_api("POST", f"/workflows/{wid}/deactivate")
+            admin_api("DELETE", f"/workflows/{wid}")
+    exists = [admin_api("GET", f"/workflows/{w}")[0] for w in (wwa, wtg)]
+    for w in (wwa, wtg):
+        hook("SetWorkflowState", o.token, {"workflowId": w, "action": "delete"})
+    ok = (pre == (True, True) and "Deactivate Clone" in ran_nodes(e1) and mid == (False, True, wwa)
+          and "Deactivate Clone" not in ran2 and exists == [200, 200])
+    return ok, f"active before={pre} after run 1 (wa, tg, stamp)={mid} run 2 called deactivate={'Deactivate Clone' in ran2} still exist={exists}"
+
+
 def main():
     ap = argparse.ArgumentParser(); ap.add_argument("--only"); ap.add_argument("--compat-closed", action="store_true"); a = ap.parse_args()
     if not AUTH_SECRET:

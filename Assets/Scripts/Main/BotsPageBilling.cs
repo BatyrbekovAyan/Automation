@@ -174,7 +174,7 @@ public class BotsPageBilling : MonoBehaviour
     /// <summary>
     /// Repaint from live facts. Public so the fact-changing moments already wired for the
     /// «Первые шаги» card (bot created via BotsPage.RefreshEmptyState, bot deleted via
-    /// Bot.DeleteBot) refresh this surface too. Never opens anything, so it is safe on the
+    /// Bot.DeleteBotLocally) refresh this surface too. Never opens anything, so it is safe on the
     /// «Удалить все данные» wipe path.
     /// </summary>
     public void Refresh()
@@ -335,7 +335,7 @@ public class BotsPageBilling : MonoBehaviour
 
         // PositionAddCard seats the card off botsList.rect.height, and on the Refresh() calls
         // that FOLLOW A LIST CHANGE (bot created, bot deleted — both route here via
-        // BotsPage.RefreshEmptyState / Bot.DeleteBot) uGUI has not recomputed that height yet:
+        // BotsPage.RefreshEmptyState / Bot.DeleteBotLocally) uGUI has not recomputed that height yet:
         // ReserveListBottom's MarkLayoutForRebuild is deferred to the end of the frame, and the
         // new/removed row is queued with it. Reading the stale height parks the card at the
         // PREVIOUS list length for one frame — the pop on create/delete. Forcing the rebuild
