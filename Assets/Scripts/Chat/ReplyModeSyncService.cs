@@ -190,11 +190,17 @@ public class ReplyModeSyncService : MonoBehaviour
         var ids = new List<string>(batch.Count);
         foreach (var e in batch) ids.Add(e.profileId);
         long sentVersion = first.desiredVersion;
+        long decidedAtMs = first.decidedAtMs;        // R4-clock: captured with the version it belongs to
+        string chatId = first.chatId;
+        bool suppressed = first.desiredSuppressed;
         string url = $"{Manager.n8nBaseUrl}/webhook/SetReplyMode";
-        string body = Manager.BuildReplyModePayload(ids, first.chatId, first.desiredSuppressed, sentVersion);
 
+        // R4-clock: the body is built INSIDE the factory — the decision's age is measured when each attempt leaves
+        // (after the session wait, and again for the retry after a 401 refresh), never once up front.
         UnityWebRequest www = null;
-        yield return AuthorizedRequest.Send(() => AuthorizedRequest.JsonPost(url, body, RequestTimeoutSeconds), r => www = r);
+        yield return AuthorizedRequest.Send(() => AuthorizedRequest.JsonPost(url,
+                Manager.BuildReplyModePayload(ids, chatId, suppressed, sentVersion, ReplyModeSyncQueue.DecisionAgeMs(decidedAtMs, NowMs())),
+                RequestTimeoutSeconds), r => www = r);
         using var scope = www;
 
         bool parsed = ReplyModeSyncResponse.TryParse(www.downloadHandler?.text, out var res);

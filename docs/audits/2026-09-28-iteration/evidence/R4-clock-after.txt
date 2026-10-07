@@ -1,0 +1,144 @@
+# R4-clock — AFTER (decision dated by its own label: client decidedAtMs → per-attempt decisionAgeMs; server decided = now − age)
+# 2026-10-07T08:37:43Z
+
+# python3 Tools/n8n/apply-reply-mode-v2.py (second run: no diff) && --check
+up to date  SCLcpn6DMDG3Z4VN-Set_Reply_Mode.json
+up to date  XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json
+up to date  Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json
+reply-mode v2: OK
+
+# python3 Tools/n8n/verify-reply-mode.py
+OK  SCLcpn6DMDG3Z4VN-Set_Reply_Mode.json (versioned atomic upsert, per-profile report, 400/500 codes)
+OK  XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json (initial reply mode seeded before the clone exists; a clone only on the saved marker)
+OK  Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json (initial reply mode seeded before the clone exists; a clone only on the saved marker)
+OK  bot templates (gate read unchanged: absence → reply)
+ALL REPLY MODE ASSERTS PASSED
+
+# python3 Tools/n8n/verify-sql-comments.py
+OK  72 Postgres node(s) in 27 workflow file(s): no placeholder outside code, no {{ }}, no modifier, no leading =
+
+# python3 Tools/n8n/tests/test_reply_mode.py
+PASS R4 [WA] A: a delayed OLDER «Авто» (v100 after v200) changes nothing — pause and the request stay
+PASS R4 [WA] A2: a stale «Авто» newer than the request but older than the server's «Вместе» closes nothing
+PASS R4 [WA] B: a replay of the SAME applied version after a NEW handoff keeps the new request open and paused
+PASS R4 [WA] C: an «Авто» decided BEFORE the request (queued offline, delivered after it) leaves the request open
+PASS R4 [WA] D: the owner's NEW explicit «Авто» resumes the chat (closes the request, lifts the pause)
+PASS R4 [WA] E: a legit «Авто» resolves the older request but a request created AFTER the tap keeps the chat paused
+PASS R4 [WA] F: a bot-wide '*' «Авто» never lifts a chat's pause nor closes its request
+PASS R4 [WA] G: a heal that repeats the ORIGINAL decision version on chat open closes nothing newer
+PASS R4 [WA] H: the client's floor-version «Авто» (no row on the server) writes the row but resolves no request
+PASS R4 [WA] I: a 16-digit version (Validate's maximum) neither overflows nor fails
+PASS R4 [TG] A: a delayed OLDER «Авто» (v100 after v200) changes nothing — pause and the request stay
+PASS R4 [TG] A2: a stale «Авто» newer than the request but older than the server's «Вместе» closes nothing
+PASS R4 [TG] B: a replay of the SAME applied version after a NEW handoff keeps the new request open and paused
+PASS R4 [TG] C: an «Авто» decided BEFORE the request (queued offline, delivered after it) leaves the request open
+PASS R4 [TG] D: the owner's NEW explicit «Авто» resumes the chat (closes the request, lifts the pause)
+PASS R4 [TG] E: a legit «Авто» resolves the older request but a request created AFTER the tap keeps the chat paused
+PASS R4 [TG] F: a bot-wide '*' «Авто» never lifts a chat's pause nor closes its request
+PASS R4 [TG] G: a heal that repeats the ORIGINAL decision version on chat open closes nothing newer
+PASS R4 [TG] H: the client's floor-version «Авто» (no row on the server) writes the row but resolves no request
+PASS R4 [TG] I: a 16-digit version (Validate's maximum) neither overflows nor fails
+PASS R4-clock [WA] J: a fast-clock «Авто» decided BEFORE the request and delivered after it leaves the request open
+PASS R4-clock [WA] J2: same, with NO row on the server (absence = «Авто»)
+PASS R4-clock [WA] K: the reviewer's literal repro — an IMMEDIATE «Авто» on a fast clock closes the existing request (legit)
+PASS R4-clock [WA] L: an immediate «Авто» on a SLOW clock closes the existing request too (it used to stay paused)
+PASS R4-clock [WA] M: a replay of J's version with a fresh age after a NEWER request changes nothing
+PASS R4-clock [WA] B6: a clock fixed after a fast tap — the version is last+1 (minutes ahead), the label is the real tap
+PASS R4-clock [WA] N: the floor-version probe (version 1, never sent with an age) resolves nothing
+PASS R4-clock [WA] O: the current client (version, NO decisionAgeMs) keeps the previous behaviour byte-for-byte
+PASS R4-clock [WA] P: one request for two profiles on a fast clock — both applied, both newer requests stay open
+PASS R4-clock [WA] Q: a malformed or negative age is ignored (the version decides), a huge age closes nothing
+PASS R4-clock [WA] R (documented residual): a request created within the delivery latency after the real tap is still closed
+PASS R4-clock [TG] J: a fast-clock «Авто» decided BEFORE the request and delivered after it leaves the request open
+PASS R4-clock [TG] J2: same, with NO row on the server (absence = «Авто»)
+PASS R4-clock [TG] K: the reviewer's literal repro — an IMMEDIATE «Авто» on a fast clock closes the existing request (legit)
+PASS R4-clock [TG] L: an immediate «Авто» on a SLOW clock closes the existing request too (it used to stay paused)
+PASS R4-clock [TG] M: a replay of J's version with a fresh age after a NEWER request changes nothing
+PASS R4-clock [TG] B6: a clock fixed after a fast tap — the version is last+1 (minutes ahead), the label is the real tap
+PASS R4-clock [TG] N: the floor-version probe (version 1, never sent with an age) resolves nothing
+PASS R4-clock [TG] O: the current client (version, NO decisionAgeMs) keeps the previous behaviour byte-for-byte
+PASS R4-clock [TG] P: one request for two profiles on a fast clock — both applied, both newer requests stay open
+PASS R4-clock [TG] Q: a malformed or negative age is ignored (the version decides), a huge age closes nothing
+PASS R4-clock [TG] R (documented residual): a request created within the delivery latency after the real tap is still closed
+PASS R4 verifier: the structural tripwire rejects the pre-R4 side effects, the version-dated boundary, and accepts the canonical SQL
+
+43 pass, 0 fail
+exit=0
+
+# Unity (Editor closed): Tools/run-tests-headless.sh 'ReplyModeSync' (queue + payload + wiring)
+================ EditMode test results (headless) ================
+  result=Passed  total=45  passed=45  failed=0  skipped=0  inconclusive=0
+=================================================================
+GREEN ✅  all 45 tests passed.
+# Unity full EditMode suite: Tools/run-tests-headless.sh
+================ EditMode test results (headless) ================
+  result=Passed  total=2742  passed=2742  failed=0  skipped=0  inconclusive=0
+=================================================================
+GREEN ✅  all 2742 tests passed.
+
+# STAGING after re-import (bootstrap.py --bot wa:stgwa001 --bot tg:stgtg001):
+# python3 Tools/n8n/staging/e2e-handoff.py --only fast_clock / --only stale_or_replayed / --only handoffs_webhook
+PASS  fast_clock_queued_auto_keeps_newer_handoff[wa] (7s) — R4-clock: through the real SetReplyMode webhook, an «Авто» decided 4 min BEFORE a request on a phone 5 min fast (queued, delivered after it) leaves the request open and the chat paused; an immediate «Авто» from the same phone resumes it
+      {"queued": [200, [true]], "after_queued": ["t", "1004:open:question:pending:-"], "immediate": [200, [true]], "after_immediate": ["f", "1004:done:question:failed:-"]}
+PASS  fast_clock_queued_auto_keeps_newer_handoff[tg] (3s) — R4-clock: through the real SetReplyMode webhook, an «Авто» decided 4 min BEFORE a request on a phone 5 min fast (queued, delivered after it) leaves the request open and the chat paused; an immediate «Авто» from the same phone resumes it
+      {"queued": [200, [true]], "after_queued": ["t", "1005:open:question:pending:-"], "immediate": [200, [true]], "after_immediate": ["f", "1005:done:question:pending:-"]}
+
+2 pass, 0 fail
+PASS  stale_or_replayed_auto_keeps_newer_handoff[wa] (4s) — R4: through the real SetReplyMode webhook, a replay of the
+PASS  stale_or_replayed_auto_keeps_newer_handoff[tg] (3s) — R4: through the real SetReplyMode webhook, a replay of the
+2 pass, 0 fail
+PASS  handoffs_webhook_owner_scoped_list_take_done (2s) — A5: the app's list/take/done are token-only and owner-scoped
+1 pass, 0 fail
+# python3 Tools/n8n/staging/e2e-auth.py (full; incl. replymode_* and the R8 create scenarios)
+PASS  session_bootstrap_and_refresh (0.2s) — bootstrap mints an install; refresh with the secret returns a t
+PASS  session_bad_request_is_400 (0.2s) — a malformed AuthSession body answers 400, never a token
+PASS  proxy_requires_token (0.2s) — WappiProxy without / with a forged / with an expired token → 401 and N
+PASS  proxy_profile_add_binds_owner (0.8s) — profile.add creates the Wappi profile, binds it to the install 
+PASS  proxy_owner_isolation (0.8s) — owner B cannot read/act on owner A's profile through ANY proxy op (403,
+PASS  proxy_legit_ops_pass_through (0.4s) — the owner's own ops reach the transport with the server credenti
+PASS  proxy_unknown_op_rejected (0.2s) — an op outside the allow-list is refused without a transport call
+PASS  hooks_reject_foreign_ids (0.8s) — gated webhooks refuse owner B's ids on owner A's token (and refuse n
+PASS  claim_by_code_transfers_ownership (0.6s) — a legacy/other-install profile: claim.start sends a code to
+PASS  claim_reauth_then_code_binds (1.9s) — V2: an UNAUTHORISED legacy profile: claim.start → reauth; a pa
+PASS  claim_reauth_independent_reconnect_not_transferred (5.5s) — V2: the claimant requests a QR, the OWNER 
+PASS  claim_code_send_failure_is_reported (2.8s) — V2: a code the transport refuses is reported (502 code_se
+PASS  claim_reauth_owned_profile_not_transferred (4.1s) — R1: a stranger's pending claim on an OWNED profile
+PASS  claim_stale_capability_cannot_pair (3.6s) — R1: once another install takes over a pending claim, the f
+PASS  claim_unauthenticated_writes_nothing (6.4s) — R1: a claim.* call with a wrong secret is refused (401) 
+PASS  replymode_reordered_versions_keep_newest (4.8s) — SetReplyMode v2: a later request with an OLDER versi
+PASS  replymode_bot_default_covers_both_channels_atomically (5.3s) — SetReplyMode v2: a bot-default write fo
+PASS  replymode_legacy_body_still_writes (1.3s) — SetReplyMode v2: a legacy body (no version) is applied wit
+PASS  replymode_invalid_is_400 (0.2s) — SetReplyMode v2: a malformed body answers 400 (was 200 + success:fal
+PASS  create_seeds_reply_mode_before_activation (5.3s) — CreateWhatsappWorkflow with ReplyMode=semi: the '*'
+PASS  create_slot_count_excludes_own_profile_and_retires_refused (3.8s) — 2026-09-24 hotfix: on a 1-channel 
+PASS  refresh_db_outage_keeps_install (0.9s) — R11: a refresh while the database fails answers 503 db_unavai
+PASS  billing_id_first_bind (2.4s) — R2: a second install naming a billing id another install holds (with a 
+PASS  create_rejects_empty_appuserid_in_session (1.3s) — R2: CreateWhatsappWorkflow/CreateTelegramWorkflow w
+PASS  create_seed_failure_keeps_clone_inactive (9.7s) — R8 + R8-deletefail: a «Вместе» create whose 
+PASS  sql_comment_values_run_nothing (4.9s) — V1: a value whose newline would end an SQL comment stays a lit
+PASS  upload_price_list_multipart (5.6s) — R3: a real .txt price list sent the way WWWForm sends it passes t
+27 pass, 0 fail
+
+# python3 Tools/n8n/verify-deployed.py --base http://localhost:5678 (summary)
+base http://localhost:5678: canonical 26 (diff 0), clones 2 (behind template 0), archived clones 0 (not counted), other 2
+
+# python3 Tools/n8n/tests/run_all.py (full behavioural suite, exit 0)
+OK   test_auth_refresh.py: 12 pass, 0 fail
+OK   test_billing_identity.py: 14 pass, 0 fail
+OK   test_claim.py: 16 pass, 0 fail
+OK   test_create_seed.py: 52 pass, 0 fail
+OK   test_harness_selfcheck.py: 2 pass, 0 fail
+OK   test_legacy_generators.py: 5 pass, 0 fail
+OK   test_reply_lost_send.py: 5 pass, 0 fail
+OK   test_reply_memory.py: 32 pass, 0 fail
+OK   test_reply_mode.py: 43 pass, 0 fail
+OK   test_reply_order.py: 26 pass, 0 fail
+OK   test_reply_reconcile.py: 32 pass, 0 fail
+OK   test_sql_comment_injection.py: 36 pass, 0 fail
+OK   test_suggest_catalog.py: 24 pass, 0 fail
+OK   test_suggest_query.py: 17 pass, 0 fail
+OK   test_test_dialog.py: 17 pass, 0 fail
+OK   test_upload.py: 22 pass, 0 fail
+OK   test_verify_deployed.py: 26 pass, 0 fail
+OK   test_verify_parity.py: 36 pass, 0 fail
+OK   test_verify_sql_comments.py: 53 pass, 0 fail

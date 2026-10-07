@@ -2,7 +2,8 @@
 """Structural-assert verifier for the A2 confirmable reply mode (audit stage 2). No network.
 
 Pins:
-  * Set Reply Mode: Validate emits ONE item with a version (legacy → server "now"); the upsert is ONE
+  * Set Reply Mode: Validate emits ONE item with a version (legacy → server "now") and a decision time (R4-clock:
+    server now − decisionAgeMs, else the version); the upsert is ONE
     statement over every requested profile, guarded `where reply_mode_flags.version < excluded.version`,
     reporting applied/suppressed/version per profile; Shape Response never turns a DB error into
     success; malformed body → HTTP 400; the response code is driven by the shaped `_status`.
@@ -49,9 +50,15 @@ def check_set_reply_mode():
     f = "SCLcpn6DMDG3Z4VN-Set_Reply_Mode.json"
     wf = load(f)
     js = node(wf, "Validate")["parameters"]["jsCode"]
-    assert "return [{ json: { invalid: false, profileIds: ids, chatId: b.chatId, suppressed: b.suppressed, version, legacy: !hasVersion } }]" in js, \
-        f"{f}: Validate must emit ONE item carrying the version (no per-profile fan-out)"
+    assert "return [{ json: { invalid: false, profileIds: ids, chatId: b.chatId, suppressed: b.suppressed, version, decided, legacy: !hasVersion } }]" in js, \
+        f"{f}: Validate must emit ONE item carrying the version and the decision time (no per-profile fan-out)"
     assert "Date.now()" in js, f"{f}: a legacy body (no version) must get a server-assigned version"
+    # R4-clock: the decision is dated on THIS clock from the client's age; without a valid age, by the version (as before)
+    assert "const decided = hasAge ? Math.max(0, Date.now() - Number(age)) : version;" in js \
+        and "const hasAge = hasVersion && ((Number.isInteger(age) && age >= 0)" in js, \
+        f"{f}: Validate must date the decision as server now − decisionAgeMs, falling back to the version (R4-clock)"
+    qr = up_params(wf)
+    assert qr.rstrip().endswith("$json.version, $json.decided ] }}"), f"{f}: the decision time must be the upsert's fifth parameter: {qr}"
     up = node(wf, "Upsert Reply Mode")
     q = sql(up["parameters"]["query"])
     assert "jsonb_array_elements_text($1::jsonb)" in q, f"{f}: upsert must expand the whole profile list in ONE statement"
@@ -70,14 +77,21 @@ def check_set_reply_mode():
     print(f"OK  {f} (versioned atomic upsert, per-profile report, 400/500 codes)")
 
 
+def up_params(wf):
+    return node(wf, "Upsert Reply Mode")["parameters"].get("options", {}).get("queryReplacement", "")
+
+
 def check_resume_side_effects(q, f="Set Reply Mode"):
     """R4 (2026-09-27): a chat-scoped «Авто» resolves handoffs only when it is APPLIED, and only requests created no
     later than the command's version. Every side-effect UPDATE must read the applied rows (`resumed`, built from
     `up`), never the raw request `req` — a stale or replayed version is not applied and must change nothing.
+    R4-clock (2026-09-28): the boundary is the DECISION time Validate computed (the fifth parameter, `decided`), never
+    the version — the version is the phone's wall clock and only orders.
     The behaviour itself is pinned by tests/test_reply_mode.py (real SQL); this is the cheap structural tripwire."""
-    assert re.search(r"resumed as \(\s*select up\.profile_id, r\.chat_id, up\.version\s+from up join req r on r\.profile_id = up\.profile_id\s+"
+    assert "$5::bigint as decided" in q, f"{f}: the request must carry the decision time as a parameter (R4-clock)"
+    assert re.search(r"resumed as \(\s*select up\.profile_id, r\.chat_id, up\.version, r\.decided\s+from up join req r on r\.profile_id = up\.profile_id\s+"
                      r"where r\.chat_id <> '\*' and up\.suppressed = false", q), \
-        f"{f}: the resume set must be the APPLIED chat-scoped «Авто» rows (from up), never '*' and never the raw request"
+        f"{f}: the resume set must be the APPLIED chat-scoped «Авто» rows (from up) with their decision time, never '*' and never the raw request"
     for table in ("handoff_requests", "chat_reply_state"):
         m = re.search(r"update " + table + r"\b(.*?)returning", q, re.S)
         assert m, f"{f}: side-effect update on {table} missing"
@@ -85,11 +99,11 @@ def check_resume_side_effects(q, f="Set Reply Mode"):
         assert "from resumed r" in body and not re.search(r"\bfrom req\b", body), \
             f"{f}: the {table} side effect must key off the applied rows (from resumed), not the request (R4)"
     closed = re.search(r"update handoff_requests\b(.*?)returning", q, re.S).group(1)
-    assert "(extract(epoch from h.created_at) * 1000)::bigint <= r.version" in closed, \
-        f"{f}: an applied «Авто» may close only requests created no later than its version (R4)"
+    assert "(extract(epoch from h.created_at) * 1000)::bigint <= r.decided" in closed and "r.version" not in closed, \
+        f"{f}: an applied «Авто» may close only requests created no later than its DECISION time (R4, R4-clock)"
     unpause = re.search(r"update chat_reply_state\b(.*?)returning", q, re.S).group(1)
-    assert "(extract(epoch from o.created_at) * 1000)::bigint > r.version" in unpause and "not exists" in unpause, \
-        f"{f}: a request created after the decision must keep the chat paused (R4)"
+    assert "(extract(epoch from o.created_at) * 1000)::bigint > r.decided" in unpause and "not exists" in unpause and "r.version" not in unpause, \
+        f"{f}: a request created after the decision must keep the chat paused (R4, R4-clock)"
 
 
 ENTRIES_INTO_CLONE_CHAIN = {("If Has AppUserID?", 1), ("Register Profile", 0)}   # legacy (no AppUserID) / slot-allowed

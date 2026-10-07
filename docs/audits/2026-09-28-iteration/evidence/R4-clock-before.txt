@@ -1,0 +1,90 @@
+# R4-clock — BEFORE (HEAD dc2484bc: canonical Set Reply Mode unchanged; new tests applied)
+# 2026-10-07T08:14:10Z  python3 Tools/n8n/tests/test_reply_mode.py
+# J/J2/B6/P = a decision older than the request (queued; fast clock; clock fixed after a fast tap) closes it;
+# L = an immediate «Авто» on a slow clock leaves the existing request paused; Q = no way to date the decision except the version.
+# K/M/N/O/R pass on HEAD by design (legit immediate resume, replay, floor probe, compat without the field, documented residual).
+
+PASS R4 [WA] A: a delayed OLDER «Авто» (v100 after v200) changes nothing — pause and the request stay
+PASS R4 [WA] A2: a stale «Авто» newer than the request but older than the server's «Вместе» closes nothing
+PASS R4 [WA] B: a replay of the SAME applied version after a NEW handoff keeps the new request open and paused
+PASS R4 [WA] C: an «Авто» decided BEFORE the request (queued offline, delivered after it) leaves the request open
+PASS R4 [WA] D: the owner's NEW explicit «Авто» resumes the chat (closes the request, lifts the pause)
+PASS R4 [WA] E: a legit «Авто» resolves the older request but a request created AFTER the tap keeps the chat paused
+PASS R4 [WA] F: a bot-wide '*' «Авто» never lifts a chat's pause nor closes its request
+PASS R4 [WA] G: a heal that repeats the ORIGINAL decision version on chat open closes nothing newer
+PASS R4 [WA] H: the client's floor-version «Авто» (no row on the server) writes the row but resolves no request
+PASS R4 [WA] I: a 16-digit version (Validate's maximum) neither overflows nor fails
+PASS R4 [TG] A: a delayed OLDER «Авто» (v100 after v200) changes nothing — pause and the request stay
+PASS R4 [TG] A2: a stale «Авто» newer than the request but older than the server's «Вместе» closes nothing
+PASS R4 [TG] B: a replay of the SAME applied version after a NEW handoff keeps the new request open and paused
+PASS R4 [TG] C: an «Авто» decided BEFORE the request (queued offline, delivered after it) leaves the request open
+PASS R4 [TG] D: the owner's NEW explicit «Авто» resumes the chat (closes the request, lifts the pause)
+PASS R4 [TG] E: a legit «Авто» resolves the older request but a request created AFTER the tap keeps the chat paused
+PASS R4 [TG] F: a bot-wide '*' «Авто» never lifts a chat's pause nor closes its request
+PASS R4 [TG] G: a heal that repeats the ORIGINAL decision version on chat open closes nothing newer
+PASS R4 [TG] H: the client's floor-version «Авто» (no row on the server) writes the row but resolves no request
+PASS R4 [TG] I: a 16-digit version (Validate's maximum) neither overflows nor fails
+FAIL R4-clock [WA] J: a fast-clock «Авто» decided BEFORE the request and delivered after it leaves the request open
+      - a decision older than the request resolved it: paused=False {'J1': 'done'}
+FAIL R4-clock [WA] J2: same, with NO row on the server (absence = «Авто»)
+      - {'profileId': 'wa-prof-r4c', 'applied': True, 'suppressed': False, 'version': 1791360858136} paused=False {'J2': 'done'}
+PASS R4-clock [WA] K: the reviewer's literal repro — an IMMEDIATE «Авто» on a fast clock closes the existing request (legit)
+FAIL R4-clock [WA] L: an immediate «Авто» on a SLOW clock closes the existing request too (it used to stay paused)
+      - {'profileId': 'wa-prof-r4c', 'applied': True, 'suppressed': False, 'version': 1791360498136} paused=True {'L1': 'open'}
+PASS R4-clock [WA] M: a replay of J's version with a fresh age after a NEWER request changes nothing
+FAIL R4-clock [WA] B6: a clock fixed after a fast tap — the version is last+1 (minutes ahead), the label is the real tap
+      - {'profileId': 'wa-prof-r4c', 'applied': True, 'suppressed': False, 'version': 1791360918137} paused=False {'B61': 'done'}
+PASS R4-clock [WA] N: the floor-version probe (version 1, never sent with an age) resolves nothing
+PASS R4-clock [WA] O: the current client (version, NO decisionAgeMs) keeps the previous behaviour byte-for-byte
+FAIL R4-clock [WA] P: one request for two profiles on a fast clock — both applied, both newer requests stay open
+      - False {'P1': 'done'} / False {'P2': 'done'}
+FAIL R4-clock [WA] Q: a malformed or negative age is ignored (the version decides), a huge age closes nothing
+      - {'profileId': 'wa-prof-r4c', 'applied': True, 'suppressed': False, 'version': 1791364398136} paused=False {'Q0': 'done', 'Q1': 'done', 'Q2': 'done', 'Q3': 'done', 'Q4': 'done', 'Qhuge': 'done'}
+PASS R4-clock [WA] R (documented residual): a request created within the delivery latency after the real tap is still closed
+FAIL R4-clock [TG] J: a fast-clock «Авто» decided BEFORE the request and delivered after it leaves the request open
+      - a decision older than the request resolved it: paused=False {'J1': 'done'}
+FAIL R4-clock [TG] J2: same, with NO row on the server (absence = «Авто»)
+      - {'profileId': 'tg-prof-r4c', 'applied': True, 'suppressed': False, 'version': 1791360878362} paused=False {'J2': 'done'}
+PASS R4-clock [TG] K: the reviewer's literal repro — an IMMEDIATE «Авто» on a fast clock closes the existing request (legit)
+FAIL R4-clock [TG] L: an immediate «Авто» on a SLOW clock closes the existing request too (it used to stay paused)
+      - {'profileId': 'tg-prof-r4c', 'applied': True, 'suppressed': False, 'version': 1791360518362} paused=True {'L1': 'open'}
+PASS R4-clock [TG] M: a replay of J's version with a fresh age after a NEWER request changes nothing
+FAIL R4-clock [TG] B6: a clock fixed after a fast tap — the version is last+1 (minutes ahead), the label is the real tap
+      - {'profileId': 'tg-prof-r4c', 'applied': True, 'suppressed': False, 'version': 1791360938363} paused=False {'B61': 'done'}
+PASS R4-clock [TG] N: the floor-version probe (version 1, never sent with an age) resolves nothing
+PASS R4-clock [TG] O: the current client (version, NO decisionAgeMs) keeps the previous behaviour byte-for-byte
+FAIL R4-clock [TG] P: one request for two profiles on a fast clock — both applied, both newer requests stay open
+      - False {'P1': 'done'} / False {'P2': 'done'}
+FAIL R4-clock [TG] Q: a malformed or negative age is ignored (the version decides), a huge age closes nothing
+      - {'profileId': 'tg-prof-r4c', 'applied': True, 'suppressed': False, 'version': 1791364418362} paused=False {'Q0': 'done', 'Q1': 'done', 'Q2': 'done', 'Q3': 'done', 'Q4': 'done', 'Qhuge': 'done'}
+PASS R4-clock [TG] R (documented residual): a request created within the delivery latency after the real tap is still closed
+FAIL R4 verifier: the structural tripwire rejects the pre-R4 side effects, the version-dated boundary, and accepts the canonical SQL
+      - boundary = version (pre-R4-clock): mutation did not apply
+      - boundary = version (pre-R4-clock): the tripwire accepted it
+      - no decision parameter: mutation did not apply
+      - no decision parameter: the tripwire accepted it
+
+30 pass, 13 fail
+exit=1
+
+# Unity (Editor closed): Tools/run-tests-headless.sh 'ReplyModeSyncWiringTests' — client before the fix (the new source guard; the
+# pure-seam tests reference members that do not exist on HEAD, so they were added with the fix)
+================ EditMode test results (headless) ================
+  result=Failed(Child)  total=9  passed=8  failed=1  skipped=0  inconclusive=0
+  Failing / inconclusive tests:
+    - ReplyModeSyncWiringTests.SendBatch_DatesTheDecision_AtEveryAttempt_InsideTheRequestFactory
+=================================================================
+NOT GREEN ❌  (unity exit=2).
+Tools/run-tests-headless.sh 'ReplyModeSyncWiringTests'  71.06s user 22.59s system 120% cpu 1:18.03 total
+--- SendBatch_DatesTheDecision_AtEveryAttempt_InsideTheRequestFactory
+the body and the decision's age must be built INSIDE the factory, once per attempt
+  Expected: True
+  But was:  False
+
+# STAGING (Set Reply Mode at HEAD imported): python3 Tools/n8n/staging/e2e-handoff.py --only fast_clock
+FAIL  fast_clock_queued_auto_keeps_newer_handoff[wa] (4s) — R4-clock: through the real SetReplyMode webhook, an «Авто» decided 4 min BEFORE a request on a phone 5 min fast (queued, delivered after it) leaves the request open and the chat paused; an immediate «Авто» from the same phone resumes it
+      {"queued": [200, [true]], "after_queued": ["f", "1002:done:question:pending:-"], "immediate": [200, [true]], "after_immediate": ["f", "1002:done:question:pending:-"]}
+FAIL  fast_clock_queued_auto_keeps_newer_handoff[tg] (3s) — R4-clock: through the real SetReplyMode webhook, an «Авто» decided 4 min BEFORE a request on a phone 5 min fast (queued, delivered after it) leaves the request open and the chat paused; an immediate «Авто» from the same phone resumes it
+      {"queued": [200, [true]], "after_queued": ["f", "1003:done:question:pending:-"], "immediate": [200, [true]], "after_immediate": ["f", "1003:done:question:pending:-"]}
+
+0 pass, 2 fail

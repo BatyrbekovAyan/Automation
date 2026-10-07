@@ -298,6 +298,83 @@ public class ReplyModeSyncQueueTests
         Assert.IsTrue(ReplyModeSendGate.CanSend(false, ReplyModeSendGate.SafetySeconds), "a boot that never opens it cannot strand the queue");
     }
 
+    // ---- R4-clock (iteration 2026-09-28): the decision is dated by its own label, the version only orders ----
+
+    [Test]
+    public void Desire_StampsTheTap_NotTheMonotonicVersion()
+    {
+        // B6: a phone whose clock ran 5 min fast confirmed v = T+2min; the owner fixed the clock and taps again at T-2min.
+        // The version must stay above the stored one (T+2min+1) — but dating the decision by it closed requests made
+        // after the real tap. The label is the tap itself.
+        var m = M();
+        const long fastStamp = 1_000_120_000;
+        long v1 = ReplyModeSyncQueue.Desire(m, "Bot0", new[] { "wa" }, "c1", false, fastStamp);
+        var e = ReplyModeSyncQueue.Find(m, "wa", "c1");
+        ReplyModeSyncQueue.OnResponse(e, v1, true, false, v1);
+        const long realTap = 999_880_000;                                              // the clock was corrected meanwhile
+        long v2 = ReplyModeSyncQueue.Desire(m, "Bot0", new[] { "wa" }, "c1", false, realTap);
+        Assert.AreEqual(fastStamp + 1, v2, "ordering is unchanged: last + 1");
+        Assert.AreEqual(realTap, e.decidedAtMs, "the decision is dated by the tap, not by the version");
+    }
+
+    [Test]
+    public void DecisionAge_IsMeasuredOnTheSameClock_AndOmittedWhenItCannotBeTrusted()
+    {
+        Assert.AreEqual(240_000L, ReplyModeSyncQueue.DecisionAgeMs(1_000_000, 1_240_000), "queued 4 min");
+        Assert.AreEqual(0L, ReplyModeSyncQueue.DecisionAgeMs(1_000_000, 1_000_000), "sent at once");
+        Assert.IsNull(ReplyModeSyncQueue.DecisionAgeMs(0, 1_240_000), "no decision to date (floor probe / adopted / older build)");
+        Assert.IsNull(ReplyModeSyncQueue.DecisionAgeMs(1_000_000, 700_000), "the clock stepped back: no age is trustworthy, the server keeps the version");
+    }
+
+    [Test]
+    public void Reassert_KeepsTheOriginalDecisionTime_AndTheFloorProbeHasNone()
+    {
+        var m = M();
+        ReplyModeSyncQueue.Desire(m, "Bot0", new[] { "wa" }, "c1", false, 1000);
+        var e = ReplyModeSyncQueue.Find(m, "wa", "c1");
+        for (int i = 0; i < ReplyModeSyncQueue.MaxAttemptsPerLaunch; i++) ReplyModeSyncQueue.OnSendFailed(e, 2000);
+        Assert.IsTrue(e.IsFailed);
+        ReplyModeSyncQueue.Reassert(m, "Bot0", "wa", "c1", false, 90_000);            // chat open re-arms the parked «Авто»
+        Assert.IsTrue(e.IsPending && e.decidedAtMs == 1000, "a heal repeats the decision — with its original time");
+        ReplyModeSyncQueue.Reassert(m, "Bot0", "wa", "c2", false, 90_000);            // an «Авто» the queue never saw
+        var probe = ReplyModeSyncQueue.Find(m, "wa", "c2");
+        Assert.AreEqual(ReplyModeSyncQueue.FloorVersion, probe.desiredVersion);
+        Assert.AreEqual(0L, probe.decidedAtMs, "the floor probe is not a decision: it is sent without an age and closes nothing");
+        ReplyModeSyncQueue.Reassert(m, "Bot0", "wa", "c1", true, 95_000);             // a differing «Вместе» is a fresh desire
+        Assert.AreEqual(95_000L, e.decidedAtMs);
+    }
+
+    [Test]
+    public void AdoptingTheServersValue_ClearsTheDecisionTime()
+    {
+        var m = M();
+        long v = ReplyModeSyncQueue.Desire(m, "Bot0", new[] { "wa" }, "c1", false, 1000);
+        var e = ReplyModeSyncQueue.Find(m, "wa", "c1");
+        ReplyModeSyncQueue.OnResponse(e, v, applied: false, serverSuppressed: true, serverVersion: v + 500);
+        Assert.AreEqual(0L, e.decidedAtMs, "a value adopted from the server was not decided on this phone");
+    }
+
+    [Test]
+    public void Batches_NeverMergeTwoDecisionTimes()
+    {
+        var m = M();
+        long v = ReplyModeSyncQueue.Desire(m, "Bot0", new[] { "wa", "tg" }, "c1", false, 1000);
+        Assert.AreEqual(1, ReplyModeSyncQueue.Batches(ReplyModeSyncQueue.Due(m, 1000)).Count, "one tap, one request");
+        ReplyModeSyncQueue.Find(m, "tg", "c1").decidedAtMs = 0;                     // e.g. an entry persisted by an older build
+        Assert.AreEqual(v, ReplyModeSyncQueue.Find(m, "tg", "c1").desiredVersion);
+        Assert.AreEqual(2, ReplyModeSyncQueue.Batches(ReplyModeSyncQueue.Due(m, 1000)).Count, "a request carries ONE decision age");
+    }
+
+    [Test]
+    public void DecisionTime_SurvivesARestart_AndAnOlderBuildsQueueLoadsWithoutOne()
+    {
+        var m = M();
+        ReplyModeSyncQueue.Desire(m, "Bot0", new[] { "wa" }, "c1", false, 1234);
+        Assert.AreEqual(1234L, ReplyModeSyncQueue.Find(ReplyModeSyncQueue.Deserialize(ReplyModeSyncQueue.Serialize(m), 9999), "wa", "c1").decidedAtMs);
+        var old = ReplyModeSyncQueue.Deserialize("{\"entries\":[{\"botId\":\"Bot0\",\"profileId\":\"wa\",\"chatId\":\"c1\",\"desiredSuppressed\":false,\"desiredVersion\":5000,\"state\":\"pending\"}]}", 9999);
+        Assert.AreEqual(0L, old.entries[0].decidedAtMs, "pre-R4-clock entries are resent without an age (the version decides, as before)");
+    }
+
     [Test]
     public void Deserialize_ToleratesGarbage_AndEmpty()
     {

@@ -17,7 +17,7 @@ using UnityEngine.Networking;
 public partial class Manager
 {
     /// <summary>Wire body for POST /webhook/SetReplyMode. Matches the Set_Reply_Mode
-    /// Validate node contract: { profileIds:[...], chatId, suppressed }.</summary>
+    /// Validate node contract: { profileIds:[...], chatId, suppressed, version, decisionAgeMs? }.</summary>
     [System.Serializable]
     private class ReplyModePayload
     {
@@ -27,20 +27,27 @@ public partial class Manager
         // A2: the desired-state version (ReplyModeSyncQueue.NextVersion) — the server applies the
         // row only when its stored version is older, so a reordered/retried write cannot regress.
         public long version;
+        // R4-clock: how long ago the owner decided, measured as the request leaves. The server dates the decision
+        // on its own clock (now − age) and closes only the handoff requests that existed by then. Omitted when there
+        // is no decision to date — the server then keeps judging by the version.
+        [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+        public long? decisionAgeMs;
     }
 
     /// <summary>
     /// Serialises the SetReplyMode body. Pure + static so EditMode tests can JObject.Parse it.
     /// chatId is "*" for a bot-wide default row or the real chat id for a per-chat override.
     /// </summary>
-    public static string BuildReplyModePayload(IReadOnlyList<string> profileIds, string chatId, bool suppressed, long version)
+    public static string BuildReplyModePayload(IReadOnlyList<string> profileIds, string chatId, bool suppressed, long version,
+                                               long? decisionAgeMs = null)
     {
         var payload = new ReplyModePayload
         {
             profileIds = profileIds is string[] array ? array : new List<string>(profileIds).ToArray(),
             chatId = chatId,
             suppressed = suppressed,
-            version = version
+            version = version,
+            decisionAgeMs = decisionAgeMs
         };
         return JsonConvert.SerializeObject(payload);
     }

@@ -37,6 +37,18 @@ public class ReplyModeSyncPayloadTests
         Assert.AreEqual("pWA", (string)ids[0]);
     }
 
+    [Test]
+    public void BuildPayload_CarriesTheDecisionAge_OnlyWhenThereIsOne()
+    {
+        // R4-clock (iteration 2026-09-28): the server dates the decision as its own now − decisionAgeMs.
+        var dated = JObject.Parse(Manager.BuildReplyModePayload(new[] { "pWA" }, "7701@c.us", false, 1700000300000, 240000));
+        Assert.AreEqual(JTokenType.Integer, dated["decisionAgeMs"]?.Type);
+        Assert.AreEqual(240000L, (long)dated["decisionAgeMs"]);
+        Assert.AreEqual(1700000300000L, (long)dated["version"], "the version still travels unchanged — it orders, it does not date");
+        var undated = JObject.Parse(Manager.BuildReplyModePayload(new[] { "pWA" }, "7701@c.us", false, 1));
+        Assert.IsNull(undated["decisionAgeMs"], "no decision to date → the field is absent (never null/0): the server keeps the version");
+    }
+
     // --- AuthedProfileIds (sentinel / blank filtering, C1) --------------------
 
     [Test]

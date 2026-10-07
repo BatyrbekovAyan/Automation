@@ -15,6 +15,20 @@ Contract (decision of the iteration README, R4):
   * a bot-wide '*' write never lifts a chat's pause;
   * the owner's new explicit «Авто» still resumes the chat (legit path).
 
+R4-clock (iteration 2026-09-28): the version is the phone's wall clock (max(now, last+1)) and was ALSO the boundary of
+what an «Авто» closes — a phone running fast closed a request created AFTER a decision that waited in the offline
+queue. Reachable form (refuter): the server is effectively «Авто» and unpaused in the gap (no row / an older «Авто»
+row; the owner's undelivered «Вместе» was overtaken by «Авто» in the queue), the AI creates a request, the queued
+«Авто» lands. Contract now:
+  * the version ONLY orders (unchanged guard, replay, adopt-server, floor version);
+  * a client that dates its decision sends `decisionAgeMs` (measured as the request leaves; two readings of one
+    clock) and the boundary is the SERVER's now − age — a queued fast-clock «Авто» leaves the newer request open, an
+    immediate «Авто» on a fast OR slow clock closes the requests that exist;
+  * no field (legacy and pre-R4-clock clients) or a malformed / negative one → the version dates the decision,
+    byte-for-byte the previous behaviour; a floor-version probe is never sent with an age;
+  * documented residual: the age excludes the request's own one-way latency, so a request created within that
+    latency after the real tap is still closed (pinned below, so the limit stays visible).
+
     python3 Tools/n8n/tests/test_reply_mode.py
 """
 import json
@@ -33,15 +47,21 @@ MIN = 60_000
 CHATS = {'WA': ('wa-prof-r4', '77001112233@c.us'), 'TG': ('tg-prof-r4', '5550001112')}
 
 
-def set_reply_mode(pg, pid, chat, suppressed, version):
-    """One Set Reply Mode call past the auth gate: Validate → queryReplacement → Upsert. Returns the per-profile row."""
-    v = code(SRM, 'Validate', {'json': {'body': {'profileIds': [pid], 'chatId': chat, 'suppressed': suppressed,
-                                                  'version': version}}})[0]['json']
+ABSENT = object()
+
+
+def set_reply_mode(pg, pid, chat, suppressed, version, age=ABSENT, pids=None):
+    """One Set Reply Mode call past the auth gate: Validate → queryReplacement → Upsert. Returns the per-profile row
+    (all rows when `pids` names several profiles). `age` = the body's decisionAgeMs (R4-clock), absent by default."""
+    body = {'profileIds': pids or [pid], 'chatId': chat, 'suppressed': suppressed, 'version': version}
+    if age is not ABSENT:
+        body['decisionAgeMs'] = age
+    v = code(SRM, 'Validate', {'json': {'body': body}})[0]['json']
     assert v.get('invalid') is False, v
     up = node(SRM, 'Upsert Reply Mode')
     params = expr(up['parameters']['options']['queryReplacement'], v)
     rows = pg.q(bind(up['parameters']['query'], params))
-    return rows[0]
+    return rows if pids else rows[0]
 
 
 def handoff(pg, pid, chat, msg_id, created_ms):
@@ -147,6 +167,110 @@ for ch, (P, C) in CHATS.items():
             paused, reqs = state(pg, P, C)
             c.check(row['applied'] is True and paused is False and reqs == {'I1': 'done'}, f'{row} paused={paused} {reqs}')
 
+# ---- R4-clock (iteration 2026-09-28): the decision is dated on the SERVER's clock from the client's decision age ----
+CLOCK_CHATS = {'WA': (('wa-prof-r4c', 'wa-prof-r4c2'), '77001112244@c.us'), 'TG': (('tg-prof-r4c', 'tg-prof-r4c2'), '5550001144')}
+for ch, ((P, P2), C) in CLOCK_CHATS.items():
+    NOW = int(time.time() * 1000)
+    FAST = 5 * MIN                                     # the phone's clock runs 5 min ahead
+
+    with Case(f'R4-clock [{ch}] J: a fast-clock «Авто» decided BEFORE the request and delivered after it leaves the request open') as c:
+        with PgSession(SETUP) as pg:
+            # the reachable path: the server holds an older «Авто» (no pause) in the gap — the owner's «Вместе» never
+            # reached it — so the AI hands over at NOW−2m; the owner's tap at real NOW−4m waited in the offline queue
+            mode_row(pg, P, C, False, NOW - 60 * MIN)
+            handoff(pg, P, C, 'J1', NOW - 2 * MIN)
+            row = set_reply_mode(pg, P, C, False, NOW - 4 * MIN + FAST, age=4 * MIN)
+            paused, reqs = state(pg, P, C)
+            c.check(row['applied'] is True and row['version'] == NOW - 4 * MIN + FAST, f'the desire still orders by its version: {row}')
+            c.check(paused is True and reqs == {'J1': 'open'}, f'a decision older than the request resolved it: paused={paused} {reqs}')
+
+    with Case(f'R4-clock [{ch}] J2: same, with NO row on the server (absence = «Авто»)') as c:
+        with PgSession(SETUP) as pg:
+            handoff(pg, P, C, 'J2', NOW - 2 * MIN)
+            row = set_reply_mode(pg, P, C, False, NOW - 4 * MIN + FAST, age=4 * MIN)
+            paused, reqs = state(pg, P, C)
+            c.check(row['applied'] is True and paused is True and reqs == {'J2': 'open'}, f'{row} paused={paused} {reqs}')
+
+    with Case(f'R4-clock [{ch}] K: the reviewer\'s literal repro — an IMMEDIATE «Авто» on a fast clock closes the existing request (legit)') as c:
+        with PgSession(SETUP) as pg:
+            handoff(pg, P, C, 'K1', NOW - 2 * MIN)
+            row = set_reply_mode(pg, P, C, False, NOW + FAST, age=0)
+            paused, reqs = state(pg, P, C)
+            c.check(row['applied'] is True and paused is False and reqs == {'K1': 'done'}, f'{row} paused={paused} {reqs}')
+
+    with Case(f'R4-clock [{ch}] L: an immediate «Авто» on a SLOW clock closes the existing request too (it used to stay paused)') as c:
+        with PgSession(SETUP) as pg:
+            mode_row(pg, P, C, False, NOW - 60 * MIN)
+            handoff(pg, P, C, 'L1', NOW - 2 * MIN)
+            row = set_reply_mode(pg, P, C, False, NOW - FAST, age=0)
+            paused, reqs = state(pg, P, C)
+            c.check(row['applied'] is True and paused is False and reqs == {'L1': 'done'}, f'{row} paused={paused} {reqs}')
+
+    with Case(f'R4-clock [{ch}] M: a replay of J\'s version with a fresh age after a NEWER request changes nothing') as c:
+        with PgSession(SETUP) as pg:
+            first = set_reply_mode(pg, P, C, False, NOW - 4 * MIN + FAST, age=0)
+            handoff(pg, P, C, 'M1', NOW - MIN)
+            row = set_reply_mode(pg, P, C, False, NOW - 4 * MIN + FAST, age=0)
+            paused, reqs = state(pg, P, C)
+            c.check(first['applied'] is True and row['applied'] is False, f'first={first} replay={row}')
+            c.check(paused is True and reqs == {'M1': 'open'}, f'a replay resolved a newer request: paused={paused} {reqs}')
+
+    with Case(f'R4-clock [{ch}] B6: a clock fixed after a fast tap — the version is last+1 (minutes ahead), the label is the real tap') as c:
+        with PgSession(SETUP) as pg:
+            mode_row(pg, P, C, False, NOW + 2 * MIN)                         # the previous tap, stamped by the fast clock
+            handoff(pg, P, C, 'B61', NOW - MIN)
+            row = set_reply_mode(pg, P, C, False, NOW + 2 * MIN + 1, age=2 * MIN)   # tapped at real NOW−2m, delivered now
+            paused, reqs = state(pg, P, C)
+            c.check(row['applied'] is True and paused is True and reqs == {'B61': 'open'}, f'{row} paused={paused} {reqs}')
+
+    with Case(f'R4-clock [{ch}] N: the floor-version probe (version 1, never sent with an age) resolves nothing') as c:
+        with PgSession(SETUP) as pg:
+            handoff(pg, P, C, 'N1', NOW - MIN)
+            row = set_reply_mode(pg, P, C, False, 1)
+            paused, reqs = state(pg, P, C)
+            c.check(row['applied'] is True and paused is True and reqs == {'N1': 'open'}, f'{row} paused={paused} {reqs}')
+
+    with Case(f'R4-clock [{ch}] O: the current client (version, NO decisionAgeMs) keeps the previous behaviour byte-for-byte') as c:
+        with PgSession(SETUP) as pg:
+            mode_row(pg, P, C, False, NOW - 60 * MIN)
+            handoff(pg, P, C, 'O1', NOW - 2 * MIN)
+            row = set_reply_mode(pg, P, C, False, NOW - 4 * MIN + FAST)
+            paused, reqs = state(pg, P, C)
+            c.check(row['applied'] is True and paused is False and reqs == {'O1': 'done'},
+                    f'compat: without the field the version dates the decision, as before: {row} paused={paused} {reqs}')
+
+    with Case(f'R4-clock [{ch}] P: one request for two profiles on a fast clock — both applied, both newer requests stay open') as c:
+        with PgSession(SETUP) as pg:
+            handoff(pg, P, C, 'P1', NOW - 2 * MIN)
+            handoff(pg, P2, C, 'P2', NOW - 2 * MIN)
+            rows = set_reply_mode(pg, P, C, False, NOW - 4 * MIN + FAST, age=4 * MIN, pids=[P, P2])
+            (pa, ra), (pb, rb) = state(pg, P, C), state(pg, P2, C)
+            c.check(len(rows) == 2 and all(r['applied'] is True for r in rows), f'rows={rows}')
+            c.check(pa is True and pb is True and ra == {'P1': 'open'} and rb == {'P2': 'open'}, f'{pa} {ra} / {pb} {rb}')
+
+    with Case(f'R4-clock [{ch}] Q: a malformed or negative age is ignored (the version decides), a huge age closes nothing') as c:
+        with PgSession(SETUP) as pg:
+            for i, bad in enumerate((-60_000, '4m', 1.5, None, True)):
+                handoff(pg, P, C, f'Q{i}', NOW - 2 * MIN)
+                row = set_reply_mode(pg, P, C, False, NOW - 4 * MIN + FAST + i, age=bad)
+                paused, reqs = state(pg, P, C)
+                c.check(row['applied'] is True and reqs.get(f'Q{i}') == 'done',
+                        f'age={bad!r}: must fall back to the version (closes as before): {row} {reqs}')
+            handoff(pg, P, C, 'Qhuge', NOW - 2 * MIN)
+            row = set_reply_mode(pg, P, C, False, NOW + 60 * MIN, age='9999999999999999')
+            paused, reqs = state(pg, P, C)
+            c.check(row['applied'] is True and paused is True and reqs.get('Qhuge') == 'open', f'{row} paused={paused} {reqs}')
+
+    with Case(f'R4-clock [{ch}] R (documented residual): a request created within the delivery latency after the real tap is still closed') as c:
+        with PgSession(SETUP) as pg:
+            # the age is measured when the request leaves the phone; the server reads its clock a one-way latency later
+            # (1.5 s here), so the decision is dated that much late — a request created 1 s after the real tap closes
+            tap = NOW - 4 * MIN
+            handoff(pg, P, C, 'R1', tap + 1_000)
+            row = set_reply_mode(pg, P, C, False, tap + FAST, age=(int(time.time() * 1000) - tap) - 1_500)
+            paused, reqs = state(pg, P, C)
+            c.check(row['applied'] is True and reqs == {'R1': 'done'}, f'the residual changed — re-document it: {row} {reqs}')
+
 # The structural tripwire in verify-reply-mode.py must reject the pre-R4 shape (side effects keyed off `req`), so a
 # later "simplification" back to it cannot pass the verifier even when nobody runs this suite.
 PRE_R4_SIDE_EFFECTS = """), unpause as (
@@ -160,7 +284,7 @@ PRE_R4_SIDE_EFFECTS = """), unpause as (
 )
 select r.profile_id as "profileId","""
 
-with Case('R4 verifier: the structural tripwire rejects the pre-R4 side effects and accepts the canonical SQL') as c:
+with Case('R4 verifier: the structural tripwire rejects the pre-R4 side effects, the version-dated boundary, and accepts the canonical SQL') as c:
     vrm = module('verify-reply-mode.py')
     canon = vrm.sql(node(SRM, 'Upsert Reply Mode')['parameters']['query'])
     head, tail = canon.split('), resumed as (', 1)
@@ -170,11 +294,15 @@ with Case('R4 verifier: the structural tripwire rejects the pre-R4 side effects 
         vrm.check_resume_side_effects(canon)
     except AssertionError as e:
         c.check(False, f'canonical SQL rejected: {e}')
-    for label, bad in (('pre-R4', old), ('closed reads req', half)):
+    # R4-clock: the boundary is the decision time the Validate computed — dating it by the version again must fail
+    by_version = canon.replace('<= r.decided', '<= r.version').replace('> r.decided', '> r.version')
+    no_param = canon.replace(', $5::bigint as decided', '')
+    for label, bad in (('pre-R4', old), ('closed reads req', half), ('boundary = version (pre-R4-clock)', by_version),
+                       ('no decision parameter', no_param)):
         c.check(bad != canon, f'{label}: mutation did not apply')
         try:
             vrm.check_resume_side_effects(bad)
-            c.check(False, f'{label}: the tripwire accepted a side effect keyed off the request')
+            c.check(False, f'{label}: the tripwire accepted it')
         except AssertionError:
             pass
 

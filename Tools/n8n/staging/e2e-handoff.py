@@ -368,6 +368,26 @@ def stale_auto(ctx, ch):
     return ok, json.dumps({k: (v if k.startswith("after") else (v[0], applied(v))) for k, v in r.items()}, ensure_ascii=False)
 
 
+@for_channels("fast_clock_queued_auto_keeps_newer_handoff", "R4-clock: through the real SetReplyMode webhook, an «Авто» decided 4 min BEFORE a request on a phone 5 min fast (queued, delivered after it) leaves the request open and the chat paused; an immediate «Авто» from the same phone resumes it")
+def fast_clock_auto(ctx, ch):
+    b = Bot(ctx, ch, "r4c")
+    owner = owner_for(ctx, b)
+    now = int(time.time() * 1000)
+    fast = 300_000                                                                          # the phone's clock runs 5 min ahead
+    body = lambda v, age: {"profileIds": [b.pid], "chatId": b.chat, "suppressed": False, "version": v, "decisionAgeMs": age}
+    # the server is «Авто» in the gap (no row for the chat): the AI hands over 2 min ago, exactly as Upsert Handoff writes it
+    psql(f"insert into handoff_requests (profile_id, chat_id, source_message_id, reason, summary, created_at) values ('{b.pid}', '{b.chat}', 'r4c-{ctx.run_id}', 'question', 'Нужен менеджер', now() - interval '2 minutes');")
+    psql(f"insert into chat_reply_state (profile_id, chat_id, handoff_paused) values ('{b.pid}', '{b.chat}', true) on conflict (profile_id, chat_id) do update set handoff_paused = true;")
+    r = {"queued": e2e_auth.hook("SetReplyMode", owner.token, body(now - 240_000 + fast, 240_000))}   # tapped at real now−4m
+    r["after_queued"] = (paused(b.pid, b.chat), handoffs(b.pid, b.chat))
+    r["immediate"] = e2e_auth.hook("SetReplyMode", owner.token, body(int(time.time() * 1000) + fast, 0))   # the owner taps «Авто» now
+    r["after_immediate"] = (paused(b.pid, b.chat), handoffs(b.pid, b.chat))
+    applied = lambda x: [a.get("applied") for a in ((x[1] or {}).get("applied") or [])]
+    ok = r["queued"][0] == 200 and applied(r["queued"]) == [True] and r["after_queued"][0] == "t" and ":open:" in r["after_queued"][1] \
+        and r["immediate"][0] == 200 and applied(r["immediate"]) == [True] and r["after_immediate"][0] == "f" and ":done:" in r["after_immediate"][1]
+    return ok, json.dumps({k: (v if k.startswith("after") else (v[0], applied(v))) for k, v in r.items()}, ensure_ascii=False)
+
+
 @scenario("dashboard_shows_open_handoff_as_event","A5/A6: «Сводка» reports an open request as a REAL event (source=event) that outranks the classifier")
 def dashboard(ctx):
     b = Bot(ctx, "wa", "db")

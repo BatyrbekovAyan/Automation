@@ -98,6 +98,28 @@ public class ReplyModeSyncWiringTests
     }
 
     [Test]
+    public void SendBatch_DatesTheDecision_AtEveryAttempt_InsideTheRequestFactory()
+    {
+        // R4-clock (iteration 2026-09-28): the server closes handoff requests created no later than the owner's DECISION,
+        // dated on ITS clock as now − decisionAgeMs. The age must be measured when the request actually leaves: a body
+        // built once before AuthorizedRequest.Send would carry a stale age into the retry after a 401 refresh (and the
+        // session wait before the first attempt), dating the decision earlier than it was. The decision label is
+        // captured with the version it belongs to, so a tap landing mid-flight cannot lend the batch its own label.
+        string svc = MethodBody(Src("Scripts/Chat/ReplyModeSyncService.cs"), "IEnumerator SendBatch");
+        var send = Regex.Match(svc, @"AuthorizedRequest\.Send\(\s*\(\)\s*=>(?<make>.*?),\s*r\s*=>\s*www\s*=\s*r\s*\)", RegexOptions.Singleline);
+        Assert.IsTrue(send.Success, "SendBatch must send through AuthorizedRequest.Send with a request factory");
+        string make = send.Groups["make"].Value;
+        Assert.IsTrue(make.Contains("Manager.BuildReplyModePayload(") && make.Contains("ReplyModeSyncQueue.DecisionAgeMs(decidedAtMs, NowMs())"),
+            "the body and the decision's age must be built INSIDE the factory, once per attempt");
+        Assert.IsFalse(Regex.IsMatch(svc, @"string\s+body\s*=\s*Manager\.BuildReplyModePayload\("), "no body may be precomputed before the send");
+        int version = svc.IndexOf("long sentVersion = first.desiredVersion;", System.StringComparison.Ordinal);
+        int label = svc.IndexOf("long decidedAtMs = first.decidedAtMs;", System.StringComparison.Ordinal);
+        int sent = svc.IndexOf("AuthorizedRequest.Send(", System.StringComparison.Ordinal);
+        Assert.IsTrue(version >= 0 && label >= 0 && label < sent && version < sent,
+            "the decision label is captured together with the version, before the send");
+    }
+
+    [Test]
     public void Service_BootsItself_OnEveryLaunch_AndAnnouncesTheLoadedQueue()
     {
         // R5: the persisted queue used to be read only when something happened to create the service (a tap, a

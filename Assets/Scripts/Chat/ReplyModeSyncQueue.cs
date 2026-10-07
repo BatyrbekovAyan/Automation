@@ -14,6 +14,14 @@ using Newtonsoft.Json.Linq;
 /// its current value + version otherwise — so a delayed retry can never overwrite a newer desire,
 /// and a newer server value (another device) is ADOPTED rather than fought.
 ///
+/// Decision time (R4-clock, iteration 2026-09-28): the version orders desires, it does NOT date them — it is
+/// max(now, last+1), so after a clock correction or an adopted server version it is a stale stamp, and even a
+/// fresh one is the phone's wall clock, which the server cannot compare with its own. An applied chat-scoped «Авто»
+/// closes the handoff requests that existed when the owner DECIDED, so every desire also carries
+/// <see cref="Entry.decidedAtMs"/> (the phone clock at the tap) and every attempt sends its AGE
+/// (<see cref="DecisionAgeMs"/>); the server dates the decision as its own now − age. Two local readings, one
+/// clock: the phone's absolute offset cancels out.
+///
 /// No Unity types: EditMode-tested (ReplyModeSyncQueueTests). Persistence is JSON via
 /// <see cref="Serialize"/>/<see cref="Deserialize"/>; the service layer owns PlayerPrefs.
 /// </summary>
@@ -34,6 +42,12 @@ public static class ReplyModeSyncQueue
         public string chatId;
         public bool desiredSuppressed;
         public long desiredVersion;
+        /// <summary>
+        /// R4-clock: the phone's wall clock when the owner made THIS desire (0 = no decision to date: a floor-version
+        /// heal probe, a value adopted from the server, or an entry persisted by a build without the field — all of
+        /// them are sent without an age and the server falls back to the version).
+        /// </summary>
+        public long decidedAtMs;
         public bool hasConfirmed;
         public bool confirmedSuppressed;
         public long confirmedVersion;
@@ -89,6 +103,7 @@ public static class ReplyModeSyncQueue
             e.botId = botId;
             e.desiredSuppressed = suppressed;
             e.desiredVersion = version;
+            e.decidedAtMs = nowMs;                  // R4-clock: the tap itself, never the monotonic-guarded version
             e.attempts = 0;
             e.nextAttemptAtMs = nowMs;
             e.state = StatePending;
@@ -134,7 +149,20 @@ public static class ReplyModeSyncQueue
         e.botId = botId;
         e.desiredSuppressed = false;
         e.desiredVersion = FloorVersion;
+        e.decidedAtMs = 0;                          // a probe, not a decision: nothing to date, nothing to close
         Arm(e, nowMs);
+    }
+
+    /// <summary>
+    /// R4-clock: how long ago the owner made the desire, measured at the moment a request leaves (call it inside
+    /// the request factory, once per attempt). Null — the field is omitted and the server uses the version — when
+    /// there is no decision to date, or when the wall clock now reads EARLIER than at the tap: it stepped back, so
+    /// no age can be trusted, and the version is what the server judged before this field existed.
+    /// </summary>
+    public static long? DecisionAgeMs(long decidedAtMs, long nowMs)
+    {
+        if (decidedAtMs <= 0 || nowMs < decidedAtMs) return null;
+        return nowMs - decidedAtMs;
     }
 
     private static void Arm(Entry e, long nowMs)
@@ -207,6 +235,7 @@ public static class ReplyModeSyncQueue
         e.confirmedVersion = serverVersion;
         e.desiredSuppressed = serverSuppressed;
         e.desiredVersion = Math.Max(serverVersion, e.desiredVersion);
+        e.decidedAtMs = 0;                          // the server's value is not a decision made on this phone
         e.state = StateConfirmed;
         return Outcome.AdoptedServer;
     }
@@ -259,14 +288,14 @@ public static class ReplyModeSyncQueue
         return scopes;
     }
 
-    /// <summary>Groups due entries that can travel in one request (same chat, value and version).</summary>
+    /// <summary>Groups due entries that can travel in one request (same chat, value, version and decision time).</summary>
     public static List<List<Entry>> Batches(List<Entry> due)
     {
         var groups = new Dictionary<string, List<Entry>>();
         var order = new List<string>();
         foreach (var e in due)
         {
-            string k = e.chatId + "|" + e.desiredSuppressed + "|" + e.desiredVersion;
+            string k = $"{e.chatId}|{e.desiredSuppressed}|{e.desiredVersion}|{e.decidedAtMs}";
             if (!groups.TryGetValue(k, out var list)) { list = new List<Entry>(); groups[k] = list; order.Add(k); }
             list.Add(e);
         }

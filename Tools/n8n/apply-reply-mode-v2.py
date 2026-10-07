@@ -7,6 +7,16 @@ Set Reply Mode (SCLcpn6DMDG3Z4VN):
   * Upsert Reply Mode — ONE atomic statement for every profile in the request, applying a row only
     when the stored version is older; returns a per-profile report (applied / current suppressed /
     current version) so a stale desire is answered with the server's newer truth, never silently.
+  * R4-clock (iteration 2026-09-28): the version ORDERS desires, it no longer DATES the decision. An applied
+    chat-scoped «Авто» closes the handoff requests that existed when the owner decided; that boundary used to be
+    the version — the phone's wall clock, which this server cannot compare with its own `created_at`, so a phone
+    running fast closed a request created after a decision that waited in the offline queue. A client that dates
+    its decision sends `decisionAgeMs` (how long ago the owner decided, measured as the request left: two readings
+    of ONE clock, so the phone's offset cancels) and Validate dates it on THIS clock: `decided = now − age`. No
+    field (legacy, pre-R4-clock clients, the floor-version probe) or a malformed / negative one → `decided =
+    version`, byte-for-byte the previous behaviour. Computed in Validate, not with now() in SQL: the Postgres node
+    costs ≈1.9 s on prod before the statement runs. Residual: the age excludes the request's own one-way latency.
+    Behaviour pinned by tests/test_reply_mode.py (R4-clock block).
   * Shape Response — `{success:true, chatId, requestedVersion, allApplied, applied:[...], written}` or
     `{success:false,error:"db_error"}` with HTTP 500; malformed body → HTTP 400 (was 200 + success:false).
 Create WhatsApp/Telegram workflow:
@@ -64,8 +74,16 @@ const okSup  = typeof b.suppressed === "boolean";
 // client sends none: the server assigns "now", which keeps its last-arrival semantics.
 const hasVersion = (Number.isInteger(b.version) && b.version > 0) || (typeof b.version === "string" && /^[1-9]\d{0,15}$/.test(b.version));
 const version = hasVersion ? Number(b.version) : Date.now();
+// R4-clock (2026-09-28): the version ORDERS, it does not DATE the decision. It is the phone's wall clock, which this
+// server cannot compare with handoff_requests.created_at — a phone running fast closed a request created AFTER a
+// decision that waited in the offline queue. A client that dates its decision sends decisionAgeMs (how long ago the
+// owner decided, measured as the request left: two readings of one clock, the phone's offset cancels) and the
+// decision is dated on THIS clock. No field / malformed / negative → the version dates it, exactly as before.
+const age = b.decisionAgeMs;
+const hasAge = hasVersion && ((Number.isInteger(age) && age >= 0) || (typeof age === "string" && /^\d{1,16}$/.test(age)));
+const decided = hasAge ? Math.max(0, Date.now() - Number(age)) : version;
 if (ids.length === 0 || !okChat || !okSup) return [{ json: { invalid: true } }];
-return [{ json: { invalid: false, profileIds: ids, chatId: b.chatId, suppressed: b.suppressed, version, legacy: !hasVersion } }];"""
+return [{ json: { invalid: false, profileIds: ids, chatId: b.chatId, suppressed: b.suppressed, version, decided, legacy: !hasVersion } }];"""
 
 UPSERT_SQL = """-- A2: ONE statement for every requested profile — all rows or none (a partial write can never read
 -- as «the whole bot switched»). A row is applied only when the stored version is OLDER than the
@@ -74,7 +92,7 @@ UPSERT_SQL = """-- A2: ONE statement for every requested profile — all rows or
 -- (a data-modifying CTE is invisible to the rest of the same statement), which is exactly the
 -- "what the server holds if we were not applied" value.
 with req as (
-  select jsonb_array_elements_text($1::jsonb) as profile_id, $2::text as chat_id, $3::boolean as suppressed, $4::bigint as version
+  select jsonb_array_elements_text($1::jsonb) as profile_id, $2::text as chat_id, $3::boolean as suppressed, $4::bigint as version, $5::bigint as decided
 ), up as (
   insert into reply_mode_flags (profile_id, chat_id, suppressed, version, updated_at)
   select profile_id, chat_id, suppressed, version, now() from req
@@ -87,16 +105,17 @@ with req as (
   -- but only when it is APPLIED. A stale (older) or replayed (same) version is not applied and has NO
   -- side effect, so a late retry can never resolve a handoff the owner has not seen. A bot-wide '*'
   -- write never resumes a chat.
-  select up.profile_id, r.chat_id, up.version
+  select up.profile_id, r.chat_id, up.version, r.decided
   from up join req r on r.profile_id = up.profile_id
   where r.chat_id <> '*' and up.suppressed = false
 ), closed as (
   -- ...and it resolves only what existed when the owner decided: requests created no later than the
-  -- command's version (the client's ms clock). A request created after the decision stays open.
+  -- decision time (R4-clock: dated on this server's clock from the client's decision age; the version
+  -- only when the client sent no age). A request created after the decision stays open.
   update handoff_requests h set status = 'done', done_at = now(), updated_at = now()
   from resumed r
   where h.profile_id = r.profile_id and h.chat_id = r.chat_id and h.status <> 'done'
-    and (extract(epoch from h.created_at) * 1000)::bigint <= r.version
+    and (extract(epoch from h.created_at) * 1000)::bigint <= r.decided
   returning 1
 ), unpause as (
   -- `closed` is invisible here (one snapshot), so «still open after this statement» is spelled out: a
@@ -106,7 +125,7 @@ with req as (
   where c.profile_id = r.profile_id and c.chat_id = r.chat_id and c.handoff_paused
     and not exists (select 1 from handoff_requests o
                     where o.profile_id = r.profile_id and o.chat_id = r.chat_id and o.status <> 'done'
-                      and (extract(epoch from o.created_at) * 1000)::bigint > r.version)
+                      and (extract(epoch from o.created_at) * 1000)::bigint > r.decided)
   returning 1
 )
 select r.profile_id as "profileId",
@@ -117,7 +136,9 @@ from req r
 left join up on up.profile_id = r.profile_id
 left join reply_mode_flags cur on cur.profile_id = r.profile_id and cur.chat_id = r.chat_id;"""
 
-UPSERT_PARAMS = "={{ [ JSON.stringify($json.profileIds), $json.chatId, $json.suppressed, $json.version ] }}"
+# R4-clock: the decision time is ALWAYS a number (Validate falls back to the version) — an empty rendered parameter
+# is dropped by the node's comma-split and the statement fails with «no parameter».
+UPSERT_PARAMS = "={{ [ JSON.stringify($json.profileIds), $json.chatId, $json.suppressed, $json.version, $json.decided ] }}"
 
 SHAPE_JS = r"""// A2: the confirmation the client acts on. Every requested profile is reported; `allApplied` is
 // the only thing that may be read as «the switch is confirmed». A DB error never reads as success.
@@ -354,6 +375,7 @@ def check():
     bad = []
     wf = json.load(open(os.path.join(WF, SRM), encoding="utf-8"))
     if node(wf, "Validate")["parameters"]["jsCode"] != VALIDATE_JS or node(wf, "Upsert Reply Mode")["parameters"]["query"] != UPSERT_SQL \
+            or node(wf, "Upsert Reply Mode")["parameters"].get("options", {}).get("queryReplacement") != UPSERT_PARAMS \
             or node(wf, "Shape Response") is None or node(wf, "Shape Response")["parameters"]["jsCode"] != SHAPE_JS:
         bad.append(SRM)
     for f, field in CREATES.items():
