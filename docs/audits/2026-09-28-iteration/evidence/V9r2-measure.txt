@@ -1,0 +1,44 @@
+V9 + V9-r2 — платный замер до/после (staging, 2026-10-08). Набор v1.2 (64 сценария), оценщик h5, модель gpt-5.4-mini
+(параметры шаблона из worktree на обеих сторонах). «До» = 5b0a222d (последний коммит до сверки цен), «после» = 67f68f0f (V9-r2).
+
+0) Дефект стенда замера, найденный и исправленный перед замером
+   run-eval.py брал инструмент поиска из worktree для ОБЕИХ сторон (`model_params("worktree")`), а --prompts-ref переключал только
+   промпты. V9 изменил ИНСТРУМЕНТ, не промпты, поэтому первый прогон «до» (--prompts-ref 5b0a222d) молча шёл через сегодняшний
+   Reconcile Prices и показал 8/8 «до» — ложное «до». Те результаты удалены. Исправление: флаг --search-ref (шаблон бота этой ref
+   решает имитацию поиска; в summary.search_simulation теперь пишется ref), закреплён Tools/n8n/eval/test_search_ref.py.
+   Утверждение в V9-price-measure.txt §4, что summary «до» называет raw documents, было неверным до этого исправления.
+
+1) Вход модели до/после (детерминированно, без модели)
+   auto scenarios: 52  byte-identical model input (system + tools + search result): 51  changed: 1 → [ap_source_conflict: search]
+   ⇒ любое расхождение вердиктов в остальных 51 сценарии — разброс выборки модели, не следствие фикса.
+
+2) Прицельно ×8 (команды ниже)
+   v9r2-before-price-x8  search: raw documents (retrieve-as-tool at 5b0a222d)   pass_all 1/2, fail 1
+   v9r2-after-price-x8   search: Price List Search sub-workflow                   pass_all 2/2
+     ap_source_conflict         до 0/8 (no_fresh_price_pick ×8: «— 3900 тг, оригинал.»)
+                                после 8/8 («цены в каталоге и прайсе расходятся: в каталоге 3200 тг, в прайсе 3900 тг.
+                                Точную цену подтвердит менеджер.»)
+     ap_price_agrees_analogues  до 8/8, после 8/8 (уверенно 3200, аналоги перечислены, «расходятся» не звучит) — V9-r2 не
+                                вносит ложного конфликта на прайсе, согласном с каталогом (на 1fd3157e сюда шли три твёрдые
+                                пометки, см. V9-adversarial/repro-output-1fd3157e.txt CHUNK-consistent-with-analogues).
+
+3) Весь автоответ ×3
+   v9r2-before-auto-x3   52 сценария / 156 прогонов: чистых 48, нестабильных 2, провал 2, cost $0.1929
+   v9r2-after-auto-x3    52 сценария / 156 прогонов: чистых 46, нестабильных 4, провал 2, cost $0.1938
+   Различия (кроме ap_source_conflict 0/3 → 3/3) — только сценарии с побайтно тем же входом:
+     ap_sku_exact_kz 3/3→2/3 (lang_kz), ed_kz_parent 3/3→1/3 (lang_kz), ks_kz_availability 1/3→0/3 (lang_kz),
+     ks_where_is_order 3/3→2/3, ws_list_of_items 2/3→1/3 (no_total_confirmation), pr_kz_battery 0/3→0/3.
+   Казахский: известное свойство gpt-5.4-mini (≈1 из 7 ответов по-русски на казахский вопрос, CLAUDE.md, замер 2026-09-22)
+   — вопрос промпта/модели, вне V9.
+
+4) Панель ×8 (после): v9r2-after-panel-x8 — 12 сценариев / 96 прогонов: чистых 12, нестабильных 0, провалов 0
+   (против v9p-after-x8.h4: 12/0/0 — без регресса от F4/F5).
+
+Стоимость замера: ≈ $0.45 (авто) + панель; проба кредитов $0.004.
+
+Команды:
+  python3 Tools/n8n/eval/run-eval.py --skip-panel --only ap_source_conflict,ap_price_agrees_analogues --repeat 8 --repeat-all --prompts-ref 5b0a222d --search-ref 5b0a222d --label v9r2-before-price-x8
+  python3 Tools/n8n/eval/run-eval.py --skip-panel --only ap_source_conflict,ap_price_agrees_analogues --repeat 8 --repeat-all --label v9r2-after-price-x8
+  python3 Tools/n8n/eval/run-eval.py --skip-panel --repeat 3 --repeat-all --prompts-ref 5b0a222d --search-ref 5b0a222d --label v9r2-before-auto-x3
+  python3 Tools/n8n/eval/run-eval.py --skip-panel --repeat 3 --repeat-all --label v9r2-after-auto-x3
+  python3 Tools/n8n/eval/run-eval.py --skip-auto --only pn_ --repeat 8 --repeat-all --label v9r2-after-panel-x8

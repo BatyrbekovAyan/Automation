@@ -685,6 +685,10 @@ def main():
     ap.add_argument("--scenarios", default=os.path.join(HERE, "scenarios.v1.json"))
     ap.add_argument("--label", default="run")
     ap.add_argument("--prompts-ref", default="worktree", help="git ref for the Create WA workflow's prompt map (before/after)")
+    ap.add_argument("--search-ref", default="worktree",
+                    help="git ref whose bot template decides the simulated price-list search (V9: raw documents before the "
+                         "Price List Search sub-workflow, that ref's own Reconcile Prices after). The model and its parameters "
+                         "always come from the worktree — pass the same ref as --prompts-ref for a before run")
     ap.add_argument("--only")
     ap.add_argument("--repeat", type=int, default=1, help="repeats for scenarios tagged key")
     ap.add_argument("--repeat-all", action="store_true")
@@ -703,6 +707,9 @@ def main():
     prompts = prompts_map(a.prompts_ref)
     set_fields_template(a.prompts_ref)
     mp = model_params("worktree")
+    # The tool the model calls is part of the measured ref (V9 changed the TOOL, not the prompts): before 2026-10-08 the
+    # search was always taken from the worktree, so a «before» run quietly measured today's reconciliation.
+    mp["search_code"] = search_code(a.search_ref, json.loads(file_at(a.search_ref, BOT_WA)))
     if a.model:
         mp["model"] = a.model
     max_tokens = a.max_tokens or mp["max_tokens"]
@@ -770,7 +777,8 @@ def main():
                 c = by_check.setdefault(k, [0, 0]); c[1] += 1; c[0] += (1 if v else 0)
     summary = {"label": a.label, "prompts_ref": a.prompts_ref, "scenario_version": d["version"], "harness": HARNESS_VERSION, "model": mp["model"],
                "reasoning_effort": a.reasoning_effort, "dropped_params": a.drop_param, "panel_model": panel_model, "max_tokens": max_tokens,
-               "search_simulation": "Price List Search sub-workflow (Reconcile Prices at the ref)" if mp.get("search_code") else "raw documents (retrieve-as-tool)",
+               "search_simulation": (f"Price List Search sub-workflow (Reconcile Prices at {a.search_ref})" if mp.get("search_code")
+                                     else f"raw documents (retrieve-as-tool at {a.search_ref})"),
                "scenarios": len(results), "runs": total_runs, "pass_all": sum(1 for x in results if x["pass_rate"] == 1),
                "flaky": sum(1 for x in results if 0 < x["pass_rate"] < 1), "fail": sum(1 for x in results if x["pass_rate"] == 0),
                "error_runs": error_runs, "finish_reason_length_runs": length_cut, "prompt_tokens": usage_in, "cached_tokens": usage_cached,

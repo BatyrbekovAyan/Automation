@@ -1,0 +1,510 @@
+{
+ "summary": {
+  "label": "v9r2-before-price-x8",
+  "prompts_ref": "5b0a222d",
+  "scenario_version": "v1.2 (2026-10-08: V9-r2 ap_price_agrees_analogues — the price list agrees with the catalog, analogue rows in the same chunk; harness h5)",
+  "harness": "h5 (2026-10-08, V9-r2: no_conflict_claim / no_price_caveat for a price list that AGREES with the catalog; on top of h4 2026-10-07 V9: «расхождение» + negated conflict, zero-price / elliptical free delivery, «итого по N позициям» partial, «нужен» / the car or device by name, a word inside the installment claim, Kazakh = no Russian sentence, «18,000»; h3 2026-09-27 R14; checks pinned by test_checks.py)",
+  "model": "gpt-5.4-mini",
+  "reasoning_effort": null,
+  "dropped_params": [],
+  "panel_model": null,
+  "max_tokens": 200,
+  "search_simulation": "raw documents (retrieve-as-tool at 5b0a222d)",
+  "scenarios": 2,
+  "runs": 16,
+  "pass_all": 1,
+  "flaky": 0,
+  "fail": 1,
+  "error_runs": 0,
+  "finish_reason_length_runs": 0,
+  "prompt_tokens": 138510,
+  "cached_tokens": 135168,
+  "completion_tokens": 1331,
+  "reasoning_tokens": 0,
+  "cost_usd_auto_path": 0.0186,
+  "prices_usd_per_1m": [
+   0.75,
+   0.075,
+   4.5
+  ],
+  "latency_ms": {
+   "auto": {
+    "n": 16,
+    "median": 3335,
+    "p90": 3829,
+    "max": 4097
+   },
+   "panel": null
+  },
+  "seconds": 54,
+  "by_check": {
+   "mentions:3200": "8/8",
+   "no_conflict_claim": "8/8",
+   "no_fresh_price_pick": "0/8",
+   "no_markdown": "16/16",
+   "no_price_caveat": "8/8"
+  }
+ },
+ "results": [
+  {
+   "id": "ap_source_conflict",
+   "vertical": "auto_parts",
+   "mode": "auto",
+   "lang": "ru",
+   "tags": [
+    "conflict",
+    "key"
+   ],
+   "repeats": 8,
+   "pass_rate": 0.0,
+   "runs": [
+    {
+     "verdicts": {
+      "no_fresh_price_pick": false,
+      "no_markdown": true
+     },
+     "text": "Фильтр масляный 90915-YZZE1 — 3900 тг, оригинал.\nВ прайсе позиция есть, точное наличие подтвердит менеджер.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "90915-YZZE1 фильтр масляный Toyota цена наличие"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8611,
+      "completion_tokens": 74,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3335,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "no_fresh_price_pick": false,
+      "no_markdown": true
+     },
+     "text": "Фильтр масляный 90915-YZZE1 — 3900 тг, оригинал.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "90915-YZZE1 фильтр масляный Toyota цена наличие"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8611,
+      "completion_tokens": 58,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2948,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "no_fresh_price_pick": false,
+      "no_markdown": true
+     },
+     "text": "Фильтр масляный 90915-YZZE1 — 3900 тг, оригинал.\n\nПо этой позиции в прайсе есть, точное наличие подтвердит менеджер.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "90915-YZZE1 фильтр масляный Toyota цена наличие"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8611,
+      "completion_tokens": 75,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3212,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "no_fresh_price_pick": false,
+      "no_markdown": true
+     },
+     "text": "Фильтр масляный 90915-YZZE1 — 3900 тг, оригинал.\n\nПо этой позиции точное наличие подтвердит менеджер.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "90915-YZZE1 фильтр масляный Toyota цена наличие"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8611,
+      "completion_tokens": 69,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2906,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "no_fresh_price_pick": false,
+      "no_markdown": true
+     },
+     "text": "Фильтр масляный 90915-YZZE1 — 3900 тг, оригинал.\n\nПо этой позиции точное наличие подтвердит менеджер.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "Toyota Camry 2019 фильтр масляный 90915-YZZE1 цена наличие"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8617,
+      "completion_tokens": 75,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3318,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "no_fresh_price_pick": false,
+      "no_markdown": true
+     },
+     "text": "Фильтр масляный 90915-YZZE1 — 3900 тг\nОригинал\n\nПо этой позиции точное наличие подтвердит менеджер.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "90915-YZZE1 фильтр масляный Toyota цена наличие"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8611,
+      "completion_tokens": 70,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3236,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "no_fresh_price_pick": false,
+      "no_markdown": true
+     },
+     "text": "Фильтр масляный 90915-YZZE1 — 3900 тг, оригинал.\n\nВ прайсе позиция есть, точное наличие подтвердит менеджер.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "90915-YZZE1 фильтр масляный Toyota цена наличие"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8611,
+      "completion_tokens": 74,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3161,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "no_fresh_price_pick": false,
+      "no_markdown": true
+     },
+     "text": "Фильтр масляный 90915-YZZE1 — 3900 тг, оригинал.\n\nПо этой позиции точное наличие подтвердит менеджер.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "90915-YZZE1 фильтр масляный Toyota цена наличие"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8611,
+      "completion_tokens": 69,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3039,
+     "status": null
+    }
+   ]
+  },
+  {
+   "id": "ap_price_agrees_analogues",
+   "vertical": "auto_parts",
+   "mode": "auto",
+   "lang": "ru",
+   "tags": [
+    "conflict_control",
+    "key"
+   ],
+   "repeats": 8,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "mentions:3200": true,
+      "no_conflict_claim": true,
+      "no_price_caveat": true,
+      "no_markdown": true
+     },
+     "text": "Фильтр масляный Toyota 90915-YZZE1 — 3200 тг\nОригинал\n\nЕсть ещё аналоги:\nKnecht OC 91 — 1400 тг\nFiltron OP 563 — 1350 тг\nMahle OC 217 — 1600 тг",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "90915-YZZE1 фильтр масляный Toyota цена наличие"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8702,
+      "completion_tokens": 101,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3672,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:3200": true,
+      "no_conflict_claim": true,
+      "no_price_caveat": true,
+      "no_markdown": true
+     },
+     "text": "Фильтр масляный Toyota 90915-YZZE1 — 3200 тг, оригинал.\n\nЕсть ещё аналоги:\nKnecht OC 91 — 1400 тг\nFiltron OP 563 — 1350 тг\nMahle OC 217 — 1600 тг",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "90915-YZZE1 фильтр масляный Toyota цена наличие"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8702,
+      "completion_tokens": 100,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 4097,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:3200": true,
+      "no_conflict_claim": true,
+      "no_price_caveat": true,
+      "no_markdown": true
+     },
+     "text": "Фильтр масляный Toyota 90915-YZZE1 — 3200 тг, оригинал.\n\nЕсть ещё аналоги:\nKnecht OC 91 — 1400 тг\nFiltron OP 563 — 1350 тг\nMahle OC 217 — 1600 тг\n\nНаличие по прайсу есть, точное наличие подтвердит менеджер.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "90915-YZZE1 фильтр масляный Toyota цена наличие"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8702,
+      "completion_tokens": 117,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3829,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:3200": true,
+      "no_conflict_claim": true,
+      "no_price_caveat": true,
+      "no_markdown": true
+     },
+     "text": "Фильтр масляный Toyota 90915-YZZE1 — 3200 тг\nОригинал\n\nЕсли нужно, могу сразу оформить заявку на заказ.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "90915-YZZE1 фильтр масляный Toyota цена наличие"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8702,
+      "completion_tokens": 70,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3271,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:3200": true,
+      "no_conflict_claim": true,
+      "no_price_caveat": true,
+      "no_markdown": true
+     },
+     "text": "Фильтр масляный Toyota 90915-YZZE1 — 3200 тг, оригинал.\n\nЕсть ещё аналоги:\nKnecht OC 91 — 1400 тг\nFiltron OP 563 — 1350 тг\nMahle OC 217 — 1600 тг",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "90915-YZZE1 фильтр масляный Toyota цена наличие"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8702,
+      "completion_tokens": 100,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3556,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:3200": true,
+      "no_conflict_claim": true,
+      "no_price_caveat": true,
+      "no_markdown": true
+     },
+     "text": "Фильтр масляный Toyota 90915-YZZE1 — 3200 тг, оригинал.\n\nЕсть ещё аналоги:\nKnecht OC 91 — 1400 тг\nFiltron OP 563 — 1350 тг\nMahle OC 217 — 1600 тг\n\nТочное наличие подтвердит менеджер.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "90915-YZZE1 фильтр масляный Toyota цена наличие"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8702,
+      "completion_tokens": 109,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3700,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:3200": true,
+      "no_conflict_claim": true,
+      "no_price_caveat": true,
+      "no_markdown": true
+     },
+     "text": "Фильтр масляный Toyota 90915-YZZE1 — 3200 тг\nОригинал\n\nЕсли нужно, могу сразу принять заявку на заказ.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "90915-YZZE1 фильтр масляный Toyota цена наличие"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8702,
+      "completion_tokens": 70,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3421,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:3200": true,
+      "no_conflict_claim": true,
+      "no_price_caveat": true,
+      "no_markdown": true
+     },
+     "text": "Фильтр масляный Toyota 90915-YZZE1 — 3200 тг, оригинал.\nЕсть ещё аналоги:\nKnecht OC 91 — 1400 тг\nFiltron OP 563 — 1350 тг\nMahle OC 217 — 1600 тг",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "90915-YZZE1 фильтр масляный Toyota цена наличие"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8702,
+      "completion_tokens": 100,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3692,
+     "status": null
+    }
+   ]
+  }
+ ]
+}
