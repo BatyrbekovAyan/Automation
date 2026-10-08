@@ -137,9 +137,13 @@ return [{ json: out, pairedItem: { item: 0 } }];
 # (a device-id fallback never is). Written without `$` / regex so no placeholder syntax can ever collide with it.
 RC_ID_OF_3 = ("(case when length(coalesce($3, '')) = 47 and left($3, 15) = chr(36) || 'RCAnonymousID:' "
               "and translate(substr($3, 16), '0123456789abcdef', '') = '' then $3 end)")
-# The requested id is granted when it is free, already this install's, or its holder is revoked / owns no live bot
-# (a lost install secret: claim the bots by code first, then the billing id follows). ON CONFLICT DO UPDATE ... WHERE
-# never raises in a race (a unique index would, and a refresh error used to become a 401 — R11).
+# The requested id is granted when it is free, already this install's, or its holder was REVOKED by the server — the
+# only transfer backed by an act of the server rather than by knowing the id. V3 (2026-09-28): «the holder owns no live
+# bot» is NOT a release any more — a paying owner before the first bot (or right after deleting it) lost the id to
+# anyone who named it, and two bot-less installs ping-ponged it on every refresh. A lost install secret is a support
+# case (revoke the dead install, the id then follows); «Удалить все данные» keeps the install. Used by Verify Install
+# ONLY (a refresh proves the secret); bootstrap binds nothing. ON CONFLICT DO UPDATE ... WHERE never raises in a race
+# (a unique index would, and a refresh error used to become a 401 — R11).
 BILLING_BIND_CTES = """req as (
   select """ + RC_ID_OF_3 + """ as id
 ), bind as (
@@ -149,7 +153,6 @@ BILLING_BIND_CTES = """req as (
       bound_at = case when billing_bindings.install_id = excluded.install_id then billing_bindings.bound_at else now() end
   where billing_bindings.install_id = excluded.install_id
      or not exists (select 1 from installs h where h.install_id = billing_bindings.install_id and h.revoked_at is null)
-     or not exists (select 1 from bot_profiles bp where bp.owner_id = billing_bindings.install_id and bp.deleted_at is null)
   returning app_user_id
 ), strip as (
   update installs set app_user_id = null where app_user_id = (select app_user_id from bind) and install_id <> $1
@@ -160,17 +163,18 @@ BILLING_BIND_CTES = """req as (
 # and bootstrap is unauthenticated (verify-sql-comments.py guards every Postgres node).
 CREATE_INSTALL_SQL = """-- A1: mint an install (the client keeps installId + installSecret; only the hash is stored).
 -- Bootstrap is unauthenticated, so it is capped: at most 60 new installs per minute instance-wide.
--- R2 (2026-09-27): the billing id (third parameter) is NOT trusted for being named — it is bound to this install only when
--- billing_bindings grants it (see BILLING_BIND_CTES); otherwise app_user_id stays NULL and billing_conflict says why.
+-- V3 (2026-09-28): bootstrap binds NO billing id (the third parameter is deliberately unused) — it is bound only by a
+-- refresh, which proves the install secret (Verify Install). An orphaned bootstrap whose answer was lost therefore
+-- never holds anyone's id; the client refreshes right after a bootstrap in the same session op.
 with ok as (
   select 1 as go where (select count(*) from installs where created_at > now() - interval '1 minute') < 60
-), """ + BILLING_BIND_CTES.replace("__HOLDER__", "$1").replace("__FROM__", ", ok") + """, ins as (
+), ins as (
   insert into installs (install_id, secret_hash, app_user_id, platform, app_version)
-  select $1, $2, (select app_user_id from bind), nullif($4, ''), nullif($5, '') from ok
+  select $1, $2, null::text, nullif($4, ''), nullif($5, '') from ok
   returning install_id, app_user_id, token_version
 )
 select ins.install_id, ins.app_user_id, ins.token_version, '{}'::text[] as p, '{}'::text[] as w, '{}'::text[] as c,
-  ((select id from req) is not null and ins.app_user_id is null) as billing_conflict
+  false as billing_conflict
 from ins;"""
 
 VERIFY_INSTALL_SQL = """-- A1: refresh = prove the install secret (hash compare), touch last_seen, adopt the client's current
@@ -178,8 +182,8 @@ VERIFY_INSTALL_SQL = """-- A1: refresh = prove the install secret (hash compare)
 -- ~1.9 s on prod). ALWAYS exactly one row carrying verdict = 'checked' (R11, 2026-09-27): install_id is
 -- NULL when the secret is wrong or the install is unknown/revoked -> 401 install_revoked. A row WITHOUT
 -- the verdict (node error, input passed through, nothing) is a fault -> 503, never a reason to wipe.
--- R2: the billing id is adopted only when billing_bindings grants it; a refused one keeps the install's own
--- still-bound id (or none) and reports billing_conflict.
+-- R2/V3: the billing id is adopted only when billing_bindings grants it (free, already ours, or its holder revoked);
+-- a refused one keeps the install's own still-bound id (or none) and reports billing_conflict.
 with me as (
   select install_id from installs where install_id = $1 and secret_hash = $2 and revoked_at is null
 ), """ + BILLING_BIND_CTES.replace("__HOLDER__", "me.install_id").replace("__FROM__", ", me") + """, v as (

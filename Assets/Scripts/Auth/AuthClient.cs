@@ -50,17 +50,53 @@ public class AuthClient : MonoBehaviour
     /// <summary>
     /// R2: the server declined the billing id this install asked for because another install holds it — the token
     /// carries no billing identity, so billing-bound calls (usage, suggestions, a new bot) are refused until it is
-    /// released (the holder revoked or without live bots). Not an identity change: no refresh is triggered by it.
+    /// released. V3 (2026-09-28): ONLY a revoke of the holder releases it (support), never «the holder has no live
+    /// bot». Not an identity change; a return to the app retries it once (<see cref="OnApplicationFocus"/>).
     /// </summary>
     public bool BillingConflict { get; private set; }
 
     private bool _inFlight;
+    private long _lastBillingRetrySec;
 
     private void Awake()
     {
         instance ??= this;
         Token = PlayerPrefs.GetString(KeyToken, "");
         Claims = InstallSession.TryParse(Token, out var c) ? c : null;
+    }
+
+    /// <summary>
+    /// V3: back in the app with a declined billing id (billingConflict) — ask again once: the holding install may have
+    /// been revoked by support since, and the id then follows on this refresh instead of the planned one ~10 h later.
+    /// </summary>
+    private void OnApplicationFocus(bool hasFocus)
+    {
+        long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        if (!SessionRefreshPolicy.ShouldRetryBillingOnResume(hasFocus, HasInstall, _inFlight, Claims, BillingIdentity.AppUserId, now, _lastBillingRetrySec)) return;
+        _lastBillingRetrySec = now;
+        StartCoroutine(ForceRefresh());
+    }
+
+    /// <summary>
+    /// V3 (owner decision 2026-10-06): «Удалить все данные» wipes bots, history and settings but KEEPS this install's
+    /// server identity — the RevenueCat id survives a PlayerPrefs wipe in the SDK's own storage, and a second install
+    /// naming it would be refused (billing ids bind to one install). Restores the credentials synchronously, before any
+    /// code can read CrAuth.* again and bootstrap a second install, and saves ONCE after they are back (the wipe itself
+    /// must not save — the disk never holds a wipe without them).
+    /// </summary>
+    public static void PreserveAcrossWipe(Action wipe)
+    {
+        string id = PlayerPrefs.GetString(KeyInstallId, ""), secret = PlayerPrefs.GetString(KeyInstallSecret, "");
+        string token = PlayerPrefs.GetString(KeyToken, ""), requested = PlayerPrefs.GetString(KeyRequestedBillingId, "");
+        wipe?.Invoke();
+        if (!SessionRefreshPolicy.NeedsBootstrap(id, secret))
+        {
+            PlayerPrefs.SetString(KeyInstallId, id);
+            PlayerPrefs.SetString(KeyInstallSecret, secret);
+            if (!string.IsNullOrEmpty(token)) PlayerPrefs.SetString(KeyToken, token);
+            PlayerPrefs.SetString(KeyRequestedBillingId, requested);
+        }
+        PlayerPrefs.Save();
     }
 
     public bool Owns(string profileId)
@@ -101,7 +137,8 @@ public class AuthClient : MonoBehaviour
         try
         {
             string op = HasInstall ? "refresh" : "bootstrap";
-            for (int attempt = 0; attempt < 2; attempt++)
+            // ≤ 3 round trips: a refused refresh → bootstrap → the bootstrap's own refresh (V3)
+            for (int attempt = 0; attempt < 3; attempt++)
             {
                 string requested = BillingIdentity.AppUserId ?? "";
                 var body = new JObject
@@ -142,8 +179,14 @@ public class AuthClient : MonoBehaviour
                 }
                 else
                 {
-                    PlayerPrefs.SetString(KeyRequestedBillingId, requested);   // asked for; a declined id is not re-asked each call
+                    // asked for; a declined id is not re-asked each call. A bootstrap records none (V3: it binds nothing).
+                    PlayerPrefs.SetString(KeyRequestedBillingId, SessionRefreshPolicy.RequestedIdToRecord(op, requested));
                     PlayerPrefs.Save();
+                    if (SessionRefreshPolicy.RefreshAfterBootstrap(op, requested))
+                    {
+                        op = "refresh";                 // V3: the billing id is bound only once the new install proves its secret
+                        continue;
+                    }
                     if (BillingConflict) Debug.LogWarning("[AuthClient] the billing id is held by another install — no billing identity on this token (billingConflict)");
                 }
                 yield break;

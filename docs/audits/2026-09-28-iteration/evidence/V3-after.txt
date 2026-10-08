@@ -1,0 +1,63 @@
+V3 — после исправления (база HEAD 71c38611 + рабочее дерево V3; ALT-B по поправке опровергателя + решение владельца 2026-10-06)
+
+1. Поведенческий тест Tools/n8n/tests/test_billing_identity.py (настоящие SQL Create/Verify Install, Issue Token, Auth Gate Get Usage из перегенерированного канона, temp-таблицы стенда, compat закрыт):
+
+PASS R2 B1: a second install naming a billing id another install holds (with a live bot) gets NO billing identity + billingConflict
+PASS R2 B2: a refresh naming another install's billing id does not move it (the caller keeps its own / nothing)
+PASS R2 B3: the holder's own repeated refresh is idempotent (no conflict)
+PASS R2 B4: a REVOKED holder releases the id — the next install that names it takes it over
+PASS V3 B5: a live holder WITHOUT a live bot (a paying owner before the first bot) keeps its id — another install naming it gets nothing, on bootstrap AND refresh, and cannot pass Get Usage
+PASS V3 B8: the holder deleted its ONLY bot (deleted_at set, as Delete Bot Files does) — the id still does not move
+PASS V3 B9: «Удалить все данные» keeps the install — all its profiles retired, the same install refreshes with the same id: same u, no conflict, nothing owned
+PASS V3 B10: no ping-pong — after a conflict, repeated refreshes of the holder and of the other install never move the holder
+PASS V3 B11: the unauthenticated bootstrap binds NOTHING — an orphaned bootstrap (answer lost) never holds the id, the real install's refresh binds it
+PASS R2 B6: a device-id fallback is never bound (not a RevenueCat id) — no identity, no conflict; the RC id binds later
+PASS R2 B7: exactly one live install ever holds a billing id
+PASS R2 M1: the migration seed keeps ONE live holder per id (the most recently seen) and clears the others
+PASS R2 T1: Issue Token signs u = null and tells the client billingConflict
+PASS R2 G1/G2: a token WITHOUT a billing identity cannot name any billing id (GetUsage, SuggestReplies)
+PASS R2 G3/G4: a token with u = R passes its own id and refuses another
+PASS R2 G5: Create WA/TG refuse an EMPTY AppUserID in session mode (it skipped the channel count and the quota)
+PASS R2 G7: Delete Bot Files is not blocked by its audit-only appUserId (a conflicted install can still delete its bot)
+PASS R2 negative: verify-auth-gate.py rejects an Auth Session that adopts the named billing id directly
+PASS V3 negative: verify-auth-gate.py rejects a bootstrap that binds (or adopts the named id), and a bind that moves the id from a holder without live bots
+
+19 pass, 0 fail
+
+2. Генератор: python3 Tools/n8n/build-auth-workflows.py → изменён только crAuthSession001 (Create Install, Verify Install); второй прогон без диффа; --check: up to date.
+   verify-auth-gate.py: ALL AUTH GATE ASSERTS PASSED (правило перехода закреплено ТОЧНО: свой держатель или отозванный); verify-sql-comments.py: OK 82 Postgres-узла.
+
+3. Стенд (bootstrap.py --bot wa:stgwa001 --bot tg:stgtg001 → verify-deployed.py --base http://localhost:5678: exit 0, canonical 27 diff 0, клоны AT-CANONICAL).
+   e2e-auth.py (полный): 30 pass, 0 fail
+PASS  billing_id_first_bind (2.9s) — R2/V3: a second install naming a billing id another install holds — WITH a live bot or WITHOUT one (a paying owner before the first bot) — gets NO billing identity + billingConflict on bootstrap AND refresh; its GetUsage/profile.add on that id are refused; the bootstrap itself binds nothing; the id follows only once the holder is revoked
+      WITH bot: second appUserId=None conflict=True usage_own=200 usage_second=403 profile.add_second=409 {'success': False, 'error': 'no_billing_identity', 'detail': None} holders=True after_revoke=True/False | NO bot (V3): bootstrap_binds=None/None second=None/True usage_second=403 profile.add_second=409/tg 409 holder_refresh=True/False usage_holder=200 holders=True after_revoke=True/False
+   e2e-auth.py --compat-closed --only billing_id_first_bind: 1 pass, 0 fail
+   e2e-handoff.py (Owner из e2e-auth теперь делает refresh после bootstrap): 16 pass, 3 fail — все три generation_failed:
+   OpenAI стенда отвечает 429 «You have no credits remaining» (n8n.log); сценарии требуют ответа модели, к V3 не относятся.
+
+4. Unity EditMode (headless): InstallSessionTests|AuthWiringGuardTests|BotDeletionWiringTests|ReplyModeSyncWiringTests|ProfileClaimWiringTests 52/52;
+   полный набор: result=Passed  total=2780  passed=2780  failed=0  skipped=0  inconclusive=0
+
+5. python3 Tools/n8n/tests/run_all.py: exit 0, 22/22 файлов зелёные:
+OK   test_auth_refresh.py: 12 pass, 0 fail
+OK   test_billing_identity.py: 19 pass, 0 fail
+OK   test_claim.py: 16 pass, 0 fail
+OK   test_create_seed.py: 52 pass, 0 fail
+OK   test_harness_selfcheck.py: 2 pass, 0 fail
+OK   test_legacy_generators.py: 5 pass, 0 fail
+OK   test_price_search.py: 24 pass, 0 fail
+OK   test_reply_lost_send.py: 5 pass, 0 fail
+OK   test_reply_memory.py: 44 pass, 0 fail
+OK   test_reply_mode.py: 43 pass, 0 fail
+OK   test_reply_order.py: 44 pass, 0 fail
+OK   test_reply_reconcile.py: 66 pass, 0 fail
+OK   test_retired_delete.py: 13 pass, 0 fail
+OK   test_sql_comment_injection.py: 36 pass, 0 fail
+OK   test_suggest_catalog.py: 24 pass, 0 fail
+OK   test_suggest_lang.py: 11 pass, 0 fail
+OK   test_suggest_query.py: 37 pass, 0 fail
+OK   test_test_dialog.py: 17 pass, 0 fail
+OK   test_upload.py: 45 pass, 0 fail
+OK   test_verify_deployed.py: 48 pass, 0 fail
+OK   test_verify_parity.py: 38 pass, 0 fail
+OK   test_verify_sql_comments.py: 53 pass, 0 fail

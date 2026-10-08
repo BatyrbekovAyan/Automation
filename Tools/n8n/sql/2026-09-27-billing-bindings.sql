@@ -1,8 +1,9 @@
 -- R2 (iteration 2026-09-27): a RevenueCat billing id belongs to ONE install. Naming an id in bootstrap /
 -- refresh no longer makes it the token's billing identity (u): Auth Session binds it only when it is a
 -- RevenueCat anonymous id (`$RCAnonymousID:` + 32 hex — a device-id fallback is never bound) that is free,
--- already ours, or held by an install that is revoked or owns no live bot (recovery after a lost install
--- secret: claim the bots by code, then the id follows). Everyone else gets u = NULL + billingConflict.
+-- already ours, or held by an install the server REVOKED. V3 (iteration 2026-09-28): bound only on refresh
+-- (bootstrap binds nothing), and «the holder owns no live bot» no longer releases it — a lost install secret
+-- is a support revoke (a1-deploy-runbook.md §5). Everyone else gets u = NULL + billingConflict.
 -- Invariant kept by Create/Verify Install: installs.app_user_id is NULL or bound to that very install.
 -- Additive + idempotent. Apply BEFORE deploying crAuthSession001 (it references the table); before that,
 -- read-only check for duplicates the seed will resolve (the most recently seen live install wins):

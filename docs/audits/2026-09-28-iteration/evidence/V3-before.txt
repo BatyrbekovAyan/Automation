@@ -1,5 +1,5 @@
-V3 — поведенческий тест ДО исправления (HEAD 0fced8b4, Tools/n8n/tests/test_billing_identity.py: настоящие SQL Create/Verify Install, Issue Token и Auth Gate Get Usage из канона, temp-таблицы стенда, compat закрыт)
-Ожидаемо падают: B5 (платящий без бота теряет id — второй install проходит Get Usage), B8 (окно после удаления единственного бота), B10 (пинг-понг), B11 (неаутентифицированный bootstrap привязывает id), B7, негатив верификатора.
+V3 — поведенческий тест ДО исправления (HEAD 71c38611, Tools/n8n/tests/test_billing_identity.py: настоящие SQL Create/Verify Install, Issue Token и Auth Gate Get Usage из канона, temp-таблицы стенда, compat закрыт)
+Ожидаемо падают: B5 (платящий без бота теряет id — второй install проходит Get Usage), B8 (окно после удаления единственного бота), B10 (пинг-понг), B11 (неаутентифицированный bootstrap привязывает id — сирота), B7 (один держатель без бота), негатив верификатора (bootstrap привязывает / берёт названный id / перехват у держателя без живых ботов).
 
 PASS R2 B1: a second install naming a billing id another install holds (with a live bot) gets NO billing identity + billingConflict
 PASS R2 B2: a refresh naming another install's billing id does not move it (the caller keeps its own / nothing)
@@ -26,10 +26,25 @@ PASS R2 G3/G4: a token with u = R passes its own id and refuses another
 PASS R2 G5: Create WA/TG refuse an EMPTY AppUserID in session mode (it skipped the channel count and the quota)
 PASS R2 G7: Delete Bot Files is not blocked by its audit-only appUserId (a conflicted install can still delete its bot)
 PASS R2 negative: verify-auth-gate.py rejects an Auth Session that adopts the named billing id directly
-FAIL V3 negative: verify-auth-gate.py rejects a bootstrap that binds, and a bind that moves the id from a holder without live bots
-      - bootstrap binds: verifier passed: ped delete)
+FAIL V3 negative: verify-auth-gate.py rejects a bootstrap that binds (or adopts the named id), and a bind that moves the id from a holder without live bots
+      - bootstrap binds: verifier passed: )
+OK  Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json (workflow id + owner bound to the profile)
+OK  Delete Bot Files / Set Workflow State (V12: database ownership, honest answer, idempotent delete)
+OK  Set Workflow State (protected list carries Auth Session + Wappi Proxy)
+ALL AUTH GATE ASSERTS PASSED
 
-      - no-live-bot takeover: verifier passed: ped delete)
+      - bootstrap adopts the named id: the mutation did not apply
+      - bootstrap adopts the named id: verifier passed: )
+OK  Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json (workflow id + owner bound to the profile)
+OK  Delete Bot Files / Set Workflow State (V12: database ownership, honest answer, idempotent delete)
+OK  Set Workflow State (protected list carries Auth Session + Wappi Proxy)
+ALL AUTH GATE ASSERTS PASSED
+
+      - no-live-bot takeover: verifier passed: )
+OK  Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json (workflow id + owner bound to the profile)
+OK  Delete Bot Files / Set Workflow State (V12: database ownership, honest answer, idempotent delete)
+OK  Set Workflow State (protected list carries Auth Session + Wappi Proxy)
+ALL AUTH GATE ASSERTS PASSED
 
 
 13 pass, 6 fail

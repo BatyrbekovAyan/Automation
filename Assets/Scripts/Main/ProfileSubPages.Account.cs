@@ -122,11 +122,18 @@ public partial class ProfileSubPages
         //    lives in memory too and re-persists itself on its next write: empty it
         //    first, or a new Bot0 would inherit the old bots' pending choices (R5).
         ReplyModeSyncService.Existing?.ForgetAll();
-        PlayerPrefs.DeleteAll();
-        PlayerPrefs.Save();
+        // V3 (owner decision 2026-10-06): the install's server identity SURVIVES the wipe — the RevenueCat id lives in
+        // the SDK's own storage and comes back on the next refresh; a fresh install naming it would be refused (one
+        // install per billing id) and the subscription would be stuck in billingConflict until support revokes.
+        // PreserveAcrossWipe saves once, after the credentials are back — the disk never holds a wipe without them.
+        AuthClient.PreserveAcrossWipe(() => PlayerPrefs.DeleteAll());
 
         // 3. Disk: cache tree, response dumps, stickers, link previews.
         LocalDataWipe.DeleteDiskData(Application.persistentDataPath);
+
+        // The token still lists the retired bots for up to 12 h: re-read ownership now (same install, nothing owned).
+        var auth = AuthClient.Existing;
+        if (auth != null) auth.StartCoroutine(auth.ForceRefresh());
 
         RefreshAccountCard();
         ProfilePage.Instance?.RefreshProfileCard();

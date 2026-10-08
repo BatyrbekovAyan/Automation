@@ -141,8 +141,19 @@ def check_session():
     assert "secret_hash = $2" in vi and "revoked_at is null" in vi, "refresh must compare the secret hash and honour revocation"
     # R2: a named billing id becomes the token's u only through billing_bindings (one install per RevenueCat id)
     for q, label in ((ci, "Create Install"), (vi, "Verify Install")):
-        assert "insert into billing_bindings" in q and "billing_conflict" in q and "RCAnonymousID:" in q, f"R2: {label} must bind the billing id via billing_bindings"
+        assert "billing_conflict" in q, f"R2: {label} must report billing_conflict"
         assert "coalesce(nullif($3, ''), app_user_id)" not in q and "nullif($3, '')," not in q.split("insert into installs")[-1][:120], f"R2: {label} must not adopt the named id directly"
+    assert "insert into billing_bindings" in vi and "RCAnonymousID:" in vi, "R2: Verify Install must bind the billing id via billing_bindings"
+    # V3 (2026-09-28): only a refresh (the secret proven) binds; the unauthenticated bootstrap binds nothing, and the id
+    # moves only from a REVOKED holder — never from one that merely owns no live bot.
+    assert "insert into billing_bindings" not in ci and "select $1, $2, null::text," in ci, "V3: bootstrap (Create Install) must bind no billing id"
+    # the grant rule is pinned EXACTLY (whitespace-normalised): an added «or …» — such as the old «the holder owns no live
+    # bot» — would hand the id to anyone who names it
+    grant = " ".join(vi.split("on conflict (app_user_id) do update", 1)[-1].split("returning app_user_id", 1)[0].split())
+    grant = grant[grant.find(" where ") + 1:] if " where " in grant else ""
+    assert grant == ("where billing_bindings.install_id = excluded.install_id or not exists (select 1 from installs h "
+                     "where h.install_id = billing_bindings.install_id and h.revoked_at is null)"), \
+        f"V3: the billing id may move only to its own holder or from a REVOKED one (a holder without live bots keeps it): {grant!r}"
     assert "array_agg" in vi and "bot_profiles" in vi, "refresh must load ownership in the same statement"
     it = node(wf, "Issue Token")["parameters"]["jsCode"]
     assert "billingConflict: !!row.billing_conflict" in it, "R2: the client must learn billingConflict"

@@ -108,4 +108,46 @@ public static class SessionRefreshPolicy
     public static bool IdentityChanged(InstallSession.TokenClaims claims, string currentAppUserId, string lastRequestedAppUserId)
         => claims != null && !string.IsNullOrEmpty(currentAppUserId) && claims.AppUserId != currentAppUserId
            && currentAppUserId != lastRequestedAppUserId;
+
+    /// <summary>
+    /// V3 (2026-09-28): the server binds a billing id ONLY on a refresh — an install that has proven its secret.
+    /// Bootstrap is unauthenticated, so it binds nothing (an orphaned bootstrap whose answer was lost can never hold
+    /// anyone's id). A bootstrap that named an id is therefore followed by a refresh in the same session op.
+    /// </summary>
+    public static bool RefreshAfterBootstrap(string op, string requestedAppUserId)
+        => op == "bootstrap" && !string.IsNullOrEmpty(requestedAppUserId);
+
+    /// <summary>
+    /// What to record as «asked for» after a successful session op: a bootstrap asked for nothing the server could
+    /// grant (V3), so it records none — the next <see cref="IdentityChanged"/> check then asks with a refresh.
+    /// </summary>
+    public static string RequestedIdToRecord(string op, string requestedAppUserId)
+        => op == "bootstrap" ? "" : (requestedAppUserId ?? "");
+
+    /// <summary>Only a RevenueCat anonymous id is bindable (the server's rule — a device-id fallback never is).</summary>
+    public static bool IsBindableBillingId(string appUserId)
+    {
+        const string prefix = "$RCAnonymousID:";
+        if (appUserId == null || appUserId.Length != prefix.Length + 32 || !appUserId.StartsWith(prefix, StringComparison.Ordinal)) return false;
+        for (int i = prefix.Length; i < appUserId.Length; i++)
+        {
+            char ch = appUserId[i];
+            if (!((ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'f'))) return false;
+        }
+        return true;
+    }
+
+    /// <summary>Minimum gap between two resume-time retries of a declined billing id.</summary>
+    public const long BillingRetryGapSeconds = 60;
+
+    /// <summary>
+    /// V3: the token carries no (or another) billing identity for this device's RevenueCat id — billingConflict, or a
+    /// bootstrap whose follow-up refresh did not happen. The only cure on the server is a revoke of the holding install
+    /// (support), after which a refresh takes the id over; without a retry on resume the client would wait for the
+    /// planned refresh (~10 h). At most once a minute, never while a session op is in flight.
+    /// </summary>
+    public static bool ShouldRetryBillingOnResume(bool hasFocus, bool hasInstall, bool inFlight, InstallSession.TokenClaims claims,
+                                                  string currentAppUserId, long nowSec, long lastAttemptSec)
+        => hasFocus && hasInstall && !inFlight && claims != null && IsBindableBillingId(currentAppUserId)
+           && claims.AppUserId != currentAppUserId && nowSec - lastAttemptSec >= BillingRetryGapSeconds;
 }

@@ -97,6 +97,9 @@ class Owner:
         st, d = session({"op": "bootstrap", "platform": "test", "appVersion": "e2e", "appUserId": self.app_user_id})
         assert st == 200 and d.get("success"), f"bootstrap {tag}: {st} {d}"
         self.install_id, self.secret, self.token = d["installId"], d["installSecret"], d["token"]
+        self.boot_app_user_id = d.get("appUserId")
+        # V3: the unauthenticated bootstrap binds no billing id; the client refreshes right after it (same session op)
+        self.refresh()
 
     def refresh(self):
         st, d = session({"op": "refresh", "installId": self.install_id, "installSecret": self.secret, "appUserId": self.app_user_id})
@@ -593,7 +596,7 @@ def wait_ready(timeout=90):
         time.sleep(2)
 
 
-@scenario("billing_id_first_bind", "R2: a second install naming a billing id another install holds (with a live bot) gets NO billing identity + billingConflict — its GetUsage/Create/profile.add on that id are refused; the id follows only once the holder is revoked")
+@scenario("billing_id_first_bind", "R2/V3: a second install naming a billing id another install holds — WITH a live bot or WITHOUT one (a paying owner before the first bot) — gets NO billing identity + billingConflict on bootstrap AND refresh; its GetUsage/profile.add on that id are refused; the bootstrap itself binds nothing; the id follows only once the holder is revoked")
 def s_billing_bind(ctx):
     a = fresh_owner(ctx, "r2a")                                   # holds the id and owns a live bot
     b = Owner("r2b", ctx["run_id"], app_user_id=a.app_user_id)   # the same id named by another install
@@ -604,10 +607,29 @@ def s_billing_bind(ctx):
     holders = pg(f"select string_agg(install_id, ',') from installs where app_user_id = '{a.app_user_id}' and revoked_at is null;")
     pg(f"update installs set revoked_at = now() where install_id = '{a.install_id}';")
     d_b2 = b.refresh()
-    ok = (d_b.get("appUserId") is None and d_b.get("billingConflict") is True and usage_own == 200 and usage_b == 403
-          and add_b == 409 and holders == a.install_id and d_b2.get("appUserId") == a.app_user_id and not d_b2.get("billingConflict"))
-    return ok, (f"second: appUserId={d_b.get('appUserId')} conflict={d_b.get('billingConflict')} usage_own={usage_own} usage_second={usage_b} "
-                f"profile.add_second={add_b} {add_body} holders={holders == a.install_id} after_revoke={d_b2.get('appUserId') == a.app_user_id}/{d_b2.get('billingConflict')}")
+    with_bot = (d_b.get("appUserId") is None and d_b.get("billingConflict") is True and usage_own == 200 and usage_b == 403
+                and add_b == 409 and holders == a.install_id and d_b2.get("appUserId") == a.app_user_id and not d_b2.get("billingConflict"))
+    # V3: the holder owns NO bot (paid, before its first bot) — still keeps the id; the bootstrap binds nothing
+    c = Owner("v3c", ctx["run_id"])                               # bootstrap + refresh: holds its id, no profile
+    pg(f"update subscribers set plan = 'business', status = 'active' where app_user_id = '{c.app_user_id}';")
+    x = Owner("v3x", ctx["run_id"], app_user_id=c.app_user_id)
+    d_x = x.refresh()
+    usage_x = hook("GetUsage", x.token, {"appUserId": c.app_user_id})[0]
+    add_x, _ = proxy(x.token, {"op": "profile.add", "channel": "whatsapp", "name": "e2e v3x"})
+    add_x_tg, _ = proxy(x.token, {"op": "profile.add", "channel": "telegram", "name": "e2e v3x tg"})
+    d_c = c.refresh()
+    usage_c = hook("GetUsage", c.token, {"appUserId": c.app_user_id})[0]
+    holders_c = pg(f"select string_agg(install_id, ',') from installs where app_user_id = '{c.app_user_id}' and revoked_at is null;")
+    pg(f"update installs set revoked_at = now() where install_id = '{c.install_id}';")
+    d_x2 = x.refresh()
+    no_bot = (c.boot_app_user_id is None and x.boot_app_user_id is None and d_x.get("appUserId") is None and d_x.get("billingConflict") is True
+              and usage_x == 403 and add_x == 409 and add_x_tg == 409 and d_c.get("appUserId") == c.app_user_id and not d_c.get("billingConflict")
+              and usage_c == 200 and holders_c == c.install_id and d_x2.get("appUserId") == c.app_user_id and not d_x2.get("billingConflict"))
+    return with_bot and no_bot, (f"WITH bot: second appUserId={d_b.get('appUserId')} conflict={d_b.get('billingConflict')} usage_own={usage_own} usage_second={usage_b} "
+                                 f"profile.add_second={add_b} {add_body} holders={holders == a.install_id} after_revoke={d_b2.get('appUserId') == a.app_user_id}/{d_b2.get('billingConflict')} | "
+                                 f"NO bot (V3): bootstrap_binds={c.boot_app_user_id}/{x.boot_app_user_id} second={d_x.get('appUserId')}/{d_x.get('billingConflict')} "
+                                 f"usage_second={usage_x} profile.add_second={add_x}/tg {add_x_tg} holder_refresh={d_c.get('appUserId') == c.app_user_id}/{d_c.get('billingConflict')} "
+                                 f"usage_holder={usage_c} holders={holders_c == c.install_id} after_revoke={d_x2.get('appUserId') == c.app_user_id}/{d_x2.get('billingConflict')}")
 
 
 @scenario("create_rejects_empty_appuserid_in_session", "R2: CreateWhatsappWorkflow/CreateTelegramWorkflow with an EMPTY AppUserID in session mode are refused before any write (the empty id skipped Count Channels and let the quota fail open)")

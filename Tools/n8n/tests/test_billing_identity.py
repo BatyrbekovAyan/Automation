@@ -1,12 +1,16 @@
 #!/usr/bin/env python3
-"""R2 (iteration 2026-09-27): naming a RevenueCat billing id no longer grants its plan, quota or channel slots.
+"""R2 (iteration 2026-09-27) + V3 (iteration 2026-09-28): naming a RevenueCat billing id never grants its plan, quota or
+channel slots.
 
 A billing id (only the RevenueCat anonymous format `$RCAnonymousID:` + 32 hex — a device-id fallback is never bound)
 belongs to ONE install (billing_bindings). Another install that names it gets NO billing identity in its token
-(u = null) and a `billingConflict` flag — unless the holder is revoked or owns no live bot (recovery after a lost
-install secret: claim the bots by code first, then the billing id follows). The gates then refuse any billing-id
-field that is not the token's own (u = null refuses them all), and Create WA/TG refuse an empty AppUserID in
-session mode (it skipped the channel count and let the quota fail open).
+(u = null) and a `billingConflict` flag. V3: the id moves ONLY from a holder the server itself revoked — never because
+the holder «has no live bot» (a paying owner before the first bot, or right after deleting it, lost the id to anyone
+who named it, and the two installs then ping-ponged it on every refresh). And it is bound ONLY on a refresh (an install
+that proved its secret): the unauthenticated bootstrap binds nothing, so an orphaned bootstrap whose answer was lost can
+never hold anyone's id (the case the «no live bot» exception used to cover). The client refreshes right after a
+bootstrap; «Удалить все данные» keeps the install (owner decision 2026-10-06). The gates then refuse any billing-id field
+that is not the token's own (u = null refuses them all), and Create WA/TG refuse an empty AppUserID in session mode.
 
 Real SQL of Create Install / Verify Install (+ the migration's seed) on staging-Postgres session temp tables with a
 real clock; real Issue Token and gate Code bodies from the canonical JSONs; the legacy compat window CLOSED
@@ -16,7 +20,7 @@ import re
 import time
 from pathlib import Path
 
-from harness import N8N, Case, PgSession, bind, code, node, report, run_js, wf
+from harness import N8N, Case, PgSession, bind, code, module, node, report, run_js, wf
 
 W = wf('crAuthSession001-Auth_Session.json')
 Q = lambda name: node(W, name)['parameters']['query']
@@ -38,6 +42,25 @@ def refresh(pg, install, app_user_id):
     return pg.q(bind(Q('Verify Install'), [install, 'h-' + install, app_user_id]))[0]
 
 
+def join(pg, install, app_user_id):
+    """What the client does on a fresh install (V3): bootstrap, then refresh in the same session op — the refresh is
+    where the billing id is bound. Returns the refresh row (the token the client ends up with)."""
+    boot(pg, install, app_user_id)
+    return refresh(pg, install, app_user_id)
+
+
+def usage_gate_for(row):
+    """Issue Token on a Verify Install row → the real Auth Gate of Get Usage with that token naming R."""
+    issued = code(W, 'Issue Token', {'json': row}, named={'Route': {'op': 'refresh', 'installId': row.get('install_id'), 'nowSec': int(time.time()), 'installSecret': ''}})[0]['json']
+    g = code(wf('jtbssfzXbOxwTK4k-Get_Usage.json'), 'Auth Gate', {'json': {'headers': {'authorization': 'Bearer ' + issued.get('token', '')}, 'body': {'appUserId': R}}})[0]['json']['crAuth']
+    return 'ok' if g['ok'] else g['reason']
+
+
+def paid(pg, app_user_id):
+    pg.x("create temp table if not exists subscribers (app_user_id text primary key, plan text, status text);")
+    pg.x(f"insert into subscribers (app_user_id, plan, status) values ('{app_user_id}', 'business', 'active') on conflict do nothing;")
+
+
 def holders(pg, app_user_id):
     return [r['install_id'] for r in pg.q(f"select install_id from installs where app_user_id = '{app_user_id}' and revoked_at is null order by install_id")]
 
@@ -48,42 +71,83 @@ def own_bot(pg, install, pid):
 
 with Case('R2 B1: a second install naming a billing id another install holds (with a live bot) gets NO billing identity + billingConflict') as c:
     with PgSession(SETUP) as pg:
-        a = boot(pg, 'inst-A', R)
+        a = join(pg, 'inst-A', R)
         own_bot(pg, 'inst-A', 'wa-A')
-        b = boot(pg, 'inst-B', R)
+        b = join(pg, 'inst-B', R)
         c.check(a.get('app_user_id') == R, f'first install must hold it: {a}')
         c.check(b.get('install_id') == 'inst-B' and b.get('app_user_id') is None and b.get('billing_conflict') is True, f'second install: {b}')
         c.check(holders(pg, R) == ['inst-A'], f'holders {holders(pg, R)}')
 
 with Case('R2 B2: a refresh naming another install\'s billing id does not move it (the caller keeps its own / nothing)') as c:
     with PgSession(SETUP) as pg:
-        boot(pg, 'inst-A', R); own_bot(pg, 'inst-A', 'wa-A')
-        boot(pg, 'inst-C', R2)
+        join(pg, 'inst-A', R); own_bot(pg, 'inst-A', 'wa-A')
+        join(pg, 'inst-C', R2)
         r = refresh(pg, 'inst-C', R)
         c.check(r.get('app_user_id') == R2 and r.get('billing_conflict') is True and holders(pg, R) == ['inst-A'], f'{r} holders={holders(pg, R)}')
 
 with Case('R2 B3: the holder\'s own repeated refresh is idempotent (no conflict)') as c:
     with PgSession(SETUP) as pg:
-        boot(pg, 'inst-A', R); own_bot(pg, 'inst-A', 'wa-A')
+        join(pg, 'inst-A', R); own_bot(pg, 'inst-A', 'wa-A')
         r1, r2 = refresh(pg, 'inst-A', R), refresh(pg, 'inst-A', R)
         c.check(r1.get('app_user_id') == R and r2.get('app_user_id') == R and not r2.get('billing_conflict'), f'{r1} / {r2}')
 
 with Case('R2 B4: a REVOKED holder releases the id — the next install that names it takes it over') as c:
     with PgSession(SETUP) as pg:
-        boot(pg, 'inst-A', R); own_bot(pg, 'inst-A', 'wa-A')
-        boot(pg, 'inst-B', R)
+        join(pg, 'inst-A', R); own_bot(pg, 'inst-A', 'wa-A')
+        join(pg, 'inst-B', R)
         pg.x("update installs set revoked_at = now() where install_id = 'inst-A';")
         r = refresh(pg, 'inst-B', R)
         c.check(r.get('app_user_id') == R and not r.get('billing_conflict'), f'{r}')
 
-with Case('R2 B5: a holder with NO live bot releases the id (recovery: claim the bots first, the billing id follows)') as c:
+with Case('V3 B5: a live holder WITHOUT a live bot (a paying owner before the first bot) keeps its id — another install naming it gets nothing, on bootstrap AND refresh, and cannot pass Get Usage') as c:
     with PgSession(SETUP) as pg:
-        boot(pg, 'inst-OLD', R); own_bot(pg, 'inst-OLD', 'wa-1')
-        n1 = boot(pg, 'inst-NEW', R)
-        pg.x("update bot_profiles set owner_id = 'inst-NEW' where profile_id = 'wa-1';")      # claimed by code
-        n2 = refresh(pg, 'inst-NEW', R)
-        c.check(n1.get('app_user_id') is None and n2.get('app_user_id') == R and holders(pg, R) == ['inst-NEW'],
-                f'before claim {n1} after claim {n2} holders={holders(pg, R)}')
+        paid(pg, R)
+        v = join(pg, 'inst-V', R)                                   # the paying owner, no bot yet
+        x_boot = boot(pg, 'inst-X', R)
+        x_ref = refresh(pg, 'inst-X', R)
+        victim_row = pg.q("select app_user_id from installs where install_id = 'inst-V'")[0]['app_user_id']
+        v2 = refresh(pg, 'inst-V', R)
+        c.check(v.get('app_user_id') == R, f'the owner must hold its id: {v}')
+        c.check(x_boot.get('app_user_id') is None and x_ref.get('app_user_id') is None and x_ref.get('billing_conflict') is True,
+                f'the second install got the id: boot={x_boot} refresh={x_ref}')
+        c.check(victim_row == R and v2.get('app_user_id') == R and not v2.get('billing_conflict') and holders(pg, R) == ['inst-V'],
+                f'the owner lost it: row={victim_row} refresh={v2} holders={holders(pg, R)}')
+        c.check(usage_gate_for(x_ref) != 'ok', 'the second install passes Get Usage with the owner\'s id')
+        c.check(usage_gate_for(v2) == 'ok', 'the owner must pass its own Get Usage')
+
+with Case('V3 B8: the holder deleted its ONLY bot (deleted_at set, as Delete Bot Files does) — the id still does not move') as c:
+    with PgSession(SETUP) as pg:
+        join(pg, 'inst-V', R); own_bot(pg, 'inst-V', 'wa-V')
+        pg.x("update bot_profiles set deleted_at = now(), deleted_reason = 'app_delete' where profile_id = 'wa-V';")
+        x = join(pg, 'inst-X', R)
+        c.check(x.get('app_user_id') is None and x.get('billing_conflict') is True and holders(pg, R) == ['inst-V'], f'{x} holders={holders(pg, R)}')
+
+with Case('V3 B9: «Удалить все данные» keeps the install — all its profiles retired, the same install refreshes with the same id: same u, no conflict, nothing owned') as c:
+    with PgSession(SETUP) as pg:
+        join(pg, 'inst-V', R); own_bot(pg, 'inst-V', 'wa-V'); own_bot(pg, 'inst-V', 'tg-V')
+        pg.x("update bot_profiles set deleted_at = now(), deleted_reason = 'app_delete' where owner_id = 'inst-V';")
+        r = refresh(pg, 'inst-V', R)
+        c.check(r.get('app_user_id') == R and not r.get('billing_conflict') and r.get('p') == [], f'{r}')
+
+with Case('V3 B10: no ping-pong — after a conflict, repeated refreshes of the holder and of the other install never move the holder') as c:
+    with PgSession(SETUP) as pg:
+        join(pg, 'inst-V', R)
+        boot(pg, 'inst-X', R)                                       # the other install exists (bootstrap) and names the id
+        seen = []
+        for _ in range(3):
+            seen.append(refresh(pg, 'inst-X', R).get('app_user_id'))
+            seen.append(refresh(pg, 'inst-V', R).get('app_user_id'))
+        c.check(seen == [None, R] * 3 and holders(pg, R) == ['inst-V'], f'alternating refreshes: {seen} holders={holders(pg, R)}')
+
+with Case('V3 B11: the unauthenticated bootstrap binds NOTHING — an orphaned bootstrap (answer lost) never holds the id, the real install\'s refresh binds it') as c:
+    with PgSession(SETUP) as pg:
+        orphan = boot(pg, 'inst-ORPHAN', R)                         # the client never saw this answer
+        bound = pg.q(f"select count(*) as n from billing_bindings where app_user_id = '{R}'")[0]['n']
+        c.check(orphan.get('app_user_id') is None and not orphan.get('billing_conflict') and bound == 0,
+                f'a bootstrap bound the id: {orphan} bindings={bound}')
+        mine = join(pg, 'inst-MINE', R)
+        c.check(mine.get('app_user_id') == R and not mine.get('billing_conflict') and holders(pg, R) == ['inst-MINE'],
+                f'the real install must get its id on its first refresh: {mine} holders={holders(pg, R)}')
 
 with Case('R2 B6: a device-id fallback is never bound (not a RevenueCat id) — no identity, no conflict; the RC id binds later') as c:
     with PgSession(SETUP) as pg:
@@ -93,7 +157,7 @@ with Case('R2 B6: a device-id fallback is never bound (not a RevenueCat id) — 
 
 with Case('R2 B7: exactly one live install ever holds a billing id') as c:
     with PgSession(SETUP) as pg:
-        boot(pg, 'inst-A', R); own_bot(pg, 'inst-A', 'wa-A')
+        join(pg, 'inst-A', R)                                       # V3: no live bot needed to keep it
         for i in range(3):
             boot(pg, f'inst-X{i}', R)
             refresh(pg, f'inst-X{i}', R)
@@ -183,5 +247,37 @@ with Case('R2 negative: verify-auth-gate.py rejects an Auth Session that adopts 
         c.check(r.returncode != 0 and 'R2' in r.stdout, f'verifier passed the pre-R2 refresh: {r.stdout[-300:]}')
     finally:
         shutil.rmtree(d, ignore_errors=True)
+
+with Case('V3 negative: verify-auth-gate.py rejects a bootstrap that binds (or adopts the named id), and a bind that moves the id from a holder without live bots') as c:
+    import json as _json
+    import shutil
+    import subprocess
+    import sys
+    import tempfile
+    gen = module('build-auth-workflows.py')
+    old_cond = "     or not exists (select 1 from bot_profiles bp where bp.owner_id = billing_bindings.install_id and bp.deleted_at is null)\n"
+    # the realistic regression: the generator's own bind CTEs put back into the unauthenticated bootstrap
+    boot_ctes = gen.BILLING_BIND_CTES.replace('__HOLDER__', '$1').replace('__FROM__', ', ok')
+    for label, field, make in (
+        ('bootstrap binds', 'Create Install', lambda q: q.replace("), ins as (", "), " + boot_ctes + ", ins as (", 1)
+                                                         .replace("null::text", "(select app_user_id from bind)", 1)),
+        ('bootstrap adopts the named id', 'Create Install', lambda q: q.replace("select $1, $2, null::text,", "select $1, $2, $3,", 1)),
+        ('no-live-bot takeover', 'Verify Install', lambda q: q.replace("  returning app_user_id\n), strip", old_cond + "  returning app_user_id\n), strip", 1)),
+    ):
+        d = Path(tempfile.mkdtemp(prefix='v3-neg-'))
+        try:
+            for p in (N8N / 'workflows').glob('*.json'):
+                shutil.copy(p, d / p.name)
+            f = d / 'crAuthSession001-Auth_Session.json'
+            w = _json.loads(f.read_text(encoding='utf-8'))
+            n = next(x for x in w['nodes'] if x['name'] == field)
+            before = n['parameters']['query']
+            n['parameters']['query'] = make(before)
+            c.check(n['parameters']['query'] != before, f'{label}: the mutation did not apply')
+            f.write_text(_json.dumps(w, indent=2, ensure_ascii=False) + '\n', encoding='utf-8')
+            r = subprocess.run([sys.executable, str(N8N / 'verify-auth-gate.py'), '--dir', str(d)], capture_output=True, text=True)
+            c.check(r.returncode != 0 and 'V3' in r.stdout, f'{label}: verifier passed: {r.stdout[-300:]}')
+        finally:
+            shutil.rmtree(d, ignore_errors=True)
 
 report()

@@ -123,4 +123,52 @@ public class InstallSessionTests
         Assert.IsFalse(SessionRefreshPolicy.IdentityChanged(kept, "rc-other", "rc-other"), "asked for another install's id, kept our own");
         Assert.IsTrue(SessionRefreshPolicy.IdentityChanged(declined, "rc-2", "rc-1"), "a different id than the declined one is asked for once");
     }
+
+    private const string Rc = "$RCAnonymousID:0123456789abcdef0123456789abcdef";
+
+    /// <summary>
+    /// V3 (2026-09-28): the server binds a billing id only on a refresh (an install that proved its secret); the
+    /// unauthenticated bootstrap binds nothing, so an orphaned bootstrap can never hold anyone's id. A bootstrap that
+    /// named an id therefore refreshes in the same op and records NO requested id (a failed follow-up refresh is then
+    /// retried by IdentityChanged on the next call).
+    /// </summary>
+    [Test]
+    public void Bootstrap_BindsNothing_TheIdIsAskedForByTheFollowUpRefresh()
+    {
+        Assert.IsTrue(SessionRefreshPolicy.RefreshAfterBootstrap("bootstrap", Rc));
+        Assert.IsFalse(SessionRefreshPolicy.RefreshAfterBootstrap("bootstrap", ""), "nothing to bind");
+        Assert.IsFalse(SessionRefreshPolicy.RefreshAfterBootstrap("refresh", Rc), "a refresh is the bind itself");
+        Assert.AreEqual("", SessionRefreshPolicy.RequestedIdToRecord("bootstrap", Rc));
+        Assert.AreEqual(Rc, SessionRefreshPolicy.RequestedIdToRecord("refresh", Rc));
+        var boot = new InstallSession.TokenClaims { AppUserId = null };
+        Assert.IsTrue(SessionRefreshPolicy.IdentityChanged(boot, Rc, SessionRefreshPolicy.RequestedIdToRecord("bootstrap", Rc)),
+            "after a bootstrap whose refresh failed, the next call must ask again");
+    }
+
+    [Test]
+    public void IsBindableBillingId_OnlyTheRevenueCatAnonymousFormat()
+    {
+        Assert.IsTrue(SessionRefreshPolicy.IsBindableBillingId(Rc));
+        Assert.IsFalse(SessionRefreshPolicy.IsBindableBillingId("A1B2C3D4-E5F6-47A8-9B0C-D1E2F3A4B5C6"), "device-id fallback");
+        Assert.IsFalse(SessionRefreshPolicy.IsBindableBillingId("$RCAnonymousID:0123456789ABCDEF0123456789abcdef"), "upper-case hex");
+        Assert.IsFalse(SessionRefreshPolicy.IsBindableBillingId(Rc + "0"));
+        Assert.IsFalse(SessionRefreshPolicy.IsBindableBillingId(null));
+    }
+
+    /// <summary>V3: a declined id is retried once on return to the app (support may have revoked the holder), never in a storm.</summary>
+    [Test]
+    public void ShouldRetryBillingOnResume_OnlyForADeclinedRevenueCatId_AtMostOnceAMinute()
+    {
+        var declined = new InstallSession.TokenClaims { AppUserId = null };
+        var granted = new InstallSession.TokenClaims { AppUserId = Rc };
+        Assert.IsTrue(SessionRefreshPolicy.ShouldRetryBillingOnResume(true, true, false, declined, Rc, 1000, 0));
+        Assert.IsFalse(SessionRefreshPolicy.ShouldRetryBillingOnResume(true, true, false, granted, Rc, 1000, 0), "the token already carries it");
+        Assert.IsFalse(SessionRefreshPolicy.ShouldRetryBillingOnResume(false, true, false, declined, Rc, 1000, 0), "focus lost");
+        Assert.IsFalse(SessionRefreshPolicy.ShouldRetryBillingOnResume(true, false, false, declined, Rc, 1000, 0), "no install yet");
+        Assert.IsFalse(SessionRefreshPolicy.ShouldRetryBillingOnResume(true, true, true, declined, Rc, 1000, 0), "a session op in flight");
+        Assert.IsFalse(SessionRefreshPolicy.ShouldRetryBillingOnResume(true, true, false, null, Rc, 1000, 0), "no token");
+        Assert.IsFalse(SessionRefreshPolicy.ShouldRetryBillingOnResume(true, true, false, declined, "device-id", 1000, 0), "a device id never binds");
+        Assert.IsFalse(SessionRefreshPolicy.ShouldRetryBillingOnResume(true, true, false, declined, Rc, 1059, 1000), "inside the gap");
+        Assert.IsTrue(SessionRefreshPolicy.ShouldRetryBillingOnResume(true, true, false, declined, Rc, 1060, 1000));
+    }
 }
