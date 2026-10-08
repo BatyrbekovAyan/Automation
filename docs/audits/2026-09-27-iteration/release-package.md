@@ -31,7 +31,15 @@ workflow — `deploy-canonical.py` (dry-run → `--apply --yes`, точка от
 
 - Существующие канонические → `deploy-canonical.py` (dry-run, затем `--apply --yes`; точка отката — versionId каждого).
 - `Set Workflow State`, `Support Message` → `build-client-webhooks.py --update`.
-- Новых workflow с фиксированными id в этой итерации НЕТ (`import:workflow` не требуется).
+- **Новый workflow `crPriceSearch001` (Price List Search; итерация 2026-09-28, V9 + V9-r2) — импортируется ОТДЕЛЬНО и ПЕРВЫМ.**
+  `deploy-canonical.py` новые workflow не импортирует (печатает `MISSING crPriceSearch001 … import it with n8n import:workflow`).
+  Импорт: `docker exec … n8n import:workflow --separate` с файлом `Tools/n8n/workflows/crPriceSearch001-Price_List_Search.json`
+  (id сохраняется — на него ссылаются по литералу), затем `publish:workflow` (это под-workflow с триггером «Execute Workflow»;
+  активация через API не нужна), read-back: `activeVersionId == versionId`. Порядок обязателен: ДО шаблонов WA/TG, ДО обновления
+  клонов (`update-clones.py`) и ДО Test Dialog — их инструмент «Supabase Vector Store» теперь toolWorkflow на `crPriceSearch001`;
+  без опубликованного под-workflow поиск по прайсам у бота и в Test Dialog отвечает ошибкой инструмента. Идентификатор — в
+  защищённом списке Set Workflow State (`build-client-webhooks.py --update`). Suggest Replies (панель) несёт ту же функцию сверки
+  в своём Assemble и от под-workflow не зависит. Других новых workflow с фиксированными id в этой итерации нет.
 - **Клоны ботов — инвентарь только по выводу инструмента** (итерация 2026-09-28, V10). Прежняя строка «клонов нет, обновлять
   нечего» была перенесена из журнала деплоя 24.09 и на 28.09 была ложной: «23» / `dt6hHFUVrW07unTj` был активен, с графом
   и головой промпта шаблона 24.09. Поэтому список клонов берётся ТОЛЬКО из `verify-deployed.py --base <prod>` (строки
@@ -65,7 +73,7 @@ workflow — `deploy-canonical.py` (dry-run → `--apply --yes`, точка от
 
 Затрагиваемые группы: Auth Session, Wappi Proxy, все gated вебхуки, оба шаблона ботов, Create/Edit WA+TG, Suggest Replies,
 Upload File, Delete File, Delete Bot Files, Dashboard Outcomes, Get Usage, Set Reply Mode, Handoffs, Handoff Notifier, Test Dialog,
-Profile Lifecycle Sweep (V12).
+Profile Lifecycle Sweep (V12), Price List Search `crPriceSearch001` (V9 — новый, импорт отдельно, см. выше).
 
 ## 3. Read-back
 
@@ -101,11 +109,13 @@ Device-pass до релиза: холодный старт R5, строка ID R
 
 ## 8. Порядок
 
-1) read-only проверка дублей (R2) → 2) миграции §1 по порядку → 3) workflow-группа (`deploy-canonical`: шаблоны, Create/Edit
-с новой картой промптов, gated) + `build-client-webhooks --update` → 4) инвентарь клонов по `verify-deployed`; для каждого
-живого клона `update-clones` dry-run → `--only <id> --apply --yes` → 5) read-back `verify-deployed` exit 0 (канон + клоны по
-графу и промпту) → 6) активность `crHandoffNtfy001` → 7) canary (.txt upload, Test Dialog, заявка; на обновлённом клоне —
-входящее → `sent`, Test Dialog отвечает по опубликованной версии с новой головой) → 8) только затем сборка и раскатка клиента.
+1) read-only проверка дублей (R2) → 2) миграции §1 по порядку → 3) импорт + `publish:workflow` нового `crPriceSearch001` (V9),
+read-back → 4) workflow-группа (`deploy-canonical`: шаблоны, Create/Edit с новой картой промптов, gated, Test Dialog) +
+`build-client-webhooks --update` → 5) инвентарь клонов по `verify-deployed`; для каждого
+живого клона `update-clones` dry-run → `--only <id> --apply --yes` → 6) read-back `verify-deployed` exit 0 (канон + клоны по
+графу и промпту) → 7) активность `crHandoffNtfy001` → 8) canary (.txt upload, Test Dialog, заявка; на обновлённом клоне —
+входящее → `sent`, Test Dialog отвечает по опубликованной версии с новой головой; вопрос о цене позиции с артикулом —
+поиск по прайсам отвечает, без ошибки инструмента) → 9) только затем сборка и раскатка клиента.
 
 ## Отдельно (вне полосы этой итерации, решение владельца)
 

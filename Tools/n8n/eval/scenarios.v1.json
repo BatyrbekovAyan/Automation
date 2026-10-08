@@ -1,5 +1,5 @@
 {
-  "version": "v1.1 (2026-09-22: absent-item check names the item; harness h2)",
+  "version": "v1.2 (2026-10-08: V9-r2 ap_price_agrees_analogues — the price list agrees with the catalog, analogue rows in the same chunk; harness h5)",
   "notes": "Synthetic business scenarios — no real chats, no real names or numbers. `mode`: auto (the bot's composed system prompt through the completions proxy, with the create_handoff and price_list_search tools simulated by the runner) | panel (the Suggest Replies webhook on staging). `expect` names deterministic checks the runner applies; `tool` sets the simulated create_handoff result.",
   "knowledge": {
     "auto_parts": {
@@ -218,6 +218,31 @@
       ],
       "expect": [
         "no_fresh_price_pick",
+        "no_markdown"
+      ]
+    },
+    {
+      "id": "ap_price_agrees_analogues",
+      "vertical": "auto_parts",
+      "mode": "auto",
+      "lang": "ru",
+      "tags": [
+        "conflict_control",
+        "key"
+      ],
+      "docs_override": [
+        "Фильтры масляные Toyota\nФильтр масляный Toyota 90915-YZZE1 (оригинал) — 3200 тг\nФильтр масляный Knecht OC 91 (90915-YZZE1) — 1400 тг\nФильтр масляный Filtron OP 563 (90915-YZZE1) — 1350 тг\nФильтр масляный Mahle OC 217 (90915-YZZE1) — 1600 тг"
+      ],
+      "messages": [
+        [
+          "client",
+          "Camry 2019, фильтр масляный 90915-YZZE1 сколько?"
+        ]
+      ],
+      "expect": [
+        "mentions:3200",
+        "no_conflict_claim",
+        "no_price_caveat",
         "no_markdown"
       ]
     },

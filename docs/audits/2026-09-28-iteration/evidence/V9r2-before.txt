@@ -1,0 +1,191 @@
+V9-r2 — tests FIRST: the final V9-r2 test files run against HEAD 3ea18d90's code
+(a `git archive HEAD Tools/n8n` copy with only these files replaced: tests/test_price_search.py, tests/test_suggest_price.py,
+ eval/test_checks.py, eval/scenarios.v1.json — the generators, the canonical workflows and run-eval.py are HEAD's).
+date: 2026-10-08T10:38Z   no network, no staging, no model — the REAL Code bodies of the canonical workflows
+Summary: test_price_search 23 pass / 8 fail; test_suggest_price 2 pass / 10 fail; test_checks 13 failures.
+
+$ python3 Tools/n8n/tests/test_price_search.py
+PASS sub-workflow: Guard → Valid? → Search Price Lists (the bot's own documents, fail-open) → Reconcile Prices
+PASS [WA] template: the price-list tool goes through the sub-workflow with the clone's own id, key and PUBLISHED prompt
+PASS [TG] template: the price-list tool goes through the sub-workflow with the clone's own id, key and PUBLISHED prompt
+PASS Test Dialog: its tool is the same sub-workflow, fed with the bot's id/key (Validate) and the published prompt it read (Compose)
+PASS Guard: a search runs only for a real bot id under botWaId / botTgId
+PASS ap_source_conflict: one mark under the price-list row — the item, 3200 and 3900, «Цены расходятся»
+PASS base documents of every vertical, at their own catalog prices, come back byte for byte
+PASS price-list shapes the converter / OCR / PDF / free text produce: a different price is marked
+FAIL V9-r2 F2(b): a bare number at the end of a PDF/DOCX line (no currency, no label) is at most the soft mark, still naming both numbers
+      - pdf, no currency: ['[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1» — 3200 тг, в прайсе — 3 900. Цены расходятся.]']
+      - pdf, leader dots: ['[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1» — 3200 тг, в прайсе — 3900. Цены расходятся.]']
+      - docx table row (F7: «;» at the end): []
+      - rtf tabs: ['[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1» — 3200 тг, в прайсе — 3900. Цены расходятся.]']
+PASS all price columns are compared: опт/розн — no mark when either equals the catalog, both named when neither does
+PASS ambiguous prices («от», a range) get the catalog price only — never «Цены расходятся»
+PASS no mark: price on the next line, a longer code, a bare year, an analogue mention or column, no article, «договорная»
+PASS grades, sizes and specs are not articles; an accessory with the same model code is only a soft mark
+PASS adversarial (own review): analogue rows, promo prices, joined specs, two amounts — never a false «Цены расходятся»
+FAIL V9-r2 corpus: rows about another item / prices that are not comparable — never the firm «Цены расходятся»
+      - FP-analog-paren-OEM: ['conflict'] ['Фильтр масляный Knecht OC 91 (Toyota 90915-YZZE1) — 1400 тг\n[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1» — 3200 тг, в прайсе — 1400 тг. Цены расходятся.]']
+      - FP-analog-primenimost-free: ['conflict'] ['Фильтр масляный MANN W 68/3, применимость: Toyota 90915-YZZE1 — 1400 тг\n[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1» — 3200 тг, в прайсе — 1400 тг. Цены расходятся.]']
+      - FP-analog-podhodit-free: ['conflict'] ['Фильтр масляный Sakura C 1139, подходит для Toyota 90915-YZZE1 — 1400 тг\n[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1» — 3200 тг, в прайсе — 1400 тг. Цены расходятся.]']
+      - FP-analog-dlya: ['conflict'] ['Фильтр масляный Bosch для 90915-YZZE1 — 1400 тг\n[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1» — 3200 тг, в прайсе — 1400 тг. Цены расходятся.]']
+      - FP-analog-conv-primenimost: ['conflict'] ['product[5]: Наименование: Фильтр масляный MANN W 68/3; Применимость: Toyota 90915-YZZE1; Цена: 1400; \n[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1» — 3200 тг, в прайсе — 1400. Цены расходятся.]']
+      - FP-analog-conv-primechanie: ['conflict'] ['product[6]: Наименование: Фильтр масляный Sakura; Примечание: заменяет 90915-YZZE1; Цена: 1400; \n[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1» — 3200 тг, в прайсе — 1400. Цены расходятся.]']
+      - FP-analog-conv-OE-first: ['conflict'] ['product[2]: OE номер: 90915-YZZE1; Артикул: W 68/3; Наименование: Фильтр масляный MANN; Цена: 1400; \n[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1» — 3200 тг, в прайсе — 1400. Цены расходятся.]']
+      - FP-analog-conv-nomerOE: ['conflict'] ['product[2]: Номер OE: 90915-YZZE1; Бренд: MANN; Наименование: Фильтр масляный; Цена: 1400; \n[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1» — 3200 тг, в прайсе — 1400. Цены расходятся.]']
+      - FP-analog-conv-kross-in-name: ['conflict'] ['product[4]: Наименование: Фильтр масляный Sakura (кросс 90915-YZZE1); Цена: 1400; \n[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1» — 3200 тг, в прайсе — 1400. Цены расходятся.]']
+      - bosch-spaces: ['conflict'] ['Фильтр масляный Bosch 0 986 452 041 (90915-YZZE1) — 1900 тг\n[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1» — 3200 тг, в прайсе — 1900 тг. Цены расходятся.]']
+      - FP-kit-single-article: ['conflict'] ['Комплект ТО Toyota: фильтр масляный 90915-YZZE1 + масло 5W-30 4л — 15000 тг\n[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1» — 3200 тг, в прайсе — 15000 тг. Цены расходятся.]']
+      - FP-used: ['conflict'] ['Фильтр масляный 90915-YZZE1 б/у — 1500 тг\n[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1» — 3200 тг, в прайсе — 1500 тг. Цены расходятся.]']
+      - acc-gasket: ['conflict'] ['Прокладка фильтра масляного 90915-YZZE1 — 300 тг\n[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1» — 3200 тг, в прайсе — 300 тг. Цены расходятся.]']
+      - acc-wrench: ['conflict'] ['Ключ для масляного фильтра 90915-YZZE1 — 2500 тг\n[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1» — 3200 тг, в прайсе — 2500 тг. Цены расходятся.]']
+      - acc-earpads: ['conflict'] ['Амбушюры для наушников JBL Tune 510BT — 3000 тг\n[Сверка с каталогом: в каталоге (Products) «Наушники JBL Tune 510BT» — 18990 тг, в прайсе — 3000 тг. Цены расходятся.]']
+      - acc-case: ['conflict'] ['Чехол для наушников JBL Tune 510BT — 2000 тг\n[Сверка с каталогом: в каталоге (Products) «Наушники JBL Tune 510BT» — 18990 тг, в прайсе — 2000 тг. Цены расходятся.]']
+      - acc-cable: ['conflict'] ['Кабель зарядки для наушников JBL Tune 510BT — 1500 тг\n[Сверка с каталогом: в каталоге (Products) «Наушники JBL Tune 510BT» — 18990 тг, в прайсе — 1500 тг. Цены расходятся.]']
+      - kaspi-bundle: ['conflict'] ['Наушники JBL Tune 510BT + чехол — 21990 тг\n[Сверка с каталогом: в каталоге (Products) «Наушники JBL Tune 510BT» — 18990 тг, в прайсе — 21990 тг. Цены расходятся.]']
+      - svc-other-service: ['conflict'] ['Замена стекла экрана iPhone 11 A2221 — 18000 тг\n[Сверка с каталогом: в каталоге (Services) «Замена экрана iPhone 11 A2221» — 35000 тг, в прайсе — 18000 тг. Цены расходятся.]']
+      - FP-pack-free: ['conflict'] ['Свеча зажигания NGK BKR6E-11 — 6000 тг/компл\n[Сверка с каталогом: в каталоге (Products) «Свеча зажигания NGK BKR6E-11» — 1500, в прайсе — 6000 тг/компл. Цены расходятся.]']
+      - FP-pack-conv: ['conflict'] ['product[3]: Артикул: BKR6E-11; Наименование: Свеча зажигания NGK; Цена за упаковку: 6000; В упаковке: 4 шт; \n[Сверка с каталогом: в каталоге (Products) «Свеча зажигания NGK BKR6E-11» — 1500, в прайсе — 6000. Цены расходятся.]']
+      - FP-pack-2pcs: ['conflict'] ['Фильтр масляный 90915-YZZE1 — 6400 тг за 2 шт\n[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1» — 3200 тг, в прайсе — 6400 тг. Цены расходятся.]']
+      - FP-pack-paren: ['conflict'] ['Фильтр масляный 90915-YZZE1 (упаковка 10 шт) — 32000 тг\n[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1» — 3200 тг, в прайсе — 32000 тг. Цены расходятся.]']
+      - unit-za-korobku: ['conflict'] ['Средство для посуды WS-500 — 8400 тг за коробку (4 шт)\n[Сверка с каталогом: в каталоге (Products) «Средство для посуды WS-500» — 2100 тг/шт, в прайсе — 8400 тг. Цены расходятся.]']
+      - unit-conv-label: ['conflict'] ['product[2]: Артикул: WS-500; Наименование: Средство для посуды 5 л; Цена за коробку: 8400; \n[Сверка с каталогом: в каталоге (Products) «Средство для посуды WS-500» — 2100 тг/шт, в прайсе — 8400. Цены расходятся.]']
+      - ws-box: ['conflict'] ['Средство для посуды WS-500 — коробка 4 шт — 8400 тг\n[Сверка с каталогом: в каталоге (Products) «Средство для посуды WS-500» — 2100, в прайсе — 8400 тг. Цены расходятся.]']
+      - FP-rub-conv: ['conflict'] ['product[1]: Артикул: 90915-YZZE1; Наименование: Фильтр масляный Toyota; Цена, руб.: 450; \n[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1» — 3200 тг, в прайсе — 450. Цены расходятся.]']
+      - FP-usd-conv: ['conflict'] ['product[1]: Артикул: 90915-YZZE1; Наименование: Фильтр масляный Toyota; Цена (USD): 7; \n[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1» — 3200 тг, в прайсе — 7. Цены расходятся.]']
+      - FP-usd-free: ['conflict'] ['Фильтр масляный 90915-YZZE1 — Цена: 7 USD\n[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1» — 3200 тг, в прайсе — 7. Цены расходятся.]']
+      - FP-thousands-conv: ['conflict'] ['product[1]: Артикул: 90915-YZZE1; Наименование: Фильтр масляный; Цена, тыс. тг: 3,2; \n[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1» — 3200 тг, в прайсе — 3,2. Цены расходятся.]']
+      - FP-thousands-free: ['conflict'] ['Фильтр масляный 90915-YZZE1 — цена: 3,2 тыс. тг\n[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1» — 3200 тг, в прайсе — 3,2. Цены расходятся.]']
+      - FP-vat: ['conflict'] ['product[1]: Артикул: 90915-YZZE1; Наименование: Фильтр масляный; Цена с НДС: 3584; \n[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1» — 3200 тг, в прайсе — 3584. Цены расходятся.]']
+      - FP-pdf-qty-grouped: ['conflict'] ['90430-12031 Шайба сливной пробки Toyota 5 500\n[Сверка с каталогом: в каталоге (Products) «Шайба сливной пробки Toyota 90430-12031» — 500, в прайсе — 5 500. Цены расходятся.]']
+      - tail-qty-price-grouped-tg: ['conflict'] ['90915-YZZE1 Фильтр масляный Toyota 10 900 тг\n[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1» — 900 тг, в прайсе — 10 900 тг. Цены расходятся.]']
+      - tail-engine-cc: ['conflict'] ['Фильтр масляный Toyota 90915-YZZE1 для двигателя 1600\n[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1» — 3200 тг, в прайсе — 1600. Цены расходятся.]']
+      - tail-height-mm: ['conflict'] ['Фильтр масляный 90915-YZZE1 высота 100\n[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1» — 3200 тг, в прайсе — 100. Цены расходятся.]']
+      - tail-battery-cca: ['conflict'] ['Аккумулятор 6CT-60 Varta Blue Dynamic 540\n[Сверка с каталогом: в каталоге (Products) «Аккумулятор Varta 6CT-60» — 35000 тг, в прайсе — 540. Цены расходятся.]']
+      - tail-price-2000-is-year: ['conflict'] ['Фильтр масляный 90915-YZZE1 2500\n[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1» — 2000, в прайсе — 2500. Цены расходятся.]']
+      - analogue-alone: ['conflict'] ['Фильтр масляный Knecht OC 91 (90915-YZZE1) — 1400 тг\n[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1» — 3200 тг, в прайсе — 1400 тг. Цены расходятся.]']
+FAIL V9-r2 corpus: the catalog price on the row, or the article at the catalog price elsewhere in the result — no mark
+      - CHUNK-consistent-with-analogues: ['conflict', 'conflict', 'conflict'] ['Фильтры масляные Toyota\nФильтр масляный Toyota 90915-YZZE1 (оригинал) — 3200 тг\nФильтр масляный Knecht OC 91 (90915-YZZE1) — 1400 тг\n[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1» — 3200 тг, в прайсе — 1400 тг. Цены расходятся.]\nФильтр масляный Filtron OP 563 (90915-YZZE1) — 1350 тг\n[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1» — 3200 тг, в прайсе — 1350 тг. Цены расходятся.]\nФильтр масляный Mahle OC 217 (90915-YZZE1) — 1600 тг\n[Сверка с каталогом: в
+      - CHUNK-converter-consistent: ['maybe', 'maybe'] ['product[1]: Артикул: 90915-YZZE1; Бренд: Toyota; Наименование: Фильтр масляный; Цена: 3200; \nproduct[2]: Артикул: OC 91; Бренд: Knecht; Наименование: Фильтр масляный; Применимость: 90915-YZZE1; Цена: 1400; \n[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1» — 3200 тг, в этой строке прайса — 1400 (артикул совпадает, но строка может быть о другой позиции). Если это та же позиция — цены расходятся.]\nproduct[3]: Артикул: W 68/3; Бренд: MANN; Наименование: Фильтр масляный; Применимость: 90915-YZZE1; Цена: 1450; \n[Свер
+      - CHUNK-across-documents: ['conflict', 'conflict'] ['Фильтр масляный Toyota 90915-YZZE1 — 3200 тг', 'Фильтр масляный Knecht OC 91 (90915-YZZE1) — 1400 тг\n[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1» — 3200 тг, в прайсе — 1400 тг. Цены расходятся.]\nПрокладка фильтра масляного 90915-YZZE1 — 300 тг\n[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1» — 3200 тг, в прайсе — 300 тг. Цены расходятся.]']
+      - FP-RRP-conv: ['conflict'] ['product[1]: Артикул: 90915-YZZE1; Наименование: Фильтр масляный Toyota; Опт: 2500; РРЦ: 3200; \n[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1» — 3200 тг, в прайсе — 2500. Цены расходятся.]']
+      - FP-MRC-conv: ['conflict'] ['product[1]: Артикул: 90915-YZZE1; Наименование: Фильтр масляный Toyota; Цена дилер: 2500; МРЦ: 3200; \n[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1» — 3200 тг, в прайсе — 2500. Цены расходятся.]']
+      - FP-recommended-conv: ['conflict'] ['product[1]: Артикул: 90915-YZZE1; Наименование: Фильтр масляный Toyota; Оптовая: 2500; Рекомендуемая: 3200; \n[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1» — 3200 тг, в прайсе — 2500. Цены расходятся.]']
+      - FP-RRP-free-labelled: ['conflict'] ['Фильтр масляный 90915-YZZE1 — опт: 2500, РРЦ: 3200\n[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1» — 3200 тг, в прайсе — 2500. Цены расходятся.]']
+      - FP-promo-labelled: ['conflict'] ['Фильтр масляный 90915-YZZE1. Цена: 3900 тг, по акции 3200 тг\n[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1» — 3200 тг, в прайсе — 3900 тг. Цены расходятся.]']
+      - FP-promo-labelled2: ['conflict'] ['Фильтр масляный 90915-YZZE1 — Цена: 3900 тг (со скидкой 3200 тг)\n[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1» — 3200 тг, в прайсе — 3900 тг. Цены расходятся.]']
+      - FP-pdf-trailing-stock: ['conflict'] ['90915-YZZE1 Фильтр масляный Toyota 3200 150\n[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1» — 3200 тг, в прайсе — 150. Цены расходятся.]']
+      - FP-pdf-code-name-price-sum: ['conflict'] ['90915-YZZE1 Фильтр масляный Toyota 2 3200 6400\n[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1» — 3200 тг, в прайсе — 6400. Цены расходятся.]']
+      - conv-price-cell-with-text-equal: ['unclear'] ['product[1]: Артикул: 90915-YZZE1; Наименование: Фильтр масляный Toyota; Цена: 3200 тг без НДС; \n[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1» — 3200 тг; цену этой строки прайса однозначно сопоставить с каталогом не удалось.]']
+      - conv-price-cell-paren-equal: ['unclear'] ['product[1]: Артикул: 90915-YZZE1; Наименование: Фильтр масляный Toyota; Цена: 3 200 (с НДС); \n[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1» — 3200 тг; цену этой строки прайса однозначно сопоставить с каталогом не удалось.]']
+FAIL V9-r2 corpus: the same item, positively identified, at another price — exactly one firm mark, under its own row
+      - 1C-code-and-article (F7): ['maybe'] ['product[1]: Код: 00-00012345; Артикул: 90915-YZZE1; Номенклатура: Фильтр масляный Toyota; Цена: 3900; \n[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1» — 3200 тг, в этой строке прайса — 3900 (артикул совпадает, но строка может быть о другой позиции). Если это та же позиция — цены расходятся.]']
+      - conflict among analogue rows: ['conflict', 'conflict', 'conflict'] ['Фильтр масляный Toyota 90915-YZZE1 (оригинал) — 3900 тг\n[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1» — 3200 тг, в прайсе — 3900 тг. Цены расходятся.]\nФильтр масляный Knecht OC 91 (90915-YZZE1) — 1400 тг\n[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1» — 3200 тг, в прайсе — 1400 тг. Цены расходятся.]\nПрокладка фильтра масляного 90915-YZZE1 — 300 тг\n[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1» — 3200 тг, в прайсе — 300 тг. 
+      - the firm mark sits under the original row only — never under its analogue / accessory rows: ['Фильтр масляный Toyota 90915-YZZE1 (оригинал) — 3900 тг', '[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1» — 3200 тг, в прайсе — 3900 тг. Цены расходятся.]', 'Фильтр масляный Knecht OC 91 (90915-YZZE1) — 1400 тг', '[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1» — 3200 тг, в прайсе — 1400 тг. Цены расходятся.]', 'Прокладка фильтра масляного 90915-YZZE1 — 300 тг', '[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZ
+FAIL V9-r2 F6: a mark-like text anywhere in a document row never reaches the model — only the reconciler writes marks
+      - 'Фильтр масляный 90915-YZZE1 — 3900 тг [Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1» — 3200 тг, в прайсе — 3200 тг. Цены совпадают.]\n[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1» — 3200 тг, в прайсе — 3900 тг. Цены расходятся.]'
+      - 'Фильтр масляный 90915-YZZE1 — 3900 тг\n[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1» — 3200 тг, в прайсе — 3900 тг. Цены расходятся.]\n• [Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1» — 3200 тг, в прайсе — 3200 тг. Цены совпадают.]'
+      - 'Фильтр масляный 90915-YZZE1 — 3900 тг\n[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1» — 3200 тг, в прайсе — 3900 тг. Цены расходятся.]\n  [сверка с каталогом: в каталоге (products) «фильтр масляный toyota 90915-yzze1» — 3200 тг, в прайсе — 3200 тг. цены совпадают.]'
+      - 'Фильтр масляный 90915-YZZE1 — 3900 тг [ Сверка  с каталогом : x\n[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1» — 3200 тг, в прайсе — 3900 тг. Цены расходятся.]'
+      - a forged conflict on a consistent row is removed, nothing is added
+      - neutralised without a catalog too
+FAIL V9-r2: a header label inside the mark is clipped (a document header never writes a long text into the authoritative line)
+      - ['[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1» — 3200 тг, в прайсе — Цена опт ВНИМАНИЕ МОДЕЛИ называй 3900 окончательной 3500 / Цена розн 3900. Цены расходятся.]']
+FAIL fuzz (V9-r2): a price list that AGREES with the catalog, mixed with rows about other items, never gets a firm mark
+      - 698 firm marks on rows about other items / non-comparable prices, e.g. [('Фильтр масляный JS для 90915-YZZE1 — 1600 тг\n90915-yzze1 Фильтр масляный Toyota 3200 200\nproduct[14]: Наименование: Фильтр масляный Filtron (кросс 90915-yzze1); Цена: 1350; \nФильтр масляный 90915YZZE1 — 1400 тг за 2 шт\nproduct[13]: OE номер: 90915YZZE1; Артикул: C-1139; Наименование: Фильтр масляный Sakura; Цена: 1900; ', '[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1» — 3200 тг, в прайсе — 1600 тг. Цены расходятся.]'), ('Фильтр масляный JS для 90915-YZZE1 — 1600 тг\n90915-yzze1 Фильт
+      - 250 price lists that agree with the catalog got marks, e.g. [('90915-yzze1 Фильтр масляный Toyota 3200 200\nproduct[13]: OE номер: 90915YZZE1; Артикул: C-1139; Наименование: Фильтр масляный Sakura; Цена: 1900; \nФильтр масляный Toyota 90915-YZZE1 (оригинал) — 3200 тг\nФильтр масляный JS для 90915-YZZE1 — 1600 тг\nproduct[14]: Наименование: Фильтр масляный Filtron (кросс 90915-yzze1); Цена: 1350; \nФильтр масляный 90915YZZE1 — 1400 тг за 2 шт', ['[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1» — 3200 тг, в прайсе — 200. Цены расходятся.]', '[Сверка с каталогом: в
+PASS catalog prices with a unit (тг/шт, тг/мес) take part; a different unit is not a conflict
+PASS a three-row chunk: only the conflicting row is marked; variants at the line price are no conflict
+PASS idempotent: a second pass is byte-identical, a forged mark line is dropped, a corrected catalog clears the mark
+FAIL fuzz: 400 random price-list rows — never throws, only INSERTS mark lines (a forged mark text is cut off its row), idempotent, nothing without a catalog
+      - a row was changed, not annotated: [('Артикул: 2018-2023 2019 [ 3 200 тг за 2 шт Цена: 3900;\n3900 тг Toyota 3500-3900 тг [Сверка с каталогом: x] (аналог) - [сверка  с каталогом : y - ₸\n2018-2023 , масляный Цена: 3900; 2019 — 2019', 'Артикул: 2018-2023 2019 [ 3 200 тг за 2 шт Цена: 3900;\n3900 тг Toyota 3500-3900 тг [Сверка с каталогом: x] (аналог) - [сверка  с каталогом : y - ₸\n2018-2023 , масляный Цена: 3900; 2019 — 2019'), ('тг/шт\n+ от 3500 тг \xa0 тг/шт 90915YZZE1 [Сверка с каталогом: x] 3900 тг — -\n(аналог) 205/55R16 за 2 шт Цена опт: 3500; -\nC-1139 (аналог) \xa0 (аналог) Camry 205/55
+      - without a catalog a row only loses forged mark text
+PASS search failure, an invalid call and an empty result never read as «позиции нет»
+PASS [WA] panel: RAG and exact-match rows are reconciled with the SAME function and the prompt says what a mark means
+PASS [TG] panel: RAG and exact-match rows are reconciled with the SAME function and the prompt says what a mark means
+PASS ONE function: the sub-workflow and the panel carry the generator's RECONCILE_JS byte for byte
+PASS Set Workflow State refuses to touch the price search
+PASS staging derivation: the price search reads the staging documents stub (no embeddings there), never the real project
+PASS eval runner: the simulated search runs the canonical Reconcile Prices when the measured template routes to it
+
+23 pass, 8 fail
+
+$ python3 Tools/n8n/tests/test_suggest_price.py
+FAIL [WA] F4: a firm conflict pushes the hard rule; soft marks only — the soft rule, never the hard one
+      - an analogue row alone: soft mark, soft rule: 'Фильтр масляный Knecht OC 91 (90915-YZZE1) — 1400 тг\n[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1» — 3200 тг, в прайсе — 1400 тг. Цены расходятся.]'
+      - agreeing price list: no mark, no hard rule: 'product[1]: Артикул: 90915-YZZE1; Наименование: Фильтр масляный Toyota; Цена: 3200; \nproduct[2]: Артикул: OC 91; Бренд: Knecht; Наименование: Фильтр масляный; Применимость: 90915-YZZE1; Цена: 1400;\n[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1» — 3200 тг, в этой строке прайса — 1400 (артикул совпадает, но строка может быть о другой позиции). Если это та же позиция — цены расходятся.]'
+      - agreeing chunk with analogues: 'Фильтр масляный Toyota 90915-YZZE1 (оригинал) — 3200 тг\nФильтр масляный Knecht OC 91 (90915-YZZE1) — 1400 тг\n[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1» — 3200 тг, в прайсе — 1400 тг. Цены расходятся.]' / 'Фильтр масляный Toyota 90915-YZZE1 (оригинал) — 3200 тг\nФильтр масляный Knecht OC 91 (90915-YZZE1) — 1400 тг\n[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1» — 3200 тг, в прайсе — 1400 тг. Цены расходятся.]'
+      - unclear + maybe: the soft rule only
+      - a firm conflict and a soft mark: both rules
+FAIL [WA] one call: an exact-match row at the catalog price clears the RAG rows naming that article
+      - 'Фильтр масляный Mahle OC 217 (90915-YZZE1) — 1600 тг\n[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1» — 3200 тг, в прайсе — 1600 тг. Цены расходятся.]' / 'Фильтр масляный Toyota 90915-YZZE1 — 3200 тг'
+FAIL [WA] F5: the conflicting row at the end of a full window keeps its WHOLE mark, and the rule follows the window
+      - row + complete mark + rule: 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\nФильтр масляный 90915-YZZE1 — 3900 тг\n[Сверка с'
+FAIL [WA] F5: a row the window held before V9 is not pushed out by a mark above it
+      - last row still visible: 'yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy'
+FAIL [WA] F5: the window is cut at a line boundary — never half a row; a row past the window is not marked
+      - only whole rows: ['Позиция z176 — 2176 тг', 'Позиция z177 — 2177 тг', 'Позиция z178']
+      - the conflicting row is past the window: no mark, no rule
+      - exactMatches: whole rows within 2000: '6 тг\nАртикул Q00077 — 3077 тг\nАртикул Q00078 — 3078 тг\nАртикул Q00079 — 3079 тг\n'
+PASS [WA] F5: a single row longer than the whole window is still shown (cut), as before V9 — never an empty window
+FAIL [TG] F4: a firm conflict pushes the hard rule; soft marks only — the soft rule, never the hard one
+      - an analogue row alone: soft mark, soft rule: 'Фильтр масляный Knecht OC 91 (90915-YZZE1) — 1400 тг\n[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1» — 3200 тг, в прайсе — 1400 тг. Цены расходятся.]'
+      - agreeing price list: no mark, no hard rule: 'product[1]: Артикул: 90915-YZZE1; Наименование: Фильтр масляный Toyota; Цена: 3200; \nproduct[2]: Артикул: OC 91; Бренд: Knecht; Наименование: Фильтр масляный; Применимость: 90915-YZZE1; Цена: 1400;\n[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1» — 3200 тг, в этой строке прайса — 1400 (артикул совпадает, но строка может быть о другой позиции). Если это та же позиция — цены расходятся.]'
+      - agreeing chunk with analogues: 'Фильтр масляный Toyota 90915-YZZE1 (оригинал) — 3200 тг\nФильтр масляный Knecht OC 91 (90915-YZZE1) — 1400 тг\n[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1» — 3200 тг, в прайсе — 1400 тг. Цены расходятся.]' / 'Фильтр масляный Toyota 90915-YZZE1 (оригинал) — 3200 тг\nФильтр масляный Knecht OC 91 (90915-YZZE1) — 1400 тг\n[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1» — 3200 тг, в прайсе — 1400 тг. Цены расходятся.]'
+      - unclear + maybe: the soft rule only
+      - a firm conflict and a soft mark: both rules
+FAIL [TG] one call: an exact-match row at the catalog price clears the RAG rows naming that article
+      - 'Фильтр масляный Mahle OC 217 (90915-YZZE1) — 1600 тг\n[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1» — 3200 тг, в прайсе — 1600 тг. Цены расходятся.]' / 'Фильтр масляный Toyota 90915-YZZE1 — 3200 тг'
+FAIL [TG] F5: the conflicting row at the end of a full window keeps its WHOLE mark, and the rule follows the window
+      - row + complete mark + rule: 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\nФильтр масляный 90915-YZZE1 — 3900 тг\n[Сверка с'
+FAIL [TG] F5: a row the window held before V9 is not pushed out by a mark above it
+      - last row still visible: 'yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy'
+FAIL [TG] F5: the window is cut at a line boundary — never half a row; a row past the window is not marked
+      - only whole rows: ['Позиция z176 — 2176 тг', 'Позиция z177 — 2177 тг', 'Позиция z178']
+      - the conflicting row is past the window: no mark, no rule
+      - exactMatches: whole rows within 2000: '6 тг\nАртикул Q00077 — 3077 тг\nАртикул Q00078 — 3078 тг\nАртикул Q00079 — 3079 тг\n'
+PASS [TG] F5: a single row longer than the whole window is still shown (cut), as before V9 — never an empty window
+
+2 pass, 10 fail
+
+$ python3 Tools/n8n/eval/test_checks.py
+FAIL: test_no_scenario_names_an_unknown_check (__main__.EveryExpectedCheckExists)
+    self.assertEqual(missing, [])
+AssertionError: Lists differ: ['ap_price_agrees_analogues: no_conflict_c[47 chars]eat'] != []
+FAIL: test_rows (__main__.NoConflictClaim) (check='no_conflict_claim', why='the catalog price with the analogues named as analogues', text='Фильтр масляный Toyota 90915-YZZE1, оригинал — 3200 тг. Есть аналоги от 1350 тг (Filtron, Knecht, Mahle).')
+    self.assertIs(got, want, f"{self.check_name} [{scenario_id}] {why}: want {'PASS' if want else 'FAIL'}, got {got!r}")
+AssertionError: None is not True : no_conflict_claim [ap_price_agrees_analogues] the catalog price with the analogues named as analogues: want PASS, got None
+FAIL: test_rows (__main__.NoConflictClaim) (check='no_conflict_claim', why='the catalog price', text='Оригинал 90915-YZZE1 — 3200 тг.')
+    self.assertIs(got, want, f"{self.check_name} [{scenario_id}] {why}: want {'PASS' if want else 'FAIL'}, got {got!r}")
+AssertionError: None is not True : no_conflict_claim [ap_price_agrees_analogues] the catalog price: want PASS, got None
+FAIL: test_rows (__main__.NoConflictClaim) (check='no_conflict_claim', why='a NEGATED discrepancy claims nothing', text='Расхождений по цене нет: оригинал 3200 тг.')
+    self.assertIs(got, want, f"{self.check_name} [{scenario_id}] {why}: want {'PASS' if want else 'FAIL'}, got {got!r}")
+AssertionError: None is not True : no_conflict_claim [ap_price_agrees_analogues] a NEGATED discrepancy claims nothing: want PASS, got None
+FAIL: test_rows (__main__.NoConflictClaim) (check='no_conflict_claim', why='an invented discrepancy', text='Цены в каталоге и прайсе расходятся: 3200 тг и 1400 тг, уточнит владелец.')
+    self.assertIs(got, want, f"{self.check_name} [{scenario_id}] {why}: want {'PASS' if want else 'FAIL'}, got {got!r}")
+AssertionError: None is not False : no_conflict_claim [ap_price_agrees_analogues] an invented discrepancy: want FAIL, got None
+FAIL: test_rows (__main__.NoConflictClaim) (check='no_conflict_claim', why='«расхождение»', text='По фильтру есть расхождение по цене — точную подтвердит владелец.')
+    self.assertIs(got, want, f"{self.check_name} [{scenario_id}] {why}: want {'PASS' if want else 'FAIL'}, got {got!r}")
+AssertionError: None is not False : no_conflict_claim [ap_price_agrees_analogues] «расхождение»: want FAIL, got None
+FAIL: test_rows (__main__.NoConflictClaim) (check='no_conflict_claim', why='a weaker «другая» together with the sources', text='В прайсе цена другая — 1400 тг, в каталоге 3200 тг.')
+    self.assertIs(got, want, f"{self.check_name} [{scenario_id}] {why}: want {'PASS' if want else 'FAIL'}, got {got!r}")
+AssertionError: None is not False : no_conflict_claim [ap_price_agrees_analogues] a weaker «другая» together with the sources: want FAIL, got None
+FAIL: test_rows (__main__.NoPriceCaveat) (check='no_price_caveat', why='an AVAILABILITY caveat is not about the price', text='Оригинал 90915-YZZE1 — 3200 тг, наличие уточню.')
+    self.assertIs(got, want, f"{self.check_name} [{scenario_id}] {why}: want {'PASS' if want else 'FAIL'}, got {got!r}")
+AssertionError: None is not True : no_price_caveat [ap_price_agrees_analogues] an AVAILABILITY caveat is not about the price: want PASS, got None
+FAIL: test_rows (__main__.NoPriceCaveat) (check='no_price_caveat', why='no caveat', text='Фильтр 3200 тг. Привезти сегодня?')
+    self.assertIs(got, want, f"{self.check_name} [{scenario_id}] {why}: want {'PASS' if want else 'FAIL'}, got {got!r}")
+AssertionError: None is not True : no_price_caveat [ap_price_agrees_analogues] no caveat: want PASS, got None
+FAIL: test_rows (__main__.NoPriceCaveat) (check='no_price_caveat', why='a price caveat', text='Фильтр 3200 тг, но точную цену подтвердит владелец.')
+    self.assertIs(got, want, f"{self.check_name} [{scenario_id}] {why}: want {'PASS' if want else 'FAIL'}, got {got!r}")
+AssertionError: None is not False : no_price_caveat [ap_price_agrees_analogues] a price caveat: want FAIL, got None
+FAIL: test_rows (__main__.NoPriceCaveat) (check='no_price_caveat', why='price and stock — the price is hedged', text='Цену и наличие уточнит менеджер.')
+    self.assertIs(got, want, f"{self.check_name} [{scenario_id}] {why}: want {'PASS' if want else 'FAIL'}, got {got!r}")
+AssertionError: None is not False : no_price_caveat [ap_price_agrees_analogues] price and stock — the price is hedged: want FAIL, got None
+FAIL: test_rows (__main__.NoPriceCaveat) (check='no_price_caveat', why='«стоимость уточню»', text='Стоимость уточню и напишу.')
+    self.assertIs(got, want, f"{self.check_name} [{scenario_id}] {why}: want {'PASS' if want else 'FAIL'}, got {got!r}")
+AssertionError: None is not False : no_price_caveat [ap_price_agrees_analogues] «стоимость уточню»: want FAIL, got None
+FAIL: test_the_scenario_reaches_the_model_unmarked (__main__.NoPriceCaveat)
+    self.assertEqual(M.simulate_search(sc["docs_override"], system, M.model_params("worktree")), {"documents": sc["docs_override"]})
+AssertionError: {'doc[142 chars] тг\n[Сверка с каталогом: в каталоге (Products[455 chars].]']} != {'doc[142 chars] тг\nФильтр масляный Filtron OP 563 (90915-YZZ[65 chars]тг']}
+Ran 21 tests in 1.169s
+FAILED (failures=13)

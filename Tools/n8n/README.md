@@ -86,9 +86,13 @@ prompt editing, RAG file upload/delete, and (in progress) live reply suggestions
   every hit with the catalog AT SEARCH TIME — `crPriceSearch001` (Guard → Search Price Lists → Reconcile Prices) is the
   bots' and the Test Dialog's «Supabase Vector Store» tool (a toolWorkflow of the same name; the catalog comes from the
   caller's published prompt), and the panel's Assemble runs the same `RECONCILE_JS` (`apply-suggest-v2.py`); a row that
-  names a catalog article at another price gets «[Сверка с каталогом: …]» under it. Nothing is stored. Staging: the
-  sub-workflow reads the `documents` stub (`derive-staging.py isolate_supabase_readers`); `eval/run-eval.py` runs the
-  ref's own Reconcile Prices in its simulated search (harness h4) — see CLAUDE.md «V9 price reconciliation».
+  names a catalog article at another price gets «[Сверка с каталогом: …]» under it. Nothing is stored. V9-r2
+  (2026-10-08, tests `tests/test_price_search.py` + `tests/test_suggest_price.py`): the firm «Цены расходятся» only on a
+  POSITIVELY identified item without the catalog price on the row; analogues / accessories / kits / packs / other
+  currencies / bare numbers — at most a soft mark; a row at the catalog price anywhere in one search result settles the
+  article; the panel cuts its windows on line boundaries before marking and pushes «РАСХОЖДЕНИЕ ЦЕН» only for a firm mark.
+  Staging: the sub-workflow reads the `documents` stub (`derive-staging.py isolate_supabase_readers`); `eval/run-eval.py`
+  runs the ref's own Reconcile Prices in its simulated search (harness h5) — see CLAUDE.md «V9 price reconciliation».
   `$execution.id` as correlationId). `verify-message-batching.py` / `verify-telegram-parity.py` pin the
   stamp's wiring and the winner → billing-gate → Input type path (their pre-2026-09 expectations were
   stale and failed every run).

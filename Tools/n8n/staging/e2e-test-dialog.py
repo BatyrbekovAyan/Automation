@@ -291,14 +291,18 @@ def price_search_probe(run_id):
     return wid, f"{BASE}/webhook/{path}"
 
 
-@scenario("price_search_subworkflow_runs_on_n8n", "V9: the deployed Price List Search (Guard → the bot's own rows → Reconcile Prices) on the real n8n task runner, called with the tool's inputs — no model: a 3900 row against a 3200 catalog comes back marked, the catalog price unmarked, a foreign bot's row and a '-1' id never searched")
+@scenario("price_search_subworkflow_runs_on_n8n", "V9: the deployed Price List Search (Guard → the bot's own rows → Reconcile Prices) on the real n8n task runner, called with the tool's inputs — no model: a 3900 row against a 3200 catalog comes back marked, the catalog price unmarked, a foreign bot's row and a '-1' id never searched; V9-r2: a price list that AGREES with the catalog plus analogue rows (two documents of one search) comes back with no mark at all, a lone analogue row only with the soft mark")
 def s_price_search(ctx):
     t = Target(ctx, "tps")
     tag = f"tps-{ctx.run_id}"
+    agree_id, lone_id = f"wfV9r2Agree{ctx.run_id}"[:40], f"wfV9r2Alone{ctx.run_id}"[:40]
+    agree = ["Фильтр масляный Toyota 90915-YZZE1 (оригинал) — 3200 тг\nФильтр масляный Knecht OC 91 (90915-YZZE1) — 1400 тг",
+             "Фильтр масляный Mahle OC 217 (90915-YZZE1) — 1600 тг"]
     rows = [("Фильтр масляный 90915-YZZE1 — 3900 тг, оригинал", t.wf_id), ("Колодки тормозные 04465-02220 — 18500 тг", t.wf_id),
-            ("Фильтр масляный 90915-YZZE1 — 1 тг, чужой бот", "wfForeignBot0001")]
+            ("Фильтр масляный 90915-YZZE1 — 1 тг, чужой бот", "wfForeignBot0001"), (agree[0], agree_id), (agree[1], agree_id),
+            ("Фильтр масляный Knecht OC 91 (90915-YZZE1) — 1400 тг", lone_id)]
     for content, bot in rows:
-        psql(f"insert into documents (content, metadata) values ('{content}', '{{\"botWaId\": \"{bot}\", \"fileId\": \"{tag}\"}}'::jsonb);")
+        psql(f"insert into documents (content, metadata) values (E'{content.replace(chr(10), chr(92) + 'n')}', '{{\"botWaId\": \"{bot}\", \"fileId\": \"{tag}\"}}'::jsonb);")
     prompt = ("Business Type: Автозапчасти\n\nAbout Business: x\n\nProducts:\nProduct1: Фильтр масляный Toyota 90915-YZZE1\nProduct1 Price: 3200 тг\n"
               "Product1 Description: Оригинал\n\nProduct2: Колодки тормозные передние Toyota 04465-02220\nProduct2 Price: 18500 тг\n"
               "Product2 Description: Оригинал\n\nServices:\n")
@@ -308,6 +312,8 @@ def s_price_search(ctx):
         body = {"query": "фильтр 90915-YZZE1", "botId": t.wf_id, "filterKey": "botWaId", "prompt": prompt}
         st, d = http("POST", url, body, timeout=60)
         st2, d2 = http("POST", url, dict(body, botId="-1"), timeout=60)
+        st3, d3 = http("POST", url, dict(body, botId=agree_id), timeout=60)
+        st4, d4 = http("POST", url, dict(body, botId=lone_id), timeout=60)
     finally:
         if wid:
             rest("POST", f"/workflows/{wid}/deactivate")
@@ -319,7 +325,12 @@ def s_price_search(ctx):
     ok = st == 200 and len(docs) == 2 and len(marked) == 1 and "[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1» — 3200 тг, в прайсе — 3900 тг. Цены расходятся.]" in marked[0] \
         and any(x == "Колодки тормозные 04465-02220 — 18500 тг" for x in docs) and not any("чужой" in x for x in docs) \
         and st2 == 200 and isinstance(d2, dict) and d2.get("documents") == []
-    return ok, {"status": st, "documents": docs, "sentinel_id": d2}
+    # V9-r2: the agreeing price list (the original at 3200 in one document, analogues in both) — no mark anywhere
+    agreed = sorted((d3 or {}).get("documents") or []) if isinstance(d3, dict) else []
+    ok_agree = st3 == 200 and agreed == sorted(agree)
+    lone = ((d4 or {}).get("documents") or []) if isinstance(d4, dict) else []
+    ok_lone = st4 == 200 and len(lone) == 1 and "(артикул совпадает, но строка может быть о другой позиции)" in lone[0] and "Цены расходятся.]" not in lone[0]
+    return ok and ok_agree and ok_lone, {"status": st, "documents": docs, "sentinel_id": d2, "agreeing": agreed, "lone_analogue": lone}
 
 
 @scenario("handoffs_status_lists_last_outcomes_owner_scoped", "7.3: op status returns the ledger's last states for the owner's profiles (chat tail only), 403 for a foreign install")

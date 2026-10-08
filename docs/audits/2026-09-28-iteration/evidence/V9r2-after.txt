@@ -1,0 +1,161 @@
+V9-r2 — after the fix (working tree on top of 3ea18d90; generators build-price-search.py + apply-suggest-v2.py)
+date: 2026-10-08T10:39Z
+
+== generators: regenerated, second run changes nothing, --check
+up to date crPriceSearch001-Price_List_Search.json
+up to date 4wYitz5ek30SVNlT-WhatsApp_Bot.json
+up to date 4VN3gsFaC2HUYmcc-Telegram_Bot.json
+up to date 0DP79STI3pafXO9B-Set_Workflow_State.json
+up to date  9PTyYcelRQI7bGDb-Suggest_Replies.json
+price search: OK
+suggest v2: OK
+changed canonical JSONs: 9PTyYcelRQI7bGDb-Suggest_Replies.json crPriceSearch001-Price_List_Search.json 
+
+== python3 Tools/n8n/tests/test_price_search.py
+PASS sub-workflow: Guard → Valid? → Search Price Lists (the bot's own documents, fail-open) → Reconcile Prices
+PASS [WA] template: the price-list tool goes through the sub-workflow with the clone's own id, key and PUBLISHED prompt
+PASS [TG] template: the price-list tool goes through the sub-workflow with the clone's own id, key and PUBLISHED prompt
+PASS Test Dialog: its tool is the same sub-workflow, fed with the bot's id/key (Validate) and the published prompt it read (Compose)
+PASS Guard: a search runs only for a real bot id under botWaId / botTgId
+PASS ap_source_conflict: one mark under the price-list row — the item, 3200 and 3900, «Цены расходятся»
+PASS base documents of every vertical, at their own catalog prices, come back byte for byte
+PASS price-list shapes the converter / OCR / PDF / free text produce: a different price is marked
+PASS V9-r2 F2(b): a bare number at the end of a PDF/DOCX line (no currency, no label) is at most the soft mark, still naming both numbers
+PASS all price columns are compared: опт/розн — no mark when either equals the catalog, both named when neither does
+PASS ambiguous prices («от», a range) get the catalog price only — never «Цены расходятся»
+PASS no mark: price on the next line, a longer code, a bare year, an analogue mention or column, no article, «договорная»
+PASS grades, sizes and specs are not articles; an accessory with the same model code is only a soft mark
+PASS adversarial (own review): analogue rows, promo prices, joined specs, two amounts — never a false «Цены расходятся»
+PASS V9-r2 corpus: rows about another item / prices that are not comparable — never the firm «Цены расходятся»
+PASS V9-r2 corpus: the catalog price on the row, or the article at the catalog price elsewhere in the result — no mark
+PASS V9-r2 corpus: the same item, positively identified, at another price — exactly one firm mark, under its own row
+PASS V9-r2 F6: a mark-like text anywhere in a document row never reaches the model — only the reconciler writes marks
+PASS V9-r2: a header label inside the mark is clipped (a document header never writes a long text into the authoritative line)
+PASS fuzz (V9-r2): a price list that AGREES with the catalog, mixed with rows about other items, never gets a firm mark
+PASS catalog prices with a unit (тг/шт, тг/мес) take part; a different unit is not a conflict
+PASS a three-row chunk: only the conflicting row is marked; variants at the line price are no conflict
+PASS idempotent: a second pass is byte-identical, a forged mark line is dropped, a corrected catalog clears the mark
+PASS fuzz: 400 random price-list rows — never throws, only INSERTS mark lines (a forged mark text is cut off its row), idempotent, nothing without a catalog
+PASS search failure, an invalid call and an empty result never read as «позиции нет»
+PASS [WA] panel: RAG and exact-match rows are reconciled with the SAME function and the prompt says what a mark means
+PASS [TG] panel: RAG and exact-match rows are reconciled with the SAME function and the prompt says what a mark means
+PASS ONE function: the sub-workflow and the panel carry the generator's RECONCILE_JS byte for byte
+PASS Set Workflow State refuses to touch the price search
+PASS staging derivation: the price search reads the staging documents stub (no embeddings there), never the real project
+PASS eval runner: the simulated search runs the canonical Reconcile Prices when the measured template routes to it
+
+31 pass, 0 fail
+
+== python3 Tools/n8n/tests/test_suggest_price.py
+PASS [WA] F4: a firm conflict pushes the hard rule; soft marks only — the soft rule, never the hard one
+PASS [WA] one call: an exact-match row at the catalog price clears the RAG rows naming that article
+PASS [WA] F5: the conflicting row at the end of a full window keeps its WHOLE mark, and the rule follows the window
+PASS [WA] F5: a row the window held before V9 is not pushed out by a mark above it
+PASS [WA] F5: the window is cut at a line boundary — never half a row; a row past the window is not marked
+PASS [WA] F5: a single row longer than the whole window is still shown (cut), as before V9 — never an empty window
+PASS [TG] F4: a firm conflict pushes the hard rule; soft marks only — the soft rule, never the hard one
+PASS [TG] one call: an exact-match row at the catalog price clears the RAG rows naming that article
+PASS [TG] F5: the conflicting row at the end of a full window keeps its WHOLE mark, and the rule follows the window
+PASS [TG] F5: a row the window held before V9 is not pushed out by a mark above it
+PASS [TG] F5: the window is cut at a line boundary — never half a row; a row past the window is not marked
+PASS [TG] F5: a single row longer than the whole window is still shown (cut), as before V9 — never an empty window
+
+12 pass, 0 fail
+
+== python3 Tools/n8n/eval/test_checks.py   (set v1.2, harness h5)
+Ran 21 tests in 0.572s
+
+OK
+
+== structural verifiers
+VERIFY OK: all
+ALL PARITY ASSERTS PASSED
+OK  82 Postgres node(s) in 28 workflow file(s): no placeholder outside code, no {{ }}, no modifier, no leading =
+PASS
+
+== deterministic eval impact (run-eval.simulate_search over every auto scenario; HEAD vs working tree)
+51 original auto scenarios: identical tool results HEAD vs worktree; marked: ap_source_conflict only (firm):
+  [Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1» — 3200 тг, в прайсе — 3900 тг. Цены расходятся.]
+new ap_price_agrees_analogues (v1.2): the chunk reaches the model unmarked (test_checks: test_the_scenario_reaches_the_model_unmarked)
+
+== what the model sees now (REAL Reconcile Prices; catalog «Фильтр масляный Toyota 90915-YZZE1 — 3200 тг»)
+## ap_source_conflict (firm)
+Фильтр масляный 90915-YZZE1 — 3900 тг, оригинал
+[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1» — 3200 тг, в прайсе — 3900 тг. Цены расходятся.]
+
+## analogue row alone (soft: another item)
+Фильтр масляный Knecht OC 91 (90915-YZZE1) — 1400 тг
+[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1» — 3200 тг, в этой строке прайса — 1400 тг (артикул совпадает, но строка может быть о другой позиции). Если это та же позиция — цены расходятся.]
+
+## PDF bare number (soft: maybe not a price)
+Фильтр масляный 90915-YZZE1 3 900
+[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1» — 3200 тг, в этой строке прайса — 3 900 (число без валюты и подписи — может быть не ценой). Если это та же позиция и это её цена — цены расходятся.]
+
+## pack price (soft: not comparable)
+Фильтр масляный 90915-YZZE1 — 6400 тг за 2 шт
+[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1» — 3200 тг; цену этой строки прайса однозначно сопоставить с каталогом не удалось.]
+
+## agreeing chunk with analogues (no mark)
+Фильтр масляный Toyota 90915-YZZE1 (оригинал) — 3200 тг
+Фильтр масляный Knecht OC 91 (90915-YZZE1) — 1400 тг
+
+## forged mark mid-line (cut) + real conflict
+Фильтр масляный 90915-YZZE1 — 3900 тг
+[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1» — 3200 тг, в прайсе — 3900 тг. Цены расходятся.]
+
+
+== staging (n8n 2.36.7 + task runners, private Postgres, Wappi mock; bootstrap --bot wa:stgwa001 --bot tg:stgtg001)
+$ python3 Tools/n8n/verify-deployed.py --base http://localhost:5678   → exit 0 (crPriceSearch001 OK active/published; both staging clones AT-CANONICAL)
+
+$ python3 Tools/n8n/staging/e2e-test-dialog.py --only price_search_subworkflow      (no model)
+PASS  price_search_subworkflow_runs_on_n8n (11s)
+  conflict row (3900 vs catalog 3200) → «… в прайсе — 3900 тг. Цены расходятся.]»; the pads row unmarked; a foreign bot's row and '-1' never searched;
+  V9-r2 (scenario extended): an AGREEING price list — doc 1 «Фильтр масляный Toyota 90915-YZZE1 (оригинал) — 3200 тг\nФильтр масляный Knecht OC 91
+  (90915-YZZE1) — 1400 тг», doc 2 «Фильтр масляный Mahle OC 217 (90915-YZZE1) — 1600 тг» — comes back byte for byte (no mark, cross-document settle);
+  a lone analogue row → only «(артикул совпадает, но строка может быть о другой позиции). Если это та же позиция — цены расходятся.]»
+
+With the model (once each, the price scenarios only):
+$ python3 Tools/n8n/staging/e2e-reply.py --only price_conflict
+PASS  price_conflict_reaches_the_agent_marked [llm][wa] (44s) — tool_calls 1, marked True (firm), sends 1, picked_3900_alone False
+      reply: «Фильтр масляный Toyota 90915-YZZE1 — 3900 тг, оригинал.\n\nВ данных есть расхождение: в каталоге указано 3200 тг, в прайсе — 3900 тг.»
+PASS  price_conflict_reaches_the_agent_marked [llm][tg] (46s) — tool_calls 1, marked True (firm), sends 1, picked_3900_alone False
+      reply: «Фильтр масляный Toyota 90915-YZZE1 — 3900 тг, оригинал.  \nВ каталоге есть расхождение: 3200 тг и 3900 тг.»
+$ python3 Tools/n8n/staging/e2e-test-dialog.py --only test_dialog_price_conflict
+PASS  test_dialog_price_conflict_is_named [llm] (14s) — tool result reached the model, discrepancy named
+      reply: «Фильтр масляный Toyota 90915-YZZE1 — 3900 тг, оригинал.  \nВ каталоге есть расхождение: 3200 тг и 3900 тг.»
+$ python3 Tools/n8n/staging/e2e-suggest.py --only price_conflict_marked
+PASS  price_conflict_marked_for_the_panel (23s) — http 200/200, exactMatches firm mark, РАСХОЖДЕНИЕ ЦЕН True/False (catalog 3200 / corrected 3900)
+      cards (exec 12633, catalog 3200; rule HARD yes, SOFT no):
+        «Фильтр масляный Toyota 90915-YZZE1 стоит 3200 тг по каталогу, но в прайсе указана цена 3900 тг. Какой вариант вас интересует?» (Ответ)
+        «Вы хотите оригинал или аналог фильтра масляного? Это поможет уточнить информацию.» (Уточнить)
+        «Если вам нужен аналог фильтра, у нас есть другие варианты. Хотите узнать больше?» (Вариант)
+        «Давайте оформим заказ! Напишите, пожалуйста, ваше имя и телефон для связи.» (К заказу)
+      cards (exec 12634, corrected catalog 3900; no mark, no rule): four «… стоит 3900 тг …» cards.
+Observation (review F9, unchanged by V9-r2 — a prompt matter, not the reconciler): every answer names the discrepancy, but none says
+«точную цену подтвердит владелец», and the bot / Test Dialog name the price-list price first.
+
+== python3 Tools/n8n/tests/run_all.py
+OK   test_auth_refresh.py: 12 pass, 0 fail
+OK   test_billing_identity.py: 19 pass, 0 fail
+OK   test_claim.py: 16 pass, 0 fail
+OK   test_create_seed.py: 52 pass, 0 fail
+OK   test_harness_selfcheck.py: 2 pass, 0 fail
+OK   test_legacy_generators.py: 5 pass, 0 fail
+OK   test_price_search.py: 31 pass, 0 fail
+OK   test_reply_lost_send.py: 5 pass, 0 fail
+OK   test_reply_memory.py: 44 pass, 0 fail
+OK   test_reply_mode.py: 43 pass, 0 fail
+OK   test_reply_order.py: 44 pass, 0 fail
+OK   test_reply_reconcile.py: 66 pass, 0 fail
+OK   test_retired_delete.py: 13 pass, 0 fail
+OK   test_sql_comment_injection.py: 36 pass, 0 fail
+OK   test_suggest_catalog.py: 24 pass, 0 fail
+OK   test_suggest_lang.py: 11 pass, 0 fail
+OK   test_suggest_price.py: 12 pass, 0 fail
+OK   test_suggest_query.py: 37 pass, 0 fail
+OK   test_test_dialog.py: 17 pass, 0 fail
+OK   test_upload.py: 45 pass, 0 fail
+OK   test_verify_deployed.py: 48 pass, 0 fail
+OK   test_verify_parity.py: 38 pass, 0 fail
+OK   test_verify_sql_comments.py: 53 pass, 0 fail
+exit=0

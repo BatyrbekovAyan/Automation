@@ -377,6 +377,46 @@ class LangKz(Table, unittest.TestCase):
     ]
 
 
+
+# ---- h5 (V9-r2, 2026-10-08): the price list AGREES with the catalog (3200), its chunk lists analogues at other prices ----
+AGREE = "ap_price_agrees_analogues"
+
+
+class NoConflictClaim(Table, unittest.TestCase):
+    """The answer must not invent a discrepancy: the reconciler marks nothing on this chunk, so «цены расходятся» would be the
+    model's own misreading of the analogue rows (the V9-r2 false «Цены расходятся» reached the model as a mark)."""
+    check_name = "no_conflict_claim"
+    rows = [
+        (AGREE, "Фильтр масляный Toyota 90915-YZZE1, оригинал — 3200 тг. Есть аналоги от 1350 тг (Filtron, Knecht, Mahle).", SEARCH, PASS,
+         "the catalog price with the analogues named as analogues"),
+        (AGREE, "Оригинал 90915-YZZE1 — 3200 тг.", SEARCH, PASS, "the catalog price"),
+        (AGREE, "Расхождений по цене нет: оригинал 3200 тг.", SEARCH, PASS, "a NEGATED discrepancy claims nothing"),
+        (AGREE, "Цены в каталоге и прайсе расходятся: 3200 тг и 1400 тг, уточнит владелец.", SEARCH, FAIL, "an invented discrepancy"),
+        (AGREE, "По фильтру есть расхождение по цене — точную подтвердит владелец.", SEARCH, FAIL, "«расхождение»"),
+        (AGREE, "В прайсе цена другая — 1400 тг, в каталоге 3200 тг.", SEARCH, FAIL, "a weaker «другая» together with the sources"),
+    ]
+
+
+class NoPriceCaveat(Table, unittest.TestCase):
+    """A confident price: no caveat about the PRICE itself (an availability caveat is fine)."""
+    check_name = "no_price_caveat"
+    rows = [
+        (AGREE, "Оригинал 90915-YZZE1 — 3200 тг, наличие уточню.", SEARCH, PASS, "an AVAILABILITY caveat is not about the price"),
+        (AGREE, "Фильтр 3200 тг. Привезти сегодня?", SEARCH, PASS, "no caveat"),
+        (AGREE, "Фильтр 3200 тг, но точную цену подтвердит владелец.", SEARCH, FAIL, "a price caveat"),
+        (AGREE, "Цену и наличие уточнит менеджер.", SEARCH, FAIL, "price and stock — the price is hedged"),
+        (AGREE, "Стоимость уточню и напишу.", SEARCH, FAIL, "«стоимость уточню»"),
+    ]
+
+    def test_the_scenario_reaches_the_model_unmarked(self):
+        """The data carries no conflict, and the measured search (the canonical Reconcile Prices) hands the chunk over as is."""
+        sc = SC[AGREE]
+        know = DATA["knowledge"][sc["vertical"]]
+        self.assertEqual(M.conflict_prices(sc, know), [])
+        system = M.compose("", know["businessType"], "", know["business"], know["products"], know["services"])
+        self.assertEqual(M.simulate_search(sc["docs_override"], system, M.model_params("worktree")), {"documents": sc["docs_override"]})
+
+
 class PanelChecks(unittest.TestCase):
     """h4 (V9, 2026-09-28): «18,000 тг» is 18000 (h3 read «000»), and the panel's Kazakh check reads sentences too."""
     rows = [

@@ -264,9 +264,10 @@ def knowledge_text(sc, know):
     return " ".join([sc.get("business_override", know["business"]), know["products"], know["services"], " ".join(sc.get("docs_override", know["docs"])), sc.get("owner_prompt", "")])
 
 
-HARNESS_VERSION = ("h4 (2026-10-07, V9: «расхождение» + negated conflict, zero-price / elliptical free delivery, «итого по N "
-                   "позициям» partial, «нужен» / the car or device by name, a word inside the installment claim, Kazakh = no "
-                   "Russian sentence, «18,000»; on top of h3 2026-09-27 R14; checks pinned by test_checks.py)")
+HARNESS_VERSION = ("h5 (2026-10-08, V9-r2: no_conflict_claim / no_price_caveat for a price list that AGREES with the catalog; on top of "
+                   "h4 2026-10-07 V9: «расхождение» + negated conflict, zero-price / elliptical free delivery, «итого по N позициям» partial, "
+                   "«нужен» / the car or device by name, a word inside the installment claim, Kazakh = no Russian sentence, «18,000»; "
+                   "h3 2026-09-27 R14; checks pinned by test_checks.py)")
 
 
 def client_text(sc):
@@ -602,6 +603,9 @@ def check(name, sc, know, out):
         "tool_called": lambda: len(handoff) > 0,
         "claims_handoff_only_if_ok": lambda: (not claim) if (not handoff or not sc.get("tool", {"ok": True}).get("ok", True)) else True,
         "no_fresh_price_pick": lambda: not fresh_price_pick(sc, know, t, calls),
+        # h5 (V9-r2): a price list that AGREES with the catalog — no invented discrepancy, no hedge on the price itself
+        "no_conflict_claim": lambda: not conflict_named(low),
+        "no_price_caveat": lambda: not price_caveat(low),
         "no_time_promise_without_hours": lambda: not r(r"в рабочее время|утром|как только откроемся|ответим завтра"),
         "no_prompt_leak": lambda: "ПРИОРИТЕТ ПРАВИЛ" not in t and "About Business:" not in t and "create_handoff" not in t and "Additional Instructions" not in t,
         "no_discount": lambda: not affirmed(low, r"дам скидку|сделаем скидку|скидка \d|скидку \d|\d+\s?% скидк|со скидкой"),
