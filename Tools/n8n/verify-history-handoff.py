@@ -7,6 +7,7 @@ proxy recorder after the response).
 
     python3 Tools/n8n/verify-history-handoff.py
 """
+import copy
 import json
 import os
 import sys
@@ -37,6 +38,60 @@ def node(wf, name):
 
 
 MEM_MARK = "'additional_kwargs', jsonb_build_object('source'"
+
+# F3 (iteration 2026-09-28, final regression 2026-10-08): the notifier's only way from `Due Notifications` to the
+# transport and to Record Notify — a gate that passes a real request row alone.
+NOTIFIER_DUE = "Due Notifications"
+NOTIFIER_GATE = "Due Request?"
+NOTIFIER_GATE_EXPR = "={{ Number($json.id) > 0 && typeof $json.profile_id === 'string' && $json.profile_id !== '' }}"
+
+
+def _edges(wf, src, out=0):
+    outs = wf["connections"].get(src, {}).get("main") or []
+    return [e["node"] for e in (outs[out] if out < len(outs) else None) or []]
+
+
+def _reachable(wf, start, cut=frozenset()):
+    seen, todo = set(), [start]
+    while todo:
+        n = todo.pop()
+        if n in seen:
+            continue
+        seen.add(n)
+        for i, out in enumerate(wf["connections"].get(n, {}).get("main") or []):
+            if (n, i) not in cut:
+                todo.extend(e["node"] for e in (out or []))
+    return seen
+
+
+def check_notifier_gate(ntf):
+    """F3: `Due Notifications` (alwaysOutputData + continueRegularOutput) answers ONE item on every tick — `{}` when no
+    request is due, `{message, error}` when the statement failed, the trigger's own item when the node threw. Until
+    2026-10-08 that item went straight to `Owner Phone` (a bare `GET sync/get/status` every 2 minutes) and on to Record
+    Notify. Only a real request row (a positive id and a profile id) may reach a transport node or Record Notify.
+    Raises AssertionError (tests/test_handoff_notifier.py holds the negative cases)."""
+    names = {n["name"]: n for n in ntf["nodes"]}
+    trig = next((n["name"] for n in ntf["nodes"] if n["type"] == "n8n-nodes-base.scheduleTrigger"), None)
+    assert trig, "notifier: no schedule trigger"
+    gate = names.get(NOTIFIER_GATE)
+    assert gate is not None and gate["type"] == "n8n-nodes-base.if", f"notifier: missing If gate {NOTIFIER_GATE!r} (F3)"
+    conds = gate["parameters"]["conditions"]["conditions"]
+    assert len(conds) == 1 and conds[0]["leftValue"] == NOTIFIER_GATE_EXPR \
+        and conds[0]["operator"] == {"type": "boolean", "operation": "true", "singleValue": True} \
+        and gate["parameters"]["conditions"].get("combinator") == "and", \
+        f"notifier: {NOTIFIER_GATE} must pass only a real request row: {conds}"
+    outs = ntf["connections"].get(NOTIFIER_DUE, {}).get("main") or []
+    assert len(outs) == 1 and _edges(ntf, NOTIFIER_DUE) == [NOTIFIER_GATE], \
+        f"notifier: {NOTIFIER_DUE} must feed {NOTIFIER_GATE} alone (F3): {outs}"
+    assert _edges(ntf, NOTIFIER_GATE, 0) == ["Owner Phone"], f"notifier: {NOTIFIER_GATE}[true] must lead to Owner Phone alone"
+    assert not _edges(ntf, NOTIFIER_GATE, 1), f"notifier: what {NOTIFIER_GATE} refuses must go nowhere: {_edges(ntf, NOTIFIER_GATE, 1)}"
+    feeders = {(src, i) for src, c in ntf["connections"].items() for i, out in enumerate(c.get("main") or [])
+               for e in (out or []) if e["node"] == "Owner Phone"}
+    assert feeders == {(NOTIFIER_GATE, 0)}, f"notifier: Owner Phone must be fed by {NOTIFIER_GATE}[true] alone: {sorted(feeders)}"
+    effects = {n["name"] for n in ntf["nodes"] if n["type"] == "n8n-nodes-base.httpRequest"} | {"Record Notify"}
+    assert effects <= _reachable(ntf, trig), f"notifier: the notice branch is disconnected: {sorted(effects - _reachable(ntf, trig))}"
+    around = effects & _reachable(ntf, trig, cut={(NOTIFIER_GATE, 0)})
+    assert not around, f"notifier: {sorted(around)} reachable from the schedule without passing {NOTIFIER_GATE}[true] (F3)"
 NO_DOUBLE = "x.message->'additional_kwargs'->>'message_id' = $3"
 
 
@@ -101,6 +156,18 @@ def verify_handoff_workflows():
           "the owner notice is built ONLY from the reason word and a masked chat tail")
     q = node(ntf, "Record Notify")["parameters"]["query"]
     check("notify_state = $2" in q and "handoff_requests" in q and "delete" not in q.lower(), "Record Notify must only update the notify state")
+    # F3: nothing due (or a DB fault) never reaches Wappi or Record Notify; the tripwire itself must reject the pre-fix shape
+    try:
+        check_notifier_gate(ntf)
+    except AssertionError as e:
+        fail(str(e))
+    pre_fix = copy.deepcopy(ntf)
+    pre_fix["connections"][NOTIFIER_DUE] = {"main": [[{"node": "Owner Phone", "type": "main", "index": 0}]]}
+    try:
+        check_notifier_gate(pre_fix)
+        fail("F3 tripwire accepted the pre-fix notifier (Due Notifications → Owner Phone)")
+    except AssertionError:
+        pass
     # R9: the same schedule settles lost sends (send_pending > 10 min → send_unknown), in a branch with no transport node
     q = node(ntf, "Settle Lost Sends")["parameters"]["query"]
     for frag in ("update reply_events", "set state = 'send_unknown'", "where state = 'send_pending'", "interval '10 minutes'", "run_lost"):

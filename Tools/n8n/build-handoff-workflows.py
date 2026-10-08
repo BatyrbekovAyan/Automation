@@ -12,6 +12,9 @@
                                           failed delivery never loses the request. Also settles LOST SENDS
                                           (R9): a bot reply left send_pending > 10 min (its run died between
                                           the lease and Record Send) becomes send_unknown — never a resend.
+                                          F3 (2026-10-08): only a real due request passes `Due Request?` —
+                                          a tick with nothing due (or a DB fault) calls no Wappi endpoint and
+                                          writes nothing.
   crHandoffsApi001-Handoffs.json          /webhook/Handoffs — the app's pending list + take/done
                                           (A1-gated, owner-scoped). `done` clears the chat's pause.
 
@@ -35,6 +38,17 @@ NTFY_ID, NTFY_NAME = "crHandoffNtfy001", "Handoff Notifier"
 API_ID, API_NAME = "crHandoffsApi001", "Handoffs"
 MAX_NOTIFY_ATTEMPTS = 6
 LOST_SEND_MINUTES = 10
+# F3 (iteration 2026-09-28, final regression 2026-10-08): `Due Notifications` keeps alwaysOutputData + onError continue
+# (a DB fault must not fail the run — the R9 sweep shares the schedule), so it answers ONE item on every tick: `{}` when
+# nothing is due, `{message, error}` when the statement failed, the trigger's own item when the node threw outside the
+# query runner. Until this gate that item went to Owner Phone — a `GET sync/get/status` with NO profile_id every 2
+# minutes (≈720 a day on prod since 2026-09-24) — and on to Record Notify with a null id. Only a claimed request row
+# (a positive id AND a profile id) passes; what the gate refuses goes nowhere. Compose Notice keeps reading the row as
+# `$('Due Notifications').item`: n8n re-pairs every node's input items to their own index before it runs, so the walk
+# back through the If is exact (staging probe 2026-10-08, evidence F3-after.txt). Pinned by tests/test_handoff_notifier.py
+# (behaviour, n8n's own expression engine) and verify-history-handoff.py check_notifier_gate (structure).
+DUE_GATE = "Due Request?"
+DUE_GATE_EXPR = "={{ Number($json.id) > 0 && typeof $json.profile_id === 'string' && $json.profile_id !== '' }}"
 
 
 def nid(*parts):
@@ -184,20 +198,22 @@ def build_notifier():
     # bottom), reaching no transport node; onError continue (auth.postgres) so it can never fail the notices either.
     n.append(auth.postgres("Settle Lost Sends", LOST_SEND_SQL, "={{ [] }}", [220, 0]))
     n.append(auth.postgres("Due Notifications", DUE_SQL, "={{ [] }}", [220, 200]))
-    n.append(auth.http_wappi("Owner Phone", "GET", "={{ ($json.channel === 'telegram' ? 'https://wappi.pro/tapi/' : 'https://wappi.pro/api/') + 'sync/get/status' }}", [440, 200],
+    n.append(auth.if_true(DUE_GATE, DUE_GATE_EXPR, [440, 200]))     # F3: a real due request only; the false output leads nowhere
+    n.append(auth.http_wappi("Owner Phone", "GET", "={{ ($json.channel === 'telegram' ? 'https://wappi.pro/tapi/' : 'https://wappi.pro/api/') + 'sync/get/status' }}", [660, 200],
                              query_expr="={{ JSON.stringify({ profile_id: $json.profile_id }) }}", timeout=20000))
-    n.append(auth.code("Compose Notice", COMPOSE_NOTICE_JS, [660, 200]))
+    n.append(auth.code("Compose Notice", COMPOSE_NOTICE_JS, [880, 200]))
     n[-1]["parameters"]["mode"] = "runOnceForEachItem"     # one notice per due request, never only the first
-    n.append(auth.if_true("Skip?", "={{ $json.skip }}", [880, 200]))
-    n.append(auth.http_wappi("Send Notice", "POST", "={{ $json.url }}", [1100, 300],
+    n.append(auth.if_true("Skip?", "={{ $json.skip }}", [1100, 200]))
+    n.append(auth.http_wappi("Send Notice", "POST", "={{ $json.url }}", [1320, 300],
                              query_expr="={{ JSON.stringify({ profile_id: $json.profileId }) }}",
                              body_expr="={{ JSON.stringify({ recipient: $json.recipient, body: $json.body }) }}", timeout=30000))
-    n.append(auth.code("Settle Notice", SETTLE_NOTICE_JS, [1320, 200]))
+    n.append(auth.code("Settle Notice", SETTLE_NOTICE_JS, [1540, 200]))
     n[-1]["parameters"]["mode"] = "runOnceForEachItem"
-    n.append(auth.postgres("Record Notify", RECORD_NOTIFY_SQL, "={{ [ $json.id, $json.state, $json.error ] }}", [1540, 200]))
+    n.append(auth.postgres("Record Notify", RECORD_NOTIFY_SQL, "={{ [ $json.id, $json.state, $json.error ] }}", [1760, 200]))
     auth.edge(c, "Every 2 Minutes", "Settle Lost Sends")
     auth.edge(c, "Every 2 Minutes", "Due Notifications")
-    auth.edge(c, "Due Notifications", "Owner Phone")
+    auth.edge(c, "Due Notifications", DUE_GATE)
+    auth.edge(c, DUE_GATE, "Owner Phone", 0)
     auth.edge(c, "Owner Phone", "Compose Notice")
     auth.edge(c, "Compose Notice", "Skip?")
     auth.edge(c, "Skip?", "Settle Notice", 0)

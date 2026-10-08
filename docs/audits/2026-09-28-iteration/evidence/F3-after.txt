@@ -1,0 +1,154 @@
+# F3 — AFTER (gate `Due Request?` between Due Notifications and Owner Phone; generator build-handoff-workflows.py)
+# 2026-10-08T13:42:56Z  base HEAD 3a8d29b5 + working tree
+
+# python3 Tools/n8n/build-handoff-workflows.py (second run: no diff) && --check
+request / app webhook: unchanged vs HEAD
+handoff workflows: OK
+exit=0
+
+# canonical notifier vs HEAD, node by node (positions aside)
+added nodes: ['Due Request?'] removed: []
+  Compose Notice       same (moved [660, 200]->[880, 200])
+  Due Notifications    same
+  Every 2 Minutes      same
+  Owner Phone          same (moved [440, 200]->[660, 200])
+  Record Notify        same (moved [1540, 200]->[1760, 200])
+  Send Notice          same (moved [1100, 300]->[1320, 300])
+  Settle Lost Sends    same
+  Settle Notice        same (moved [1320, 200]->[1540, 200])
+  Skip?                same (moved [880, 200]->[1100, 200])
+  edges: Due Notifications {"main": [[{"node": "Owner Phone", "type": "main", "index": 0}]]} -> {"main": [[{"node": "Due Request?", "type": "main", "index": 0}]]}
+  edges: Due Request? null -> {"main": [[{"node": "Owner Phone", "type": "main", "index": 0}]]}
+  gate condition: ={{ Number($json.id) > 0 && typeof $json.profile_id === 'string' && $json.profile_id !== '' }}
+
+# python3 Tools/n8n/tests/test_handoff_notifier.py
+PASS F3 A [no_due]: a tick with nothing due calls no Wappi endpoint and writes no notice state
+PASS F3 A [db_query_error]: a tick with nothing due calls no Wappi endpoint and writes no notice state
+PASS F3 A [db_thrown]: a tick with nothing due calls no Wappi endpoint and writes no notice state
+PASS F3 A [no_due]: the R9 lost-send sweep off the same schedule is unchanged (once, first, leads nowhere)
+PASS F3 A [db_query_error]: the R9 lost-send sweep off the same schedule is unchanged (once, first, leads nowhere)
+PASS F3 A [db_thrown]: the R9 lost-send sweep off the same schedule is unchanged (once, first, leads nowhere)
+PASS F3 A [one_due]: the R9 lost-send sweep off the same schedule is unchanged (once, first, leads nowhere)
+PASS F3 A [two_due]: the R9 lost-send sweep off the same schedule is unchanged (once, first, leads nowhere)
+PASS F3 A [no_phone]: the R9 lost-send sweep off the same schedule is unchanged (once, first, leads nowhere)
+PASS F3 A [one_due]: a real request still reaches Owner Phone → (Send Notice) → Record Notify, about its own row
+PASS F3 A [two_due]: a real request still reaches Owner Phone → (Send Notice) → Record Notify, about its own row
+PASS F3 A [no_phone]: a real request still reaches Owner Phone → (Send Notice) → Record Notify, about its own row
+PASS F3 B: Due Notifications feeds exactly one If gate, and its condition passes ONLY a real request row (n8n expression engine)
+PASS F3 C: verify-history-handoff accepts the canonical notifier and its tripwire rejects every bypass the driver also catches
+
+14 pass, 0 fail
+exit=0
+
+# python3 Tools/n8n/verify-history-handoff.py (incl. check_notifier_gate + its built-in negative: the pre-fix shape is rejected)
+OK  4wYitz5ek30SVNlT-WhatsApp_Bot.json
+OK  4VN3gsFaC2HUYmcc-Telegram_Bot.json
+OK  handoff workflows (request / notifier / app webhook)
+OK  test dialog (no memory, no send, no quota, dry handoff, owner check)
+OK  integrations (Create types / Dashboard / Delete / Set State / proxy)
+ALL HISTORY/HANDOFF ASSERTS PASSED
+exit=0
+
+# python3 Tools/n8n/tests/test_reply_lost_send.py (R9 branch off the same schedule)
+5 pass, 0 fail
+
+# python3 Tools/n8n/apply-history-handoff.py --check ; python3 Tools/n8n/verify-sql-comments.py
+history/handoff: OK
+OK  82 Postgres node(s) in 28 workflow file(s): no placeholder outside code, no {{ }}, no modifier, no leading =
+
+# python3 Tools/n8n/tests/run_all.py (HEAD with the new test: 23 OK + test_handoff_notifier 9 pass / 5 fail; after:)
+OK   test_auth_refresh.py: 12 pass, 0 fail
+OK   test_billing_identity.py: 19 pass, 0 fail
+OK   test_claim.py: 16 pass, 0 fail
+OK   test_create_seed.py: 52 pass, 0 fail
+OK   test_handoff_notifier.py: 14 pass, 0 fail
+OK   test_harness_selfcheck.py: 2 pass, 0 fail
+OK   test_legacy_generators.py: 5 pass, 0 fail
+OK   test_price_search.py: 31 pass, 0 fail
+OK   test_reply_lost_send.py: 5 pass, 0 fail
+OK   test_reply_memory.py: 44 pass, 0 fail
+OK   test_reply_mode.py: 43 pass, 0 fail
+OK   test_reply_order.py: 44 pass, 0 fail
+OK   test_reply_reconcile.py: 66 pass, 0 fail
+OK   test_retired_delete.py: 13 pass, 0 fail
+OK   test_sql_comment_injection.py: 36 pass, 0 fail
+OK   test_suggest_catalog.py: 24 pass, 0 fail
+OK   test_suggest_lang.py: 11 pass, 0 fail
+OK   test_suggest_price.py: 12 pass, 0 fail
+OK   test_suggest_query.py: 37 pass, 0 fail
+OK   test_test_dialog.py: 17 pass, 0 fail
+OK   test_upload.py: 45 pass, 0 fail
+OK   test_verify_deployed.py: 48 pass, 0 fail
+OK   test_verify_parity.py: 38 pass, 0 fail
+OK   test_verify_sql_comments.py: 53 pass, 0 fail
+exit=0
+
+# STAGING (n8n 2.36.7 + task runners, private Postgres, Wappi mock)
+
+## paired-item probe, 2026-10-08, before the re-import (temporary workflow, deleted after use: Postgres 3 rows → If → HTTP → per-item Code)
+## n8n re-pairs each node's input items before it runs (workflow-execute.js newTaskDataConnections), so Compose Notice's
+## $('Due Notifications').item stays exact behind the gate — the driver models the same rule
+status 200
+[{"rowViaPostgres": 101, "rowViaGate": 101, "own": 101}, {"rowViaPostgres": 202, "rowViaGate": 202, "own": 202}, {"rowViaPostgres": 303, "rowViaGate": 303, "own": 303}]
+delete 200
+
+## python3 Tools/n8n/staging/bootstrap.py --bot wa:stgwa001 --bot tg:stgtg001 (18:25–18:28) → imported 28 + 2 staging bots
+## python3 Tools/n8n/verify-deployed.py --base http://localhost:5678  (18:29)
+base http://localhost:5678: canonical 27 (diff 0), clones 2 (behind template 0, ...)  crHandoffNtfy001 OK active=True graph=True published=True; exit=0
+
+## Wappi mock log (Tools/test-output/wappi-mock.jsonl): nothing idle for 5 min (ticks 18:30/32/34/36), then the e2e below
+last bare get/status before the re-import: 2026-10-08T18:24:18
+window 2026-10-08T18:27:26 .. 2026-10-08T18:40:37 (local, UTC+5): 4 transport calls, bare get/status: 0
+  2026-10-08T18:38:18  GET /api/sync/get/status query={'profile_id': 'stgntef16e749'} -> 200
+  2026-10-08T18:38:18  GET /api/sync/get/status query={'profile_id': 'stgntef16e749'} -> 200
+  2026-10-08T18:38:18  POST /api/sync/message/send query={'profile_id': 'stgntef16e749'} recipient=77010009999 -> 500
+  2026-10-08T18:38:18  POST /api/sync/message/send query={'profile_id': 'stgntef16e749'} recipient=77010009999 -> 200
+
+## python3 Tools/n8n/staging/e2e-handoff.py --only notifier  (18:37–18:40)
+PASS  notifier_delivers_self_message_and_survives_failure (70s) — A5 acceptance: the owner notice is a self-message on the bot's channel (no client text); a failed delivery keeps the request and is retried
+      states=failed/1,sent/1 send_calls=2 to_self=True no_leak=True requests_intact=True body='Choose Reply: вопрос клиента (чат …6321). Автоответ в этом чате приостановлен — '
+PASS  lost_send_settled_by_notifier (121s) — R9: a reply left send_pending > 10 min (its run died between the lease and Record Send) becomes send_unknown on the notifier's schedule — no transport call; a live one is untouched
+      lost=send_unknown|dead-run|run_lost: no send result recorded within 10 min (execution dead-run) live=send_pending send_calls_for_profile=0
+   cleanup: deleted rows: 3
+   cleanup: 0 owner fixture(s)
+
+2 pass, 0 fail
+
+## python3 Tools/n8n/staging/e2e-test-dialog.py  (18:40–18:42; [llm] scenarios once each)
+PASS  snapshot_counts_a_send_and_ignores_reads (7s) — harness: the side-effect snapshot moves on a real mock send for the test's profile (and on one to its recipient), not on a bare get/status or another profile's send — no model, no workflow
+      {'before': 0, 'after_noise': 0, 'after_send': 1, 'after_send_to_recipient': 2}
+PASS  test_dialog_replies_with_zero_side_effects [llm] (17s) — 7.1: the bot's real prompt answers; nothing is sent, counted, remembered or claimed
+      {'status': 200, 'reply': 'Не нашёл цену букета из 25 роз в доступных данных.', 'sources': {'catalog': False, 'contacts': False, 'businessText': False, 'documents': []}, 'wouldHandoff': None, 'side_effects_unchanged': True, 'before': {'transport_writes': 0, 'memory': 0, 'dialogs': 0, 'ledger': 0, 'handoffs': 0, 'history': 0}, 'after': {'transport_writes': 0, 'memory': 0, 'dialogs': 0, 'ledger': 0, 'handoffs': 0, 'history': 0}}
+PASS  test_dialog_gate_fails_closed (4s) — 7.1: no token → 401; a foreign install → 403; a workflow the install does not own → 403; empty text → 400
+      {'notoken': 401, 'foreign': 403, 'wrong_workflow': 403, 'empty': 400}
+PASS  test_dialog_dry_handoff_is_recorded_not_created [llm] (12s) — 7.1: a handoff the model would make lands in test_dialog_actions, never in handoff_requests, and no notice is sent
+      {'status': 200, 'wouldHandoff': {'name': 'Айдос', 'phone': '+7 701 123 45 67', 'reason': 'order', 'summary': 'Клиент хочет заказать букет из 25 роз на завтра и просит подтвердить заказ владельцем.'}, 'recorded_actions': 1, 'handoff_requests_unchanged': True, 'side_effects_unchanged': True, 'reply': 'Передал владельцу, он свяжется'}
+   restore: OK (active=True, versionId==activeVersionId: True)
+PASS  test_dialog_active_bot_tests_published_not_draft [llm] (17s) — R15: an active bot with an unpublished draft (999) is tested by the PUBLISHED prompt (3200) and the response names that version
+      {'status': 200, 'reply': 'Букет из 25 роз стоит 3200 тенге.', 'promptVersion': {'source': 'published', 'versionId': 'e49a84f2-b410-4488-91e9-fa9ee4f1baf2', 'draftPending': True}, 'published': 'e49a84f2-b410-4488-91e9-fa9ee4f1baf2', 'draft': '42e459d8-ad21-4189-8d54-122cad3da689', 'side_effects_unchanged': True}
+   restore: OK (active=True, versionId==activeVersionId: True)
+PASS  test_dialog_inactive_bot_tests_draft_and_says_so [llm] (8s) — R15: an inactive bot is tested by its draft — the version activation publishes — and the response says source=draft (not an error)
+      {'status': 200, 'reply': 'Букет из 25 роз стоит 999 тенге.', 'promptVersion': {'source': 'draft', 'versionId': '8817fe9c-0d7f-4b33-9ceb-d587ab027648', 'draftPending': False}, 'draft': '8817fe9c-0d7f-4b33-9ceb-d587ab027648'}
+   restore: OK (active=True, versionId==activeVersionId: True)
+PASS  test_dialog_price_conflict_is_named [llm] (14s) — V9: the Test Dialog's price-list tool is the reconciling sub-workflow fed with the PUBLISHED prompt it read — a price-list row at 3900 against the catalog's 3200 is answered as a discrepancy, never as 3900 alone
+      {'status': 200, 'reply': 'Фильтр масляный Toyota 90915-YZZE1: 3900 тг, оригинал.  \nВ каталоге также указана цена 3200 тг, есть расхождение.', 'tool_result_reached_the_model': True, 'discrepancy_named': True}
+PASS  price_search_subworkflow_runs_on_n8n (6s) — V9: the deployed Price List Search (Guard → the bot's own rows → Reconcile Prices) on the real n8n task runner, called with the tool's inputs — no model: a 3900 row against a 3200 catalog comes back marked, the catalog price unmarked, a foreign bot's row and a '-1' id never searched; V9-r2: a price list that AGREES with the catalog plus analogue rows (two documents of one search) comes back with no mark at all, a lone analogue row only with the soft mark
+      {'status': 200, 'documents': ['Колодки тормозные 04465-02220 — 18500 тг', 'Фильтр масляный 90915-YZZE1 — 3900 тг, оригинал\n[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1» — 3200 тг, в прайсе — 3900 тг. Цены расходятся.]'], 'sentinel_id': {'documents': []}, 'agreeing': ['Фильтр масляный Mahle OC 217 (90915-YZZE1) — 1600 тг', 'Фильтр масляный Toyota 90915-YZZE1 (оригинал) — 3200 тг\nФильтр масляный Knecht OC 91 (90915-YZZE1) — 1400 тг'], 'lone_analogue': ['Фильтр масляный Knecht OC 91 (90915-YZZE1) — 1400 тг\n[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1» — 3200 тг, в этой строке прайса — 1400 тг (артикул совпадает, но строка может быть о другой позиции). Если это та же позиция — цены расходятся.]']}
+PASS  handoffs_status_lists_last_outcomes_owner_scoped (4s) — 7.3: op status returns the ledger's last states for the owner's profiles (chat tail only), 403 for a foreign install
+      {'status': 200, 'row': {'profileId': 'stgwa001', 'chatTail': '6543', 'state': 'send_unknown', 'at': 1791466933718, 'executionId': 'exec-c416131140db', 'transportMessageId': None}, 'recent_n': 1, 'foreign': 403, 'leaks_text': False, 'body': None}
+   cleanup: deleted rows: 2
+
+9 pass, 0 fail
+
+## closing check — every mock call 2026-10-08T18:27:26 .. 2026-10-08T19:05:45 (local, UTC+5):
+  2026-10-08T18:38:18  GET /api/sync/get/status query={'profile_id': 'stgntef16e749'}   <- notifier tick serving the e2e requests
+  2026-10-08T18:38:18  GET /api/sync/get/status query={'profile_id': 'stgntef16e749'}   <- notifier tick serving the e2e requests
+  2026-10-08T18:38:18  POST /api/sync/message/send query={'profile_id': 'stgntef16e749'} recipient=77010009999 body='Choose Reply: новый заказ (чат …6632). Автоответ'   <- notifier tick serving the e2e requests
+  2026-10-08T18:38:18  POST /api/sync/message/send query={'profile_id': 'stgntef16e749'} recipient=77010009999 body='Choose Reply: вопрос клиента (чат …6321). Автоот'   <- notifier tick serving the e2e requests
+  2026-10-08T18:40:49  GET /api/sync/get/status query={}   <- the e2e-test-dialog self-check's deliberate F3-shaped call (harness, not a tick: :49, not :18)
+  2026-10-08T18:40:49  POST /api/sync/message/send query={'profile_id': 'stgOtherProfile1'} recipient=77019999999 body='другой бот'   <- e2e-test-dialog self-check (harness)
+  2026-10-08T18:40:50  POST /api/sync/message/send query={'profile_id': 'stgwa001'} recipient=77010000001 body='тест не должен отправлять'   <- e2e-test-dialog self-check (harness)
+  2026-10-08T18:40:51  POST /api/sync/message/send query={'profile_id': 'stgOtherProfile1'} recipient=77015550011 body='получателю теста'   <- e2e-test-dialog self-check (harness)
+  2026-10-08T19:00:22  GET /api/profile/all/get query={}   <- Delete Orphan Profiles (hourly)
+  2026-10-08T19:00:22  GET /tapi/profile/all/get query={}   <- Delete Orphan Profiles (hourly)
+Notifier ticks 18:30 … 19:04 with nothing due: no transport call. The two notices of the 18:38 tick name different chats (…6632, …6321) — each built from its own row through the gate.

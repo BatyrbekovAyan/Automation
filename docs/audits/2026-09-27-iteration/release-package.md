@@ -69,6 +69,7 @@ workflow — `deploy-canonical.py` (dry-run → `--apply --yes`, точка от
   клиентом: клиент делает refresh сразу после bootstrap; A1-сборка без этой части получит billing-идентичность лишь на
   первом плановом refresh (до ~10 ч). Потеря секрета без «Удалить все данные» — отзыв мёртвой установки поддержкой
   (`docs/audits/a1-deploy-runbook.md` §5).
+- **Handoff Notifier несёт R9 и F3** (итерация 2026-09-28, 2026-10-08: гейт `Due Request?` — тик без заявки к отправке или со сбоем БД больше не зовёт Wappi `get/status` без профиля и не пишет Record Notify; ветка R9 без изменений) — `deploy-canonical.py`, после PUT workflow должен остаться активным (§5).
 - Точный список к выкладке брать из `verify-deployed.py --base <prod>` (строки DIFF) — он же критерий готовности.
 
 Затрагиваемые группы: Auth Session, Wappi Proxy, все gated вебхуки, оба шаблона ботов, Create/Edit WA+TG, Suggest Replies,

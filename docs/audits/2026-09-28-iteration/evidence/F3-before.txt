@@ -1,0 +1,48 @@
+# F3 — BEFORE (HEAD 3a8d29b5, canonical Handoff Notifier unchanged; new test + verifier check applied)
+# 2026-10-08T12:46:56Z
+
+# python3 Tools/n8n/tests/test_handoff_notifier.py
+FAIL F3 A [no_due]: a tick with nothing due calls no Wappi endpoint and writes no notice state
+      - transport call Owner Phone GET https://wappi.pro/api/sync/get/status query={}
+      - Record Notify ran with [None, 'failed', 'no_phone']
+FAIL F3 A [db_query_error]: a tick with nothing due calls no Wappi endpoint and writes no notice state
+      - transport call Owner Phone GET https://wappi.pro/api/sync/get/status query={}
+      - Record Notify ran with [None, 'failed', 'no_phone']
+FAIL F3 A [db_thrown]: a tick with nothing due calls no Wappi endpoint and writes no notice state
+      - transport call Owner Phone GET https://wappi.pro/api/sync/get/status query={}
+      - Record Notify ran with [None, 'failed', 'no_phone']
+PASS F3 A [no_due]: the R9 lost-send sweep off the same schedule is unchanged (once, first, leads nowhere)
+PASS F3 A [db_query_error]: the R9 lost-send sweep off the same schedule is unchanged (once, first, leads nowhere)
+PASS F3 A [db_thrown]: the R9 lost-send sweep off the same schedule is unchanged (once, first, leads nowhere)
+PASS F3 A [one_due]: the R9 lost-send sweep off the same schedule is unchanged (once, first, leads nowhere)
+PASS F3 A [two_due]: the R9 lost-send sweep off the same schedule is unchanged (once, first, leads nowhere)
+PASS F3 A [no_phone]: the R9 lost-send sweep off the same schedule is unchanged (once, first, leads nowhere)
+PASS F3 A [one_due]: a real request still reaches Owner Phone → (Send Notice) → Record Notify, about its own row
+PASS F3 A [two_due]: a real request still reaches Owner Phone → (Send Notice) → Record Notify, about its own row
+PASS F3 A [no_phone]: a real request still reaches Owner Phone → (Send Notice) → Record Notify, about its own row
+FAIL F3 B: Due Notifications feeds exactly one If gate, and its condition passes ONLY a real request row (n8n expression engine)
+      - Due Notifications must feed exactly one If node, found ['Owner Phone']
+FAIL F3 C: verify-history-handoff accepts the canonical notifier and its tripwire rejects every bypass the driver also catches
+      - canonical notifier rejected: notifier: missing If gate 'Due Request?' (F3)
+
+9 pass, 5 fail
+exit=1
+
+# python3 Tools/n8n/verify-history-handoff.py
+OK  4wYitz5ek30SVNlT-WhatsApp_Bot.json
+OK  4VN3gsFaC2HUYmcc-Telegram_Bot.json
+HISTORY/HANDOFF FAIL: notifier: missing If gate 'Due Request?' (F3)
+exit=1
+
+# staging Wappi mock log (Tools/test-output/wappi-mock.jsonl): get/status calls WITHOUT profile_id — the notifier's tick
+total calls in log: 4917; bare get/status: 1219; first 2026-09-25T19:04:18, last 2026-10-08T17:46:18 (local, UTC+5)
+last 8:
+  2026-10-08T17:32:18  GET /api/sync/get/status query={} -> 200 {"authorized": true, "profile_id": "", "phone": null, "authorized_at": null, "logouted_at": null}
+  2026-10-08T17:34:18  GET /api/sync/get/status query={} -> 200 {"authorized": true, "profile_id": "", "phone": null, "authorized_at": null, "logouted_at": null}
+  2026-10-08T17:36:18  GET /api/sync/get/status query={} -> 200 {"authorized": true, "profile_id": "", "phone": null, "authorized_at": null, "logouted_at": null}
+  2026-10-08T17:38:18  GET /api/sync/get/status query={} -> 200 {"authorized": true, "profile_id": "", "phone": null, "authorized_at": null, "logouted_at": null}
+  2026-10-08T17:40:18  GET /api/sync/get/status query={} -> 200 {"authorized": true, "profile_id": "", "phone": null, "authorized_at": null, "logouted_at": null}
+  2026-10-08T17:42:18  GET /api/sync/get/status query={} -> 200 {"authorized": true, "profile_id": "", "phone": null, "authorized_at": null, "logouted_at": null}
+  2026-10-08T17:44:18  GET /api/sync/get/status query={} -> 200 {"authorized": true, "profile_id": "", "phone": null, "authorized_at": null, "logouted_at": null}
+  2026-10-08T17:46:18  GET /api/sync/get/status query={} -> 200 {"authorized": true, "profile_id": "", "phone": null, "authorized_at": null, "logouted_at": null}
+gaps between the last 30 (s): [119, 120, 121, 360]
