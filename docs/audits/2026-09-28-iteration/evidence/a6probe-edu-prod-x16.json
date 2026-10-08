@@ -1,0 +1,373 @@
+{
+ "summary": {
+  "label": "a6probe-edu-prod-x16",
+  "prompts_ref": "f08546f1",
+  "scenario_version": "v1.2 (2026-10-08: V9-r2 ap_price_agrees_analogues — the price list agrees with the catalog, analogue rows in the same chunk; harness h5) + a6 probe (scratch, 2026-10-08)",
+  "harness": "h5 (2026-10-08, V9-r2: no_conflict_claim / no_price_caveat for a price list that AGREES with the catalog; on top of h4 2026-10-07 V9: «расхождение» + negated conflict, zero-price / elliptical free delivery, «итого по N позициям» partial, «нужен» / the car or device by name, a word inside the installment claim, Kazakh = no Russian sentence, «18,000»; h3 2026-09-27 R14; checks pinned by test_checks.py)",
+  "model": "gpt-5.4-mini",
+  "reasoning_effort": null,
+  "dropped_params": [],
+  "panel_model": null,
+  "max_tokens": 200,
+  "search_simulation": "raw documents (retrieve-as-tool at f08546f1)",
+  "scenarios": 1,
+  "runs": 16,
+  "pass_all": 0,
+  "flaky": 1,
+  "fail": 0,
+  "error_runs": 0,
+  "finish_reason_length_runs": 0,
+  "prompt_tokens": 63113,
+  "cached_tokens": 54400,
+  "completion_tokens": 703,
+  "reasoning_tokens": 0,
+  "cost_usd_auto_path": 0.0138,
+  "prices_usd_per_1m": [
+   0.75,
+   0.075,
+   4.5
+  ],
+  "latency_ms": {
+   "auto": {
+    "n": 16,
+    "median": 1571,
+    "p90": 1987,
+    "max": 3627
+   },
+   "panel": null
+  },
+  "seconds": 27,
+  "by_check": {
+   "mentions:15": "5/16",
+   "mentions:Марин": "5/16"
+  }
+ },
+ "results": [
+  {
+   "id": "a6_owner_agreement_education",
+   "vertical": "education",
+   "mode": "auto",
+   "lang": "ru",
+   "tags": [
+    "memory",
+    "key"
+   ],
+   "repeats": 16,
+   "pass_rate": 0.3125,
+   "runs": [
+    {
+     "verdicts": {
+      "mentions:15": false,
+      "mentions:Марин": false
+     },
+     "text": "Спасибо! Передал администратору — он свяжется, подтвердит время и подберёт группу.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "question",
+        "summary": "Клиент просит напомнить, во сколько подойти и кого спросить. В данных бизнеса нет подтверждённого времени и имени сотрудника для этой записи."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 7523,
+      "completion_tokens": 82,
+      "cached_tokens": 6912,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3627,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:15": false,
+      "mentions:Марин": false
+     },
+     "text": "Я не вижу в переписке подтверждённого времени и имени, кого спросить.\n\nЕсли хотите, я уточню это у администратора — напишите, пожалуйста, ваше имя и номер телефона.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 3706,
+      "completion_tokens": 51,
+      "cached_tokens": 2688,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1619,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:15": false,
+      "mentions:Марин": false
+     },
+     "text": "Я не вижу в переписке подтверждённого времени и имени, кого спросить.\n\nЕсли хотите, я передам администратору уточнение — напишите, пожалуйста, ваше имя и номер телефона.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 3706,
+      "completion_tokens": 53,
+      "cached_tokens": 3200,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1570,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:15": false,
+      "mentions:Марин": false
+     },
+     "text": "Я не вижу, чтобы время и имя были подтверждены в данных.\n\nМогу передать администратору, он уточнит и свяжется с вами. Напишите, пожалуйста, ваше имя и номер телефона.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 3706,
+      "completion_tokens": 54,
+      "cached_tokens": 3200,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1907,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:15": false,
+      "mentions:Марин": false
+     },
+     "text": "Я не вижу в переписке подтверждённого времени и имени, кого спросить.  \nЕсли хотите, я передам заявку администратору — он уточнит и свяжется с вами.  \nНапишите, пожалуйста, ваше имя и номер телефона.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 3706,
+      "completion_tokens": 64,
+      "cached_tokens": 3200,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1961,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:15": false,
+      "mentions:Марин": false
+     },
+     "text": "Я не вижу в переписке подтверждённого времени и имени, кого спросить.\n\nЕсли хотите, я передам заявку администратору — он уточнит время и подскажет, кого спросить. Напишите, пожалуйста, ваше имя и номер телефона.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 3706,
+      "completion_tokens": 65,
+      "cached_tokens": 3200,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1571,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:15": true,
+      "mentions:Марин": true
+     },
+     "text": "Завтра в 15:00, спросите Марину.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 3706,
+      "completion_tokens": 23,
+      "cached_tokens": 3200,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1097,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:15": false,
+      "mentions:Марин": false
+     },
+     "text": "Я не вижу в переписке подтверждённого времени и имени, кого спросить.  \nАдминистратор уточнит это по телефону: +7 702 333 44 55.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 3706,
+      "completion_tokens": 50,
+      "cached_tokens": 3200,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1987,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:15": true,
+      "mentions:Марин": true
+     },
+     "text": "Завтра в 15:00, спросите Марину.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 3706,
+      "completion_tokens": 23,
+      "cached_tokens": 3200,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1206,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:15": true,
+      "mentions:Марин": true
+     },
+     "text": "Завтра в 15:00, спросите Марину.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 3706,
+      "completion_tokens": 23,
+      "cached_tokens": 3200,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1453,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:15": true,
+      "mentions:Марин": true
+     },
+     "text": "Завтра в 15:00, спросите Марину.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 3706,
+      "completion_tokens": 23,
+      "cached_tokens": 3200,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1213,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:15": false,
+      "mentions:Марин": false
+     },
+     "text": "Уточните, пожалуйста, для кого занятие — ребёнок или взрослый, и какой курс нужен: английский или подготовка к ЕНТ.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 3706,
+      "completion_tokens": 41,
+      "cached_tokens": 3200,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1526,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:15": true,
+      "mentions:Марин": true
+     },
+     "text": "Завтра в 15:00, спросите Марину.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 3706,
+      "completion_tokens": 23,
+      "cached_tokens": 3200,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1414,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:15": false,
+      "mentions:Марин": false
+     },
+     "text": "Я не вижу в переписке подтверждённого времени и имени, кого спросить.  \nНапишите, пожалуйста, ваше имя и номер телефона — администратор уточнит и свяжется с вами.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 3706,
+      "completion_tokens": 53,
+      "cached_tokens": 3200,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1978,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:15": false,
+      "mentions:Марин": false
+     },
+     "text": "Уточните, пожалуйста, для кого запись — имя и возраст ученика.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 3706,
+      "completion_tokens": 25,
+      "cached_tokens": 3200,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1247,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:15": false,
+      "mentions:Марин": false
+     },
+     "text": "Я не вижу в переписке подтверждённого времени и имени, кого спросить.\n\nЕсли хотите, я уточню у администратора — напишите, пожалуйста, ваше имя и номер телефона.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 3706,
+      "completion_tokens": 50,
+      "cached_tokens": 3200,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1640,
+     "status": null
+    }
+   ]
+  }
+ ]
+}

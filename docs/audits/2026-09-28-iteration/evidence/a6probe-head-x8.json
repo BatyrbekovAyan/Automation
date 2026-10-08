@@ -1,0 +1,581 @@
+{
+ "summary": {
+  "label": "a6probe-head-x8",
+  "prompts_ref": "worktree",
+  "scenario_version": "v1.2 (2026-10-08: V9-r2 ap_price_agrees_analogues — the price list agrees with the catalog, analogue rows in the same chunk; harness h5) + a6 probe (scratch, 2026-10-08)",
+  "harness": "h5 (2026-10-08, V9-r2: no_conflict_claim / no_price_caveat for a price list that AGREES with the catalog; on top of h4 2026-10-07 V9: «расхождение» + negated conflict, zero-price / elliptical free delivery, «итого по N позициям» partial, «нужен» / the car or device by name, a word inside the installment claim, Kazakh = no Russian sentence, «18,000»; h3 2026-09-27 R14; checks pinned by test_checks.py)",
+  "model": "gpt-5.4-mini",
+  "reasoning_effort": null,
+  "dropped_params": [],
+  "panel_model": null,
+  "max_tokens": 200,
+  "search_simulation": "Price List Search sub-workflow (Reconcile Prices at worktree)",
+  "scenarios": 3,
+  "runs": 24,
+  "pass_all": 1,
+  "flaky": 1,
+  "fail": 1,
+  "error_runs": 0,
+  "finish_reason_length_runs": 0,
+  "prompt_tokens": 120007,
+  "cached_tokens": 96512,
+  "completion_tokens": 1078,
+  "reasoning_tokens": 0,
+  "cost_usd_auto_path": 0.0297,
+  "prices_usd_per_1m": [
+   0.75,
+   0.075,
+   4.5
+  ],
+  "latency_ms": {
+   "auto": {
+    "n": 24,
+    "median": 1534,
+    "p90": 3241,
+    "max": 3739
+   },
+   "panel": null
+  },
+  "seconds": 44,
+  "by_check": {
+   "mentions:15": "11/24",
+   "mentions:Марин": "11/24"
+  }
+ },
+ "results": [
+  {
+   "id": "a6_owner_agreement_flowers",
+   "vertical": "flowers",
+   "mode": "auto",
+   "lang": "ru",
+   "tags": [
+    "memory",
+    "key"
+   ],
+   "repeats": 8,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "mentions:15": true,
+      "mentions:Марин": true
+     },
+     "text": "Завтра в 15:00, спросите Марину.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4104,
+      "completion_tokens": 23,
+      "cached_tokens": 0,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1384,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:15": true,
+      "mentions:Марин": true
+     },
+     "text": "Завтра в 15:00, спросите Марину.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4104,
+      "completion_tokens": 23,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1105,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:15": true,
+      "mentions:Марин": true
+     },
+     "text": "Завтра в 15:00, спросите Марину.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4104,
+      "completion_tokens": 23,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1096,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:15": true,
+      "mentions:Марин": true
+     },
+     "text": "Завтра в 15:00, спросите Марину.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4104,
+      "completion_tokens": 23,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1109,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:15": true,
+      "mentions:Марин": true
+     },
+     "text": "Завтра в 15:00, спросите Марину.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4104,
+      "completion_tokens": 23,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1137,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:15": true,
+      "mentions:Марин": true
+     },
+     "text": "Завтра в 15:00, спросите Марину.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4104,
+      "completion_tokens": 23,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1134,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:15": true,
+      "mentions:Марин": true
+     },
+     "text": "Завтра в 15:00, спросите Марину.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4104,
+      "completion_tokens": 23,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1315,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:15": true,
+      "mentions:Марин": true
+     },
+     "text": "Завтра в 15:00, спросите Марину.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4104,
+      "completion_tokens": 23,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1354,
+     "status": null
+    }
+   ]
+  },
+  {
+   "id": "a6_owner_agreement_education",
+   "vertical": "education",
+   "mode": "auto",
+   "lang": "ru",
+   "tags": [
+    "memory",
+    "key"
+   ],
+   "repeats": 8,
+   "pass_rate": 0.375,
+   "runs": [
+    {
+     "verdicts": {
+      "mentions:15": true,
+      "mentions:Марин": true
+     },
+     "text": "Завтра в 15:00, спросите Марину.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4061,
+      "completion_tokens": 23,
+      "cached_tokens": 0,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1253,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:15": true,
+      "mentions:Марин": true
+     },
+     "text": "Завтра в 15:00, спросите Марину.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "question",
+        "summary": "Клиент просит напомнить, во сколько подойти и кого спросить. В переписке ранее было указано: завтра в 15:00, спросить Марину."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8237,
+      "completion_tokens": 77,
+      "cached_tokens": 7424,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2964,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:15": false,
+      "mentions:Марин": false
+     },
+     "text": "Точное время и кого спросить я не вижу в данных.\n\nАдминистратор уточнит и пришлёт актуальную информацию.\nТелефон: +7 702 333 44 55",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "завтра подъехать во сколько подойти кого спросить запись пробный урок администратор"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8217,
+      "completion_tokens": 80,
+      "cached_tokens": 7424,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2969,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:15": false,
+      "mentions:Марин": false
+     },
+     "text": "Уточните, пожалуйста, для кого занятие — ребёнок или взрослый, и какой курс нужен: английский, ЕНТ или IELTS.  \nПробный урок бесплатный, а время и группу подтвердит администратор.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "завтра во сколько подойти и кого спросить запись на пробный урок или визит"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8217,
+      "completion_tokens": 89,
+      "cached_tokens": 7424,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3739,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:15": true,
+      "mentions:Марин": true
+     },
+     "text": "Завтра в 15:00, спросите Марину.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4061,
+      "completion_tokens": 23,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1329,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:15": false,
+      "mentions:Марин": false
+     },
+     "text": "Я не вижу подтверждённого времени и имени, кого спросить. Администратор уточнит это по вашему номеру.\n\nНапишите, пожалуйста, ваш номер телефона — передам вопрос.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4061,
+      "completion_tokens": 49,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2041,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:15": false,
+      "mentions:Марин": false
+     },
+     "text": "Точное время и кого спросить я не вижу в данных.\n\nАдминистратор подскажет актуально:\n+7 702 333 44 55\n\nЕсли хотите, могу сразу передать заявку на пробный урок.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "завтра подъехать во сколько подойти кого спросить запись на пробный урок расписание администратор"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8220,
+      "completion_tokens": 90,
+      "cached_tokens": 7424,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3241,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:15": false,
+      "mentions:Марин": false
+     },
+     "text": "Точное время и кого спросить сейчас не вижу в данных.\n\nАдминистратор подскажет актуально по телефону:\n+7 702 333 44 55\n\nЕсли хотите, могу сразу передать заявку на пробный урок.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "завтра подъехать во сколько подойти кого спросить запись на пробный урок время и контакт администратор"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8221,
+      "completion_tokens": 93,
+      "cached_tokens": 7424,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3441,
+     "status": null
+    }
+   ]
+  },
+  {
+   "id": "a6_owner_agreement_phone_repair",
+   "vertical": "phone_repair",
+   "mode": "auto",
+   "lang": "ru",
+   "tags": [
+    "memory",
+    "key"
+   ],
+   "repeats": 8,
+   "pass_rate": 0.0,
+   "runs": [
+    {
+     "verdicts": {
+      "mentions:15": false,
+      "mentions:Марин": false
+     },
+     "text": "Завтра с 10:00 до 19:00\n\nАдрес: ТЦ Азия, 2 этаж\n\nСпросите мастера или администратора.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4235,
+      "completion_tokens": 43,
+      "cached_tokens": 0,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2098,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:15": false,
+      "mentions:Марин": false
+     },
+     "text": "У нас часы работы: 10:00–19:00\n\nАдрес: ТЦ Азия, 2 этаж\n\nСпросите мастера или администратора.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4235,
+      "completion_tokens": 43,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1696,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:15": false,
+      "mentions:Марин": false
+     },
+     "text": "У нас часы работы: 10:00–19:00\n\nАдрес: ТЦ Азия, 2 этаж\n\nЕсли хотите, могу передать заявку мастеру — напишите модель устройства, что случилось, ваше имя и номер телефона.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4235,
+      "completion_tokens": 59,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1742,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:15": false,
+      "mentions:Марин": false
+     },
+     "text": "Завтра с 10:00 до 19:00\n\nАдрес: ТЦ Азия, 2 этаж\n\nСпросите мастера на приёме.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4235,
+      "completion_tokens": 44,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1534,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:15": false,
+      "mentions:Марин": false
+     },
+     "text": "У нас часы работы: 10:00–19:00\n\nАдрес: ТЦ Азия, 2 этаж\n\nСпросите мастера на месте.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4235,
+      "completion_tokens": 42,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1542,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:15": false,
+      "mentions:Марин": false
+     },
+     "text": "У нас часы работы: 10:00–19:00.\n\nАдрес: ТЦ Азия, 2 этаж\n\nСпросите мастера или администратора — подскажут на месте.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4235,
+      "completion_tokens": 49,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1526,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:15": false,
+      "mentions:Марин": false
+     },
+     "text": "Подойти можно с 10:00 до 19:00.\n\nАдрес: ТЦ Азия, 2 этаж\nСпросить можно мастера на месте.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4235,
+      "completion_tokens": 43,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1638,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:15": false,
+      "mentions:Марин": false
+     },
+     "text": "Подойти можно в рабочее время: 10:00–19:00\n\nАдрес: ТЦ Азия, 2 этаж\n\nСпросить можно мастера или администратора.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4235,
+      "completion_tokens": 47,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1533,
+     "status": null
+    }
+   ]
+  }
+ ]
+}

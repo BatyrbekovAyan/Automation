@@ -1,0 +1,424 @@
+{
+ "summary": {
+  "label": "a6probe-edu-head-x16",
+  "prompts_ref": "worktree",
+  "scenario_version": "v1.2 (2026-10-08: V9-r2 ap_price_agrees_analogues — the price list agrees with the catalog, analogue rows in the same chunk; harness h5) + a6 probe (scratch, 2026-10-08)",
+  "harness": "h5 (2026-10-08, V9-r2: no_conflict_claim / no_price_caveat for a price list that AGREES with the catalog; on top of h4 2026-10-07 V9: «расхождение» + negated conflict, zero-price / elliptical free delivery, «итого по N позициям» partial, «нужен» / the car or device by name, a word inside the installment claim, Kazakh = no Russian sentence, «18,000»; h3 2026-09-27 R14; checks pinned by test_checks.py)",
+  "model": "gpt-5.4-mini",
+  "reasoning_effort": null,
+  "dropped_params": [],
+  "panel_model": null,
+  "max_tokens": 200,
+  "search_simulation": "Price List Search sub-workflow (Reconcile Prices at worktree)",
+  "scenarios": 1,
+  "runs": 16,
+  "pass_all": 0,
+  "flaky": 1,
+  "fail": 0,
+  "error_runs": 0,
+  "finish_reason_length_runs": 0,
+  "prompt_tokens": 98272,
+  "cached_tokens": 89088,
+  "completion_tokens": 991,
+  "reasoning_tokens": 0,
+  "cost_usd_auto_path": 0.018,
+  "prices_usd_per_1m": [
+   0.75,
+   0.075,
+   4.5
+  ],
+  "latency_ms": {
+   "auto": {
+    "n": 16,
+    "median": 2857,
+    "p90": 3579,
+    "max": 3661
+   },
+   "panel": null
+  },
+  "seconds": 39,
+  "by_check": {
+   "mentions:15": "3/16",
+   "mentions:Марин": "3/16"
+  }
+ },
+ "results": [
+  {
+   "id": "a6_owner_agreement_education",
+   "vertical": "education",
+   "mode": "auto",
+   "lang": "ru",
+   "tags": [
+    "memory",
+    "key"
+   ],
+   "repeats": 16,
+   "pass_rate": 0.1875,
+   "runs": [
+    {
+     "verdicts": {
+      "mentions:15": false,
+      "mentions:Марин": false
+     },
+     "text": "Точное время и кого спросить сейчас не вижу, это уточнит администратор.\n\nТелефон: +7 702 333 44 55",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "завтра во сколько подойти и кого спросить запись на пробный урок или визит"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8217,
+      "completion_tokens": 72,
+      "cached_tokens": 7424,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2857,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:15": true,
+      "mentions:Марин": true
+     },
+     "text": "Завтра в 15:00, спросите Марину.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "question",
+        "summary": "Клиент просит уточнить, во сколько подойти и кого спросить. В переписке ранее было указано: завтра в 15:00, спросить Марину."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8236,
+      "completion_tokens": 76,
+      "cached_tokens": 7424,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3060,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:15": false,
+      "mentions:Марин": false
+     },
+     "text": "Точное время и кого спросить сейчас не вижу.\n\nАдминистратор подтвердит актуально по телефону:\n+7 702 333 44 55\n\nЕсли хотите, могу сразу передать ваш вопрос администратору.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "завтра подъехать во сколько подойти кого спросить запись на пробный урок или визит администратор время"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8222,
+      "completion_tokens": 92,
+      "cached_tokens": 7424,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3351,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:15": false,
+      "mentions:Марин": false
+     },
+     "text": "Я не вижу подтверждённого времени и имени, кого спросить.\n\nАдминистратор уточнит и ответит по телефону:\n+7 702 333 44 55",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4061,
+      "completion_tokens": 46,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1595,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:15": false,
+      "mentions:Марин": false
+     },
+     "text": "Я не вижу подтверждённого времени и имени, кого спросить.\n\nАдминистратор подскажет актуально по телефону:\n+7 702 333 44 55",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4061,
+      "completion_tokens": 46,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1518,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:15": false,
+      "mentions:Марин": false
+     },
+     "text": "Точное время и кого спросить сейчас не вижу — администратор уточнит.\n\nТелефон: +7 702 333 44 55\nАдрес: пр. Республики 10\n\nЕсли хотите, могу передать ваш вопрос администратору.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "завтра подъехать во сколько подойти кого спросить запись пробный урок расписание администратор"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8219,
+      "completion_tokens": 96,
+      "cached_tokens": 7424,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3500,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:15": false,
+      "mentions:Марин": false
+     },
+     "text": "Точное время и кого спросить сейчас не вижу, это подтвердит администратор.\n\nТелефон: +7 702 333 44 55\nАдрес: пр. Республики 10\nЧасы работы: 9:00–20:00",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "завтра подъехать во сколько подойти кого спросить запись пробный урок администратор время кто встречает"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8221,
+      "completion_tokens": 98,
+      "cached_tokens": 7424,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3579,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:15": false,
+      "mentions:Марин": false
+     },
+     "text": "Спасибо! Передал администратору — он свяжется, подтвердит время и подберёт группу.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "question",
+        "summary": "Клиент просит напомнить, во сколько подойти и кого спросить. Нужна актуальная информация по записи/визиту."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8228,
+      "completion_tokens": 77,
+      "cached_tokens": 7424,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3164,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:15": false,
+      "mentions:Марин": false
+     },
+     "text": "Я не вижу подтверждённого времени и имени, кого спросить.\n\nЕсли хотите, я передам администратору уточнить это. Напишите, пожалуйста, ваше имя и номер телефона.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4061,
+      "completion_tokens": 50,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1568,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:15": false,
+      "mentions:Марин": false
+     },
+     "text": "Подойти можно в рабочее время: с 9:00 до 20:00.\n\nАдрес: пр. Республики 10\nСпросить администратора.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4061,
+      "completion_tokens": 43,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1617,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:15": false,
+      "mentions:Марин": false
+     },
+     "text": "Точное время и кого спросить я не вижу в данных.\n\nМогу передать администратору, он уточнит и свяжется с вами. Напишите, пожалуйста, ваше имя и номер телефона.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "завтра подъехать во сколько подойти кого спросить запись на пробный урок расписание администратор"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8220,
+      "completion_tokens": 87,
+      "cached_tokens": 7424,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3661,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:15": true,
+      "mentions:Марин": true
+     },
+     "text": "Завтра в 15:00, спросите Марину.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4061,
+      "completion_tokens": 23,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1187,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:15": false,
+      "mentions:Марин": false
+     },
+     "text": "Спасибо! Передал администратору — он свяжется, подтвердит время и подберёт группу.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "question",
+        "summary": "Клиент просит уточнить, во сколько подойти и кого спросить. В данных бизнеса этого нет."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8221,
+      "completion_tokens": 70,
+      "cached_tokens": 7424,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3074,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:15": false,
+      "mentions:Марин": false
+     },
+     "text": "Я не вижу подтверждённого времени и имени, кого нужно спросить.  \nНапишите, пожалуйста, имя и номер телефона — администратор уточнит и свяжется с вами.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4061,
+      "completion_tokens": 49,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1882,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:15": true,
+      "mentions:Марин": true
+     },
+     "text": "Подойти можно завтра в 15:00, спросить Марину.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4061,
+      "completion_tokens": 24,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1742,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:15": false,
+      "mentions:Марин": false
+     },
+     "text": "Подойти можно в рабочее время с 9:00 до 20:00.\n\nАдрес: пр. Республики 10\nСпросить администратора.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4061,
+      "completion_tokens": 42,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1505,
+     "status": null
+    }
+   ]
+  }
+ ]
+}

@@ -1,0 +1,154 @@
+{
+ "version": "v1.2 (2026-10-08: V9-r2 ap_price_agrees_analogues — the price list agrees with the catalog, analogue rows in the same chunk; harness h5) + a6 probe (scratch, 2026-10-08)",
+ "notes": "Synthetic business scenarios — no real chats, no real names or numbers. `mode`: auto (the bot's composed system prompt through the completions proxy, with the create_handoff and price_list_search tools simulated by the runner) | panel (the Suggest Replies webhook on staging). `expect` names deterministic checks the runner applies; `tool` sets the simulated create_handoff result.",
+ "knowledge": {
+  "auto_parts": {
+   "businessType": "Автозапчасти",
+   "business": "About Business:\nМагазин автозапчастей для японских авто в Астане. Работаем с 2009 года. Доставка по городу от 1500 тг.\n\nКонтакты:\nТелефон: +7 777 000 11 22\nЧасы работы: 9:00–19:00\nАдрес: ул. Абая 1",
+   "products": "Product1: Фильтр масляный Toyota 90915-YZZE1\nProduct1 Price: 3200 тг\nProduct1 Description: Оригинал, цена без установки\n\nProduct2: Колодки тормозные передние Toyota 04465-02220\nProduct2 Price: 18500 тг\nProduct2 Description: Оригинал",
+   "services": "Service1: Замена масла\nService1 Price: 5000 тг\nService1 Description: с вашим маслом",
+   "docs": [
+    "Фильтр масляный 90915-YZZE1 Toyota Camry 2019 — 3200 тг, оригинал; аналог Sakura C-1139 — 1400 тг",
+    "Колодки тормозные передние 04465-02220 Camry 2018-2023 — 18500 тг"
+   ]
+  },
+  "wholesale": {
+   "businessType": "Оптовые продажи",
+   "business": "About Business:\nОптовые поставки бытовой химии для магазинов, ИП и ТОО. Минимальный заказ 50 000 тг, безнал с НДС, счёт и накладные.\n\nКонтакты:\nТелефон: +7 700 111 22 33\nЧасы работы: 9:00–18:00 пн–пт",
+   "products": "Product1: Средство для посуды 5 л\nProduct1 Price: 2100 тг\nProduct1 Description: коробка 4 шт\n\nProduct2: Стиральный порошок 10 кг\nProduct2 Price: 6900 тг\nProduct2 Description: мешок",
+   "services": "",
+   "docs": [
+    "Средство для посуды 5 л, арт. WS-500 — 2100 тг/шт, коробка 4 шт",
+    "Стиральный порошок 10 кг, арт. WP-10 — 6900 тг/шт"
+   ]
+  },
+  "flowers": {
+   "businessType": "Цветы",
+   "business": "About Business:\nЦветочный магазин в Астане, букеты и композиции на заказ. Доставка по городу 2000 тг.\n\nКонтакты:\nТелефон: +7 777 123 45 67\nЧасы работы: 10:00–20:00\nАдрес: ул. Абая 1, Астана",
+   "products": "Product1: Букет 25 роз\nProduct1 Price: 25000 тг\nProduct1 Description: розы 50 см, Эквадор\n\nProduct2: Букет пионов\nProduct2 Price: 18000 тг\nProduct2 Description: сезонный",
+   "services": "",
+   "docs": [
+    "Букет 25 роз 50 см — 25000 тг",
+    "Букет 51 роза — 48000 тг",
+    "Букет пионов 9 шт — 18000 тг"
+   ]
+  },
+  "kaspi_seller": {
+   "businessType": "Продавец на Kaspi",
+   "business": "About Business:\nМагазин электроники на Kaspi.kz: https://kaspi.kz/shop/techstore. Оформление и рассрочка Kaspi на странице товара.\n\nКонтакты:\nТелефон: +7 701 222 33 44\nЧасы работы: 10:00–21:00",
+   "products": "Product1: Наушники JBL Tune 510BT\nProduct1 Price: 18990 тг\nProduct1 Description: чёрные и белые",
+   "services": "",
+   "docs": [
+    "Наушники JBL Tune 510BT чёрные — 18990 тг",
+    "Наушники JBL Tune 510BT белые — 18990 тг"
+   ]
+  },
+  "education": {
+   "businessType": "Образование",
+   "business": "About Business:\nУчебный центр: английский и подготовка к ЕНТ для школьников и взрослых. Пробный урок бесплатный.\n\nКонтакты:\nТелефон: +7 702 333 44 55\nЧасы работы: 9:00–20:00\nАдрес: пр. Республики 10",
+   "products": "",
+   "services": "Service1: Английский для детей, группа\nService1 Price: 40000 тг/мес\nService1 Description: 3 раза в неделю по 60 минут\n\nService2: Подготовка к ЕНТ\nService2 Price: 55000 тг/мес\nService2 Description: математика и физика",
+   "docs": [
+    "Английский для детей, группа — 40000 тг/мес, 3 раза в неделю",
+    "IELTS индивидуально — 12000 тг/занятие"
+   ]
+  },
+  "phone_repair": {
+   "businessType": "Ремонт телефонов",
+   "business": "About Business:\nСервис по ремонту телефонов и ноутбуков. Диагностика бесплатная.\n\nКонтакты:\nТелефон: +7 705 444 55 66\nЧасы работы: 10:00–19:00\nАдрес: ТЦ Азия, 2 этаж",
+   "products": "",
+   "services": "Service1: Замена экрана iPhone 11\nService1 Price: 35000 тг\nService1 Description: оригинальный дисплей, 1 час\n\nService2: Замена АКБ iPhone 11-13\nService2 Price: 15000 тг\nService2 Description: 40 минут",
+   "docs": [
+    "Замена экрана iPhone 11 — 35000 тг, 1 час",
+    "Замена экрана iPhone 13 — 52000 тг",
+    "Замена АКБ iPhone 11-13 — 15000 тг"
+   ]
+  }
+ },
+ "scenarios": [
+  {
+   "id": "a6_owner_agreement_flowers",
+   "vertical": "flowers",
+   "mode": "auto",
+   "lang": "ru",
+   "tags": [
+    "memory",
+    "key"
+   ],
+   "messages": [
+    [
+     "client",
+     "Здравствуйте, можно к вам завтра подъехать?"
+    ],
+    [
+     "business",
+     "Да, конечно. Завтра в 15:00 вас ждём, спросите Марину."
+    ],
+    [
+     "client",
+     "Напомните, во сколько мне подойти и кого спросить?"
+    ]
+   ],
+   "expect": [
+    "mentions:15",
+    "mentions:Марин"
+   ]
+  },
+  {
+   "id": "a6_owner_agreement_education",
+   "vertical": "education",
+   "mode": "auto",
+   "lang": "ru",
+   "tags": [
+    "memory",
+    "key"
+   ],
+   "messages": [
+    [
+     "client",
+     "Здравствуйте, можно к вам завтра подъехать?"
+    ],
+    [
+     "business",
+     "Да, конечно. Завтра в 15:00 вас ждём, спросите Марину."
+    ],
+    [
+     "client",
+     "Напомните, во сколько мне подойти и кого спросить?"
+    ]
+   ],
+   "expect": [
+    "mentions:15",
+    "mentions:Марин"
+   ]
+  },
+  {
+   "id": "a6_owner_agreement_phone_repair",
+   "vertical": "phone_repair",
+   "mode": "auto",
+   "lang": "ru",
+   "tags": [
+    "memory",
+    "key"
+   ],
+   "messages": [
+    [
+     "client",
+     "Здравствуйте, можно к вам завтра подъехать?"
+    ],
+    [
+     "business",
+     "Да, конечно. Завтра в 15:00 вас ждём, спросите Марину."
+    ],
+    [
+     "client",
+     "Напомните, во сколько мне подойти и кого спросить?"
+    ]
+   ],
+   "expect": [
+    "mentions:15",
+    "mentions:Марин"
+   ]
+  }
+ ]
+}
