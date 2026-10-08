@@ -8,18 +8,23 @@ Handoffs `status` op, the private Postgres and the Wappi MOCK.
 Scenarios tagged [llm] drive the REAL model (the reply's shape is the model's; the SIDE-EFFECT asserts — no send, no
 memory, no dialog count, no ledger row, no real handoff — and the tested-version asserts are deterministic).
 R15 (2026-09-27): two scenarios edit the staging WA bot's prompt into draft ≠ published / inactive and restore it.
+«Nothing was sent» is judged on the transport calls that CHANGE something for the test's bot (every route but the mock's
+read-only ones, for the test's profile, for no profile at all, or to a recipient the scenario names) — not on the mock's
+total, which also counts reads and other workflows' schedules (the 2026-10-08 regression failed on the notifier's bare
+get/status, F3). `transport_writes_self_check()` runs first and a live scenario proves the count still moves on a send.
 """
 import argparse
 import copy
 import importlib.util
 import os
+import re
 import subprocess
 import sys
 import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
-from e2e import Ctx, fixture, http, mock, mock_total, workflow_id_by_name, BASE, KEY, WA_PROFILE  # noqa: E402
+from e2e import Ctx, fixture, http, mock, workflow_id_by_name, BASE, KEY, WA_PROFILE  # noqa: E402
 
 _spec = importlib.util.spec_from_file_location("e2e_auth", os.path.join(HERE, "e2e-auth.py"))
 e2e_auth = importlib.util.module_from_spec(_spec)
@@ -37,6 +42,76 @@ def count(sql):
     return int(psql(sql) or 0)
 
 
+# wappi-mock.py's routes that only READ. Every other route — a send, a read receipt, typing, a reaction, a chat delete,
+# a profile / webhook / auth op, an unknown route — CHANGES something and counts.
+READ_ONLY_TRANSPORT = frozenset({"messages/get", "messages/id/get", "get/status", "profile/all/get", "webhook/url/get", "chats/filter"})
+
+
+def transport_tail(path):
+    for pre in ("/api/sync/", "/tapi/sync/", "/api/", "/tapi/"):
+        if path.startswith(pre):
+            return path[len(pre):]
+    return path
+
+
+def _digits(v):
+    return re.sub(r"\D", "", str(v or ""))
+
+
+def transport_writes(calls, pid, recipients=()):
+    """The recorded mock calls that would change something for the test's bot: a non-read route whose profile is the
+    test's — or names NO profile (an unattributable write is never «someone else's») — or whose recipient is one the
+    scenario named. Reads, and other profiles' writes to other recipients (another workflow's schedule), do not count."""
+    rec = {_digits(r) for r in recipients if _digits(r)}
+    out = []
+    for c in calls:
+        if transport_tail(c.get("path") or "") in READ_ONLY_TRANSPORT:
+            continue
+        q = c.get("query") or {}
+        b = c.get("body") if isinstance(c.get("body"), dict) else {}
+        prof = q.get("profile_id") or b.get("profile_id") or ""
+        to = _digits(b.get("recipient") or b.get("=recipient") or q.get("recipient"))
+        if prof in ("", pid) or (to and to in rec):
+            out.append(c)
+    return out
+
+
+def transport_writes_self_check():
+    """The negative self-check: the count must move on every kind of write for the test, and only on those."""
+    pid, other = "stgself01", "stgother1"
+    call = lambda path, q=None, b=None: {"method": "POST" if b is not None else "GET", "path": path, "query": q or {}, "body": b or {}}
+    counted = {
+        "send for the test's profile": call("/api/sync/message/send", {"profile_id": pid}, {"recipient": "77010000000", "body": "x"}),
+        "send naming no profile": call("/api/sync/message/send", {}, {"recipient": "77010000000", "body": "x"}),
+        "telegram send for the test's profile": call("/tapi/sync/message/send", {"profile_id": pid}, {"recipient": "5000", "body": "x"}),
+        "read receipt for the test's profile": call("/api/sync/message/mark/read", {"profile_id": pid, "mark_all": "true"}, {"message_id": "m"}),
+        "typing for the test's profile": call("/api/sync/chat/typing/start", {"profile_id": pid}, {"recipient": "77010000000"}),
+        "profile op for the test's profile": call("/api/profile/delete", {"profile_id": pid}, {}),
+        "unknown route for the test's profile": call("/api/sync/message/forward", {"profile_id": pid}, {"recipient": "1"}),
+        "send by another profile to the scenario's recipient": call("/api/sync/message/send", {"profile_id": other}, {"recipient": "+7 701 123 45 67", "body": "x"}),
+    }
+    ignored = {
+        "bare get/status (the F3 notifier tick)": call("/api/sync/get/status"),
+        "history read for the test's profile": call("/api/sync/messages/get", {"profile_id": pid, "chat_id": "c"}),
+        "status read for the test's profile": call("/tapi/sync/get/status", {"profile_id": pid}),
+        "another profile's send to another recipient": call("/api/sync/message/send", {"profile_id": other}, {"recipient": "77019999999", "body": "x"}),
+        "another profile's read receipt": call("/api/sync/message/mark/read", {"profile_id": other}, {"message_id": "m"}),
+    }
+    bad = [k for k, c in counted.items() if len(transport_writes([c], pid, ["77011234567"])) != 1]
+    bad += [k for k, c in ignored.items() if transport_writes([c], pid, ["77011234567"])]
+    every = list(counted.values()) + list(ignored.values())
+    if len(transport_writes(every, pid, ["77011234567"])) != len(counted):
+        bad.append("mixed batch miscounted")
+    return bad
+
+
+def mock_calls():
+    st, d = mock("GET", "/__mock/calls?since=0")
+    if st != 200:
+        raise RuntimeError(f"mock calls {st}")
+    return d["calls"]
+
+
 class Target:
     """The staging WA bot: its profile registered to this run's subscriber, OWNED by a fresh install whose
     token therefore carries the profile AND the bot workflow id (the Test Dialog gate needs both)."""
@@ -50,10 +125,11 @@ class Target:
         self.owner = e2e_auth.Owner(tag, ctx.run_id)
         psql(f"update bot_profiles set owner_id = '{self.owner.install_id}', workflow_id = '{self.wf_id}' where profile_id = '{self.pid}';")
         self.owner.refresh()
+        self.recipients = []        # numbers a scenario puts in the dialog: a write TO them counts whoever's profile sends
 
     def snapshot(self):
         return {
-            "sends": mock_total(),
+            "transport_writes": len(transport_writes(mock_calls(), self.pid, self.recipients)),
             "memory": count(f"select count(*) from n8n_chat_histories where session_id like '{self.pid}:%';"),
             "dialogs": count(f"select count(*) from dialog_counts where app_user_id = '{self.owner.app_user_id}';"),
             "ledger": count(f"select count(*) from reply_events where profile_id = '{self.pid}';"),
@@ -147,6 +223,24 @@ def scenario(id_, title):
     return deco
 
 
+@scenario("snapshot_counts_a_send_and_ignores_reads", "harness: the side-effect snapshot moves on a real mock send for the test's profile (and on one to its recipient), not on a bare get/status or another profile's send — no model, no workflow")
+def s_snapshot_self_check(ctx):
+    t = Target(ctx, "tsc")
+    t.recipients = ["+7 701 555 00 11"]
+    before = t.snapshot()
+    mock("GET", "/api/sync/get/status")                                                          # the F3 tick shape
+    mock("POST", "/api/sync/message/send?profile_id=stgOtherProfile1", {"recipient": "77019999999", "body": "другой бот"})
+    noise = t.snapshot()
+    mock("POST", f"/api/sync/message/send?profile_id={t.pid}", {"recipient": "77010000001", "body": "тест не должен отправлять"})
+    sent = t.snapshot()
+    mock("POST", "/api/sync/message/send?profile_id=stgOtherProfile1", {"recipient": "77015550011", "body": "получателю теста"})
+    to_recipient = t.snapshot()
+    ok = noise == before and sent != before and sent["transport_writes"] == before["transport_writes"] + 1 \
+        and to_recipient["transport_writes"] == sent["transport_writes"] + 1
+    return ok, {"before": before["transport_writes"], "after_noise": noise["transport_writes"], "after_send": sent["transport_writes"],
+                "after_send_to_recipient": to_recipient["transport_writes"]}
+
+
 @scenario("test_dialog_replies_with_zero_side_effects [llm]", "7.1: the bot's real prompt answers; nothing is sent, counted, remembered or claimed")
 def s_reply(ctx):
     t = Target(ctx, "td")
@@ -178,6 +272,7 @@ def s_gate(ctx):
 @scenario("test_dialog_dry_handoff_is_recorded_not_created [llm]", "7.1: a handoff the model would make lands in test_dialog_actions, never in handoff_requests, and no notice is sent")
 def s_dry(ctx):
     t = Target(ctx, "th")
+    t.recipients = ["+7 701 123 45 67"]
     before = t.snapshot()
     hist = [{"role": "client", "text": "Хочу заказать букет 25 роз на завтра"}, {"role": "business", "text": "Конечно! Как вас зовут и какой номер телефона?"}]
     st, d = t.test("Айдос, +7 701 123 45 67. Передайте владельцу, пусть подтвердит заказ", history=hist)
@@ -365,6 +460,9 @@ def main():
         sys.exit(f"staging n8n not reachable at {BASE}")
     if not workflow_id_by_name("Test Dialog"):
         sys.exit("Test Dialog not imported on staging — run bootstrap.py first")
+    broken = transport_writes_self_check()
+    if broken:
+        sys.exit(f"the side-effect count is broken (it must count every write for the test and nothing else): {broken}")
     ctx = Ctx()
     passed = failed = 0
     try:
