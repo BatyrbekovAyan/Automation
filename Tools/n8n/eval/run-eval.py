@@ -264,7 +264,9 @@ def knowledge_text(sc, know):
     return " ".join([sc.get("business_override", know["business"]), know["products"], know["services"], " ".join(sc.get("docs_override", know["docs"])), sc.get("owner_prompt", "")])
 
 
-HARNESS_VERSION = ("h5 (2026-10-08, V9-r2: no_conflict_claim / no_price_caveat for a price list that AGREES with the catalog; on top of "
+HARNESS_VERSION = ("h6 (2026-10-09, Q1: not_mentions:X — X stated in no un-refused clause and not merely quoted as the client's words, for the client-time echo; mentions:H:MM "
+                   "reads a time of day; on top of "
+                   "h5 2026-10-08, V9-r2: no_conflict_claim / no_price_caveat for a price list that AGREES with the catalog; on top of "
                    "h4 2026-10-07 V9: «расхождение» + negated conflict, zero-price / elliptical free delivery, «итого по N позициям» partial, "
                    "«нужен» / the car or device by name, a word inside the installment claim, Kazakh = no Russian sentence, «18,000»; "
                    "h3 2026-09-27 R14; checks pinned by test_checks.py)")
@@ -313,12 +315,62 @@ def numbers(text):
     return out
 
 
+CLOCK = re.compile(r"(\d{1,2})[:.](\d{2})")
+
+
+def _clock_named(t, want):
+    """h6: a clock time «H:MM» is named as a time — «15:00» / «15.00» (leading zero optional) and, for a full hour, «15 ч» /
+    «15 часов» or a bare «в/к/до/с/на 15» that ends the phrase. None = `want` is not a clock time. Until h6 «mentions:15:00»
+    read the digits as ONE number (1500) and could never pass."""
+    m = CLOCK.fullmatch(want.strip())
+    if not m:
+        return None
+    h, mm = int(m.group(1)), m.group(2)
+    pats = [rf"(?<!\d)0?{h}[:.]{mm}(?!\d)"]
+    if mm == "00":
+        pats += [rf"(?<![\d:.])0?{h}\s*(?:ч\b|час\w*)",
+                 rf"\b(?:в|к|до|с|на)\s+0?{h}(?=\s*(?:$|[.!?,;)\n]|утра|дня|вечера|ночи))"]
+    return any(re.search(p, t or "", re.I) for p in pats)
+
+
 def mentions(t, want):
-    """mentions:N — the answer names the number N (or N thousand / N million, how «50 000» and «50 мың» are written)."""
+    """mentions:N — the answer names the number N (or N thousand / N million, how «50 000» and «50 мың» are written);
+    mentions:H:MM — the time of day; mentions:<word> — a case-insensitive substring."""
+    clock = _clock_named(t, want)
+    if clock is not None:
+        return clock
     if not digits(want):
         return want.lower() in t.lower()
     n = int(digits(want))
     return bool({n, n * 1000, n * 1_000_000} & numbers(t))
+
+
+# h6 (Q1, 2026-10-09): «не позже 15:00» bounds the time and «не опаздывайте / не забудьте» insist on it — neither refuses it
+_CLAUSE_SPLIT = re.compile(r"[,;—–]|:(?!\d)")
+_BOUND = re.compile(r"\bне\s+(?:позже|позднее|раньше|ранее|опаздыва\w*|забуд\w*)\b")
+# the client's own words, quoted as such: reported speech («вы писали, что …») or «ваш запрос / ваша заявка …»
+_CLIENT_WORDS = re.compile(r"\bвы\s+(?:\S+\s+){0,2}?(?:писали|написали|предлагали|предложили|хотели|указали|говорили|сказали"
+                           r"|планируете|планировали|собирались)\b[^.!?]*?\bчто\b"
+                           r"|\bваш(?:а|у|е|и|его|ей)?\s+(?:запрос|заявк|пожелани|просьб|предложени)\w*", re.I)
+_ACCEPTS = re.compile(r"\bприня[тл]\w*|подтверждаю|подтвержд[её]н\w*|согласован\w*|договорились|записал\w*|оформил\w*|оформлен\w*"
+                      r"|\bжд[её]м\b|забронир\w*", re.I)
+
+
+def not_mentions(t, want):
+    """not_mentions:X — the answer does not STATE X: X (as mentions: reads it) stands in no clause that does not refuse it.
+    «15:00 не подтверждаю» / «Не могу подтвердить 15:00 — …» name nothing; «Нет, приходите в 15:00» (the «нет» is another
+    clause), «Можете подойти в 15:00, но время подтвердит мастер» and «Приходите не позже 15:00» state it. A sentence that
+    QUOTES the client («Вы писали, что придёте в 15:00 — это подтвердит мастер», «передам ваш запрос на 15:00») states nothing,
+    unless it also accepts it («Ваш запрос на 15:00 принят», «…— подтверждаю», «ждём»). Built for the Q1 negative controls,
+    where the CLIENT named the time and an answer serving it back as the plan is the echo the Q1 design calls the
+    unacceptable error. When a control fails, read its text."""
+    for s in sentences(t):
+        if _CLIENT_WORDS.search(s) and not _ACCEPTS.search(s):
+            continue
+        for clause in _CLAUSE_SPLIT.split(s):
+            if mentions(clause, want) and not re.search(r"\b(?:не|нет|ни)\b", _BOUND.sub(" ", clause.lower())):
+                return False
+    return True
 
 
 # -- free delivery: the claim is a phrase, and its negation belongs to that phrase, not to the sentence --------
@@ -579,6 +631,8 @@ def check(name, sc, know, out):
     handoff = [c for c in calls if c["name"] == "create_handoff"]
     claim = affirmed(low, r"передал|передаю|передан[аоы]?\b|заявк\w* (принят|записан|оформлен|передан)|свяж[ёе]тся|свяжемся")
     r = lambda p: re.search(p, low) is not None
+    if name.startswith("not_mentions:"):
+        return not_mentions(t, name.split(":", 1)[1])
     if name.startswith("mentions:"):
         return mentions(t, name.split(":", 1)[1])
     if name.startswith("max_questions:"):

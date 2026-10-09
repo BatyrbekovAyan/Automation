@@ -1,6 +1,6 @@
 {
-  "version": "v1.2 (2026-10-08: V9-r2 ap_price_agrees_analogues — the price list agrees with the catalog, analogue rows in the same chunk; harness h5)",
-  "notes": "Synthetic business scenarios — no real chats, no real names or numbers. `mode`: auto (the bot's composed system prompt through the completions proxy, with the create_handoff and price_list_search tools simulated by the runner) | panel (the Suggest Replies webhook on staging). `expect` names deterministic checks the runner applies; `tool` sets the simulated create_handoff result.",
+  "version": "v1.3 (2026-10-09: Q1 — the owner's agreement in the chat history: a6_owner_agreement_* ×3 verticals, q1p_* paraphrases (other words, facts, verticals), q1c_* negative controls (no agreement / the CLIENT names the time) with not_mentions:15:00 against echoing the client's own time as agreed; harness h6)",
+  "notes": "Synthetic business scenarios — no real chats, no real names or numbers. `mode`: auto (the bot's composed system prompt through the completions proxy, with the create_handoff and price_list_search tools simulated by the runner) | panel (the Suggest Replies webhook on staging). `expect` names deterministic checks the runner applies; `tool` sets the simulated create_handoff result. Q1 (v1.3): in a6_/q1p_ the `business` turn is the OWNER's reply as it reaches the bot's memory (an ai row) — the bot must repeat that agreement; q1c_ must NOT assign a time or serve the client's own time as agreed.",
   "knowledge": {
     "auto_parts": {
       "businessType": "Автозапчасти",
@@ -1155,6 +1155,379 @@
       "expect": [
         "lang_kz",
         "no_markdown"
+      ]
+    },
+    {
+      "id": "a6_owner_agreement_flowers",
+      "vertical": "flowers",
+      "mode": "auto",
+      "lang": "ru",
+      "tags": [
+        "memory",
+        "key"
+      ],
+      "messages": [
+        [
+          "client",
+          "Здравствуйте, можно к вам завтра подъехать?"
+        ],
+        [
+          "business",
+          "Да, конечно. Завтра в 15:00 вас ждём, спросите Марину."
+        ],
+        [
+          "client",
+          "Напомните, во сколько мне подойти и кого спросить?"
+        ]
+      ],
+      "expect": [
+        "mentions:15",
+        "mentions:Марин"
+      ]
+    },
+    {
+      "id": "a6_owner_agreement_education",
+      "vertical": "education",
+      "mode": "auto",
+      "lang": "ru",
+      "tags": [
+        "memory",
+        "key"
+      ],
+      "messages": [
+        [
+          "client",
+          "Здравствуйте, можно к вам завтра подъехать?"
+        ],
+        [
+          "business",
+          "Да, конечно. Завтра в 15:00 вас ждём, спросите Марину."
+        ],
+        [
+          "client",
+          "Напомните, во сколько мне подойти и кого спросить?"
+        ]
+      ],
+      "expect": [
+        "mentions:15",
+        "mentions:Марин"
+      ]
+    },
+    {
+      "id": "a6_owner_agreement_phone_repair",
+      "vertical": "phone_repair",
+      "mode": "auto",
+      "lang": "ru",
+      "tags": [
+        "memory",
+        "key"
+      ],
+      "messages": [
+        [
+          "client",
+          "Здравствуйте, можно к вам завтра подъехать?"
+        ],
+        [
+          "business",
+          "Да, конечно. Завтра в 15:00 вас ждём, спросите Марину."
+        ],
+        [
+          "client",
+          "Напомните, во сколько мне подойти и кого спросить?"
+        ]
+      ],
+      "expect": [
+        "mentions:15",
+        "mentions:Марин"
+      ]
+    },
+    {
+      "id": "q1p_visit_phone_repair",
+      "vertical": "phone_repair",
+      "mode": "auto",
+      "lang": "ru",
+      "tags": [
+        "memory"
+      ],
+      "messages": [
+        [
+          "client",
+          "Экран на iPhone 11 разбит, когда можно привезти?"
+        ],
+        [
+          "business",
+          "Привозите в субботу к 11:00, мастер Ерлан будет на месте. Вход со двора."
+        ],
+        [
+          "client",
+          "А к кому обратиться и с какого входа заходить?"
+        ]
+      ],
+      "expect": [
+        "mentions:Ерлан",
+        "mentions:двор"
+      ]
+    },
+    {
+      "id": "q1p_trial_education",
+      "vertical": "education",
+      "mode": "auto",
+      "lang": "ru",
+      "tags": [
+        "memory"
+      ],
+      "messages": [
+        [
+          "client",
+          "Можно записать сына на пробный урок английского?"
+        ],
+        [
+          "business",
+          "Да, пробный урок в среду в 17:30, преподаватель Айжан, кабинет 204."
+        ],
+        [
+          "client",
+          "Ещё раз: в какой день и в каком кабинете?"
+        ]
+      ],
+      "expect": [
+        "mentions:сред",
+        "mentions:204"
+      ]
+    },
+    {
+      "id": "q1p_early_phone_repair",
+      "vertical": "phone_repair",
+      "mode": "auto",
+      "lang": "ru",
+      "tags": [
+        "memory"
+      ],
+      "messages": [
+        [
+          "client",
+          "Можно завтра пораньше, до работы?"
+        ],
+        [
+          "business",
+          "Да, завтра можем принять в 9:00, до открытия. Позвоните в дверь, откроет Марина."
+        ],
+        [
+          "client",
+          "Во сколько, напомните, и кто откроет?"
+        ]
+      ],
+      "expect": [
+        "mentions:9",
+        "mentions:Марин"
+      ]
+    },
+    {
+      "id": "q1c_no_agreement_phone_repair",
+      "vertical": "phone_repair",
+      "mode": "auto",
+      "lang": "ru",
+      "tags": [
+        "control"
+      ],
+      "messages": [
+        [
+          "client",
+          "Здравствуйте, можно к вам завтра подъехать?"
+        ],
+        [
+          "business",
+          "Да, конечно, подходите. Напишите, во сколько вам удобно, — я уточню у мастера."
+        ],
+        [
+          "client",
+          "Напомните, во сколько мне подойти и кого спросить?"
+        ]
+      ],
+      "expect": [
+        "no_time_assignment",
+        "no_exact_time_confirmation",
+        "offers_handoff_or_clarifies"
+      ]
+    },
+    {
+      "id": "q1c_no_agreement_education",
+      "vertical": "education",
+      "mode": "auto",
+      "lang": "ru",
+      "tags": [
+        "control"
+      ],
+      "messages": [
+        [
+          "client",
+          "Здравствуйте, можно к вам завтра подъехать?"
+        ],
+        [
+          "business",
+          "Да, конечно, подходите. Напишите, во сколько вам удобно, — я уточню у администратора."
+        ],
+        [
+          "client",
+          "Напомните, во сколько мне подойти и кого спросить?"
+        ]
+      ],
+      "expect": [
+        "no_time_assignment",
+        "no_exact_time_confirmation",
+        "offers_handoff_or_clarifies"
+      ]
+    },
+    {
+      "id": "q1c_client_time_education",
+      "vertical": "education",
+      "mode": "auto",
+      "lang": "ru",
+      "tags": [
+        "control"
+      ],
+      "messages": [
+        [
+          "client",
+          "Хочу прийти на пробный урок завтра в 15:00, кого спросить на месте?"
+        ]
+      ],
+      "expect": [
+        "no_time_assignment",
+        "no_exact_time_confirmation",
+        "offers_handoff_or_clarifies",
+        "not_mentions:15:00"
+      ]
+    },
+    {
+      "id": "q1c_client_time_phone_repair",
+      "vertical": "phone_repair",
+      "mode": "auto",
+      "lang": "ru",
+      "tags": [
+        "control"
+      ],
+      "messages": [
+        [
+          "client",
+          "Приду завтра в 15:00 с iPhone 11, экран. Кого спросить?"
+        ]
+      ],
+      "expect": [
+        "no_time_assignment",
+        "no_exact_time_confirmation",
+        "offers_handoff_or_clarifies",
+        "not_mentions:15:00"
+      ]
+    },
+    {
+      "id": "q1c_client_time_history_phone_repair",
+      "vertical": "phone_repair",
+      "mode": "auto",
+      "lang": "ru",
+      "tags": [
+        "control"
+      ],
+      "messages": [
+        [
+          "client",
+          "iPhone 11, экран. Приду завтра в 15:00, нормально?"
+        ],
+        [
+          "business",
+          "Принял заявку, мастер свяжется с вами и подтвердит время."
+        ],
+        [
+          "client",
+          "Так во сколько мне подойти?"
+        ]
+      ],
+      "expect": [
+        "no_time_assignment",
+        "no_exact_time_confirmation",
+        "offers_handoff_or_clarifies",
+        "not_mentions:15:00"
+      ]
+    },
+    {
+      "id": "q1p_pickup_auto_parts",
+      "vertical": "auto_parts",
+      "mode": "auto",
+      "lang": "ru",
+      "tags": [
+        "memory"
+      ],
+      "messages": [
+        [
+          "client",
+          "Колодки 04465-02220 на Camry 2019 можете отложить? Заберу сам."
+        ],
+        [
+          "business",
+          "Отложили до завтра до 18:00. На складе спросите Асхата, склад №3."
+        ],
+        [
+          "client",
+          "До скольки держите и кому сказать на складе?"
+        ]
+      ],
+      "expect": [
+        "mentions:18",
+        "mentions:Асхат"
+      ]
+    },
+    {
+      "id": "q1p_delivery_flowers",
+      "vertical": "flowers",
+      "mode": "auto",
+      "lang": "ru",
+      "tags": [
+        "memory"
+      ],
+      "messages": [
+        [
+          "client",
+          "Можно букет 25 роз доставить сегодня к 19:00?"
+        ],
+        [
+          "business",
+          "Да, доставим к 19:00, курьер Санжар позвонит за 30 минут."
+        ],
+        [
+          "client",
+          "Ещё раз — к какому времени и кто позвонит?"
+        ]
+      ],
+      "expect": [
+        "mentions:19",
+        "mentions:Санжар"
+      ]
+    },
+    {
+      "id": "q1p_meeting_wholesale",
+      "vertical": "wholesale",
+      "mode": "auto",
+      "lang": "ru",
+      "tags": [
+        "memory"
+      ],
+      "messages": [
+        [
+          "client",
+          "Можно приехать посмотреть образцы перед заказом?"
+        ],
+        [
+          "business",
+          "Да, в четверг в 10:00 на складе, ул. Складская 5, спросите Бекзата."
+        ],
+        [
+          "client",
+          "Напомните адрес склада и кого спросить"
+        ]
+      ],
+      "expect": [
+        "mentions:Складская",
+        "mentions:Бекзат"
       ]
     },
     {

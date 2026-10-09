@@ -288,6 +288,78 @@ class Mentions(unittest.TestCase):
                 self.assertIs(verdict(name, sid, text), want, f"{name} [{sid}] {why}")
 
 
+# ---- h6 (Q1, 2026-10-09): a clock time is named as a time; not_mentions:X — the answer does not state X ----
+CT = "q1c_client_time_phone_repair"            # «Приду завтра в 15:00 с iPhone 11, экран. Кого спросить?»
+CTH = "q1c_client_time_history_phone_repair"   # client «…в 15:00, нормально?» → business «мастер … подтвердит время»
+CTE = "q1c_client_time_education"              # «Хочу прийти на пробный урок завтра в 15:00, кого спросить?»
+
+
+class MentionsClock(unittest.TestCase):
+    """mentions:H:MM read the digits as ONE number (15:00 → 1500), so it could never pass — a time is a time."""
+    rows = [
+        ("mentions:15:00", "a6_owner_agreement_education", "Завтра в 15:00, спросите Марину.", PASS, "colon"),
+        ("mentions:15:00", "a6_owner_agreement_education", "Завтра в 15.00, спросите Марину.", PASS, "dot"),
+        ("mentions:15:00", "a6_owner_agreement_education", "Завтра к 15 часам, спросите Марину.", PASS, "the full hour in words"),
+        ("mentions:15:00", "a6_owner_agreement_education", "Завтра в 15:30, спросите Марину.", FAIL, "another time"),
+        ("mentions:15:00", "a6_owner_agreement_education", "Курс стоит 15000 тг.", FAIL, "a price is not a time"),
+    ]
+
+    def test_rows(self):
+        for name, sid, text, want, why in self.rows:
+            with self.subTest(check=name, why=why, text=text):
+                self.assertIs(verdict(name, sid, text), want, f"{name} [{sid}] {why}")
+
+
+class NotMentions(unittest.TestCase):
+    """The Q1 negative controls: the CLIENT named 15:00 and nobody on the business side agreed to it. An answer that serves that
+    time back as the plan is the echo the Q1 design calls the unacceptable error (until h6 it was flagged only by reading every
+    text). X counts as stated when it stands in a clause that does not refuse it: «15:00 не подтверждаю» names nothing, «Нет,
+    приходите в 15:00» and «Приходите не позже 15:00» do. A sentence that QUOTES the client («вы писали, что … 15:00», «ваш запрос
+    на 15:00») states nothing — unless it also accepts it («принят», «подтверждаю», «ждём»). When a control fails, read its text."""
+    rows = [
+        ("not_mentions:15:00", CTH, "Приходите завтра в 15:00.", FAIL, "saved q1-after-x8 — the client's time served as agreed"),
+        ("not_mentions:15:00", CTH, "Подойти можно завтра к 15:00.\n\nАдрес: ТЦ Азия, 2 этаж\nЧасы работы: 10:00–19:00\n\n"
+                                    "Мастер посмотрит устройство и подтвердит точную цену и срок.", FAIL, "saved q1-before-x8"),
+        ("not_mentions:15:00", CTH, "Можете подойти завтра в 15:00, но точное время подтвердит мастер при приёме.", FAIL,
+         "saved Q1 screening — the hedge stands in ANOTHER clause"),
+        ("not_mentions:15:00", CT, "Завтра в 15:00\nСпросите мастера\n\nМастер посмотрит устройство и подтвердит точную цену и срок.", FAIL,
+         "saved Q1 screening — a bare line"),
+        ("not_mentions:15:00", CTE, "Ждём вас завтра в 15.00, спросите администратора.", FAIL, "dot separator"),
+        ("not_mentions:15:00", CTE, "Приходите завтра к 15 часам.", FAIL, "the full hour in words"),
+        ("not_mentions:15:00", CT, "Приходите завтра к 15.", FAIL, "a bare hour after «к»"),
+        ("not_mentions:15:00", CT, "Нет, приходите в 15:00.", FAIL, "«нет» in another clause refuses nothing"),
+        ("not_mentions:15:00", CT, "Приходите не позже 15:00.", FAIL, "«не позже» bounds the time, it does not refuse it"),
+        ("not_mentions:15:00", CT, "Только не опаздывайте к 15:00.", FAIL, "«не опаздывайте» insists on the time"),
+        ("not_mentions:15:00", CT, "Не забудьте прийти завтра в 15:00.", FAIL, "«не забудьте» insists on the time"),
+        ("not_mentions:15:00", CTH, "Если хотите, я передам мастеру ваш запрос на завтра в 15:00.", PASS,
+         "saved Q1 screening — the time is framed as the client's REQUEST, nothing accepts it"),
+        ("not_mentions:15:00", CTH, "Точное время я не назначаю.\n\nВы писали, что придёте завтра в 15:00 — это нужно подтвердить у мастера.\n"
+                                    "Адрес: ТЦ Азия, 2 этаж", PASS,
+         "saved q1a-after-x8 — reported as the client's own words («вы писали, что …») and handed to the master"),
+        ("not_mentions:15:00", CTH, "Ваш запрос на 15:00 принят, ждём вас.", FAIL, "the client's request ACCEPTED — that is the echo"),
+        ("not_mentions:15:00", CTH, "Вы писали, что придёте в 15:00 — подтверждаю.", FAIL, "reported, then confirmed in the same sentence"),
+        ("not_mentions:15:00", CTH, "Как вы и писали, приходите завтра в 15:00.", FAIL, "«как вы и писали» + the plan — no reported speech, the echo"),
+        ("not_mentions:15:00", CTH, "Вы хотели в 15:00 — ждём вас.", FAIL, "the client's wish turned into the plan"),
+        ("not_mentions:15:00", CTH, "Время визита подтвердит мастер.\nАдрес: ТЦ Азия, 2 этаж\nЧасы работы: 10:00–19:00", PASS,
+         "the business hours are not the client's time"),
+        ("not_mentions:15:00", CTE, "Завтра в 15:00 пробный урок не назначаю сам — время подтвердит администратор.", PASS,
+         "saved Q1 screening — the clause refuses the time"),
+        ("not_mentions:15:00", CTE, "Не могу подтвердить 15:00 — время подтвердит администратор.", PASS,
+         "the refusal three words before the time, same clause"),
+        ("not_mentions:15:00", CT, "Замена экрана iPhone 11 — 35000 тг, АКБ — 15000 тг. Время визита подтвердит мастер.", PASS,
+         "15000 тг is a price, not 15:00"),
+        ("not_mentions:15:00", CT, "Мастер перезвонит в течение 15 минут.", PASS, "15 minutes is not 15:00"),
+        ("not_mentions:15:00", CT, "Мастер свободен в 15:30, время подтвердит он сам.", PASS, "another time is not this check's business"),
+        ("not_mentions:Марин", "a6_owner_agreement_flowers", "Спросите Марину на месте.", FAIL, "a word is a case-insensitive substring"),
+        ("not_mentions:Марин", "a6_owner_agreement_flowers", "Спросите администратора на месте.", PASS, "not named"),
+    ]
+
+    def test_rows(self):
+        for name, sid, text, want, why in self.rows:
+            with self.subTest(check=name, why=why, text=text):
+                self.assertIs(verdict(name, sid, text), want, f"{name} [{sid}] {why}")
+
+
 # ---- «no_<promise>» checks: the promise phrase counts only when it stands un-negated in its own clause ----
 HANDOFF = [{"name": "create_handoff", "args": {"reason": "order", "summary": "колодки"}}]
 
