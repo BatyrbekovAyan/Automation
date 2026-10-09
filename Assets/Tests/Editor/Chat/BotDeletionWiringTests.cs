@@ -49,6 +49,19 @@ public class BotDeletionWiringTests
     }
 
     [Test]
+    public void LocalWipe_ClearsTheRetiredChannelMarkers()
+    {
+        // M4 (2026-10-09): a channel the server retired is remembered per bot — {bot}{Whatsapp|Telegram}Retired{ProfileId|Reason}.
+        // Per-bot keys like any other: a deleted bot must not leave them behind (bot-persistence).
+        string local = MethodBody(Src("Scripts/Main/Bot.cs"), "public void DeleteBotLocally");
+        Assert.IsTrue(local.Contains("ProfileRetirement.Clear(transform.name)"), "the local wipe must clear the retired-channel markers");
+        string retirement = Src("Scripts/Auth/ProfileRetirement.cs");
+        foreach (var suffix in new[] { "WhatsappRetiredProfileId", "WhatsappRetiredReason", "TelegramRetiredProfileId", "TelegramRetiredReason" })
+            Assert.IsTrue(retirement.Contains($"\"{suffix}\""), $"marker key suffix {suffix} must be declared in ProfileRetirement");
+        Assert.IsTrue(MethodBody(retirement, "public static void Clear").Contains("KeySuffixes"), "Clear deletes every declared marker key");
+    }
+
+    [Test]
     public void ServerHalf_UnlinksTheProfileFirst_ReadsEveryAnswer_AndHoldsTheQueue()
     {
         string manager = Src("Scripts/Main/Manager.cs");

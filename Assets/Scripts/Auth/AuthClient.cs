@@ -232,9 +232,11 @@ public class AuthClient : MonoBehaviour
     public sealed class ClaimResult
     {
         public bool Success;
-        public string Error;          // already_owned | claim_code_rejected | unauthorized | ...
+        public string Error;          // already_owned | claim_code_rejected | profile_retired (410, M4) | ...
         public string Method;         // owned | code | reauth
         public long HttpStatus;
+        /// <summary>M4: why the server retired the profile (with error profile_retired; told to the row's owner only, else null).</summary>
+        public string RetiredReason;
     }
 
     /// <summary>op ∈ claim.start | claim.verify (code) | claim.status; the response's token is adopted.</summary>
@@ -261,6 +263,7 @@ public class AuthClient : MonoBehaviour
             result.Success = jo.Value<bool?>("success") == true;
             result.Error = jo.Value<string>("error");
             result.Method = jo.Value<string>("claimMethod");
+            result.RetiredReason = jo.Value<string>("retiredReason");
             if (result.Success && !string.IsNullOrEmpty(jo.Value<string>("token"))) AdoptToken(jo.Value<string>("token"));
         }
         catch

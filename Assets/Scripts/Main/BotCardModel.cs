@@ -10,8 +10,24 @@ public enum BotChannelIconState
     /// <summary>Channel connected AND enabled — full brand color.</summary>
     Colored,
 
-    /// <summary>Channel connected but toggled off in Bot Settings — InkTertiary gray.</summary>
+    /// <summary>Channel connected but toggled off in Bot Settings — InkTertiary gray.
+    /// Also (M4) a channel the server retired: the profile is gone, the bot cannot answer there.</summary>
     Muted,
+}
+
+/// <summary>Which state the C2 subline shows — one at a time, in <see cref="BotCardModel.SublineKind"/>'s priority order.</summary>
+public enum BotSublineKind
+{
+    /// <summary>The business type (the ordinary card).</summary>
+    Business,
+    /// <summary>A channel is being authorised — the blinking «Подключение…».</summary>
+    Connecting,
+    /// <summary>M4: the server retired a channel — «Отключён · …» / «Канал отключён» / «Удаление не завершено …».</summary>
+    Retired,
+    /// <summary>A2: a reply-mode change waits for the server's confirmation.</summary>
+    SyncPending,
+    /// <summary>A2: the reply-mode change was not saved this launch.</summary>
+    SyncFailed,
 }
 
 /// <summary>
@@ -39,10 +55,39 @@ public static class BotCardModel
     /// connected + channel toggle on → brand color; connected + toggle off →
     /// gray («как будто деактивирован»).
     /// </summary>
-    public static BotChannelIconState IconState(string profileId, bool channelEnabled)
+    public static BotChannelIconState IconState(string profileId, bool channelEnabled) =>
+        IconState(profileId, channelEnabled, retired: false);
+
+    /// <summary>
+    /// M4: a channel the server retired keeps its icon (the bot still HAS that channel — its ids are what V12 deletes
+    /// the server traces by) but never in brand colour: gray, whatever its toggle says.
+    /// </summary>
+    public static BotChannelIconState IconState(string profileId, bool channelEnabled, bool retired)
     {
         if (!IsConnected(profileId)) return BotChannelIconState.Hidden;
-        return channelEnabled ? BotChannelIconState.Colored : BotChannelIconState.Muted;
+        return channelEnabled && !retired ? BotChannelIconState.Colored : BotChannelIconState.Muted;
+    }
+
+    /// <summary>
+    /// M4: the subline's state, highest first — connecting (an auth in progress owns the card), a retired channel (the
+    /// persistent fact that also explains a mode that cannot be saved), then the A2 sync states, then the business type.
+    /// </summary>
+    public static BotSublineKind SublineKind(bool connecting, bool retired, bool syncPending, bool syncFailed)
+    {
+        if (connecting) return BotSublineKind.Connecting;
+        if (retired) return BotSublineKind.Retired;
+        if (syncPending) return BotSublineKind.SyncPending;
+        return syncFailed ? BotSublineKind.SyncFailed : BotSublineKind.Business;
+    }
+
+    /// <summary>
+    /// M4: the subline for the bot's retired channel(s) — null when neither is retired. A reason of "" (the server named
+    /// none) still counts as retired. Card order: WhatsApp's reason first, then Telegram's.
+    /// </summary>
+    public static string RetiredSubline(string whatsappRetiredReason, string telegramRetiredReason)
+    {
+        string reason = whatsappRetiredReason ?? telegramRetiredReason;
+        return reason == null ? null : ProfileRetirementCopy.SublineFor(reason);
     }
 
     /// <summary>

@@ -7,6 +7,10 @@ using UnityEngine;
 /// link session completed it. After a channel reports authorised, the client asks the server to send a code into the
 /// bot's own chat (claim.start) and binds only with claim.verify; the auth flow may create a workflow only once that
 /// succeeded. EditMode cannot run the sheet or the network, so the wiring is pinned in the source.
+///
+/// M4 (follow-ups 2026-10-09): the boot loop asked a RETIRED profile forever — the server answered «owned» for the
+/// install's own retired row, the token (live rows only) never listed it, and «owned» meant «done, next». The loop now
+/// asks each profile at most once per run, and a 410 profile_retired marks the bot's channel and moves on.
 /// </summary>
 public class ProfileClaimWiringTests
 {
@@ -40,6 +44,64 @@ public class ProfileClaimWiringTests
         Assert.IsTrue(run.Contains("\"claim.start\""), "the code is requested with claim.start");
         Assert.IsTrue(run.Contains("SheetMode.Code"), "the owner enters the code from the bot's own chat");
         Assert.IsTrue(MethodBody(flow, "private static IEnumerator VerifyCode(").Contains("\"claim.verify\""), "only claim.verify binds");
+    }
+
+    [Test]
+    public void RunAtBoot_NeverAsksTheSameProfileTwiceInOneRun()
+    {
+        string flow = Src("Scripts/Auth/ProfileClaimFlow.cs");
+        string run = MethodBody(flow, "public static IEnumerator RunAtBoot(");
+        int create = run.IndexOf("new ProfileClaimRun(", System.StringComparison.Ordinal);
+        int loop = run.IndexOf("while (true)", System.StringComparison.Ordinal);
+        int take = run.IndexOf(".TakeNext(", System.StringComparison.Ordinal);
+        int claim = run.IndexOf("ClaimOne(", System.StringComparison.Ordinal);
+        Assert.IsTrue(create >= 0 && loop > create, "M4: ONE run per boot run, created before the loop (a per-turn one would forget what it asked)");
+        Assert.IsTrue(take > loop && claim > take, "M4: the next profile comes from the run — recorded as asked BEFORE ClaimOne");
+        Assert.IsFalse(run.Contains("ProfileClaimPolicy.NextUnowned("), "M4: the loop must not pick a profile past the run's asked set");
+        string takeNext = MethodBody(Src("Scripts/Auth/ProfileClaimPolicy.cs"), "TakeNext(");
+        int pick = takeNext.IndexOf("NextUnowned(", System.StringComparison.Ordinal);
+        int add = takeNext.IndexOf(".Add(", System.StringComparison.Ordinal);
+        Assert.IsTrue(pick >= 0 && add > pick, "M4: TakeNext skips the asked profiles and records the one it hands out");
+    }
+
+    [Test]
+    public void ConnectedProfiles_CarryTheBotKeyAndItsRetiredMarker()
+    {
+        string connected = MethodBody(Src("Scripts/Auth/ProfileClaimFlow.cs"), "public static IEnumerable<ProfileClaimPolicy.Candidate> ConnectedProfiles(");
+        Assert.IsTrue(connected.Contains("BotKey = bot.name"), "M4: the marker lives under the bot GameObject's name (the PlayerPrefs prefix)");
+        Assert.IsTrue(connected.Contains("ProfileRetirement.MarkerId(bot.name, ChatChannel.WhatsApp)")
+                      && connected.Contains("ProfileRetirement.MarkerId(bot.name, ChatChannel.Telegram)"),
+            "M4: a channel marked retired is skipped at the next launch — both channels read their own marker");
+    }
+
+    [Test]
+    public void ClaimOne_OnProfileRetired_MarksTheChannelAndMovesOn()
+    {
+        string flow = Src("Scripts/Auth/ProfileClaimFlow.cs");
+        string one = MethodBody(flow, "private static IEnumerator ClaimOne(");
+        int retired = one.IndexOf("ProfileClaimPolicy.IsRetired(start", System.StringComparison.Ordinal);
+        int mark = retired < 0 ? -1 : one.IndexOf("ProfileRetirement.Mark(c.BotKey, c.Channel, c.ProfileId, start.RetiredReason)", retired, System.StringComparison.Ordinal);
+        int moveOn = mark < 0 ? -1 : one.IndexOf("finished(true)", mark, System.StringComparison.Ordinal);
+        int stop = one.IndexOf("if (!usable)", System.StringComparison.Ordinal);
+        Assert.IsTrue(retired >= 0 && mark > retired && moveOn > mark,
+            "M4: profile_retired → mark the bot's channel (with the server's reason) → finished(true): the loop goes on to the next bot");
+        Assert.IsTrue(stop > moveOn, "M4: the retired branch must precede the generic «not usable → stop» (that stop starved every later bot)");
+        int owned = one.IndexOf("SheetMode.Owned", System.StringComparison.Ordinal);
+        Assert.IsTrue(owned >= 0 && one.IndexOf("auth.Owns(c.ProfileId)", owned, System.StringComparison.Ordinal) > owned,
+            "M4: «owned» without the profile in the token is a server anomaly — logged, never re-asked (the run's asked set)");
+        foreach (string src in new[] { flow, Src("Scripts/Auth/ProfileRetirement.cs") })
+            foreach (string write in new[] { "whatsappProfileId =", "telegramProfileId =", "whatsappWorkflowId =", "telegramWorkflowId =",
+                                             "\"WhatsappProfileId\"", "\"TelegramProfileId\"", "\"WhatsappWorkflowId\"", "\"TelegramWorkflowId\"" })
+                Assert.IsFalse(src.Contains(write), $"M4: the bot's profile / workflow ids must stay as they are — V12 deletes the server traces by them ({write})");
+    }
+
+    [Test]
+    public void AuthClient_Claim_ReadsRetiredReason()
+    {
+        string client = Src("Scripts/Auth/AuthClient.cs");
+        Assert.IsTrue(client.Contains("public string RetiredReason;"), "M4: ClaimResult carries the server's retiredReason");
+        string claim = MethodBody(client, "public IEnumerator Claim(");
+        Assert.IsTrue(claim.Contains("RetiredReason = jo.Value<string>(\"retiredReason\")"), "M4: the reason is read from the 410 body");
     }
 
     [Test]

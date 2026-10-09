@@ -33,8 +33,10 @@ All prefixed with `<botName>` (the bot GameObject's `.name`, e.g. `Bot0`). Defau
 | *(bare name, no suffix)* | int 0/1 | `1` | Master activation toggle |
 | `ProductsNumber` | int | `0` | Product list count (see §3) |
 | `ServicesNumber` | int | `0` | Service list count (see §3) |
+| `WhatsappRetiredProfileId` / `TelegramRetiredProfileId` | string | `""` | M4: the profile id the server retired on that channel (410 `profile_retired` on claim.start). Written ONLY by `ProfileRetirement.Mark`; holds for that id only and yields to the token. The channel's own `…ProfileId`/`…WorkflowId` stay — V12 deletes by them |
+| `WhatsappRetiredReason` / `TelegramRetiredReason` | string | `""` | M4: the server's `deleted_reason` (`trial_expiry`/`churn_grace`/`liveness`/`app_delete`/`channel_limit`; `""` = not told) — the card's subline via `ProfileRetirementCopy` |
 
-Note: the profile/workflow ids are also mirrored as public fields on the `Bot` component (`whatsappProfileId`, `telegramProfileId`, `whatsappWorkflowId`, `telegramWorkflowId`) — the PlayerPrefs copy is the persisted form. Legacy keys `isOn` and `Status` are also deleted in `DeleteBot` but are not actively written; don't add new dependencies on them.
+Note: the profile/workflow ids are also mirrored as public fields on the `Bot` component (`whatsappProfileId`, `telegramProfileId`, `whatsappWorkflowId`, `telegramWorkflowId`) — the PlayerPrefs copy is the persisted form. The four M4 retired-channel keys are deleted by `ProfileRetirement.Clear(transform.name)` inside `Bot.DeleteBotLocally`. Legacy keys `isOn` and `Status` are also deleted in `DeleteBot` but are not actively written; don't add new dependencies on them.
 
 ## 2. The activation keys (expanded)
 

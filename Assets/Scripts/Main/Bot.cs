@@ -122,6 +122,7 @@ public class Bot : MonoBehaviour
         // repaint this card — all three controls share the bot's ReplyMode.
         ReplyModeToggleBinder.OnReplyModeChanged += HandleReplyModeChanged;
         ReplyModeSyncService.OnStateChanged += HandleReplyModeSyncState;
+        ProfileRetirement.Changed += HandleRetirementChanged;
 
         // Returning to the Боты tab after Bot Settings: the channel toggles or
         // the business type may have changed while this card was inactive.
@@ -138,6 +139,7 @@ public class Bot : MonoBehaviour
         Theme.Changed -= HandleThemeChanged;
         ReplyModeToggleBinder.OnReplyModeChanged -= HandleReplyModeChanged;
         ReplyModeSyncService.OnStateChanged -= HandleReplyModeSyncState;
+        ProfileRetirement.Changed -= HandleRetirementChanged;
         KillSublineBlink();
         KillPillTweens();
 
@@ -272,6 +274,7 @@ public class Bot : MonoBehaviour
             PlayerPrefs.DeleteKey(transform.name + "TelegramSyncUntil");
             PlayerPrefs.DeleteKey(transform.name + "ReplyMode");
             PlayerPrefs.DeleteKey(transform.name + BotTestSheet.LastTestKeySuffix);   // R16: the «Проверка бота» verdict
+            ProfileRetirement.Clear(transform.name);                                  // M4: the retired-channel markers
 
             if (PlayerPrefs.GetInt(transform.name + "ProductsNumber", 0) > 0)
             {
@@ -426,6 +429,12 @@ public class Bot : MonoBehaviour
         if (cardStateReady && botId == transform.name) RefreshCardState(animatePill: false);
     }
 
+    // M4: the boot claim loop just learnt that the server retired one of this bot's channels.
+    private void HandleRetirementChanged(string botKey)
+    {
+        if (cardStateReady && botKey == transform.name) RefreshCardState(animatePill: false);
+    }
+
     // Deferred one frame: Manager renames the instantiated card and writes its
     // PlayerPrefs after Instantiate, so an Awake-time read would see another
     // bot's defaults (the old SetSwitches used the same trick).
@@ -490,37 +499,25 @@ public class Bot : MonoBehaviour
         if (BotDesc == null) return;
 
         bool connecting = Status != null && ColorsClose(Status.color, blue);
+        // M4: a channel the server retired (marker for THIS id, the token does not list it) — honest subline, gray icon.
+        var claims = AuthClient.Existing != null ? AuthClient.Existing.Claims : null;
+        string waRetired = ProfileRetirement.ActiveReason(transform.name, ChatChannel.WhatsApp, whatsappProfileId, claims);
+        string tgRetired = ProfileRetirement.ActiveReason(transform.name, ChatChannel.Telegram, telegramProfileId, claims);
+        string retiredText = BotCardModel.RetiredSubline(waRetired, tgRetired);
         var sync = ReplyModeSyncService.Existing;
-        bool syncPending = !connecting && sync != null && sync.IsPending(transform.name);
-        bool syncFailed = !connecting && !syncPending && sync != null && sync.HasFailed(transform.name);
-        string typeName = connecting ? "" : BusinessTypeDisplayName();
-        BotDesc.text = syncPending ? ReplyModeSyncCopy.Pending
-                     : syncFailed ? ReplyModeSyncCopy.Failed
-                     : BotCardModel.SublineText(connecting, typeName);
+        var kind = BotCardModel.SublineKind(connecting, retiredText != null,
+            sync != null && sync.IsPending(transform.name), sync != null && sync.HasFailed(transform.name));
 
-        if (syncPending || syncFailed)
+        PaintSubline(kind, retiredText);
+        if (kind == BotSublineKind.Connecting)
         {
-            var c = BotDesc.color;
-            Color ink = syncFailed ? Theme.Color(ThemeRole.Destructive) : ConnectingInk;
-            BotDesc.color = new Color(ink.r, ink.g, ink.b, c.a);
-            ApplyChannelIcon(waChannelIcon, whatsappProfileId, "isOnWhatsapp", waIconColored, waIconGray);
-            ApplyChannelIcon(tgChannelIcon, telegramProfileId, "isOnTelegram", tgIconColored, tgIconGray);
-            if (syncPending) EnsureSublineBlink(); else KillSublineBlink();
-        }
-        else if (connecting)
-        {
-            var c = BotDesc.color;
-            BotDesc.color = new Color(ConnectingInk.r, ConnectingInk.g, ConnectingInk.b, c.a);
             SetIconState(waChannelIcon, BotChannelIconState.Hidden, null);
             SetIconState(tgChannelIcon, BotChannelIconState.Hidden, null);
-            EnsureSublineBlink();
         }
         else
         {
-            KillSublineBlink();
-            BotDesc.color = Theme.Color(ThemeRole.InkTertiary);
-            ApplyChannelIcon(waChannelIcon, whatsappProfileId, "isOnWhatsapp", waIconColored, waIconGray);
-            ApplyChannelIcon(tgChannelIcon, telegramProfileId, "isOnTelegram", tgIconColored, tgIconGray);
+            ApplyChannelIcon(waChannelIcon, whatsappProfileId, "isOnWhatsapp", waRetired != null, waIconColored, waIconGray);
+            ApplyChannelIcon(tgChannelIcon, telegramProfileId, "isOnTelegram", tgRetired != null, tgIconColored, tgIconGray);
         }
 
         bool anyIcon = (waChannelIcon != null && waChannelIcon.gameObject.activeSelf)
@@ -535,12 +532,35 @@ public class Bot : MonoBehaviour
             subRow.gameObject.SetActive(hasText || anyIcon);
     }
 
-    private void ApplyChannelIcon(Image icon, string profileId, string channelKeySuffix,
+    // Text, ink and blink of one subline state. Connecting and an unconfirmed mode blink in the connecting blue;
+    // a retired channel and a mode that was not saved are destructive ink; the business type is the quiet tertiary.
+    private void PaintSubline(BotSublineKind kind, string retiredText)
+    {
+        BotDesc.text = kind switch
+        {
+            BotSublineKind.Connecting => BotCardModel.ConnectingText,
+            BotSublineKind.Retired => retiredText,
+            BotSublineKind.SyncPending => ReplyModeSyncCopy.Pending,
+            BotSublineKind.SyncFailed => ReplyModeSyncCopy.Failed,
+            _ => BotCardModel.SublineText(false, BusinessTypeDisplayName()),
+        };
+        bool blink = kind == BotSublineKind.Connecting || kind == BotSublineKind.SyncPending;
+        if (!blink) KillSublineBlink();
+        bool destructive = kind == BotSublineKind.Retired || kind == BotSublineKind.SyncFailed;
+        Color ink = blink ? ConnectingInk
+                  : destructive ? Theme.Color(ThemeRole.Destructive)
+                  : Theme.Color(ThemeRole.InkTertiary);
+        float alpha = kind == BotSublineKind.Business ? ink.a : BotDesc.color.a;
+        BotDesc.color = new Color(ink.r, ink.g, ink.b, alpha);
+        if (blink) EnsureSublineBlink();
+    }
+
+    private void ApplyChannelIcon(Image icon, string profileId, string channelKeySuffix, bool retired,
         Sprite coloredSprite, Sprite graySprite)
     {
         if (icon == null) return;
         var state = BotCardModel.IconState(profileId,
-            PlayerPrefs.GetInt(transform.name + channelKeySuffix, 1) == 1);
+            PlayerPrefs.GetInt(transform.name + channelKeySuffix, 1) == 1, retired);
         SetIconState(icon, state,
             state == BotChannelIconState.Colored ? coloredSprite : graySprite);
     }

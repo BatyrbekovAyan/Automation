@@ -15,6 +15,11 @@ using UnityEngine;
 /// bot's own chat is the only proof: a channel that becomes authorised while a claim is pending reports
 /// back through <see cref="AfterChannelAuthorized"/>, which asks for that code (claim.start →
 /// claim.verify) before the caller may create a workflow for the profile.
+///
+/// M4 (2026-10-09): a profile the server RETIRED (the sweep after a trial or a subscription ended, gone from Wappi, an
+/// unfinished delete) answers 410 profile_retired: the bot's channel is marked (<see cref="ProfileRetirement"/>), the
+/// card says the channel is off, and the loop goes on to the next bot. Each profile is asked at most once per run
+/// (<see cref="ProfileClaimRun"/>) — the server used to answer «owned» for such a row, which spun this loop forever.
 /// </summary>
 public static class ProfileClaimFlow
 {
@@ -38,9 +43,17 @@ public static class ProfileClaimFlow
             if (bot == null) continue;
             string name = bot.BotName != null ? bot.BotName.text : bot.name;
             if (ProfileClaimPolicy.IsAuthedId(bot.whatsappProfileId))
-                yield return new ProfileClaimPolicy.Candidate { ProfileId = bot.whatsappProfileId, Channel = ChatChannel.WhatsApp, BotName = name };
+                yield return new ProfileClaimPolicy.Candidate
+                {
+                    ProfileId = bot.whatsappProfileId, Channel = ChatChannel.WhatsApp, BotName = name,
+                    BotKey = bot.name, RetiredMarkerId = ProfileRetirement.MarkerId(bot.name, ChatChannel.WhatsApp),
+                };
             if (ProfileClaimPolicy.IsAuthedId(bot.telegramProfileId))
-                yield return new ProfileClaimPolicy.Candidate { ProfileId = bot.telegramProfileId, Channel = ChatChannel.Telegram, BotName = name };
+                yield return new ProfileClaimPolicy.Candidate
+                {
+                    ProfileId = bot.telegramProfileId, Channel = ChatChannel.Telegram, BotName = name,
+                    BotKey = bot.name, RetiredMarkerId = ProfileRetirement.MarkerId(bot.name, ChatChannel.Telegram),
+                };
         }
     }
 
@@ -68,9 +81,10 @@ public static class ProfileClaimFlow
             var auth = AuthClient.Instance;
             if (auth == null) yield break;
             yield return auth.EnsureSession();
+            var run = new ProfileClaimRun();   // M4: each profile at most once per run — bounded by the connected profiles
             while (true)
             {
-                var next = ProfileClaimPolicy.NextUnowned(ConnectedProfiles(botsRoot), auth.Claims, Snoozed);
+                var next = run.TakeNext(ConnectedProfiles(botsRoot), auth.Claims, Snoozed);
                 if (next == null) yield break;
                 bool done = false;
                 yield return ClaimOne(next.Value, FontFrom(botsRoot), ok => done = ok);
@@ -88,6 +102,15 @@ public static class ProfileClaimFlow
         var auth = AuthClient.Instance;
         AuthClient.ClaimResult start = null;
         yield return auth.Claim("claim.start", c.ProfileId, c.Channel, null, r => start = r);
+        if (start != null && ProfileClaimPolicy.IsRetired(start.Error))
+        {
+            // M4: the server retired this profile. Remember it on the bot's channel (the card says so, the next launch
+            // does not ask again) and go on to the next bot. The bot's profile / workflow ids stay as they are — V12
+            // deletes the server traces (memory, history, clone) by them when the owner deletes the bot.
+            ProfileRetirement.Mark(c.BotKey, c.Channel, c.ProfileId, start.RetiredReason);
+            finished(true);
+            yield break;
+        }
         bool usable = start != null && (start.Success || start.Error == "code_send_failed" || ProfileClaimPolicy.IsCodeDead(start.Error));
         if (!usable)
         {
@@ -97,7 +120,11 @@ public static class ProfileClaimFlow
         }
         if (start.Success && ProfileClaimPolicy.ModeFor(start.Method) == ProfileClaimPolicy.SheetMode.Owned)
         {
-            finished(true);                              // already ours (token was just refreshed)
+            // already ours (token was just refreshed). «Owned» without the profile in the token is a server anomaly
+            // (M4's shape): logged, and never asked again in this run — the run's asked set guarantees it.
+            if (!auth.Owns(c.ProfileId))
+                Debug.LogWarning($"[ProfileClaim] claim.start for {c.ProfileId} answered «owned» but the token does not list it — not asked again this run");
+            finished(true);
             yield break;
         }
         if (start.Success && ProfileClaimPolicy.ModeFor(start.Method) == ProfileClaimPolicy.SheetMode.Reauth)

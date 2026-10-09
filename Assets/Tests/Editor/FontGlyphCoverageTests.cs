@@ -301,6 +301,7 @@ public class FontGlyphCoverageTests
             typeof(ReplyOutcomeCopy),   // stage 7.3 ledger-state labels (2026-09-22)
             typeof(BotReadinessCopy),   // stage 7.1/7.2 test-dialog + readiness copy (2026-09-22)
             typeof(BotDeletionCopy),    // V12 refused / failed bot deletion (2026-10-07)
+            typeof(ProfileRetirementCopy), // M4 retired-channel subline of the bot card (2026-10-09)
         };
         foreach (var t in constTypes)
             foreach (var f in t.GetFields(BindingFlags.Public | BindingFlags.Static))
@@ -363,6 +364,9 @@ public class FontGlyphCoverageTests
             BotReadinessCopy.VersionNote(TestDialogPromptVersion.SourcePublished, "a4ad53ce-e6c3", true)));
         yield return ("BotReadinessCopy.CorrelationLine(draft)", BotReadinessCopy.CorrelationLine("1546",
             BotReadinessCopy.VersionNote(TestDialogPromptVersion.SourceDraft, "b2c1ff9e-5ee0", false)));
+
+        foreach (var reason in new[] { "trial_expiry", "churn_grace", "liveness", "app_delete", "channel_limit", "", null })
+            yield return ($"ProfileRetirementCopy.SublineFor({reason ?? "null"})", ProfileRetirementCopy.SublineFor(reason));
 
         foreach (OutcomeStatus s in Enum.GetValues(typeof(OutcomeStatus)))
             yield return ($"DashboardStatusInfo.Label({s})", DashboardStatusInfo.Label(s));
