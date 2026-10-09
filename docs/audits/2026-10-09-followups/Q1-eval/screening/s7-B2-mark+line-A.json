@@ -1,0 +1,487 @@
+{
+ "variants": {
+  "HEAD": [],
+  "P-final": [
+   {
+    "file": "_core.md",
+    "old": "Память. Chat Memory хранит переписку этого чата: сообщения клиента, твои ответы и ответы владельца, когда они прошли через приложение или телефон. Веди диалог с учётом контекста; чего в памяти нет — не утверждай, что этого не было, а уточни.",
+    "new": "Память. Chat Memory хранит переписку этого чата: сообщения клиента, твои ответы и ответы владельца, когда они прошли через приложение или телефон. Веди диалог с учётом контекста; чего в памяти нет — не утверждай, что этого не было, а уточни.\n\nДоговорённости из этого чата. Ответы владельца стоят в истории так же, как твои прежние ответы. Сам ты время не назначаешь и бронь не подтверждаешь — значит, конкретные день, время, место или человека, которые сторона бизнеса уже назвала этому клиенту в этом чате (визит, запись, урок, бронь, доставка, к кому обратиться), назвал владелец: это подтверждённая договорённость. Клиент переспрашивает — повтори её как есть, даже если в About Business её нет: не заменяй часами работы или адресом и не отсылай к владельцу. Время, которое назвал сам клиент, договорённостью не становится, пока бизнес не написал это время сам. Договорённости в истории нет — отвечай как обычно."
+   }
+  ],
+  "B1-mark-only": [],
+  "B2-mark+line": [
+   {
+    "file": "_core.md",
+    "old": "Память. Chat Memory хранит переписку этого чата: сообщения клиента, твои ответы и ответы владельца, когда они прошли через приложение или телефон. Веди диалог с учётом контекста; чего в памяти нет — не утверждай, что этого не было, а уточни.",
+    "new": "Память. Chat Memory хранит переписку этого чата: сообщения клиента, твои ответы и ответы владельца, когда они прошли через приложение или телефон. Веди диалог с учётом контекста; чего в памяти нет — не утверждай, что этого не было, а уточни. Реплики, которые начинаются с «Владелец:», написал сам владелец: названные в них день, время, место или человек — подтверждённая договорённость; клиент переспрашивает — повтори её как есть. Сам эту пометку в ответах не пиши."
+   }
+  ]
+ },
+ "results": {
+  "B2-mark+line": {
+   "a6_owner_agreement_flowers": {
+    "pass": 6,
+    "n": 6,
+    "runs": [
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:15": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 15:00, спросите Марину.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:15": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 15:00, спросите Марину.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:15": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 15:00, спросите Марину.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:15": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 15:00, спросите Марину.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:15": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 15:00, спросите Марину.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:15": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 15:00, спросите Марину.",
+      "tool_calls": [],
+      "error": null
+     }
+    ]
+   },
+   "a6_owner_agreement_education": {
+    "pass": 6,
+    "n": 6,
+    "runs": [
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:15": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 15:00, спросите Марину.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:15": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 15:00, спросите Марину.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:15": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 15:00, спросите Марину.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:15": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 15:00, спросите Марину.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:15": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 15:00, спросите Марину.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:15": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 15:00, спросите Марину.",
+      "tool_calls": [],
+      "error": null
+     }
+    ]
+   },
+   "a6_owner_agreement_phone_repair": {
+    "pass": 6,
+    "n": 6,
+    "runs": [
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:15": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 15:00, спросите Марину.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:15": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 15:00, спросите Марину.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:15": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 15:00, спросите Марину.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:15": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 15:00, спросите Марину.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:15": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 15:00, спросите Марину.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:15": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 15:00.\nСпросите Марину.",
+      "tool_calls": [],
+      "error": null
+     }
+    ]
+   },
+   "q1p_visit_phone_repair": {
+    "pass": 5,
+    "n": 6,
+    "runs": [
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:Ерлан": false,
+       "mentions:двор": false
+      },
+      "text": "ТЦ Азия, 2 этаж\n\nТелефон: +7 705 444 55 66\nЧасы работы: 10:00–19:00\n\nПо поводу мастера и входа уточнит владелец, если хотите — напишите имя и номер телефона, передам вопрос.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:Ерлан": true,
+       "mentions:двор": true
+      },
+      "text": "Обратитесь к мастеру Ерлану.\n\nВход со двора.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:Ерлан": true,
+       "mentions:двор": true
+      },
+      "text": "Вход со двора. Мастер Ерлан.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:Ерлан": true,
+       "mentions:двор": true
+      },
+      "text": "Вход со двора. Мастер Ерлан будет на месте.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:Ерлан": true,
+       "mentions:двор": true
+      },
+      "text": "Вход со двора.  \nМастер Ерлан.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:Ерлан": true,
+       "mentions:двор": true
+      },
+      "text": "ТЦ Азия, 2 этаж.\n\nВход со двора.  \nОбратиться к мастеру Ерлану.",
+      "tool_calls": [],
+      "error": null
+     }
+    ]
+   },
+   "q1p_trial_education": {
+    "pass": 3,
+    "n": 6,
+    "runs": [
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:сред": false,
+       "mentions:204": false
+      },
+      "text": "Я не вижу подтверждённой записи на конкретный день и кабинет.\n\nПробный урок бесплатный, адрес: пр. Республики 10.\nЧтобы администратор подобрал время и группу, напишите, пожалуйста, имя и возраст сына.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:сред": false,
+       "mentions:204": false
+      },
+      "text": "Я не вижу подтверждённой записи на конкретный день и кабинет в данных.\n\nПробный урок бесплатный.\nАдрес: пр. Республики 10\nТелефон администратора: +7 702 333 44 55\n\nЕсли хотите, я передам заявку администратору — он уточнит день и кабинет.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:сред": true,
+       "mentions:204": true
+      },
+      "text": "Пробный урок в среду, кабинет 204.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:сред": true,
+       "mentions:204": true
+      },
+      "text": "Пробный урок в среду, кабинет 204.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:сред": true,
+       "mentions:204": true
+      },
+      "text": "Пробный урок — в среду, кабинет 204.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:сред": false,
+       "mentions:204": false
+      },
+      "text": "Я не вижу подтверждённой записи на конкретный день и кабинет в данных.\n\nПробный урок бесплатный, а точное время и место подтвердит администратор.\nЕсли хотите, я передам заявку — напишите имя и возраст сына, и номер телефона.",
+      "tool_calls": [],
+      "error": null
+     }
+    ]
+   },
+   "q1p_early_phone_repair": {
+    "pass": 6,
+    "n": 6,
+    "runs": [
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:9": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 9:00.\nОткроет Марина.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:9": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 9:00, откроет Марина.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:9": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 9:00.\nОткроет Марина.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:9": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 9:00.\nОткроет Марина.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:9": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 9:00.\nОткроет Марина.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:9": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 9:00.\nОткроет Марина.",
+      "tool_calls": [],
+      "error": null
+     }
+    ]
+   },
+   "q1p_pickup_auto_parts": {
+    "pass": 6,
+    "n": 6,
+    "runs": [
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:18": true,
+       "mentions:Асхат": true
+      },
+      "text": "Отложили до завтра до 18:00.\nНа складе скажите Асхату, склад №3.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:18": true,
+       "mentions:Асхат": true
+      },
+      "text": "До 18:00 держим.\n\nНа складе скажите Асхату, склад №3.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:18": true,
+       "mentions:Асхат": true
+      },
+      "text": "Отложили до завтра до 18:00.\nНа складе скажите Асхату, склад №3.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:18": true,
+       "mentions:Асхат": true
+      },
+      "text": "До 18:00.\n\nНа складе скажите Асхату, склад №3.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:18": true,
+       "mentions:Асхат": true
+      },
+      "text": "До завтра до 18:00.\n\nНа складе скажите Асхату, склад №3.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:18": true,
+       "mentions:Асхат": true
+      },
+      "text": "До завтра до 18:00.\n\nНа складе скажите Асхату, склад №3.",
+      "tool_calls": [],
+      "error": null
+     }
+    ]
+   }
+  }
+ },
+ "usd": 0.0418716
+}

@@ -1,0 +1,602 @@
+{
+ "variants": {
+  "HEAD": [],
+  "pr-hours_line": [
+   {
+    "file": "phone_repair.md",
+    "old": "— Гарантия на ремонт, адрес, часы работы, оплата и Kaspi рассрочка — только по данным из About Business.\n",
+    "new": ""
+   }
+  ],
+  "pr-zayavka_hours": [
+   {
+    "file": "phone_repair.md",
+    "old": "назови адрес и часы работы (из About Business), ",
+    "new": ""
+   }
+  ],
+  "pr-both": [
+   {
+    "file": "phone_repair.md",
+    "old": "— Гарантия на ремонт, адрес, часы работы, оплата и Kaspi рассрочка — только по данным из About Business.\n",
+    "new": ""
+   },
+   {
+    "file": "phone_repair.md",
+    "old": "назови адрес и часы работы (из About Business), ",
+    "new": ""
+   }
+  ],
+  "ed-schedule": [
+   {
+    "file": "education.md",
+    "old": "— Расписание и места в группах: есть в прайсе — называй, добавляя, что набор и точное время подтвердит администратор; нет — не придумывай, возьми телефон: администратор пришлёт актуальное. Свободное место не обещай.\n",
+    "new": ""
+   }
+  ],
+  "ed-noassign": [
+   {
+    "file": "education.md",
+    "old": " Сам время и группу не назначай.",
+    "new": ""
+   }
+  ],
+  "ed-facts_line": [
+   {
+    "file": "education.md",
+    "old": "— Возраст, формат (офлайн/онлайн), адрес, преподаватели, Kaspi рассрочка — только по данным из About Business; данных нет — «уточнит администратор» (возьми контакт).",
+    "new": ""
+   }
+  ],
+  "core-only_data": [
+   {
+    "file": "_core.md",
+    "old": " Отвечай на такие вопросы ТОЛЬКО по этим данным. Если нужного факта там нет — не выдумывай: скажи, что уточнит владелец, возьми имя и номер телефона и передай вопрос.",
+    "new": ""
+   }
+  ],
+  "core+uni-noassign": [
+   {
+    "file": "_core.md",
+    "old": ", не подтверждай бронь и не назначай время — только принимай заявку, владелец подтвердит",
+    "new": ""
+   },
+   {
+    "file": "_universal.md",
+    "old": "— Не подтверждать бронь, запись или точное время — только принять заявку, подтверждает человек.\n",
+    "new": ""
+   }
+  ]
+ },
+ "results": {
+  "HEAD": {
+   "a6_owner_agreement_phone_repair": {
+    "pass": 0,
+    "n": 8,
+    "runs": [
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:15": false,
+       "mentions:Марин": false
+      },
+      "text": "Уточните, пожалуйста, модель устройства и что нужно сделать — тогда подскажу по ремонту и сориентирую по приёму.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:15": false,
+       "mentions:Марин": false
+      },
+      "text": "Подойти можно с 10:00 до 19:00.\n\nАдрес: ТЦ Азия, 2 этаж\nСпросите мастера или администратора.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:15": false,
+       "mentions:Марин": false
+      },
+      "text": "Уточните, пожалуйста, модель устройства и что нужно сделать.\n\nЕсли хотите, я передам заявку мастеру — он подскажет, во сколько подойти и кого спросить.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:15": false,
+       "mentions:Марин": false
+      },
+      "text": "У нас часы работы: 10:00–19:00\n\nАдрес: ТЦ Азия, 2 этаж\n\nСпросите мастера или администратора.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:15": false,
+       "mentions:Марин": false
+      },
+      "text": "У нас часы работы: 10:00–19:00\n\nАдрес: ТЦ Азия, 2 этаж\n\nЕсли хотите, могу передать заявку мастеру — напишите модель устройства, что случилось, ваше имя и номер телефона.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:15": false,
+       "mentions:Марин": false
+      },
+      "text": "Подойти можно с 10:00 до 19:00.\n\nАдрес: ТЦ Азия, 2 этаж\n\nСпросить можно мастера на месте.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:15": false,
+       "mentions:Марин": false
+      },
+      "text": "Уточните, пожалуйста, ваше имя и номер телефона — передам владельцу, он ответит по времени и кому подойти.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:15": false,
+       "mentions:Марин": false
+      },
+      "text": "Уточните, пожалуйста, модель устройства и что нужно сделать — тогда подскажу по ремонту и сориентирую по приёму.",
+      "tool_calls": [],
+      "error": null
+     }
+    ]
+   }
+  },
+  "pr-hours_line": {
+   "a6_owner_agreement_phone_repair": {
+    "pass": 0,
+    "n": 8,
+    "runs": [
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:15": false,
+       "mentions:Марин": false
+      },
+      "text": "Завтра с 10:00 до 19:00\n\nАдрес: ТЦ Азия, 2 этаж\n\nСпросите мастера на месте.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:15": false,
+       "mentions:Марин": false
+      },
+      "text": "Подойти можно в часы работы: 10:00–19:00.\n\nАдрес: ТЦ Азия, 2 этаж\n\nСпросите мастера.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:15": false,
+       "mentions:Марин": false
+      },
+      "text": "Подойти можно в часы работы: 10:00–19:00.\n\nАдрес:\nТЦ Азия, 2 этаж\n\nСпросить можно на месте администратора или мастера.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:15": false,
+       "mentions:Марин": false
+      },
+      "text": "Уточните, пожалуйста, модель устройства и что нужно сделать — тогда подскажу по ремонту и передам заявку мастеру.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:15": false,
+       "mentions:Марин": false
+      },
+      "text": "Подойти можно в часы работы: 10:00–19:00.\n\nАдрес: ТЦ Азия, 2 этаж\nСпросить можно мастера, имя не указано.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:15": false,
+       "mentions:Марин": true
+      },
+      "text": "Подойти можно в часы работы: 10:00–19:00.\nАдрес: ТЦ Азия, 2 этаж.\n\nКого спросить — Марину.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:15": false,
+       "mentions:Марин": false
+      },
+      "text": "Подойти можно в часы работы: 10:00–19:00.\n\nАдрес: ТЦ Азия, 2 этаж\nСпросите мастера или администратора.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:15": false,
+       "mentions:Марин": false
+      },
+      "text": "Подойти можно в часы работы: 10:00–19:00.\n\nАдрес: ТЦ Азия, 2 этаж\nСпросить можно мастера на месте.",
+      "tool_calls": [],
+      "error": null
+     }
+    ]
+   }
+  },
+  "pr-zayavka_hours": {
+   "a6_owner_agreement_phone_repair": {
+    "pass": 0,
+    "n": 8,
+    "runs": [
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:15": false,
+       "mentions:Марин": false
+      },
+      "text": "Уточните, пожалуйста, модель устройства и что нужно сделать — тогда скажу по времени и передам мастеру, кого спросить.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:15": false,
+       "mentions:Марин": false
+      },
+      "text": "Я не вижу подтверждённого времени и имени для записи.\n\nЕсли хотите, я передам вопрос владельцу — напишите, пожалуйста, имя и номер телефона.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:15": false,
+       "mentions:Марин": false
+      },
+      "text": "Я не вижу подтверждённой записи на конкретное время.\n\nЕсли хотите подъехать, напишите, пожалуйста:\nмодель устройства\nчто случилось\nваше имя\nномер телефона\n\nМастер посмотрит устройство и подтвердит точную цену и срок.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:15": false,
+       "mentions:Марин": false
+      },
+      "text": "Я не вижу подтверждённой записи на конкретное время.\n\nЕсли хотите подъехать, напишите, пожалуйста:\nмодель устройства\nчто случилось\nваше имя\nномер телефона\n\nМастер посмотрит устройство и подтвердит точную цену и срок.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:15": false,
+       "mentions:Марин": false
+      },
+      "text": "Уточните, пожалуйста, модель устройства и что нужно сделать — тогда подскажу по ремонту.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:15": false,
+       "mentions:Марин": false
+      },
+      "text": "Я не вижу подтверждённого времени из переписки.\n\nЕсли хотите, могу передать заявку мастеру — напишите, пожалуйста:\nмодель устройства\nчто случилось\nваше имя\nномер телефона\n\nМастер посмотрит устройство и подтвердит точную цену и срок.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:15": false,
+       "mentions:Марин": false
+      },
+      "text": "Я не вижу подтверждённого времени и имени для записи.\n\nЕсли хотите, я передам заявку мастеру — напишите, пожалуйста:\nмодель устройства\nчто случилось\nваше имя\nномер телефона\n\nМастер посмотрит устройство и подтвердит точную цену и срок.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:15": false,
+       "mentions:Марин": false
+      },
+      "text": "Я не вижу подтверждённой записи на конкретное время.\n\nЕсли хотите, могу передать заявку мастеру — напишите, пожалуйста, модель устройства, что случилось, ваше имя и номер телефона.",
+      "tool_calls": [],
+      "error": null
+     }
+    ]
+   }
+  },
+  "pr-both": {
+   "a6_owner_agreement_phone_repair": {
+    "pass": 6,
+    "n": 8,
+    "runs": [
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:15": false,
+       "mentions:Марин": false
+      },
+      "text": "Уточните, пожалуйста, модель устройства и что нужно сделать — тогда подскажу по ремонту и оформлю заявку.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:15": false,
+       "mentions:Марин": false
+      },
+      "text": "Уточните, пожалуйста, модель устройства и что нужно сделать — тогда скажу, во сколько подойти и кого спросить.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:15": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 15:00, спросите Марину.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:15": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 15:00, спросите Марину.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:15": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 15:00, спросите Марину.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:15": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 15:00, спросите Марину.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:15": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 15:00.\nСпросите Марину.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:15": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 15:00, спросите Марину.",
+      "tool_calls": [],
+      "error": null
+     }
+    ]
+   }
+  },
+  "core-only_data": {
+   "a6_owner_agreement_phone_repair": {
+    "pass": 0,
+    "n": 8,
+    "runs": [
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:15": false,
+       "mentions:Марин": false
+      },
+      "text": "Уточните, пожалуйста, модель устройства и что нужно сделать — тогда подскажу по ремонту.  \nЕсли вы уже записывались, напишите имя, и я сориентирую по времени и кому подойти.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:15": false,
+       "mentions:Марин": false
+      },
+      "text": "Подойти можно в часы работы: 10:00–19:00\n\nАдрес: ТЦ Азия, 2 этаж\n\nСпросить можно мастера на приёме.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:15": false,
+       "mentions:Марин": false
+      },
+      "text": "У нас часы работы: 10:00–19:00\n\nАдрес: ТЦ Азия, 2 этаж\n\nСпросите мастера или администратора на месте.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:15": false,
+       "mentions:Марин": false
+      },
+      "text": "У нас часы работы: 10:00–19:00\n\nАдрес: ТЦ Азия, 2 этаж\n\nСпросите мастера или администратора на месте.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:15": false,
+       "mentions:Марин": false
+      },
+      "text": "У нас часы работы: 10:00–19:00\n\nАдрес: ТЦ Азия, 2 этаж\n\nСпросите мастера на месте.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:15": false,
+       "mentions:Марин": false
+      },
+      "text": "Подойти можно в рабочее время: 10:00–19:00\n\nАдрес: ТЦ Азия, 2 этаж\n\nСпросить можно мастера или администратора.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:15": false,
+       "mentions:Марин": false
+      },
+      "text": "У нас часы работы: 10:00–19:00\n\nАдрес: ТЦ Азия, 2 этаж\n\nСпросите мастера на месте.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:15": false,
+       "mentions:Марин": false
+      },
+      "text": "С 10:00 до 19:00\n\nТЦ Азия, 2 этаж\n\nСпросите мастера или администратора.",
+      "tool_calls": [],
+      "error": null
+     }
+    ]
+   }
+  },
+  "core+uni-noassign": {
+   "a6_owner_agreement_phone_repair": {
+    "pass": 3,
+    "n": 8,
+    "runs": [
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:15": false,
+       "mentions:Марин": false
+      },
+      "text": "10:00–19:00\n\nАдрес: ТЦ Азия, 2 этаж\n\nСпросите мастера.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:15": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 15:00, спросите Марину.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:15": false,
+       "mentions:Марин": false
+      },
+      "text": "Подойти можно с 10:00 до 19:00.\n\nАдрес: ТЦ Азия, 2 этаж\nСпросить можно мастера на месте.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:15": false,
+       "mentions:Марин": false
+      },
+      "text": "Завтра с 10:00 до 19:00\n\nАдрес: ТЦ Азия, 2 этаж\n\nСпросите мастера или администратора.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:15": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 15:00.\nСпросите Марину.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:15": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра можно подойти в 15:00, спросить Марину.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:15": false,
+       "mentions:Марин": false
+      },
+      "text": "Завтра с 10:00 до 19:00\n\nАдрес: ТЦ Азия, 2 этаж\n\nСпросите мастера или администратора.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:15": false,
+       "mentions:Марин": false
+      },
+      "text": "Завтра с 10:00 до 19:00\nАдрес: ТЦ Азия, 2 этаж\n\nСпросите мастера.",
+      "tool_calls": [],
+      "error": null
+     }
+    ]
+   }
+  }
+ },
+ "usd": 0.0600495
+}

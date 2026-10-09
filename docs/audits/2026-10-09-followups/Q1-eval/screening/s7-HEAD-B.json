@@ -1,0 +1,763 @@
+{
+ "variants": {
+  "HEAD": [],
+  "P-final": [
+   {
+    "file": "_core.md",
+    "old": "Память. Chat Memory хранит переписку этого чата: сообщения клиента, твои ответы и ответы владельца, когда они прошли через приложение или телефон. Веди диалог с учётом контекста; чего в памяти нет — не утверждай, что этого не было, а уточни.",
+    "new": "Память. Chat Memory хранит переписку этого чата: сообщения клиента, твои ответы и ответы владельца, когда они прошли через приложение или телефон. Веди диалог с учётом контекста; чего в памяти нет — не утверждай, что этого не было, а уточни.\n\nДоговорённости из этого чата. Ответы владельца стоят в истории так же, как твои прежние ответы. Сам ты время не назначаешь и бронь не подтверждаешь — значит, конкретные день, время, место или человека, которые сторона бизнеса уже назвала этому клиенту в этом чате (визит, запись, урок, бронь, доставка, к кому обратиться), назвал владелец: это подтверждённая договорённость. Клиент переспрашивает — повтори её как есть, даже если в About Business её нет: не заменяй часами работы или адресом и не отсылай к владельцу. Время, которое назвал сам клиент, договорённостью не становится, пока бизнес не написал это время сам. Договорённости в истории нет — отвечай как обычно."
+   }
+  ],
+  "B1-mark-only": [],
+  "B2-mark+line": [
+   {
+    "file": "_core.md",
+    "old": "Память. Chat Memory хранит переписку этого чата: сообщения клиента, твои ответы и ответы владельца, когда они прошли через приложение или телефон. Веди диалог с учётом контекста; чего в памяти нет — не утверждай, что этого не было, а уточни.",
+    "new": "Память. Chat Memory хранит переписку этого чата: сообщения клиента, твои ответы и ответы владельца, когда они прошли через приложение или телефон. Веди диалог с учётом контекста; чего в памяти нет — не утверждай, что этого не было, а уточни. Реплики, которые начинаются с «Владелец:», написал сам владелец: названные в них день, время, место или человек — подтверждённая договорённость; клиент переспрашивает — повтори её как есть. Сам эту пометку в ответах не пиши."
+   }
+  ]
+ },
+ "results": {
+  "HEAD": {
+   "q1c_no_agreement_phone_repair": {
+    "pass": 8,
+    "n": 8,
+    "runs": [
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Мы работаем с 10:00 до 19:00.\n\nАдрес: ТЦ Азия, 2 этаж\n\nСпросите мастера на месте.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Мы работаем с 10:00 до 19:00.\n\nАдрес: ТЦ Азия, 2 этаж\n\nСпросите мастера на месте.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Мы работаем с 10:00 до 19:00.\n\nАдрес: ТЦ Азия, 2 этаж\n\nСпросите мастера на месте.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Мы работаем с 10:00 до 19:00.\n\nАдрес: ТЦ Азия, 2 этаж\n\nСпросите мастера.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Подходите с 10:00 до 19:00.\n\nАдрес: ТЦ Азия, 2 этаж\n\nСпросите мастера.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Подойти можно с 10:00 до 19:00.\n\nАдрес: ТЦ Азия, 2 этаж\n\nСпросите мастера или администратора.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Мы работаем с 10:00 до 19:00.\n\nАдрес: ТЦ Азия, 2 этаж\n\nСпросите мастера.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Мы работаем с 10:00 до 19:00.\n\nАдрес: ТЦ Азия, 2 этаж\n\nСпросите мастера по ремонту.",
+      "tool_calls": [],
+      "error": null
+     }
+    ]
+   },
+   "q1c_no_agreement_education": {
+    "pass": 8,
+    "n": 8,
+    "runs": [
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Подойти можно в часы работы: 9:00–20:00.\n\nАдрес: пр. Республики 10\n\nСпросить администратора.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Подойти можно в часы работы: 9:00–20:00.\nАдрес: пр. Республики 10\n\nСпросить администратора.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Подойти можно в часы работы: 9:00–20:00.\nАдрес: пр. Республики 10\n\nСпросить администратора.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Подойти можно в часы работы: 9:00–20:00.\nАдрес: пр. Республики 10.\n\nСпросить администратора.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Учебный центр работает с 9:00 до 20:00.\n\nАдрес: пр. Республики 10\n\nСпросить можно администратора.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Подойти можно в рабочее время: с 9:00 до 20:00.\nАдрес: пр. Республики 10\n\nСпросить администратора.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Подойти можно в часы работы: 9:00–20:00.\nАдрес: пр. Республики 10\n\nСпросите администратора.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Учебный центр работает с 9:00 до 20:00.\n\nАдрес: пр. Республики 10\n\nСпросить можно администратора.",
+      "tool_calls": [],
+      "error": null
+     }
+    ]
+   },
+   "q1c_client_time_education": {
+    "pass": 8,
+    "n": 8,
+    "runs": [
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Здравствуйте! Пробный урок бесплатный.\n\nНа месте вас встретит администратор, он подскажет всё по записи и группе. Адрес: пр. Республики 10.\n\nЕсли хотите, могу сразу передать заявку на пробный урок — напишите имя и возраст ученика.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Пробный урок бесплатный.\n\nАдрес: пр. Республики 10\nЧасы работы: 9:00–20:00\n\nНа месте вас встретит администратор — он подскажет по пробному уроку и группе.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Пробный урок бесплатный.\n\nАдрес: пр. Республики 10\nЧасы работы: 9:00–20:00\n\nНа месте вас встретит администратор, он подскажет по пробному уроку и группе. Если хотите, могу передать заявку заранее — напишите имя и возраст ученика.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Пробный урок бесплатный.\n\nНа месте вас встретит администратор, но я не назначаю время сам — лучше оставьте заявку, и он подтвердит визит.\n\nНапишите, пожалуйста, имя и возраст ученика.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Здравствуйте! Пробный урок бесплатный.\n\nНа месте вас встретит администратор, он подскажет всё по записи и группе. Адрес: пр. Республики 10.\n\nЕсли хотите, я могу передать заявку на пробный урок — напишите имя и возраст ученика.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Спасибо! Передал администратору — он свяжется, подтвердит время и подскажет, кого спросить на месте.",
+      "tool_calls": [
+       {
+        "name": "create_handoff",
+        "args": {
+         "reason": "question",
+         "summary": "Клиент хочет прийти на пробный урок завтра в 15:00 и спрашивает, кого спросить на месте. Нужен ответ по встрече и подтверждение, кого искать на месте."
+        }
+       }
+      ],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Спасибо! Передал администратору — он свяжется, подтвердит время и подберёт группу.",
+      "tool_calls": [
+       {
+        "name": "create_handoff",
+        "args": {
+         "reason": "question",
+         "summary": "Клиент хочет прийти на пробный урок завтра в 15:00 и спрашивает, кого спросить на месте."
+        }
+       }
+      ],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Здравствуйте! Пробный урок бесплатный.\n\nНа месте вас встретит администратор, он подскажет всё по уроку и группе. Адрес: пр. Республики 10.\n\nЕсли хотите, могу передать заявку на пробный урок — напишите имя и возраст ученика.",
+      "tool_calls": [],
+      "error": null
+     }
+    ]
+   },
+   "q1c_client_time_phone_repair": {
+    "pass": 8,
+    "n": 8,
+    "runs": [
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Спросите мастера по ремонту телефонов на месте.\n\nАдрес: ТЦ Азия, 2 этаж\nЧасы работы: 10:00–19:00\n\nПередал владельцу, он свяжется.",
+      "tool_calls": [
+       {
+        "name": "create_handoff",
+        "args": {
+         "reason": "order",
+         "name": "",
+         "phone": "",
+         "summary": "Клиент придёт завтра в 15:00, iPhone 11, нужна замена экрана. Спрашивает, кого спросить."
+        }
+       }
+      ],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Передал владельцу, он свяжется.\n\nПриходите в ТЦ Азия, 2 этаж, с 10:00 до 19:00.\nМастер посмотрит устройство и подтвердит точную цену и срок.",
+      "tool_calls": [
+       {
+        "name": "create_handoff",
+        "args": {
+         "reason": "order",
+         "name": null,
+         "phone": null,
+         "summary": "Клиент придёт завтра в 15:00 с iPhone 11, нужна замена экрана. Спрашивает, кого спросить."
+        }
+       }
+      ],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Подойдите к мастеру на месте, он вас сориентирует.\n\nТЦ Азия, 2 этаж\n10:00–19:00\n\nПередал владельцу, он свяжется.",
+      "tool_calls": [
+       {
+        "name": "create_handoff",
+        "args": {
+         "reason": "order",
+         "name": "",
+         "phone": "",
+         "summary": "Клиент планирует прийти завтра в 15:00. Устройство: iPhone 11. Нужен ремонт экрана. Спрашивает, кого спросить."
+        }
+       }
+      ],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Спросите мастера на месте.\n\nТЦ Азия, 2 этаж\n10:00–19:00\n\nПередал владельцу, он свяжется.",
+      "tool_calls": [
+       {
+        "name": "create_handoff",
+        "args": {
+         "reason": "order",
+         "name": null,
+         "phone": null,
+         "summary": "Клиент придёт завтра в 15:00 с iPhone 11 на замену экрана. Спрашивает, кого спросить."
+        }
+       }
+      ],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Спросите мастера по ремонту.\n\nАдрес: ТЦ Азия, 2 этаж\nЧасы работы: 10:00–19:00\n\nПередал владельцу, он свяжется.",
+      "tool_calls": [
+       {
+        "name": "create_handoff",
+        "args": {
+         "reason": "order",
+         "name": null,
+         "phone": null,
+         "summary": "Клиент придёт завтра в 15:00, iPhone 11, нужна замена экрана. Спрашивает, кого спросить."
+        }
+       }
+      ],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Спросите мастера на месте.\n\nТЦ Азия, 2 этаж\n10:00–19:00\n\nПередал владельцу, он свяжется.",
+      "tool_calls": [
+       {
+        "name": "create_handoff",
+        "args": {
+         "reason": "order",
+         "name": null,
+         "phone": null,
+         "summary": "Клиент придёт завтра в 15:00 с iPhone 11, нужна замена экрана. Спрашивает, кого спросить."
+        }
+       }
+      ],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Передал владельцу, он свяжется.\n\nАдрес: ТЦ Азия, 2 этаж\nЧасы работы: 10:00–19:00\nМастер посмотрит устройство и подтвердит точную цену и срок.",
+      "tool_calls": [
+       {
+        "name": "create_handoff",
+        "args": {
+         "reason": "order",
+         "name": null,
+         "phone": null,
+         "summary": "Клиент придёт завтра в 15:00 с iPhone 11, нужна замена экрана. Спрашивает, кого спросить."
+        }
+       }
+      ],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Спросите мастера по ремонту.\n\nАдрес: ТЦ Азия, 2 этаж\nЧасы работы: 10:00–19:00\n\nПередал владельцу, он свяжется.",
+      "tool_calls": [
+       {
+        "name": "create_handoff",
+        "args": {
+         "reason": "order",
+         "name": "",
+         "phone": "",
+         "summary": "Клиент придёт завтра в 15:00, iPhone 11, нужна замена экрана. Спрашивает, кого спросить."
+        }
+       }
+      ],
+      "error": null
+     }
+    ]
+   },
+   "q1c_client_time_history_phone_repair": {
+    "pass": 8,
+    "n": 8,
+    "runs": [
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Подойти можно в часы работы:\n10:00–19:00\n\nАдрес:\nТЦ Азия, 2 этаж\n\nМастер посмотрит устройство и подтвердит точную цену и срок.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Приходите в часы работы: 10:00–19:00.\nАдрес: ТЦ Азия, 2 этаж\n\nМастер посмотрит устройство и подтвердит точную цену и срок.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Подойти можно в часы работы:\n10:00–19:00\n\nАдрес:\nТЦ Азия, 2 этаж\n\nМастер посмотрит устройство и подтвердит точную цену и срок.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Подойти можно в часы работы:\n10:00–19:00\n\nАдрес:\nТЦ Азия, 2 этаж\n\nМастер посмотрит устройство и подтвердит точную цену и срок.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Подойти можно в часы работы:\n10:00–19:00\n\nАдрес:\nТЦ Азия, 2 этаж\n\nМастер посмотрит устройство и подтвердит точную цену и срок.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Подходите в часы работы: 10:00–19:00.\n\nАдрес: ТЦ Азия, 2 этаж\n\nМастер посмотрит устройство и подтвердит точную цену и срок.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Подойти можно в часы работы:\n10:00–19:00\n\nАдрес:\nТЦ Азия, 2 этаж\n\nМастер посмотрит устройство и подтвердит точную цену и срок.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Подойти можно в часы работы:\n10:00–19:00\n\nАдрес:\nТЦ Азия, 2 этаж\n\nМастер посмотрит устройство и подтвердит точную цену и срок.",
+      "tool_calls": [],
+      "error": null
+     }
+    ]
+   },
+   "q1p_delivery_flowers": {
+    "pass": 0,
+    "n": 8,
+    "runs": [
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:19": true,
+       "mentions:Санжар": false
+      },
+      "text": "К 19:00.\nПо доставке заранее позвонит флорист.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:19": true,
+       "mentions:Санжар": false
+      },
+      "text": "К 19:00.\n\nНо точное время доставки подтвердит флорист при оформлении заказа.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:19": true,
+       "mentions:Санжар": false
+      },
+      "text": "К 19:00.\nТочное время доставки флорист подтвердит при оформлении.\n\nПо звонку: я не могу обещать, кто именно позвонит без подтверждения заказа. Если хотите, оформлю заявку на букет 25 роз и передам флористу.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:19": true,
+       "mentions:Санжар": false
+      },
+      "text": "К 19:00.\nТочное время доставки подтвердит флорист, а перед приездом позвонит курьер.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:19": true,
+       "mentions:Санжар": false
+      },
+      "text": "К 19:00.\n\nЗа 30 минут позвонит курьер.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:19": true,
+       "mentions:Санжар": false
+      },
+      "text": "К 19:00.\n\nНо точное время доставки флорист подтвердит при оформлении.\n",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:19": true,
+       "mentions:Санжар": false
+      },
+      "text": "К 19:00.\n\nНо точное время доставки подтвердит флорист при оформлении.\n",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:19": true,
+       "mentions:Санжар": false
+      },
+      "text": "К 19:00.\n\nНо точное время доставки флорист подтвердит при оформлении.\n",
+      "tool_calls": [],
+      "error": null
+     }
+    ]
+   },
+   "q1p_meeting_wholesale": {
+    "pass": 8,
+    "n": 8,
+    "runs": [
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:Складская": true,
+       "mentions:Бекзат": true
+      },
+      "text": "Адрес склада: ул. Складская 5\n\nСпросить Бекзата",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:Складская": true,
+       "mentions:Бекзат": true
+      },
+      "text": "Адрес склада: ул. Складская 5\n\nСпросить Бекзата",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:Складская": true,
+       "mentions:Бекзат": true
+      },
+      "text": "Адрес склада: ул. Складская 5.\nСпросить Бекзата.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:Складская": true,
+       "mentions:Бекзат": true
+      },
+      "text": "Адрес склада: ул. Складская 5.\nСпросить Бекзата.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:Складская": true,
+       "mentions:Бекзат": true
+      },
+      "text": "Адрес склада: ул. Складская 5.\nСпросить Бекзата.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:Складская": true,
+       "mentions:Бекзат": true
+      },
+      "text": "Адрес склада: ул. Складская 5\n\nСпросить Бекзата",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:Складская": true,
+       "mentions:Бекзат": true
+      },
+      "text": "Адрес склада: ул. Складская 5\nСпросить Бекзата",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:Складская": true,
+       "mentions:Бекзат": true
+      },
+      "text": "Адрес склада: ул. Складская 5\nСпросить Бекзата",
+      "tool_calls": [],
+      "error": null
+     }
+    ]
+   }
+  }
+ },
+ "usd": 0.06808725
+}

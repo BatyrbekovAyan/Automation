@@ -1,0 +1,4042 @@
+{
+ "variants": {
+  "HEAD": [],
+  "F1-mem": [
+   {
+    "file": "_core.md",
+    "old": "Память. Chat Memory хранит переписку этого чата: сообщения клиента, твои ответы и ответы владельца, когда они прошли через приложение или телефон. Веди диалог с учётом контекста; чего в памяти нет — не утверждай, что этого не было, а уточни.",
+    "new": "Память. Chat Memory хранит переписку этого чата: сообщения клиента, твои ответы и ответы владельца, когда они прошли через приложение или телефон. Ответы владельца стоят в истории так же, как твои прежние ответы. Сам ты время не назначаешь и бронь не подтверждаешь — поэтому конкретная договорённость, которую сторона бизнеса уже дала этому клиенту в этом чате (день и время визита, к кому обратиться, где встретиться), — это слова владельца, она уже подтверждена. Клиент переспрашивает о ней — повтори её как есть: не заменяй часами работы или адресом из About Business и не говори, что её нет в данных. Новое время сам не назначай и договорённость не меняй. Веди диалог с учётом контекста; чего в памяти нет — не утверждай, что этого не было, а уточни."
+   }
+  ],
+  "F2-mem+bullets": [
+   {
+    "file": "_core.md",
+    "old": "Память. Chat Memory хранит переписку этого чата: сообщения клиента, твои ответы и ответы владельца, когда они прошли через приложение или телефон. Веди диалог с учётом контекста; чего в памяти нет — не утверждай, что этого не было, а уточни.",
+    "new": "Память. Chat Memory хранит переписку этого чата: сообщения клиента, твои ответы и ответы владельца, когда они прошли через приложение или телефон. Ответы владельца стоят в истории так же, как твои прежние ответы. Сам ты время не назначаешь и бронь не подтверждаешь — поэтому конкретная договорённость, которую сторона бизнеса уже дала этому клиенту в этом чате (день и время визита, к кому обратиться, где встретиться), — это слова владельца, она уже подтверждена. Клиент переспрашивает о ней — повтори её как есть: не заменяй часами работы или адресом из About Business и не говори, что её нет в данных. Новое время сам не назначай и договорённость не меняй. Веди диалог с учётом контекста; чего в памяти нет — не утверждай, что этого не было, а уточни."
+   },
+   {
+    "file": "_core.md",
+    "old": "не подтверждай бронь и не назначай время — только принимай заявку, владелец подтвердит.",
+    "new": "не подтверждай бронь и не назначай время — только принимай заявку, владелец подтвердит (повторить договорённость, которую владелец уже дал в этом чате, можно — см. «Память»)."
+   },
+   {
+    "file": "_universal.md",
+    "old": "— Не подтверждать бронь, запись или точное время — только принять заявку, подтверждает человек.",
+    "new": "— Не подтверждать бронь, запись или точное время — только принять заявку, подтверждает человек. Договорённость, которую владелец уже дал в этом чате, повторять можно — это не новое подтверждение."
+   }
+  ],
+  "F3-+pr": [
+   {
+    "file": "_core.md",
+    "old": "Память. Chat Memory хранит переписку этого чата: сообщения клиента, твои ответы и ответы владельца, когда они прошли через приложение или телефон. Веди диалог с учётом контекста; чего в памяти нет — не утверждай, что этого не было, а уточни.",
+    "new": "Память. Chat Memory хранит переписку этого чата: сообщения клиента, твои ответы и ответы владельца, когда они прошли через приложение или телефон. Ответы владельца стоят в истории так же, как твои прежние ответы. Сам ты время не назначаешь и бронь не подтверждаешь — поэтому конкретная договорённость, которую сторона бизнеса уже дала этому клиенту в этом чате (день и время визита, к кому обратиться, где встретиться), — это слова владельца, она уже подтверждена. Клиент переспрашивает о ней — повтори её как есть: не заменяй часами работы или адресом из About Business и не говори, что её нет в данных. Новое время сам не назначай и договорённость не меняй. Веди диалог с учётом контекста; чего в памяти нет — не утверждай, что этого не было, а уточни."
+   },
+   {
+    "file": "_core.md",
+    "old": "не подтверждай бронь и не назначай время — только принимай заявку, владелец подтвердит.",
+    "new": "не подтверждай бронь и не назначай время — только принимай заявку, владелец подтвердит (повторить договорённость, которую владелец уже дал в этом чате, можно — см. «Память»)."
+   },
+   {
+    "file": "_universal.md",
+    "old": "— Не подтверждать бронь, запись или точное время — только принять заявку, подтверждает человек.",
+    "new": "— Не подтверждать бронь, запись или точное время — только принять заявку, подтверждает человек. Договорённость, которую владелец уже дал в этом чате, повторять можно — это не новое подтверждение."
+   },
+   {
+    "file": "phone_repair.md",
+    "old": "назови адрес и часы работы (из About Business), ",
+    "new": "назови адрес и часы работы (из About Business) — а если день и время визита уже согласованы в этом чате, назови их, "
+   }
+  ],
+  "F4-+data": [
+   {
+    "file": "_core.md",
+    "old": "Память. Chat Memory хранит переписку этого чата: сообщения клиента, твои ответы и ответы владельца, когда они прошли через приложение или телефон. Веди диалог с учётом контекста; чего в памяти нет — не утверждай, что этого не было, а уточни.",
+    "new": "Память. Chat Memory хранит переписку этого чата: сообщения клиента, твои ответы и ответы владельца, когда они прошли через приложение или телефон. Ответы владельца стоят в истории так же, как твои прежние ответы. Сам ты время не назначаешь и бронь не подтверждаешь — поэтому конкретная договорённость, которую сторона бизнеса уже дала этому клиенту в этом чате (день и время визита, к кому обратиться, где встретиться), — это слова владельца, она уже подтверждена. Клиент переспрашивает о ней — повтори её как есть: не заменяй часами работы или адресом из About Business и не говори, что её нет в данных. Новое время сам не назначай и договорённость не меняй. Веди диалог с учётом контекста; чего в памяти нет — не утверждай, что этого не было, а уточни."
+   },
+   {
+    "file": "_core.md",
+    "old": "не подтверждай бронь и не назначай время — только принимай заявку, владелец подтвердит.",
+    "new": "не подтверждай бронь и не назначай время — только принимай заявку, владелец подтвердит (повторить договорённость, которую владелец уже дал в этом чате, можно — см. «Память»)."
+   },
+   {
+    "file": "_universal.md",
+    "old": "— Не подтверждать бронь, запись или точное время — только принять заявку, подтверждает человек.",
+    "new": "— Не подтверждать бронь, запись или точное время — только принять заявку, подтверждает человек. Договорённость, которую владелец уже дал в этом чате, повторять можно — это не новое подтверждение."
+   },
+   {
+    "file": "phone_repair.md",
+    "old": "назови адрес и часы работы (из About Business), ",
+    "new": "назови адрес и часы работы (из About Business) — а если день и время визита уже согласованы в этом чате, назови их, "
+   },
+   {
+    "file": "_core.md",
+    "old": "Отвечай на такие вопросы ТОЛЬКО по этим данным.",
+    "new": "Отвечай на такие вопросы ТОЛЬКО по этим данным — и по договорённостям, которые владелец уже дал этому клиенту в этом чате (см. «Память»)."
+   }
+  ]
+ },
+ "results": {
+  "HEAD": {
+   "a6_owner_agreement_flowers": {
+    "pass": 5,
+    "n": 6,
+    "runs": [
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:15": false,
+       "mentions:Марин": false
+      },
+      "text": "Завтра можно подъехать в часы работы с 10:00 до 20:00.\n\nАдрес: ул. Абая 1, Астана\nСпросить можно флориста, если нужен конкретный человек — уточните, и я передам заявку.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:15": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 15:00, спросите Марину.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:15": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 15:00, спросите Марину.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:15": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 15:00, спросите Марину.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:15": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 15:00, спросите Марину.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:15": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 15:00, спросите Марину.",
+      "tool_calls": [],
+      "error": null
+     }
+    ]
+   },
+   "a6_owner_agreement_education": {
+    "pass": 0,
+    "n": 6,
+    "runs": [
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:15": false,
+       "mentions:Марин": false
+      },
+      "text": "Я не вижу подтверждённого времени и имени из данных.\n\nАдрес: пр. Республики 10\nЧасы работы: 9:00–20:00\n\nЕсли хотите, я передам администратору, чтобы он уточнил точное время и кого спросить.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:15": false,
+       "mentions:Марин": false
+      },
+      "text": "Я не вижу подтверждённого времени и имени из переписки.\n\nАдрес: пр. Республики 10\nЧасы работы: 9:00–20:00\n\nЕсли хотите, я передам администратору, он уточнит точное время и кого спросить. Напишите, пожалуйста, ваше имя и номер телефона.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:15": false,
+       "mentions:Марин": false
+      },
+      "text": "Я не вижу подтверждённого времени и имени из данных.\n\nАдрес: пр. Республики 10\nЧасы работы: 9:00–20:00\n\nЕсли хотите, я передам ваш вопрос администратору — он уточнит, во сколько подойти и кого спросить. Напишите, пожалуйста, ваше имя и номер телефона.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:15": false,
+       "mentions:Марин": false
+      },
+      "text": "Я не вижу подтверждённого времени и имени, кого спросить.\n\nМогу передать администратору, он уточнит и свяжется с вами. Напишите, пожалуйста, ваше имя и номер телефона.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:15": false,
+       "mentions:Марин": false
+      },
+      "text": "Я не вижу подтверждённого времени и имени, кого спросить.\n\nНапишите, пожалуйста, имя и номер телефона ученика — администратор уточнит и свяжется с вами.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:15": false,
+       "mentions:Марин": false
+      },
+      "text": "Я не вижу подтверждённого времени и имени для вашего визита.\n\nМогу передать администратору, он уточнит и свяжется с вами.\nНапишите, пожалуйста, ваше имя и номер телефона.",
+      "tool_calls": [],
+      "error": null
+     }
+    ]
+   },
+   "a6_owner_agreement_phone_repair": {
+    "pass": 0,
+    "n": 6,
+    "runs": [
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:15": false,
+       "mentions:Марин": false
+      },
+      "text": "У нас часы работы: 10:00–19:00\n\nАдрес: ТЦ Азия, 2 этаж\n\nКого спросить — уточните, пожалуйста, имя или номер телефона, и я передам вопрос мастеру.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:15": false,
+       "mentions:Марин": false
+      },
+      "text": "Уточните, пожалуйста, модель устройства и что нужно сделать — тогда подскажу по ремонту и сориентирую по приёму.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:15": false,
+       "mentions:Марин": false
+      },
+      "text": "У нас часы работы: 10:00–19:00\n\nАдрес: ТЦ Азия, 2 этаж\n\nСпросите мастера или администратора.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:15": false,
+       "mentions:Марин": false
+      },
+      "text": "У нас часы работы: 10:00–19:00\n\nАдрес: ТЦ Азия, 2 этаж\n\nСпросите мастера или администратора.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:15": false,
+       "mentions:Марин": false
+      },
+      "text": "Уточните, пожалуйста, модель устройства и что нужно сделать — тогда подскажу по ремонту и сориентирую по приёму.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:15": false,
+       "mentions:Марин": false
+      },
+      "text": "Подойти можно с 10:00 до 19:00.\n\nАдрес: ТЦ Азия, 2 этаж\n\nСпросить можно мастера на месте.",
+      "tool_calls": [],
+      "error": null
+     }
+    ]
+   },
+   "q1p_visit_phone_repair": {
+    "pass": 0,
+    "n": 6,
+    "runs": [
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:Ерлан": false,
+       "mentions:двор": false
+      },
+      "text": "Адрес: ТЦ Азия, 2 этаж\n\nТелефон: +7 705 444 55 66\nЧасы работы: 10:00–19:00\n\nПо поводу входа и к кому обратиться лучше уточнит мастер при приёме.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:Ерлан": false,
+       "mentions:двор": false
+      },
+      "text": "Адрес: ТЦ Азия, 2 этаж\n\nЧасы работы: 10:00–19:00\nТелефон: +7 705 444 55 66\n\nПо поводу входа и к кому обратиться лучше уточнит мастер при приёме.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:Ерлан": false,
+       "mentions:двор": false
+      },
+      "text": "Адрес: ТЦ Азия, 2 этаж\n\nТелефон: +7 705 444 55 66\nЧасы работы: 10:00–19:00\n\nПо поводу мастера и входа лучше уточнить на месте у администратора.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:Ерлан": false,
+       "mentions:двор": false
+      },
+      "text": "Адрес: ТЦ Азия, 2 этаж\n\nЧасы работы: 10:00–19:00\n\nПо входу и к кому именно обратиться уточнит мастер при приёме.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:Ерлан": false,
+       "mentions:двор": false
+      },
+      "text": "Адрес: ТЦ Азия, 2 этаж\n\nТелефон: +7 705 444 55 66\nЧасы работы: 10:00–19:00\n\nПо поводу входа и к кому обратиться — это уточнит мастер при приёме.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:Ерлан": false,
+       "mentions:двор": false
+      },
+      "text": "Адрес: ТЦ Азия, 2 этаж\n\nТелефон: +7 705 444 55 66\nЧасы работы: 10:00–19:00\n\nПо входу и к кому именно подойти лучше уточнить по телефону, вам подскажут на месте.",
+      "tool_calls": [],
+      "error": null
+     }
+    ]
+   },
+   "q1p_trial_education": {
+    "pass": 0,
+    "n": 6,
+    "runs": [
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:сред": false,
+       "mentions:204": false
+      },
+      "text": "Я не могу подтвердить день и кабинет без заявки от администратора.\n\nПробный урок бесплатный, для записи напишите, пожалуйста:\nимя и возраст сына\nкурс: английский\nномер телефона\n\nПосле этого передам заявку администратору.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:сред": false,
+       "mentions:204": false
+      },
+      "text": "Я не могу подтвердить день и кабинет без заявки от администратора.\n\nПробный урок бесплатный.\nЧтобы записать сына, напишите, пожалуйста, его имя и возраст.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:сред": false,
+       "mentions:204": false
+      },
+      "text": "Я не могу подтвердить день и кабинет без заявки от администратора.\n\nПробный урок бесплатный.\nЕсли хотите, передам заявку — напишите имя и возраст сына.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:сред": false,
+       "mentions:204": false
+      },
+      "text": "Я не могу подтвердить день и кабинет без заявки от администратора.\n\nПробный урок бесплатный.\nЕсли хотите, запишу сына на пробный урок — напишите его имя и возраст.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:сред": false,
+       "mentions:204": false
+      },
+      "text": "Я не могу сам подтвердить день и кабинет.\n\nПробный урок бесплатный, но время и группу подтвердит администратор.\nНапишите, пожалуйста, имя и возраст сына — передам заявку.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:сред": false,
+       "mentions:204": false
+      },
+      "text": "Я не могу подтвердить день и кабинет без заявки от администратора.\n\nПробный урок бесплатный, а точное время и место подтвердит администратор. Если хотите, запишу сына на пробный урок.",
+      "tool_calls": [],
+      "error": null
+     }
+    ]
+   },
+   "q1p_early_phone_repair": {
+    "pass": 0,
+    "n": 6,
+    "runs": [
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:9": false,
+       "mentions:Марин": false
+      },
+      "text": "С 10:00 до 19:00\n\nАдрес: ТЦ Азия, 2 этаж\n\nКто откроет — уточнит мастер при приёме.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:9": false,
+       "mentions:Марин": false
+      },
+      "text": "Сервис работает с 10:00 до 19:00.\n\nАдрес: ТЦ Азия, 2 этаж\nОткроет мастер/администратор на месте.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:9": false,
+       "mentions:Марин": false
+      },
+      "text": "Сервис работает с 10:00 до 19:00.\n\nАдрес: ТЦ Азия, 2 этаж\n\nЕсли хотите, могу передать заявку мастеру.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:9": false,
+       "mentions:Марин": false
+      },
+      "text": "Сервис работает с 10:00 до 19:00.\n\nАдрес: ТЦ Азия, 2 этаж\n\nКто откроет — уточнит мастер при приёме.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:9": false,
+       "mentions:Марин": false
+      },
+      "text": "Сервис работает с 10:00 до 19:00.\n\nКто откроет — уточнит мастер на месте.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:9": false,
+       "mentions:Марин": false
+      },
+      "text": "Сервис работает с 10:00 до 19:00.\n\nАдрес: ТЦ Азия, 2 этаж\n\nКто откроет — уточнит мастер при приёме.",
+      "tool_calls": [],
+      "error": null
+     }
+    ]
+   },
+   "q1c_no_agreement_phone_repair": {
+    "pass": 6,
+    "n": 6,
+    "runs": [
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Подойти можно с 10:00 до 19:00.\n\nАдрес: ТЦ Азия, 2 этаж\n\nСпросить мастера или администратора.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Мы работаем с 10:00 до 19:00.\n\nАдрес: ТЦ Азия, 2 этаж\n\nСпросите мастера на месте.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Мы работаем с 10:00 до 19:00.\n\nАдрес: ТЦ Азия, 2 этаж\n\nСпросите мастера на месте.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Мы работаем с 10:00 до 19:00.\n\nАдрес: ТЦ Азия, 2 этаж\n\nСпросите мастера.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Мы работаем с 10:00 до 19:00.\n\nАдрес: ТЦ Азия, 2 этаж\n\nСпросите мастера по ремонту.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Мы работаем с 10:00 до 19:00.\n\nАдрес: ТЦ Азия, 2 этаж\n\nСпросите мастера на месте.",
+      "tool_calls": [],
+      "error": null
+     }
+    ]
+   },
+   "q1c_no_agreement_education": {
+    "pass": 6,
+    "n": 6,
+    "runs": [
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Подойти можно в часы работы: 9:00–20:00.\n\nАдрес: пр. Республики 10\n\nСпросить администратора.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Подойти можно в часы работы: 9:00–20:00.\n\nАдрес: пр. Республики 10\n\nСпросить администратора.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Адрес: пр. Республики 10\nЧасы работы: 9:00–20:00\n\nПодойти можно в любое удобное время в эти часы, а на месте вас встретит администратор.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Адрес: пр. Республики 10\n\nЧасы работы: 9:00–20:00\n\nПодойти можно в это время, а кого именно спросить — уточнит администратор. Если хотите, я передам ваш вопрос и номер телефона.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Подойти можно в часы работы: 9:00–20:00.\n\nАдрес: пр. Республики 10\n\nСпросить администратора.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Подойти можно в часы работы: 9:00–20:00.\n\nАдрес: пр. Республики 10\n\nСпросить администратора.",
+      "tool_calls": [],
+      "error": null
+     }
+    ]
+   },
+   "q1c_client_time_education": {
+    "pass": 6,
+    "n": 6,
+    "runs": [
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Спасибо! Передал администратору — он свяжется, подтвердит время и подскажет, кого спросить на месте.",
+      "tool_calls": [
+       {
+        "name": "create_handoff",
+        "args": {
+         "reason": "order",
+         "summary": "Клиент хочет прийти на пробный урок завтра в 15:00 и спрашивает, кого спросить на месте. Нужна запись и подтверждение времени администратором."
+        }
+       }
+      ],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Спасибо! Передал администратору — он свяжется, подтвердит время и подберёт группу.",
+      "tool_calls": [
+       {
+        "name": "create_handoff",
+        "args": {
+         "reason": "question",
+         "summary": "Клиент хочет прийти на пробный урок завтра в 15:00 и спрашивает, кого спросить на месте."
+        }
+       }
+      ],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Спасибо! Передал администратору — он свяжется, подтвердит время и подберёт группу.",
+      "tool_calls": [
+       {
+        "name": "create_handoff",
+        "args": {
+         "reason": "order",
+         "summary": "Клиент хочет прийти на пробный урок завтра в 15:00 и спрашивает, кого спросить на месте. Нужна запись и подтверждение времени администратором.",
+         "name": ""
+        }
+       }
+      ],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Спасибо! Передал администратору — он свяжется, подтвердит время и подберёт группу.",
+      "tool_calls": [
+       {
+        "name": "create_handoff",
+        "args": {
+         "reason": "order",
+         "summary": "Клиент хочет прийти на пробный урок завтра в 15:00 и уточняет, кого спросить на месте."
+        }
+       }
+      ],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Спасибо! Передал администратору — он свяжется, подтвердит время и подберёт группу.",
+      "tool_calls": [
+       {
+        "name": "create_handoff",
+        "args": {
+         "reason": "order",
+         "summary": "Клиент хочет прийти на пробный урок завтра в 15:00 и спрашивает, кого спросить на месте. Нужна запись и подтверждение времени.",
+         "name": ""
+        }
+       }
+      ],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Спасибо! Передал администратору — он свяжется, подтвердит время и подберёт группу.",
+      "tool_calls": [
+       {
+        "name": "create_handoff",
+        "args": {
+         "reason": "order",
+         "summary": "Клиент хочет прийти на пробный урок завтра в 15:00 и уточняет, кого спросить на месте. Нужна запись на пробный урок и подтверждение деталей."
+        }
+       }
+      ],
+      "error": null
+     }
+    ]
+   },
+   "q1c_client_time_phone_repair": {
+    "pass": 6,
+    "n": 6,
+    "runs": [
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Подойдите к мастеру на месте, он вас сориентирует.\n\nАдрес: ТЦ Азия, 2 этаж\nЧасы работы: 10:00–19:00\n\nПередал владельцу, он свяжется.",
+      "tool_calls": [
+       {
+        "name": "create_handoff",
+        "args": {
+         "reason": "order",
+         "name": null,
+         "phone": null,
+         "summary": "Клиент придёт завтра в 15:00 с iPhone 11, нужна замена экрана. Спрашивает, кого спросить."
+        }
+       }
+      ],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Спросите мастера на месте.\n\nТЦ Азия, 2 этаж\n10:00–19:00\n\nМастер посмотрит устройство и подтвердит точную цену и срок.",
+      "tool_calls": [
+       {
+        "name": "create_handoff",
+        "args": {
+         "reason": "order",
+         "name": null,
+         "phone": null,
+         "summary": "Клиент придёт завтра в 15:00 с iPhone 11, нужна замена экрана. Спрашивает, кого спросить."
+        }
+       }
+      ],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Спросите мастера на месте.\n\nТЦ Азия, 2 этаж\n10:00–19:00\n\nМастер посмотрит устройство и подтвердит точную цену и срок.",
+      "tool_calls": [
+       {
+        "name": "create_handoff",
+        "args": {
+         "reason": "order",
+         "name": null,
+         "phone": null,
+         "summary": "Клиент придёт завтра в 15:00 с iPhone 11, нужна замена экрана. Спрашивает, кого спросить."
+        }
+       }
+      ],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Спросите мастера на месте.\n\nТЦ Азия, 2 этаж\n10:00–19:00\n\nМастер посмотрит устройство и подтвердит точную цену и срок.",
+      "tool_calls": [
+       {
+        "name": "create_handoff",
+        "args": {
+         "reason": "order",
+         "name": null,
+         "phone": null,
+         "summary": "Клиент придёт завтра в 15:00, iPhone 11, нужна замена экрана. Спрашивает, кого спросить."
+        }
+       }
+      ],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Спросите мастера на месте.\n\nТЦ Азия, 2 этаж\n10:00–19:00\n\nПередал владельцу, он свяжется.",
+      "tool_calls": [
+       {
+        "name": "create_handoff",
+        "args": {
+         "reason": "order",
+         "name": null,
+         "phone": null,
+         "summary": "Клиент придёт завтра в 15:00, iPhone 11, замена экрана. Спрашивает, кого спросить."
+        }
+       }
+      ],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Спросите мастера на месте.\n\nТЦ Азия, 2 этаж\n10:00–19:00\n\nПередал владельцу, он свяжется.",
+      "tool_calls": [
+       {
+        "name": "create_handoff",
+        "args": {
+         "reason": "order",
+         "name": null,
+         "phone": null,
+         "summary": "Клиент придёт завтра в 15:00, iPhone 11, замена экрана. Спрашивает, кого спросить."
+        }
+       }
+      ],
+      "error": null
+     }
+    ]
+   }
+  },
+  "F1-mem": {
+   "a6_owner_agreement_flowers": {
+    "pass": 6,
+    "n": 6,
+    "runs": [
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:15": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 15:00, спросите Марину.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:15": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 15:00, спросите Марину.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:15": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 15:00, спросите Марину.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:15": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 15:00, спросить Марину.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:15": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 15:00, спросите Марину.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:15": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 15:00, спросите Марину.",
+      "tool_calls": [],
+      "error": null
+     }
+    ]
+   },
+   "a6_owner_agreement_education": {
+    "pass": 6,
+    "n": 6,
+    "runs": [
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:15": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 15:00, спросите Марину.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:15": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 15:00, спросите Марину.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:15": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 15:00, спросите Марину.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:15": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 15:00, спросите Марину.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:15": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 15:00, спросите Марину.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:15": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 15:00, спросите Марину.",
+      "tool_calls": [],
+      "error": null
+     }
+    ]
+   },
+   "a6_owner_agreement_phone_repair": {
+    "pass": 6,
+    "n": 6,
+    "runs": [
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:15": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 15:00.\nСпросите Марину.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:15": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 15:00.\nСпросите Марину.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:15": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 15:00, спросите Марину.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:15": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 15:00, спросите Марину.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:15": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 15:00, спросите Марину.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:15": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 15:00, спросите Марину.",
+      "tool_calls": [],
+      "error": null
+     }
+    ]
+   },
+   "q1p_visit_phone_repair": {
+    "pass": 4,
+    "n": 6,
+    "runs": [
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:Ерлан": true,
+       "mentions:двор": true
+      },
+      "text": "Обратитесь к мастеру Ерлану.\n\nЗаходить со двора.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:Ерлан": false,
+       "mentions:двор": false
+      },
+      "text": "ТЦ Азия, 2 этаж\nТелефон: +7 705 444 55 66\nЧасы работы: 10:00–19:00\n\nПо поводу к кому обратиться и с какого входа заходить — уточнит мастер при приёме.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:Ерлан": true,
+       "mentions:двор": true
+      },
+      "text": "Обратитесь к Ерлану.\nВход со двора.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:Ерлан": true,
+       "mentions:двор": true
+      },
+      "text": "Обратитесь к мастеру Ерлану.\nВход со двора.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:Ерлан": true,
+       "mentions:двор": true
+      },
+      "text": "Обратитесь к Ерлану.\n\nЗаходить со двора.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:Ерлан": false,
+       "mentions:двор": false
+      },
+      "text": "ТЦ Азия, 2 этаж\n\nТелефон: +7 705 444 55 66\nЧасы работы: 10:00–19:00\n\nПо поводу к кому обратиться и с какого входа заходить — уточнит мастер при приёме.",
+      "tool_calls": [],
+      "error": null
+     }
+    ]
+   },
+   "q1p_trial_education": {
+    "pass": 2,
+    "n": 6,
+    "runs": [
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:сред": false,
+       "mentions:204": false
+      },
+      "text": "Я не вижу подтверждённой записи в переписке.\n\nПробный урок бесплатный, но день и кабинет администратор подтвердит после заявки.\n\nНапишите, пожалуйста, имя и возраст сына.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:сред": true,
+       "mentions:204": true
+      },
+      "text": "В среду, в кабинете 204.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:сред": false,
+       "mentions:204": false
+      },
+      "text": "Я не вижу подтверждённой записи на конкретный день и кабинет в данных.\n\nПробный урок бесплатный, адрес: пр. Республики 10\nЧтобы администратор уточнил время и кабинет, напишите, пожалуйста, имя и возраст сына.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:сред": false,
+       "mentions:204": false
+      },
+      "text": "Я не вижу подтверждённой записи в данных. Пробный урок бесплатный, а день и кабинет подтвердит администратор.\n\nНапишите, пожалуйста, имя и возраст сына, и номер телефона — передам заявку.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:сред": false,
+       "mentions:204": false
+      },
+      "text": "Я не вижу подтверждённой записи в этом чате, поэтому не могу назвать день и кабинет как факт.\n\nПробный урок бесплатный.\nАдрес: пр. Республики 10\nТелефон администратора: +7 702 333 44 55\n\nЕсли хотите, я передам заявку на пробный урок. Напишите имя и возраст сына.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:сред": true,
+       "mentions:204": true
+      },
+      "text": "В среду, кабинет 204.",
+      "tool_calls": [],
+      "error": null
+     }
+    ]
+   },
+   "q1p_early_phone_repair": {
+    "pass": 6,
+    "n": 6,
+    "runs": [
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:9": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 9:00.\nОткроет Марина.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:9": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 9:00.\nОткроет Марина.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:9": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 9:00.\nОткроет Марина.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:9": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 9:00.\nОткроет Марина.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:9": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 9:00\nОткроет Марина",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:9": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 9:00\nОткроет Марина",
+      "tool_calls": [],
+      "error": null
+     }
+    ]
+   },
+   "q1c_no_agreement_phone_repair": {
+    "pass": 6,
+    "n": 6,
+    "runs": [
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Уточните, пожалуйста, на какой день и время вы договаривались — я посмотрю по переписке и напомню.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "У меня в переписке нет подтверждённого времени и имени мастера для вас.\n\nАдрес: ТЦ Азия, 2 этаж\nЧасы работы: 10:00–19:00\n\nЕсли хотите, могу передать вопрос владельцу — напишите ваше имя и номер телефона.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Уточните, пожалуйста, на какое время вам назначали визит — я не вижу в переписке подтверждённой договорённости.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "У вас в переписке нет подтверждённого времени визита и имени мастера.\n\nАдрес:\nТЦ Азия, 2 этаж\n\nЧасы работы:\n10:00–19:00\n\nЕсли хотите, могу передать заявку мастеру — напишите модель устройства, что случилось, ваше имя и номер телефона.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "У меня в переписке нет подтверждённого времени и имени мастера.\n\nАдрес:\nТЦ Азия, 2 этаж\n\nЧасы работы:\n10:00–19:00\n\nЕсли хотите, я передам ваш вопрос мастеру — напишите имя и номер телефона.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Уточните, пожалуйста, на какое время вы договаривались — я посмотрю по переписке и напишу, к кому подойти.",
+      "tool_calls": [],
+      "error": null
+     }
+    ]
+   },
+   "q1c_no_agreement_education": {
+    "pass": 6,
+    "n": 6,
+    "runs": [
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "У нас часы работы с 9:00 до 20:00.\n\nАдрес: пр. Республики 10\n\nКого спросить, уточнит администратор — напишите, пожалуйста, ваше имя и номер телефона, и я передам вопрос.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "У нас адрес: пр. Республики 10\nЧасы работы: 9:00–20:00\n\nКого именно спросить, уточнит администратор. Напишите, пожалуйста, ваше имя и номер телефона — передам вопрос.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Уточните, пожалуйста, ваше имя и номер телефона — я передам администратору, он подтвердит время и подскажет, кого спросить.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Вы можете подойти к нам с 9:00 до 20:00 по адресу: пр. Республики 10.\n\nЕсли хотите, я передам администратору ваш номер, и он уточнит удобное время и подскажет, кого лучше спросить.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Вы можете подойти к нам с 9:00 до 20:00 по адресу: пр. Республики 10.\n\nЕсли хотите, я передам администратору ваш вопрос и он уточнит, к кому лучше подойти. Напишите, пожалуйста, ваше имя и номер телефона.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Вы можете подойти к нам с 9:00 до 20:00 по адресу: пр. Республики 10.\n\nЕсли хотите, я передам администратору ваш вопрос, и он уточнит, кого лучше спросить. Напишите, пожалуйста, ваше имя и номер телефона.",
+      "tool_calls": [],
+      "error": null
+     }
+    ]
+   },
+   "q1c_client_time_education": {
+    "pass": 6,
+    "n": 6,
+    "runs": [
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Спасибо! Передал администратору — он свяжется, подтвердит время и подберёт группу.",
+      "tool_calls": [
+       {
+        "name": "create_handoff",
+        "args": {
+         "reason": "order",
+         "summary": "Клиент хочет прийти на пробный урок завтра в 15:00 и спрашивает, кого спросить на месте. Нужна подтверждающая информация и запись на пробный урок.",
+         "name": ""
+        }
+       }
+      ],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Спасибо! Передал администратору — он свяжется, подтвердит время и подберёт группу.",
+      "tool_calls": [
+       {
+        "name": "create_handoff",
+        "args": {
+         "reason": "order",
+         "summary": "Клиент хочет прийти на пробный урок завтра в 15:00 и спрашивает, кого спросить на месте. Нужна передача администратору для подтверждения визита и подсказки по встрече."
+        }
+       }
+      ],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Спасибо! Передал администратору — он свяжется, подтвердит время и подберёт группу.",
+      "tool_calls": [
+       {
+        "name": "create_handoff",
+        "args": {
+         "reason": "order",
+         "summary": "Клиент хочет прийти на пробный урок завтра в 15:00 и спрашивает, кого спросить на месте. Нужна запись и подтверждение визита."
+        }
+       }
+      ],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Спасибо! Передал администратору — он свяжется, подтвердит время и подберёт группу.",
+      "tool_calls": [
+       {
+        "name": "create_handoff",
+        "args": {
+         "reason": "order",
+         "summary": "Клиент хочет прийти на пробный урок завтра в 15:00 и уточняет, кого спросить на месте. Нужна запись на пробный урок и подтверждение деталей."
+        }
+       }
+      ],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Спасибо! Передал администратору — он свяжется, подтвердит время и подберёт группу.",
+      "tool_calls": [
+       {
+        "name": "create_handoff",
+        "args": {
+         "reason": "order",
+         "summary": "Клиент хочет прийти на пробный урок завтра в 15:00 и спрашивает, кого спросить на месте. Нужна подтверждение и инструкция по встрече.",
+         "name": "",
+         "phone": ""
+        }
+       }
+      ],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Спасибо! Передал администратору — он свяжется, подтвердит время и подберёт группу.",
+      "tool_calls": [
+       {
+        "name": "create_handoff",
+        "args": {
+         "reason": "order",
+         "summary": "Клиент хочет прийти на пробный урок завтра в 15:00 и спрашивает, кого спросить на месте. Нужна подтверждённая встреча/инструкция от администратора.",
+         "name": ""
+        }
+       }
+      ],
+      "error": null
+     }
+    ]
+   },
+   "q1c_client_time_phone_repair": {
+    "pass": 6,
+    "n": 6,
+    "runs": [
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Спросите мастера на месте.\n\nЗаявку передал, вас встретят по адресу: ТЦ Азия, 2 этаж\nЧасы работы: 10:00–19:00",
+      "tool_calls": [
+       {
+        "name": "create_handoff",
+        "args": {
+         "reason": "order",
+         "name": "",
+         "phone": "",
+         "summary": "Клиент придёт завтра в 15:00 с iPhone 11, нужна замена экрана. Спрашивает, кого спросить."
+        }
+       }
+      ],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Спросите мастера на месте.\n\nТЦ Азия, 2 этаж\n10:00–19:00\n\nМастер посмотрит устройство и подтвердит точную цену и срок.",
+      "tool_calls": [
+       {
+        "name": "create_handoff",
+        "args": {
+         "reason": "order",
+         "name": "",
+         "phone": "",
+         "summary": "Клиент придёт завтра в 15:00 с iPhone 11 на замену экрана. Спрашивает, кого спросить."
+        }
+       }
+      ],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Спросите мастера на месте.\n\nТЦ Азия, 2 этаж\n10:00–19:00\n\nМастер посмотрит устройство и подтвердит точную цену и срок.",
+      "tool_calls": [
+       {
+        "name": "create_handoff",
+        "args": {
+         "reason": "order",
+         "name": null,
+         "phone": null,
+         "summary": "Клиент придёт завтра в 15:00 с iPhone 11, нужна замена экрана. Спрашивает, кого спросить."
+        }
+       }
+      ],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Спросите мастера.\n\nЗавтра в 15:00 вас встретят в ТЦ Азия, 2 этаж.\nМастер посмотрит iPhone 11 и подтвердит точную цену и срок.",
+      "tool_calls": [
+       {
+        "name": "create_handoff",
+        "args": {
+         "reason": "order",
+         "summary": "Клиент придёт завтра в 15:00 с iPhone 11 на замену экрана. Спрашивает, кого спросить."
+        }
+       }
+      ],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Спросите мастера на месте.\n\nТЦ Азия, 2 этаж\n10:00–19:00\n\nПередал владельцу, он свяжется.",
+      "tool_calls": [
+       {
+        "name": "create_handoff",
+        "args": {
+         "reason": "order",
+         "name": null,
+         "phone": null,
+         "summary": "Клиент придёт завтра в 15:00 с iPhone 11 на замену экрана. Спрашивает, кого спросить."
+        }
+       }
+      ],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Спросите мастера по ремонту.\n\nТЦ Азия, 2 этаж\n10:00–19:00\n\nПередал владельцу, он свяжется",
+      "tool_calls": [
+       {
+        "name": "create_handoff",
+        "args": {
+         "reason": "order",
+         "summary": "Клиент придёт завтра в 15:00 с iPhone 11, нужна замена экрана. Спрашивает, кого спросить."
+        }
+       }
+      ],
+      "error": null
+     }
+    ]
+   }
+  },
+  "F2-mem+bullets": {
+   "a6_owner_agreement_flowers": {
+    "pass": 6,
+    "n": 6,
+    "runs": [
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:15": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 15:00, спросите Марину.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:15": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 15:00, спросите Марину.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:15": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 15:00, спросите Марину.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:15": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 15:00, спросите Марину.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:15": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 15:00, спросите Марину.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:15": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 15:00, спросите Марину.",
+      "tool_calls": [],
+      "error": null
+     }
+    ]
+   },
+   "a6_owner_agreement_education": {
+    "pass": 6,
+    "n": 6,
+    "runs": [
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:15": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 15:00, спросите Марину.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:15": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 15:00, спросите Марину.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:15": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 15:00, спросите Марину.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:15": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 15:00, спросите Марину.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:15": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 15:00, спросите Марину.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:15": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 15:00, спросите Марину.",
+      "tool_calls": [],
+      "error": null
+     }
+    ]
+   },
+   "a6_owner_agreement_phone_repair": {
+    "pass": 6,
+    "n": 6,
+    "runs": [
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:15": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 15:00, спросите Марину.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:15": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 15:00, спросите Марину.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:15": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 15:00, спросите Марину.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:15": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 15:00, спросите Марину.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:15": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 15:00, спросите Марину.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:15": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 15:00, спросите Марину.",
+      "tool_calls": [],
+      "error": null
+     }
+    ]
+   },
+   "q1p_visit_phone_repair": {
+    "pass": 6,
+    "n": 6,
+    "runs": [
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:Ерлан": true,
+       "mentions:двор": true
+      },
+      "text": "Обратитесь к Ерлану.\n\nВход со двора.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:Ерлан": true,
+       "mentions:двор": true
+      },
+      "text": "Обратитесь к мастеру Ерлану.\n\nЗаходить со двора, вход через ТЦ Азия, 2 этаж.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:Ерлан": true,
+       "mentions:двор": true
+      },
+      "text": "Обратитесь к мастеру Ерлану.\n\nЗаходить со двора, вход через ТЦ Азия, 2 этаж.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:Ерлан": true,
+       "mentions:двор": true
+      },
+      "text": "Обратитесь к Ерлану.\n\nЗаходите со двора.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:Ерлан": true,
+       "mentions:двор": true
+      },
+      "text": "Обратитесь к мастеру Ерлану.\n\nЗаходить со двора, ТЦ Азия, 2 этаж.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:Ерлан": true,
+       "mentions:двор": true
+      },
+      "text": "Обратитесь к мастеру Ерлану.\nЗаходить со двора, вход через ТЦ Азия, 2 этаж.",
+      "tool_calls": [],
+      "error": null
+     }
+    ]
+   },
+   "q1p_trial_education": {
+    "pass": 0,
+    "n": 6,
+    "runs": [
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:сред": false,
+       "mentions:204": false
+      },
+      "text": "Я не вижу подтверждённой записи в данных чата.\n\nПробный урок бесплатный, но день и кабинет я сам не назначаю — администратор подтвердит.\n\nЕсли хотите, передам заявку: напишите имя и возраст сына.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:сред": false,
+       "mentions:204": false
+      },
+      "text": "Я не вижу подтверждённой записи на этот урок в данных чата. Могу передать заявку администратору на пробный урок — он уточнит день и кабинет.\n\nНапишите, пожалуйста, имя и возраст ученика.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:сред": false,
+       "mentions:204": false
+      },
+      "text": "Я не вижу в данных подтверждённого дня и кабинета.\n\nПробный урок бесплатный, а точное время и место подтвердит администратор. Если хотите, передам заявку — напишите имя и возраст сына, и номер телефона.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:сред": false,
+       "mentions:204": false
+      },
+      "text": "Я не вижу подтверждённой записи на конкретный день и кабинет в данных центра.\n\nПробный урок бесплатный, а время и место подтвердит администратор. Если хотите, передам заявку — напишите имя сына и номер телефона.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:сред": false,
+       "mentions:204": false
+      },
+      "text": "Я не вижу подтверждённой записи в переписке. Пробный урок бесплатный, а день и кабинет подтвердит администратор.\n\nНапишите, пожалуйста, имя и возраст сына, и номер телефона — передам заявку.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:сред": false,
+       "mentions:204": false
+      },
+      "text": "Я не вижу подтверждённой записи на этот чат, поэтому не могу надёжно повторить день и кабинет.\n\nЕсли хотите, я передам заявку на пробный урок. Напишите, пожалуйста, имя и возраст сына.",
+      "tool_calls": [],
+      "error": null
+     }
+    ]
+   },
+   "q1p_early_phone_repair": {
+    "pass": 6,
+    "n": 6,
+    "runs": [
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:9": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 9:00.\nОткроет Марина.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:9": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 9:00.\nОткроет Марина.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:9": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 9:00.\nОткроет Марина.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:9": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 9:00.\nОткроет Марина.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:9": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 9:00.\nОткроет Марина.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:9": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 9:00.\nОткроет Марина.",
+      "tool_calls": [],
+      "error": null
+     }
+    ]
+   },
+   "q1c_no_agreement_phone_repair": {
+    "pass": 5,
+    "n": 6,
+    "runs": [
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Уточните, пожалуйста, во сколько вам удобно подъехать — я передам мастеру и он подтвердит время.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Уточните, пожалуйста, ваше имя и номер телефона — я передам мастеру, чтобы он подтвердил время и к кому подойти.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": false,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": false
+      },
+      "text": "Напомните, пожалуйста, когда вы уже договаривались и с кем именно — я повторю без изменений.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Уточните, пожалуйста, во сколько вам удобно подъехать — я передам мастеру и он подтвердит время.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Уточните, пожалуйста, ваше имя и номер телефона — я передам мастеру, чтобы он подтвердил время и к кому подойти.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Уточните, пожалуйста, вы уже записывались на завтра или это новый визит?\n\nЕсли запись уже была, я повторю время и к кому подойти. Если нет — напишите, что нужно сделать с устройством, и я подскажу адрес и часы работы.",
+      "tool_calls": [],
+      "error": null
+     }
+    ]
+   },
+   "q1c_no_agreement_education": {
+    "pass": 6,
+    "n": 6,
+    "runs": [
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "У нас занятия и приём с 9:00 до 20:00.\n\nАдрес: пр. Республики 10\n\nЕсли вы уже записывались, напишите, пожалуйста, имя ученика — я уточню, кого именно вам нужно спросить.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Вы можете подойти с 9:00 до 20:00.\n\nАдрес: пр. Республики 10\n\nСпросить администратора.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "У нас учебный центр на пр. Республики 10, работает с 9:00 до 20:00.\n\nКого спросить — администратор подскажет при записи, а если вы уже договаривались о конкретном времени, напомните, пожалуйста, его здесь.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Если вы уже записывались, напишите, пожалуйста, ваше имя — я подскажу по вашей заявке.\n\nЕсли записи ещё нет:\nАдрес: пр. Республики 10\nЧасы работы: 9:00–20:00\nСпросить администратора\n\nЕсли хотите, могу сразу передать заявку на пробный урок — он бесплатный. Напишите имя и возраст ученика.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Я не вижу в переписке, на какое время вам уже назначали визит.\n\nЕсли хотите, я передам администратору и он уточнит для вас. Напишите, пожалуйста, ваше имя и номер телефона.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Если вы про запись, я не вижу в переписке подтверждённого времени.\n\nАдрес: пр. Республики 10\nЧасы работы: 9:00–20:00\n\nКого спросить — уточнит администратор. Могу передать ваш вопрос, напишите, пожалуйста, имя и номер телефона.",
+      "tool_calls": [],
+      "error": null
+     }
+    ]
+   },
+   "q1c_client_time_education": {
+    "pass": 6,
+    "n": 6,
+    "runs": [
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Спасибо! Передал администратору — он свяжется, подтвердит время и подскажет, к кому обратиться на месте.",
+      "tool_calls": [
+       {
+        "name": "create_handoff",
+        "args": {
+         "reason": "order",
+         "summary": "Клиент хочет прийти на пробный урок завтра в 15:00 и спрашивает, кого спросить на месте. Нужна запись и подтверждение деталей визита.",
+         "name": ""
+        }
+       }
+      ],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Спасибо! Передал администратору — он свяжется, подтвердит время и подберёт группу.",
+      "tool_calls": [
+       {
+        "name": "create_handoff",
+        "args": {
+         "reason": "order",
+         "summary": "Клиент хочет прийти на пробный урок завтра в 15:00 и уточняет, кого спросить на месте."
+        }
+       }
+      ],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Спасибо! Передал администратору — он свяжется, подтвердит время и подберёт группу.",
+      "tool_calls": [
+       {
+        "name": "create_handoff",
+        "args": {
+         "reason": "order",
+         "summary": "Клиент хочет прийти на пробный урок завтра в 15:00 и спрашивает, кого спросить на месте."
+        }
+       }
+      ],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Спасибо! Передал администратору — он свяжется, подтвердит время и подберёт группу.",
+      "tool_calls": [
+       {
+        "name": "create_handoff",
+        "args": {
+         "reason": "order",
+         "summary": "Клиент хочет прийти на пробный урок завтра в 15:00 и спрашивает, кого спросить на месте. Нужна подтверждающая информация и запись на пробный урок."
+        }
+       }
+      ],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Спасибо! Передал администратору — он свяжется, подтвердит время и подберёт группу.",
+      "tool_calls": [
+       {
+        "name": "create_handoff",
+        "args": {
+         "reason": "order",
+         "summary": "Клиент хочет прийти на пробный урок завтра в 15:00 и спрашивает, кого спросить на месте. Нужна запись на пробный урок и уточнение по встрече."
+        }
+       }
+      ],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Спасибо! Передал администратору — он свяжется, подтвердит время и подберёт группу.",
+      "tool_calls": [
+       {
+        "name": "create_handoff",
+        "args": {
+         "reason": "order",
+         "summary": "Клиент хочет прийти на пробный урок завтра в 15:00 и спрашивает, кого спросить на месте. Нужна передача заявки и подтверждение контакта на месте.",
+         "name": ""
+        }
+       }
+      ],
+      "error": null
+     }
+    ]
+   },
+   "q1c_client_time_phone_repair": {
+    "pass": 6,
+    "n": 6,
+    "runs": [
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Спросите мастера на месте.\n\nТЦ Азия, 2 этаж\n10:00–19:00\n\nПередал владельцу, он свяжется",
+      "tool_calls": [
+       {
+        "name": "create_handoff",
+        "args": {
+         "reason": "order",
+         "name": "",
+         "phone": "",
+         "summary": "Клиент придёт завтра в 15:00, iPhone 11, замена экрана. Спрашивает, кого спросить."
+        }
+       }
+      ],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Спросите мастера на месте.\n\nТЦ Азия, 2 этаж\n10:00–19:00\n\nПередал владельцу, он свяжется.",
+      "tool_calls": [
+       {
+        "name": "create_handoff",
+        "args": {
+         "reason": "order",
+         "name": "",
+         "phone": "",
+         "summary": "Клиент придёт завтра в 15:00 с iPhone 11, нужна замена экрана. Спрашивает, кого спросить."
+        }
+       }
+      ],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Подойдите к мастеру на месте.\n\nЗавтра в 15:00 вас встретят по iPhone 11, замена экрана.\nПередал владельцу, он свяжется.",
+      "tool_calls": [
+       {
+        "name": "create_handoff",
+        "args": {
+         "reason": "order",
+         "summary": "Клиент придёт завтра в 15:00, iPhone 11, замена экрана. Просит уточнить, к кому подойти."
+        }
+       }
+      ],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Передал владельцу, он свяжется.\n\nЗавтра в 15:00 подойдите в ТЦ Азия, 2 этаж.\nМастер посмотрит устройство и подтвердит точную цену и срок.",
+      "tool_calls": [
+       {
+        "name": "create_handoff",
+        "args": {
+         "reason": "order",
+         "name": null,
+         "phone": null,
+         "summary": "Клиент придёт завтра в 15:00 с iPhone 11, нужна замена экрана. Спрашивает, кого спросить."
+        }
+       }
+      ],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Спросите мастера на месте.\n\nЗавтра в 15:00, iPhone 11, замена экрана — заявку передал владельцу.",
+      "tool_calls": [
+       {
+        "name": "create_handoff",
+        "args": {
+         "reason": "order",
+         "name": null,
+         "phone": null,
+         "summary": "Клиент придёт завтра в 15:00, iPhone 11, замена экрана. Спрашивает, к кому обратиться."
+        }
+       }
+      ],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Спросите мастера по ремонту.\n\nЗавтра в 15:00\niPhone 11, экран\n\nАдрес: ТЦ Азия, 2 этаж\nЧасы работы: 10:00–19:00\n\nПередал владельцу, он свяжется",
+      "tool_calls": [
+       {
+        "name": "create_handoff",
+        "args": {
+         "reason": "order",
+         "summary": "Клиент придёт завтра в 15:00, iPhone 11, нужна замена экрана. Просит уточнить, кого спросить."
+        }
+       }
+      ],
+      "error": null
+     }
+    ]
+   }
+  },
+  "F3-+pr": {
+   "a6_owner_agreement_flowers": {
+    "pass": 6,
+    "n": 6,
+    "runs": [
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:15": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 15:00, спросите Марину.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:15": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 15:00, спросите Марину.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:15": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 15:00, спросите Марину.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:15": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 15:00, спросите Марину.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:15": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 15:00, спросите Марину.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:15": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 15:00, спросите Марину.",
+      "tool_calls": [],
+      "error": null
+     }
+    ]
+   },
+   "a6_owner_agreement_education": {
+    "pass": 6,
+    "n": 6,
+    "runs": [
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:15": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 15:00, спросите Марину.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:15": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 15:00, спросите Марину.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:15": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 15:00, спросите Марину.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:15": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 15:00, спросите Марину.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:15": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 15:00, спросите Марину.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:15": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 15:00, спросите Марину.",
+      "tool_calls": [],
+      "error": null
+     }
+    ]
+   },
+   "a6_owner_agreement_phone_repair": {
+    "pass": 6,
+    "n": 6,
+    "runs": [
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:15": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 15:00, спросите Марину.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:15": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 15:00, спросите Марину.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:15": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 15:00, спросите Марину.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:15": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 15:00, спросите Марину.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:15": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 15:00, спросите Марину.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:15": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 15:00, спросите Марину.",
+      "tool_calls": [],
+      "error": null
+     }
+    ]
+   },
+   "q1p_visit_phone_repair": {
+    "pass": 5,
+    "n": 6,
+    "runs": [
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:Ерлан": true,
+       "mentions:двор": true
+      },
+      "text": "Обратитесь к Ерлану.\n\nВход со двора.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:Ерлан": false,
+       "mentions:двор": false
+      },
+      "text": "ТЦ Азия, 2 этаж.\n\nПо поводу мастера и входа уточню у владельца и сразу передам вам ответ.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:Ерлан": true,
+       "mentions:двор": true
+      },
+      "text": "Вход со двора, к мастеру Ерлану.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:Ерлан": true,
+       "mentions:двор": true
+      },
+      "text": "Вход со двора, обратиться к мастеру Ерлану.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:Ерлан": true,
+       "mentions:двор": true
+      },
+      "text": "Обратитесь к мастеру Ерлану.\n\nВход со двора.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:Ерлан": true,
+       "mentions:двор": true
+      },
+      "text": "Вход со двора, к мастеру Ерлану.",
+      "tool_calls": [],
+      "error": null
+     }
+    ]
+   },
+   "q1p_trial_education": {
+    "pass": 0,
+    "n": 6,
+    "runs": [
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:сред": false,
+       "mentions:204": false
+      },
+      "text": "Я не вижу подтверждённой записи на день и кабинет в данных центра.\n\nПробный урок бесплатный, но время и кабинет подтвердит администратор. Если хотите, передам заявку — напишите имя сына и номер телефона.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:сред": false,
+       "mentions:204": false
+      },
+      "text": "Я не вижу подтверждённой записи на конкретный день и кабинет в данных.\n\nПробный урок бесплатный, но время и кабинет подтвердит администратор. Могу передать заявку — напишите имя и возраст сына, и номер телефона.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:сред": false,
+       "mentions:204": false
+      },
+      "text": "Я не вижу подтверждённой записи на конкретный день и кабинет в данных центра.\n\nПробный урок бесплатный, а время и место подтвердит администратор.  \nЕсли хотите, я передам заявку — напишите имя и возраст сына, и номер телефона.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:сред": false,
+       "mentions:204": false
+      },
+      "text": "Я не вижу в данных подтверждённого дня и кабинета для этой записи.\n\nПробный урок бесплатный, адрес: пр. Республики 10, часы работы 9:00–20:00.\n\nЕсли хотите, я передам заявку администратору — он уточнит день и кабинет. Напишите имя и возраст ученика, курс и номер телефона.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:сред": false,
+       "mentions:204": false
+      },
+      "text": "Я не вижу подтверждённой записи на конкретный день и кабинет в данных.\n\nПробный урок бесплатный, а время и место подтвердит администратор.\nЕсли хотите, передам заявку — напишите имя и возраст сына, и номер телефона.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:сред": false,
+       "mentions:204": false
+      },
+      "text": "Я не вижу подтверждённой записи на конкретный день и кабинет в данных чата.\n\nПробный урок бесплатный.\nАдрес: пр. Республики 10\nТелефон администратора: +7 702 333 44 55\n\nЕсли хотите, я передам заявку администратору — он уточнит день и кабинет.",
+      "tool_calls": [],
+      "error": null
+     }
+    ]
+   },
+   "q1p_early_phone_repair": {
+    "pass": 6,
+    "n": 6,
+    "runs": [
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:9": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 9:00.\nОткроет Марина.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:9": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 9:00.\nОткроет Марина.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:9": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 9:00.\nОткроет Марина.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:9": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 9:00.\nОткроет Марина.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:9": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 9:00.\nОткроет Марина.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:9": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 9:00.\nОткроет Марина.",
+      "tool_calls": [],
+      "error": null
+     }
+    ]
+   },
+   "q1c_no_agreement_phone_repair": {
+    "pass": 6,
+    "n": 6,
+    "runs": [
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "В чате нет согласованного времени визита и имени мастера, поэтому я не могу это подтвердить.\n\nСейчас можем принять заявку:\nнапишите, пожалуйста, модель устройства, что случилось, ваше имя и номер телефона — и я передам мастеру.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Подойти можно завтра в рабочее время: 10:00–19:00.\n\nАдрес: ТЦ Азия, 2 этаж\n\nКого спросить — уточню у мастера, напишите, пожалуйста, ваше имя и номер телефона.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Подойти можно завтра в 10:00–19:00.\n\nАдрес: ТЦ Азия, 2 этаж\n\nСпросить мастера по ремонту.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Подойти можно завтра в часы работы: 10:00–19:00.\nАдрес: ТЦ Азия, 2 этаж.\n\nКого спросить — уточнит мастер, я передам ваш вопрос. Напишите, пожалуйста, ваше имя и номер телефона.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Подойти можно завтра в часы работы: 10:00–19:00\n\nАдрес: ТЦ Азия, 2 этаж\n\nКого спросить — уточнит мастер, я передам ваш вопрос.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Вы можете подойти завтра в рабочее время с 10:00 до 19:00.\n\nАдрес: ТЦ Азия, 2 этаж\n\nСпросить мастера по ремонту.",
+      "tool_calls": [],
+      "error": null
+     }
+    ]
+   },
+   "q1c_no_agreement_education": {
+    "pass": 5,
+    "n": 6,
+    "runs": [
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Вы можете подойти с 9:00 до 20:00 по адресу: пр. Республики 10.\n\nСпросите администратора.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "У нас занятия и приём с 9:00 до 20:00.\n\nАдрес: пр. Республики 10\n\nСпросить можно администратора.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "У нас учебный центр на пр. Республики 10, работаем с 9:00 до 20:00.\n\nЕсли вы уже записывались на пробный урок, напомните, пожалуйста, имя ученика — я уточню, к кому подойти.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": false,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": false
+      },
+      "text": "Если вы про уже согласованную встречу, напишите, пожалуйста, ещё раз день и время — я повторю точную договорённость.  \nЕсли вы хотите записаться на пробный урок, он бесплатный. Напишите имя и возраст ученика.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Я не вижу в переписке, на какое время вам уже назначали визит и к кому именно подходить.\n\nНапишите, пожалуйста, имя и номер телефона — я передам вопрос администратору, он уточнит и ответит.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Я не вижу в переписке, на какое время вам уже назначали визит и к кому именно подходить. Напишите, пожалуйста, имя и телефон — администратор уточнит и подтвердит.",
+      "tool_calls": [],
+      "error": null
+     }
+    ]
+   },
+   "q1c_client_time_education": {
+    "pass": 6,
+    "n": 6,
+    "runs": [
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Спасибо! Передал администратору — он свяжется, подтвердит время и подберёт группу.",
+      "tool_calls": [
+       {
+        "name": "create_handoff",
+        "args": {
+         "reason": "order",
+         "summary": "Клиент хочет прийти на пробный урок завтра в 15:00 и спрашивает, кого спросить на месте. Нужна передача администратору для подтверждения и инструкции по встрече."
+        }
+       }
+      ],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Спасибо! Передал администратору — он свяжется, подтвердит время и подберёт группу.",
+      "tool_calls": [
+       {
+        "name": "create_handoff",
+        "args": {
+         "reason": "order",
+         "summary": "Клиент хочет прийти на пробный урок завтра в 15:00 и спрашивает, кого спросить на месте."
+        }
+       }
+      ],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Спасибо! Передал администратору — он свяжется, подтвердит время и подскажет, к кому подойти на месте.",
+      "tool_calls": [
+       {
+        "name": "create_handoff",
+        "args": {
+         "reason": "order",
+         "summary": "Клиент хочет прийти на пробный урок завтра в 15:00 и спрашивает, кого спросить на месте. Нужна подсказка по встрече и подтверждение деталей.",
+         "name": ""
+        }
+       }
+      ],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Спасибо! Передал администратору — он свяжется, подтвердит время и подберёт группу.",
+      "tool_calls": [
+       {
+        "name": "create_handoff",
+        "args": {
+         "reason": "order",
+         "summary": "Клиент хочет прийти на пробный урок завтра в 15:00 и спрашивает, кого спросить на месте. Нужна подтверждающая информация по встрече и контакту на месте."
+        }
+       }
+      ],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Спасибо! Передал администратору — он свяжется, подтвердит время и подберёт группу.",
+      "tool_calls": [
+       {
+        "name": "create_handoff",
+        "args": {
+         "reason": "order",
+         "summary": "Клиент хочет прийти на пробный урок завтра в 15:00 и уточняет, к кому обратиться на месте. Нужна подтверждающая информация и запись на пробный урок."
+        }
+       }
+      ],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Спасибо! Передал администратору — он свяжется, подтвердит время и подберёт группу.",
+      "tool_calls": [
+       {
+        "name": "create_handoff",
+        "args": {
+         "reason": "order",
+         "summary": "Клиент хочет прийти на пробный урок завтра в 15:00 и уточняет, кого спросить на месте. Нужна подтверждённая встреча и контактное лицо."
+        }
+       }
+      ],
+      "error": null
+     }
+    ]
+   },
+   "q1c_client_time_phone_repair": {
+    "pass": 6,
+    "n": 6,
+    "runs": [
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Завтра в 15:00 подойдите в ТЦ Азия, 2 этаж.\n\nСпросите мастера.\nМастер посмотрит устройство и подтвердит точную цену и срок.",
+      "tool_calls": [
+       {
+        "name": "create_handoff",
+        "args": {
+         "reason": "order",
+         "name": "",
+         "phone": "",
+         "summary": "Клиент придёт завтра в 15:00 с iPhone 11, нужна замена экрана. Спрашивает, кого спросить."
+        }
+       }
+      ],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Завтра в 15:00 подойдите в ТЦ Азия, 2 этаж.\n\nСпросите мастера.\nМастер посмотрит устройство и подтвердит точную цену и срок.",
+      "tool_calls": [
+       {
+        "name": "create_handoff",
+        "args": {
+         "reason": "order",
+         "name": null,
+         "phone": null,
+         "summary": "Клиент придёт завтра в 15:00 с iPhone 11, нужна замена экрана. Спрашивает, кого спросить."
+        }
+       }
+      ],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Подойдите к мастеру на месте, он вас встретит.\n\nЗавтра в 15:00\niPhone 11, замена экрана\nМастер посмотрит устройство и подтвердит точную цену и срок.",
+      "tool_calls": [
+       {
+        "name": "create_handoff",
+        "args": {
+         "reason": "order",
+         "name": "",
+         "phone": "",
+         "summary": "Клиент придёт завтра в 15:00 с iPhone 11, нужна замена экрана. Спрашивает, кого спросить."
+        }
+       }
+      ],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Завтра в 15:00, iPhone 11, замена экрана.\n\nСпросите мастера.\nМастер посмотрит устройство и подтвердит точную цену и срок.",
+      "tool_calls": [
+       {
+        "name": "create_handoff",
+        "args": {
+         "reason": "order",
+         "name": "",
+         "phone": "",
+         "summary": "Клиент придёт завтра в 15:00 с iPhone 11, нужна замена экрана. Спрашивает, кого спросить."
+        }
+       }
+      ],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Завтра в 15:00, iPhone 11, замена экрана.\n\nСпросите мастера.\nМастер посмотрит устройство и подтвердит точную цену и срок.",
+      "tool_calls": [
+       {
+        "name": "create_handoff",
+        "args": {
+         "reason": "order",
+         "name": "",
+         "phone": "",
+         "summary": "Клиент придёт завтра в 15:00 с iPhone 11, нужна замена экрана. Спрашивает, кого спросить."
+        }
+       }
+      ],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Завтра в 15:00, iPhone 11, замена экрана — вас встретит мастер.\n\nМастер посмотрит устройство и подтвердит точную цену и срок.",
+      "tool_calls": [
+       {
+        "name": "create_handoff",
+        "args": {
+         "reason": "order",
+         "name": null,
+         "phone": null,
+         "summary": "Клиент планирует прийти завтра в 15:00 с iPhone 11, нужна замена экрана. Спрашивает, кого спросить."
+        }
+       }
+      ],
+      "error": null
+     }
+    ]
+   }
+  },
+  "F4-+data": {
+   "a6_owner_agreement_flowers": {
+    "pass": 6,
+    "n": 6,
+    "runs": [
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:15": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 15:00, спросите Марину.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:15": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 15:00, спросите Марину.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:15": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 15:00, спросите Марину.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:15": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 15:00, спросите Марину.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:15": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 15:00, спросите Марину.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:15": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 15:00, спросите Марину.",
+      "tool_calls": [],
+      "error": null
+     }
+    ]
+   },
+   "a6_owner_agreement_education": {
+    "pass": 6,
+    "n": 6,
+    "runs": [
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:15": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 15:00, спросите Марину.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:15": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 15:00, спросите Марину.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:15": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 15:00, спросите Марину.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:15": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 15:00, спросите Марину.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:15": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 15:00, спросите Марину.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:15": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 15:00, спросите Марину.",
+      "tool_calls": [],
+      "error": null
+     }
+    ]
+   },
+   "a6_owner_agreement_phone_repair": {
+    "pass": 6,
+    "n": 6,
+    "runs": [
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:15": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 15:00, спросите Марину.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:15": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 15:00, спросите Марину.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:15": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 15:00, спросите Марину.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:15": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 15:00, спросите Марину.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:15": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 15:00, спросите Марину.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:15": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 15:00, спросите Марину.",
+      "tool_calls": [],
+      "error": null
+     }
+    ]
+   },
+   "q1p_visit_phone_repair": {
+    "pass": 6,
+    "n": 6,
+    "runs": [
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:Ерлан": true,
+       "mentions:двор": true
+      },
+      "text": "Обратитесь к мастеру Ерлану.\nВход со двора.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:Ерлан": true,
+       "mentions:двор": true
+      },
+      "text": "Обратитесь к мастеру Ерлану.\n\nЗаходить со двора.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:Ерлан": true,
+       "mentions:двор": true
+      },
+      "text": "К Ерлану.\nВход со двора.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:Ерлан": true,
+       "mentions:двор": true
+      },
+      "text": "Обратитесь к мастеру Ерлану.\n\nВход со двора.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:Ерлан": true,
+       "mentions:двор": true
+      },
+      "text": "Обратитесь к мастеру Ерлану.\n\nЗаходить со двора.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:Ерлан": true,
+       "mentions:двор": true
+      },
+      "text": "К Ерлану.\nВход со двора.",
+      "tool_calls": [],
+      "error": null
+     }
+    ]
+   },
+   "q1p_trial_education": {
+    "pass": 0,
+    "n": 6,
+    "runs": [
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:сред": false,
+       "mentions:204": false
+      },
+      "text": "Я не вижу подтверждённой записи на конкретный день и кабинет в данных.\n\nПробный урок бесплатный, а время и группу подтвердит администратор.\nТелефон: +7 702 333 44 55",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:сред": false,
+       "mentions:204": false
+      },
+      "text": "Я не вижу подтверждённой записи на конкретный день и кабинет.\n\nПробный урок бесплатный, а время и группу подтвердит администратор.\nЕсли хотите, я передам заявку — напишите имя и возраст сына, и номер телефона.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:сред": false,
+       "mentions:204": false
+      },
+      "text": "Я не вижу подтверждённой записи на конкретный день и кабинет в данных.\n\nПробный урок бесплатный, а точное время и кабинет подтвердит администратор.\n\nЕсли хотите, я передам заявку — напишите имя и возраст сына.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:сред": false,
+       "mentions:204": false
+      },
+      "text": "Я не вижу подтверждённой записи на конкретный день и кабинет в данных.\n\nПробный урок бесплатный, но время и место подтвердит администратор.\n\nЕсли хотите, я передам заявку — напишите имя сына и номер телефона.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:сред": false,
+       "mentions:204": false
+      },
+      "text": "Я не вижу подтверждённой записи на конкретный день и кабинет в данных центра.\n\nПробный урок бесплатный, а точное время и кабинет подтвердит администратор:\n+7 702 333 44 55",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": false,
+      "verdicts": {
+       "mentions:сред": false,
+       "mentions:204": false
+      },
+      "text": "Я не вижу подтверждённой записи в данных чата.\n\nПробный урок бесплатный, но день и кабинет подтвердит администратор.  \nТелефон: +7 702 333 44 55",
+      "tool_calls": [],
+      "error": null
+     }
+    ]
+   },
+   "q1p_early_phone_repair": {
+    "pass": 6,
+    "n": 6,
+    "runs": [
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:9": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 9:00\nОткроет Марина",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:9": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 9:00\nОткроет Марина",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:9": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 9:00.\nОткроет Марина.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:9": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 9:00.\nОткроет Марина.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:9": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 9:00.\nОткроет Марина.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "mentions:9": true,
+       "mentions:Марин": true
+      },
+      "text": "Завтра в 9:00.\nОткроет Марина.",
+      "tool_calls": [],
+      "error": null
+     }
+    ]
+   },
+   "q1c_no_agreement_phone_repair": {
+    "pass": 4,
+    "n": 6,
+    "runs": [
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Вы можете подойти завтра в рабочее время: с 10:00 до 19:00.\n\nАдрес: ТЦ Азия, 2 этаж\n\nСпросить можно мастера.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": false,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": false
+      },
+      "text": "Напомните, пожалуйста, на какое время вы договаривались и с кем именно — я подскажу без ошибок.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "У нас часы работы: 10:00–19:00\nАдрес: ТЦ Азия, 2 этаж\n\nКого спросить и точное время визита я не вижу в переписке. Напишите, пожалуйста, имя и номер телефона — передам владельцу, он уточнит и ответит вам.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Напомните, пожалуйста, на какое время вы договаривались и с кем именно? Я проверю и подскажу.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Вы можете подойти завтра в удобное для вас время в часы работы: 10:00–19:00.\n\nАдрес: ТЦ Азия, 2 этаж\n\nСпросите мастера.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": false,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": false
+      },
+      "text": "Напомните, пожалуйста, на какой день и время у вас была договорённость — я подскажу, кого спросить.",
+      "tool_calls": [],
+      "error": null
+     }
+    ]
+   },
+   "q1c_no_agreement_education": {
+    "pass": 6,
+    "n": 6,
+    "runs": [
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "У нас учебный центр на пр. Республики 10, работает с 9:00 до 20:00.\n\nЕсли вы уже договаривались о конкретном времени, напишите, пожалуйста, когда именно — я проверю по переписке. Если нет, администратор подскажет удобное время и к кому подойти.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "У вас в чате пока не было подтверждённого времени и конкретного человека для встречи.\n\nАдрес:\nпр. Республики 10\n\nЧасы работы:\n9:00–20:00\n\nЕсли хотите, я передам заявку администратору — он уточнит время и подскажет, кого спросить. Напишите, пожалуйста, ваше имя и номер телефона.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "У нас пробный урок бесплатный, а точное время и к кому подойти подтвердит администратор.\n\nТелефон: +7 702 333 44 55\nАдрес: пр. Республики 10",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Уточните, пожалуйста, ваше имя и номер телефона — администратор проверит и подскажет, во сколько подойти и к кому обратиться.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Уточните, пожалуйста, ваше имя и номер телефона — администратор проверит и подтвердит, во сколько подойти и к кому обратиться.",
+      "tool_calls": [],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "У нас занятия и приём с 9:00 до 20:00, адрес: пр. Республики 10.\n\nЕсли вы уже записывались, напишите, пожалуйста, имя ученика — я уточню, к кому подойти.",
+      "tool_calls": [],
+      "error": null
+     }
+    ]
+   },
+   "q1c_client_time_education": {
+    "pass": 6,
+    "n": 6,
+    "runs": [
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Спасибо! Передал администратору — он свяжется, подтвердит время и подберёт группу.",
+      "tool_calls": [
+       {
+        "name": "create_handoff",
+        "args": {
+         "reason": "order",
+         "summary": "Клиент хочет прийти на пробный урок завтра в 15:00 и спрашивает, кого спросить на месте. Нужна подтверждающая информация и запись на пробный урок.",
+         "name": ""
+        }
+       }
+      ],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Спасибо! Передал администратору — он свяжется, подтвердит время и подберёт группу.",
+      "tool_calls": [
+       {
+        "name": "create_handoff",
+        "args": {
+         "reason": "order",
+         "summary": "Клиент хочет прийти на пробный урок завтра в 15:00 и спрашивает, кого спросить на месте. Нужна подтверждение и инструкция по встрече."
+        }
+       }
+      ],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Спасибо! Передал администратору — он свяжется, подтвердит время и подберёт группу.",
+      "tool_calls": [
+       {
+        "name": "create_handoff",
+        "args": {
+         "reason": "order",
+         "summary": "Клиент хочет прийти на пробный урок завтра в 15:00 и спрашивает, кого спросить на месте. Нужна подтверждённая запись и уточнение по встрече."
+        }
+       }
+      ],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Спасибо! Передал администратору — он свяжется, подтвердит время и подскажет, к кому обратиться на месте.",
+      "tool_calls": [
+       {
+        "name": "create_handoff",
+        "args": {
+         "reason": "order",
+         "summary": "Клиент хочет прийти на бесплатный пробный урок завтра в 15:00 и спрашивает, кого спросить на месте. Нужна запись и подтверждение от администратора."
+        }
+       }
+      ],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Спасибо! Передал администратору — он свяжется, подтвердит время и подберёт группу.",
+      "tool_calls": [
+       {
+        "name": "create_handoff",
+        "args": {
+         "reason": "order",
+         "summary": "Клиент хочет прийти на пробный урок завтра в 15:00 и уточняет, кого спросить на месте."
+        }
+       }
+      ],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Спасибо! Передал администратору — он свяжется, подтвердит время и подберёт группу.",
+      "tool_calls": [
+       {
+        "name": "create_handoff",
+        "args": {
+         "reason": "order",
+         "summary": "Клиент хочет прийти на пробный урок завтра в 15:00 и спрашивает, кого спросить на месте. Нужна запись/подтверждение визита."
+        }
+       }
+      ],
+      "error": null
+     }
+    ]
+   },
+   "q1c_client_time_phone_repair": {
+    "pass": 6,
+    "n": 6,
+    "runs": [
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Подойдите в ТЦ Азия, 2 этаж.\nСпросите мастера.\n\nМастер посмотрит устройство и подтвердит точную цену и срок.",
+      "tool_calls": [
+       {
+        "name": "create_handoff",
+        "args": {
+         "reason": "order",
+         "summary": "Клиент придёт завтра в 15:00, iPhone 11, нужна замена экрана. Спрашивает, кого спросить.",
+         "name": ""
+        }
+       }
+      ],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Спросите мастера на месте.\n\nЗавтра в 15:00\niPhone 11, замена экрана\n\nМастер посмотрит устройство и подтвердит точную цену и срок.",
+      "tool_calls": [
+       {
+        "name": "create_handoff",
+        "args": {
+         "reason": "order",
+         "summary": "Клиент придёт завтра в 15:00, iPhone 11, нужна замена экрана. Спрашивает, кого спросить."
+        }
+       }
+      ],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Завтра в 15:00 вас встретят в ТЦ Азия, 2 этаж.\n\nСпросите мастера по ремонту телефонов.\n\nМастер посмотрит устройство и подтвердит точную цену и срок.",
+      "tool_calls": [
+       {
+        "name": "create_handoff",
+        "args": {
+         "reason": "order",
+         "summary": "Клиент придёт завтра в 15:00, iPhone 11, замена экрана. Спрашивает, кого спросить."
+        }
+       }
+      ],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Спросите мастера.\n\nЗавтра в 15:00, iPhone 11, замена экрана.\nМастер посмотрит устройство и подтвердит точную цену и срок.",
+      "tool_calls": [
+       {
+        "name": "create_handoff",
+        "args": {
+         "reason": "order",
+         "summary": "Клиент придёт завтра в 15:00 с iPhone 11, нужна замена экрана. Спрашивает, кого спросить."
+        }
+       }
+      ],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Подойдите к мастеру на месте.\n\nЗавтра в 15:00\niPhone 11, замена экрана\n\nМастер посмотрит устройство и подтвердит точную цену и срок.\nАдрес: ТЦ Азия, 2 этаж\nЧасы работы: 10:00–19:00",
+      "tool_calls": [
+       {
+        "name": "create_handoff",
+        "args": {
+         "reason": "order",
+         "summary": "Клиент придёт завтра в 15:00, iPhone 11, нужна замена экрана. Спрашивает, кого спросить."
+        }
+       }
+      ],
+      "error": null
+     },
+     {
+      "pass": true,
+      "verdicts": {
+       "no_time_assignment": true,
+       "no_exact_time_confirmation": true,
+       "offers_handoff_or_clarifies": true
+      },
+      "text": "Завтра в 15:00, iPhone 11, замена экрана — понял.\n\nПодойдите к мастеру в ТЦ Азия, 2 этаж.\nМастер посмотрит устройство и подтвердит точную цену и срок.",
+      "tool_calls": [
+       {
+        "name": "create_handoff",
+        "args": {
+         "reason": "order",
+         "summary": "Клиент придёт завтра в 15:00, iPhone 11, замена экрана. Нужно уточнить, к кому подойти."
+        }
+       }
+      ],
+      "error": null
+     }
+    ]
+   }
+  }
+ },
+ "usd": 0.29146245
+}

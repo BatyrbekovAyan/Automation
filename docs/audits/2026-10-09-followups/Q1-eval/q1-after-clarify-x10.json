@@ -1,0 +1,1359 @@
+{
+ "summary": {
+  "label": "q1-after-clarify-x10",
+  "prompts_ref": "worktree",
+  "scenario_version": "v1.2 (2026-10-08: V9-r2 ap_price_agrees_analogues — the price list agrees with the catalog, analogue rows in the same chunk; harness h5)",
+  "harness": "h5 (2026-10-08, V9-r2: no_conflict_claim / no_price_caveat for a price list that AGREES with the catalog; on top of h4 2026-10-07 V9: «расхождение» + negated conflict, zero-price / elliptical free delivery, «итого по N позициям» partial, «нужен» / the car or device by name, a word inside the installment claim, Kazakh = no Russian sentence, «18,000»; h3 2026-09-27 R14; checks pinned by test_checks.py)",
+  "model": "gpt-5.4-mini",
+  "reasoning_effort": null,
+  "dropped_params": [],
+  "panel_model": null,
+  "max_tokens": 200,
+  "search_simulation": "Price List Search sub-workflow (Reconcile Prices at worktree)",
+  "scenarios": 5,
+  "runs": 50,
+  "pass_all": 3,
+  "flaky": 2,
+  "fail": 0,
+  "error_runs": 0,
+  "finish_reason_length_runs": 0,
+  "prompt_tokens": 371654,
+  "cached_tokens": 347264,
+  "completion_tokens": 3420,
+  "reasoning_tokens": 0,
+  "cost_usd_auto_path": 0.0597,
+  "prices_usd_per_1m": [
+   0.75,
+   0.075,
+   4.5
+  ],
+  "latency_ms": {
+   "auto": {
+    "n": 50,
+    "median": 3144,
+    "p90": 3699,
+    "max": 5250
+   },
+   "panel": null
+  },
+  "seconds": 146,
+  "by_check": {
+   "asks_car": "10/10",
+   "asks_for_whom_or_goal": "5/10",
+   "asks_model": "7/10",
+   "asks_occasion_or_budget_or_offers": "10/10",
+   "lang_ru": "10/10",
+   "max_questions:2": "10/10",
+   "no_closing_offer": "10/10",
+   "no_markdown": "20/20",
+   "no_price": "27/30",
+   "numbers_grounded": "10/10",
+   "offers_handoff_or_clarifies": "10/10"
+  }
+ },
+ "results": [
+  {
+   "id": "ap_price_without_car",
+   "vertical": "auto_parts",
+   "mode": "auto",
+   "lang": "ru",
+   "tags": [
+    "niche",
+    "key"
+   ],
+   "repeats": 10,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "no_price": true,
+      "asks_car": true,
+      "lang_ru": true,
+      "no_markdown": true,
+      "no_closing_offer": true
+     },
+     "text": "Для какой марки, модели и года авто нужны передние колодки?",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "колодки передние Toyota 04465-02220 цена наличие"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8984,
+      "completion_tokens": 50,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2993,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "no_price": true,
+      "asks_car": true,
+      "lang_ru": true,
+      "no_markdown": true,
+      "no_closing_offer": true
+     },
+     "text": "Какая у вас марка, модель и год авто?",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "колодки передние Toyota 04465-02220 цена"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8983,
+      "completion_tokens": 46,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3448,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "no_price": true,
+      "asks_car": true,
+      "lang_ru": true,
+      "no_markdown": true,
+      "no_closing_offer": true
+     },
+     "text": "Для какой марки, модели и года авто нужны передние колодки?",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "колодки передние Toyota 04465-02220 цена наличие"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8984,
+      "completion_tokens": 50,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3236,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "no_price": true,
+      "asks_car": true,
+      "lang_ru": true,
+      "no_markdown": true,
+      "no_closing_offer": true
+     },
+     "text": "Какая у вас марка, модель и год автомобиля?",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4431,
+      "completion_tokens": 15,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1300,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "no_price": true,
+      "asks_car": true,
+      "lang_ru": true,
+      "no_markdown": true,
+      "no_closing_offer": true
+     },
+     "text": "Для какой марки, модели и года авто нужны передние колодки?",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "колодки передние Toyota 04465-02220 цена"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8983,
+      "completion_tokens": 49,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3144,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "no_price": true,
+      "asks_car": true,
+      "lang_ru": true,
+      "no_markdown": true,
+      "no_closing_offer": true
+     },
+     "text": "Для какой марки, модели и года авто нужны передние колодки?",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "колодки передние тормозные Toyota 04465-02220 цена наличие"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8987,
+      "completion_tokens": 53,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2862,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "no_price": true,
+      "asks_car": true,
+      "lang_ru": true,
+      "no_markdown": true,
+      "no_closing_offer": true
+     },
+     "text": "Для какой марки, модели и года авто нужны передние колодки?",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "колодки тормозные передние Toyota 04465-02220 цена"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8986,
+      "completion_tokens": 52,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3118,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "no_price": true,
+      "asks_car": true,
+      "lang_ru": true,
+      "no_markdown": true,
+      "no_closing_offer": true
+     },
+     "text": "Для какой марки, модели и года авто нужны передние колодки?",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "колодки передние Toyota 04465-02220 цена"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8983,
+      "completion_tokens": 49,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2596,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "no_price": true,
+      "asks_car": true,
+      "lang_ru": true,
+      "no_markdown": true,
+      "no_closing_offer": true
+     },
+     "text": "Для какой марки, модели и года авто нужны передние колодки?",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "колодки передние Toyota 04465-02220 цена наличие"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8984,
+      "completion_tokens": 50,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 4945,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "no_price": true,
+      "asks_car": true,
+      "lang_ru": true,
+      "no_markdown": true,
+      "no_closing_offer": true
+     },
+     "text": "Для какой марки, модели и года авто нужны передние колодки?",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4431,
+      "completion_tokens": 24,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1282,
+     "status": null
+    }
+   ]
+  },
+  {
+   "id": "fl_recommend",
+   "vertical": "flowers",
+   "mode": "auto",
+   "lang": "ru",
+   "tags": [
+    "niche"
+   ],
+   "repeats": 10,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "asks_occasion_or_budget_or_offers": true,
+      "numbers_grounded": true,
+      "max_questions:2": true
+     },
+     "text": "Для годовщины жене хорошо подойдёт что-то нежное и праздничное.\n\nВарианты:\nБукет пионов — 18 000 тг\nБукет 25 роз — 25 000 тг\n\nЕсли хотите, подберу точнее: какой бюджет и больше нравятся розы или пионы?",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4237,
+      "completion_tokens": 74,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1969,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "asks_occasion_or_budget_or_offers": true,
+      "numbers_grounded": true,
+      "max_questions:2": true
+     },
+     "text": "Для годовщины жене хорошо подойдёт нежный и красивый букет.\n\nЕсть вариант:\nБукет пионов — 18 000 тг\nСезонный, флорист подберёт свежий состав при оформлении.\n\nЕсли хотите, могу ещё предложить вариант под ваш бюджет.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4237,
+      "completion_tokens": 67,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2297,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "asks_occasion_or_budget_or_offers": true,
+      "numbers_grounded": true,
+      "max_questions:2": true
+     },
+     "text": "Для годовщины жене хорошо подойдёт:\nБукет пионов — 18 000 тг\nили\nБукет 25 роз — 25 000 тг\n\nЕсли хотите, подберу точнее под бюджет.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4237,
+      "completion_tokens": 55,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1724,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "asks_occasion_or_budget_or_offers": true,
+      "numbers_grounded": true,
+      "max_questions:2": true
+     },
+     "text": "Для годовщины жене хорошо подойдёт что-то нежное и красивое:\n\nБукет пионов — 18000 тг\nСезонный, очень романтичный вариант\n\nБукет 25 роз — 25000 тг\nРозы 50 см, Эквадор, классика для такого повода\n\nЕсли хотите, подберу точнее под ваш бюджет.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4237,
+      "completion_tokens": 88,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2277,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "asks_occasion_or_budget_or_offers": true,
+      "numbers_grounded": true,
+      "max_questions:2": true
+     },
+     "text": "Для годовщины жене хорошо подойдёт нежный и красивый букет.\n\nВарианты:\nБукет пионов — 18000 тг\nБукет 25 роз — 25000 тг\n\nЕсли хотите, подберу точнее под ваш бюджет.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4237,
+      "completion_tokens": 63,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2248,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "asks_occasion_or_budget_or_offers": true,
+      "numbers_grounded": true,
+      "max_questions:2": true
+     },
+     "text": "Для годовщины жене хорошо подойдёт:\n\nБукет пионов — 18 000 тг\nНежный и очень праздничный вариант, сезонный.\n\nБукет 25 роз — 25 000 тг\nКлассика для такого повода, розы 50 см, Эквадор.\n\nЕсли хотите, подберу ещё точнее под ваш бюджет.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4237,
+      "completion_tokens": 85,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2064,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "asks_occasion_or_budget_or_offers": true,
+      "numbers_grounded": true,
+      "max_questions:2": true
+     },
+     "text": "Для годовщины жене хорошо подойдёт что-то нежное и красивое.\n\nВарианты:\nБукет пионов — 18000 тг\nБукет 25 роз — 25000 тг\n\nЕсли хотите, подберу точнее: какой бюджет вам комфортен?",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4237,
+      "completion_tokens": 66,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1748,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "asks_occasion_or_budget_or_offers": true,
+      "numbers_grounded": true,
+      "max_questions:2": true
+     },
+     "text": "Для годовщины жене хорошо подойдёт что-то нежное и красивое.\n\nВарианты:\nБукет пионов — 18000 тг\nБукет 25 роз — 25000 тг\n\nЕсли хотите, подберу точнее под ваш бюджет и настроение букета.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4237,
+      "completion_tokens": 67,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2001,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "asks_occasion_or_budget_or_offers": true,
+      "numbers_grounded": true,
+      "max_questions:2": true
+     },
+     "text": "Для годовщины жене хорошо подойдёт что-то нежное и красивое.\n\nВарианты:\nБукет пионов — 18000 тг\nБукет 25 роз — 25000 тг\n\nЕсли хотите, подберу точнее: какой бюджет и больше нравятся розы или пионы?",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4237,
+      "completion_tokens": 72,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1888,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "asks_occasion_or_budget_or_offers": true,
+      "numbers_grounded": true,
+      "max_questions:2": true
+     },
+     "text": "Для годовщины жене хорошо подойдёт что-то нежное и праздничное.\n\nВариант 1: Букет пионов — 18 000 тг\nВариант 2: Букет 25 роз — 25 000 тг\n\nЕсли хотите, могу сразу помочь подобрать по бюджету и оформить заказ.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4237,
+      "completion_tokens": 75,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2751,
+     "status": null
+    }
+   ]
+  },
+  {
+   "id": "ed_price_no_details",
+   "vertical": "education",
+   "mode": "auto",
+   "lang": "ru",
+   "tags": [
+    "niche"
+   ],
+   "repeats": 10,
+   "pass_rate": 0.5,
+   "runs": [
+    {
+     "verdicts": {
+      "asks_for_whom_or_goal": false,
+      "no_markdown": true
+     },
+     "text": "Английский для детей, группа — 40 000 тг/мес\n3 раза в неделю по 60 минут\n\nЕсли хотите, могу записать на бесплатный пробный урок.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "цена английский курс для детей и взрослых, английский для детей группа, подготовка к ЕНТ, прайс"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8477,
+      "completion_tokens": 87,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3174,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "asks_for_whom_or_goal": false,
+      "no_markdown": true
+     },
+     "text": "Английский для детей, группа — 40000 тг/мес\n3 раза в неделю по 60 минут\n\nЕсли хотите, могу записать на бесплатный пробный урок.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "цена английский курс для детей и взрослых, английский для детей группа, подготовка к ЕНТ, прайс-лист"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8479,
+      "completion_tokens": 88,
+      "cached_tokens": 7424,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3410,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "asks_for_whom_or_goal": false,
+      "no_markdown": true
+     },
+     "text": "Английский для детей, группа — 40000 тг/мес\n3 раза в неделю по 60 минут\n\nЕсли хотите, могу записать на бесплатный пробный урок.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "цена английский курс для детей и взрослых, английский для детей группа, подготовка к ЕНТ, прайс-лист"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8479,
+      "completion_tokens": 88,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3385,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "asks_for_whom_or_goal": false,
+      "no_markdown": true
+     },
+     "text": "Английский для детей, группа — 40000 тг/мес\n3 раза в неделю по 60 минут\n\nЕсли хотите, могу записать на бесплатный пробный урок.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "цена английский курс для детей и взрослых, английский для детей группа, подготовка к ЕНТ, прайс-лист"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8479,
+      "completion_tokens": 88,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3218,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "asks_for_whom_or_goal": true,
+      "no_markdown": true
+     },
+     "text": "Чтобы подсказать цену, уточните, пожалуйста, для кого курс — для ребёнка или для взрослого?",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4188,
+      "completion_tokens": 25,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1352,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "asks_for_whom_or_goal": true,
+      "no_markdown": true
+     },
+     "text": "Английский для детей, группа — 40 000 тг/мес\n3 раза в неделю по 60 минут\n\nЕсли нужен английский для взрослого или другая цель, уточните, пожалуйста, для кого и какой формат интересует — и я подскажу точнее. Пробный урок бесплатный.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "цена английский курс для детей и взрослых прайс-лист учебный центр"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8468,
+      "completion_tokens": 105,
+      "cached_tokens": 7424,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3699,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "asks_for_whom_or_goal": true,
+      "no_markdown": true
+     },
+     "text": "Для ребёнка или взрослого?\nИ какая цель: английский для школы, разговорный или подготовка к ЕНТ?",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4188,
+      "completion_tokens": 29,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1223,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "asks_for_whom_or_goal": false,
+      "no_markdown": true
+     },
+     "text": "Английский для детей, группа — 40000 тг/мес\n3 раза в неделю по 60 минут\n\nЕсли хотите, могу записать на бесплатный пробный урок.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "цена английский курс для детей и взрослых, английский для детей группа, подготовка к ЕНТ, прайс-лист"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8479,
+      "completion_tokens": 88,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3275,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "asks_for_whom_or_goal": true,
+      "no_markdown": true
+     },
+     "text": "Для ребёнка курс английского — 40 000 тг/мес.\n3 раза в неделю по 60 минут.\n\nЕсли нужен английский для взрослого или хотите записаться на пробный урок, напишите имя и возраст ученика.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4188,
+      "completion_tokens": 53,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1573,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "asks_for_whom_or_goal": true,
+      "no_markdown": true
+     },
+     "text": "Английский для детей — 40 000 тг/мес\n3 раза в неделю по 60 минут\n\nЕсли нужен английский для взрослого или другая цель, уточните, пожалуйста, для кого и какой формат нужен — подскажу точнее.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "цена английский курс для детей и взрослых, английский для детей, английский, прайс"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8472,
+      "completion_tokens": 97,
+      "cached_tokens": 7424,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3317,
+     "status": null
+    }
+   ]
+  },
+  {
+   "id": "pr_price_no_model",
+   "vertical": "phone_repair",
+   "mode": "auto",
+   "lang": "ru",
+   "tags": [
+    "niche",
+    "key"
+   ],
+   "repeats": 10,
+   "pass_rate": 0.7,
+   "runs": [
+    {
+     "verdicts": {
+      "asks_model": true,
+      "no_price": true
+     },
+     "text": "Напишите, пожалуйста, модель телефона.\n\nТогда скажу точную цену замены экрана.\nДиагностика бесплатная, точную цену мастер подтвердит до начала работ.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "замена экрана разбит экран цена ремонт iPhone Samsung Xiaomi экран"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8833,
+      "completion_tokens": 72,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3331,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "asks_model": true,
+      "no_price": true
+     },
+     "text": "Подскажите модель телефона.\n\nТочная цена зависит от модели. Диагностика бесплатная, мастер подтвердит цену и срок до начала работ.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "замена экрана разбил экран цена ремонт телефона iPhone Samsung модель"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8833,
+      "completion_tokens": 65,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3017,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "asks_model": true,
+      "no_price": true
+     },
+     "text": "Подскажите, пожалуйста, модель телефона.\n\nТочная цена зависит от модели. Диагностика бесплатная, мастер подтвердит стоимость до начала работ.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "замена экрана разбил экран цена ремонт телефонов модель iPhone Samsung экран"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8835,
+      "completion_tokens": 68,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3235,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "asks_model": false,
+      "no_price": false
+     },
+     "text": "Если у вас iPhone 11, замена экрана — 35000 тг, 1 час.\n\nТочная цена — после диагностики, мастер подтвердит её до начала работ.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "замена экрана разбил экран цена ремонт телефона iPhone 11 экран"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8834,
+      "completion_tokens": 75,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2923,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "asks_model": true,
+      "no_price": true
+     },
+     "text": "Нужна модель телефона.\n\nПо замене экрана цена зависит от модели, точную стоимость скажу после уточнения. Диагностика бесплатная, мастер подтвердит цену до начала работ.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "замена экрана цена ремонт телефона разбит экран iPhone Samsung Xiaomi модель"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8834,
+      "completion_tokens": 76,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 4491,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "asks_model": false,
+      "no_price": false
+     },
+     "text": "Если у вас iPhone 11, замена экрана — 35000 тг\nОригинальный дисплей, срок — 1 час\n\nТочная цена — после диагностики, мастер подтвердит её до начала работ",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "замена экрана цена iPhone 11 экран разбил"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8831,
+      "completion_tokens": 79,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 5250,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "asks_model": true,
+      "no_price": true
+     },
+     "text": "Уточните, пожалуйста, модель телефона.\n\nПо замене экрана цена зависит от модели.  \nДиагностика бесплатная, точную цену мастер подтвердит до начала работ.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "замена экрана цена ремонт экран разбил iPhone 11 iPhone 12 iPhone 13 дисплей"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8842,
+      "completion_tokens": 81,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3455,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "asks_model": false,
+      "no_price": false
+     },
+     "text": "Если у вас iPhone 11, замена экрана — 35000 тг\nОригинальный дисплей, срок — 1 час\n\nТочная цена — после диагностики, мастер подтвердит её до начала работ",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "замена экрана цена iPhone 11 экран разбил"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8831,
+      "completion_tokens": 79,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3012,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "asks_model": true,
+      "no_price": true
+     },
+     "text": "Уточните, пожалуйста, модель телефона.\n\nТогда скажу точную цену. Точная цена — после диагностики, мастер подтвердит её до начала работ.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "замена экрана разбил экран цена iPhone 11 сервис ремонт телефонов"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8835,
+      "completion_tokens": 70,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3041,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "asks_model": true,
+      "no_price": true
+     },
+     "text": "Уточните, пожалуйста, модель телефона.\n\nТочная цена зависит от модели. Диагностика бесплатная, мастер подтвердит цену до начала работ.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "замена экрана цена для телефона разбил экран"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8829,
+      "completion_tokens": 62,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2801,
+     "status": null
+    }
+   ]
+  },
+  {
+   "id": "pr_model_not_in_list",
+   "vertical": "phone_repair",
+   "mode": "auto",
+   "lang": "ru",
+   "tags": [
+    "unknown",
+    "key"
+   ],
+   "repeats": 10,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "no_price": true,
+      "offers_handoff_or_clarifies": true
+     },
+     "text": "Для Samsung S21 в прайсе цены нет.\n\nМогу передать вопрос мастеру, он уточнит стоимость после диагностики. Диагностика бесплатная.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "Samsung S21 разбит экран цена замена экрана"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8832,
+      "completion_tokens": 66,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3514,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "no_price": true,
+      "offers_handoff_or_clarifies": true
+     },
+     "text": "По Samsung S21 цены в прайсе нет.\n\nМогу передать вопрос мастеру — он уточнит стоимость после диагностики. Диагностика бесплатная.\n\nАдрес: ТЦ Азия, 2 этаж\nЧасы работы: 10:00–19:00\nТелефон: +7 705 444 55 66",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "Samsung S21 замена экрана цена"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8829,
+      "completion_tokens": 100,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3483,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "no_price": true,
+      "offers_handoff_or_clarifies": true
+     },
+     "text": "По Samsung S21 цены в прайсе нет.\n\nДиагностика бесплатная\nПринесите устройство в ТЦ Азия, 2 этаж, с 10:00 до 19:00\nМастер посмотрит экран и скажет точную цену и срок до начала работ",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "Samsung S21 разбит экран цена замена экрана"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8832,
+      "completion_tokens": 91,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3518,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "no_price": true,
+      "offers_handoff_or_clarifies": true
+     },
+     "text": "По Samsung S21 цены в прайсе нет.\n\nМогу передать вопрос мастеру, он уточнит стоимость после диагностики. Диагностика бесплатная.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "Samsung S21 разбит экран цена замена экрана"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8832,
+      "completion_tokens": 66,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3318,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "no_price": true,
+      "offers_handoff_or_clarifies": true
+     },
+     "text": "Для Samsung S21 цены в прайсе нет.\n\nДиагностика бесплатная.\nПринесите устройство в ТЦ Азия, 2 этаж, с 10:00 до 19:00 — мастер посмотрит и скажет точную цену и срок.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "Samsung S21 разбит экран цена замена экрана"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8832,
+      "completion_tokens": 87,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3556,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "no_price": true,
+      "offers_handoff_or_clarifies": true
+     },
+     "text": "По Samsung S21 цены в прайсе нет.\n\nМогу передать вопрос мастеру, он уточнит стоимость после диагностики.\nДиагностика бесплатная.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "Samsung S21 разбит экран цена замена экрана"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8832,
+      "completion_tokens": 66,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3131,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "no_price": true,
+      "offers_handoff_or_clarifies": true
+     },
+     "text": "Для Samsung S21 в прайсе цены нет.\n\nДиагностика бесплатная.\nМастер посмотрит устройство и скажет точную стоимость и срок после осмотра.\n\nАдрес: ТЦ Азия, 2 этаж\nЧасы работы: 10:00–19:00",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "Samsung S21 разбит экран цена замена экрана"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8832,
+      "completion_tokens": 91,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3789,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "no_price": true,
+      "offers_handoff_or_clarifies": true
+     },
+     "text": "По Samsung S21 цены в прайсе нет.\n\nМастер посмотрит устройство и скажет точную стоимость после диагностики.\nДиагностика бесплатная.\n\nАдрес: ТЦ Азия, 2 этаж\nЧасы работы: 10:00–19:00\nТелефон: +7 705 444 55 66",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "Samsung S21 замена экрана цена"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8829,
+      "completion_tokens": 99,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3416,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "no_price": true,
+      "offers_handoff_or_clarifies": true
+     },
+     "text": "Для Samsung S21 цены в прайсе нет.\n\nДиагностика бесплатная.\nМастер посмотрит устройство и скажет точную цену и срок после осмотра.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "Samsung S21 разбит экран цена замена экрана"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8832,
+      "completion_tokens": 68,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3394,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "no_price": true,
+      "offers_handoff_or_clarifies": true
+     },
+     "text": "Для Samsung S21 в прайсе цены нет.\n\nМогу передать вопрос мастеру на уточнение, диагностика у нас бесплатная.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "Samsung S21 разбит экран цена замена экрана"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8832,
+      "completion_tokens": 61,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3225,
+     "status": null
+    }
+   ]
+  }
+ ]
+}
