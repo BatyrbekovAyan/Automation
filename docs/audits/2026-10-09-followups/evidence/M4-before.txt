@@ -1,0 +1,252 @@
+# M4 before — HEAD 90a8fa53 (server canon + client code = HEAD; the NEW tests only), 2026-10-09T09:24:36Z
+
+## Server behavioural test: python3 Tools/n8n/tests/test_claim.py   (canonical crAuthSession001 = HEAD)
+PASS R1 S1: the owner re-pairs its own profile while a stranger holds a pending claim -> the stranger gets nothing
+PASS V2 S2: a legacy profile re-paired by its owner is NOT bound by the pairing — it is bound by the code that then lands in its own chat
+PASS R1 S3: a stranger takes over the pending claim while the claimant pairs -> nobody is bound
+PASS V2 S4: a claim older than a day records no pairing; a renewed claim (claim.start) pairs again and binds only by code
+PASS R1 S5: a stale claim capability (the claim was taken over) cannot start a pairing through the proxy
+PASS R1 S7: claim.status never mints or sends a code (no unsolicited codes / phishing aid)
+PASS R1 S8: transfer by code on reinstall — wrong / expired / replayed codes change nothing, the right code transfers
+PASS R1 S9: two concurrent claims — only the proof (the code from the bot's own chat) binds; the racing claimant without it changes nothing
+PASS R1 S10: an unauthenticated claim.* call never reaches Claim Start (no pending claim / row written before the refusal)
+PASS V2 S11: a QR request + the OWNER's independent re-connection never hands an owner-less profile (or its workflow) to the requester
+PASS V2 S12: a code the transport did not accept is reported (code_send_failed, 502) and cleared — the retry sends a NEW one, never "reuses" a lost one
+PASS V2 S13: five wrong answers kill the code — the right one is then refused (claim_code_locked) and no new code is sent until its window ends
+PASS V2 S14: structure — no reauth bind, only Verify Claim Code writes owner_id, claim.verify never calls Wappi, a send is judged
+PASS V2 S15: another install's claim.status / claim.verify never take over a pending claim, nor burn its attempts
+PASS V2 S16: Telegram — the code goes to the AUTHORISED account (account.phone), never to a number named in auth/phone
+FAIL M4 S17: claim.start / claim.status / claim.verify on the install's OWN retired row -> 410 profile_retired + the reason; Wappi is not asked, no pending claim, no code, Verify Claim Code never runs
+      - Z-trial_expiry claim.start (Wappi 200): answer 200 None success=True claimMethod=owned
+      - Z-trial_expiry claim.start (Wappi 200): a refusal must not carry a token
+      - Z-trial_expiry claim.start (Wappi 200): retiredReason None != 'trial_expiry'
+      - Z-trial_expiry claim.start (Wappi 200): Wappi get/status was called for a retired profile
+      - Z-trial_expiry claim.start (Wappi 404): answer 200 None success=True claimMethod=owned
+      - Z-trial_expiry claim.start (Wappi 404): a refusal must not carry a token
+      - Z-trial_expiry claim.start (Wappi 404): retiredReason None != 'trial_expiry'
+      - Z-trial_expiry claim.start (Wappi 404): Wappi get/status was called for a retired profile
+      - Z-trial_expiry claim.status (Wappi 200): answer 200 None success=True claimMethod=owned
+      - Z-trial_expiry claim.status (Wappi 200): a refusal must not carry a token
+      - Z-trial_expiry claim.status (Wappi 200): retiredReason None != 'trial_expiry'
+      - Z-trial_expiry claim.status (Wappi 200): Wappi get/status was called for a retired profile
+      - Z-trial_expiry claim.verify (Wappi 200): answer 403 claim_code_rejected success=False claimMethod=None
+      - Z-trial_expiry claim.verify (Wappi 200): retiredReason None != 'trial_expiry'
+      - Z-trial_expiry claim.verify (Wappi 200): Verify Claim Code ran for a retired profile
+      - Z-churn_grace claim.start (Wappi 200): answer 200 None success=True claimMethod=owned
+      - Z-churn_grace claim.start (Wappi 200): a refusal must not carry a token
+      - Z-churn_grace claim.start (Wappi 200): retiredReason None != 'churn_grace'
+      - Z-churn_grace claim.start (Wappi 200): Wappi get/status was called for a retired profile
+      - Z-churn_grace claim.start (Wappi 404): answer 200 None success=True claimMethod=owned
+      - Z-churn_grace claim.start (Wappi 404): a refusal must not carry a token
+      - Z-churn_grace claim.start (Wappi 404): retiredReason None != 'churn_grace'
+      - Z-churn_grace claim.start (Wappi 404): Wappi get/status was called for a retired profile
+      - Z-churn_grace claim.status (Wappi 200): answer 200 None success=True claimMethod=owned
+      - Z-churn_grace claim.status (Wappi 200): a refusal must not carry a token
+      - Z-churn_grace claim.status (Wappi 200): retiredReason None != 'churn_grace'
+      - Z-churn_grace claim.status (Wappi 200): Wappi get/status was called for a retired profile
+      - Z-churn_grace claim.verify (Wappi 200): answer 403 claim_code_rejected success=False claimMethod=None
+      - Z-churn_grace claim.verify (Wappi 200): retiredReason None != 'churn_grace'
+      - Z-churn_grace claim.verify (Wappi 200): Verify Claim Code ran for a retired profile
+      - Z-liveness claim.start (Wappi 200): answer 200 None success=True claimMethod=owned
+      - Z-liveness claim.start (Wappi 200): a refusal must not carry a token
+      - Z-liveness claim.start (Wappi 200): retiredReason None != 'liveness'
+      - Z-liveness claim.start (Wappi 200): Wappi get/status was called for a retired profile
+      - Z-liveness claim.start (Wappi 404): answer 200 None success=True claimMethod=owned
+      - Z-liveness claim.start (Wappi 404): a refusal must not carry a token
+      - Z-liveness claim.start (Wappi 404): retiredReason None != 'liveness'
+      - Z-liveness claim.start (Wappi 404): Wappi get/status was called for a retired profile
+      - Z-liveness claim.status (Wappi 200): answer 200 None success=True claimMethod=owned
+      - Z-liveness claim.status (Wappi 200): a refusal must not carry a token
+      - Z-liveness claim.status (Wappi 200): retiredReason None != 'liveness'
+      - Z-liveness claim.status (Wappi 200): Wappi get/status was called for a retired profile
+      - Z-liveness claim.verify (Wappi 200): answer 403 claim_code_rejected success=False claimMethod=None
+      - Z-liveness claim.verify (Wappi 200): retiredReason None != 'liveness'
+      - Z-liveness claim.verify (Wappi 200): Verify Claim Code ran for a retired profile
+      - Z-app_delete claim.start (Wappi 200): answer 200 None success=True claimMethod=owned
+      - Z-app_delete claim.start (Wappi 200): a refusal must not carry a token
+      - Z-app_delete claim.start (Wappi 200): retiredReason None != 'app_delete'
+      - Z-app_delete claim.start (Wappi 200): Wappi get/status was called for a retired profile
+      - Z-app_delete claim.start (Wappi 404): answer 200 None success=True claimMethod=owned
+      - Z-app_delete claim.start (Wappi 404): a refusal must not carry a token
+      - Z-app_delete claim.start (Wappi 404): retiredReason None != 'app_delete'
+      - Z-app_delete claim.start (Wappi 404): Wappi get/status was called for a retired profile
+      - Z-app_delete claim.status (Wappi 200): answer 200 None success=True claimMethod=owned
+      - Z-app_delete claim.status (Wappi 200): a refusal must not carry a token
+      - Z-app_delete claim.status (Wappi 200): retiredReason None != 'app_delete'
+      - Z-app_delete claim.status (Wappi 200): Wappi get/status was called for a retired profile
+      - Z-app_delete claim.verify (Wappi 200): answer 403 claim_code_rejected success=False claimMethod=None
+      - Z-app_delete claim.verify (Wappi 200): retiredReason None != 'app_delete'
+      - Z-app_delete claim.verify (Wappi 200): Verify Claim Code ran for a retired profile
+      - Z-channel_limit claim.start (Wappi 200): answer 200 None success=True claimMethod=owned
+      - Z-channel_limit claim.start (Wappi 200): a refusal must not carry a token
+      - Z-channel_limit claim.start (Wappi 200): retiredReason None != 'channel_limit'
+      - Z-channel_limit claim.start (Wappi 200): Wappi get/status was called for a retired profile
+      - Z-channel_limit claim.start (Wappi 404): answer 200 None success=True claimMethod=owned
+      - Z-channel_limit claim.start (Wappi 404): a refusal must not carry a token
+      - Z-channel_limit claim.start (Wappi 404): retiredReason None != 'channel_limit'
+      - Z-channel_limit claim.start (Wappi 404): Wappi get/status was called for a retired profile
+      - Z-channel_limit claim.status (Wappi 200): answer 200 None success=True claimMethod=owned
+      - Z-channel_limit claim.status (Wappi 200): a refusal must not carry a token
+      - Z-channel_limit claim.status (Wappi 200): retiredReason None != 'channel_limit'
+      - Z-channel_limit claim.status (Wappi 200): Wappi get/status was called for a retired profile
+      - Z-channel_limit claim.verify (Wappi 200): answer 403 claim_code_rejected success=False claimMethod=None
+      - Z-channel_limit claim.verify (Wappi 200): retiredReason None != 'channel_limit'
+      - Z-channel_limit claim.verify (Wappi 200): Verify Claim Code ran for a retired profile
+      - Z-tg claim.start (Wappi 200): answer 200 None success=True claimMethod=owned
+      - Z-tg claim.start (Wappi 200): a refusal must not carry a token
+      - Z-tg claim.start (Wappi 200): retiredReason None != 'trial_expiry'
+      - Z-tg claim.start (Wappi 200): Wappi get/status was called for a retired profile
+      - Z-tg claim.status (Wappi 200): answer 200 None success=True claimMethod=owned
+      - Z-tg claim.status (Wappi 200): a refusal must not carry a token
+      - Z-tg claim.status (Wappi 200): retiredReason None != 'trial_expiry'
+      - Z-tg claim.status (Wappi 200): Wappi get/status was called for a retired profile
+      - Z-tg claim.verify (Wappi 200): answer 403 claim_code_rejected success=False claimMethod=None
+      - Z-tg claim.verify (Wappi 200): retiredReason None != 'trial_expiry'
+      - Z-tg claim.verify (Wappi 200): Verify Claim Code ran for a retired profile
+FAIL M4 S18: a retired row this install does NOT own (owner-less, another install's) -> the same 410 without a reason; no pending claim, never in c; a live Wappi profile behind it (liveness false positive) gets no code and no owner
+      - R-wa claim.start: answer 200 None success=True claimMethod=reauth
+      - R-wa claim.start: a refusal must not carry a token
+      - R-wa claim.start: Wappi get/status was called for a retired profile
+      - R-wa claim.start: a pending claim was written onto a retired row: {'owner_id': None, 'claim_pending_by': 'inst-O', 'claim_pending_at': '2026-10-09T14:32:42.600905+05:00', 'claim_code_hash': None, 'retired': True}
+      - R-wa claim.start: the retired row entered the token's c: ['R-wa']
+      - R-wa claim.status: answer 200 None success=True claimMethod=reauth
+      - R-wa claim.status: a refusal must not carry a token
+      - R-wa claim.status: Wappi get/status was called for a retired profile
+      - R-wa claim.status: a pending claim was written onto a retired row: {'owner_id': None, 'claim_pending_by': 'inst-O', 'claim_pending_at': '2026-10-09T14:32:42.600905+05:00', 'claim_code_hash': None, 'retired': True}
+      - R-wa claim.status: the retired row entered the token's c: ['R-wa']
+      - R-wa claim.start: answer 200 None success=True claimMethod=reauth
+      - R-wa claim.start: a refusal must not carry a token
+      - R-wa claim.start: Wappi get/status was called for a retired profile
+      - R-wa claim.start: a pending claim was written onto a retired row: {'owner_id': None, 'claim_pending_by': 'inst-O', 'claim_pending_at': '2026-10-09T14:32:42.600905+05:00', 'claim_code_hash': None, 'retired': True}
+      - R-wa claim.start: the retired row entered the token's c: ['R-wa']
+      - F-wa claim.start: answer 200 None success=True claimMethod=reauth
+      - F-wa claim.start: a refusal must not carry a token
+      - F-wa claim.start: Wappi get/status was called for a retired profile
+      - F-wa claim.start: a pending claim was written onto a retired row: {'owner_id': 'inst-A', 'claim_pending_by': 'inst-O', 'claim_pending_at': '2026-10-09T14:32:54.609684+05:00', 'claim_code_hash': None, 'retired': True}
+      - F-wa claim.status: answer 200 None success=True claimMethod=reauth
+      - F-wa claim.status: a refusal must not carry a token
+      - F-wa claim.status: Wappi get/status was called for a retired profile
+      - F-wa claim.status: a pending claim was written onto a retired row: {'owner_id': 'inst-A', 'claim_pending_by': 'inst-O', 'claim_pending_at': '2026-10-09T14:32:54.609684+05:00', 'claim_code_hash': None, 'retired': True}
+      - F-wa claim.start: answer 200 None success=True claimMethod=reauth
+      - F-wa claim.start: a refusal must not carry a token
+      - F-wa claim.start: Wappi get/status was called for a retired profile
+      - F-wa claim.start: a pending claim was written onto a retired row: {'owner_id': 'inst-A', 'claim_pending_by': 'inst-O', 'claim_pending_at': '2026-10-09T14:32:54.609684+05:00', 'claim_code_hash': None, 'retired': True}
+      - B-wa claim.start: answer 200 None success=True claimMethod=code
+      - B-wa claim.start: a refusal must not carry a token
+      - B-wa claim.start: Wappi get/status was called for a retired profile
+      - B-wa claim.start: a code was sent into a retired profile's chat
+      - B-wa claim.verify: answer 200 None success=True claimMethod=code
+      - B-wa claim.verify: a refusal must not carry a token
+      - B-wa claim.verify: Verify Claim Code ran for a retired profile
+      - a retired owner-less row got an owner: {'owner_id': 'inst-O', 'claim_pending_by': None, 'claim_pending_at': None, 'claim_code_hash': None, 'retired': True}
+FAIL M4 S19: invariant — every claimMethod:'owned' answer issues a token whose p lists the profile (own / foreign / owner-less × live / retired)
+      - own retired trial_expiry claim.start: «owned» without the profile in the token — profiles=['C-own'] token p=['C-own']
+      - own retired trial_expiry claim.start: a retired row answered success (owned)
+      - own retired trial_expiry claim.status: «owned» without the profile in the token — profiles=['C-own'] token p=['C-own']
+      - own retired trial_expiry claim.status: a retired row answered success (owned)
+      - own retired churn_grace claim.start: «owned» without the profile in the token — profiles=['C-own'] token p=['C-own']
+      - own retired churn_grace claim.start: a retired row answered success (owned)
+      - own retired churn_grace claim.status: «owned» without the profile in the token — profiles=['C-own'] token p=['C-own']
+      - own retired churn_grace claim.status: a retired row answered success (owned)
+      - own retired liveness claim.start: «owned» without the profile in the token — profiles=['C-own'] token p=['C-own']
+      - own retired liveness claim.start: a retired row answered success (owned)
+      - own retired liveness claim.status: «owned» without the profile in the token — profiles=['C-own'] token p=['C-own']
+      - own retired liveness claim.status: a retired row answered success (owned)
+      - own retired app_delete claim.start: «owned» without the profile in the token — profiles=['C-own'] token p=['C-own']
+      - own retired app_delete claim.start: a retired row answered success (owned)
+      - own retired app_delete claim.status: «owned» without the profile in the token — profiles=['C-own'] token p=['C-own']
+      - own retired app_delete claim.status: a retired row answered success (owned)
+      - own retired channel_limit claim.start: «owned» without the profile in the token — profiles=['C-own'] token p=['C-own']
+      - own retired channel_limit claim.start: a retired row answered success (owned)
+      - own retired channel_limit claim.status: «owned» without the profile in the token — profiles=['C-own'] token p=['C-own']
+      - own retired channel_limit claim.status: a retired row answered success (owned)
+      - foreign retired claim.start: a retired row answered success (code)
+      - foreign retired claim.status: a retired row answered success (pending)
+      - owner-less retired claim.start: a retired row answered success (code)
+      - owner-less retired claim.status: a retired row answered success (pending)
+FAIL V2/M4 negative: verify-auth-gate.py rejects an Auth Session that binds on a pairing again, lets claim.verify call Wappi, or loses either half of the M4 retired-row refusal
+      - M4 retired answered owned: the mutation found nothing to change in the canon
+      - M4 retired answered owned: verifier passed (or failed without naming M4): )
+OK  Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json (workflow id + owner bound to the profile)
+OK  Delete Bot Files / Set Workflow State (V12: database ownership, honest answer, idempotent delete)
+OK  Set Workflow State (protected list carries Auth Session + Wappi Proxy)
+ALL AUTH GATE ASSERTS PASSED
+
+      - M4 retired asks Wappi: the mutation found nothing to change in the canon
+      - M4 retired asks Wappi: verifier passed (or failed without naming M4): )
+OK  Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json (workflow id + owner bound to the profile)
+OK  Delete Bot Files / Set Workflow State (V12: database ownership, honest answer, idempotent delete)
+OK  Set Workflow State (protected list carries Auth Session + Wappi Proxy)
+ALL AUTH GATE ASSERTS PASSED
+
+      - M4 pending on a retired row: the mutation found nothing to change in the canon
+      - M4 pending on a retired row: verifier passed (or failed without naming M4): )
+OK  Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json (workflow id + owner bound to the profile)
+OK  Delete Bot Files / Set Workflow State (V12: database ownership, honest answer, idempotent delete)
+OK  Set Workflow State (protected list carries Auth Session + Wappi Proxy)
+ALL AUTH GATE ASSERTS PASSED
+
+
+15 pass, 4 fail
+python3 Tools/n8n/tests/test_claim.py  576.27s user 105.84s system 102% cpu 11:04.26 total
+exit=1
+
+## The NEW verifier pins on the HEAD canon: python3 Tools/n8n/verify-auth-gate.py
+AUTH GATE FAIL: V2/M4: claim.verify must not call Wappi, nor may any op on a retired profile (Claim Start's retired)
+
+## STAGING (verify-deployed --base http://localhost:5678 exit 0: staging = HEAD canon): python3 Tools/n8n/staging/e2e-auth.py --only claim_on_retired
+2026-10-09T09:37:01Z
+   pre-run: swept 0 stale mock profile(s) (live mock knows 4)
+FAIL  claim_on_retired_profile_is_refused (3.7s) — M4: claim.start / claim.status / claim.verify on a bot profile the sweep retired (trial over) → 410 profile_retired, retiredReason for its owner only (another install: the same 410 without it), Wappi is never asked, no pending claim, no token; the owner's V12 delete of that same bot then goes through (profile.delete answers a FINAL code the client steps over — not in the token, 403; DeleteBotFiles and SetWorkflowState delete = 200, the clones gone) — WhatsApp and Telegram
+      token after retire=[] answers={"own whatsapp claim.start": [200, null, null, true], "own whatsapp claim.status": [200, null, null, true], "own whatsapp claim.verify": [403, "claim_code_rejected", null, false], "foreign whatsapp claim.start": [200, null, null, true], "own telegram claim.start": [200, null, null, true], "own telegram claim.status": [200, null, null, true], "own telegram claim.verify": [403, "claim_code_rejected", null, false], "foreign telegram claim.start": [200, null, null, true]} wappi calls for the retired ids=['/api/sync/get/status', '/api/sync/get/status', '/api/sync/get/status', '/api/sync/message/send', '/tapi/sync/get/status', '/tapi/sync/get/status', '/tapi/sync/get/status', '/tapi/sync/message/send'] claims written=2 | V12 delete: unlink=[403, 403] dbf=200 {'success': True, 'deletedChunks': 0, 'deletedFiles': 0, 'retiredProfiles': 0, 'deletedMemoryRows': 0, 'deletedOutcomes': 0, 'deletedReplyFlags': 2, 'deletedHistoryEvents': 0, 'deletedHandoffs': 0, 'deletedReplyEvents': 0, 'deletedChatStates': 0} sws=[200, 200] GET=[404, 404]
+   cleanup A: deleted rows: 3
+   cleanup B: deleted rows: 3
+   cleanup m4: deleted rows: 4
+   cleanup m4x: deleted rows: 2
+
+0 pass, 1 fail
+exit=1
+
+# Note: on HEAD a FOREIGN install's claim.start on the retired row SENT A CODE into its chat (message/send above, the mock
+# reports the profile authorised = a liveness false positive) and wrote a pending claim (claims written=2).
+
+## Client (Unity 6000.3.9f1 EditMode, headless, Editor closed; client code = HEAD): Tools/run-tests-headless.sh 'ProfileClaimWiringTests|BotDeletionWiringTests'
+# Only the SOURCE guards run here: the pure-seam tests (ProfileClaimPolicyTests M4 block, ProfileRetirementTests, BotCardModelTests
+# M4 block, the FontGlyphCoverageTests seam entry) reference members that do not exist on HEAD (ProfileClaimRun, ProfileRetirement,
+# ProfileClaimPolicy.IsRetired/RetiredMarkerApplies, BotCardModel.SublineKind/RetiredSubline) — they were added with the fix.
+================ EditMode test results (headless) ================
+  result=Failed(Child)  total=12  passed=7  failed=5  skipped=0  inconclusive=0
+  Failing / inconclusive tests:
+    - BotDeletionWiringTests.LocalWipe_ClearsTheRetiredChannelMarkers
+    - ProfileClaimWiringTests.AuthClient_Claim_ReadsRetiredReason
+    - ProfileClaimWiringTests.ClaimOne_OnProfileRetired_MarksTheChannelAndMovesOn
+    - ProfileClaimWiringTests.ConnectedProfiles_CarryTheBotKeyAndItsRetiredMarker
+    - ProfileClaimWiringTests.RunAtBoot_NeverAsksTheSameProfileTwiceInOneRun
+=================================================================
+PASSED BotDeletionWiringTests.DeletePopup_BodyClearsTheButtons_InThePrefab
+PASSED BotDeletionWiringTests.FullWipe_ClearsPrefsOnlyAfterEveryBotIsSettled
+FAILED BotDeletionWiringTests.LocalWipe_ClearsTheRetiredChannelMarkers
+        the local wipe must clear the retired-channel markers
+          Expected: True
+          But was:  False
+PASSED BotDeletionWiringTests.LocalWipe_TalksToNoServer_AndTheOldOneCallDeleteIsGone
+PASSED BotDeletionWiringTests.ServerHalf_UnlinksTheProfileFirst_ReadsEveryAnswer_AndHoldsTheQueue
+PASSED BotDeletionWiringTests.SettingsDelete_RemovesTheBotOnlyOnTheVerdict_OrTheOwnersPhoneOnlyChoice
+PASSED ProfileClaimWiringTests.AfterChannelAuthorized_AsksForTheCode_NeverPollsClaimStatus
+FAILED ProfileClaimWiringTests.AuthClient_Claim_ReadsRetiredReason
+        M4: ClaimResult carries the server's retiredReason
+          Expected: True
+          But was:  False
+PASSED ProfileClaimWiringTests.AuthPollers_CreateNothing_UntilTheClaimSucceeded
+FAILED ProfileClaimWiringTests.ClaimOne_OnProfileRetired_MarksTheChannelAndMovesOn
+        M4: profile_retired → mark the bot's channel (with the server's reason) → finished(true): the loop goes on to the next bot
+          Expected: True
+          But was:  False
+FAILED ProfileClaimWiringTests.ConnectedProfiles_CarryTheBotKeyAndItsRetiredMarker
+        M4: the marker lives under the bot GameObject's name (the PlayerPrefs prefix)
+          Expected: True
+          But was:  False
+FAILED ProfileClaimWiringTests.RunAtBoot_NeverAsksTheSameProfileTwiceInOneRun
+        M4: ONE run per boot run, created before the loop (a per-turn one would forget what it asked)
+          Expected: True
+          But was:  False
