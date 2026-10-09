@@ -1,0 +1,210 @@
+Q1 (вариант A) — ПОСЛЕ правки. Канон: 04ed35eb (оценщик h6 + набор v1.3), f02b6674 (_core.md + карты Create/Edit WA/TG).
+staging n8n 2.36.7 localhost:5678, 2026-10-09. Прод не тронут.
+
+1. Оценщик: python3 Tools/n8n/eval/test_checks.py → OK (23 теста; NotMentions 25 строк, MentionsClock 5 строк).
+   Сверка с ручным флагом эха проекта Q1 (q1report.py: любое 15:00 в ответе q1c_client_time_*) по всем сохранённым ответам
+   (Q1-eval/ + q1a-*-x8): совпадение 422/426; 4 расхождения — отказы («…не назначаю сам», «…не подтверждаю заранее») и цитаты
+   клиента («Вы писали, что придёте завтра в 15:00 — это нужно подтвердить у мастера», «…передам мастеру ваш запрос на …»).
+
+2. inject-prompts.py (~/.venvs/tiktoken): запись → 4 файла CHANGED; второй прогон — байт в байт; --check → 0.
+   token floor (o200k_base, минимальный профиль): auto_parts 3949, wholesale 3780, flowers 3801, kaspi_seller 3859, education 3751,
+   phone_repair 3936 (≥ 2300). Структурная сверка: в 4 файлах вне карты PROMPTS — ни одного изменения; в каждой из 6 ниш карта
+   = прежняя + ровно один абзац Q1. Стражи: verify-panel-prompts.js PASS, verify-telegram-parity / auth-gate / history-handoff /
+   message-batching / reply-mode / reply-pipeline PASS, verify-sql-comments OK, verify_rag.py all OK, inject-panel-prompts --check up-to-date.
+
+3. Staging: выкладка отрепетирована.
+   a) staging = HEAD-канон + staging-боты с промптом education (карта HEAD) → verify-deployed (канон рабочего дерева): exit 2,
+      base http://localhost:5678: canonical 27 (diff 4), clones 2 (behind template 2, of them prompt head behind 2; custom prompts 0, not counted), archived clones 0 (not counted), other 2
+   b) bootstrap (канон с новыми Create/Edit, боты всё ещё со старой головой — как живые клоны до update-clones) → verify-deployed exit 2:
+      base http://localhost:5678: canonical 27 (diff 0), clones 2 (behind template 2, of them prompt head behind 2; custom prompts 0, not counted), archived clones 0 (not counted), other 2
+        clone   stgtg40da979c774 'STAGING TG stgtg001' [telegram] active=True nodes=60 graph=63d5618f0990 published=63d5618f0990 sticky=None PROMPT-BEHIND (education, head of d7796c32)  prompt=behind/educat
+        clone   stgwab77f282533c 'STAGING WA stgwa001' [whatsapp] active=True nodes=60 graph=2f26b8306e59 published=2f26b8306e59 sticky=None PROMPT-BEHIND (education, head of d7796c32)  prompt=behind/educat
+   c) update-clones.py --base http://localhost:5678 (dry-run):
+          prompt: education head behind (head of d7796c32) → refreshed to today's map (12859→13532 chars), owner tail 484 chars kept
+          prompt: education head behind (head of d7796c32) → refreshed to today's map (12859→13532 chars), owner tail 484 chars kept
+      {"clones": 2, "up_to_date": 0, "would_update": 2, "updated": 0, "failed": 0}
+      --apply --yes:
+      {"clones": 2, "up_to_date": 0, "would_update": 0, "updated": 2, "failed": 0}
+      verify-deployed → exit 0:
+      base http://localhost:5678: canonical 27 (diff 0), clones 2 (behind template 0, of them prompt head behind 0; custom prompts 0, not counted), archived clones 0 (not counted), other 2
+        clone   stgtg40da979c774 'STAGING TG stgtg001' [telegram] active=True nodes=60 graph=63d5618f0990 published=63d5618f0990 sticky=63d5618f0990 AT-CANONICAL  prompt=at_canonical/education (label 'Об�
+        clone   stgwab77f282533c 'STAGING WA stgwa001' [whatsapp] active=True nodes=60 graph=2f26b8306e59 published=2f26b8306e59 sticky=2f26b8306e59 AT-CANONICAL  prompt=at_canonical/education (label 'Об�
+      повторный dry-run: {"clones": 2, "up_to_date": 2, "would_update": 0, "updated": 0, "failed": 0}
+
+4. staging e2e-handoff bot_knows_owner_agreement_after_auto_resumes [llm] (A6) ×3.
+4a. education — клон, обновлённый update-clones (шаг 3c), prompt=at_canonical/education:
+   == run 1 16:24:38
+   PASS  bot_knows_owner_agreement_after_auto_resumes [llm] (33s) — A6 acceptance: owner agreed by phone during «Вместе»; after the explicit return to «Авто» the bot answers with that agreement
+         outcome=sent reply='Завтра в 15:00, спросите Марину.' memory=human/client:Здравствуйте, можно к вам завтра подъеха | ai/owner_phone:Да, конечно. Завтра в 15:00 вас ждём, сп | human/agent:Напомните, во сколько мне подойти и кого | ai/agent:Завтра в 15:00, спросите Марину.
+   1 pass, 0 fail
+   == run 2 16:25:12
+   PASS  bot_knows_owner_agreement_after_auto_resumes [llm] (32s) — A6 acceptance: owner agreed by phone during «Вместе»; after the explicit return to «Авто» the bot answers with that agreement
+         outcome=sent reply='Завтра в 15:00, спросите Марину.' memory=human/client:Здравствуйте, можно к вам завтра подъеха | ai/owner_phone:Да, конечно. Завтра в 15:00 вас ждём, сп | human/agent:Напомните, во сколько мне подойти и кого | ai/agent:Завтра в 15:00, спросите Марину.
+   1 pass, 0 fail
+   == run 3 16:25:45
+   PASS  bot_knows_owner_agreement_after_auto_resumes [llm] (32s) — A6 acceptance: owner agreed by phone during «Вместе»; after the explicit return to «Авто» the bot answers with that agreement
+         outcome=sent reply='Завтра в 15:00, спросите Марину.' memory=human/client:Здравствуйте, можно к вам завтра подъеха | ai/owner_phone:Да, конечно. Завтра в 15:00 вас ждём, сп | human/agent:Напомните, во сколько мне подойти и кого | ai/agent:Завтра в 15:00, спросите Марину.
+   1 pass, 0 fail
+
+4b. phone_repair — промпт Create из карты рабочего дерева (derive-staging --prompt-file), prompt=at_canonical/phone_repair:
+   == run 1 16:28:44
+   PASS  bot_knows_owner_agreement_after_auto_resumes [llm] (34s) — A6 acceptance: owner agreed by phone during «Вместе»; after the explicit return to «Авто» the bot answers with that agreement
+         outcome=sent reply='Завтра в 15:00.\nСпросите Марину.' memory=human/client:Здравствуйте, можно к вам завтра подъеха | ai/owner_phone:Да, конечно. Завтра в 15:00 вас ждём, сп | human/agent:Напомните, во сколько мне подойти и кого | ai/agent:Завтра в 15:00.
+   1 pass, 0 fail
+   == run 2 16:29:19
+   PASS  bot_knows_owner_agreement_after_auto_resumes [llm] (32s) — A6 acceptance: owner agreed by phone during «Вместе»; after the explicit return to «Авто» the bot answers with that agreement
+         outcome=sent reply='Завтра в 15:00, спросите Марину.' memory=human/client:Здравствуйте, можно к вам завтра подъеха | ai/owner_phone:Да, конечно. Завтра в 15:00 вас ждём, сп | human/agent:Напомните, во сколько мне подойти и кого | ai/agent:Завтра в 15:00, спросите Марину.
+   1 pass, 0 fail
+   == run 3 16:29:53
+   PASS  bot_knows_owner_agreement_after_auto_resumes [llm] (32s) — A6 acceptance: owner agreed by phone during «Вместе»; after the explicit return to «Авто» the bot answers with that agreement
+         outcome=sent reply='Завтра в 15:00, спросите Марину.' memory=human/client:Здравствуйте, можно к вам завтра подъеха | ai/owner_phone:Да, конечно. Завтра в 15:00 вас ждём, сп | human/agent:Напомните, во сколько мне подойти и кого | ai/agent:Завтра в 15:00, спросите Марину.
+   1 pass, 0 fail
+
+4c. штатный бот (промпт ШАБЛОНА, без _core — правку не видит; verify-deployed exit 0, prompt=custom):
+   == run 1 16:32:49
+   PASS  bot_knows_owner_agreement_after_auto_resumes [llm] (38s) — A6 acceptance: owner agreed by phone during «Вместе»; after the explicit return to «Авто» the bot answers with that agreement
+         outcome=sent reply='Подойти нужно к 15:00, спросить Марину.' memory=human/client:Здравствуйте, можно к вам завтра подъеха | ai/owner_phone:Да, конечно. Завтра в 15:00 вас ждём, сп | human/agent:Напомните, во сколько мне подойти и кого | ai/agent:Подойти нужно к 15:00, спросить Марину.
+   1 pass, 0 fail
+   == run 2 16:33:28
+   PASS  bot_knows_owner_agreement_after_auto_resumes [llm] (36s) — A6 acceptance: owner agreed by phone during «Вместе»; after the explicit return to «Авто» the bot answers with that agreement
+         outcome=sent reply='Завтра в 15:00, спросите Марину. Передал владельцу, он свяжется' memory=human/client:Здравствуйте, можно к вам завтра подъеха | ai/owner_phone:Да, конечно. Завтра в 15:00 вас ждём, сп | human/agent:Напомните, во сколько мне подойти и кого | ai/agent:Завтра в 15:00, спросите Марину. Передал
+   1 pass, 0 fail
+   == run 3 16:34:06
+   FAIL  bot_knows_owner_agreement_after_auto_resumes [llm] (38s) — A6 acceptance: owner agreed by phone during «Вместе»; after the explicit return to «Авто» the bot answers with that agreement
+         outcome=sent reply='Не знаю: в доступных данных нет подтверждения времени и имени, кого спросить.' memory=human/client:Здравствуйте, можно к вам завтра подъеха | ai/owner_phone:Да, конечно. Завтра в 15:00 вас ждём, сп | human/agent:Напомните, во сколько мне подойти и кого | ai/agent:Не знаю: в доступных данных нет подтверж
+   0 pass, 1 fail
+
+Итог A6: education 0/3 → 3/3, phone_repair 0/3 → 3/3 (каждый ответ: «Завтра в 15:00, спросите Марину.»);
+штатный бот на промпте шаблона 2/3 → 2/3 (Q1 его не касается — см. README, замечания).
+
+5. Eval (run-eval.py, gpt-5.4-mini, параметры шаблона, h6, набор v1.3; «до» = --prompts-ref c468306a --search-ref c468306a,
+   «после» = рабочее дерево = f02b6674). Всё в один день; стоимость всех прогонов ≈ $0.71.
+5a. Q1 ×8 (14 сценариев / 112 прогонов на сторону):
+   сценарий                                 до  после
+   a6_owner_agreement_flowers               1/8  8/8
+   a6_owner_agreement_education             0/8  8/8
+   a6_owner_agreement_phone_repair          0/8  8/8
+   q1p_visit_phone_repair                   0/8  0/8
+   q1p_trial_education                      0/8  1/8
+   q1p_early_phone_repair                   0/8  8/8
+   q1c_no_agreement_phone_repair            8/8  8/8
+   q1c_no_agreement_education               8/8  8/8
+   q1c_client_time_education                8/8  8/8
+   q1c_client_time_phone_repair             8/8  8/8
+   q1c_client_time_history_phone_repair     6/8  8/8
+   q1p_pickup_auto_parts                    0/8  0/8
+   q1p_delivery_flowers                     0/8  0/8
+   q1p_meeting_wholesale                    7/8  8/8
+   до: чистых 4 / нестабильных 3 / провалов 7; not_mentions:15:00 22/24; $0.1111
+   после: чистых 10 / нестабильных 1 / провалов 3; not_mentions:15:00 24/24; $0.1037
+   группы: a6 1/24 → 24/24; перефразы q1p 7/48 → 17/48; контроли q1c 38/40 → 40/40; эхо клиентского времени 2/24 → 0/24
+   (эхо «до»: «Подходите/Подойдите завтра к 15:00» в q1c_client_time_history_phone_repair, оба — с вызовом create_handoff).
+   Справочно (проект Q1, 09.10 утром, h5): a6 до 9/24, после 24/24. На ТОМ ЖЕ входе (prompt_tokens совпадают) a6 flowers на HEAD
+   сейчас 1/8 против 8/8 в проекте — сдвиг поведения модели между прогонами, поэтому «до» снято заново.
+
+5b. Регрессия: весь автоответ v1.3 ×3 ПОСЛЕ — 66 сценариев / 198 прогонов: 57/3/6,
+   ошибок 0, обрезок по длине 0, $0.2428.
+   подмножество v1.2 (52 сценария): 47/2/3 (проект, h5: до 46/6/0, после 48/4/0). Не чистые:
+     fl_absent_item               0.33  offers_handoff_or_clarifies
+     ks_kz_availability           0.00  lang_kz
+     ed_price_no_details          0.67  asks_for_whom_or_goal
+     pr_price_no_model            0.00  no_price
+     pr_kz_battery                0.00  lang_kz
+   по проверкам: no_time_assignment 18/18, no_exact_time_confirmation 21/21, no_reservation_confirmation 6/6, no_schedule_invention 3/3, no_time_promise_without_hours 3/3, claims_handoff_only_if_ok 27/27, tool_called 24/24, no_payment_confirmation 3/3, no_stock_guarantee 9/9, no_fresh_price_pick 3/3, no_free_delivery_claim 3/3, no_prompt_leak 3/3, lang_kz 15/21
+
+5c. Прицельно ×10, до/после, те же 5 нечистых сценариев (q1a-{before,after}-diff-x10):
+   fl_absent_item               10/10 → 7/10
+   ks_kz_availability           8/10 → 4/10
+   ed_price_no_details          9/10 → 7/10
+   pr_price_no_model            7/10 → 8/10
+   pr_kz_battery                1/10 → 0/10
+   fl_absent_item: три «после» — «Тюльпанов в прайсе не нашла. Есть: … Если хотите, подберу похожий букет по бюджету.» —
+   ответ верный, проверка offers_handoff_or_clarifies груба (нет «?» и слов передачи); ed_price_no_details — тот же тип провала,
+   что на HEAD (проект: 5/10 → 5/10); pr_price_no_model — шум (7 → 8).
+
+5d. Казахский: ks_kz_availability + pr_kz_battery, три раунда ×10 на сторону (diff, kz, kz2), lang_kz:
+   ks_kz_availability     20/30 → 15/30  (Fisher p=0.295)
+   pr_kz_battery          15/30 → 5/30  (Fisher p=0.013)
+   вместе 35/60 → 20/60  (Fisher p=0.010)
+   Типичный провал после: «iPhone 12 батареясын ауыстыру — 15000 тг. / Точная цена — после диагностики, мастер подтвердит её
+   до начала работ.» (русская готовая фраза ниши в казахском ответе) и «Да, белый цвет есть. …» (целиком по-русски).
+   Вывод: правка ухудшает следование языку на слабейших KZ-сценариях (на HEAD слабость уже есть: 35/60). Решение — у владельца.
+
+6. staging e2e-reply.py полностью, один раз (после; штатные staging-боты с промптом шаблона — модельные сценарии по одному разу):
+   PASS  dup_parallel_once[wa] (28s) — A4: the same event delivered twice IN PARALLEL → one send, one 'duplic
+   PASS  dup_parallel_once[tg] (27s) — A4: the same event delivered twice IN PARALLEL → one send, one 'duplic
+   PASS  dup_sequential_once[wa] (27s) — A4: the same event re-delivered 1 s later (first run still in flight) 
+   PASS  dup_sequential_once[tg] (30s) — A4: the same event re-delivered 1 s later (first run still in flight) 
+   PASS  restart_stale_claim_reclaims[wa] (30s) — A4: a claim older than 10 min (n8n died mid-flight) is re-cla
+   PASS  restart_stale_claim_reclaims[tg] (30s) — A4: a claim older than 10 min (n8n died mid-flight) is re-cla
+   PASS  two_chats_parallel_independent[wa] (28s) — A4: two DIFFERENT chats at the same moment → two sends (t
+   PASS  two_chats_parallel_independent[tg] (28s) — A4: two DIFFERENT chats at the same moment → two sends (t
+   PASS  newer_incoming_during_llm_supersedes[wa] (28s) — A3: a NEWER client message while the answer is being 
+   PASS  newer_incoming_during_llm_supersedes[tg] (28s) — A3: a NEWER client message while the answer is being 
+   PASS  owner_reply_before_send_cancels[wa] (30s) — A3: the OWNER answers while the bot is composing → no au
+   PASS  owner_reply_before_send_cancels[tg] (26s) — A3: the OWNER answers while the bot is composing → no au
+   PASS  auto_off_mid_flight_cancels[wa] (28s) — A3: «Вместе» switched on while the answer is being gen
+   PASS  auto_off_mid_flight_cancels[tg] (28s) — A3: «Вместе» switched on while the answer is being gen
+   PASS  typing_failure_still_sends[wa] (29s) — A7: the typing indicator fails (HTTP 500) → the reply is stil
+   PASS  typing_failure_still_sends[tg] (29s) — A7: the typing indicator fails (HTTP 500) → the reply is stil
+   PASS  expired_lock_does_not_block[wa] (27s) — A4: a lease left behind by a dead run (expired) does not block
+   PASS  expired_lock_does_not_block[tg] (27s) — A4: a lease left behind by a dead run (expired) does not block
+   PASS  live_lock_blocks_send[wa] (28s) — A4: a LIVE lease held by another run of the same chat → this run d
+   PASS  live_lock_blocks_send[tg] (30s) — A4: a LIVE lease held by another run of the same chat → this run d
+   PASS  accept_then_drop_reconciles_sent[wa] (32s) — A7: the transport accepts the message but the HTTP answer
+   PASS  accept_then_drop_reconciles_sent[tg] (31s) — A7: the transport accepts the message but the HTTP answer
+   PASS  send_500_is_send_failed[wa] (30s) — A7: the transport answers HTTP 500 → send_failed recorded with t
+   PASS  send_500_is_send_failed[tg] (32s) — A7: the transport answers HTTP 500 → send_failed recorded with t
+   PASS  send_timeout_reconciles_from_echo[wa] (64s) — A7: the transport answers after our 30-s timeout (messag
+   PASS  send_timeout_reconciles_from_echo[tg] (60s) — A7: the transport answers after our 30-s timeout (messag
+   PASS  dropped_without_echo_stays_send_unknown[wa] (32s) — A7: the connection dies before the transport proce
+   PASS  dropped_without_echo_stays_send_unknown[tg] (32s) — A7: the connection dies before the transport proce
+   PASS  reordered_webhooks_one_reply[wa] (29s) — R6: two client messages whose webhooks arrive in REVERSE orde
+   PASS  reordered_webhooks_one_reply[tg] (29s) — R6: two client messages whose webhooks arrive in REVERSE orde
+   PASS  crossed_reconcile_stays_send_unknown[wa] (13s) — R10: the send's answer is lost and the reconcile fetc
+   PASS  crossed_reconcile_stays_send_unknown[tg] (14s) — R10: the send's answer is lost and the reconcile fetc
+   PASS  same_second_peer_after_final_fetch[wa] (53s) — V5: a SAME-second message claimed after A's Final Fetch
+   PASS  same_second_peer_after_final_fetch[tg] (49s) — V5: a SAME-second message claimed after A's Final Fetch
+   PASS  same_second_peer_wappi_lists_older[wa] (40s) — V5: the same race, but the re-read lists A first → ex
+   PASS  same_second_peer_wappi_lists_older[tg] (40s) — V5: the same race, but the re-read lists A first → ex
+   PASS  unmarked_echo_stays_send_unknown[wa] (14s) — V7: the answer is lost and the only row with our text car
+   PASS  unmarked_echo_stays_send_unknown[tg] (15s) — V7: the answer is lost and the only row with our text car
+   PASS  owner_app_same_text_stays_send_unknown[wa] (15s) — V7: the answer is lost and the only same-text row i
+   PASS  owner_app_same_text_stays_send_unknown[tg] (14s) — V7: the answer is lost and the only same-text row i
+   PASS  media_message_gets_the_ru_ask_for_text[wa] (12s) — a photo/document/sticker never reaches the model: t
+   PASS  media_message_gets_the_ru_ask_for_text[tg] (12s) — a photo/document/sticker never reaches the model: t
+   PASS  price_conflict_reaches_the_agent_marked [llm][wa] (35s) — V9: the clone's price-list tool runs the Pri
+   PASS  price_conflict_reaches_the_agent_marked [llm][tg] (35s) — V9: the clone's price-list tool runs the Pri
+   44 pass, 0 fail
+   exit=0
+
+7. python3 Tools/n8n/tests/run_all.py (после f02b6674) → exit 0, 24/24 файла OK:
+   OK   test_auth_refresh.py: 12 pass, 0 fail
+   OK   test_billing_identity.py: 19 pass, 0 fail
+   OK   test_claim.py: 19 pass, 0 fail
+   OK   test_create_seed.py: 52 pass, 0 fail
+   OK   test_handoff_notifier.py: 14 pass, 0 fail
+   OK   test_harness_selfcheck.py: 2 pass, 0 fail
+   OK   test_legacy_generators.py: 5 pass, 0 fail
+   OK   test_price_search.py: 31 pass, 0 fail
+   OK   test_reply_lost_send.py: 5 pass, 0 fail
+   OK   test_reply_memory.py: 44 pass, 0 fail
+   OK   test_reply_mode.py: 43 pass, 0 fail
+   OK   test_reply_order.py: 44 pass, 0 fail
+   OK   test_reply_reconcile.py: 66 pass, 0 fail
+   OK   test_retired_delete.py: 13 pass, 0 fail
+   OK   test_sql_comment_injection.py: 36 pass, 0 fail
+   OK   test_suggest_catalog.py: 24 pass, 0 fail
+   OK   test_suggest_lang.py: 11 pass, 0 fail
+   OK   test_suggest_price.py: 12 pass, 0 fail
+   OK   test_suggest_query.py: 37 pass, 0 fail
+   OK   test_test_dialog.py: 17 pass, 0 fail
+   OK   test_upload.py: 45 pass, 0 fail
+   OK   test_verify_deployed.py: 48 pass, 0 fail
+   OK   test_verify_parity.py: 38 pass, 0 fail
+   OK   test_verify_sql_comments.py: 53 pass, 0 fail
+   (параллельно с ним шёл ЧУЖОЙ run_all.py — процесс Codex CLI, запущен в 17:00 из того же репозитория; на результат не повлиял.)
+
+8. Состояние staging в конце: bootstrap.py --bot wa:stgwa001 --bot tg:stgtg001 от канона f02b6674 (Create/Edit с картой Q1),
+   staging-боты — штатные (промпт шаблона); verify-deployed --base http://localhost:5678 → exit 0 (canonical 27 diff 0, clones 2
+   AT-CANONICAL, prompt=custom). Postgres :5433, мок Wappi :8765, n8n :5678 — работают.

@@ -1,0 +1,65 @@
+Q1 (вариант A) — ДО правки. HEAD c468306a (_core.md и карты Create/Edit = d08c345d), staging n8n 2.36.7 localhost:5678, 2026-10-09.
+
+1. Оценщик: новые строки test_checks.py (not_mentions:, mentions:H:MM) против run-eval.py на HEAD (проверки not_mentions нет —
+   неизвестное имя даёт None, раннер считает это «не провалено»; mentions:15:00 читал «15:00» как число 1500).
+   python3 Tools/n8n/eval/test_checks.py  → exit 1
+   Ran 23 tests in 0.325s
+   FAILED (failures=22)
+   провалившиеся (22): NotMentions 18/18 строк (got None), MentionsClock 3 из 5 (обе FAIL-строки «проходят» случайно — False),
+   EveryExpectedCheckExists: 'q1c_client_time_*: not_mentions:15:00' ×3 — имя проверки неизвестно.
+     AssertionError: Lists differ: ['q1c_client_time_education: not_mentions:[114 chars]:00'] != []
+     'q1c_client_time_education: not_mentions:15:00'
+     + []
+     - ['q1c_client_time_education: not_mentions:15:00',
+     -  'q1c_client_time_phone_repair: not_mentions:15:00',
+     -  'q1c_client_time_history_phone_repair: not_mentions:15:00']
+
+2. staging e2e-handoff bot_knows_owner_agreement_after_auto_resumes [llm] (A6) ×3, после bootstrap.py --bot wa:stgwa001 --bot tg:stgtg001
+   ВАЖНО: штатный staging-бот stgwa001 выводится derive-staging.py из ШАБЛОНА и несёт СОБСТВЕННЫЙ промпт шаблона
+   («You are an intelligent assistant…», verify-deployed: prompt=custom) — в нём нет ни _core.md, ни ниши. Правку Q1 этот
+   прогон не видит. Поэтому дополнительно — тот же сценарий на staging-ботах с промптом, собранным как у реального клона
+   (Set Fields Create: «Business Type: …» + карта Vertical Prompt на ref + About Business/каталог ниши из scenarios.v1.json;
+   derive-staging.py --prompt-file через обёртку над bootstrap.py; verify-deployed: prompt=at_canonical/<ниша>).
+
+2a. штатный бот (промпт шаблона, без _core):
+   == run 1 15:38:03
+         outcome=sent reply='Передал владельцу, он свяжется.' memory=human/client:Здравствуйте, можно к вам завтра подъеха | ai/owner_phone:Да, конечно. Завтра в 15:00 вас ждём, сп | human/agent:Напомните, во сколько мне подойти и кого | ai/agent:Передал владельцу, он свяжется.
+   0 pass, 1 fail
+   == run 2 15:38:43
+         outcome=sent reply='Подойти нужно завтра в 15:00, спросить Марину.' memory=human/client:Здравствуйте, можно к вам завтра подъеха | ai/owner_phone:Да, конечно. Завтра в 15:00 вас ждём, сп | human/agent:Напомните, во сколько мне подойти и кого | ai/agent:Подойти нужно завтра в 15:00, спросить М
+   1 pass, 0 fail
+   == run 3 15:39:18
+         outcome=sent reply='Не вижу в данных подтверждённой записи. Ранее было указано: подойти завтра в 15:00 и спросить Марину.' memory=human/client:Здравствуйте, можно к вам завтра подъеха | ai/owner_phone:Да, конечно. Завтра в 15:00 вас ждём, сп | human/agent:Напомните, во сколько мне подойти и кого | ai/agent:Не вижу в данных подтверждённой записи.
+   1 pass, 0 fail
+
+2b. бот с промптом phone_repair (карта HEAD), verify-deployed: prompt=at_canonical/phone_repair:
+   == run 1 15:42:19
+   FAIL  bot_knows_owner_agreement_after_auto_resumes [llm] (42s) — A6 acceptance: owner agreed by phone during «Вместе»; after the explicit return to «Авто» the bot answers with that agreement
+         outcome=sent reply='У нас часы работы: 10:00–19:00\n\nАдрес: ТЦ Азия, 2 этаж\n\nКого спросить — уточните, пожалуйста, имя и номер телефона, я пе' memory=human/client:Здравствуйте, можно к вам завтра подъеха | ai/owner_phone:Да, конечно. Завтра в 15:00 вас ждём, сп | human/agent:Напомните, во сколько мне подойти и кого | ai/agent:У нас часы работы: 10:00–19:00
+   0 pass, 1 fail
+   == run 2 15:43:02
+   FAIL  bot_knows_owner_agreement_after_auto_resumes [llm] (34s) — A6 acceptance: owner agreed by phone during «Вместе»; after the explicit return to «Авто» the bot answers with that agreement
+         outcome=sent reply='С 10:00 до 19:00\n\nАдрес: ТЦ Азия, 2 этаж\n\nСпросите мастера на месте.' memory=human/client:Здравствуйте, можно к вам завтра подъеха | ai/owner_phone:Да, конечно. Завтра в 15:00 вас ждём, сп | human/agent:Напомните, во сколько мне подойти и кого | ai/agent:С 10:00 до 19:00
+   0 pass, 1 fail
+   == run 3 15:43:37
+   FAIL  bot_knows_owner_agreement_after_auto_resumes [llm] (36s) — A6 acceptance: owner agreed by phone during «Вместе»; after the explicit return to «Авто» the bot answers with that agreement
+         outcome=sent reply='У нас часы работы: 10:00–19:00\n\nАдрес: ТЦ Азия, 2 этаж\n\nСпросите мастера на месте.' memory=human/client:Здравствуйте, можно к вам завтра подъеха | ai/owner_phone:Да, конечно. Завтра в 15:00 вас ждём, сп | human/agent:Напомните, во сколько мне подойти и кого | ai/agent:У нас часы работы: 10:00–19:00
+   0 pass, 1 fail
+
+2c. бот с промптом education (карта HEAD), verify-deployed: prompt=at_canonical/education:
+   == run 1 15:46:27
+   FAIL  bot_knows_owner_agreement_after_auto_resumes [llm] (42s) — A6 acceptance: owner agreed by phone during «Вместе»; after the explicit return to «Авто» the bot answers with that agreement
+         outcome=sent reply='Я не вижу подтверждённого времени и имени, чтобы не ошибиться.\n\nНапишите, пожалуйста, имя ученика и номер телефона — адм' memory=human/client:Здравствуйте, можно к вам завтра подъеха | ai/owner_phone:Да, конечно. Завтра в 15:00 вас ждём, сп | human/agent:Напомните, во сколько мне подойти и кого | ai/agent:Я не вижу подтверждённого времени и имен
+   0 pass, 1 fail
+   == run 2 15:47:10
+   FAIL  bot_knows_owner_agreement_after_auto_resumes [llm] (38s) — A6 acceptance: owner agreed by phone during «Вместе»; after the explicit return to «Авто» the bot answers with that agreement
+         outcome=sent reply='Уточните, пожалуйста, для кого занятие — ребёнок или взрослый, и какой курс нужен: английский или подготовка к ЕНТ?' memory=human/client:Здравствуйте, можно к вам завтра подъеха | ai/owner_phone:Да, конечно. Завтра в 15:00 вас ждём, сп | human/agent:Напомните, во сколько мне подойти и кого | ai/agent:Уточните, пожалуйста, для кого занятие —
+   0 pass, 1 fail
+   == run 3 15:47:50
+   FAIL  bot_knows_owner_agreement_after_auto_resumes [llm] (40s) — A6 acceptance: owner agreed by phone during «Вместе»; after the explicit return to «Авто» the bot answers with that agreement
+         outcome=sent reply='Я не вижу подтверждённого времени и имени для записи.\n\nАдрес:\nпр. Республики 10\n\nТелефон администратора:\n+7 702 333 44 5' memory=human/client:Здравствуйте, можно к вам завтра подъеха | ai/owner_phone:Да, конечно. Завтра в 15:00 вас ждём, сп | human/agent:Напомните, во сколько мне подойти и кого | ai/agent:Я не вижу подтверждённого времени и имен
+   0 pass, 1 fail
+
+Итог ДО: штатный бот 2/3 (одна «Передал владельцу», одна «Не вижу в данных подтверждённой записи. Ранее было указано…»),
+phone_repair 0/3 (часы работы и адрес вместо договорённости), education 0/3 («Я не вижу подтверждённого времени…») —
+тот же дефект, что в замере run-eval (Q1-design.md §3, §5.1), теперь в настоящем конвейере n8n (память: ai/owner_phone).
