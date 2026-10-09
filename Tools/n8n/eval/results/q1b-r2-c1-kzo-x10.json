@@ -1,0 +1,865 @@
+{
+ "summary": {
+  "label": "q1b-r2-c1-kzo-x10",
+  "prompts_ref": "ae8305962856ba354852085911f1867f296da7dd",
+  "scenario_version": "v1.3 (2026-10-09: Q1 — the owner's agreement in the chat history: a6_owner_agreement_* ×3 verticals, q1p_* paraphrases (other words, facts, verticals), q1c_* negative controls (no agreement / the CLIENT names the time) with not_mentions:15:00 against echoing the client's own time as agreed; harness h6)",
+  "harness": "h6 (2026-10-09, Q1: not_mentions:X — X stated in no un-refused clause and not merely quoted as the client's words, for the client-time echo; mentions:H:MM reads a time of day; on top of h5 2026-10-08, V9-r2: no_conflict_claim / no_price_caveat for a price list that AGREES with the catalog; on top of h4 2026-10-07 V9: «расхождение» + negated conflict, zero-price / elliptical free delivery, «итого по N позициям» partial, «нужен» / the car or device by name, a word inside the installment claim, Kazakh = no Russian sentence, «18,000»; h3 2026-09-27 R14; checks pinned by test_checks.py)",
+  "model": "gpt-5.4-mini",
+  "reasoning_effort": null,
+  "dropped_params": [],
+  "panel_model": null,
+  "max_tokens": 200,
+  "search_simulation": "Price List Search sub-workflow (Reconcile Prices at ae8305962856ba354852085911f1867f296da7dd)",
+  "scenarios": 3,
+  "runs": 30,
+  "pass_all": 0,
+  "flaky": 3,
+  "fail": 0,
+  "error_runs": 0,
+  "finish_reason_length_runs": 0,
+  "prompt_tokens": 230670,
+  "cached_tokens": 211584,
+  "completion_tokens": 2765,
+  "reasoning_tokens": 0,
+  "cost_usd_auto_path": 0.0426,
+  "prices_usd_per_1m": [
+   0.75,
+   0.075,
+   4.5
+  ],
+  "latency_ms": {
+   "auto": {
+    "n": 30,
+    "median": 3785,
+    "p90": 4440,
+    "max": 5780
+   },
+   "panel": null
+  },
+  "seconds": 109,
+  "by_check": {
+   "lang_kz": "21/30",
+   "mentions:50": "10/10",
+   "mentions:55000": "10/10",
+   "no_invented_sku": "10/10",
+   "numbers_grounded": "30/30"
+  }
+ },
+ "results": [
+  {
+   "id": "ap_sku_exact_kz",
+   "vertical": "auto_parts",
+   "mode": "auto",
+   "lang": "kz",
+   "tags": [
+    "docs",
+    "lang"
+   ],
+   "repeats": 10,
+   "pass_rate": 0.5,
+   "runs": [
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "numbers_grounded": true,
+      "no_invented_sku": true
+     },
+     "text": "Бар.\nБағасы: 3200 тг\nАртикул: 90915-YZZE1\nОригинал\n\nНақты қалдығын менеджер растайды.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "90915-YZZE1 фильтр масляный Toyota наличие цена Camry 2019"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9029,
+      "completion_tokens": 78,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 4440,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "lang_kz": false,
+      "numbers_grounded": true,
+      "no_invented_sku": true
+     },
+     "text": "Да, есть.\n\nФильтр масляный Toyota 90915-YZZE1\n3200 тг\nОригинал\n\nПо наличию на складе точнее подтвердит менеджер.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "90915-YZZE1 фильтр масляный Toyota цена наличие Camry 2019"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9029,
+      "completion_tokens": 81,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3917,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "lang_kz": false,
+      "numbers_grounded": true,
+      "no_invented_sku": true
+     },
+     "text": "Да, фильтр 90915-YZZE1 есть.\nЦена — 3200 тг, оригинал.\n\nПо наличию на складе точнее подтвердит менеджер.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "90915-YZZE1 фильтр масляный Toyota цена наличие Camry 2019"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9029,
+      "completion_tokens": 77,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3577,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "numbers_grounded": true,
+      "no_invented_sku": true
+     },
+     "text": "Иә, бар.\n\nФильтр масляный Toyota 90915-YZZE1 — 3200 тг\nОригинал\n\nНақты қалдығын менеджер растайды.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "90915-YZZE1 фильтр масляный Toyota наличие цена Camry 2019"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9029,
+      "completion_tokens": 80,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3783,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "numbers_grounded": true,
+      "no_invented_sku": true
+     },
+     "text": "Бар.\nБағасы — 3200 тг, артикулы 90915-YZZE1.\nОригинал.\n\nНақты қалдығын менеджер растайды.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "90915-YZZE1 фильтр масляный Toyota цена наличие"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9024,
+      "completion_tokens": 72,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3412,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "lang_kz": false,
+      "numbers_grounded": true,
+      "no_invented_sku": true
+     },
+     "text": "Да, фильтр 90915-YZZE1 есть.\n\nЦена: 3200 тг\nАртикул: 90915-YZZE1\nОригинал\n\nПо наличию на складе точнее подтвердит менеджер.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "90915-YZZE1 фильтр масляный Toyota цена наличие Camry 2019"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9029,
+      "completion_tokens": 90,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3288,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "numbers_grounded": true,
+      "no_invented_sku": true
+     },
+     "text": "Бар.\nБағасы — 3200 тг, артикулы 90915-YZZE1.\nОригинал.\n\nНақты қалдығын менеджер растайды.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "90915-YZZE1 фильтр масляный Toyota цена наличие"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9024,
+      "completion_tokens": 72,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3618,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "lang_kz": false,
+      "numbers_grounded": true,
+      "no_invented_sku": true
+     },
+     "text": "Фильтр масляный Toyota 90915-YZZE1 — 3200 тг\nОригинал\n\nВ прайсе позиция есть, точное наличие подтвердит менеджер",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "90915-YZZE1 фильтр масляный Toyota цена наличие оригинал"
+       }
+      },
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "Toyota 90915-YZZE1"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9143,
+      "completion_tokens": 117,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 4212,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "lang_kz": false,
+      "numbers_grounded": true,
+      "no_invented_sku": true
+     },
+     "text": "Бар.\nБағасы — 3200 тг.\nАртикулы: 90915-YZZE1, оригинал.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "90915-YZZE1 фильтр масляный Toyota наличие цена Camry 2019"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9029,
+      "completion_tokens": 67,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2990,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "numbers_grounded": true,
+      "no_invented_sku": true
+     },
+     "text": "Бар.\nБағасы — 3200 тг.\nАртикулы: 90915-YZZE1\nОригинал.\n\nНақты қалдығын менеджер растайды.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "90915-YZZE1 фильтр масляный Toyota наличие цена"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9024,
+      "completion_tokens": 73,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 4500,
+     "status": null
+    }
+   ]
+  },
+  {
+   "id": "ws_kz_min_order",
+   "vertical": "wholesale",
+   "mode": "auto",
+   "lang": "kz",
+   "tags": [
+    "lang"
+   ],
+   "repeats": 10,
+   "pass_rate": 0.7,
+   "runs": [
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "mentions:50": true,
+      "numbers_grounded": true
+     },
+     "text": "Минималды тапсырыс — 50 000 тг.\n\nЗаңды тұлғаларға:\n— безналичный есеп айырысу\n— ҚҚС-пен\n— шот және накладной беріледі\n\nТелефон: +7 700 111 22 33\nЖұмыс уақыты: дүйсенбі–жұма, 9:00–18:00",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4230,
+      "completion_tokens": 89,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3036,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "mentions:50": true,
+      "numbers_grounded": true
+     },
+     "text": "Минималды тапсырыс — 50 000 тг.\n\nЗаңды тұлғаларға:\n— безналичный есеп\n— ҚҚС-пен\n— шот-фактура және накладной беріледі\n\nТелефон: +7 700 111 22 33\nЖұмыс уақыты: дүйсенбі–жұма, 9:00–18:00",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4230,
+      "completion_tokens": 89,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2450,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "mentions:50": true,
+      "numbers_grounded": true
+     },
+     "text": "Минималды тапсырыс — 50 000 тг.\n\nЗаңды тұлғаларға:\n— безналичный есеп айырысу\n— ҚҚС-пен\n— шот-фактура және накладной беріледі\n\nТелефон: +7 700 111 22 33\nЖұмыс уақыты: дүйсенбі–жұма, 9:00–18:00",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4230,
+      "completion_tokens": 92,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2399,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "lang_kz": false,
+      "mentions:50": true,
+      "numbers_grounded": true
+     },
+     "text": "Минималды тапсырыс — 50 000 тг.\n\nЗаңды тұлғаларға:\n— қолма-қолсыз төлем\n— ҚҚС-пен\n— шот-фактура және накладной беріледі\n\nПередал менеджеру, он свяжется.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "question",
+        "summary": "Клиент спрашивает минимальный заказ и условия для юрлица с НДС."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8554,
+      "completion_tokens": 103,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3694,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "lang_kz": false,
+      "mentions:50": true,
+      "numbers_grounded": true
+     },
+     "text": "Минималды тапсырыс — 50 000 тг.\n\nЖұмыс істейміз заңды тұлғалармен, ҚҚС-пен.\nШот және накладной береміз.\n\nПередал менеджеру, он свяжется.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "question",
+        "summary": "Клиент — заңды тұлға, сұрайды минималды тапсырыс пен ҚҚС бойынша шарттар."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8561,
+      "completion_tokens": 101,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3699,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "mentions:50": true,
+      "numbers_grounded": true
+     },
+     "text": "Минималды тапсырыс — 50 000 тг.\n\nЗаңды тұлғаларға:\n— безналичный есеп айырысу\n— ҚҚС-пен\n— шот-фактура және накладной беріледі\n\nТелефон: +7 700 111 22 33\nЖұмыс уақыты: дүйсенбі–жұма, 9:00–18:00",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4230,
+      "completion_tokens": 92,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2314,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "lang_kz": false,
+      "mentions:50": true,
+      "numbers_grounded": true
+     },
+     "text": "Минималды тапсырыс — 50 000 тг.\n\nЗаңды тұлғаларға:\nҚҚС-пен\nШот және накладной беріледі\n\nПередал менеджеру, он свяжется",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "question",
+        "summary": "Клиент — заңды тұлға, сұрады минималды тапсырыс пен ҚҚС бойынша шарттарды. Контакт деректері әлі берілмеген."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8572,
+      "completion_tokens": 106,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 4093,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "mentions:50": true,
+      "numbers_grounded": true
+     },
+     "text": "Минималды тапсырыс — 50 000 тг.\n\nЗаңды тұлғаларға:\n— безналичный расчет\n— ҚҚС-пен\n— шот-фактура және накладной беріледі\n\nТелефон: +7 700 111 22 33\nЖұмыс уақыты: дүйсенбі–жұма, 9:00–18:00",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4230,
+      "completion_tokens": 89,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2468,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "mentions:50": true,
+      "numbers_grounded": true
+     },
+     "text": "Минималды тапсырыс — 50 000 тг.\n\nЗаңды тұлғаларға:\n— безналичный есеп айырысу\n— ҚҚС-пен\n— шот және накладной беріледі\n\nТелефон: +7 700 111 22 33\nЖұмыс уақыты: дүйсенбі–жұма, 9:00–18:00",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4230,
+      "completion_tokens": 89,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2529,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "mentions:50": true,
+      "numbers_grounded": true
+     },
+     "text": "Минималды тапсырыс — 50 000 тг.\n\nЗаңды тұлғаларға:\nҚҚС-пен безнал\nШот және накладной беріледі\n\nТапсырысты менеджерге жібердім, ол байланысады.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "question",
+        "summary": "Клиент — заңды тұлға, сұрады минималды тапсырыс пен ҚҚС бойынша шарттарды. Нақтылау керек: жеткізу/құжаттар/төлем шарттары."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8578,
+      "completion_tokens": 123,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3915,
+     "status": null
+    }
+   ]
+  },
+  {
+   "id": "ed_kz_parent",
+   "vertical": "education",
+   "mode": "auto",
+   "lang": "kz",
+   "tags": [
+    "lang"
+   ],
+   "repeats": 10,
+   "pass_rate": 0.9,
+   "runs": [
+    {
+     "verdicts": {
+      "lang_kz": false,
+      "mentions:55000": true,
+      "numbers_grounded": true
+     },
+     "text": "Подготовка к ЕНТ — 55 000 тг/мес.\n\nПробный урок бесплатный.\n\nЕсли хотите, передам заявку администратору на пробный урок — он свяжется и подберёт группу.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "question",
+        "summary": "Клиент спрашивает стоимость подготовки к ЕНТ для ребёнка. Нужна передача администратору, чтобы уточнить детали и записать на пробный урок."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8505,
+      "completion_tokens": 111,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3945,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "mentions:55000": true,
+      "numbers_grounded": true
+     },
+     "text": "ЕНТ-ге дайындық — 55 000 тг/ай\n\nМатематика және физика пәндері кіреді.\n\nПробный сабақ тегін.\n\nЕгер жаздырғыңыз келсе, баланың аты-жөні мен жасын жазыңыз.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4196,
+      "completion_tokens": 59,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1917,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "mentions:55000": true,
+      "numbers_grounded": true
+     },
+     "text": "ЕНТ-ге дайындық — 55 000 тг/ай.\n\nМатематика және физика кіреді.\n\nҚаласаңыз, баланың аты-жөнін, жасын және телефон нөмірін жіберіңіз — әкімші тегін пробный сабаққа жазып береді.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "ЕНТ подготовка цена, длительность, для школьников, прайс-лист"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8485,
+      "completion_tokens": 99,
+      "cached_tokens": 7424,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 4074,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "mentions:55000": true,
+      "numbers_grounded": true
+     },
+     "text": "ЕНТ-ге дайындық — 55 000 тг/ай.\n\nМатематика және физика кіреді.\n\nҚаласаңыз, балаңыздың аты-жөнін, жасын және телефон нөмірін жіберіңіз — тегін пробный сабаққа өтінішті администраторға жіберемін.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "ЕНТ подготовка цена, длительность, расписание, пробный урок, для школьников и взрослых"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8489,
+      "completion_tokens": 111,
+      "cached_tokens": 7424,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 4348,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "mentions:55000": true,
+      "numbers_grounded": true
+     },
+     "text": "ЕНТ-ге дайындық — 55 000 тг/ай.\n\nПробный сабақ тегін.\n\nЕгер жазылғыңыз келсе, баланың аты-жөні мен жасын және телефон нөмірін жіберіңіз.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "question",
+        "summary": "Клиент спрашивает стоимость подготовки к ЕНТ для ребёнка/ученика. Нужна точная цена и условия записи на пробный урок."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8501,
+      "completion_tokens": 108,
+      "cached_tokens": 7424,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3785,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "mentions:55000": true,
+      "numbers_grounded": true
+     },
+     "text": "ЕНТ-ге дайындық — 55 000 тг/ай.\n\nМатематика және физика кіреді.\n\nТегін пробный урок бар. Егер жаздырғыңыз келсе, баланың аты-жөні мен жасын жазыңыз.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "ЕНТ подготовка цена, длительность, расписание, пробный урок, для школьников и взрослых"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8489,
+      "completion_tokens": 96,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 5780,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "mentions:55000": true,
+      "numbers_grounded": true
+     },
+     "text": "ЕНТ-ге дайындық — 55 000 тг/ай.\n\nПәндері: математика және физика.\n\nТегін пробный сабақ бар. Балаңыздың аты-жөні мен жасын жазсаңыз, администраторға жіберемін.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "ЕНТ подготовка цена, длительность, расписание, пробный урок, для школьников и взрослых"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8489,
+      "completion_tokens": 101,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 4181,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "mentions:55000": true,
+      "numbers_grounded": true
+     },
+     "text": "ЕНТ-ге дайындық — 55 000 тг/ай.\n\nПробный сабақ тегін.\n\nЕгер жазылғыңыз келсе, баланың аты-жөнін, жасын және телефон нөмірін жіберіңіз.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "question",
+        "summary": "Клиент спрашивает стоимость подготовки к ЕНТ для ребёнка/ученика. Нужна точная цена и условия записи на пробный урок."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8501,
+      "completion_tokens": 108,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 4190,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "mentions:55000": true,
+      "numbers_grounded": true
+     },
+     "text": "ЕНТ-ге дайындық — 55 000 тг/ай.\n\nМатематика және физика кіреді.\n\nҚаласаңыз, балаңызға тегін пробный сабаққа жазып беремін.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "ЕНТ подготовка цена, длительность, условия для школьников и взрослых"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8483,
+      "completion_tokens": 80,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3831,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "mentions:55000": true,
+      "numbers_grounded": true
+     },
+     "text": "ЕНТ-ге дайындық — 55 000 тг/ай.\n\nПробный сабақ тегін.\n\nҚаласаңыз, өтінімді әкімшіге жіберемін: баланың аты-жөні, жасы және телефон нөмірін жазыңыз.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "question",
+        "summary": "Клиент спрашивает стоимость подготовки к ЕНТ для ребёнка. Нужна цена и, при необходимости, запись на пробный урок."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8498,
+      "completion_tokens": 112,
+      "cached_tokens": 7424,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 4289,
+     "status": null
+    }
+   ]
+  }
+ ]
+}

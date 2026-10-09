@@ -1,0 +1,545 @@
+{
+ "summary": {
+  "label": "q1b-r1-c1-a6-x8",
+  "prompts_ref": "ae8305962856ba354852085911f1867f296da7dd",
+  "scenario_version": "v1.3 (2026-10-09: Q1 — the owner's agreement in the chat history: a6_owner_agreement_* ×3 verticals, q1p_* paraphrases (other words, facts, verticals), q1c_* negative controls (no agreement / the CLIENT names the time) with not_mentions:15:00 against echoing the client's own time as agreed; harness h6)",
+  "harness": "h6 (2026-10-09, Q1: not_mentions:X — X stated in no un-refused clause and not merely quoted as the client's words, for the client-time echo; mentions:H:MM reads a time of day; on top of h5 2026-10-08, V9-r2: no_conflict_claim / no_price_caveat for a price list that AGREES with the catalog; on top of h4 2026-10-07 V9: «расхождение» + negated conflict, zero-price / elliptical free delivery, «итого по N позициям» partial, «нужен» / the car or device by name, a word inside the installment claim, Kazakh = no Russian sentence, «18,000»; h3 2026-09-27 R14; checks pinned by test_checks.py)",
+  "model": "gpt-5.4-mini",
+  "reasoning_effort": null,
+  "dropped_params": [],
+  "panel_model": null,
+  "max_tokens": 200,
+  "search_simulation": "Price List Search sub-workflow (Reconcile Prices at ae8305962856ba354852085911f1867f296da7dd)",
+  "scenarios": 3,
+  "runs": 24,
+  "pass_all": 3,
+  "flaky": 0,
+  "fail": 0,
+  "error_runs": 0,
+  "finish_reason_length_runs": 0,
+  "prompt_tokens": 103328,
+  "cached_tokens": 74112,
+  "completion_tokens": 546,
+  "reasoning_tokens": 0,
+  "cost_usd_auto_path": 0.0299,
+  "prices_usd_per_1m": [
+   0.75,
+   0.075,
+   4.5
+  ],
+  "latency_ms": {
+   "auto": {
+    "n": 24,
+    "median": 1233,
+    "p90": 1933,
+    "max": 4807
+   },
+   "panel": null
+  },
+  "seconds": 34,
+  "by_check": {
+   "mentions:15": "24/24",
+   "mentions:Марин": "24/24"
+  }
+ },
+ "results": [
+  {
+   "id": "a6_owner_agreement_flowers",
+   "vertical": "flowers",
+   "mode": "auto",
+   "lang": "ru",
+   "tags": [
+    "memory",
+    "key"
+   ],
+   "repeats": 8,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "mentions:15": true,
+      "mentions:Марин": true
+     },
+     "text": "Завтра в 15:00, спросите Марину.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4276,
+      "completion_tokens": 23,
+      "cached_tokens": 1152,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2380,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:15": true,
+      "mentions:Марин": true
+     },
+     "text": "Завтра в 15:00, спросите Марину.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4276,
+      "completion_tokens": 23,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 4807,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:15": true,
+      "mentions:Марин": true
+     },
+     "text": "Завтра в 15:00, спросите Марину.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4276,
+      "completion_tokens": 23,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1098,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:15": true,
+      "mentions:Марин": true
+     },
+     "text": "Завтра в 15:00, спросите Марину.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4276,
+      "completion_tokens": 23,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1185,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:15": true,
+      "mentions:Марин": true
+     },
+     "text": "Завтра в 15:00, спросите Марину.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4276,
+      "completion_tokens": 23,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1072,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:15": true,
+      "mentions:Марин": true
+     },
+     "text": "Завтра в 15:00, спросите Марину.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4276,
+      "completion_tokens": 23,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1056,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:15": true,
+      "mentions:Марин": true
+     },
+     "text": "Завтра в 15:00, спросите Марину.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4276,
+      "completion_tokens": 23,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1250,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:15": true,
+      "mentions:Марин": true
+     },
+     "text": "Завтра в 15:00, спросите Марину.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4276,
+      "completion_tokens": 23,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1235,
+     "status": null
+    }
+   ]
+  },
+  {
+   "id": "a6_owner_agreement_education",
+   "vertical": "education",
+   "mode": "auto",
+   "lang": "ru",
+   "tags": [
+    "memory",
+    "key"
+   ],
+   "repeats": 8,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "mentions:15": true,
+      "mentions:Марин": true
+     },
+     "text": "Завтра в 15:00, спросите Марину.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4233,
+      "completion_tokens": 23,
+      "cached_tokens": 0,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1233,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:15": true,
+      "mentions:Марин": true
+     },
+     "text": "Завтра в 15:00, спросите Марину.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4233,
+      "completion_tokens": 23,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 972,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:15": true,
+      "mentions:Марин": true
+     },
+     "text": "Завтра в 15:00, спросите Марину.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4233,
+      "completion_tokens": 23,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1066,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:15": true,
+      "mentions:Марин": true
+     },
+     "text": "Завтра в 15:00, спросите Марину.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4233,
+      "completion_tokens": 23,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1284,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:15": true,
+      "mentions:Марин": true
+     },
+     "text": "Завтра в 15:00, спросите Марину.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4233,
+      "completion_tokens": 23,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1063,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:15": true,
+      "mentions:Марин": true
+     },
+     "text": "Завтра в 15:00, спросите Марину.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4233,
+      "completion_tokens": 23,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1412,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:15": true,
+      "mentions:Марин": true
+     },
+     "text": "Завтра в 15:00, спросите Марину.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4233,
+      "completion_tokens": 23,
+      "cached_tokens": 0,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 903,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:15": true,
+      "mentions:Марин": true
+     },
+     "text": "Завтра в 15:00, спросите Марину.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4233,
+      "completion_tokens": 23,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 939,
+     "status": null
+    }
+   ]
+  },
+  {
+   "id": "a6_owner_agreement_phone_repair",
+   "vertical": "phone_repair",
+   "mode": "auto",
+   "lang": "ru",
+   "tags": [
+    "memory",
+    "key"
+   ],
+   "repeats": 8,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "mentions:15": true,
+      "mentions:Марин": true
+     },
+     "text": "Завтра в 15:00, спросите Марину.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4407,
+      "completion_tokens": 17,
+      "cached_tokens": 0,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1156,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:15": true,
+      "mentions:Марин": true
+     },
+     "text": "Завтра в 15:00, спросите Марину.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4407,
+      "completion_tokens": 23,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 939,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:15": true,
+      "mentions:Марин": true
+     },
+     "text": "Завтра в 15:00, спросите Марину.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4407,
+      "completion_tokens": 23,
+      "cached_tokens": 0,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1156,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:15": true,
+      "mentions:Марин": true
+     },
+     "text": "Завтра в 15:00, спросите Марину.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4407,
+      "completion_tokens": 23,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1933,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:15": true,
+      "mentions:Марин": true
+     },
+     "text": "Завтра в 15:00, спросите Марину.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4407,
+      "completion_tokens": 23,
+      "cached_tokens": 0,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1458,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:15": true,
+      "mentions:Марин": true
+     },
+     "text": "Завтра в 15:00, спросите Марину.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4407,
+      "completion_tokens": 23,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1444,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:15": true,
+      "mentions:Марин": true
+     },
+     "text": "Завтра в 15:00, спросите Марину.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4407,
+      "completion_tokens": 23,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1454,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:15": true,
+      "mentions:Марин": true
+     },
+     "text": "Завтра в 15:00, спросите Марину.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4407,
+      "completion_tokens": 23,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1292,
+     "status": null
+    }
+   ]
+  }
+ ]
+}
