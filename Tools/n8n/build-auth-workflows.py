@@ -214,23 +214,29 @@ CLAIM_START_SQL = """-- A1 claim: register the intent. Legacy (unowned) profiles
 -- which also bounds unsolicited codes. A claim lives one day.
 -- V2: ONLY claim.start (the fifth parameter is the op) takes the pending claim or starts its clock; claim.status
 -- and claim.verify polling leave both as they are, so another install's poll can never take a claim over.
+-- M4 (2026-10-09): a RETIRED row (deleted_at set: the sweep, an unfinished app delete, a refused channel) has nothing
+-- left to claim — it never takes a pending claim, and the statement reports it (retired + deleted_reason) so Claim
+-- Decide refuses with 410 profile_retired before any Wappi call or code.
 insert into bot_profiles (profile_id, app_user_id, channel, claim_pending_by, claim_pending_at)
 values ($1, coalesce(nullif($3, ''), $2), $4, $2, now())
 on conflict (profile_id) do update set
   claim_pending_by = case
+      when bot_profiles.deleted_at is not null then bot_profiles.claim_pending_by
       when bot_profiles.owner_id = $2 then bot_profiles.claim_pending_by
       when $5 = 'claim.start' then excluded.claim_pending_by
       else bot_profiles.claim_pending_by end,
   -- the claim clock starts ONCE per claiming install: a repeated claim.start must not move it. A claim older
   -- than a day has expired (R1) — a new claim.start starts a new one instead of locking the install out.
   claim_pending_at = case
+      when bot_profiles.deleted_at is not null then bot_profiles.claim_pending_at
       when bot_profiles.owner_id = $2 then bot_profiles.claim_pending_at
       when $5 <> 'claim.start' then bot_profiles.claim_pending_at
       when bot_profiles.claim_pending_by = $2 and bot_profiles.claim_pending_at > now() - interval '1 day' then bot_profiles.claim_pending_at
       else now() end
 returning profile_id, owner_id, channel, claim_pending_by, extract(epoch from claim_pending_at)::bigint as claim_pending_epoch,
   (claim_code_hash is not null and claim_code_expires_at is not null and claim_code_expires_at > now()) as code_still_valid,
-  (claim_code_hash is null and claim_code_expires_at is not null and claim_code_expires_at > now()) as code_locked;"""
+  (claim_code_hash is null and claim_code_expires_at is not null and claim_code_expires_at > now()) as code_locked,
+  (deleted_at is not null) as retired, deleted_reason;"""
 
 # V2: a fresh code starts with a clean attempt counter.
 STORE_CLAIM_CODE_SQL = """update bot_profiles set claim_code_hash = $3, claim_code_expires_at = now() + interval '10 minutes', claim_code_attempts = 0
@@ -273,7 +279,8 @@ const r = $('Route').first().json;
 const inst = $('Verify Install').first().json || {};
 const row = $('Claim Start').first().json || {};
 // V2: claim.verify never calls Wappi (the code is the proof; a status call per guess only amplified a brute force),
-// so on that op the input is Claim Start's row, not a get/status response.
+// so on that op the input is Claim Start's row, not a get/status response (M4: so it is for a retired row — decided
+// below before anything reads the status).
 const isVerify = r.op === 'claim.verify';
 const st = isVerify ? {} : ($input.first().json || {});   // fullResponse of Wappi get/status
 const status = (st.body && typeof st.body === 'object') ? st.body : {};
@@ -284,6 +291,13 @@ if (!inst.install_id) {                                // R11: 401 only on the D
   out.statusCode = revoked ? 401 : 503; out.claimError = revoked ? 'install_revoked' : 'db_unavailable';
 }
 else if (row.error || !row.profile_id) { out.statusCode = 500; out.claimError = 'db_error'; }
+else if (row.retired === true) {
+  // M4: a retired profile has nothing to claim — never 'owned' (the token lists live rows only, so the client would ask
+  // again forever), never a code or a pending claim. The reason goes to the row's OWNER only; anyone else learns no
+  // more than the deletion of an id it already named.
+  out.statusCode = 410; out.claimError = 'profile_retired';
+  if (row.owner_id === inst.install_id) out.retiredReason = row.deleted_reason || null;
+}
 else if (row.owner_id === inst.install_id) { out.claimMethod = 'owned'; }
 else if (isVerify) { out.claimMethod = 'code'; }       // Verify Claim Code decides (scoped, counted, expiring)
 else if (st.statusCode !== 200 || typeof status.authorized !== 'boolean') { out.statusCode = 502; out.claimError = 'transport_unavailable'; }
@@ -326,7 +340,9 @@ try { const d = $('Claim Decide').first(); if (d && d.json && d.json.op) claimIn
 let claimVerify = null;
 try { const v = $('Verify Claim Code').first(); if (v && v.json) claimVerify = v.json; } catch (e) { claimVerify = null; }
 if (claimInfo && claimInfo.claimError) {
-  return [{ json: { success: false, error: claimInfo.claimError, _status: claimInfo.statusCode || 400 }, pairedItem: { item: 0 } }];
+  const refusal = { success: false, error: claimInfo.claimError, _status: claimInfo.statusCode || 400 };
+  if (claimInfo.retiredReason) refusal.retiredReason = claimInfo.retiredReason;   // M4: profile_retired, owner only
+  return [{ json: refusal, pairedItem: { item: 0 } }];
 }
 if (row.error || !row.install_id) {
   if (r.op === 'bootstrap') {
@@ -367,6 +383,7 @@ if (claimInfo) { out.claimMethod = claimInfo.claimMethod; out.claimProfileId = c
 return [{ json: out, pairedItem: { item: 0 } }];
 """
 
+NEEDS_STATUS_EXPR = "={{ $('Route').first().json.op !== 'claim.verify' && $json.retired !== true }}"
 CLAIM_STATUS_QUERY = "={{ JSON.stringify({ profile_id: $('Route').first().json.profileId }) }}"
 CLAIM_STATUS_URL = "={{ ($('Route').first().json.channel === 'telegram' ? 'https://wappi.pro/tapi/' : 'https://wappi.pro/api/') + 'sync/get/status' }}"
 SEND_CODE_URL = "={{ ($('Route').first().json.channel === 'telegram' ? 'https://wappi.pro/tapi/' : 'https://wappi.pro/api/') + 'sync/message/send' }}"
@@ -393,7 +410,9 @@ def build_session():
     n.append(postgres("Claim Start", CLAIM_START_SQL,
                       "={{ [ $('Route').first().json.profileId, $('Route').first().json.installId, ($input.first().json.app_user_id || ''), $('Route').first().json.channel, $('Route').first().json.op ] }}", [1320, 520]))
     # V2: claim.verify goes straight to Claim Decide — no Wappi call per guessed code.
-    n.append(if_true("Needs Status?", "={{ $('Route').first().json.op !== 'claim.verify' }}", [1430, 520]))
+    # M4: nor does a retired profile (Claim Start's `retired`) — there is nothing to ask the transport about, and it
+    # is one call with the shared server credential per refused claim.
+    n.append(if_true("Needs Status?", NEEDS_STATUS_EXPR, [1430, 520]))
     n.append(http_wappi("Claim Status", "GET", CLAIM_STATUS_URL, [1540, 420], query_expr=CLAIM_STATUS_QUERY))
     n.append(code("Claim Decide", CLAIM_DECIDE_JS.replace("__TOKEN__", tok), [1760, 520]))
     n.append(if_true("Claim Verify?", "={{ $json.op === 'claim.verify' && !$json.claimError }}", [1980, 520]))

@@ -8,7 +8,8 @@ Pins, per canonical JSON:
   * the gate code never reads the secret from anything but $env, never logs the token;
   * Wappi Proxy: allow-list present, no legacy mode, ownership check for every op with a profile,
     executions of successful calls not stored;
-  * Auth Session: bootstrap cap, secret hash compare, single-round-trip refresh, token TTL;
+  * Auth Session: bootstrap cap, secret hash compare, single-round-trip refresh, token TTL; claim scoping (V2) and the
+    retired-row refusal (M4: never 'owned', no pending claim, no Wappi call — 410 profile_retired);
   * bot templates: the callback binding condition (profile_id == webhook path);
   * Upload File validates the decoded multipart ids (session ownership, GUID fileId) and only then registers
     the upload BEFORE the ingest chain; Delete File deletes chunks and storage only when `allowed`; both decide a
@@ -174,7 +175,27 @@ def check_session():
         "V2: only claim.start may take a pending claim"
     assert edges(wf, "Claim Start") == [{"node": "Needs Status?", "type": "main", "index": 0}], "V2: Claim Start must feed Needs Status?"
     ns = node(wf, "Needs Status?")["parameters"]["conditions"]["conditions"][0]["leftValue"]
-    assert ns == "={{ $('Route').first().json.op !== 'claim.verify' }}", "V2: claim.verify must not call Wappi"
+    assert ns == "={{ $('Route').first().json.op !== 'claim.verify' && $json.retired !== true }}", \
+        "V2/M4: claim.verify must not call Wappi, nor may any op on a retired profile (Claim Start's retired)"
+    # M4 (2026-10-09): a RETIRED row (deleted_at set) is never 'owned' — the token lists live rows only, so «owned» there
+    # spun the client's boot loop forever. Claim Start keeps any pending claim off it and reports it; Claim Decide refuses
+    # it (410 profile_retired) BEFORE the owned / verify branches, naming the reason to the row's owner only.
+    csq = node(wf, "Claim Start")["parameters"]["query"]
+    assert "(deleted_at is not null) as retired, deleted_reason" in csq, "M4: Claim Start must report a retired row (retired + deleted_reason)"
+    for col in ("claim_pending_by", "claim_pending_at"):
+        assert re.search(rf"{col} = case\s+when bot_profiles\.deleted_at is not null then bot_profiles\.{col}\s", csq), \
+            f"M4: a retired row must never take a pending claim ({col}: the FIRST case branch must keep it as it is)"
+    cdj = node(wf, "Claim Decide")["parameters"]["jsCode"]
+    i_ret = cdj.find("else if (row.retired === true) {")
+    i_owned = cdj.find("else if (row.owner_id === inst.install_id) { out.claimMethod = 'owned'; }")
+    i_verify = cdj.find("else if (isVerify)")
+    assert 0 <= i_ret < i_owned < i_verify, "M4: Claim Decide must refuse a retired row before the owned and verify branches"
+    ret = cdj[i_ret:i_owned]
+    assert "out.statusCode = 410; out.claimError = 'profile_retired';" in ret and \
+        "if (row.owner_id === inst.install_id) out.retiredReason = row.deleted_reason || null;" in ret and ret.count("retiredReason") == 1, \
+        "M4: a retired row answers 410 profile_retired, with the reason for the row's owner only"
+    assert "if (claimInfo.retiredReason) refusal.retiredReason = claimInfo.retiredReason;" in node(wf, "Issue Token")["parameters"]["jsCode"], \
+        "M4: Issue Token must pass the owner's retiredReason with the refusal"
     into_status = sorted(src for src, outs in wf["connections"].items() for i, out in enumerate(outs.get("main", [])) for c in out if c["node"] == "Claim Status")
     assert into_status == ["Needs Status?"] and edges(wf, "Needs Status?", 0) == [{"node": "Claim Status", "type": "main", "index": 0}], \
         f"V2: Claim Status must be reachable only from Needs Status? true: {into_status}"
@@ -189,7 +210,7 @@ def check_session():
     vc = node(wf, "Verify Claim Code")["parameters"]["query"]
     assert "claim_code_expires_at > now()" in vc and "claim_pending_by = $2" in vc and "(owner_id is null or owner_id <> $2)" in vc, \
         "claim verify must be scoped to the claiming install, expiring, and allow a proven transfer"
-    print("OK  crAuthSession001-Auth_Session.json (cap, hash compare, single round-trip refresh, TTL, claim scoping)")
+    print("OK  crAuthSession001-Auth_Session.json (cap, hash compare, single round-trip refresh, TTL, claim scoping, M4 retired refusal)")
 
 
 def check_bots():

@@ -30,12 +30,23 @@ n8n's own expression engine — and asserts the CORRECT outcome:
   S14 V2: structure — no reauth bind exists, only Verify Claim Code writes owner_id, claim.verify never calls Wappi
   S15 V2: claim.status / claim.verify of another install never take over a pending claim (nor burn its attempts)
   S16 V2: Telegram — the code goes to the AUTHORISED account (account.phone), never to a number named in auth/phone
+  S17 M4: claim.* on the install's OWN retired row (the sweep / an unfinished delete removed the profile) -> 410
+      profile_retired + the reason; Wappi is not asked, no pending claim, no code, Verify Claim Code never runs
+  S18 M4: a retired row this install does not own (owner-less, another install's) -> the same 410 WITHOUT a reason;
+      no pending claim, never in the token's c; a live Wappi profile behind it (liveness false positive) gets no code
+  S19 M4: the invariant the defect broke — every claimMethod:'owned' answer issues a token whose p lists the profile
+      (a matrix of row states: own / foreign / owner-less × live / retired)
+
+M4 (follow-ups 2026-10-09): Claim Decide answered 'owned' for the install's own RETIRED row (deleted_at set) while the
+token — built from live rows only — never listed it; the client's boot loop read 'owned' as «done, next» and asked the
+same profile again forever (one n8n execution, three Postgres statements and a Wappi get/status per turn).
 """
+import base64
 import datetime as dt
 import json
 import re
 
-from harness import Case, PgSession, bind, code, expr, node, report, run_js, wf
+from harness import Case, PgSession, bind, code, expr, node, report, run_js, sql_literal, wf
 
 W = wf('crAuthSession001-Auth_Session.json')
 P = wf('crWappiProxy0001-Wappi_Proxy.json')
@@ -75,10 +86,11 @@ def sha(code_):
                   {'json': {'c': code_}})[0]['json']['h']
 
 
-def claim(pg, op, install, pid, status, code_='', channel='whatsapp', send=SEND_OK):
+def claim(pg, op, install, pid, status, code_='', channel='whatsapp', send=SEND_OK, status_http=200):
     """One Auth Session claim.* call from Verify Install on (the install is authenticated), walking the canonical graph.
     Returns what the client would see (`issued` = Issue Token's response) plus the side effects:
-    {decide, status_called, sent_code, recipient, bound, verify_rows, reload, issued}."""
+    {decide, status_called, sent_code, recipient, bound, verify_rows, reload, issued}. `status_http` is the HTTP status
+    Wappi's get/status answers with (fullResponse) when it is called."""
     route = {'op': op, 'profileId': pid, 'channel': channel, 'installId': install, 'code': code_,
              'codeHash': sha(code_) if code_ else '', 'nowSec': now(pg), 'installSecret': ''}
     inst = {'verdict': 'checked', 'install_id': install, 'app_user_id': None}
@@ -87,7 +99,7 @@ def claim(pg, op, install, pid, status, code_='', channel='whatsapp', send=SEND_
     start = pg.q(bind(Q(W, 'Claim Start'), [pid, install, '', channel, op]))[0]
     named = {'Route': route, 'Verify Install': inst, 'Claim Start': start}
     status_called = expr(IF(W, 'Needs Status?'), start, named) if has(W, 'Needs Status?') else True
-    item = {'json': {'statusCode': 200, 'body': status}} if status_called else {'json': start}
+    item = {'json': {'statusCode': status_http, 'body': status}} if status_called else {'json': start}
     dec = code(W, 'Claim Decide', item, named=named)[0]['json']
     named['Claim Decide'] = dec
     out = {'decide': dec, 'status_called': status_called, 'sent_code': None, 'recipient': None, 'bound': None, 'verify_rows': None}
@@ -369,18 +381,142 @@ with Case('V2 S16: Telegram — the code goes to the AUTHORISED account (account
         v = claim(pg, 'claim.verify', 'inst-A', 'P16', tg, s['sent_code'] or '', channel='telegram')
         c.check('P16' in (v['reload']['p'] or []), f'the Telegram code binds: {v["issued"]}')
 
-with Case('V2 negative: verify-auth-gate.py rejects an Auth Session that binds on a pairing again, or lets claim.verify call Wappi') as c:
+RETIRED_REASONS = ('trial_expiry', 'churn_grace', 'liveness', 'app_delete', 'channel_limit')
+
+
+def retire(pg, pid, owner, reason, channel='whatsapp'):
+    """A bot_profiles row the Profile Lifecycle Sweep / Delete Bot Files / Retire Refused Profile has retired."""
+    pg.x("insert into bot_profiles (profile_id, app_user_id, channel, owner_id, claimed_at, deleted_at, deleted_reason) values "
+         f"({sql_literal(pid)}, 'rc-O', {sql_literal(channel)}, {sql_literal(owner)}, now() - interval '3 days', now() - interval '2 days', {sql_literal(reason)});")
+
+
+def row_of(pg, pid):
+    return pg.q(f"select owner_id, claim_pending_by, claim_pending_at, claim_code_hash, deleted_at is not null as retired "
+                f"from bot_profiles where profile_id = {sql_literal(pid)}")[0]
+
+
+def token_profiles(issued):
+    """The p claim of the token an answer carries (decoded, not verified) — None when the answer carries no token."""
+    tok = issued.get('token')
+    if not tok:
+        return None
+    part = tok.split('.')[1]
+    return json.loads(base64.urlsafe_b64decode(part + '=' * (-len(part) % 4))).get('p') or []
+
+
+def refused_retired(r, reason=None):
+    """What the client must see for a retired profile: 410 profile_retired, no token; the reason only for its owner."""
+    i = r['issued']
+    problems = []
+    if not (i.get('success') is False and i.get('error') == 'profile_retired' and i.get('_status') == 410):
+        problems.append(f"answer {i.get('_status')} {i.get('error')} success={i.get('success')} claimMethod={i.get('claimMethod')}")
+    if 'token' in i:
+        problems.append('a refusal must not carry a token')
+    if reason is None and 'retiredReason' in i:
+        problems.append(f"the reason leaked to a caller that does not own the row: {i.get('retiredReason')}")
+    if reason is not None and i.get('retiredReason') != reason:
+        problems.append(f"retiredReason {i.get('retiredReason')!r} != {reason!r}")
+    if r['status_called']:
+        problems.append('Wappi get/status was called for a retired profile')
+    if r['sent_code']:
+        problems.append('a code was sent into a retired profile\'s chat')
+    if r['verify_rows'] is not None:
+        problems.append('Verify Claim Code ran for a retired profile')
+    return problems
+
+
+with Case('M4 S17: claim.start / claim.status / claim.verify on the install\'s OWN retired row -> 410 profile_retired + the reason; Wappi is not asked, no pending claim, no code, Verify Claim Code never runs') as c:
+    with PgSession(SETUP) as pg:
+        calls = []
+        for reason in RETIRED_REASONS:
+            pid = f'Z-{reason}'
+            retire(pg, pid, 'inst-O', reason)
+            calls += [(pid, reason, 'whatsapp', 'claim.start', UNAUTH, 200, ''),
+                      (pid, reason, 'whatsapp', 'claim.start', {'detail': 'profile not found'}, 404, ''),   # Wappi already deleted it
+                      (pid, reason, 'whatsapp', 'claim.status', UNAUTH, 200, ''),
+                      (pid, reason, 'whatsapp', 'claim.verify', UNAUTH, 200, '123456')]
+        retire(pg, 'Z-tg', 'inst-O', 'trial_expiry', channel='telegram')
+        calls += [('Z-tg', 'trial_expiry', 'telegram', op, UNAUTH, 200, '123456' if op == 'claim.verify' else '')
+                  for op in ('claim.start', 'claim.status', 'claim.verify')]
+        for pid, reason, ch, op, status, http, code_ in calls:
+            r = claim(pg, op, 'inst-O', pid, status, code_, channel=ch, status_http=http)
+            for p in refused_retired(r, reason):
+                c.check(False, f'{pid} {op} (Wappi {http}): {p}')
+            row = row_of(pg, pid)
+            c.check(row['claim_pending_by'] is None and row['claim_pending_at'] is None and row['claim_code_hash'] is None,
+                    f'{pid} {op}: a claim was written onto a retired row: {row}')
+            c.check(row['owner_id'] == 'inst-O' and row['retired'] is True, f'{pid} {op}: the row itself changed: {row}')
+
+with Case('M4 S18: a retired row this install does NOT own (owner-less, another install\'s) -> the same 410 without a reason; no pending claim, never in c; a live Wappi profile behind it (liveness false positive) gets no code and no owner') as c:
+    with PgSession(SETUP) as pg:
+        retire(pg, 'R-wa', None, 'liveness')                                     # an owner-less (compat-era) row the sweep retired
+        retire(pg, 'F-wa', 'inst-A', 'trial_expiry')                             # another install's retired row
+        for pid in ('R-wa', 'F-wa'):
+            for op in ('claim.start', 'claim.status', 'claim.start'):
+                r = claim(pg, op, 'inst-O', pid, UNAUTH)
+                for p in refused_retired(r):
+                    c.check(False, f'{pid} {op}: {p}')
+                c.check(row_of(pg, pid)['claim_pending_by'] is None, f'{pid} {op}: a pending claim was written onto a retired row: {row_of(pg, pid)}')
+                c.check(pid not in (r['reload']['c'] or []), f'{pid} {op}: the retired row entered the token\'s c: {r["reload"]["c"]}')
+        retire(pg, 'B-wa', None, 'liveness')                                     # the Wappi profile is in fact still authorised
+        s = claim(pg, 'claim.start', 'inst-O', 'B-wa', AUTH_OLD(pg))
+        for p in refused_retired(s):
+            c.check(False, f'B-wa claim.start: {p}')
+        v = claim(pg, 'claim.verify', 'inst-O', 'B-wa', AUTH_OLD(pg), s['sent_code'] or '123456')
+        for p in refused_retired(v):
+            c.check(False, f'B-wa claim.verify: {p}')
+        c.check(row_of(pg, 'B-wa')['owner_id'] is None, f'a retired owner-less row got an owner: {row_of(pg, "B-wa")}')
+
+with Case('M4 S19: invariant — every claimMethod:\'owned\' answer issues a token whose p lists the profile (own / foreign / owner-less × live / retired)') as c:
+    with PgSession(SETUP) as pg:
+        cells = [('own live', 'C-own', 'inst-O', None)]
+        cells += [(f'own retired {r}', f'C-own-{r}', 'inst-O', r) for r in RETIRED_REASONS]
+        cells += [('foreign live', 'C-for', 'inst-A', None), ('foreign retired', 'C-for-r', 'inst-A', 'churn_grace'),
+                  ('owner-less live', 'C-none', None, None), ('owner-less retired', 'C-none-r', None, 'liveness')]
+        for label, pid, owner, reason in cells:
+            if reason:
+                retire(pg, pid, owner, reason)
+            else:
+                pg.x(f"insert into bot_profiles (profile_id, app_user_id, channel, owner_id) values ({sql_literal(pid)}, 'rc-O', 'whatsapp', {sql_literal(owner)});")
+        owned_seen = False
+        for label, pid, owner, reason in cells:
+            for op in ('claim.start', 'claim.status', 'claim.verify'):
+                r = claim(pg, op, 'inst-O', pid, AUTH_OLD(pg), '123456' if op == 'claim.verify' else '', send=SEND_OK)
+                i = r['issued']
+                if i.get('success') and i.get('claimMethod') == 'owned':
+                    owned_seen = owned_seen or label == 'own live'
+                    c.check(pid in (i.get('profiles') or []) and pid in (token_profiles(i) or []),
+                            f'{label} {op}: «owned» without the profile in the token — profiles={i.get("profiles")} token p={token_profiles(i)}')
+                if reason:
+                    c.check(i.get('success') is False, f'{label} {op}: a retired row answered success ({i.get("claimMethod")})')
+        c.check(owned_seen, 'positive control: the install\'s own live row must answer «owned» (else the invariant is vacuous)')
+
+with Case('V2/M4 negative: verify-auth-gate.py rejects an Auth Session that binds on a pairing again, lets claim.verify call Wappi, or loses either half of the M4 retired-row refusal') as c:
     import shutil
     import subprocess
     import sys
     import tempfile
     from pathlib import Path
     from harness import N8N
-    for label, mutate in (
+
+    def drop_retired_branch(w):
+        cd = node(w, 'Claim Decide')['parameters']
+        cd['jsCode'] = re.sub(r"else if \(row\.retired === true\) \{.*?\n\}\n", '', cd['jsCode'], flags=re.S)
+
+    def pending_on_retired(w):
+        cs = node(w, 'Claim Start')['parameters']
+        cs['query'] = re.sub(r"\n\s*when bot_profiles\.deleted_at is not null then bot_profiles\.claim_pending_(by|at)", '', cs['query'])
+
+    for label, mutate, tag in (
         ('reauth bind', lambda w: (w['nodes'].append({'parameters': {'operation': 'executeQuery', 'query': 'update bot_profiles set owner_id = $2 where profile_id = $1 returning profile_id;'},
-                                                       'id': 'neg-bind', 'name': 'Bind Reauthed Profile', 'type': 'n8n-nodes-base.postgres', 'typeVersion': 2.6, 'position': [0, 0]}),)),
-        ('verify calls Wappi', lambda w: node(w, 'Needs Status?')['parameters']['conditions']['conditions'][0].__setitem__('leftValue', '={{ true }}')),
-        ('unjudged send', lambda w: w['connections'].__setitem__('Send Claim Code', {'main': [[{'node': 'Reload Ownership', 'type': 'main', 'index': 0}]]})),
+                                                       'id': 'neg-bind', 'name': 'Bind Reauthed Profile', 'type': 'n8n-nodes-base.postgres', 'typeVersion': 2.6, 'position': [0, 0]}),), 'V2'),
+        ('verify calls Wappi', lambda w: node(w, 'Needs Status?')['parameters']['conditions']['conditions'][0].__setitem__('leftValue', '={{ true }}'), 'V2'),
+        ('unjudged send', lambda w: w['connections'].__setitem__('Send Claim Code', {'main': [[{'node': 'Reload Ownership', 'type': 'main', 'index': 0}]]}), 'V2'),
+        # M4: each half of the fix, removed alone, must fail the structural verifier too
+        ('M4 retired answered owned', drop_retired_branch, 'M4'),
+        ('M4 retired asks Wappi', lambda w: node(w, 'Needs Status?')['parameters']['conditions']['conditions'][0].__setitem__(
+            'leftValue', "={{ $('Route').first().json.op !== 'claim.verify' }}"), 'M4'),
+        ('M4 pending on a retired row', pending_on_retired, 'M4'),
     ):
         d = Path(tempfile.mkdtemp(prefix='v2-neg-'))
         try:
@@ -388,10 +524,12 @@ with Case('V2 negative: verify-auth-gate.py rejects an Auth Session that binds o
                 shutil.copy(f, d / f.name)
             f = d / 'crAuthSession001-Auth_Session.json'
             w = json.loads(f.read_text(encoding='utf-8'))
+            untouched = json.dumps(w, sort_keys=True)
             mutate(w)
+            c.check(json.dumps(w, sort_keys=True) != untouched, f'{label}: the mutation found nothing to change in the canon')
             f.write_text(json.dumps(w, indent=2, ensure_ascii=False) + '\n', encoding='utf-8')
             r = subprocess.run([sys.executable, str(N8N / 'verify-auth-gate.py'), '--dir', str(d)], capture_output=True, text=True)
-            c.check(r.returncode != 0 and 'V2' in r.stdout, f'{label}: verifier passed: {r.stdout[-300:]}')
+            c.check(r.returncode != 0 and tag in r.stdout, f'{label}: verifier passed (or failed without naming {tag}): {r.stdout[-300:]}')
         finally:
             shutil.rmtree(d, ignore_errors=True)
     r = subprocess.run([sys.executable, str(N8N / 'verify-auth-gate.py')], capture_output=True, text=True)

@@ -951,6 +951,45 @@ def s_retired_delete(ctx):
                 f"activate retired={activate} rows before={before} own dbf={own_dbf} {d} rows after={after} deletes={deletes} GET={gone}")
 
 
+@scenario("claim_on_retired_profile_is_refused", "M4: claim.start / claim.status / claim.verify on a bot profile the sweep retired (trial over) → 410 profile_retired, retiredReason for its owner only (another install: the same 410 without it), Wappi is never asked, no pending claim, no token; the owner's V12 delete of that same bot then goes through (profile.delete answers a FINAL code the client steps over — not in the token, 403; DeleteBotFiles and SetWorkflowState delete = 200, the clones gone) — WhatsApp and Telegram")
+def s_claim_retired(ctx):
+    o = fresh_owner(ctx, "m4")
+    wa, tg, wwa, wtg, created = create_bot_clones(ctx, o, "m4")
+    if not (wwa and wtg):
+        return False, f"setup: create {created} wa={wwa} tg={wtg}"
+    for pid in (wa, tg):   # the worst case: a liveness false positive — Wappi still reports the profile authorised
+        http("POST", f"{MOCK}/__mock/profile", {"profile_id": pid, "authorized": True, "phone": "77003330000"})
+    pg(f"update bot_profiles set deleted_at = now(), deleted_reason = 'trial_expiry' where profile_id in ('{wa}', '{tg}');")
+    tok = o.refresh()
+    x = Owner("m4x", ctx["run_id"])
+    since = mock_total()
+    res = {}
+    for ch, pid in (("whatsapp", wa), ("telegram", tg)):
+        for who, owner, op, code in (("own", o, "claim.start", None), ("own", o, "claim.status", None),
+                                     ("own", o, "claim.verify", "123456"), ("foreign", x, "claim.start", None)):
+            st, d = claim_call(owner, op, pid, code, channel=ch)
+            d = d if isinstance(d, dict) else {}
+            res[f"{who} {ch} {op}"] = [st, d.get("error"), d.get("retiredReason"), "token" in d]
+    wappi = [c["path"] for c in mock_calls(since, "")[0]
+             if (c.get("query") or {}).get("profile_id") in (wa, tg) or any(p in json.dumps(c.get("body")) for p in (wa, tg))]
+    pending = pg(f"select count(*) from bot_profiles where profile_id in ('{wa}', '{tg}') and (claim_pending_by is not null or claim_code_hash is not null);")
+    # V12: the retired bot stays deletable by its owner — the client keeps its ids exactly for this (M4 does not touch them).
+    # Manager.DeleteBotOnServer's first step, profile.delete, is refused by Build Request for a profile the token no longer
+    # lists (403); BotServerDeletion.ClassifyProfileDelete steps over any non-transient answer, so only 0/408/429/5xx would stop it.
+    unlink = [proxy(o.token, {"op": "profile.delete", "channel": ch, "profile_id": pid})[0] for ch, pid in (("whatsapp", wa), ("telegram", tg))]
+    dbf, dd = hook("DeleteBotFiles", o.token, {"botWaId": wwa, "botTgId": wtg, "waProfileId": wa, "tgProfileId": tg, "appUserId": o.app_user_id})
+    deletes = [hook("SetWorkflowState", o.token, {"workflowId": w, "action": "delete"})[0] for w in (wwa, wtg)]
+    gone = [admin_api("GET", f"/workflows/{w}")[0] for w in (wwa, wtg)]
+    want_own, want_foreign = [410, "profile_retired", "trial_expiry", False], [410, "profile_retired", None, False]
+    ok = (not tok.get("profiles")
+          and all(v == (want_own if k.startswith("own") else want_foreign) for k, v in res.items())
+          and not wappi and pending == "0"
+          and all(isinstance(u, int) and 200 <= u < 500 and u not in (408, 429) for u in unlink) and dbf == 200 and isinstance(dd, dict) and dd.get("success") is True
+          and deletes == [200, 200] and gone == [404, 404])
+    return ok, (f"token after retire={tok.get('profiles')} answers={json.dumps(res)} wappi calls for the retired ids={wappi} "
+                f"claims written={pending} | V12 delete: unlink={unlink} dbf={dbf} {dd} sws={deletes} GET={gone}")
+
+
 @scenario("stale_token_cannot_unlink_a_claimed_profile", "V12 / M5: a token issued while install A owned a profile still lists it after install B took the profile over — A's profile.delete / profile.logout (proxy), DeleteBotFiles and SetWorkflowState(delete) are all refused (403) and the transport is never called; B's own profile.delete passes — WhatsApp and Telegram")
 def s_stale_token(ctx):
     a = fresh_owner(ctx, "st")
