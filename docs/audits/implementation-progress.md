@@ -275,3 +275,22 @@ e2e-handoff 12/14 в полном прогоне — оба провала (`not
 | «Проверить бота» из приложения | Test Dialog run 3869: dry-handoff записан в `test_dialog_actions` (`create_handoff`), при этом ledger/история/память/заявки/счётчик диалогов НЕ изменились (3/10/7/1/1 до и после); успешные прогоны Test Dialog не сохраняются в n8n по настройке (текст теста — владельца) |
 
 Не проверено живьём: «Вместе» во время генерации (`cancelled_mode`) и повторная доставка события (`duplicate`) — оба покрыты staging-сценариями; self-message заявки на телефоне владелец подтверждает сам.
+
+## Развёртывание 2026-10-09 (прод, по явному «да» владельца на пакет итераций 27.09 + 28.09)
+
+Пакет: `docs/audits/2026-09-27-iteration/release-package.md`, итоговый отчёт `docs/audits/2026-09-28-iteration/final-report.md`.
+
+| Шаг | Результат | Доказательство |
+|---|---|---|
+| Снимок «до» | `verify-deployed`: канон 27, DIFF 22 + MISSING `crPriceSearch001`, живых клонов 0, архивный «13», other 0 | `docs/audits/2026-10-09-prod-before.json` |
+| Бэкап | `~/backups/n8n-2026-10-09-predeploy.tar.gz` (07:49 UTC, 28 workflow + креды в зашифрованном виде + config); утренний сохранён как `…-0315.tar.gz` | `ls ~/backups` |
+| Предпроверки (read-only) | дублей billing id 0; индекс `documents_metadata_file_id_idx` есть; installs 1, живых `bot_profiles` 1 | `sql-oneoff` |
+| SQL (5 миграций) | claim-pairing, billing-bindings, reply-order, claim-code-attempts, retired-clone-deactivate — все 200; пост-чек: 5 колонок на месте, `billing_bindings` создана (1 строка seed), RLS = true | `sql-oneoff` |
+| Новый `crPriceSearch001` | `n8n import:workflow --separate` (id сохранён) + `publish:workflow` + контрольный рестарт n8n; healthz 200 | CLI, healthz |
+| 22 workflow | `deploy-canonical.py --apply --yes`: updated 20, failed 0, read-back ok у каждого (точки отката — `docs/audits/2026-10-09-deploy-rollback-pointers.txt`); `build-client-webhooks.py --update`: Support Message + Set Workflow State обновлены и активны, обратный экспорт — 0 диффа с каноном | вывод инструментов |
+| Read-back | `verify-deployed --base prod` exit 0: канон 27, diff 0; `crPriceSearch001` active+published; Notifier и Sweep активны; клонов 0 (обновлять нечего) | `docs/audits/2026-10-09-prod-after.json` |
+| Smoke (без изменений данных) | без токена: WappiProxy/Handoffs/TestDialog → 401; AuthSession nonsense → 400; SetWorkflowState на `crPriceSearch001` → 400 `protected_workflow`; SupportMessage пустой → 400 | curl |
+| Логи 25 мин | ошибок исполнения нет; ошибок insights нет (харнес ждёт 35 с); 4 × «No item to return» — ответы временного вебхука `sql-oneoff` на миграции из одних ALTER (колонки созданы, пост-чек) | `docker compose logs` |
+
+Попутно: `sql-oneoff.py --help` исполнил строку `--help` как SQL (комментарий, без эффекта); его временный workflow удалён (снимок «до» — other 0).
+**Не проверено на проде (нужен живой бот с новой сборки):** canary §4 пакета — загрузка .txt-прайса, вопрос о цене с артикулом, Test Dialog, заявка → self-message, удаление бота.
