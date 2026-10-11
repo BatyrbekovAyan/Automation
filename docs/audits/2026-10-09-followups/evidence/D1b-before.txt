@@ -1,0 +1,56 @@
+# D1b — BEFORE (deploy-canonical.py of HEAD 0adac3f4: the ordinary PUT path runs PUT → deactivate → activate)
+# python3 Tools/n8n/tests/test_deploy_canonical.py — in-memory n8n 2.36.7 model, no network; 2026-10-11T12:05:38Z
+PASS D1 stored canonical, PUBLISHED version older: --apply publishes the stored version in place, read-back confirms (exit 0, republished=1)
+PASS D1 dry-run: the same state is «would publish» with the rollback pointer, nothing is written (exit 0)
+PASS D1 origin: a PUT whose own publish was refused (400, version saved) fails the run; the RE-RUN repairs it and confirms
+PASS D1 an instance that reports version ids only (no activeVersion graph): activeVersionId != versionId is republished, then confirmed by the ids
+PASS D1 an active workflow whose stored version still carries an unbound placeholder is NOT published (refused, exit 1)
+PASS D1 NEG publish refused (400, n8n validated before switching): exit 1, failed=1, republished=0, the old served version is named
+PASS D1 NEG publish answered 200 but the served version did not change: the read-back fails the run (exit 1)
+PASS D1 NEG publish rolled back by n8n (trigger registration failed → INACTIVE): exit 1, the read-back names the outage
+FAIL D1b ordinary DIFF, the PUT published (n8n 2.36): neither deactivate nor activate — PUT only, read-back ok, updated=1, exit 0
+      - the PUT published: nothing else may be written: [('PUT', '/workflows/SCLcpn6DMDG3Z4VN'), ('POST', '/workflows/SCLcpn6DMDG3Z4VN/deactivate'), ('POST', '/workflows/SCLcpn6DMDG3Z4VN/activate')]
+FAIL D1b ordinary DIFF, the PUT saved but did NOT publish: only POST /activate {versionId: the saved version}, no deactivate; read-back ok, updated=1
+      - PUT, then ONE in-place publish, never deactivate: [('PUT', '/workflows/SCLcpn6DMDG3Z4VN'), ('POST', '/workflows/SCLcpn6DMDG3Z4VN/deactivate'), ('POST', '/workflows/SCLcpn6DMDG3Z4VN/activate')]
+      - the publish must name the version the PUT saved (SCLcpn-v2): [None]
+FAIL D1b ids-only instance (no activeVersion graph): a PUT that published (activeVersionId == versionId) needs no publish
+      - exit 0 {'considered': 1, 'missing': 0, 'up_to_date': 0, 'would_update': 0, 'updated': 1, 'would_publish': 0, 'republished': 0, 'inactive_must_run': 0, 'failed': 0} writes=[('PUT', '/workflows/SCLcpn6DMDG3Z4VN'), ('POST', '/workflows/SCLcpn6DMDG3Z4VN/deactivate'), ('POST', '/workflows/SCLcpn6DMDG3Z4VN/activate')]
+~ SCLcpn6DMDG3Z4VN 'Set Reply Mode' active=True nodes 10 → 10 (+0 -0)
+    rollback pointer: versionId SCLcpn-v1 (activeVersionId SCLcpn-v1)
+    read-back: ok
+{"considered": 1, "missing": 0, "up_to_date": 0, "would_update": 0, "updated": 1, "would_publish": 0, "republished": 0, "inactiv
+      - exit 0 {'considered': 1, 'missing': 0, 'up_to_date': 0, 'would_update': 0, 'updated': 1, 'would_publish': 0, 'republished': 0, 'inactive_must_run': 0, 'failed': 0} writes=[('PUT', '/workflows/SCLcpn6DMDG3Z4VN'), ('POST', '/workflows/SCLcpn6DMDG3Z4VN/deactivate'), ('POST', '/workflows/SCLcpn6DMDG3Z4VN/activate')]
+FAIL D1b NEG the PUT did not publish and the in-place publish is REFUSED: failed=1, exit 1, the workflow stays ACTIVE on its old version (never deactivated)
+      - no deactivate, one publish attempt: [('PUT', '/workflows/SCLcpn6DMDG3Z4VN'), ('POST', '/workflows/SCLcpn6DMDG3Z4VN/deactivate'), ('POST', '/workflows/SCLcpn6DMDG3Z4VN/activate')]
+      - the old version keeps serving — the webhook never went offline
+      - the failure must name what is served now (SCLcpn-v1):
+~ SCLcpn6DMDG3Z4VN 'Set Reply Mode' active=True nodes 10 → 10 (+0 -0)
+    rollback pointer: versionId SCLcpn-v1 (activeVersionId SCLcpn-v1)
+    re-activate failed 400: {'message': 'There is a conflict with one of the webhooks'}
+    read-back: FAILED — active changed: True → False
+{"considered": 1, "missing": 0, "up_to_date": 0, "would_update": 0, "updated": 0, "would_publish": 0, "republished": 0, "inactive_must_run": 0, "failed": 1}
+
+FAIL D1b NEG the in-place publish answered 200 but nothing changed: the read-back fails the run (exit 1)
+      - exit 1 {'considered': 1, 'missing': 0, 'up_to_date': 0, 'would_update': 0, 'updated': 0, 'would_publish': 0, 'republished': 0, 'inactive_must_run': 0, 'failed': 1} writes=[('PUT', '/workflows/SCLcpn6DMDG3Z4VN'), ('POST', '/workflows/SCLcpn6DMDG3Z4VN/deactivate'), ('POST', '/workflows/SCLcpn6DMDG3Z4VN/activate')]
+~ SCLcpn6DMDG3Z4VN 'Set Reply Mode' active=True nodes 10 → 10 (+0 -0)
+    rollback pointer: versionId SCLcpn-v1 (activeVersionId SCLcpn-v1)
+    read-back: FAILED — active changed: True → False
+{"considered": 1, "missing": 0, "up_to_date": 0, "would_update": 0, "updated": 0, "would_publ
+FAIL D1b NEG the in-place publish was rolled back by n8n (trigger registration failed → INACTIVE): exit 1, the output names the outage
+      - exit 1 {'considered': 1, 'missing': 0, 'up_to_date': 0, 'would_update': 0, 'updated': 0, 'would_publish': 0, 'republished': 0, 'inactive_must_run': 0, 'failed': 1} writes=[('PUT', '/workflows/SCLcpn6DMDG3Z4VN'), ('POST', '/workflows/SCLcpn6DMDG3Z4VN/deactivate'), ('POST', '/workflows/SCLcpn6DMDG3Z4VN/activate')]
+      - the output must say the workflow is now inactive:
+~ SCLcpn6DMDG3Z4VN 'Set Reply Mode' active=True nodes 10 → 10 (+0 -0)
+    rollback pointer: versionId SCLcpn-v1 (activeVersionId SCLcpn-v1)
+    re-activate failed 400: {'message': 'Workflow could not be activated (rolled back)'}
+    read-back: FAILED — active changed: True → False
+{"considered": 1, "missing": 0, "up_to_date": 0, "would_update": 0, "updated": 0, "would_publish": 0, "republished": 0, "inactive_must_run": 0, "failed": 1}
+
+PASS NEG ordinary DIFF dry-run: would_update=1, would_publish=0, nothing written
+PASS NEG fully matching (stored = published = canonical): up_to_date=1, only GETs, exit 0
+PASS NEG inactive bot template with a canonical stored graph: up_to_date, never published or activated
+PASS NEG inactive bot template whose stored graph differs: PUT only, it stays inactive (no publish)
+PASS NEG a workflow that must run but is INACTIVE (canonical stored): reported, never activated, not counted up to date, exit 0
+PASS NEG whole healthy canonical set (placeholders bound, templates inactive): --apply writes NOTHING, every workflow up to date
+
+14 pass, 6 fail
+exit=1

@@ -1,0 +1,25 @@
+# D1b — AFTER (deploy-canonical.py: after the PUT of an active workflow, read back; publish the stored version in place only if the PUT did not — no deactivate)
+# python3 Tools/n8n/tests/test_deploy_canonical.py — in-memory n8n 2.36.7 model, no network; 2026-10-11T12:16:26Z
+PASS D1 stored canonical, PUBLISHED version older: --apply publishes the stored version in place, read-back confirms (exit 0, republished=1)
+PASS D1 dry-run: the same state is «would publish» with the rollback pointer, nothing is written (exit 0)
+PASS D1 origin: a PUT whose own publish was refused (400, version saved) fails the run; the RE-RUN repairs it and confirms
+PASS D1 an instance that reports version ids only (no activeVersion graph): activeVersionId != versionId is republished, then confirmed by the ids
+PASS D1 an active workflow whose stored version still carries an unbound placeholder is NOT published (refused, exit 1)
+PASS D1 NEG publish refused (400, n8n validated before switching): exit 1, failed=1, republished=0, the old served version is named
+PASS D1 NEG publish answered 200 but the served version did not change: the read-back fails the run (exit 1)
+PASS D1 NEG publish rolled back by n8n (trigger registration failed → INACTIVE): exit 1, the read-back names the outage
+PASS D1b ordinary DIFF, the PUT published (n8n 2.36): neither deactivate nor activate — PUT only, read-back ok, updated=1, exit 0
+PASS D1b ordinary DIFF, the PUT saved but did NOT publish: only POST /activate {versionId: the saved version}, no deactivate; read-back ok, updated=1
+PASS D1b ids-only instance (no activeVersion graph): a PUT that published (activeVersionId == versionId) needs no publish
+PASS D1b NEG the PUT did not publish and the in-place publish is REFUSED: failed=1, exit 1, the workflow stays ACTIVE on its old version (never deactivated)
+PASS D1b NEG the in-place publish answered 200 but nothing changed: the read-back fails the run (exit 1)
+PASS D1b NEG the in-place publish was rolled back by n8n (trigger registration failed → INACTIVE): exit 1, the output names the outage
+PASS NEG ordinary DIFF dry-run: would_update=1, would_publish=0, nothing written
+PASS NEG fully matching (stored = published = canonical): up_to_date=1, only GETs, exit 0
+PASS NEG inactive bot template with a canonical stored graph: up_to_date, never published or activated
+PASS NEG inactive bot template whose stored graph differs: PUT only, it stays inactive (no publish)
+PASS NEG a workflow that must run but is INACTIVE (canonical stored): reported, never activated, not counted up to date, exit 0
+PASS NEG whole healthy canonical set (placeholders bound, templates inactive): --apply writes NOTHING, every workflow up to date
+
+20 pass, 0 fail
+exit=0

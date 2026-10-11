@@ -62,7 +62,8 @@ def h(w):
 class FakeN8n:
     """`publish` = what POST /activate does: ok | refuse (400 from validation, nothing touched) | rollback (400 after
     the live version was unregistered: n8n rolls the workflow back to INACTIVE) | noop (200, served version unchanged).
-    `put_publish` = what a PUT's own publish of an active workflow does: ok | refuse (400, the new version SAVED)."""
+    `put_publish` = what a PUT's own publish of an active workflow does: ok | refuse (400, the new version SAVED) |
+    skip (200, the new version saved, the served one unchanged — an n8n whose PUT does not publish)."""
 
     def __init__(self, publish='ok', put_publish='ok', report_published_graph=True):
         self.w, self.versions, self.calls, self.n = {}, {}, [], 0
@@ -118,7 +119,8 @@ class FakeN8n:
             if e['activeVersionId']:
                 if self.put_publish == 'refuse':
                     return 400, {'message': 'There is a conflict with one of the webhooks (the update was saved)'}
-                e['activeVersionId'] = vid
+                if self.put_publish == 'ok':
+                    e['activeVersionId'] = vid
             return 200, self.view(wid)
         if method == 'POST' and parts[2:] == ['activate']:
             vid = (body or {}).get('versionId') or e['versionId']
@@ -278,16 +280,81 @@ with Case('D1 NEG publish rolled back by n8n (trigger registration failed → IN
     c.check('INACTIVE' in out, f'the output must say the workflow is now inactive:\n{out[-600:]}')
 
 # ---------------------------------------------------------------------------------------------- the ordinary paths
-with Case('NEG ordinary DIFF: PUT, then (active) deactivate → activate, read-back ok — updated=1, exit 0, the path unchanged') as c:
+# D1b (2026-10-11, the D1 follow-up): after the PUT of an ACTIVE workflow the tool reads back whether the PUT already
+# published the saved version (n8n 2.36 does) and only when it did not publishes THAT version in place —
+# POST /activate {versionId}, never deactivate → activate (a window without the webhook; on a failed activate the
+# workflow stayed off) — then confirms by reading back (active, activeVersionId == versionId, published graph = canon).
+DEACTIVATE = ('POST', f'/workflows/{SET_REPLY}/deactivate')
+PUT_ = ('PUT', f'/workflows/{SET_REPLY}')
+
+with Case('D1b ordinary DIFF, the PUT published (n8n 2.36): neither deactivate nor activate — PUT only, read-back ok, updated=1, exit 0') as c:
     w = bound(CANON[SET_REPLY])
     fake = FakeN8n()
     fake.add(stale(w), active=True)
     code, out, s = deploy(fake, *APPLY)
     c.check(code == 0 and counts(s, 'updated', 'republished', 'failed') == {'updated': 1, 'republished': 0, 'failed': 0}, f'exit {code} {s}\n{out[-800:]}')
-    c.check(fake.writes() == [('PUT', f'/workflows/{SET_REPLY}'), ('POST', f'/workflows/{SET_REPLY}/deactivate'), PUBLISH],
-            f'the ordinary path: {fake.writes()}')
+    c.check(fake.writes() == [PUT_], f'the PUT published: nothing else may be written: {fake.writes()}')
+    last_put = max(i for i, x in enumerate(fake.calls) if x[:2] == PUT_)
+    c.check(any(m == 'GET' and p == f'/workflows/{SET_REPLY}' for m, p, _ in fake.calls[last_put + 1:]),
+            f'what the PUT published must be READ back: {[x[:2] for x in fake.calls]}')
     active, graph = fake.served(SET_REPLY)
     c.check(active and h(fake.w[SET_REPLY]) == h(w) and h(graph) == h(w), 'stored and served are canonical')
+    c.check('deactivate' not in out.lower() or 'no deactivate' in out.lower(), f'no deactivate window may be announced:\n{out[-600:]}')
+
+with Case('D1b ordinary DIFF, the PUT saved but did NOT publish: only POST /activate {versionId: the saved version}, no deactivate; read-back ok, updated=1') as c:
+    w = bound(CANON[SET_REPLY])
+    fake = FakeN8n(put_publish='skip')
+    fake.add(stale(w), active=True)
+    old_av = fake.w[SET_REPLY]['activeVersionId']
+    code, out, s = deploy(fake, *APPLY)
+    saved = fake.w[SET_REPLY]['versionId']
+    c.check(code == 0 and counts(s, 'updated', 'republished', 'failed') == {'updated': 1, 'republished': 0, 'failed': 0}, f'exit {code} {s}\n{out[-800:]}')
+    c.check(fake.writes() == [PUT_, PUBLISH], f'PUT, then ONE in-place publish, never deactivate: {fake.writes()}')
+    pubs = [b for m, p, b in fake.calls if (m, p) == PUBLISH]
+    c.check(pubs == [{'versionId': saved}] and saved != old_av, f'the publish must name the version the PUT saved ({saved}): {pubs}')
+    active, graph = fake.served(SET_REPLY)
+    c.check(active and fake.w[SET_REPLY]['activeVersionId'] == saved and h(graph) == h(w), 'served = the saved canonical version')
+
+with Case('D1b ids-only instance (no activeVersion graph): a PUT that published (activeVersionId == versionId) needs no publish') as c:
+    w = bound(CANON[SET_REPLY])
+    fake = FakeN8n(report_published_graph=False)
+    fake.add(stale(w), active=True)
+    code, out, s = deploy(fake, *APPLY)
+    c.check(code == 0 and s.get('updated') == 1 and fake.writes() == [PUT_], f'exit {code} {s} writes={fake.writes()}\n{out[-600:]}')
+    fake2 = FakeN8n(report_published_graph=False, put_publish='skip')    # and one that did not: published in place
+    fake2.add(stale(w), active=True)
+    code2, out2, s2 = deploy(fake2, *APPLY)
+    c.check(code2 == 0 and s2.get('updated') == 1 and fake2.writes() == [PUT_, PUBLISH]
+            and fake2.w[SET_REPLY]['activeVersionId'] == fake2.w[SET_REPLY]['versionId'], f'exit {code2} {s2} writes={fake2.writes()}')
+
+with Case('D1b NEG the PUT did not publish and the in-place publish is REFUSED: failed=1, exit 1, the workflow stays ACTIVE on its old version (never deactivated)') as c:
+    w = bound(CANON[SET_REPLY])
+    fake = FakeN8n(put_publish='skip', publish='refuse')
+    fake.add(stale(w), active=True)
+    old_av = fake.w[SET_REPLY]['activeVersionId']
+    code, out, s = deploy(fake, *APPLY)
+    c.check(code == 1 and counts(s, 'failed', 'updated') == {'failed': 1, 'updated': 0}, f'exit {code} {s}\n{out[-800:]}')
+    c.check(DEACTIVATE not in fake.writes() and fake.writes() == [PUT_, PUBLISH], f'no deactivate, one publish attempt: {fake.writes()}')
+    active, graph = fake.served(SET_REPLY)
+    c.check(active and fake.w[SET_REPLY]['activeVersionId'] == old_av and h(graph) == h(stale(w)),
+            'the old version keeps serving — the webhook never went offline')
+    c.check('FAILED' in out and old_av in out.split('FAILED', 1)[1], f'the failure must name what is served now ({old_av}):\n{out[-800:]}')
+
+with Case('D1b NEG the in-place publish answered 200 but nothing changed: the read-back fails the run (exit 1)') as c:
+    w = bound(CANON[SET_REPLY])
+    fake = FakeN8n(put_publish='skip', publish='noop')
+    fake.add(stale(w), active=True)
+    code, out, s = deploy(fake, *APPLY)
+    c.check(code == 1 and s.get('failed') == 1 and s.get('updated', 0) == 0 and DEACTIVATE not in fake.writes(),
+            f'exit {code} {s} writes={fake.writes()}\n{out[-600:]}')
+
+with Case('D1b NEG the in-place publish was rolled back by n8n (trigger registration failed → INACTIVE): exit 1, the output names the outage') as c:
+    w = bound(CANON[SET_REPLY])
+    fake = FakeN8n(put_publish='skip', publish='rollback')
+    fake.add(stale(w), active=True)
+    code, out, s = deploy(fake, *APPLY)
+    c.check(code == 1 and s.get('failed') == 1 and DEACTIVATE not in fake.writes(), f'exit {code} {s} writes={fake.writes()}')
+    c.check('INACTIVE' in out, f'the output must say the workflow is now inactive:\n{out[-600:]}')
 
 with Case('NEG ordinary DIFF dry-run: would_update=1, would_publish=0, nothing written') as c:
     w = bound(CANON[SET_REPLY])

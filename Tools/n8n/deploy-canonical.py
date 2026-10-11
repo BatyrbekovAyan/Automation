@@ -2,8 +2,12 @@
 # -*- coding: utf-8 -*-
 """Stage 7.7 — push the canonical exports of EXISTING workflows to an n8n instance, one PUT each, with
 the same discipline as update-clones.py: dry-run by default, explicit --apply --yes, the pre-update
-versionId printed as the rollback pointer, an active workflow re-published (deactivate → activate),
-and a READ-BACK after every PUT (graph hash == canonical, activeVersionId == versionId when active).
+versionId printed as the rollback pointer, and a READ-BACK after every PUT (graph hash == canonical; for an active
+workflow activeVersionId == versionId and the published graph == canonical). An ACTIVE workflow is never switched off
+(D1b, 2026-10-11): after its PUT the tool reads back whether the PUT already published the saved version (n8n 2.36
+does — update-clones.serves()'s rule) and only when it did not publishes THAT version in place,
+POST /workflows/{id}/activate {"versionId": <stored>} — no deactivate → activate window, and a refused publish leaves
+the old version serving instead of an inactive workflow.
 Scope: workflows that already exist on the instance (DIFF in verify-deployed.py). New workflows are
 imported with `n8n import:workflow` (ids must be preserved) — not here. The two placeholder workflows
 (Set Workflow State `__HDR_CRED__`, Support Message `__TG_CRED__`/`__CHAT_ID__`) are deployed by
@@ -174,6 +178,41 @@ def republish(base, wid, cur, want, apply, summary):
     print(f"    read-back: ok — serving the stored versionId {vid}, published graph canonical{note}")
 
 
+def put_published(got, want):
+    """D1b: did the PUT of an ACTIVE workflow already publish what it saved? As update-clones.serves(): active, the
+    published version IS the stored one, and — when the instance reports it — the served graph is the canon."""
+    av, vid = got.get("activeVersionId"), got.get("versionId")
+    return bool(got.get("active") and av and vid and av == vid and published_state(got, want) is not False)
+
+
+def publish_after_put(base, wid, want, summary):
+    """D1b: after the PUT of an ACTIVE workflow read back whether the PUT published the saved version (n8n 2.36 does)
+    and only when it did not publish THAT version in place — POST /workflows/{id}/activate {"versionId": <stored>},
+    never deactivate → activate: that left a window without the webhook, and a failed activate left the workflow OFF.
+    n8n validates the version before it swaps the served one, so a refused publish keeps the old version serving.
+    The caller's read-back decides; False = the run already failed here (nothing to read back against)."""
+    st, now = uc.call(base, "GET", f"/workflows/{wid}")
+    if st != 200 or not isinstance(now, dict):
+        summary["failed"] += 1
+        print(f"    read-back GET {st} after the PUT — cannot tell whether the PUT published the update; nothing else done")
+        return False
+    if put_published(now, want):
+        print("    published by the PUT (served version = the update) — no publish call, no deactivate window")
+        return True
+    vid = now.get("versionId")
+    if not vid:
+        summary["failed"] += 1
+        print("    the PUT did not publish the update and the instance reports no stored versionId — not published "
+              f"(now serving: {served_summary(st, now, want)})")
+        return False
+    print(f"    the PUT did not publish the update — publishing the stored versionId {vid} in place "
+          f"(POST /workflows/{wid}/activate, no deactivate window)")
+    st2, resp = uc.call(base, "POST", f"/workflows/{wid}/activate", {"versionId": vid})
+    if st2 != 200:
+        print(f"    publish failed {st2}: {str(resp)[:300]}")
+    return True
+
+
 def body_from(wf):
     """The PUT body: name, nodes, connections, settings — never id/active/meta/staticData/tags (read-only on PUT)."""
     return {"name": wf["name"], "nodes": copy.deepcopy(wf["nodes"]),
@@ -253,11 +292,8 @@ def main():
             summary["failed"] += 1
             print(f"    PUT failed {st}: {str(resp)[:300]}")
             continue
-        if was_active:
-            uc.call(base, "POST", f"/workflows/{wid}/deactivate")
-            st3, r3 = uc.call(base, "POST", f"/workflows/{wid}/activate")
-            if st3 != 200:
-                print(f"    re-activate failed {st3}: {str(r3)[:200]}")
+        if was_active and not publish_after_put(base, wid, want, summary):
+            continue
         st4, got = uc.call(base, "GET", f"/workflows/{wid}")
         problems = []
         if st4 != 200:
@@ -273,7 +309,8 @@ def main():
                 problems.append("PUBLISHED graph differs from canonical after PUT")
         if problems:
             summary["failed"] += 1
-            print("    read-back: FAILED — " + "; ".join(problems))
+            print("    read-back: FAILED — " + "; ".join(problems)
+                  + (f" — now serving: {served_summary(st4, got, want)}" if was_active else ""))
         else:
             summary["updated"] += 1
             print("    read-back: ok")
