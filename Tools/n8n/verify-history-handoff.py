@@ -6,6 +6,7 @@ and its context fields, the notifier's privacy, the app webhook's owner scoping,
 proxy recorder after the response).
 
     python3 Tools/n8n/verify-history-handoff.py
+    python3 Tools/n8n/verify-history-handoff.py --dir DIR   # another set of exports (mutation tests)
 """
 import copy
 import json
@@ -29,6 +30,14 @@ def check(cond, msg):
 
 def load(fname):
     return json.load(open(os.path.join(WF, fname), encoding="utf-8"))
+
+
+def _clone_lineage():
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("clone_lineage", os.path.join(HERE, "clone_lineage.py"))
+    m = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    return m
 
 
 def node(wf, name):
@@ -220,9 +229,16 @@ def verify_integrations():
     q = node(d, "Fetch Outcomes")["parameters"]["query"]
     for frag in ("FULL OUTER JOIN h", "'event' ELSE 'classifier' END AS source", "h.reason = 'order' THEN 'order_collected' ELSE 'owner_needed'", "r.status <> 'done'"):
         check(frag in q, f"Fetch Outcomes lacks {frag!r}")
-    q = node(load("lmjYsdNcQA2IE5rl-Delete_Bot_Files.json"), "Delete Chat Memory")["parameters"]["query"]
-    for t in ("chat_history_events", "handoff_requests", "reply_events", "chat_reply_state"):
+    dcm = node(load("lmjYsdNcQA2IE5rl-Delete_Bot_Files.json"), "Delete Chat Memory")["parameters"]
+    q = dcm["query"]
+    for t in ("n8n_chat_histories", "conversation_outcomes", "reply_mode_flags", "chat_history_events", "handoff_requests",
+              "reply_events", "chat_reply_state"):
         check(f"DELETE FROM public.{t}" in q, f"Delete Bot Files must wipe {t}")
+    # T5 (F1 + F2): the memory of the bot's WHOLE line, by the same fragment and parameters as the other deleting nodes
+    cl = _clone_lineage()
+    check(q.startswith("--") and cl.DBF_LINE_HEAD in q and "SELECT profile_id FROM lineage_profiles" in q
+          and (dcm.get("options") or {}).get("queryReplacement") == cl.DBF_LINE_PARAMS,
+          "T5: Delete Chat Memory must delete by the bot's line (clone_lineage.DBF_LINE_HEAD + DBF_LINE_PARAMS), not by the named ids")
     rb = node(load("lmjYsdNcQA2IE5rl-Delete_Bot_Files.json"), "Respond")["parameters"]["responseBody"]
     for k in ("deletedHistoryEvents", "deletedHandoffs", "deletedReplyEvents", "deletedChatStates"):
         check(k in rb, f"Delete Bot Files response must report {k}")
@@ -237,6 +253,9 @@ def verify_integrations():
 
 
 def main():
+    global WF
+    if "--dir" in sys.argv:
+        WF = sys.argv[sys.argv.index("--dir") + 1]
     for f in BOTS:
         verify_bot(f)
     verify_handoff_workflows()

@@ -27,6 +27,8 @@ import uuid
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 WF = os.path.join(HERE, "workflows")
+sys.path.insert(0, HERE)
+import clone_lineage as cl  # noqa: E402  (Delete Chat Memory deletes by the bot's line, T5)
 PG_CRED = {"id": "vvRrFiEXzLVqKjOx", "name": "Postgres"}
 BOTS = ("4wYitz5ek30SVNlT-WhatsApp_Bot.json", "4VN3gsFaC2HUYmcc-Telegram_Bot.json")
 CREATES = ("XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json", "Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json")
@@ -513,6 +515,32 @@ SELECT (SELECT count(*)::int FROM hist)        AS "deletedMemoryRows",
        (SELECT count(*)::int FROM states)      AS "deletedChatStates";"""
 
 
+# T5 (F1 + F2, plan 2026-10-11 §1.6): the deleted bot's memory goes with its WHOLE line — the earlier profiles of a
+# re-paired / reconnected bot (the pre-F1 orphans, a superseded predecessor, the other channel's retired row) — not only
+# the two profile ids the app names. The head is clone_lineage's (the same fragment and parameters as Delete Bot Files'
+# other deleting nodes, apply-auth-gate.py); this file keeps owning the deletes (the seven tables, DELETE_NEW_TAIL).
+DELETE_CHAT_MEMORY_SQL = """-- Privacy deletion (2026-09-01, store audit / Data Safety «можно запросить удаление»), by the bot's line (T5):
+-- a deleted bot's server-side conversation memory goes with it — under every profile of its line (session: this
+-- install's rows of the same bot key, both channels, and the superseded chain; legacy: the named ids only). Chat
+-- transcripts key off session_id = '<profileId>:<chatId>' (both bot templates' Chat Memory nodes); the history,
+-- outcomes, handoffs, reply ledger, chat state and flags carry profile_id directly. Sentinels ('-1', '', 'null',
+-- 'undefined') are no ids. dialog_counts stay UNTOUCHED on purpose: they are the owner's billing usage records
+-- (Task 17a moves them with the money on transfer), not chat content.
+-- Parameters, in order: gate mode, install id, JSON array of the profile ids, JSON array of the workflow ids.
+""" + cl.DBF_LINE_HEAD + """, valid AS (
+  SELECT profile_id FROM lineage_profiles
+), hist AS (
+  DELETE FROM public.n8n_chat_histories h
+  WHERE split_part(h.session_id, ':', 1) IN (SELECT profile_id FROM valid)
+  RETURNING 1
+), outcomes AS (
+  DELETE FROM public.conversation_outcomes c
+  WHERE c.profile_id IN (SELECT profile_id FROM valid)
+  RETURNING 1
+""" + DELETE_NEW_TAIL
+DELETE_CHAT_MEMORY_PARAMS = cl.DBF_LINE_PARAMS
+
+
 RESPOND_OLD_TAIL = '"deletedReplyFlags": $json.deletedReplyFlags ?? null } }}'
 RESPOND_NEW_TAIL = ('"deletedReplyFlags": $json.deletedReplyFlags ?? null, "deletedHistoryEvents": $json.deletedHistoryEvents ?? null, '
                     '"deletedHandoffs": $json.deletedHandoffs ?? null, "deletedReplyEvents": $json.deletedReplyEvents ?? null, '
@@ -525,11 +553,13 @@ def patch_delete_bot():
     ch = False
     n = node(wf, "Delete Chat Memory")
     q = n["parameters"]["query"]
-    if DELETE_OLD_TAIL in q:
-        n["parameters"]["query"] = q.replace(DELETE_OLD_TAIL, DELETE_NEW_TAIL)
+    if q != DELETE_CHAT_MEMORY_SQL:
+        assert DELETE_OLD_TAIL in q or DELETE_NEW_TAIL in q, "Delete Chat Memory has an unexpected shape"
+        n["parameters"]["query"] = DELETE_CHAT_MEMORY_SQL
         ch = True
-    else:
-        assert DELETE_NEW_TAIL in q, "Delete Chat Memory has an unexpected shape"
+    if n["parameters"].setdefault("options", {}).get("queryReplacement") != DELETE_CHAT_MEMORY_PARAMS:
+        n["parameters"]["options"]["queryReplacement"] = DELETE_CHAT_MEMORY_PARAMS
+        ch = True
     r = node(wf, "Respond")
     body = r["parameters"]["responseBody"]
     if RESPOND_OLD_TAIL in body:
@@ -583,7 +613,9 @@ def check():
     if node(wf, "Fetch Outcomes")["parameters"]["query"] != FETCH_OUTCOMES_SQL or TRANSCRIPT_NEW not in node(wf, "Find Changed Sessions")["parameters"]["query"]:
         bad.append(DASHBOARD)
     wf = json.load(open(os.path.join(WF, DELETE_BOT), encoding="utf-8"))
-    if DELETE_NEW_TAIL not in node(wf, "Delete Chat Memory")["parameters"]["query"] or RESPOND_NEW_TAIL not in node(wf, "Respond")["parameters"]["responseBody"]:
+    dcm = node(wf, "Delete Chat Memory")["parameters"]
+    if dcm["query"] != DELETE_CHAT_MEMORY_SQL or (dcm.get("options") or {}).get("queryReplacement") != DELETE_CHAT_MEMORY_PARAMS \
+            or RESPOND_NEW_TAIL not in node(wf, "Respond")["parameters"]["responseBody"]:
         bad.append(DELETE_BOT)
     wf = json.load(open(os.path.join(WF, SET_STATE), encoding="utf-8"))
     if not any("'crHandoffsApi001'" in n["parameters"].get("jsCode", "") for n in wf["nodes"]):

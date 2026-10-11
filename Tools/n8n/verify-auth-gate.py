@@ -424,6 +424,31 @@ def check_delete_ownership(mig):
     print("OK  Delete Bot Files / Set Workflow State (V12: database ownership, honest answer, idempotent delete)")
 
 
+def check_delete_line(mig):
+    """T5 (F1 + F2, plan 2026-10-11 §1.6): Delete Bot Files deletes the bot's LINE — every deleting node reads the same
+    clone_lineage fragment with the same parameters (the form Delete Ownership proved), the retire marks app_delete and
+    books the line's clones, the chunks and the stored originals are those of every clone of the line."""
+    dbf = load("lmjYsdNcQA2IE5rl-Delete_Bot_Files.json")
+    frag = mig.cl.lineage_cte("$1", "$2", "$3", "$4")
+    for n, query in (("List Bot Originals", mig.LIST_ORIGINALS_SQL), ("Retire Bot Profiles", mig.RETIRE_LINE_SQL),
+                     ("Delete Bot Chunks", mig.DELETE_CHUNKS_LINE_SQL)):
+        p = node(dbf, n)["parameters"]
+        assert p.get("query") == query, f"T5: {n} is stale against apply-auth-gate.py (clone_lineage): it must delete by the bot's line"
+        assert (p.get("options") or {}).get("queryReplacement") == mig.DBF_LINE_PARAMS, \
+            f"T5: {n} must read the line parameters (gate mode, install, the JSON id arrays Delete Ownership proved)"
+    for n in ("List Bot Originals", "Retire Bot Profiles", "Delete Bot Chunks", "Delete Chat Memory"):
+        p = node(dbf, n)["parameters"]
+        assert frag in p.get("query", "").replace("public.", ""), f"T5: {n} does not derive the bot's line (clone_lineage.lineage_cte)"
+        assert (p.get("options") or {}).get("queryReplacement") == mig.DBF_LINE_PARAMS, f"T5: {n} must read the line parameters"
+    q = node(dbf, "Retire Bot Profiles")["parameters"]["query"]
+    assert "deleted_reason = 'app_delete'" in q and "insert into clone_retirements" in q and "'bot_deleted'" in q \
+        and '"bookedClones"' in q and '"retiredProfiles"' in q, "T5: Retire Bot Profiles must mark the line app_delete and book its clones"
+    for n in ("List Bot Originals", "Delete Bot Chunks"):
+        assert "join line_clones c on d.metadata->>'botWaId'" in node(dbf, n)["parameters"]["query"], \
+            f"T5: {n} must read the chunks of the line's clones through the expression indexes"
+    print("OK  Delete Bot Files (T5: every deleting node by the bot's line, app_delete, the line's clones booked)")
+
+
 def check_protected():
     wf = load("0DP79STI3pafXO9B-Set_Workflow_State.json")
     js = node(wf, "Validate")["parameters"]["jsCode"]
@@ -438,7 +463,7 @@ def main():
     WF = ap.parse_args().dir
     mig = load_migration()
     try:
-        check_gated(mig); check_proxy(); check_session(); check_bots(); check_files(mig); check_create(); check_delete_ownership(mig); check_protected()
+        check_gated(mig); check_proxy(); check_session(); check_bots(); check_files(mig); check_create(); check_delete_ownership(mig); check_delete_line(mig); check_protected()
     except AssertionError as e:
         print(f"AUTH GATE FAIL: {e}")
         sys.exit(1)

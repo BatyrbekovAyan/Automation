@@ -27,7 +27,13 @@ file pins the SHAPE that behaviour rests on, so a later generator or a hand edit
       the token — the V12 / M5 lesson) and the RULE is apply-auth-gate.py's;
   (9) only a REUSED clone may skip activation (`Already Active?` requires created === false), the retired
       `Restamp RAG Chunks` is gone, and the hot path holds as many Postgres nodes as before the line (seven);
-  (10) WhatsApp and Telegram are the same graph (node names, types and connections).
+  (10) WhatsApp and Telegram are the same graph (node names, types and connections);
+  (11) T5 — the Profile Lifecycle Sweep's branch A deletes what the line booked: `Clone Retirements` = clone_lineage's
+      statement, fed by `Sweep Config` only; the DELETE is reachable ONLY past `Retirements Dry Run?`[1] (which deletes on
+      an explicit `retirementsDryRun === false` only) and `Has Retired Clone?`[0] (a clone-shaped id outside the protected
+      list); it is a localhost DELETE with the `n8n Admin API` placeholder, its status reported and judged by
+      `Retired Clone Gone?` (200/404 → Stamp Retirement Removed, else → Stamp Retirement Kept, both clone_lineage's);
+      branch A sits below every other branch; V12 `Retired Clones` skips superseded rows.
 
     python3 Tools/n8n/verify-clone-lifecycle.py                  # the canonical workflows
     python3 Tools/n8n/verify-clone-lifecycle.py --dir DIR        # another set of exports (mutation tests)
@@ -59,6 +65,8 @@ PROTECTED = sorted(set(BCW.PROTECTED_IDS) | {"0DP79STI3pafXO9B", "olmqWMfcFpCEcp
 ADMIN = {"httpHeaderAuth": {"id": "__HDR_CRED__", "name": "n8n Admin API"}}
 LOCAL_API = "http://localhost:5678/api/v1/workflows"
 FILES = {CL.CHANNELS[ch]["create_file"]: ch for ch in CL.CHANNELS}
+SWEEP_FILE = "fXYpCXPKw92EzRz8-Profile_Lifecycle_Sweep.json"
+SWEEPGEN = _module("apply_sweep_clone_deactivate", "apply-sweep-clone-deactivate.py")
 CHECKED_CALLS = ("Probe Bound Clone", "Activate Created Workflow", "Set Wappi Webhook", "Set Wappi Webhook Types",
                  "Delete Replaced Clone", "Discard New Clone")
 API_NODES = ("Get Sample Workflow", "Create Workflow", "Probe Bound Clone", "Activate Created Workflow",
@@ -293,6 +301,62 @@ def check(fname, wf):
             fails.append((label, f"{fname}: unexpected structural error: {type(e).__name__}: {e}"))
     return fails
 
+def check_sweep(sw):
+    """(11) T5: the sweep's branch A — every check runs; returns [message] of the failed ones."""
+    fails = []
+
+    def must(ok, msg):
+        if not ok:
+            fails.append("T5: " + msg)
+
+    try:
+        names = {n["name"] for n in sw["nodes"]}
+        branch = ("Clone Retirements", "Retirements Dry Run?", "Log Would Remove", "Has Retired Clone?", "Delete Retired Clone",
+                  "Retired Clone Gone?", "Stamp Retirement Removed", "Stamp Retirement Kept")
+        missing = [n for n in branch if n not in names]
+        if missing:
+            return [f"T5: the sweep's branch A is missing {missing}"]
+        must(node(sw, "Clone Retirements")["parameters"]["query"] == CL.CLONE_RETIREMENTS_SQL,
+             "Clone Retirements must be clone_lineage.CLONE_RETIREMENTS_SQL (never a live-driven, protected or young clone)")
+        must(predecessors(sw, "Clone Retirements") == {("Sweep Config", 0)}, "Clone Retirements must be fed by Sweep Config only")
+        must(cond(sw, "Retirements Dry Run?") == SWEEPGEN.RETIREMENTS_DRY and "!== false" in cond(sw, "Retirements Dry Run?"),
+             "Retirements Dry Run? must delete on an explicit retirementsDryRun === false only")
+        flag = [a for a in assignments_list(node(sw, "Sweep Config")) if a.get("name") == "retirementsDryRun"]
+        must(len(flag) == 1 and flag[0].get("type") == "boolean" and isinstance(flag[0].get("value"), bool),
+             "Sweep Config must carry the boolean retirementsDryRun")
+        must(edge(sw, "Clone Retirements") == ["Retirements Dry Run?"] and edge(sw, "Retirements Dry Run?", 0) == ["Log Would Remove"]
+             and edge(sw, "Retirements Dry Run?", 1) == ["Has Retired Clone?"] and edge(sw, "Has Retired Clone?", 0) == ["Delete Retired Clone"]
+             and edge(sw, "Has Retired Clone?", 1) == [] and edge(sw, "Delete Retired Clone") == ["Retired Clone Gone?"]
+             and edge(sw, "Retired Clone Gone?", 0) == ["Stamp Retirement Removed"]
+             and edge(sw, "Retired Clone Gone?", 1) == ["Stamp Retirement Kept"], "branch A wiring")
+        for cut in (("Retirements Dry Run?", 1), ("Has Retired Clone?", 0)):
+            must("Delete Retired Clone" not in reachable(sw, "Every 6 Hours", cut={cut}),
+                 f"Delete Retired Clone reachable without {cut[0]}[{cut[1]}]")
+        has = cond(sw, "Has Retired Clone?")
+        must(has == SWEEPGEN.HAS_RETIRED_CLONE and lists_in(has) == [PROTECTED],
+             "Has Retired Clone? must re-check the id shape and the protected list before the admin API")
+        d = node(sw, "Delete Retired Clone")
+        resp = (d["parameters"].get("options") or {}).get("response", {}).get("response", {})
+        must(d["parameters"].get("method") == "DELETE" and d["parameters"].get("url") == "=" + LOCAL_API + "/{{ $json.workflow_id }}"
+             and d.get("credentials") == ADMIN and resp.get("fullResponse") is True and resp.get("neverError") is True
+             and d.get("onError") == "continueRegularOutput",
+             "Delete Retired Clone must be a localhost DELETE with the n8n Admin API placeholder, reporting its status")
+        must(cond(sw, "Retired Clone Gone?") == SWEEPGEN.RETIRED_GONE, "Retired Clone Gone? must stamp only 200/404 as gone")
+        for n, sql in (("Stamp Retirement Removed", CL.STAMP_RETIREMENT_REMOVED_SQL), ("Stamp Retirement Kept", CL.STAMP_RETIREMENT_KEPT_SQL)):
+            must(node(sw, n)["parameters"]["query"] == sql, f"{n} must be clone_lineage's statement")
+        others = [n["position"][1] for n in sw["nodes"] if n["name"] not in branch and n["type"] != "n8n-nodes-base.stickyNote"]
+        must(node(sw, "Clone Retirements")["position"][1] > max(others), "branch A must sit below every other branch")
+        must("and bp.superseded_by is null" in node(sw, "Retired Clones")["parameters"]["query"],
+             "V12 Retired Clones must skip superseded rows (the line booked their clone)")
+    except AssertionError as e:
+        fails.append(f"T5: {e}")
+    return fails
+
+
+def assignments_list(n):
+    return n["parameters"]["assignments"]["assignments"]
+
+
 def check_parity(wa, tg):
     """(10) the two Create graphs are one graph: the same node names, types, flags and connections."""
     sig = lambda wf: sorted((n["name"], n["type"], n.get("typeVersion"), n.get("onError"), n.get("retryOnFail"),
@@ -303,7 +367,7 @@ def check_parity(wa, tg):
 
 def load_set(directory=None, rev=None):
     out = {}
-    for fname in FILES:
+    for fname in tuple(FILES) + (SWEEP_FILE,):
         if rev:
             text = subprocess.run(["git", "-C", ROOT, "show", f"{rev}:Tools/n8n/workflows/{fname}"], capture_output=True,
                                   text=True, check=True).stdout
@@ -317,6 +381,10 @@ def run(directory=None, rev=None, quiet=False):
     """[(file, message)] of every failed check — every check runs (one red check never hides the next)."""
     wfs = load_set(directory, rev)
     fails = []
+    got = check_sweep(wfs.pop(SWEEP_FILE))
+    fails += [(SWEEP_FILE, msg) for msg in got]
+    if not got and not quiet:
+        print(f"OK  {SWEEP_FILE} (T5: branch A deletes the booked clones past the dry-run gate; V12 skips superseded rows)")
     for fname, wf in wfs.items():
         got = check(fname, wf)
         fails += [(f"{fname} {label}", msg) for label, msg in got]

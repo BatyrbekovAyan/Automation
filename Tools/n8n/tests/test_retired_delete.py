@@ -45,7 +45,7 @@ RB = '$RCAnonymousID:' + 'fedcba9876543210' * 2
 LIKE = 'create temp table {0} (like public.{0} including all);\n'
 SETUP = ''.join(LIKE.format(t) for t in ('installs', 'bot_profiles', 'billing_bindings', 'subscribers', 'documents', 'n8n_chat_histories',
                                          'chat_history_events', 'handoff_requests', 'reply_events', 'chat_reply_state',
-                                         'conversation_outcomes', 'reply_mode_flags', 'uploaded_files'))
+                                         'conversation_outcomes', 'reply_mode_flags', 'uploaded_files', 'clone_retirements'))
 CHANNELS = (('whatsapp', 'wa'), ('telegram', 'tg'))
 
 
@@ -141,18 +141,20 @@ def dbf_body(wa_pid='-1', tg_pid='-1', wa_wid='-1', tg_wid='-1'):
 
 
 def run_dbf_deletes(pg, gate_item, storage=(200,)):
-    """Owned?(0) onwards: originals listing + split + storage results + settle, then the three deleting statements."""
+    """Owned?(0) onwards: originals listing + split + storage results + settle, then the three deleting statements. The
+    deleting nodes read the bot's line (T5) with parameters taken from the gate's item (`$('Auth Gate')`)."""
     webhook = {k: v for k, v in gate_item.items() if k != 'crAuth'}
-    listed = pg.q(bind(Q(DBF, 'List Bot Originals'), P(DBF, 'List Bot Originals', gate_item, {'Webhook': webhook})))[0]
+    named = {'Webhook': webhook, 'Auth Gate': gate_item}
+    listed = pg.q(bind(Q(DBF, 'List Bot Originals'), P(DBF, 'List Bot Originals', gate_item, named)))[0]
     split = [i['json'] for i in code(DBF, 'Split File Ids', {'json': {}}, named={'List Bot Originals': listed})]
     files = [s for s in split if cond(DBF, 'Has Original?', s) is True]
     results = [{'statusCode': storage[i % len(storage)], 'body': {}} for i in range(len(files))] or [s for s in split if s not in files]
     settled = code(DBF, 'Originals Settled', items=[{'json': r} for r in results], named={'Auth Gate': gate_item})[0]['json']
     if cond(DBF, 'Originals Deleted?', settled) is not True:
         return listed, split, settled, None
-    retire = pg.q(bind(Q(DBF, 'Retire Bot Profiles'), P(DBF, 'Retire Bot Profiles', settled)))[0]
-    chunks = pg.q(bind(Q(DBF, 'Delete Bot Chunks'), P(DBF, 'Delete Bot Chunks', settled, {'Webhook': webhook})))[0]
-    mem = pg.q(bind(Q(DBF, 'Delete Chat Memory'), P(DBF, 'Delete Chat Memory', settled, {'Webhook': webhook})))[0]
+    retire = pg.q(bind(Q(DBF, 'Retire Bot Profiles'), P(DBF, 'Retire Bot Profiles', settled, named)))[0]
+    chunks = pg.q(bind(Q(DBF, 'Delete Bot Chunks'), P(DBF, 'Delete Bot Chunks', retire, named)))[0]
+    mem = pg.q(bind(Q(DBF, 'Delete Chat Memory'), P(DBF, 'Delete Chat Memory', chunks, named)))[0]
     ok = cond(DBF, 'Deletion Settled?', mem, {'Retire Bot Profiles': retire, 'Delete Bot Chunks': chunks})
     return listed, split, settled, ok
 

@@ -20,7 +20,10 @@ Delete Bot Files) never carry their own copy:
   RECORD_DISCARD_FAILURE_SQL   books a new clone a failed Create could not delete;
   CLONE_RETIREMENTS_SQL + STAMP_RETIREMENT_*_SQL   the sweep's branch A (DELETE the booked clones, confirm 200/404);
   lineage_cte(...)       «the bot's line» for Delete Bot Files (T5): every row of the install with the named rows' bot key,
-                         both channels, plus the superseded chain.
+                         both channels, plus the superseded chain;
+  DBF_LINE_PARAMS + LINE_*_SQL   Delete Bot Files by the line (T5): the stored originals, the app_delete retire + the
+                         bot_deleted bookings, the chunks — every deleting node reads the same fragment with the same
+                         parameters (Delete Chat Memory, owned by apply-history-handoff.py, composes DBF_LINE_HEAD too).
 
 Protected ids (build-client-webhooks.PROTECTED_IDS + Set Workflow State + the support relay) are never reused, replaced,
 moved, booked or bound. Every statement names its parameters in words (V1: no $ + digit in a comment or literal).
@@ -434,6 +437,79 @@ def lineage_cte(mode, install, profiles_json, workflows_json):
 LINEAGE_PARAMS = ("gate mode", "install id", "JSON array of the profile ids", "JSON array of the workflow ids")
 
 
+# -------------------------------------------------------- Delete Bot Files by the bot's line (T5, plan §1.6, F1 §1.4)
+# The app names the bot's CURRENT ids; every deleting node of Delete Bot Files derives the bot's line from them with the
+# SAME fragment (lineage_cte) and the SAME parameters — exactly the form Delete Ownership proved (a JSON string per id;
+# a 'null', a number or a missing field is no id). Delete Ownership itself does not change: the line grows only through
+# rows this install owns, so whatever it reaches the caller has proven it may delete.
+DBF_LINE_PARAMS = ("={{ [ $('Auth Gate').first().json.crAuth.mode, ($('Auth Gate').first().json.crAuth.installId || ''), "
+                   "JSON.stringify([ ($('Auth Gate').first().json.body || {}).waProfileId ?? null, "
+                   "($('Auth Gate').first().json.body || {}).tgProfileId ?? null ]), "
+                   "JSON.stringify([ ($('Auth Gate').first().json.body || {}).botWaId ?? null, "
+                   "($('Auth Gate').first().json.body || {}).botTgId ?? null ]) ] }}")
+DBF_LINE_HEAD = "with recursive " + lineage_cte("$1", "$2", "$3", "$4")
+# The line's clones whose chunks / originals / booking this delete may touch: never one a LIVE row OUTSIDE the line still
+# drives (another bot's price lists stay where they are), never a protected or malformed id (lineage_workflows).
+_LINE_CLONES = """, line_clones as (     -- the line's clones that no live row outside the line drives
+  select w.workflow_id from lineage_workflows w
+  where not exists (select 1 from bot_profiles live where live.workflow_id = w.workflow_id and live.deleted_at is null
+                      and live.profile_id not in (select profile_id from lineage_profiles))
+), line_chunks as (     -- their chunks, one join per key: the RAG store's expression indexes (never a scan of the store)
+  select d.id, d.metadata->>'fileId' as file_id from documents d join line_clones c on d.metadata->>'botWaId' = c.workflow_id
+  union
+  select d.id, d.metadata->>'fileId' from documents d join line_clones c on d.metadata->>'botTgId' = c.workflow_id
+)"""
+_LINE_PARAMS_WORDS = "-- Parameters, in order: gate mode, install id, JSON array of the profile ids, JSON array of the workflow ids.\n"
+
+LINE_LIST_ORIGINALS_SQL = ("""-- V12 + T5: the deleted bot's stored price-list originals — of every clone of the bot's line, not only the current one
+-- (a re-paired or reconnected bot left its earlier clone's files behind) — listed BEFORE anything is deleted: the
+-- storage delete runs first and a failure stops the chain with the chunks still in place, so the retry finds the same
+-- files. Session: the line (clone_lineage); legacy: the named ids only. Read-only.
+""" + _LINE_PARAMS_WORDS + DBF_LINE_HEAD + _LINE_CLONES + """
+select coalesce(array_agg(distinct c.file_id) filter (where coalesce(c.file_id, '') <> ''), '{}'::text[]) as "fileIds"
+from line_chunks c;""")
+
+LINE_RETIRE_SQL = ("""-- App-delete slot release (2026-08-27) by the bot's line (T5): synchronously with the app's delete action every row of
+-- the line is retired as app_delete — the ONLY slot release for status='active' owners (the sweep never touches them)
+-- and the mark that keeps a deleted bot's rows from ever being adopted by a later Create (Clone Plan / Bind refuse
+-- app_delete). Rows are matched by profile id only, never by app_user_id (it drifts between create and delete).
+--   session: every row of the line this install owns; one retired earlier (a replaced predecessor, a trial or a
+--            subscription that ended, an orphan of the pre-F1 re-pairing) becomes app_delete too, its retirement time
+--            kept. The line's clones are booked in clone_retirements (bot_deleted) for the sweep's branch A — never one
+--            a live row outside the line drives, never a protected id; a clone already booked keeps its booking.
+--   legacy:  the named rows still alive only (the pre-T5 behaviour), nothing booked.
+-- Always one row: retiredProfiles (rows changed now) and bookedClones (bookings added now) — both numbers on success,
+-- which is what Deletion Settled? reads.
+""" + _LINE_PARAMS_WORDS + DBF_LINE_HEAD + _LINE_CLONES + """, retired as (
+  update bot_profiles bp set deleted_at = coalesce(bp.deleted_at, now()), deleted_reason = 'app_delete'
+  where bp.profile_id in (select profile_id from lineage_profiles)
+    and ((exists (select 1 from lin_me) and bp.owner_id = (select inst from lin_me)
+          and (bp.deleted_at is null or bp.deleted_reason is distinct from 'app_delete'))
+      or (not exists (select 1 from lin_me) and bp.deleted_at is null))
+  returning bp.profile_id
+), booked as (
+  insert into clone_retirements (workflow_id, profile_id, owner_id, reason)
+  select c.workflow_id,
+    (select bp.profile_id from bot_profiles bp join lin_rows r on r.profile_id = bp.profile_id
+      where bp.workflow_id = c.workflow_id order by bp.created_at desc, bp.profile_id limit 1),
+    (select inst from lin_me), 'bot_deleted'
+  from line_clones c
+  where exists (select 1 from lin_me)
+    and exists (select 1 from bot_profiles bp join lin_rows r on r.profile_id = bp.profile_id where bp.workflow_id = c.workflow_id)
+  on conflict (workflow_id) do nothing
+  returning 1
+)
+select (select count(*)::int from retired) as "retiredProfiles", (select count(*)::int from booked) as "bookedClones";""")
+
+LINE_DELETE_CHUNKS_SQL = ("""-- V12 + T5: the deleted bot's RAG chunks — of every clone of the bot's line (a predecessor's clone kept its chunks when a
+-- re-pairing replaced it before F1) — and the file ids they carried. Session: the line; legacy: the named ids only.
+""" + _LINE_PARAMS_WORDS + DBF_LINE_HEAD + _LINE_CLONES + """, deleted as (     -- by primary key (an id array: never a scan of the store)
+  delete from documents d where d.id = any (array(select id from line_chunks)) returning d.id
+)
+select (select count(*)::int from deleted) as "deletedChunks",
+  coalesce((select array_agg(distinct file_id) from line_chunks where file_id is not null and file_id <> ''), '{}'::text[]) as "fileIds";""")
+
+
 def statements():
     """Every statement of the module, by name (the guards — verify-sql-comments, T4's verifier — iterate this)."""
     out = {"Clone Plan": CLONE_PLAN_SQL}
@@ -445,6 +521,8 @@ def statements():
                              + lineage_cte("$1", "$2", "$3", "$4")
                              + "\nselect (select coalesce(jsonb_agg(profile_id order by profile_id), '[]'::jsonb) from lineage_profiles) as profiles,"
                              "\n  (select coalesce(jsonb_agg(workflow_id order by workflow_id), '[]'::jsonb) from lineage_workflows) as workflows")})
+    out.update({"List Bot Originals (line)": LINE_LIST_ORIGINALS_SQL, "Retire Bot Profiles (line)": LINE_RETIRE_SQL,
+                "Delete Bot Chunks (line)": LINE_DELETE_CHUNKS_SQL})
     return out
 
 

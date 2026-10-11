@@ -20,9 +20,28 @@ data stays stored until they delete the bot in the app or ask support — owner 
     else leaves the row unstamped, so the next run retries it.
   * The branch sits BELOW the trial/churn and liveness rows on the canvas: n8n v1 runs sibling branches top-down, so a
     row retired earlier in the same run is picked in that run.
+  * T5 (F1 + F2): a row the bot's line SUPERSEDED is skipped — its clone is booked in clone_retirements and branch A
+    below deletes it; deactivating it first would be a wasted call.
+
+T5 (F1 + F2, plan docs/audits/2026-10-09-followups/F1F2-plan.md §1.6, F1 §2.6 A) adds branch A «Clone Retirements»,
+BELOW the V12 branch — no replaced clone is left undeleted:
+
+    Sweep Config -> Clone Retirements -> Retirements Dry Run? --true--> Log Would Remove
+                                                              --false-> Has Retired Clone? --true--> Delete Retired Clone
+                    -> Retired Clone Gone? --true--> Stamp Retirement Removed ; --false--> Stamp Retirement Kept
+
+  * Clone Retirements = clone_lineage.CLONE_RETIREMENTS_SQL: the clones booked in clone_retirements (Create's replaced
+    clones and failed discards, a deleted bot's line) once they are ten minutes old — never one a LIVE bot_profiles row
+    drives, never a protected or malformed id; least tried first, 50 per run.
+  * Retirements Dry Run? reads Sweep Config.retirementsDryRun and deletes only on an explicit false (a missing flag never
+    deletes). The canon carries RETIREMENTS_DRY_RUN below: true for the first day on prod (plan §6 step 5), then flip
+    it to False here, re-run and deploy (step 12) once the dry-run log is clean.
+  * Has Retired Clone? re-checks the id (shape, never a protected id) before the admin API; Delete Retired Clone is a
+    DELETE on localhost with the `n8n Admin API` credential (`__HDR_CRED__`), status reported (neverError); 200 or 404
+    = gone → removed_at (never picked again), anything else → attempts + 1 and the status / error, picked next run.
 
     python3 Tools/n8n/apply-sweep-clone-deactivate.py          # patch the canonical JSON
-    python3 Tools/n8n/apply-sweep-clone-deactivate.py --check  # exit 2 when the branch is missing or stale
+    python3 Tools/n8n/apply-sweep-clone-deactivate.py --check  # exit 2 when a branch is missing or stale
 """
 import copy
 import importlib.util
@@ -32,7 +51,11 @@ import sys
 import uuid
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
+import clone_lineage as cl  # noqa: E402  (branch A's SQL lives with the rest of the bot's line)
+
 PATH = os.path.join(HERE, "workflows", "fXYpCXPKw92EzRz8-Profile_Lifecycle_Sweep.json")
+RETIREMENTS_DRY_RUN = True      # plan §6: true for the first day on prod, then False (one line here, re-run, deploy)
 PG_CRED = {"id": "vvRrFiEXzLVqKjOx", "name": "Postgres"}
 ADMIN_CRED = {"id": "__HDR_CRED__", "name": "n8n Admin API"}
 
@@ -50,11 +73,13 @@ RETIRED_CLONES_SQL = """-- V12 (iteration 2026-09-28): clones of bots THIS sweep
 -- confirmed inactive. Never a liveness row (that retirement is inferred from Wappi's list; a false positive must not
 -- switch off a working bot), never app_delete (the app deletes its clone), never a workflow a LIVE row still drives,
 -- never a protected infra id. clone_deactivated_id holds the workflow last confirmed inactive: a failed call is picked
--- again next run, a deactivated one never. Read-only; at most 50 per run, oldest retirement first.
+-- again next run, a deactivated one never. T5: never a row the bot's line superseded — its clone is booked in
+-- clone_retirements and branch A deletes it. Read-only; at most 50 per run, oldest retirement first.
 select bp.profile_id, bp.workflow_id, bp.deleted_reason
 from bot_profiles bp
 where bp.deleted_at is not null
   and bp.deleted_reason in ('trial_expiry', 'churn_grace')
+  and bp.superseded_by is null
   and bp.workflow_id ~ '^[A-Za-z0-9]+$' and length(bp.workflow_id) between 8 and 36
   and bp.workflow_id not in (""" + ", ".join("'%s'" % i for i in PROTECTED) + """)
   and bp.clone_deactivated_id is distinct from bp.workflow_id
@@ -71,6 +96,17 @@ update bot_profiles set clone_deactivated_id = $2
 where profile_id = $1 and workflow_id = $2
 returning profile_id, workflow_id;"""
 STAMP_PARAMS = "={{ [ $('Retired Clones').item.json.profile_id, $('Retired Clones').item.json.workflow_id ] }}"
+
+# ---- T5 branch A: the booked clones (clone_lineage) are deleted, confirmed and stamped.
+RETIREMENTS_DRY = "={{ $('Sweep Config').first().json.retirementsDryRun !== false }}"     # only an explicit false deletes
+HAS_RETIRED_CLONE = ("={{ ((id) => typeof id === 'string' && /^[A-Za-z0-9]{8,36}$/.test(id) && !"
+                     + json.dumps(cl.PROTECTED) + ".includes(id))($json.workflow_id) }}")
+DELETE_RETIRED_URL = "=http://localhost:5678/api/v1/workflows/{{ $json.workflow_id }}"
+RETIRED_GONE = "={{ [200, 404].includes(Number($json.statusCode)) }}"
+STAMP_REMOVED_PARAMS = "={{ [ $('Clone Retirements').item.json.workflow_id, String($json.statusCode) ] }}"
+STAMP_KEPT_PARAMS = ("={{ [ $('Clone Retirements').item.json.workflow_id, String($json.statusCode ?? (($json.error && "
+                     "$json.error.message) || 'no response')).slice(0, 200) ] }}")
+DRY_FLAG = {"id": "cfg-retirements-dry-run", "name": "retirementsDryRun", "value": RETIREMENTS_DRY_RUN, "type": "boolean"}
 
 
 def nid(name):
@@ -117,17 +153,68 @@ def desired_nodes(y):
     ]
 
 
+def retirement_nodes(y):
+    """T5 branch A, one row below the V12 branch."""
+    return [
+        {"parameters": {"operation": "executeQuery", "query": cl.CLONE_RETIREMENTS_SQL, "options": {}},
+         "id": nid("Clone Retirements"), "name": "Clone Retirements", "type": "n8n-nodes-base.postgres", "typeVersion": 2.6,
+         "position": [-460, y], "credentials": {"postgres": dict(PG_CRED)}},
+        if_node("Retirements Dry Run?", RETIREMENTS_DRY, [-260, y]),
+        set_node("Log Would Remove", [("dryRun", True, "boolean"), ("action", "would_delete_clone", "string"),
+                                      ("workflowId", "={{ $json.workflow_id }}", "string"), ("reason", "={{ $json.reason }}", "string"),
+                                      ("attempts", "={{ $json.attempts }}", "number")],
+                 [-260, y + 160]),
+        if_node("Has Retired Clone?", HAS_RETIRED_CLONE, [-40, y]),
+        {"parameters": {"method": "DELETE", "url": DELETE_RETIRED_URL, "authentication": "genericCredentialType",
+                        "genericAuthType": "httpHeaderAuth",
+                        "options": {"timeout": 20000, "response": {"response": {"fullResponse": True, "neverError": True}}}},
+         "id": nid("Delete Retired Clone"), "name": "Delete Retired Clone", "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2,
+         "position": [160, y], "credentials": {"httpHeaderAuth": dict(ADMIN_CRED)}, "onError": "continueRegularOutput"},
+        if_node("Retired Clone Gone?", RETIRED_GONE, [360, y]),
+        {"parameters": {"operation": "executeQuery", "query": cl.STAMP_RETIREMENT_REMOVED_SQL,
+                        "options": {"queryReplacement": STAMP_REMOVED_PARAMS}},
+         "id": nid("Stamp Retirement Removed"), "name": "Stamp Retirement Removed", "type": "n8n-nodes-base.postgres",
+         "typeVersion": 2.6, "position": [560, y - 80], "credentials": {"postgres": dict(PG_CRED)}, "alwaysOutputData": True,
+         "onError": "continueRegularOutput"},
+        {"parameters": {"operation": "executeQuery", "query": cl.STAMP_RETIREMENT_KEPT_SQL,
+                        "options": {"queryReplacement": STAMP_KEPT_PARAMS}},
+         "id": nid("Stamp Retirement Kept"), "name": "Stamp Retirement Kept", "type": "n8n-nodes-base.postgres",
+         "typeVersion": 2.6, "position": [560, y + 80], "credentials": {"postgres": dict(PG_CRED)}, "alwaysOutputData": True,
+         "onError": "continueRegularOutput"},
+    ]
+
+
 WIRES = {
     "Retired Clones": [["Clone Dry Run?"]],
     "Clone Dry Run?": [["Log Would Deactivate"], ["Has Clone?"]],
     "Has Clone?": [["Deactivate Clone"]],
     "Deactivate Clone": [["Clone Off?"]],
     "Clone Off?": [["Stamp Clone Deactivated"], ["Stamp Clone Kept"]],
+    # T5 branch A
+    "Clone Retirements": [["Retirements Dry Run?"]],
+    "Retirements Dry Run?": [["Log Would Remove"], ["Has Retired Clone?"]],
+    "Has Retired Clone?": [["Delete Retired Clone"]],
+    "Delete Retired Clone": [["Retired Clone Gone?"]],
+    "Retired Clone Gone?": [["Stamp Retirement Removed"], ["Stamp Retirement Kept"]],
 }
+BRANCH_A_BELOW = 400        # canvas rows below Retired Clones (n8n v1 runs sibling branches top-down)
 
 
 def node(wf, name):
     return next((n for n in wf["nodes"] if n["name"] == name), None)
+
+
+def ensure_flag(wf):
+    """T5: Sweep Config carries retirementsDryRun (= RETIREMENTS_DRY_RUN), next to the other branches' dryRun."""
+    cfg = node(wf, "Sweep Config")["parameters"]["assignments"]["assignments"]
+    cur = next((a for a in cfg if a.get("name") == DRY_FLAG["name"]), None)
+    if cur == DRY_FLAG:
+        return False
+    if cur is None:
+        cfg.append(dict(DRY_FLAG))
+    else:
+        cfg[cfg.index(cur)] = dict(DRY_FLAG)
+    return True
 
 
 def patch(wf):
@@ -135,7 +222,8 @@ def patch(wf):
     lowest = max(n["position"][1] for n in wf["nodes"] if n["type"] != "n8n-nodes-base.stickyNote")
     existing = node(wf, "Retired Clones")
     y = existing["position"][1] if existing else lowest + 300
-    for spec in desired_nodes(y):
+    changed |= ensure_flag(wf)
+    for spec in desired_nodes(y) + retirement_nodes(y + BRANCH_A_BELOW):
         cur = node(wf, spec["name"])
         if cur is None:
             wf["nodes"].append(spec)
@@ -151,9 +239,10 @@ def patch(wf):
             wf["connections"][src] = want
             changed = True
     cfg = wf["connections"].setdefault("Sweep Config", {"main": [[]]})["main"]
-    if not any(c["node"] == "Retired Clones" for c in cfg[0]):
-        cfg[0].append({"node": "Retired Clones", "type": "main", "index": 0})
-        changed = True
+    for first in ("Retired Clones", "Clone Retirements"):
+        if not any(c["node"] == first for c in cfg[0]):
+            cfg[0].append({"node": first, "type": "main", "index": 0})
+            changed = True
     return changed
 
 

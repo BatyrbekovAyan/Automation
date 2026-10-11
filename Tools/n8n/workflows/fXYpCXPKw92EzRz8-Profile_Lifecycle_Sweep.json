@@ -39,6 +39,12 @@
               "name": "dryRun",
               "value": false,
               "type": "boolean"
+            },
+            {
+              "id": "cfg-retirements-dry-run",
+              "name": "retirementsDryRun",
+              "value": true,
+              "type": "boolean"
             }
           ]
         }
@@ -741,7 +747,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "-- V12 (iteration 2026-09-28): clones of bots THIS sweep retired (trial or subscription over) that are not yet\n-- confirmed inactive. Never a liveness row (that retirement is inferred from Wappi's list; a false positive must not\n-- switch off a working bot), never app_delete (the app deletes its clone), never a workflow a LIVE row still drives,\n-- never a protected infra id. clone_deactivated_id holds the workflow last confirmed inactive: a failed call is picked\n-- again next run, a deactivated one never. Read-only; at most 50 per run, oldest retirement first.\nselect bp.profile_id, bp.workflow_id, bp.deleted_reason\nfrom bot_profiles bp\nwhere bp.deleted_at is not null\n  and bp.deleted_reason in ('trial_expiry', 'churn_grace')\n  and bp.workflow_id ~ '^[A-Za-z0-9]+$' and length(bp.workflow_id) between 8 and 36\n  and bp.workflow_id not in ('0DP79STI3pafXO9B', '2htWSV5IHO8E2CgB', '2islisFH7jjLoPQM', '3qax5J9u2qsT9Vao', '4VN3gsFaC2HUYmcc', '4wYitz5ek30SVNlT', '9PTyYcelRQI7bGDb', 'KoTuIlk4LMrlvnWI', 'SCLcpn6DMDG3Z4VN', 'TwWPW3gIyjZS3foR', 'Uz6HBBUpAiUqVysB', 'XuvOp7TxOImOAmlj', 'ZGYr6srzS3rSSXHp', 'ZTqpumOpL1rNDOp6', 'crAuthSession001', 'crHandoffDry0001', 'crHandoffNtfy001', 'crHandoffReq0001', 'crHandoffsApi001', 'crPriceSearch001', 'crTestDialog0001', 'crWappiProxy0001', 'fXYpCXPKw92EzRz8', 'hHwvfOvTCS42pXnq', 'jtbssfzXbOxwTK4k', 'lmjYsdNcQA2IE5rl', 'olmqWMfcFpCEcpiE')\n  and bp.clone_deactivated_id is distinct from bp.workflow_id\n  and not exists (select 1 from bot_profiles live where live.workflow_id = bp.workflow_id and live.deleted_at is null)\norder by bp.deleted_at\nlimit 50;",
+        "query": "-- V12 (iteration 2026-09-28): clones of bots THIS sweep retired (trial or subscription over) that are not yet\n-- confirmed inactive. Never a liveness row (that retirement is inferred from Wappi's list; a false positive must not\n-- switch off a working bot), never app_delete (the app deletes its clone), never a workflow a LIVE row still drives,\n-- never a protected infra id. clone_deactivated_id holds the workflow last confirmed inactive: a failed call is picked\n-- again next run, a deactivated one never. T5: never a row the bot's line superseded — its clone is booked in\n-- clone_retirements and branch A deletes it. Read-only; at most 50 per run, oldest retirement first.\nselect bp.profile_id, bp.workflow_id, bp.deleted_reason\nfrom bot_profiles bp\nwhere bp.deleted_at is not null\n  and bp.deleted_reason in ('trial_expiry', 'churn_grace')\n  and bp.superseded_by is null\n  and bp.workflow_id ~ '^[A-Za-z0-9]+$' and length(bp.workflow_id) between 8 and 36\n  and bp.workflow_id not in ('0DP79STI3pafXO9B', '2htWSV5IHO8E2CgB', '2islisFH7jjLoPQM', '3qax5J9u2qsT9Vao', '4VN3gsFaC2HUYmcc', '4wYitz5ek30SVNlT', '9PTyYcelRQI7bGDb', 'KoTuIlk4LMrlvnWI', 'SCLcpn6DMDG3Z4VN', 'TwWPW3gIyjZS3foR', 'Uz6HBBUpAiUqVysB', 'XuvOp7TxOImOAmlj', 'ZGYr6srzS3rSSXHp', 'ZTqpumOpL1rNDOp6', 'crAuthSession001', 'crHandoffDry0001', 'crHandoffNtfy001', 'crHandoffReq0001', 'crHandoffsApi001', 'crPriceSearch001', 'crTestDialog0001', 'crWappiProxy0001', 'fXYpCXPKw92EzRz8', 'hHwvfOvTCS42pXnq', 'jtbssfzXbOxwTK4k', 'lmjYsdNcQA2IE5rl', 'olmqWMfcFpCEcpiE')\n  and bp.clone_deactivated_id is distinct from bp.workflow_id\n  and not exists (select 1 from bot_profiles live where live.workflow_id = bp.workflow_id and live.deleted_at is null)\norder by bp.deleted_at\nlimit 50;",
         "options": {}
       },
       "id": "42fd16d0-d093-57eb-9e0a-bb66d78eb21a",
@@ -1005,6 +1011,259 @@
         560,
         840
       ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- F1 (plan 2026-10-11 §1.6, the sweep's branch A): booked clones not yet confirmed gone. Never one a LIVE bot_profiles\n-- row drives, never a malformed or protected id, never younger than ten minutes (a Create still in flight). Least tried\n-- first, so a clone that keeps failing never starves the rest; at most 50 per run. Read-only.\nselect r.workflow_id, r.reason, r.attempts from clone_retirements r\nwhere r.removed_at is null\n  and r.workflow_id ~ '^[A-Za-z0-9]{8,36}$' and r.workflow_id not in ('0DP79STI3pafXO9B', '2htWSV5IHO8E2CgB', '2islisFH7jjLoPQM', '3qax5J9u2qsT9Vao', '4VN3gsFaC2HUYmcc', '4wYitz5ek30SVNlT', '9PTyYcelRQI7bGDb', 'KoTuIlk4LMrlvnWI', 'SCLcpn6DMDG3Z4VN', 'TwWPW3gIyjZS3foR', 'Uz6HBBUpAiUqVysB', 'XuvOp7TxOImOAmlj', 'ZGYr6srzS3rSSXHp', 'ZTqpumOpL1rNDOp6', 'crAuthSession001', 'crHandoffDry0001', 'crHandoffNtfy001', 'crHandoffReq0001', 'crHandoffsApi001', 'crPriceSearch001', 'crTestDialog0001', 'crWappiProxy0001', 'fXYpCXPKw92EzRz8', 'hHwvfOvTCS42pXnq', 'jtbssfzXbOxwTK4k', 'lmjYsdNcQA2IE5rl', 'olmqWMfcFpCEcpiE')\n  and r.created_at < now() - interval '10 minutes'\n  and not exists (select 1 from bot_profiles live where live.workflow_id = r.workflow_id and live.deleted_at is null)\norder by r.attempts, r.created_at, r.workflow_id\nlimit 50;",
+        "options": {}
+      },
+      "id": "2c3879a3-48d2-5b90-8fc3-afec1af0ef44",
+      "name": "Clone Retirements",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -460,
+        1160
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "vvRrFiEXzLVqKjOx",
+          "name": "Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "bf9c631e-445f-5c5c-bb26-56594036e528",
+              "leftValue": "={{ $('Sweep Config').first().json.retirementsDryRun !== false }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "6ad4f9f4-beda-58a4-8c8e-becb556d2b3f",
+      "name": "Retirements Dry Run?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -260,
+        1160
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "2bb108c0-1dd2-5249-9c69-b46ed7b0f54b",
+              "name": "dryRun",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "c99dfaa9-c289-5f3c-9d02-dc5dfbed6ddc",
+              "name": "action",
+              "value": "would_delete_clone",
+              "type": "string"
+            },
+            {
+              "id": "d1545d08-d52d-5ad3-8bb9-c09ef093f187",
+              "name": "workflowId",
+              "value": "={{ $json.workflow_id }}",
+              "type": "string"
+            },
+            {
+              "id": "85b45286-c9aa-5452-b612-a6b46b075f13",
+              "name": "reason",
+              "value": "={{ $json.reason }}",
+              "type": "string"
+            },
+            {
+              "id": "7f9f38e6-5ef5-5503-bc1f-ae8fed746faf",
+              "name": "attempts",
+              "value": "={{ $json.attempts }}",
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "448fc8b1-4cc5-52a6-a9f3-3b1f363b8ca6",
+      "name": "Log Would Remove",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -260,
+        1320
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "fda468c4-f90d-51e3-9e3b-0c7f2183c71a",
+              "leftValue": "={{ ((id) => typeof id === 'string' && /^[A-Za-z0-9]{8,36}$/.test(id) && ![\"0DP79STI3pafXO9B\", \"2htWSV5IHO8E2CgB\", \"2islisFH7jjLoPQM\", \"3qax5J9u2qsT9Vao\", \"4VN3gsFaC2HUYmcc\", \"4wYitz5ek30SVNlT\", \"9PTyYcelRQI7bGDb\", \"KoTuIlk4LMrlvnWI\", \"SCLcpn6DMDG3Z4VN\", \"TwWPW3gIyjZS3foR\", \"Uz6HBBUpAiUqVysB\", \"XuvOp7TxOImOAmlj\", \"ZGYr6srzS3rSSXHp\", \"ZTqpumOpL1rNDOp6\", \"crAuthSession001\", \"crHandoffDry0001\", \"crHandoffNtfy001\", \"crHandoffReq0001\", \"crHandoffsApi001\", \"crPriceSearch001\", \"crTestDialog0001\", \"crWappiProxy0001\", \"fXYpCXPKw92EzRz8\", \"hHwvfOvTCS42pXnq\", \"jtbssfzXbOxwTK4k\", \"lmjYsdNcQA2IE5rl\", \"olmqWMfcFpCEcpiE\"].includes(id))($json.workflow_id) }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "037b6e55-c092-5277-b905-498a7e2617d1",
+      "name": "Has Retired Clone?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -40,
+        1160
+      ]
+    },
+    {
+      "parameters": {
+        "method": "DELETE",
+        "url": "=http://localhost:5678/api/v1/workflows/{{ $json.workflow_id }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 20000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "258f318b-4a12-55e0-8429-d8593e4a19a0",
+      "name": "Delete Retired Clone",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        160,
+        1160
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__HDR_CRED__",
+          "name": "n8n Admin API"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "08c74f17-66d6-519c-9940-2b8f679e72f2",
+              "leftValue": "={{ [200, 404].includes(Number($json.statusCode)) }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "b4a6fa6a-3f49-5d14-95e6-2082e9ba1df4",
+      "name": "Retired Clone Gone?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        360,
+        1160
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- F1 (plan 2026-10-11 §1.6): the clone answered 200 or 404 to DELETE, it is gone and never picked again.\n-- Parameters, in order: workflow id, the HTTP status.\nupdate clone_retirements set removed_at = now(), last_status = $2\nwhere workflow_id = $1 and removed_at is null\nreturning workflow_id;",
+        "options": {
+          "queryReplacement": "={{ [ $('Clone Retirements').item.json.workflow_id, String($json.statusCode) ] }}"
+        }
+      },
+      "id": "e92a649d-0586-5dba-9d0f-479a6c6bf548",
+      "name": "Stamp Retirement Removed",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        560,
+        1080
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "vvRrFiEXzLVqKjOx",
+          "name": "Postgres"
+        }
+      },
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- F1 (plan 2026-10-11 §1.6): the DELETE did not confirm the clone gone; count the attempt, the next run tries again.\n-- Parameters, in order: workflow id, the HTTP status (or the error).\nupdate clone_retirements set attempts = attempts + 1, last_status = $2\nwhere workflow_id = $1 and removed_at is null\nreturning workflow_id, attempts;",
+        "options": {
+          "queryReplacement": "={{ [ $('Clone Retirements').item.json.workflow_id, String($json.statusCode ?? (($json.error && $json.error.message) || 'no response')).slice(0, 200) ] }}"
+        }
+      },
+      "id": "c9e64db4-9d8a-505f-a799-3233040b1a47",
+      "name": "Stamp Retirement Kept",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        560,
+        1240
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "vvRrFiEXzLVqKjOx",
+          "name": "Postgres"
+        }
+      },
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
     }
   ],
   "connections": {
@@ -1034,6 +1293,11 @@
           },
           {
             "node": "Retired Clones",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Clone Retirements",
             "type": "main",
             "index": 0
           }
@@ -1296,6 +1560,75 @@
         [
           {
             "node": "Stamp Clone Kept",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clone Retirements": {
+      "main": [
+        [
+          {
+            "node": "Retirements Dry Run?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Retirements Dry Run?": {
+      "main": [
+        [
+          {
+            "node": "Log Would Remove",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Has Retired Clone?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Retired Clone?": {
+      "main": [
+        [
+          {
+            "node": "Delete Retired Clone",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delete Retired Clone": {
+      "main": [
+        [
+          {
+            "node": "Retired Clone Gone?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Retired Clone Gone?": {
+      "main": [
+        [
+          {
+            "node": "Stamp Retirement Removed",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Stamp Retirement Kept",
             "type": "main",
             "index": 0
           }

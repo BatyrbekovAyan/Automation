@@ -1,0 +1,126 @@
+# T5 before — 2026-10-12, base HEAD 358ab7ec (T4) + ONLY the new test tests/test_clone_retirements.py (canon, generators and verifiers untouched)
+
+## 1. python3 Tools/n8n/tests/test_clone_retirements.py   (rc=1)
+
+FAIL T5 A1: the sweep carries branch A — Sweep Config → Clone Retirements (= clone_lineage) → Retirements Dry Run? → Has Retired Clone? → Delete Retired Clone → Retired Clone Gone? → Stamp Removed / Kept (= clone_lineage); below every other branch
+      - Clone Retirements <- []
+      - EXCEPTION StopIteration: 
+FAIL T5 A2: Clone Retirements takes booked clones older than ten minutes — never one a LIVE row drives, never a protected / malformed / removed id; least tried first; at most 50
+      - EXCEPTION StopIteration: 
+FAIL T5 A3: Has Retired Clone? passes only a clone-shaped unprotected id; Delete Retired Clone is a DELETE on localhost with the n8n Admin API placeholder, reporting its status; Retired Clone Gone? = 200/404
+      - EXCEPTION StopIteration: 
+FAIL T5 A4: the stamps — 200/404 marks the booking removed (never picked again); anything else counts one attempt with the status or the error, and the booking is picked again
+      - EXCEPTION StopIteration: 
+FAIL T5 A5: retirementsDryRun — the canonical flag is a boolean on Sweep Config; true only logs, an explicit false deletes, a MISSING flag never deletes
+      - Sweep Config ['dryRun']
+      - EXCEPTION StopIteration: 
+FAIL T5 V1: V12 Retired Clones never deactivates the clone of a SUPERSEDED row (the line booked it); an unsuperseded trial_expiry row is still picked
+      - Retired Clones picked ['wa-s1', 'wa-s2']
+FAIL T5 L1 [WA] F1 §1.4: the app deletes by the CURRENT ids after a re-pairing; the orphaned predecessor (retired by Retire Same Bot Slot, no reason) loses its memory, chunks and stored originals, its clone is booked; an earlier deleted bot of the slot is re-deleted without an error
+      - the stored originals of the whole line must be listed: ['f-new']
+      - left under the line's profiles: {'WA-P1': {'mem': 1, 'hist': 1, 'outc': 1, 'hand': 1, 'ev': 1, 'st': 1, 'fl': 1}}
+      - chunks left: old 2 new 0
+      - line rows: [{'retired': True, 'reason': None}, {'retired': True, 'reason': 'app_delete'}, {'retired': True, 'reason': 'app_delete'}]
+      - booked {}
+      - Retire Bot Profiles {'retiredProfiles': 1}
+FAIL T5 L2 [WA] the post-F1 line: a predecessor superseded by the reconnect (real Clone Plan + Bind), the other channel's retired row the client no longer names, a key-less ancestor of the chain — all deleted, every row app_delete, every clone booked; a second call with the retired ids (T8) changes nothing
+      - delete ['f-one'] ok=True
+      - left under the line: {'WA-P0': {'mem': 1, 'hist': 1, 'outc': 1, 'hand': 1, 'ev': 1, 'st': 1, 'fl': 1}, 'TG-T1': {'mem': 1, 'hist': 1, 'outc': 1, 'hand': 1, 'ev': 1, 'st': 1, 'fl': 1}}
+      - chunks left [0, 0, 2, 2]
+      - rows [{'retired': True, 'reason': 'liveness'}, {'retired': True, 'reason': 'trial_expiry'}, {'retired': True, 'reason': 'app_delete'}, {'retired': True, 'reason': 'trial_expiry'}]
+      - booked {'WAone00000000000': 'replaced'}
+      - second call {'retiredProfiles': 0} {'deletedChunks': 2, 'fileIds': ['f-tee']} {'deletedMemoryRows': 1, 'deletedOutcomes': 1, 'deletedReplyFlags': 1, 'deletedHistoryEvents': 1, 'deletedHandoffs': 1, 'deletedReplyEvents': 1, 'deletedChatStates': 1}
+FAIL T5 L3 [WA] the slot re-used after the delete: an older client's Create in the same slot (no CreateOrigin) adopts nothing of the deleted bot
+      - the new bot of the slot adopts {'planned': True, 'own_id': None, 'foreign': False, 'replace_ids': ['WAold00000000000'], 'pred_profiles': ['WA-P1']}
+      - … even naming the deleted profile: {'planned': True, 'own_id': None, 'foreign': False, 'replace_ids': ['WAold00000000000'], 'pred_profiles': ['WA-P1']}
+FAIL T5 L4 [WA] negatives: another install's rows of the same bot key, another bot key, a key-less row outside the chain, a clone a LIVE row outside the line drives, a protected id — untouched, never booked
+      - booked {}
+      - the line rows themselves go (their shared / protected clone stays)
+PASS T5 L5 [WA] legacy (compat window, no token): the named ids only — an owner-less predecessor of the same key keeps its data, nothing is booked, a retired named row keeps its reason
+FAIL T5 L1 [TG] F1 §1.4: the app deletes by the CURRENT ids after a re-pairing; the orphaned predecessor (retired by Retire Same Bot Slot, no reason) loses its memory, chunks and stored originals, its clone is booked; an earlier deleted bot of the slot is re-deleted without an error
+      - the stored originals of the whole line must be listed: ['f-new']
+      - left under the line's profiles: {'TG-P1': {'mem': 1, 'hist': 1, 'outc': 1, 'hand': 1, 'ev': 1, 'st': 1, 'fl': 1}}
+      - chunks left: old 2 new 0
+      - line rows: [{'retired': True, 'reason': None}, {'retired': True, 'reason': 'app_delete'}, {'retired': True, 'reason': 'app_delete'}]
+      - booked {}
+      - Retire Bot Profiles {'retiredProfiles': 1}
+FAIL T5 L2 [TG] the post-F1 line: a predecessor superseded by the reconnect (real Clone Plan + Bind), the other channel's retired row the client no longer names, a key-less ancestor of the chain — all deleted, every row app_delete, every clone booked; a second call with the retired ids (T8) changes nothing
+      - delete ['f-one'] ok=True
+      - left under the line: {'TG-P0': {'mem': 1, 'hist': 1, 'outc': 1, 'hand': 1, 'ev': 1, 'st': 1, 'fl': 1}, 'WA-T1': {'mem': 1, 'hist': 1, 'outc': 1, 'hand': 1, 'ev': 1, 'st': 1, 'fl': 1}}
+      - chunks left [0, 0, 2, 2]
+      - rows [{'retired': True, 'reason': 'liveness'}, {'retired': True, 'reason': 'trial_expiry'}, {'retired': True, 'reason': 'app_delete'}, {'retired': True, 'reason': 'trial_expiry'}]
+      - booked {'TGone00000000000': 'replaced'}
+      - second call {'retiredProfiles': 0} {'deletedChunks': 2, 'fileIds': ['f-tee']} {'deletedMemoryRows': 1, 'deletedOutcomes': 1, 'deletedReplyFlags': 1, 'deletedHistoryEvents': 1, 'deletedHandoffs': 1, 'deletedReplyEvents': 1, 'deletedChatStates': 1}
+FAIL T5 L3 [TG] the slot re-used after the delete: an older client's Create in the same slot (no CreateOrigin) adopts nothing of the deleted bot
+      - the new bot of the slot adopts {'planned': True, 'own_id': None, 'foreign': False, 'replace_ids': ['TGold00000000000'], 'pred_profiles': ['TG-P1']}
+      - … even naming the deleted profile: {'planned': True, 'own_id': None, 'foreign': False, 'replace_ids': ['TGold00000000000'], 'pred_profiles': ['TG-P1']}
+FAIL T5 L4 [TG] negatives: another install's rows of the same bot key, another bot key, a key-less row outside the chain, a clone a LIVE row outside the line drives, a protected id — untouched, never booked
+      - booked {}
+      - the line rows themselves go (their shared / protected clone stays)
+PASS T5 L5 [TG] legacy (compat window, no token): the named ids only — an owner-less predecessor of the same key keeps its data, nothing is booked, a retired named row keeps its reason
+FAIL T5 L6: the order and the honest answer stay — originals first (a storage failure stops before anything is deleted), every deleting node behind Owned?(0), success only on numeric counters (Retire also answers bookedClones)
+      - a storage failure must stop the line before anything: None
+      - EXCEPTION AttributeError: module 'clone_lineage_py' has no attribute 'DBF_LINE_PARAMS'
+FAIL T5 B1 [WA] what the delete booked is what the sweep deletes, once — never the neighbour's clone
+      - EXCEPTION StopIteration: 
+FAIL T5 B1 [TG] what the delete booked is what the sweep deletes, once — never the neighbour's clone
+      - EXCEPTION StopIteration: 
+FAIL T5 N1: the verifiers reject copies that delete by the named ids only, bypass the dry-run gate or call a public URL
+      - verify-auth-gate.py: List Bot Originals by the named ids only passed (0):  Delete File (ownership registry + owner-scoped delete)
+OK  XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json (workflow id + owner bound to the profile, on Bind's positive marker)
+OK  Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json (workflow id + owner bound to the profile, on Bind's positive marker)
+OK  Delete Bot Files / Set Workflow State (V12: database ownership, honest answer, idempotent delete)
+OK  Set Workflow State (protected list carries Auth Session + Wappi Proxy)
+ALL AUTH GATE ASSERTS PASSED
+
+      - verify-auth-gate.py: Retire Bot Profiles by the named ids only passed (0):  Delete File (ownership registry + owner-scoped delete)
+OK  XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json (workflow id + owner bound to the profile, on Bind's positive marker)
+OK  Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json (workflow id + owner bound to the profile, on Bind's positive marker)
+OK  Delete Bot Files / Set Workflow State (V12: database ownership, honest answer, idempotent delete)
+OK  Set Workflow State (protected list carries Auth Session + Wappi Proxy)
+ALL AUTH GATE ASSERTS PASSED
+
+      - verify-auth-gate.py: Delete Bot Chunks by the named ids only passed (0):  Delete File (ownership registry + owner-scoped delete)
+OK  XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json (workflow id + owner bound to the profile, on Bind's positive marker)
+OK  Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json (workflow id + owner bound to the profile, on Bind's positive marker)
+OK  Delete Bot Files / Set Workflow State (V12: database ownership, honest answer, idempotent delete)
+OK  Set Workflow State (protected list carries Auth Session + Wappi Proxy)
+ALL AUTH GATE ASSERTS PASSED
+
+      - verify-history-handoff.py: Delete Chat Memory by the named ids only passed (0): OK  4wYitz5ek30SVNlT-WhatsApp_Bot.json
+OK  4VN3gsFaC2HUYmcc-Telegram_Bot.json
+OK  handoff workflows (request / notifier / app webhook)
+OK  test dialog (no memory, no send, no quota, dry handoff, owner check)
+OK  integrations (Create types / Dashboard / Delete / Set State / proxy)
+ALL HISTORY/HANDOFF ASSERTS PASSED
+
+      - EXCEPTION KeyError: 'Clone Retirements'
+
+2 pass, 18 fail
+
+## 2. What fails, in plan terms (§3 T5 «Тест сначала»)
+
+- L1 (F1 §1.4) — after a re-pairing the app deletes by the CURRENT ids: the predecessor P1 (retired by Retire Same Bot
+  Slot, deleted_reason NULL) keeps all seven tables of memory/history, its clone WFold keeps its 2 chunks and its stored
+  original is never listed (`['f-new']` only); P1 stays reason NULL, nothing is booked — on HEAD this is exactly the
+  orphan F1 §1.4 describes (WA and TG).
+- L2 — the post-F1 line: the other channel's retired row (the T8 client no longer names it) and a key-less ancestor of
+  the superseded chain keep their data and chunks; reasons stay liveness/trial_expiry; only Create's own 'replaced'
+  booking exists. The second call with the retired ids then deletes them — i.e. on HEAD it takes a second,
+  client-driven call per id to reach what the line reaches in one.
+- L3 — the slot re-used after the delete: an older client's Create in the same slot adopts the deleted bot's predecessor
+  (pred_profiles = [P1], replace_ids = [WFold]) — «переиспользованный слот после удаления бота» inherits the old chat.
+- L4 / L6 / B1 — nothing is booked, a storage failure does not stop anything (List Bot Originals sees no file of the
+  line), DBF_LINE_PARAMS does not exist.
+- A1–A5, B1 — the sweep has no branch A (node «Clone Retirements» missing, Sweep Config has no retirementsDryRun).
+- V1 — V12 Retired Clones picks a SUPERSEDED trial_expiry row (wa-s2) whose clone the line already booked.
+- N1 — the guards pass copies that delete by the named ids only (verify-auth-gate, verify-history-handoff) and have no
+  branch A to check (verify-clone-lifecycle: KeyError).
+- L5 (legacy) passes on HEAD on purpose: it pins that the compat window keeps the pre-T5 behaviour.
+
+## 3. Planner check of the first draft of the line's chunk delete (scratch, not committed)
+
+The draft `delete from documents d where d.id in (select id from line_chunks)` was planned (20 000 rows, prod expression
+indexes, enable_seqscan on) as `Hash Join -> Seq Scan on documents` — a scan of the RAG store on every bot delete; the
+pre-T5 statement (one CTE, 40-row estimate) went by `documents_pkey`. The committed statement deletes by
+`d.id = any (array(select id from line_chunks))` → `Index Scan using documents_pkey` (pinned by test L7).

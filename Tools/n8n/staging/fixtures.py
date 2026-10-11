@@ -112,6 +112,10 @@ def main():
         # V3 journal (T1, 2026-10-11): the refusals a fixture identity collected (only once the migration is applied)
         if psql("select to_regclass('public.billing_conflicts') is not null;") == "t":
             n = int(n or 0) + int(psql("with a as (delete from billing_conflicts where app_user_id = :'p0' returning 1) select count(*) from a;", a.app_user_id) or 0)
+        # the bot's line (T3 / T5, 2026-10-12): clones a fixture's Create replaced or its Delete Bot Files booked (only once M2 is applied)
+        if psql("select to_regclass('public.clone_retirements') is not null;") == "t":
+            for pid in a.profile_id:
+                n = int(n or 0) + int(psql("with a as (delete from clone_retirements where profile_id = :'p0' returning 1) select count(*) from a;", pid) or 0)
         print(f"deleted rows: {n}")
 
 
