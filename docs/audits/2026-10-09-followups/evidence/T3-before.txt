@@ -1,0 +1,402 @@
+# T3 before — 2026-10-12 00:39 +0500, canon = HEAD 5ac9b2f9 (the pre-F1 Create graph: Restamp RAG Chunks + the A1 Bind Workflow Id)
+
+The NEW behavioural test tests/test_create_clone.py, written first, run against the pre-F1 Create WA/TG graph
+(--head = git show 5ac9b2f9:Tools/n8n/workflows/…, identical to the working-tree canon before apply-clone-lifecycle.py ran).
+The graph runs through tests/create_seed_chain.js in BRIDGE mode: real SQL of every Postgres node on staging-Postgres temp
+tables + a fake n8n public API / Wappi (2.36.7 semantics). Books of clones (F1 §3 B), answer contract (§1.7), F2 R1/R4/R9.
+
+Summary: 70 cases (35 × WA/TG), 70 FAIL — LOST clones in 48 (F1 (а1)/(а2)/(а3)/(б)), the execution stops (n8n 500) in 32,
+a refused-by-design case answers WITH an id in 8 (Bind failure → {id}), the bot's data not moved in 16 (F2 R1: chunks under
+the old clone, memory/history/outcomes under the old profile); every success answer lacks created/adoptedProfiles.
+
+## 1. python3 Tools/n8n/tests/test_create_clone.py --head
+
+FAIL T3 [WA] session: fresh (wizard, a new bot) [HEAD]
+      - the success answer is not {id, created, adoptedProfiles}: {'id': 'WAnew10000000000'}
+      - expected a new clone WAnew10000000000: {'id': 'WAnew10000000000'}
+FAIL T3 [WA] session: reuse: the bound clone, inactive (channel saved off / session over): activated [HEAD]
+      - the success answer is not {id, created, adoptedProfiles}: {'id': 'WAextra000000000'}
+      - expected the reuse of WAold00000000000: {'id': 'WAextra000000000'}
+      - a reuse created a clone: ['WAextra000000000']
+      - LOST clone(s) ['WAold00000000000']: neither deleted, nor bound to a live row, nor booked for the sweep
+FAIL T3 [WA] session: reuse: the bound clone, active (toggle off→on without saving): not activated again [HEAD]
+      - the execution stopped (n8n answers 500): {'node': 'Activate Created Workflow', 'message': 'Activate Created Workflow: 409 - {"message":"There is a conflict with one of the webhooks."}'}
+      - no answer: trace=Register Profile -> Seed Reply Mode -> Seed Saved? -> Get Sample Workflow -> Set Fields -> Create Workflow -> Get Created Workflow Id -> Activate Created Workflow
+      - the success answer is not {id, created, adoptedProfiles}: {}
+      - expected the reuse of WAold00000000000: {}
+      - a reuse created a clone: ['WAextra000000000']
+      - LOST clone(s) ['WAextra000000000']: neither deleted, nor bound to a live row, nor booked for the sweep
+      - activations of the reused clone: [('Activate Created Workflow', 'POST', 'n8n.choosereply.com', '/api/v1/workflows/WAextra000000000/activate', 409)] (expected 0: n8n 2.36.7 re-registers an active workflow's webhook on activate)
+FAIL T3 [WA] session: the bound clone is gone (404): a new clone takes its price lists, the old id is booked [HEAD]
+      - the success answer is not {id, created, adoptedProfiles}: {'id': 'WAnew10000000000'}
+      - expected a new clone WAnew10000000000: {'id': 'WAnew10000000000'}
+      - chunks old/new (2, 0)
+FAIL T3 [WA] session: the bound clone is archived: a new clone, the archived one deleted [HEAD]
+      - the success answer is not {id, created, adoptedProfiles}: {'id': 'WAnew10000000000'}
+      - expected a new clone WAnew10000000000: {'id': 'WAnew10000000000'}
+      - WAold00000000000 was not deleted: deleted=[]
+      - LOST clone(s) ['WAold00000000000']: neither deleted, nor bound to a live row, nor booked for the sweep
+      - chunks old/new (2, 0)
+FAIL T3 [WA] session: the probe answers 500: nothing is created (clone_unavailable) [HEAD]
+      - the execution stopped (n8n answers 500): {'node': 'Activate Created Workflow', 'message': 'Activate Created Workflow: 409 - {"message":"There is a conflict with one of the webhooks."}'}
+      - no answer: trace=Register Profile -> Seed Reply Mode -> Seed Saved? -> Get Sample Workflow -> Set Fields -> Create Workflow -> Get Created Workflow Id -> Activate Created Workflow
+      - answered {}, expected the refusal clone_unavailable
+      - a refusal still created a clone: ['WAnew10000000000']
+      - LOST clone(s) ['WAnew10000000000']: neither deleted, nor bound to a live row, nor booked for the sweep
+FAIL T3 [WA] session: the probe cannot reach n8n: nothing is created (clone_unavailable) [HEAD]
+      - the execution stopped (n8n answers 500): {'node': 'Activate Created Workflow', 'message': 'Activate Created Workflow: 409 - {"message":"There is a conflict with one of the webhooks."}'}
+      - no answer: trace=Register Profile -> Seed Reply Mode -> Seed Saved? -> Get Sample Workflow -> Set Fields -> Create Workflow -> Get Created Workflow Id -> Activate Created Workflow
+      - answered {}, expected the refusal clone_unavailable
+      - a refusal still created a clone: ['WAnew10000000000']
+      - LOST clone(s) ['WAnew10000000000']: neither deleted, nor bound to a live row, nor booked for the sweep
+FAIL T3 [WA] session: (а3) a new profile of the same bot: the old clone replaced, its data moved, DELETE ok [HEAD]
+      - the success answer is not {id, created, adoptedProfiles}: {'id': 'WAnew10000000000'}
+      - expected a new clone WAnew10000000000: {'id': 'WAnew10000000000'}
+      - adoptedProfiles None
+      - WAold00000000000 was not deleted: deleted=[]
+      - LOST clone(s) ['WAold00000000000']: neither deleted, nor bound to a live row, nor booked for the sweep
+      - chunks old/new (2, 0)
+      - left under the old profile {'mem': 2, 'hist': 1, 'outc': 1, 'hand': 1, 'fl': 1}
+      - under the new profile {'mem': 0, 'hist': 0, 'outc': 0, 'hand': 0, 'fl': 0}
+      - the old row {'workflow_id': 'WAold00000000000', 'superseded_by': None, 'retired': True, 'deleted_reason': None, 'owner_id': 'inst-A'}
+FAIL T3 [WA] session: (а3) … and the replaced clone's DELETE fails: it stays booked for the sweep [HEAD]
+      - the success answer is not {id, created, adoptedProfiles}: {'id': 'WAnew10000000000'}
+      - expected a new clone WAnew10000000000: {'id': 'WAnew10000000000'}
+      - adoptedProfiles None
+      - LOST clone(s) ['WAold00000000000']: neither deleted, nor bound to a live row, nor booked for the sweep
+      - chunks old/new (2, 0)
+      - left under the old profile {'mem': 2, 'hist': 1, 'outc': 1, 'hand': 1, 'fl': 1}
+      - under the new profile {'mem': 0, 'hist': 0, 'outc': 0, 'hand': 0, 'fl': 0}
+      - the old row {'workflow_id': 'WAold00000000000', 'superseded_by': None, 'retired': True, 'deleted_reason': None, 'owner_id': 'inst-A'}
+FAIL T3 [WA] session: (б) Activate cannot reach n8n: the new clone is discarded (create_failed) [HEAD]
+      - the execution stopped (n8n answers 500): {'node': 'Activate Created Workflow', 'message': 'Activate Created Workflow: getaddrinfo EAI_AGAIN'}
+      - no answer: trace=Register Profile -> Seed Reply Mode -> Seed Saved? -> Get Sample Workflow -> Set Fields -> Create Workflow -> Get Created Workflow Id -> Activate Created Workflow
+      - answered {}, expected the refusal create_failed
+      - LOST clone(s) ['WAnew10000000000']: neither deleted, nor bound to a live row, nor booked for the sweep
+FAIL T3 [WA] session: (б) Activate refused: an orphan holds the webhook path: the new clone is discarded (create_failed) [HEAD]
+      - the execution stopped (n8n answers 500): {'node': 'Activate Created Workflow', 'message': 'Activate Created Workflow: 409 - {"message":"There is a conflict with one of the webhooks."}'}
+      - no answer: trace=Register Profile -> Seed Reply Mode -> Seed Saved? -> Get Sample Workflow -> Set Fields -> Create Workflow -> Get Created Workflow Id -> Activate Created Workflow
+      - answered {}, expected the refusal create_failed
+      - LOST clone(s) ['WAnew10000000000']: neither deleted, nor bound to a live row, nor booked for the sweep
+FAIL T3 [WA] session: (б) Activate answers 500: the new clone is discarded (create_failed) [HEAD]
+      - the execution stopped (n8n answers 500): {'node': 'Activate Created Workflow', 'message': 'Activate Created Workflow: 500 - {"message":"boom"}'}
+      - no answer: trace=Register Profile -> Seed Reply Mode -> Seed Saved? -> Get Sample Workflow -> Set Fields -> Create Workflow -> Get Created Workflow Id -> Activate Created Workflow
+      - answered {}, expected the refusal create_failed
+      - LOST clone(s) ['WAnew10000000000']: neither deleted, nor bound to a live row, nor booked for the sweep
+FAIL T3 [WA] session: (б) the Wappi webhook answers 502: the new clone is discarded (create_failed) [HEAD]
+      - the execution stopped (n8n answers 500): {'node': 'Set Wappi Webhook', 'message': 'Set Wappi Webhook: 502 - {"detail":"bad gateway"}'}
+      - no answer: trace=Seed Reply Mode -> Seed Saved? -> Get Sample Workflow -> Set Fields -> Create Workflow -> Get Created Workflow Id -> Activate Created Workflow -> Set Wappi Webhook
+      - answered {}, expected the refusal create_failed
+      - LOST clone(s) ['WAnew10000000000']: neither deleted, nor bound to a live row, nor booked for the sweep
+FAIL T3 [WA] session: (б) the Wappi webhook types time out: the new clone is discarded (create_failed) [HEAD]
+      - the execution stopped (n8n answers 500): {'node': 'Set Wappi Webhook Types', 'message': 'Set Wappi Webhook Types: ETIMEDOUT'}
+      - no answer: trace=Seed Saved? -> Get Sample Workflow -> Set Fields -> Create Workflow -> Get Created Workflow Id -> Activate Created Workflow -> Set Wappi Webhook -> Set Wappi Webhook Types
+      - answered {}, expected the refusal create_failed
+      - LOST clone(s) ['WAnew10000000000']: neither deleted, nor bound to a live row, nor booked for the sweep
+FAIL T3 [WA] session: (б) Bind Workflow Id: a query error ×3: the new clone is discarded (create_failed) [HEAD]
+      - answered {'id': 'WAnew10000000000'}, expected the refusal create_failed
+      - LOST clone(s) ['WAnew10000000000']: neither deleted, nor bound to a live row, nor booked for the sweep
+FAIL T3 [WA] session: (б) Bind Workflow Id: an error thrown outside the query ×3: the new clone is discarded (create_failed) [HEAD]
+      - answered {'id': 'WAnew10000000000'}, expected the refusal create_failed
+      - LOST clone(s) ['WAnew10000000000']: neither deleted, nor bound to a live row, nor booked for the sweep
+FAIL T3 [WA] session: (б) Bind Workflow Id: no items: the new clone is discarded (create_failed) [HEAD]
+      - answered {'id': 'WAnew10000000000'}, expected the refusal create_failed
+      - LOST clone(s) ['WAnew10000000000']: neither deleted, nor bound to a live row, nor booked for the sweep
+FAIL T3 [WA] session: (б) Bind Workflow Id: bound = false (a concurrent Create won): the new clone is discarded (create_failed) [HEAD]
+      - answered {'id': 'WAnew10000000000'}, expected the refusal create_failed
+      - LOST clone(s) ['WAnew10000000000']: neither deleted, nor bound to a live row, nor booked for the sweep
+FAIL T3 [WA] session: (б) Activate fails AND the discard answers 500: the new clone is journaled for the sweep [HEAD]
+      - the execution stopped (n8n answers 500): {'node': 'Activate Created Workflow', 'message': 'Activate Created Workflow: 500 - {}'}
+      - no answer: trace=Register Profile -> Seed Reply Mode -> Seed Saved? -> Get Sample Workflow -> Set Fields -> Create Workflow -> Get Created Workflow Id -> Activate Created Workflow
+      - answered {}, expected the refusal create_failed
+      - LOST clone(s) ['WAnew10000000000']: neither deleted, nor bound to a live row, nor booked for the sweep
+FAIL T3 [WA] session: (б) Activate fails, the discard AND the journal fail: the ONE named residual (Tier 2) [HEAD]
+      - the execution stopped (n8n answers 500): {'node': 'Activate Created Workflow', 'message': 'Activate Created Workflow: 500 - {}'}
+      - no answer: trace=Register Profile -> Seed Reply Mode -> Seed Saved? -> Get Sample Workflow -> Set Fields -> Create Workflow -> Get Created Workflow Id -> Activate Created Workflow
+      - answered {}, expected the refusal create_failed
+FAIL T3 [WA] session: Clone Plan: a query error ×3: nothing is created (clone_plan_unavailable) [HEAD]
+      - the execution stopped (n8n answers 500): {'node': 'Activate Created Workflow', 'message': 'Activate Created Workflow: 409 - {"message":"There is a conflict with one of the webhooks."}'}
+      - no answer: trace=Register Profile -> Seed Reply Mode -> Seed Saved? -> Get Sample Workflow -> Set Fields -> Create Workflow -> Get Created Workflow Id -> Activate Created Workflow
+      - answered {}, expected the refusal clone_plan_unavailable
+      - a refusal still created a clone: ['WAnew10000000000']
+      - LOST clone(s) ['WAnew10000000000']: neither deleted, nor bound to a live row, nor booked for the sweep
+FAIL T3 [WA] session: Clone Plan: an error thrown outside the query ×3: nothing is created (clone_plan_unavailable) [HEAD]
+      - the execution stopped (n8n answers 500): {'node': 'Activate Created Workflow', 'message': 'Activate Created Workflow: 409 - {"message":"There is a conflict with one of the webhooks."}'}
+      - no answer: trace=Register Profile -> Seed Reply Mode -> Seed Saved? -> Get Sample Workflow -> Set Fields -> Create Workflow -> Get Created Workflow Id -> Activate Created Workflow
+      - answered {}, expected the refusal clone_plan_unavailable
+      - a refusal still created a clone: ['WAnew10000000000']
+      - LOST clone(s) ['WAnew10000000000']: neither deleted, nor bound to a live row, nor booked for the sweep
+FAIL T3 [WA] session: Clone Plan: no items: nothing is created (clone_plan_unavailable) [HEAD]
+      - the execution stopped (n8n answers 500): {'node': 'Activate Created Workflow', 'message': 'Activate Created Workflow: 409 - {"message":"There is a conflict with one of the webhooks."}'}
+      - no answer: trace=Register Profile -> Seed Reply Mode -> Seed Saved? -> Get Sample Workflow -> Set Fields -> Create Workflow -> Get Created Workflow Id -> Activate Created Workflow
+      - answered {}, expected the refusal clone_plan_unavailable
+      - a refusal still created a clone: ['WAnew10000000000']
+      - LOST clone(s) ['WAnew10000000000']: neither deleted, nor bound to a live row, nor booked for the sweep
+FAIL T3 [WA] session: F2 R1: life → sweep (trial over) → purchase → reconnect with PreviousProfileId: everything under the new connection, the prior clone deleted [HEAD]
+      - the success answer is not {id, created, adoptedProfiles}: {'id': 'WAnew10000000000'}
+      - expected a new clone WAnew10000000000: {'id': 'WAnew10000000000'}
+      - adoptedProfiles None
+      - WAold00000000000 was not deleted: deleted=[]
+      - under the new profile {'mem': 0, 'hist': 0, 'outc': 0, 'hand': 0, 'fl': 0}
+      - left under the old profile {'mem': 2, 'hist': 1, 'outc': 1, 'hand': 1, 'fl': 1}
+      - chunks old/new (2, 0)
+      - the file registry names WAold00000000000
+      - the old row {'workflow_id': 'WAold00000000000', 'superseded_by': None, 'retired': True, 'deleted_reason': 'trial_expiry', 'owner_id': 'inst-A'}
+FAIL T3 [WA] session: F2 R4: the same pair again (the answer was lost): the bound clone is reused, nothing moves twice [HEAD]
+      - the first run: {'id': 'WAnew10000000000'}
+      - the execution stopped (n8n answers 500): {'node': 'Activate Created Workflow', 'message': 'Activate Created Workflow: 409 - {"message":"There is a conflict with one of the webhooks."}'}
+      - no answer: trace=Register Profile -> Seed Reply Mode -> Seed Saved? -> Get Sample Workflow -> Set Fields -> Create Workflow -> Get Created Workflow Id -> Activate Created Workflow
+      - the success answer is not {id, created, adoptedProfiles}: {}
+      - expected the reuse of WAnew10000000000: {}
+      - adoptedProfiles None
+      - clones created: ['WAnew10000000000', 'WAextra100000000']
+      - a reuse created a clone: ['WAnew10000000000', 'WAextra100000000']
+      - LOST clone(s) ['WAextra100000000']: neither deleted, nor bound to a live row, nor booked for the sweep
+      - under the new profile {'mem': 0, 'hist': 0, 'outc': 0, 'hand': 0, 'fl': 0}
+      - left under the old profile {'mem': 2, 'hist': 1, 'outc': 1, 'hand': 1, 'fl': 1}
+      - chunks old/new (2, 0)
+      - the file registry names WAold00000000000
+      - the old row {'workflow_id': 'WAold00000000000', 'superseded_by': None, 'retired': True, 'deleted_reason': 'trial_expiry', 'owner_id': 'inst-A'}
+FAIL T3 [WA] session: F2 R9: a two-channel bot reconnects this channel with the other id moved away (-1): only this channel moves [HEAD]
+      - the success answer is not {id, created, adoptedProfiles}: {'id': 'WAnew10000000000'}
+      - expected a new clone WAnew10000000000: {'id': 'WAnew10000000000'}
+      - adoptedProfiles None
+      - WAold00000000000 was not deleted: deleted=[]
+      - under the new profile {'mem': 0, 'hist': 0, 'outc': 0, 'hand': 0, 'fl': 0}
+      - left under the old profile {'mem': 2, 'hist': 1, 'outc': 1, 'hand': 1, 'fl': 1}
+      - chunks old/new (2, 0)
+      - the file registry names WAold00000000000
+      - the old row {'workflow_id': 'WAold00000000000', 'superseded_by': None, 'retired': True, 'deleted_reason': 'trial_expiry', 'owner_id': 'inst-A'}
+FAIL T3 [WA] session: F2 R9: this channel joins a bot of the other channel (the pre-F1 -1 rule still holds) [HEAD]
+      - the success answer is not {id, created, adoptedProfiles}: {'id': 'WAnew10000000000'}
+      - expected a new clone WAnew10000000000: {'id': 'WAnew10000000000'}
+FAIL T3 [WA] session: negative: another install's bot with the same bot key is never touched [HEAD]
+      - the success answer is not {id, created, adoptedProfiles}: {'id': 'WAnew10000000000'}
+      - expected a new clone WAnew10000000000: {'id': 'WAnew10000000000'}
+FAIL T3 [WA] session: negative: a wizard Create (a NEW bot in a reused slot) never adopts, even naming the old profile [HEAD]
+      - the success answer is not {id, created, adoptedProfiles}: {'id': 'WAnew10000000000'}
+      - expected a new clone WAnew10000000000: {'id': 'WAnew10000000000'}
+FAIL T3 [WA] legacy: negative: a legacy Create on a profile an install owns is refused (profile_owned), nothing created [HEAD]
+      - the execution stopped (n8n answers 500): {'node': 'Activate Created Workflow', 'message': 'Activate Created Workflow: 409 - {"message":"There is a conflict with one of the webhooks."}'}
+      - no answer: trace=If Has AppUserID? -> Seed Reply Mode -> Seed Saved? -> Get Sample Workflow -> Set Fields -> Create Workflow -> Get Created Workflow Id -> Activate Created Workflow
+      - answered {}, expected the refusal profile_owned
+      - a refusal still created a clone: ['WAnew10000000000']
+      - LOST clone(s) ['WAnew10000000000']: neither deleted, nor bound to a live row, nor booked for the sweep
+FAIL T3 [WA] legacy: legacy: fresh [HEAD]
+      - the success answer is not {id, created, adoptedProfiles}: {'id': 'WAnew10000000000'}
+      - expected a new clone WAnew10000000000: {'id': 'WAnew10000000000'}
+FAIL T3 [WA] legacy: legacy: reuse an owner-less binding [HEAD]
+      - the success answer is not {id, created, adoptedProfiles}: {'id': 'WAextra000000000'}
+      - expected the reuse of WAold00000000000: {'id': 'WAextra000000000'}
+      - a reuse created a clone: ['WAextra000000000']
+      - LOST clone(s) ['WAold00000000000']: neither deleted, nor bound to a live row, nor booked for the sweep
+FAIL T3 [WA] legacy: legacy: the owner-less binding is gone (404): a new clone, the old id booked [HEAD]
+      - the success answer is not {id, created, adoptedProfiles}: {'id': 'WAnew10000000000'}
+      - expected a new clone WAnew10000000000: {'id': 'WAnew10000000000'}
+      - chunks old/new (2, 0)
+FAIL T3 [WA] legacy: legacy: Activate fails: the new clone is discarded [HEAD]
+      - the execution stopped (n8n answers 500): {'node': 'Activate Created Workflow', 'message': 'Activate Created Workflow: 500 - {}'}
+      - no answer: trace=If Has AppUserID? -> Seed Reply Mode -> Seed Saved? -> Get Sample Workflow -> Set Fields -> Create Workflow -> Get Created Workflow Id -> Activate Created Workflow
+      - answered {}, expected the refusal create_failed
+      - LOST clone(s) ['WAnew10000000000']: neither deleted, nor bound to a live row, nor booked for the sweep
+FAIL T3 [WA] legacy: legacy: a second profile of an owner-less bot replaces nothing (no proof): the old clone stays bound [HEAD]
+      - the success answer is not {id, created, adoptedProfiles}: {'id': 'WAnew10000000000'}
+      - expected a new clone WAnew10000000000: {'id': 'WAnew10000000000'}
+FAIL T3 [TG] session: fresh (wizard, a new bot) [HEAD]
+      - the success answer is not {id, created, adoptedProfiles}: {'id': 'TGnew10000000000'}
+      - expected a new clone TGnew10000000000: {'id': 'TGnew10000000000'}
+FAIL T3 [TG] session: reuse: the bound clone, inactive (channel saved off / session over): activated [HEAD]
+      - the success answer is not {id, created, adoptedProfiles}: {'id': 'TGextra000000000'}
+      - expected the reuse of TGold00000000000: {'id': 'TGextra000000000'}
+      - a reuse created a clone: ['TGextra000000000']
+      - LOST clone(s) ['TGold00000000000']: neither deleted, nor bound to a live row, nor booked for the sweep
+FAIL T3 [TG] session: reuse: the bound clone, active (toggle off→on without saving): not activated again [HEAD]
+      - the execution stopped (n8n answers 500): {'node': 'Activate Created Workflow', 'message': 'Activate Created Workflow: 409 - {"message":"There is a conflict with one of the webhooks."}'}
+      - no answer: trace=Register Profile -> Seed Reply Mode -> Seed Saved? -> Get Sample Workflow -> Set Fields -> Create Workflow -> Get Created Workflow Id -> Activate Created Workflow
+      - the success answer is not {id, created, adoptedProfiles}: {}
+      - expected the reuse of TGold00000000000: {}
+      - a reuse created a clone: ['TGextra000000000']
+      - LOST clone(s) ['TGextra000000000']: neither deleted, nor bound to a live row, nor booked for the sweep
+      - activations of the reused clone: [('Activate Created Workflow', 'POST', 'n8n.choosereply.com', '/api/v1/workflows/TGextra000000000/activate', 409)] (expected 0: n8n 2.36.7 re-registers an active workflow's webhook on activate)
+FAIL T3 [TG] session: the bound clone is gone (404): a new clone takes its price lists, the old id is booked [HEAD]
+      - the success answer is not {id, created, adoptedProfiles}: {'id': 'TGnew10000000000'}
+      - expected a new clone TGnew10000000000: {'id': 'TGnew10000000000'}
+      - chunks old/new (2, 0)
+FAIL T3 [TG] session: the bound clone is archived: a new clone, the archived one deleted [HEAD]
+      - the success answer is not {id, created, adoptedProfiles}: {'id': 'TGnew10000000000'}
+      - expected a new clone TGnew10000000000: {'id': 'TGnew10000000000'}
+      - TGold00000000000 was not deleted: deleted=[]
+      - LOST clone(s) ['TGold00000000000']: neither deleted, nor bound to a live row, nor booked for the sweep
+      - chunks old/new (2, 0)
+FAIL T3 [TG] session: the probe answers 500: nothing is created (clone_unavailable) [HEAD]
+      - the execution stopped (n8n answers 500): {'node': 'Activate Created Workflow', 'message': 'Activate Created Workflow: 409 - {"message":"There is a conflict with one of the webhooks."}'}
+      - no answer: trace=Register Profile -> Seed Reply Mode -> Seed Saved? -> Get Sample Workflow -> Set Fields -> Create Workflow -> Get Created Workflow Id -> Activate Created Workflow
+      - answered {}, expected the refusal clone_unavailable
+      - a refusal still created a clone: ['TGnew10000000000']
+      - LOST clone(s) ['TGnew10000000000']: neither deleted, nor bound to a live row, nor booked for the sweep
+FAIL T3 [TG] session: the probe cannot reach n8n: nothing is created (clone_unavailable) [HEAD]
+      - the execution stopped (n8n answers 500): {'node': 'Activate Created Workflow', 'message': 'Activate Created Workflow: 409 - {"message":"There is a conflict with one of the webhooks."}'}
+      - no answer: trace=Register Profile -> Seed Reply Mode -> Seed Saved? -> Get Sample Workflow -> Set Fields -> Create Workflow -> Get Created Workflow Id -> Activate Created Workflow
+      - answered {}, expected the refusal clone_unavailable
+      - a refusal still created a clone: ['TGnew10000000000']
+      - LOST clone(s) ['TGnew10000000000']: neither deleted, nor bound to a live row, nor booked for the sweep
+FAIL T3 [TG] session: (а3) a new profile of the same bot: the old clone replaced, its data moved, DELETE ok [HEAD]
+      - the success answer is not {id, created, adoptedProfiles}: {'id': 'TGnew10000000000'}
+      - expected a new clone TGnew10000000000: {'id': 'TGnew10000000000'}
+      - adoptedProfiles None
+      - TGold00000000000 was not deleted: deleted=[]
+      - LOST clone(s) ['TGold00000000000']: neither deleted, nor bound to a live row, nor booked for the sweep
+      - chunks old/new (2, 0)
+      - left under the old profile {'mem': 2, 'hist': 1, 'outc': 1, 'hand': 1, 'fl': 1}
+      - under the new profile {'mem': 0, 'hist': 0, 'outc': 0, 'hand': 0, 'fl': 0}
+      - the old row {'workflow_id': 'TGold00000000000', 'superseded_by': None, 'retired': True, 'deleted_reason': None, 'owner_id': 'inst-A'}
+FAIL T3 [TG] session: (а3) … and the replaced clone's DELETE fails: it stays booked for the sweep [HEAD]
+      - the success answer is not {id, created, adoptedProfiles}: {'id': 'TGnew10000000000'}
+      - expected a new clone TGnew10000000000: {'id': 'TGnew10000000000'}
+      - adoptedProfiles None
+      - LOST clone(s) ['TGold00000000000']: neither deleted, nor bound to a live row, nor booked for the sweep
+      - chunks old/new (2, 0)
+      - left under the old profile {'mem': 2, 'hist': 1, 'outc': 1, 'hand': 1, 'fl': 1}
+      - under the new profile {'mem': 0, 'hist': 0, 'outc': 0, 'hand': 0, 'fl': 0}
+      - the old row {'workflow_id': 'TGold00000000000', 'superseded_by': None, 'retired': True, 'deleted_reason': None, 'owner_id': 'inst-A'}
+FAIL T3 [TG] session: (б) Activate cannot reach n8n: the new clone is discarded (create_failed) [HEAD]
+      - the execution stopped (n8n answers 500): {'node': 'Activate Created Workflow', 'message': 'Activate Created Workflow: getaddrinfo EAI_AGAIN'}
+      - no answer: trace=Register Profile -> Seed Reply Mode -> Seed Saved? -> Get Sample Workflow -> Set Fields -> Create Workflow -> Get Created Workflow Id -> Activate Created Workflow
+      - answered {}, expected the refusal create_failed
+      - LOST clone(s) ['TGnew10000000000']: neither deleted, nor bound to a live row, nor booked for the sweep
+FAIL T3 [TG] session: (б) Activate refused: an orphan holds the webhook path: the new clone is discarded (create_failed) [HEAD]
+      - the execution stopped (n8n answers 500): {'node': 'Activate Created Workflow', 'message': 'Activate Created Workflow: 409 - {"message":"There is a conflict with one of the webhooks."}'}
+      - no answer: trace=Register Profile -> Seed Reply Mode -> Seed Saved? -> Get Sample Workflow -> Set Fields -> Create Workflow -> Get Created Workflow Id -> Activate Created Workflow
+      - answered {}, expected the refusal create_failed
+      - LOST clone(s) ['TGnew10000000000']: neither deleted, nor bound to a live row, nor booked for the sweep
+FAIL T3 [TG] session: (б) Activate answers 500: the new clone is discarded (create_failed) [HEAD]
+      - the execution stopped (n8n answers 500): {'node': 'Activate Created Workflow', 'message': 'Activate Created Workflow: 500 - {"message":"boom"}'}
+      - no answer: trace=Register Profile -> Seed Reply Mode -> Seed Saved? -> Get Sample Workflow -> Set Fields -> Create Workflow -> Get Created Workflow Id -> Activate Created Workflow
+      - answered {}, expected the refusal create_failed
+      - LOST clone(s) ['TGnew10000000000']: neither deleted, nor bound to a live row, nor booked for the sweep
+FAIL T3 [TG] session: (б) the Wappi webhook answers 502: the new clone is discarded (create_failed) [HEAD]
+      - the execution stopped (n8n answers 500): {'node': 'Set Wappi Webhook', 'message': 'Set Wappi Webhook: 502 - {"detail":"bad gateway"}'}
+      - no answer: trace=Seed Reply Mode -> Seed Saved? -> Get Sample Workflow -> Set Fields -> Create Workflow -> Get Created Workflow Id -> Activate Created Workflow -> Set Wappi Webhook
+      - answered {}, expected the refusal create_failed
+      - LOST clone(s) ['TGnew10000000000']: neither deleted, nor bound to a live row, nor booked for the sweep
+FAIL T3 [TG] session: (б) the Wappi webhook types time out: the new clone is discarded (create_failed) [HEAD]
+      - the execution stopped (n8n answers 500): {'node': 'Set Wappi Webhook Types', 'message': 'Set Wappi Webhook Types: ETIMEDOUT'}
+      - no answer: trace=Seed Saved? -> Get Sample Workflow -> Set Fields -> Create Workflow -> Get Created Workflow Id -> Activate Created Workflow -> Set Wappi Webhook -> Set Wappi Webhook Types
+      - answered {}, expected the refusal create_failed
+      - LOST clone(s) ['TGnew10000000000']: neither deleted, nor bound to a live row, nor booked for the sweep
+FAIL T3 [TG] session: (б) Bind Workflow Id: a query error ×3: the new clone is discarded (create_failed) [HEAD]
+      - answered {'id': 'TGnew10000000000'}, expected the refusal create_failed
+      - LOST clone(s) ['TGnew10000000000']: neither deleted, nor bound to a live row, nor booked for the sweep
+FAIL T3 [TG] session: (б) Bind Workflow Id: an error thrown outside the query ×3: the new clone is discarded (create_failed) [HEAD]
+      - answered {'id': 'TGnew10000000000'}, expected the refusal create_failed
+      - LOST clone(s) ['TGnew10000000000']: neither deleted, nor bound to a live row, nor booked for the sweep
+FAIL T3 [TG] session: (б) Bind Workflow Id: no items: the new clone is discarded (create_failed) [HEAD]
+      - answered {'id': 'TGnew10000000000'}, expected the refusal create_failed
+      - LOST clone(s) ['TGnew10000000000']: neither deleted, nor bound to a live row, nor booked for the sweep
+FAIL T3 [TG] session: (б) Bind Workflow Id: bound = false (a concurrent Create won): the new clone is discarded (create_failed) [HEAD]
+      - answered {'id': 'TGnew10000000000'}, expected the refusal create_failed
+      - LOST clone(s) ['TGnew10000000000']: neither deleted, nor bound to a live row, nor booked for the sweep
+FAIL T3 [TG] session: (б) Activate fails AND the discard answers 500: the new clone is journaled for the sweep [HEAD]
+      - the execution stopped (n8n answers 500): {'node': 'Activate Created Workflow', 'message': 'Activate Created Workflow: 500 - {}'}
+      - no answer: trace=Register Profile -> Seed Reply Mode -> Seed Saved? -> Get Sample Workflow -> Set Fields -> Create Workflow -> Get Created Workflow Id -> Activate Created Workflow
+      - answered {}, expected the refusal create_failed
+      - LOST clone(s) ['TGnew10000000000']: neither deleted, nor bound to a live row, nor booked for the sweep
+FAIL T3 [TG] session: (б) Activate fails, the discard AND the journal fail: the ONE named residual (Tier 2) [HEAD]
+      - the execution stopped (n8n answers 500): {'node': 'Activate Created Workflow', 'message': 'Activate Created Workflow: 500 - {}'}
+      - no answer: trace=Register Profile -> Seed Reply Mode -> Seed Saved? -> Get Sample Workflow -> Set Fields -> Create Workflow -> Get Created Workflow Id -> Activate Created Workflow
+      - answered {}, expected the refusal create_failed
+FAIL T3 [TG] session: Clone Plan: a query error ×3: nothing is created (clone_plan_unavailable) [HEAD]
+      - the execution stopped (n8n answers 500): {'node': 'Activate Created Workflow', 'message': 'Activate Created Workflow: 409 - {"message":"There is a conflict with one of the webhooks."}'}
+      - no answer: trace=Register Profile -> Seed Reply Mode -> Seed Saved? -> Get Sample Workflow -> Set Fields -> Create Workflow -> Get Created Workflow Id -> Activate Created Workflow
+      - answered {}, expected the refusal clone_plan_unavailable
+      - a refusal still created a clone: ['TGnew10000000000']
+      - LOST clone(s) ['TGnew10000000000']: neither deleted, nor bound to a live row, nor booked for the sweep
+FAIL T3 [TG] session: Clone Plan: an error thrown outside the query ×3: nothing is created (clone_plan_unavailable) [HEAD]
+      - the execution stopped (n8n answers 500): {'node': 'Activate Created Workflow', 'message': 'Activate Created Workflow: 409 - {"message":"There is a conflict with one of the webhooks."}'}
+      - no answer: trace=Register Profile -> Seed Reply Mode -> Seed Saved? -> Get Sample Workflow -> Set Fields -> Create Workflow -> Get Created Workflow Id -> Activate Created Workflow
+      - answered {}, expected the refusal clone_plan_unavailable
+      - a refusal still created a clone: ['TGnew10000000000']
+      - LOST clone(s) ['TGnew10000000000']: neither deleted, nor bound to a live row, nor booked for the sweep
+FAIL T3 [TG] session: Clone Plan: no items: nothing is created (clone_plan_unavailable) [HEAD]
+      - the execution stopped (n8n answers 500): {'node': 'Activate Created Workflow', 'message': 'Activate Created Workflow: 409 - {"message":"There is a conflict with one of the webhooks."}'}
+      - no answer: trace=Register Profile -> Seed Reply Mode -> Seed Saved? -> Get Sample Workflow -> Set Fields -> Create Workflow -> Get Created Workflow Id -> Activate Created Workflow
+      - answered {}, expected the refusal clone_plan_unavailable
+      - a refusal still created a clone: ['TGnew10000000000']
+      - LOST clone(s) ['TGnew10000000000']: neither deleted, nor bound to a live row, nor booked for the sweep
+FAIL T3 [TG] session: F2 R1: life → sweep (trial over) → purchase → reconnect with PreviousProfileId: everything under the new connection, the prior clone deleted [HEAD]
+      - the success answer is not {id, created, adoptedProfiles}: {'id': 'TGnew10000000000'}
+      - expected a new clone TGnew10000000000: {'id': 'TGnew10000000000'}
+      - adoptedProfiles None
+      - TGold00000000000 was not deleted: deleted=[]
+      - under the new profile {'mem': 0, 'hist': 0, 'outc': 0, 'hand': 0, 'fl': 0}
+      - left under the old profile {'mem': 2, 'hist': 1, 'outc': 1, 'hand': 1, 'fl': 1}
+      - chunks old/new (2, 0)
+      - the file registry names TGold00000000000
+      - the old row {'workflow_id': 'TGold00000000000', 'superseded_by': None, 'retired': True, 'deleted_reason': 'trial_expiry', 'owner_id': 'inst-A'}
+FAIL T3 [TG] session: F2 R4: the same pair again (the answer was lost): the bound clone is reused, nothing moves twice [HEAD]
+      - the first run: {'id': 'TGnew10000000000'}
+      - the execution stopped (n8n answers 500): {'node': 'Activate Created Workflow', 'message': 'Activate Created Workflow: 409 - {"message":"There is a conflict with one of the webhooks."}'}
+      - no answer: trace=Register Profile -> Seed Reply Mode -> Seed Saved? -> Get Sample Workflow -> Set Fields -> Create Workflow -> Get Created Workflow Id -> Activate Created Workflow
+      - the success answer is not {id, created, adoptedProfiles}: {}
+      - expected the reuse of TGnew10000000000: {}
+      - adoptedProfiles None
+      - clones created: ['TGnew10000000000', 'TGextra100000000']
+      - a reuse created a clone: ['TGnew10000000000', 'TGextra100000000']
+      - LOST clone(s) ['TGextra100000000']: neither deleted, nor bound to a live row, nor booked for the sweep
+      - under the new profile {'mem': 0, 'hist': 0, 'outc': 0, 'hand': 0, 'fl': 0}
+      - left under the old profile {'mem': 2, 'hist': 1, 'outc': 1, 'hand': 1, 'fl': 1}
+      - chunks old/new (2, 0)
+      - the file registry names TGold00000000000
+      - the old row {'workflow_id': 'TGold00000000000', 'superseded_by': None, 'retired': True, 'deleted_reason': 'trial_expiry', 'owner_id': 'inst-A'}
+FAIL T3 [TG] session: F2 R9: a two-channel bot reconnects this channel with the other id moved away (-1): only this channel moves [HEAD]
+      - the success answer is not {id, created, adoptedProfiles}: {'id': 'TGnew10000000000'}
+      - expected a new clone TGnew10000000000: {'id': 'TGnew10000000000'}
+      - adoptedProfiles None
+      - TGold00000000000 was not deleted: deleted=[]
+      - under the new profile {'mem': 0, 'hist': 0, 'outc': 0, 'hand': 0, 'fl': 0}
+      - left under the old profile {'mem': 2, 'hist': 1, 'outc': 1, 'hand': 1, 'fl': 1}
+      - chunks old/new (2, 0)
+      - the file registry names TGold00000000000
+      - the old row {'workflow_id': 'TGold00000000000', 'superseded_by': None, 'retired': True, 'deleted_reason': 'trial_expiry', 'owner_id': 'inst-A'}
+FAIL T3 [TG] session: F2 R9: this channel joins a bot of the other channel (the pre-F1 -1 rule still holds) [HEAD]
+      - the success answer is not {id, created, adoptedProfiles}: {'id': 'TGnew10000000000'}
+      - expected a new clone TGnew10000000000: {'id': 'TGnew10000000000'}
+FAIL T3 [TG] session: negative: another install's bot with the same bot key is never touched [HEAD]
+      - the success answer is not {id, created, adoptedProfiles}: {'id': 'TGnew10000000000'}
+      - expected a new clone TGnew10000000000: {'id': 'TGnew10000000000'}
+FAIL T3 [TG] session: negative: a wizard Create (a NEW bot in a reused slot) never adopts, even naming the old profile [HEAD]
+      - the success answer is not {id, created, adoptedProfiles}: {'id': 'TGnew10000000000'}
+      - expected a new clone TGnew10000000000: {'id': 'TGnew10000000000'}
+FAIL T3 [TG] legacy: negative: a legacy Create on a profile an install owns is refused (profile_owned), nothing created [HEAD]
+      - the execution stopped (n8n answers 500): {'node': 'Activate Created Workflow', 'message': 'Activate Created Workflow: 409 - {"message":"There is a conflict with one of the webhooks."}'}
+      - no answer: trace=If Has AppUserID? -> Seed Reply Mode -> Seed Saved? -> Get Sample Workflow -> Set Fields -> Create Workflow -> Get Created Workflow Id -> Activate Created Workflow
+      - answered {}, expected the refusal profile_owned
+      - a refusal still created a clone: ['TGnew10000000000']
+      - LOST clone(s) ['TGnew10000000000']: neither deleted, nor bound to a live row, nor booked for the sweep
+FAIL T3 [TG] legacy: legacy: fresh [HEAD]
+      - the success answer is not {id, created, adoptedProfiles}: {'id': 'TGnew10000000000'}
+      - expected a new clone TGnew10000000000: {'id': 'TGnew10000000000'}
+FAIL T3 [TG] legacy: legacy: reuse an owner-less binding [HEAD]
+      - the success answer is not {id, created, adoptedProfiles}: {'id': 'TGextra000000000'}
+      - expected the reuse of TGold00000000000: {'id': 'TGextra000000000'}
+      - a reuse created a clone: ['TGextra000000000']
+      - LOST clone(s) ['TGold00000000000']: neither deleted, nor bound to a live row, nor booked for the sweep
+FAIL T3 [TG] legacy: legacy: the owner-less binding is gone (404): a new clone, the old id booked [HEAD]
+      - the success answer is not {id, created, adoptedProfiles}: {'id': 'TGnew10000000000'}
+      - expected a new clone TGnew10000000000: {'id': 'TGnew10000000000'}
+      - chunks old/new (2, 0)
+FAIL T3 [TG] legacy: legacy: Activate fails: the new clone is discarded [HEAD]
+      - the execution stopped (n8n answers 500): {'node': 'Activate Created Workflow', 'message': 'Activate Created Workflow: 500 - {}'}
+      - no answer: trace=If Has AppUserID? -> Seed Reply Mode -> Seed Saved? -> Get Sample Workflow -> Set Fields -> Create Workflow -> Get Created Workflow Id -> Activate Created Workflow
+      - answered {}, expected the refusal create_failed
+      - LOST clone(s) ['TGnew10000000000']: neither deleted, nor bound to a live row, nor booked for the sweep
+FAIL T3 [TG] legacy: legacy: a second profile of an owner-less bot replaces nothing (no proof): the old clone stays bound [HEAD]
+      - the success answer is not {id, created, adoptedProfiles}: {'id': 'TGnew10000000000'}
+      - expected a new clone TGnew10000000000: {'id': 'TGnew10000000000'}
+
+0 pass, 70 fail
+exit=1
+
+## 2. python3 Tools/n8n/tests/test_create_seed.py on HEAD with the extended driver (backward compatible)
+
+53 pass, 0 fail   (R8: the extended create_seed_chain.js — bridge, HTTP options, Code, dot-notation Set — changes nothing for the old graph)

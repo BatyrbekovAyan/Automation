@@ -157,14 +157,10 @@ SELECT (SELECT count(*)::int FROM deleted) AS "deletedChunks", EXISTS (SELECT 1 
 
 DELETE_CHUNKS_PARAMS = "={{ [ $json.body.fileId, $json.crAuth.mode, ($json.crAuth.installId || ''), JSON.stringify($json.crAuth.workflows || []) ] }}"
 
-BIND_WORKFLOW_SQL = """-- A1: remember which clone drives this profile (ownership of workflow ids derives from it) and, in
--- session mode, stamp the creating install as owner if the profile has none yet.
-insert into bot_profiles (profile_id, app_user_id, channel, workflow_id, owner_id, claimed_at)
-select $1, coalesce(nullif($3, ''), $1), $4, $2, nullif($5, ''), case when nullif($5, '') is null then null else now() end
-where nullif($1, '') is not null and $1 <> '-1'
-on conflict (profile_id) do update set workflow_id = excluded.workflow_id,
-  owner_id = coalesce(bot_profiles.owner_id, excluded.owner_id),
-  claimed_at = coalesce(bot_profiles.claimed_at, excluded.claimed_at), deleted_at = null;"""
+# Create WA/TG `Bind Workflow Id` (A1: the clone id + the creating install bound to the profile row) moved to the bot's
+# line (F1 + F2, plan 2026-10-11 §1.5, T3): its ONE statement is clone_lineage.BIND_WORKFLOW_SQL and the node, its wiring
+# and the retired `Restamp RAG Chunks` belong to Tools/n8n/apply-clone-lifecycle.py — like stage 4 owns the Claim
+# bodies. patch_create below is that pointer; this file only gates Create (Auth Gate / Authorized? / RULE).
 
 
 # V12 (iteration 2026-09-28): ownership for a DELETING call (Delete Bot Files, Set Workflow State delete/deactivate) is
@@ -610,20 +606,10 @@ def patch_set_workflow_state(wf):
 
 
 def patch_create(wf, profile_field, channel):
-    """Bind the created clone's id (and the creating install) to the profile row."""
-    src = node(wf, "Restamp RAG Chunks")
-    changed = ensure_node(wf, {"parameters": {"operation": "executeQuery", "query": BIND_WORKFLOW_SQL,
-                                              "options": {"queryReplacement": "={{ [ $('Unity Webhook').first().json.body." + profile_field + ", $('Get Created Workflow Id').first().json.id, ($('Unity Webhook').first().json.body.AppUserID || ''), '" + channel + "', ($('Auth Gate').first().json.crAuth.installId || '') ] }}"}},
-                               "id": nid("create", channel, "bind"), "name": "Bind Workflow Id", "type": "n8n-nodes-base.postgres", "typeVersion": 2.6,
-                               "position": [src["position"][0] + 200, src["position"][1] + 200],
-                               "credentials": {"postgres": dict(PG_CRED)}, "alwaysOutputData": True, "onError": "continueRegularOutput"})
-    if conn(wf, "Restamp RAG Chunks")[0] != [{"node": "Bind Workflow Id", "type": "main", "index": 0}]:
-        wf["connections"]["Restamp RAG Chunks"] = {"main": [[{"node": "Bind Workflow Id", "type": "main", "index": 0}]]}
-        changed = True
-    if conn(wf, "Bind Workflow Id")[0] != [{"node": "Send New Workflows Id", "type": "main", "index": 0}]:
-        wf["connections"]["Bind Workflow Id"] = {"main": [[{"node": "Send New Workflows Id", "type": "main", "index": 0}]]}
-        changed = True
-    return changed
+    """F1 + F2 (T3): nothing to do here any more — Bind Workflow Id and the whole clone chain after the reply-mode seed
+    are written by Tools/n8n/apply-clone-lifecycle.py (clone_lineage.BIND_WORKFLOW_SQL). Kept as the pointer, so the
+    two generators never rewrite each other's nodes."""
+    return False
 
 
 def patch_bot(fname):

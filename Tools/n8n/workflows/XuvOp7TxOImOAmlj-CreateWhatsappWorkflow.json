@@ -29,30 +29,39 @@
           "parameters": [
             {
               "name": "profile_id",
-              "value": "={{ $('Unity Webhook').item.json.body.WhatsappProfileId }}"
+              "value": "={{ $('Unity Webhook').first().json.body.WhatsappProfileId }}"
             },
             {
               "name": "url",
-              "value": "=https://n8n.choosereply.com/webhook/{{ $('Unity Webhook').item.json.body.WhatsappProfileId }}"
+              "value": "=https://n8n.choosereply.com/webhook/{{ $('Unity Webhook').first().json.body.WhatsappProfileId }}"
             }
           ]
         },
-        "options": {}
+        "options": {
+          "timeout": 20000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
       },
+      "id": "d9b6beb7-c293-444f-887d-51e109fcbdaf",
+      "name": "Set Wappi Webhook",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        2492,
+        3336,
         -16
       ],
-      "id": "d9b6beb7-c293-444f-887d-51e109fcbdaf",
-      "name": "Set Wappi Webhook",
       "credentials": {
         "httpHeaderAuth": {
           "id": "EuhhqAaV56DpoqAN",
           "name": "WappiAuthToken"
         }
-      }
+      },
+      "onError": "continueRegularOutput"
     },
     {
       "parameters": {
@@ -65,60 +74,70 @@
           "parameters": [
             {
               "name": "profile_id",
-              "value": "={{ $('Unity Webhook').item.json.body.WhatsappProfileId }}"
+              "value": "={{ $('Unity Webhook').first().json.body.WhatsappProfileId }}"
             }
           ]
         },
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "[\n  \"incoming_message\",\n  \"outgoing_message_phone\",\n  \"outgoing_message_api\"\n]",
-        "options": {}
+        "options": {
+          "timeout": 20000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
       },
+      "id": "f3ecd9a8-8c9b-40d9-b10e-69138800eef3",
+      "name": "Set Wappi Webhook Types",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        2668,
+        3696,
         -16
       ],
-      "id": "f3ecd9a8-8c9b-40d9-b10e-69138800eef3",
-      "name": "Set Wappi Webhook Types",
       "credentials": {
         "httpHeaderAuth": {
           "id": "EuhhqAaV56DpoqAN",
           "name": "WappiAuthToken"
         }
-      }
+      },
+      "onError": "continueRegularOutput"
     },
     {
       "parameters": {
         "method": "POST",
-        "url": "=https://n8n.choosereply.com/api/v1/workflows/{{ $('Get Created Workflow Id').first().json.id }}/activate",
+        "url": "=http://localhost:5678/api/v1/workflows/{{ $('Clone Id').first().json.id }}/activate",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
-        "options": {}
+        "options": {
+          "timeout": 20000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
       },
+      "id": "a3f0d5dc-e86f-434b-82af-fff63cd85831",
+      "name": "Activate Created Workflow",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        2220,
+        2976,
         -16
       ],
-      "id": "a3f0d5dc-e86f-434b-82af-fff63cd85831",
-      "name": "Activate Created Workflow",
       "credentials": {
-        "n8nApi": {
-          "id": "X1k4igOAG65Fb3oz",
-          "name": "n8n account"
-        },
-        "httpBearerAuth": {
-          "id": "nfU8CbYjPssGjEZA",
-          "name": "Bearer Auth account"
-        },
         "httpHeaderAuth": {
-          "id": "RV7m661NMLPXEcvm",
-          "name": "n8nAPIKey"
+          "id": "__HDR_CRED__",
+          "name": "n8n Admin API"
         }
-      }
+      },
+      "onError": "continueRegularOutput"
     },
     {
       "parameters": {
@@ -129,19 +148,25 @@
               "name": "id",
               "value": "={{ $json.id }}",
               "type": "string"
+            },
+            {
+              "id": "1f2a9229-ef5e-5938-a1d9-1da6d624dd52",
+              "name": "created",
+              "value": true,
+              "type": "boolean"
             }
           ]
         },
         "options": {}
       },
+      "id": "43fc8007-8196-45d4-ad13-33169215fe57",
+      "name": "Get Created Workflow Id",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        2044,
+        2616,
         -16
-      ],
-      "id": "43fc8007-8196-45d4-ad13-33169215fe57",
-      "name": "Get Created Workflow Id"
+      ]
     },
     {
       "parameters": {
@@ -150,81 +175,61 @@
             {
               "id": "d730dd9e-5fef-4dce-be83-cd5cfdda2ed6",
               "name": "id",
-              "value": "={{ $('Get Created Workflow Id').first().json.id }}",
+              "value": "={{ $('Clone Id').first().json.id }}",
               "type": "string"
+            },
+            {
+              "id": "6b3e61e5-da65-50e6-ae43-31445787d529",
+              "name": "created",
+              "value": "={{ $('Clone Id').first().json.created === true }}",
+              "type": "boolean"
+            },
+            {
+              "id": "59dd53e8-6988-5b63-9a5c-72e79195d59a",
+              "name": "adoptedProfiles",
+              "value": "={{ (Array.isArray($('Bind Workflow Id').first().json.adopted_profiles) ? $('Bind Workflow Id').first().json.adopted_profiles : []).filter((p) => typeof p === 'string') }}",
+              "type": "array"
             }
           ]
         },
         "options": {}
       },
+      "id": "0bfba713-ae60-435e-87ce-d2980384fd54",
+      "name": "Send New Workflows Id",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        2924,
+        4956,
         -16
       ],
-      "id": "0bfba713-ae60-435e-87ce-d2980384fd54",
-      "name": "Send New Workflows Id"
+      "executeOnce": true
     },
     {
       "parameters": {
-        "operation": "executeQuery",
-        "query": "UPDATE documents\nSET metadata = jsonb_set(metadata, '{botWaId}', to_jsonb($1::text))\nWHERE $2 <> '-1' AND $2 <> ''\n  AND metadata->>'botTgId' = $2\n  AND metadata->>'botWaId' = '-1';",
-        "options": {
-          "queryReplacement": "={{ $('Get Created Workflow Id').item.json.id }},{{ $('Unity Webhook').first().json.body.TelegramWorkflowId }}"
-        }
-      },
-      "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2.6,
-      "position": [
-        2796,
-        160
-      ],
-      "id": "a5b6c7d8-0401-4e5f-9a01-000000000402",
-      "name": "Restamp RAG Chunks",
-      "alwaysOutputData": true,
-      "onError": "continueRegularOutput",
-      "credentials": {
-        "postgres": {
-          "id": "vvRrFiEXzLVqKjOx",
-          "name": "Postgres"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "url": "https://n8n.choosereply.com/api/v1/workflows/4wYitz5ek30SVNlT",
+        "url": "http://localhost:5678/api/v1/workflows/4wYitz5ek30SVNlT",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "options": {}
       },
+      "id": "6fe729ba-1051-467c-98b4-1690e97dc0c4",
+      "name": "Get Sample Workflow",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        1356,
+        2076,
         -16
       ],
-      "id": "6fe729ba-1051-467c-98b4-1690e97dc0c4",
-      "name": "Get Sample Workflow",
       "credentials": {
-        "n8nApi": {
-          "id": "X1k4igOAG65Fb3oz",
-          "name": "n8n account"
-        },
-        "httpBearerAuth": {
-          "id": "nfU8CbYjPssGjEZA",
-          "name": "Bearer Auth account"
-        },
         "httpHeaderAuth": {
-          "id": "RV7m661NMLPXEcvm",
-          "name": "n8nAPIKey"
+          "id": "__HDR_CRED__",
+          "name": "n8n Admin API"
         }
       }
     },
     {
       "parameters": {
         "method": "POST",
-        "url": "https://n8n.choosereply.com/api/v1/workflows",
+        "url": "http://localhost:5678/api/v1/workflows",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "sendBody": true,
@@ -232,26 +237,18 @@
         "jsonBody": "={{ $json }}",
         "options": {}
       },
+      "id": "2b800017-076e-44ef-b794-5be56021c70f",
+      "name": "Create Workflow",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        1756,
+        2436,
         -16
       ],
-      "id": "2b800017-076e-44ef-b794-5be56021c70f",
-      "name": "Create Workflow",
       "credentials": {
-        "n8nApi": {
-          "id": "X1k4igOAG65Fb3oz",
-          "name": "n8n account"
-        },
-        "httpBearerAuth": {
-          "id": "nfU8CbYjPssGjEZA",
-          "name": "Bearer Auth account"
-        },
         "httpHeaderAuth": {
-          "id": "RV7m661NMLPXEcvm",
-          "name": "n8nAPIKey"
+          "id": "__HDR_CRED__",
+          "name": "n8n Admin API"
         }
       }
     },
@@ -633,9 +630,9 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "-- A1: remember which clone drives this profile (ownership of workflow ids derives from it) and, in\n-- session mode, stamp the creating install as owner if the profile has none yet.\ninsert into bot_profiles (profile_id, app_user_id, channel, workflow_id, owner_id, claimed_at)\nselect $1, coalesce(nullif($3, ''), $1), $4, $2, nullif($5, ''), case when nullif($5, '') is null then null else now() end\nwhere nullif($1, '') is not null and $1 <> '-1'\non conflict (profile_id) do update set workflow_id = excluded.workflow_id,\n  owner_id = coalesce(bot_profiles.owner_id, excluded.owner_id),\n  claimed_at = coalesce(bot_profiles.claimed_at, excluded.claimed_at), deleted_at = null;",
+        "query": "-- F1 + F2 (plan 2026-10-11 §1.5): bind the clone to the profile and hand it everything the bot had on the server, in\n-- ONE statement that ALWAYS answers one row; bound = true only when the profile's row now names this clone. The plan ran\n-- about ten seconds earlier, so every condition is re-checked on the rows written here — on the version a concurrent\n-- statement committed, not only on this statement's snapshot (a row moved or marked meanwhile is never taken back).\n--   bind     the profile's row: never a sentinel, never a malformed or protected clone id, never a row of the other\n--            channel or of another owner (a legacy call binds only a row without one), and only while the row still\n--            names the binding this statement saw: a concurrent Create of the same profile that bound its clone after\n--            this statement began wins, and this one answers bound = false (the graph discards its clone; the client's\n--            retry reuses the winner). Whatever binding it overwrites is replaced too, so no clone is left unbound.\n--   p        the predecessors the plan named that still qualify: this install's (not revoked), this channel, a bot key\n--            compatible with the new profile's, never a deleted bot, never taken over by another profile, never bound to a\n--            protected id or to a clone a live row of another bot drives — and the new profile is this install's row.\n--   moved    the replaced clones: the overwritten binding, the plan's own binding (a clone that is gone) and the\n--            predecessors' clones the plan named; never protected, never this clone, never one a live row outside this\n--            bot drives.\n--   The predecessors' memory, history, outcomes, handoffs, reply ledger, chat state and chat flags move to the new profile\n--   (row ids kept: the memory order and the run watermarks stay right). Where the new profile already holds the same key\n--   its row wins; among several predecessors the freshest. The predecessors' '*' rows go: the new one was seeded from the\n--   client's current mode. dialog_counts stay (billing records, not chat content).\n--   The moved clones' chunks and file registry go to the new clone — this install's rows and owner-less ones (a compat\n--   upload), so a file's row and its chunks keep naming ONE clone (the V4 evidence of Delete File / Register Upload);\n--   a file row of another install never. Plus the pre-F1 rule: a second channel joining a bot takes the other\n--   channel's chunks that carry the -1 sentinel.\n--   The predecessor rows and the rows bound to a moved clone are marked superseded (their own reason kept, a missing one\n--   becomes replaced) unless another profile took them over meanwhile; adopted_profiles names only the predecessors\n--   that are marked for THIS profile. The moved clones are booked in clone_retirements BEFORE the graph deletes them.\n-- Parameters, in order: profile id, clone id, app user id, channel, install id, the profile's previous binding when the\n-- clone was created (or empty), JSON array of the clones to replace, JSON array of the predecessor profiles, the other\n-- channel's workflow id.\nwith me as (\n  select i.install_id as inst from installs i where i.install_id = nullif($5, '') and i.revoked_at is null\n), cur as (\n  select bp.workflow_id, bp.owner_id, bp.bot_key from bot_profiles bp where bp.profile_id = $1\n), bind as (\n  insert into bot_profiles as bp (profile_id, app_user_id, channel, workflow_id, owner_id, claimed_at)\n  select $1, coalesce(nullif($3, ''), $1), $4, $2, nullif($5, ''), case when nullif($5, '') is null then null else now() end\n  where nullif($1, '') is not null and $1 <> '-1' and $2 ~ '^[A-Za-z0-9]{8,36}$' and $2 not in ('0DP79STI3pafXO9B', '2htWSV5IHO8E2CgB', '2islisFH7jjLoPQM', '3qax5J9u2qsT9Vao', '4VN3gsFaC2HUYmcc', '4wYitz5ek30SVNlT', '9PTyYcelRQI7bGDb', 'KoTuIlk4LMrlvnWI', 'SCLcpn6DMDG3Z4VN', 'TwWPW3gIyjZS3foR', 'Uz6HBBUpAiUqVysB', 'XuvOp7TxOImOAmlj', 'ZGYr6srzS3rSSXHp', 'ZTqpumOpL1rNDOp6', 'crAuthSession001', 'crHandoffDry0001', 'crHandoffNtfy001', 'crHandoffReq0001', 'crHandoffsApi001', 'crPriceSearch001', 'crTestDialog0001', 'crWappiProxy0001', 'fXYpCXPKw92EzRz8', 'hHwvfOvTCS42pXnq', 'jtbssfzXbOxwTK4k', 'lmjYsdNcQA2IE5rl', 'olmqWMfcFpCEcpiE')\n  on conflict (profile_id) do update set workflow_id = excluded.workflow_id,\n    owner_id = coalesce(bp.owner_id, excluded.owner_id), claimed_at = coalesce(bp.claimed_at, excluded.claimed_at),\n    deleted_at = null, superseded_by = null, superseded_at = null\n  where bp.channel = excluded.channel and (bp.owner_id is null or bp.owner_id = excluded.owner_id)\n    and bp.workflow_id is not distinct from (select c.workflow_id from cur c)\n  returning bp.workflow_id\n), p0 as (\n  select bp.profile_id as pid, bp.workflow_id as wf, bp.superseded_by as sup\n  from bot_profiles bp join me on bp.owner_id = me.inst\n  where exists (select 1 from bind)\n    and bp.profile_id in (select x #>> '{}' as v from jsonb_array_elements(case when jsonb_typeof($8::jsonb) = 'array' then $8::jsonb else '[]'::jsonb end) x where jsonb_typeof(x) = 'string')\n    and bp.profile_id <> $1 and bp.channel = $4\n    and bp.deleted_reason is distinct from 'app_delete'\n    and (bp.superseded_by is null or bp.superseded_by = $1)\n    and (bp.workflow_id is null or bp.workflow_id not in ('0DP79STI3pafXO9B', '2htWSV5IHO8E2CgB', '2islisFH7jjLoPQM', '3qax5J9u2qsT9Vao', '4VN3gsFaC2HUYmcc', '4wYitz5ek30SVNlT', '9PTyYcelRQI7bGDb', 'KoTuIlk4LMrlvnWI', 'SCLcpn6DMDG3Z4VN', 'TwWPW3gIyjZS3foR', 'Uz6HBBUpAiUqVysB', 'XuvOp7TxOImOAmlj', 'ZGYr6srzS3rSSXHp', 'ZTqpumOpL1rNDOp6', 'crAuthSession001', 'crHandoffDry0001', 'crHandoffNtfy001', 'crHandoffReq0001', 'crHandoffsApi001', 'crPriceSearch001', 'crTestDialog0001', 'crWappiProxy0001', 'fXYpCXPKw92EzRz8', 'hHwvfOvTCS42pXnq', 'jtbssfzXbOxwTK4k', 'lmjYsdNcQA2IE5rl', 'olmqWMfcFpCEcpiE'))\n    and exists (select 1 from cur where cur.owner_id = me.inst\n                  and (nullif(bp.bot_key, '') is null or nullif(cur.bot_key, '') is null or bp.bot_key = cur.bot_key))\n), p as (\n  select p0.pid, p0.wf, p0.sup from p0\n  where not exists (select 1 from bot_profiles live where live.workflow_id = p0.wf and live.deleted_at is null\n                      and live.profile_id <> $1 and live.profile_id not in (select pid from p0))\n), moved as (\n  select distinct s.wf from (\n    select nullif($6, '') as wf\n    union all select cur.workflow_id from cur\n    union all select p.wf from p where p.wf in (select x #>> '{}' as v from jsonb_array_elements(case when jsonb_typeof($7::jsonb) = 'array' then $7::jsonb else '[]'::jsonb end) x where jsonb_typeof(x) = 'string')\n  ) s\n  where exists (select 1 from bind) and s.wf ~ '^[A-Za-z0-9]{8,36}$' and s.wf not in ('0DP79STI3pafXO9B', '2htWSV5IHO8E2CgB', '2islisFH7jjLoPQM', '3qax5J9u2qsT9Vao', '4VN3gsFaC2HUYmcc', '4wYitz5ek30SVNlT', '9PTyYcelRQI7bGDb', 'KoTuIlk4LMrlvnWI', 'SCLcpn6DMDG3Z4VN', 'TwWPW3gIyjZS3foR', 'Uz6HBBUpAiUqVysB', 'XuvOp7TxOImOAmlj', 'ZGYr6srzS3rSSXHp', 'ZTqpumOpL1rNDOp6', 'crAuthSession001', 'crHandoffDry0001', 'crHandoffNtfy001', 'crHandoffReq0001', 'crHandoffsApi001', 'crPriceSearch001', 'crTestDialog0001', 'crWappiProxy0001', 'fXYpCXPKw92EzRz8', 'hHwvfOvTCS42pXnq', 'jtbssfzXbOxwTK4k', 'lmjYsdNcQA2IE5rl', 'olmqWMfcFpCEcpiE') and s.wf <> $2\n    and not exists (select 1 from bot_profiles live where live.workflow_id = s.wf and live.deleted_at is null\n                      and live.profile_id <> $1 and live.profile_id not in (select pid from p))\n), chunks_moved as (\n  update documents d set metadata = jsonb_set(d.metadata, '{botWaId}', to_jsonb($2::text))\n  from moved m\n  where exists (select 1 from moved) and d.metadata->>'botWaId' = m.wf           -- the expression index of the RAG store\n  returning 1\n), chunks_sentinel as (\n  update documents d set metadata = jsonb_set(d.metadata, '{botWaId}', to_jsonb($2::text))\n  where exists (select 1 from bind) and $9 ~ '^[A-Za-z0-9]{8,36}$'\n    and d.metadata->>'botTgId' = $9 and d.metadata->>'botWaId' = '-1'\n  returning 1\n), files as (\n  update uploaded_files u set bot_wa_id = $2\n  where exists (select 1 from moved) and u.bot_wa_id in (select wf from moved)\n    and (u.owner_id is null or u.owner_id = (select inst from me))\n  returning 1\n), superseded as (\n  update bot_profiles bp set superseded_by = $1,\n    superseded_at = case when bp.superseded_by is not distinct from $1 then coalesce(bp.superseded_at, now()) else now() end,\n    deleted_at = coalesce(bp.deleted_at, now()), deleted_reason = coalesce(bp.deleted_reason, 'replaced')\n  where exists (select 1 from bind) and bp.profile_id <> $1 and bp.owner_id = (select inst from me)\n    and (bp.profile_id in (select pid from p) or bp.workflow_id in (select wf from moved))\n    and (bp.superseded_by is null or bp.superseded_by = $1)\n    and (bp.superseded_by is distinct from $1 or bp.deleted_at is null or bp.deleted_reason is null)\n  returning bp.profile_id\n), booked as (\n  insert into clone_retirements (workflow_id, profile_id, owner_id, reason, replaced_by)\n  select m.wf,\n    (select bp.profile_id from bot_profiles bp where bp.workflow_id = m.wf\n      order by (bp.profile_id = $1) desc, (bp.owner_id is not distinct from nullif($5, '')) desc, bp.created_at desc, bp.profile_id\n      limit 1),\n    nullif($5, ''), 'replaced', $2\n  from moved m\n  on conflict (workflow_id) do nothing\n  returning 1\n), mem as (\n  update n8n_chat_histories h set session_id = $1 || substr(h.session_id, length(split_part(h.session_id, ':', 1)) + 1)\n  where exists (select 1 from p) and split_part(h.session_id, ':', 1) in (select pid from p)\n  returning 1\n), hist_r as (\n  select e.id, e.profile_id as pid,\n    row_number() over (partition by e.chat_id, e.message_id order by e.created_at desc, e.id desc) as rn,\n    exists (select 1 from chat_history_events x where x.profile_id = $1 and x.chat_id = e.chat_id\n              and x.message_id = e.message_id) as taken\n  from chat_history_events e where e.profile_id in (select pid from p)\n), hist_mv as (\n  update chat_history_events e set profile_id = $1 from hist_r r\n  where e.id = r.id and e.profile_id = r.pid and r.rn = 1 and not r.taken\n  returning 1\n), hist_dup as (\n  delete from chat_history_events e using hist_r r where e.id = r.id and e.profile_id = r.pid and (r.rn > 1 or r.taken)\n  returning 1\n), outc_r as (\n  select o.session_id as sid, row_number() over (partition by o.chat_id\n      order by o.updated_at desc, o.outcome_at desc, o.session_id desc) as rn,\n    exists (select 1 from conversation_outcomes x where x.session_id = $1 || ':' || o.chat_id) as taken\n  from conversation_outcomes o where o.profile_id in (select pid from p)\n), outc_mv as (\n  update conversation_outcomes o set profile_id = $1, session_id = $1 || ':' || o.chat_id\n  from outc_r r where o.session_id = r.sid and r.rn = 1 and not r.taken\n  returning 1\n), outc_dup as (\n  delete from conversation_outcomes o using outc_r r where o.session_id = r.sid and (r.rn > 1 or r.taken)\n  returning 1\n), hand_r as (\n  select h.id, h.profile_id as pid,\n    row_number() over (partition by h.chat_id, h.source_message_id order by h.updated_at desc, h.id desc) as rn,\n    exists (select 1 from handoff_requests x where x.profile_id = $1 and x.chat_id = h.chat_id\n              and x.source_message_id = h.source_message_id) as taken\n  from handoff_requests h where h.profile_id in (select pid from p)\n), hand_mv as (\n  update handoff_requests h set profile_id = $1 from hand_r r\n  where h.id = r.id and h.profile_id = r.pid and r.rn = 1 and not r.taken\n  returning 1\n), hand_dup as (\n  delete from handoff_requests h using hand_r r where h.id = r.id and h.profile_id = r.pid and (r.rn > 1 or r.taken)\n  returning 1\n), ev_r as (\n  select e.profile_id as pid, e.chat_id, e.message_id,\n    row_number() over (partition by e.chat_id, e.message_id order by e.updated_at desc, e.profile_id desc) as rn,\n    exists (select 1 from reply_events x where x.profile_id = $1 and x.chat_id = e.chat_id\n              and x.message_id = e.message_id) as taken\n  from reply_events e where e.profile_id in (select pid from p)\n), ev_mv as (\n  update reply_events e set profile_id = $1 from ev_r r\n  where e.profile_id = r.pid and e.chat_id = r.chat_id and e.message_id = r.message_id and r.rn = 1 and not r.taken\n  returning 1\n), ev_dup as (\n  delete from reply_events e using ev_r r\n  where e.profile_id = r.pid and e.chat_id = r.chat_id and e.message_id = r.message_id and (r.rn > 1 or r.taken)\n  returning 1\n), st_r as (\n  select s.profile_id as pid, s.chat_id,\n    row_number() over (partition by s.chat_id\n      order by s.newest_message_time desc nulls last, s.last_sent_at desc nulls last, s.profile_id desc) as rn,\n    exists (select 1 from chat_reply_state x where x.profile_id = $1 and x.chat_id = s.chat_id) as taken\n  from chat_reply_state s where s.profile_id in (select pid from p)\n), st_mv as (\n  update chat_reply_state s set profile_id = $1 from st_r r\n  where s.profile_id = r.pid and s.chat_id = r.chat_id and r.rn = 1 and not r.taken\n  returning 1\n), st_dup as (\n  delete from chat_reply_state s using st_r r\n  where s.profile_id = r.pid and s.chat_id = r.chat_id and (r.rn > 1 or r.taken)\n  returning 1\n), fl_r as (\n  select f.profile_id as pid, f.chat_id,\n    row_number() over (partition by f.chat_id order by f.updated_at desc, f.version desc, f.profile_id desc) as rn,\n    (f.chat_id = '*' or exists (select 1 from reply_mode_flags x where x.profile_id = $1 and x.chat_id = f.chat_id)) as taken\n  from reply_mode_flags f where f.profile_id in (select pid from p)\n), fl_mv as (\n  update reply_mode_flags f set profile_id = $1 from fl_r r\n  where f.profile_id = r.pid and f.chat_id = r.chat_id and r.rn = 1 and not r.taken\n  returning 1\n), fl_dup as (\n  delete from reply_mode_flags f using fl_r r\n  where f.profile_id = r.pid and f.chat_id = r.chat_id and (r.rn > 1 or r.taken)\n  returning 1\n)\nselect exists (select 1 from bind where workflow_id = $2) as bound, $2::text as workflow_id,\n  coalesce((select jsonb_agg(a.pid order by a.pid) from (\n     select p.pid from p where p.sup = $1\n     union select s.profile_id from superseded s where s.profile_id in (select pid from p)) a), '[]'::jsonb) as adopted_profiles,\n  coalesce((select jsonb_agg(wf order by wf) from moved), '[]'::jsonb) as retired_ids,\n  ((select count(*) from chunks_moved) + (select count(*) from chunks_sentinel))::int as restamped_chunks,\n  (select count(*) from files)::int as restamped_files,\n  (select count(*) from superseded)::int as superseded_rows,\n  (select count(*) from booked)::int as booked,\n  (select count(*) from mem)::int as moved_memory,\n  (select count(*) from hist_mv)::int as moved_history,\n  (select count(*) from outc_mv)::int as moved_outcomes,\n  (select count(*) from hand_mv)::int as moved_handoffs,\n  (select count(*) from ev_mv)::int as moved_events,\n  (select count(*) from st_mv)::int as moved_states,\n  (select count(*) from fl_mv)::int as moved_flags,\n  ((select count(*) from hist_dup) + (select count(*) from outc_dup) + (select count(*) from hand_dup)\n   + (select count(*) from ev_dup) + (select count(*) from st_dup) + (select count(*) from fl_dup))::int as dropped_rows",
         "options": {
-          "queryReplacement": "={{ [ $('Unity Webhook').first().json.body.WhatsappProfileId, $('Get Created Workflow Id').first().json.id, ($('Unity Webhook').first().json.body.AppUserID || ''), 'whatsapp', ($('Auth Gate').first().json.crAuth.installId || '') ] }}"
+          "queryReplacement": "={{ [ String($('Unity Webhook').first().json.body.WhatsappProfileId || ''), String($('Clone Id').first().json.id || ''), String($('Unity Webhook').first().json.body.AppUserID || ''), 'whatsapp', String($('Auth Gate').first().json.crAuth.installId || ''), ($('Clone Id').first().json.created === true ? String($('Clone Plan').first().json.own_id || '') : ''), JSON.stringify(Array.isArray($('Clone Plan').first().json.replace_ids) ? $('Clone Plan').first().json.replace_ids : []), JSON.stringify(Array.isArray($('Clone Plan').first().json.pred_profiles) ? $('Clone Plan').first().json.pred_profiles : []), String($('Unity Webhook').first().json.body.TelegramWorkflowId || '') ] }}"
         }
       },
       "id": "d16f6b61-b34c-50e8-ba78-420a1d0a05b3",
@@ -643,8 +640,8 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.6,
       "position": [
-        2996,
-        360
+        4056,
+        -16
       ],
       "credentials": {
         "postgres": {
@@ -652,8 +649,11 @@
           "name": "Postgres"
         }
       },
-      "alwaysOutputData": true,
-      "onError": "continueRegularOutput"
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1000,
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true
     },
     {
       "parameters": {
@@ -769,6 +769,801 @@
         1408,
         384
       ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- F1 + F2 (plan 2026-10-11 §1.3): what this Create may reuse, must refuse, replace and adopt. Read-only; ALWAYS one\n-- row with planned = true once it completed (the graph gates on that positive field, never on «the node continued»).\n--   own_id         the profile's own bound clone when the binding is the caller's (session: its install, not revoked;\n--                  legacy: a row without an owner) and the clone is not booked for deletion (a superseded profile that\n--                  comes back gets a new clone — reusing a booked one would hand the sweep a clone a live row drives).\n--                  The graph probes it and reuses it while it still serves the profile.\n--   foreign        the profile belongs to an install that is not the caller (any legacy call, a revoked install, a token\n--                  older than a claim by code): the graph refuses, nothing is created.\n--   pred_profiles  the earlier profiles of THIS bot on this channel, proven here: owned by the caller's live install,\n--                  never for a wizard create (a new bot in a reused slot), the same bot key or the named previous profile\n--                  (whose bot key is empty or the same), never a deleted bot (app_delete), never one another profile\n--                  already took over, never one bound to a protected id or to a clone a live row of another bot drives,\n--                  and the new profile is the caller's live row of this channel.\n--   replace_ids    their clones (well formed, never protected, never the profile's own binding): booked and deleted once\n--                  the new clone is bound.\n-- Parameters, in order: gate mode, install id, the new profile id, channel, bot key, create origin, previous profile id.\nwith me as (\n  select i.install_id as inst from installs i\n  where $1 = 'session' and i.install_id = nullif($2, '') and i.revoked_at is null\n), target as (\n  select bp.channel, bp.owner_id, bp.workflow_id from bot_profiles bp where bp.profile_id = $3\n), own as (\n  select t.workflow_id from target t\n  where t.channel = $4 and t.workflow_id ~ '^[A-Za-z0-9]{8,36}$' and t.workflow_id not in ('0DP79STI3pafXO9B', '2htWSV5IHO8E2CgB', '2islisFH7jjLoPQM', '3qax5J9u2qsT9Vao', '4VN3gsFaC2HUYmcc', '4wYitz5ek30SVNlT', '9PTyYcelRQI7bGDb', 'KoTuIlk4LMrlvnWI', 'SCLcpn6DMDG3Z4VN', 'TwWPW3gIyjZS3foR', 'Uz6HBBUpAiUqVysB', 'XuvOp7TxOImOAmlj', 'ZGYr6srzS3rSSXHp', 'ZTqpumOpL1rNDOp6', 'crAuthSession001', 'crHandoffDry0001', 'crHandoffNtfy001', 'crHandoffReq0001', 'crHandoffsApi001', 'crPriceSearch001', 'crTestDialog0001', 'crWappiProxy0001', 'fXYpCXPKw92EzRz8', 'hHwvfOvTCS42pXnq', 'jtbssfzXbOxwTK4k', 'lmjYsdNcQA2IE5rl', 'olmqWMfcFpCEcpiE')\n    and not exists (select 1 from clone_retirements r where r.workflow_id = t.workflow_id)\n    and ((t.owner_id = (select inst from me)) or ($1 = 'legacy' and t.owner_id is null))\n), cand as (\n  select bp.profile_id, bp.workflow_id from bot_profiles bp join me on bp.owner_id = me.inst\n  where bp.channel = $4 and bp.profile_id <> $3\n    and coalesce($6, '') <> 'start'\n    and ((nullif($5, '') is not null and bp.bot_key = $5)\n      or (nullif($7, '') is not null and bp.profile_id = $7\n          and (nullif(bp.bot_key, '') is null or nullif($5, '') is null or bp.bot_key = $5)))\n    and bp.deleted_reason is distinct from 'app_delete'\n    and (bp.superseded_by is null or bp.superseded_by = $3)\n    and (bp.workflow_id is null or bp.workflow_id not in ('0DP79STI3pafXO9B', '2htWSV5IHO8E2CgB', '2islisFH7jjLoPQM', '3qax5J9u2qsT9Vao', '4VN3gsFaC2HUYmcc', '4wYitz5ek30SVNlT', '9PTyYcelRQI7bGDb', 'KoTuIlk4LMrlvnWI', 'SCLcpn6DMDG3Z4VN', 'TwWPW3gIyjZS3foR', 'Uz6HBBUpAiUqVysB', 'XuvOp7TxOImOAmlj', 'ZGYr6srzS3rSSXHp', 'ZTqpumOpL1rNDOp6', 'crAuthSession001', 'crHandoffDry0001', 'crHandoffNtfy001', 'crHandoffReq0001', 'crHandoffsApi001', 'crPriceSearch001', 'crTestDialog0001', 'crWappiProxy0001', 'fXYpCXPKw92EzRz8', 'hHwvfOvTCS42pXnq', 'jtbssfzXbOxwTK4k', 'lmjYsdNcQA2IE5rl', 'olmqWMfcFpCEcpiE'))\n    and exists (select 1 from bot_profiles nw where nw.profile_id = $3 and nw.owner_id = me.inst\n                  and nw.channel = $4 and nw.deleted_at is null)\n), pred as (\n  select c.profile_id, c.workflow_id from cand c\n  where not exists (select 1 from bot_profiles live where live.workflow_id = c.workflow_id and live.deleted_at is null\n                      and live.profile_id <> $3 and live.profile_id not in (select profile_id from cand))\n)\nselect true as planned,\n  (select workflow_id from own limit 1) as own_id,\n  exists (select 1 from target t where t.owner_id is not null and t.owner_id is distinct from (select inst from me)) as \"foreign\",\n  coalesce((select jsonb_agg(distinct p.workflow_id order by p.workflow_id) from pred p\n            where p.workflow_id ~ '^[A-Za-z0-9]{8,36}$' and p.workflow_id is distinct from (select t.workflow_id from target t)),\n           '[]'::jsonb) as replace_ids,\n  coalesce((select jsonb_agg(p.profile_id order by p.profile_id) from pred p), '[]'::jsonb) as pred_profiles",
+        "options": {
+          "queryReplacement": "={{ [ String($('Auth Gate').first().json.crAuth.mode || ''), String($('Auth Gate').first().json.crAuth.installId || ''), String($('Unity Webhook').first().json.body.WhatsappProfileId || ''), 'whatsapp', String($('Unity Webhook').first().json.body.BotKey || ''), String($('Unity Webhook').first().json.body.CreateOrigin || ''), String($('Unity Webhook').first().json.body.PreviousProfileId || '') ] }}"
+        }
+      },
+      "id": "3046793f-8a01-521f-b9fc-17d7f2af5343",
+      "name": "Clone Plan",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1356,
+        -16
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "vvRrFiEXzLVqKjOx",
+          "name": "Postgres"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1000,
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "73755671-dd3a-5f6e-b90a-95d84976ecba",
+              "leftValue": "={{ $json.planned === true }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "1e1f5352-7ff3-5254-9fef-939260897a98",
+      "name": "Plan Read?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1536,
+        -16
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "9d1895b9-0283-5a7b-ab0c-2b96b5119723",
+              "leftValue": "={{ $json.foreign === true }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "2ca1f7a5-6b39-57a3-910e-f91a1b57ecb4",
+      "name": "Legacy Owned?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1716,
+        -16
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "1f1c8bac-560b-5530-aa9b-e767f45a0222",
+              "leftValue": "={{ ((id) => typeof id === 'string' && /^[A-Za-z0-9]{8,36}$/.test(id) && ![\"0DP79STI3pafXO9B\", \"2htWSV5IHO8E2CgB\", \"2islisFH7jjLoPQM\", \"3qax5J9u2qsT9Vao\", \"4VN3gsFaC2HUYmcc\", \"4wYitz5ek30SVNlT\", \"9PTyYcelRQI7bGDb\", \"KoTuIlk4LMrlvnWI\", \"SCLcpn6DMDG3Z4VN\", \"TwWPW3gIyjZS3foR\", \"Uz6HBBUpAiUqVysB\", \"XuvOp7TxOImOAmlj\", \"ZGYr6srzS3rSSXHp\", \"ZTqpumOpL1rNDOp6\", \"crAuthSession001\", \"crHandoffDry0001\", \"crHandoffNtfy001\", \"crHandoffReq0001\", \"crHandoffsApi001\", \"crPriceSearch001\", \"crTestDialog0001\", \"crWappiProxy0001\", \"fXYpCXPKw92EzRz8\", \"hHwvfOvTCS42pXnq\", \"jtbssfzXbOxwTK4k\", \"lmjYsdNcQA2IE5rl\", \"olmqWMfcFpCEcpiE\"].includes(id))($json.own_id) }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "440940c5-7f32-517b-9a40-04f157b8814e",
+      "name": "Reuse?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1896,
+        -16
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=http://localhost:5678/api/v1/workflows/{{ $('Clone Plan').first().json.own_id }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 10000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "2ead7bdc-d904-56de-bbe8-c0bef95e8619",
+      "name": "Probe Bound Clone",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2076,
+        -296
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__HDR_CRED__",
+          "name": "n8n Admin API"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 1000
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "7caca76b-c051-58bd-95e5-16562552bb49",
+              "leftValue": "={{ ((r, id, pid) => Number(r.statusCode) === 200 && !!r.body && typeof r.body === 'object' && r.body.isArchived !== true && r.body.id === id && (Array.isArray(r.body.nodes) ? r.body.nodes : []).some((n) => !!n && n.name === 'Webhook' && !!n.parameters && n.parameters.path === pid))($json, $('Clone Plan').first().json.own_id, String($('Unity Webhook').first().json.body.WhatsappProfileId || '')) }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "8524a0d4-1545-5ed1-b368-696cde12bc41",
+      "name": "Bound Clone Usable?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2256,
+        -296
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "5316737b-76a6-58b0-a7d8-b190dec93182",
+              "leftValue": "={{ Number($json.statusCode) === 404 || (Number($json.statusCode) === 200 && !!$json.body && $json.body.isArchived === true) }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "438357a5-5a29-56bb-bfeb-adc327f455aa",
+      "name": "Bound Clone Gone?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2436,
+        -216
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "2f62ac68-e680-5248-b95d-97406f1b0d6f",
+              "name": "id",
+              "value": "={{ $('Clone Plan').first().json.own_id }}",
+              "type": "string"
+            },
+            {
+              "id": "c43b1459-eecc-5b90-ada3-89fa28b5baa5",
+              "name": "created",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "1ae46f43-4aca-54b0-a15a-f99c7922e39c",
+              "name": "active",
+              "value": "={{ !!$json.body && $json.body.active === true }}",
+              "type": "boolean"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "b8c80254-17f4-5b18-9a5e-0409991b0855",
+      "name": "Reused Clone Id",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2436,
+        -396
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "0029268b-e755-572d-a0d6-d3bf2d7ee9a9",
+              "name": "id",
+              "value": "={{ $json.id }}",
+              "type": "string"
+            },
+            {
+              "id": "782253f0-66ca-5eb9-8ada-d7b295b63ae3",
+              "name": "created",
+              "value": "={{ $json.created === true }}",
+              "type": "boolean"
+            },
+            {
+              "id": "29d1a04d-fd48-52de-bb5e-4da59b9f58ac",
+              "name": "active",
+              "value": "={{ $json.active === true }}",
+              "type": "boolean"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "26d9fbc2-d7e8-5463-b380-7863640faf58",
+      "name": "Clone Id",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2796,
+        -16
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "489978e8-892a-5ddf-9561-4ffcf2026d16",
+              "leftValue": "={{ Number($json.statusCode) === 200 }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "0c14e751-4e21-5a2e-becf-8778bfa70e4e",
+      "name": "Activated?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        3156,
+        -16
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "391f35f5-7b20-5ef6-bdae-70b5eb3489f4",
+              "leftValue": "={{ Number($json.statusCode) === 200 }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "47b299d2-4dba-5b74-b962-84082191662b",
+      "name": "Webhook Set?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        3516,
+        -16
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "567eaf87-c0ee-54b4-aea7-75a7b542d5f9",
+              "leftValue": "={{ Number($json.statusCode) === 200 }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "7331b0e3-dc22-5692-8a3c-0d45d9c88294",
+      "name": "Types Set?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        3876,
+        -16
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "515437c1-b5e5-5a3a-ad1e-60ce678285b0",
+              "leftValue": "={{ $json.bound === true && $json.workflow_id === $('Clone Id').first().json.id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "46c92187-e3f5-5cf1-8ccb-7ae102b49a10",
+      "name": "Bound?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        4236,
+        -16
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// CREATE / Replaced Items (generated by Tools/n8n/apply-clone-lifecycle.py, F1 + F2): one item per clone the bind\n// booked for deletion — Bind Workflow Id's retired_ids: the replaced predecessors' clones, the profile's own binding that\n// is gone or archived, a binding a concurrent Create overwrote — each well formed, never protected, never the clone just\n// bound; or ONE {none} item when there is nothing to delete (a node without items would end the run without an answer).\n// The clones are already in clone_retirements: a DELETE that fails here is the sweep's to finish.\nconst PROTECTED = [\"0DP79STI3pafXO9B\", \"2htWSV5IHO8E2CgB\", \"2islisFH7jjLoPQM\", \"3qax5J9u2qsT9Vao\", \"4VN3gsFaC2HUYmcc\", \"4wYitz5ek30SVNlT\", \"9PTyYcelRQI7bGDb\", \"KoTuIlk4LMrlvnWI\", \"SCLcpn6DMDG3Z4VN\", \"TwWPW3gIyjZS3foR\", \"Uz6HBBUpAiUqVysB\", \"XuvOp7TxOImOAmlj\", \"ZGYr6srzS3rSSXHp\", \"ZTqpumOpL1rNDOp6\", \"crAuthSession001\", \"crHandoffDry0001\", \"crHandoffNtfy001\", \"crHandoffReq0001\", \"crHandoffsApi001\", \"crPriceSearch001\", \"crTestDialog0001\", \"crWappiProxy0001\", \"fXYpCXPKw92EzRz8\", \"hHwvfOvTCS42pXnq\", \"jtbssfzXbOxwTK4k\", \"lmjYsdNcQA2IE5rl\", \"olmqWMfcFpCEcpiE\"];\nconst bound = String($('Clone Id').first().json.id || '');\nconst ids = $('Bind Workflow Id').first().json.retired_ids;\nconst todo = [...new Set((Array.isArray(ids) ? ids : []).filter((w) =>\n  typeof w === 'string' && /^[A-Za-z0-9]{8,36}$/.test(w) && !PROTECTED.includes(w) && w !== bound))];\nreturn todo.length ? todo.map((workflowId) => ({ json: { workflowId }, pairedItem: { item: 0 } }))\n                   : [{ json: { none: true }, pairedItem: { item: 0 } }];"
+      },
+      "id": "01cf8b54-ac1e-536e-a33d-7cf29f0e98a1",
+      "name": "Replaced Items",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4416,
+        -16
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "0803f4c1-fffd-5d24-b8b5-fdbc8c59542c",
+              "leftValue": "={{ typeof $json.workflowId === 'string' && $json.workflowId !== '' }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "470563b0-fe6a-5bc0-99a2-68891d86f338",
+      "name": "Has Replaced?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        4596,
+        -16
+      ]
+    },
+    {
+      "parameters": {
+        "method": "DELETE",
+        "url": "=http://localhost:5678/api/v1/workflows/{{ $json.workflowId }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 20000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "7ec45484-f04f-5cfc-8b36-e2822ba513b1",
+      "name": "Delete Replaced Clone",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        4776,
+        -156
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__HDR_CRED__",
+          "name": "n8n Admin API"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "88bee081-5526-53c1-a0e7-0dd1cdce2632",
+              "leftValue": "={{ ((c) => !!c && c.created === true && typeof c.id === 'string' && /^[A-Za-z0-9]{8,36}$/.test(c.id) && ![\"0DP79STI3pafXO9B\", \"2htWSV5IHO8E2CgB\", \"2islisFH7jjLoPQM\", \"3qax5J9u2qsT9Vao\", \"4VN3gsFaC2HUYmcc\", \"4wYitz5ek30SVNlT\", \"9PTyYcelRQI7bGDb\", \"KoTuIlk4LMrlvnWI\", \"SCLcpn6DMDG3Z4VN\", \"TwWPW3gIyjZS3foR\", \"Uz6HBBUpAiUqVysB\", \"XuvOp7TxOImOAmlj\", \"ZGYr6srzS3rSSXHp\", \"ZTqpumOpL1rNDOp6\", \"crAuthSession001\", \"crHandoffDry0001\", \"crHandoffNtfy001\", \"crHandoffReq0001\", \"crHandoffsApi001\", \"crPriceSearch001\", \"crTestDialog0001\", \"crWappiProxy0001\", \"fXYpCXPKw92EzRz8\", \"hHwvfOvTCS42pXnq\", \"jtbssfzXbOxwTK4k\", \"lmjYsdNcQA2IE5rl\", \"olmqWMfcFpCEcpiE\"].includes(c.id))($('Clone Id').first().json) }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "90b07cf9-89a8-599a-88d1-064f61635391",
+      "name": "Discard?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        4236,
+        324
+      ]
+    },
+    {
+      "parameters": {
+        "method": "DELETE",
+        "url": "=http://localhost:5678/api/v1/workflows/{{ $('Clone Id').first().json.id }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 20000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "7ab7e465-758f-5381-9ccb-00f6ba4663f1",
+      "name": "Discard New Clone",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        4416,
+        324
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__HDR_CRED__",
+          "name": "n8n Admin API"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 1000
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "f1461761-ee49-5728-adbd-161285089b7d",
+              "leftValue": "={{ [200, 404].includes(Number($json.statusCode)) }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "55550bf2-0d79-54d0-aa81-d89fa8cbe888",
+      "name": "Discarded?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        4596,
+        324
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- F1 (plan 2026-10-11 §1.4): the new clone of a failed Create could not be deleted (Discard New Clone answered\n-- neither 200 nor 404). Book it, so the sweep deletes it later. Never a malformed or protected id; idempotent.\n-- Parameters, in order: the clone id, the profile id, install id.\ninsert into clone_retirements (workflow_id, profile_id, owner_id, reason)\nselect $1, nullif($2, ''), nullif($3, ''), 'discard_failed'\nwhere $1 ~ '^[A-Za-z0-9]{8,36}$' and $1 not in ('0DP79STI3pafXO9B', '2htWSV5IHO8E2CgB', '2islisFH7jjLoPQM', '3qax5J9u2qsT9Vao', '4VN3gsFaC2HUYmcc', '4wYitz5ek30SVNlT', '9PTyYcelRQI7bGDb', 'KoTuIlk4LMrlvnWI', 'SCLcpn6DMDG3Z4VN', 'TwWPW3gIyjZS3foR', 'Uz6HBBUpAiUqVysB', 'XuvOp7TxOImOAmlj', 'ZGYr6srzS3rSSXHp', 'ZTqpumOpL1rNDOp6', 'crAuthSession001', 'crHandoffDry0001', 'crHandoffNtfy001', 'crHandoffReq0001', 'crHandoffsApi001', 'crPriceSearch001', 'crTestDialog0001', 'crWappiProxy0001', 'fXYpCXPKw92EzRz8', 'hHwvfOvTCS42pXnq', 'jtbssfzXbOxwTK4k', 'lmjYsdNcQA2IE5rl', 'olmqWMfcFpCEcpiE')\non conflict (workflow_id) do nothing\nreturning workflow_id;",
+        "options": {
+          "queryReplacement": "={{ [ String($('Clone Id').first().json.id || ''), String($('Unity Webhook').first().json.body.WhatsappProfileId || ''), String($('Auth Gate').first().json.crAuth.installId || '') ] }}"
+        }
+      },
+      "id": "ec17ddd9-a0b9-567a-bc33-5c5434c8a887",
+      "name": "Record Discard Failure",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        4776,
+        484
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "vvRrFiEXzLVqKjOx",
+          "name": "Postgres"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "80ac7467-ea70-5e3f-a7f5-4112fcefe7a3",
+              "name": "success",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "ebc259a6-f9b9-5094-ba3c-e344c324ce0e",
+              "name": "error",
+              "value": "clone_plan_unavailable",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "3ba9943f-0c63-5048-b830-b05101277844",
+      "name": "Respond Plan Unavailable",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1716,
+        404
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f2b43641-557f-5fcf-89e2-c127fccd19a4",
+              "name": "success",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "80cbf636-73d3-5a38-aaa2-bcd15ae4f501",
+              "name": "error",
+              "value": "profile_owned",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "d9af1c3d-a3d6-5c39-aef2-c058d5ed5b87",
+      "name": "Respond Profile Owned",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1896,
+        404
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "0b57a205-7906-5f3d-8b68-e649c12928f0",
+              "name": "success",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "41de50c7-a43f-5c8e-b6b5-9ba0ec4b3fa1",
+              "name": "error",
+              "value": "clone_unavailable",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "d06a64dc-b0fd-5390-b5c3-e410a5468e38",
+      "name": "Respond Clone Unavailable",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2616,
+        -216
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a1f7862e-747c-5e41-bfe5-ae5b37dbbe96",
+              "name": "success",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "1de93f04-3bda-53e3-92e7-d84840e897aa",
+              "name": "error",
+              "value": "create_failed",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "6d4d443d-2542-5d86-8119-07a2c7b423ef",
+      "name": "Respond Create Failed",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        4956,
+        324
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "dabf1310-9e04-5ef9-8bb1-87c246daeb70",
+              "leftValue": "={{ $json.created === false && $json.active === true }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "a30205e6-0689-5112-ab07-b4e367b1c22d",
+      "name": "Already Active?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2886,
+        -176
+      ]
     }
   ],
   "connections": {
@@ -787,7 +1582,7 @@
       "main": [
         [
           {
-            "node": "Set Wappi Webhook Types",
+            "node": "Webhook Set?",
             "type": "main",
             "index": 0
           }
@@ -798,7 +1593,7 @@
       "main": [
         [
           {
-            "node": "Set Wappi Webhook",
+            "node": "Activated?",
             "type": "main",
             "index": 0
           }
@@ -809,7 +1604,7 @@
       "main": [
         [
           {
-            "node": "Activate Created Workflow",
+            "node": "Clone Id",
             "type": "main",
             "index": 0
           }
@@ -820,18 +1615,7 @@
       "main": [
         [
           {
-            "node": "Restamp RAG Chunks",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Restamp RAG Chunks": {
-      "main": [
-        [
-          {
-            "node": "Bind Workflow Id",
+            "node": "Types Set?",
             "type": "main",
             "index": 0
           }
@@ -1017,7 +1801,7 @@
       "main": [
         [
           {
-            "node": "Send New Workflows Id",
+            "node": "Bound?",
             "type": "main",
             "index": 0
           }
@@ -1050,7 +1834,7 @@
       "main": [
         [
           {
-            "node": "Get Sample Workflow",
+            "node": "Clone Plan",
             "type": "main",
             "index": 0
           }
@@ -1058,6 +1842,328 @@
         [
           {
             "node": "Respond Reply Mode Not Saved",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clone Plan": {
+      "main": [
+        [
+          {
+            "node": "Plan Read?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Plan Read?": {
+      "main": [
+        [
+          {
+            "node": "Legacy Owned?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Plan Unavailable",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Legacy Owned?": {
+      "main": [
+        [
+          {
+            "node": "Respond Profile Owned",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Reuse?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reuse?": {
+      "main": [
+        [
+          {
+            "node": "Probe Bound Clone",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get Sample Workflow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Probe Bound Clone": {
+      "main": [
+        [
+          {
+            "node": "Bound Clone Usable?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Bound Clone Usable?": {
+      "main": [
+        [
+          {
+            "node": "Reused Clone Id",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Bound Clone Gone?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Bound Clone Gone?": {
+      "main": [
+        [
+          {
+            "node": "Get Sample Workflow",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Clone Unavailable",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reused Clone Id": {
+      "main": [
+        [
+          {
+            "node": "Clone Id",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clone Id": {
+      "main": [
+        [
+          {
+            "node": "Already Active?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Activated?": {
+      "main": [
+        [
+          {
+            "node": "Set Wappi Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Discard?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook Set?": {
+      "main": [
+        [
+          {
+            "node": "Set Wappi Webhook Types",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Discard?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Types Set?": {
+      "main": [
+        [
+          {
+            "node": "Bind Workflow Id",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Discard?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Bound?": {
+      "main": [
+        [
+          {
+            "node": "Replaced Items",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Discard?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Replaced Items": {
+      "main": [
+        [
+          {
+            "node": "Has Replaced?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Replaced?": {
+      "main": [
+        [
+          {
+            "node": "Delete Replaced Clone",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send New Workflows Id",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delete Replaced Clone": {
+      "main": [
+        [
+          {
+            "node": "Send New Workflows Id",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Discard?": {
+      "main": [
+        [
+          {
+            "node": "Discard New Clone",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Create Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Discard New Clone": {
+      "main": [
+        [
+          {
+            "node": "Discarded?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Discarded?": {
+      "main": [
+        [
+          {
+            "node": "Respond Create Failed",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Record Discard Failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Record Discard Failure": {
+      "main": [
+        [
+          {
+            "node": "Respond Create Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Already Active?": {
+      "main": [
+        [
+          {
+            "node": "Set Wappi Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Activate Created Workflow",
             "type": "main",
             "index": 0
           }

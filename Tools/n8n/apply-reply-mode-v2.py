@@ -42,6 +42,12 @@ Create WhatsApp/Telegram workflow:
     node is removed. Closing criterion: «a reply-mode seed failure never creates a clone» — a failure
     AFTER Create, and a re-authorisation that creates a second clone, are a separate finding (F1).
     Behaviour pinned by tests/test_create_seed.py; topology by verify-reply-mode.py.
+  * F1 + F2 (plan 2026-10-11 §1.4, T3): the clone chain now starts at `Clone Plan` (apply-clone-lifecycle.py owns it and
+    everything after it — the reuse/probe branch, Get Sample → Create, Clone Id → Activate → Wappi → Bind → Delete Replaced
+    / Discard). This file keeps the seed chain and the Seed Saved? edges: `Seed Saved?`[0] → Clone Plan is the ONLY way
+    into the plan, so `Create Workflow` and `Activate Created Workflow` stay reachable only through it (a reply-mode seed
+    failure still creates and activates nothing). The Activate URL and the Get Created Workflow Id → Activate edge it used
+    to write belong to apply-clone-lifecycle.py now (localhost + `n8n Admin API`, via Clone Id).
 
     python3 Tools/n8n/apply-reply-mode-v2.py            # patch in place (re-runnable)
     python3 Tools/n8n/apply-reply-mode-v2.py --check
@@ -181,7 +187,7 @@ SEED_GATE_EXPR = "={{ $json.seeded === true || String($('Unity Webhook').first()
 NOT_SAVED_ERROR = "reply_mode_not_saved"
 # R8-deletefail: the compensating DELETE of an unseeded clone — gone, since no clone exists before the seed.
 RETIRED_NODES = ("Delete Unseeded Workflow",)
-CLONE_CHAIN = "Get Sample Workflow"     # the first node of the clone chain (template read → Set Fields → Create)
+CLONE_CHAIN = "Clone Plan"     # the first node of the clone chain (apply-clone-lifecycle.py: plan → reuse | template → Create)
 
 
 def nid(*parts):
@@ -330,7 +336,8 @@ def patch_create(fname, profile_field):
     path = os.path.join(WF, fname)
     wf = json.load(open(path, encoding="utf-8"))
     changed = False
-    act = node(wf, "Activate Created Workflow")
+    if node(wf, CLONE_CHAIN) is None:
+        sys.exit(f"{fname}: {CLONE_CHAIN!r} missing — run Tools/n8n/apply-clone-lifecycle.py first (it owns the clone chain)")
     seats = seed_positions(node(wf, CLONE_CHAIN))
     params = "={{ [ $('Unity Webhook').first().json.body." + profile_field + ", String($('Unity Webhook').first().json.body.ReplyMode || ''), String($('Unity Webhook').first().json.body.ReplyModeVersion || '0') ] }}"
     seed = node(wf, "Seed Reply Mode")
@@ -349,8 +356,6 @@ def patch_create(fname, profile_field):
         if seed.get(k) != v:
             seed[k] = v
             changed = True
-    want_url = "=https://n8n.choosereply.com/api/v1/workflows/{{ $('Get Created Workflow Id').first().json.id }}/activate"
-    changed = set_param(act, "url", want_url, changed)
     for spec in seed_gate_nodes(fname, seats):
         changed = ensure_node(wf, spec) or changed
     changed = retire_nodes(wf, RETIRED_NODES) or changed
@@ -358,7 +363,6 @@ def patch_create(fname, profile_field):
     changed = route_entries_through_seed(wf) or changed
     changed = set_edges(wf, "Seed Reply Mode", ["Seed Saved?"]) or changed
     changed = set_edges(wf, "Seed Saved?", [CLONE_CHAIN, "Respond Reply Mode Not Saved"]) or changed
-    changed = set_edges(wf, "Get Created Workflow Id", ["Activate Created Workflow"]) or changed
     for name, seat in seats.items():
         n = node(wf, name)
         if n["position"] != seat:
@@ -383,14 +387,13 @@ def check():
         s = node(wf, "Seed Reply Mode")
         gate = node(wf, "Seed Saved?")
         topology = {src: [[c["node"] for c in out] for out in wf["connections"].get(src, {}).get("main", [])]
-                    for src in ("Seed Reply Mode", "Seed Saved?", "Get Created Workflow Id")}
+                    for src in ("Seed Reply Mode", "Seed Saved?")}
         into = lambda dst: sorted((src, i) for src, c in wf["connections"].items() for i, out in enumerate(c.get("main", []) or [])
                                   for e in (out or []) if e["node"] == dst)
         if s is None or s["parameters"]["query"] != SEED_SQL or any(s.get(k) != v for k, v in SEED_FLAGS.items()) \
                 or gate is None or gate["parameters"]["conditions"]["conditions"][0]["leftValue"] != SEED_GATE_EXPR \
                 or topology != {"Seed Reply Mode": [["Seed Saved?"]],
-                                "Seed Saved?": [[CLONE_CHAIN], ["Respond Reply Mode Not Saved"]],
-                                "Get Created Workflow Id": [["Activate Created Workflow"]]} \
+                                "Seed Saved?": [[CLONE_CHAIN], ["Respond Reply Mode Not Saved"]]} \
                 or into("Seed Reply Mode") != [("If Has AppUserID?", 1), ("Register Profile", 0)] \
                 or into(CLONE_CHAIN) != [("Seed Saved?", 0)] \
                 or any(node(wf, n) is not None or n in wf["connections"] for n in RETIRED_NODES):

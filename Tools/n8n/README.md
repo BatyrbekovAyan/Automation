@@ -94,7 +94,7 @@ prompt editing, RAG file upload/delete, and (in progress) live reply suggestions
   Staging: the sub-workflow reads the `documents` stub (`derive-staging.py isolate_supabase_readers`); `eval/run-eval.py`
   runs the ref's own Reconcile Prices in its simulated search (harness h5) — see CLAUDE.md «V9 price reconciliation».
   F1 + F2 «линия бота» (follow-ups 2026-10-11, plan `docs/audits/2026-10-09-followups/F1F2-plan.md`; T2 = the SQL core,
-  not wired into any workflow yet — T3 Create WA/TG, T5 the sweep's branch A + Delete Bot Files): `clone_lineage.py`
+  T3 = Create WA/TG wired by `apply-clone-lifecycle.py`, T5 the sweep's branch A + Delete Bot Files): `clone_lineage.py`
   holds every statement once — `Clone Plan` (reuse / refuse / replace / adopt, the predecessor proven in the DATABASE),
   `Bind Workflow Id` per channel (bind + move the predecessors' memory, history, outcomes, handoffs, reply ledger, chat
   state and chat flags, the replaced clones' chunks and file registry, mark superseded, book the replaced clones — every
@@ -103,6 +103,15 @@ prompt editing, RAG file upload/delete, and (in progress) live reply suggestions
   Files); `--check` runs verify-sql-comments over all of them. Migration M2 `sql/2026-10-11-bot-lineage.sql`
   (`bot_profiles.superseded_by/_at`, `clone_retirements`). Behaviour: `tests/test_clone_lineage_sql.py` (real staging
   Postgres; L-matrix WA+TG, C-races on two connections, `--head` runs the same matrix against the pre-F1 canon).
+  `apply-clone-lifecycle.py` (`--check`) writes the Create graph of plan §1.4 after the reply-mode seed gate: Clone Plan →
+  (foreign: profile_owned) → reuse the bound clone when the probe proves it serves the profile | template → Create →
+  Clone Id → Activate → Wappi webhook + types → Bind (positive `bound`) → delete the booked replaced clones; every «no»
+  after the clone exists discards a NEW clone (failed discard → `clone_retirements`), every refusal answers
+  `{success:false, error}` without an id, success `{id, created, adoptedProfiles}`; n8n API calls on localhost with the
+  `n8n Admin API` placeholder credential. It owns those nodes; `apply-reply-mode-v2.py` keeps the seed chain
+  (CLONE_CHAIN = Clone Plan), `apply-auth-gate.py` only the gate. Behaviour: `tests/test_create_clone.py` (the canonical
+  graph through `tests/create_seed_chain.js` in BRIDGE mode — real SQL on temp tables + a fake n8n/Wappi; the books of
+  clones, the answer contract, F2 R1/R4/R9; `--head` = the pre-F1 graph, `--verbose` = traces).
   `$execution.id` as correlationId). `verify-message-batching.py` / `verify-telegram-parity.py` pin the
   stamp's wiring and the winner → billing-gate → Input type path (their pre-2026-09 expectations were
   stale and failed every run).

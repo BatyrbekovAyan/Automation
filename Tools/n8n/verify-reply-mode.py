@@ -11,9 +11,12 @@ Pins:
     `ReplyMode`, version-guarded, and answers a positive `seeded` marker; `Seed Saved?` gates on it. R8-deletefail
     (iteration 2026-09-28): the gate stands BEFORE the clone exists — the seed's only predecessors are the two
     entries into the clone chain (`Register Profile`[0], `If Has AppUserID?`[1]), `Seed Saved?`[0] is the ONLY way
-    into `Get Sample Workflow`, and with that one edge cut `Create Workflow` is unreachable from `Unity Webhook`; the
-    false branch answers reply_mode_not_saved directly (nothing to delete: no compensating `Delete Unseeded Workflow`,
-    whose own failure orphaned the clone). Activate resolves the id by node name (behaviour: tests/test_create_seed.py).
+    into the clone chain, and with that one edge cut neither `Create Workflow` nor `Activate Created Workflow` is
+    reachable from `Unity Webhook`; the false branch answers reply_mode_not_saved directly (nothing to delete: no
+    compensating `Delete Unseeded Workflow`, whose own failure orphaned the clone). F1 + F2 (T3, 2026-10-11): the chain
+    starts at `Clone Plan` (apply-clone-lifecycle.py) — the plan may REUSE the bound clone, so Activate is guarded as
+    well as Create; Activate resolves the id through `Clone Id` (behaviour: tests/test_create_seed.py,
+    tests/test_create_clone.py).
   * Bot templates: Read Reply Mode's coalesce(absence → false) is UNCHANGED (locked semantics).
 
     python3 Tools/n8n/verify-reply-mode.py [--dir DIR]
@@ -107,6 +110,7 @@ def check_resume_side_effects(q, f="Set Reply Mode"):
 
 
 ENTRIES_INTO_CLONE_CHAIN = {("If Has AppUserID?", 1), ("Register Profile", 0)}   # legacy (no AppUserID) / slot-allowed
+CLONE_CHAIN = "Clone Plan"     # F1 + F2 (T3): the first node of the clone chain (apply-clone-lifecycle.py)
 
 
 def predecessors(wf, dst):
@@ -152,15 +156,20 @@ def check_create(f, field, wf=None):
     assert predecessors(wf, "Seed Reply Mode") == ENTRIES_INTO_CLONE_CHAIN, \
         f"{f}: the seed must be entered from exactly {sorted(ENTRIES_INTO_CLONE_CHAIN)} — an entry wired past it skips the '*' row " \
         f"(«Авто» silently unseeded): {sorted(predecessors(wf, 'Seed Reply Mode'))}"
-    assert edge(wf, "Seed Saved?", 0) == [{"node": "Get Sample Workflow", "type": "main", "index": 0}], \
-        f"{f}: the clone chain (template read → Create) must start only AFTER the saved marker (R8-deletefail)"
-    assert predecessors(wf, "Get Sample Workflow") == {("Seed Saved?", 0)}, \
-        f"{f}: Seed Saved?[0] must be the ONLY way into Get Sample Workflow: {sorted(predecessors(wf, 'Get Sample Workflow'))}"
-    assert "Create Workflow" in reachable(wf, "Unity Webhook") \
-        and "Create Workflow" not in reachable(wf, "Unity Webhook", cut={("Seed Saved?", 0)}), \
-        f"{f}: Create Workflow must be reachable from Unity Webhook ONLY through Seed Saved?[0] (R8-deletefail)"
-    assert edge(wf, "Get Created Workflow Id") == [{"node": "Activate Created Workflow", "type": "main", "index": 0}], \
-        f"{f}: the created clone goes straight to activation (the seed already ran)"
+    assert edge(wf, "Seed Saved?", 0) == [{"node": CLONE_CHAIN, "type": "main", "index": 0}], \
+        f"{f}: the clone chain (Clone Plan → reuse | template read → Create) must start only AFTER the saved marker (R8-deletefail)"
+    assert predecessors(wf, CLONE_CHAIN) == {("Seed Saved?", 0)}, \
+        f"{f}: Seed Saved?[0] must be the ONLY way into {CLONE_CHAIN}: {sorted(predecessors(wf, CLONE_CHAIN))}"
+    for target in ("Create Workflow", "Activate Created Workflow"):
+        assert target in reachable(wf, "Unity Webhook") \
+            and target not in reachable(wf, "Unity Webhook", cut={("Seed Saved?", 0)}), \
+            f"{f}: {target} must be reachable from Unity Webhook ONLY through Seed Saved?[0] (R8-deletefail; F1: the plan " \
+            f"may reuse the bound clone, so its activation is guarded too)"
+    assert predecessors(wf, "Get Sample Workflow") <= {("Reuse?", 1), ("Bound Clone Gone?", 0)}, \
+        f"{f}: only the plan's create branches may read the template: {sorted(predecessors(wf, 'Get Sample Workflow'))}"
+    assert edge(wf, "Clone Id") == [{"node": "Already Active?", "type": "main", "index": 0}] \
+        and edge(wf, "Already Active?", 1) == [{"node": "Activate Created Workflow", "type": "main", "index": 0}], \
+        f"{f}: the clone (created, or reused and not yet serving) goes straight to activation (the seed already ran)"
     assert not any(n["name"] == "Delete Unseeded Workflow" for n in wf["nodes"]) and "Delete Unseeded Workflow" not in wf["connections"], \
         f"{f}: no compensating DELETE may remain — a refused create has no clone to delete (R8-deletefail)"
     assert edge(wf, "Seed Saved?", 1) == [{"node": "Respond Reply Mode Not Saved", "type": "main", "index": 0}], \
@@ -169,7 +178,7 @@ def check_create(f, field, wf=None):
     body = {a["name"]: a["value"] for a in node(wf, "Respond Reply Mode Not Saved")["parameters"]["assignments"]["assignments"]}
     assert body == {"success": False, "error": "reply_mode_not_saved"}, f"{f}: refusal body must carry no id: {body}"
     act = node(wf, "Activate Created Workflow")["parameters"]["url"]
-    assert "$('Get Created Workflow Id').first().json.id" in act, f"{f}: Activate must resolve the id by node name"
+    assert "$('Clone Id').first().json.id" in act, f"{f}: Activate must resolve the id by node name (Clone Id)"
     print(f"OK  {f} (initial reply mode seeded before the clone exists; a clone only on the saved marker)")
 
 

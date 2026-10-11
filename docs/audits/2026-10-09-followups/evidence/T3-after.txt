@@ -1,0 +1,648 @@
+# T3 after — 2026-10-12 01:17 +0500, base HEAD 5ac9b2f9 + the T3 working tree (generator apply-clone-lifecycle.py, canon Create WA/TG)
+
+## 1. python3 Tools/n8n/tests/test_create_clone.py   (the same 70 cases that fail on the pre-F1 graph, T3-before)
+
+PASS T3 [WA] session: fresh (wizard, a new bot) [canon]
+PASS T3 [WA] session: reuse: the bound clone, inactive (channel saved off / session over): activated [canon]
+PASS T3 [WA] session: reuse: the bound clone, active (toggle off→on without saving): not activated again [canon]
+PASS T3 [WA] session: the bound clone is gone (404): a new clone takes its price lists, the old id is booked [canon]
+PASS T3 [WA] session: the bound clone is archived: a new clone, the archived one deleted [canon]
+PASS T3 [WA] session: the probe answers 500: nothing is created (clone_unavailable) [canon]
+PASS T3 [WA] session: the probe cannot reach n8n: nothing is created (clone_unavailable) [canon]
+PASS T3 [WA] session: (а3) a new profile of the same bot: the old clone replaced, its data moved, DELETE ok [canon]
+PASS T3 [WA] session: (а3) … and the replaced clone's DELETE fails: it stays booked for the sweep [canon]
+PASS T3 [WA] session: (б) Activate cannot reach n8n: the new clone is discarded (create_failed) [canon]
+PASS T3 [WA] session: (б) Activate refused: an orphan holds the webhook path: the new clone is discarded (create_failed) [canon]
+PASS T3 [WA] session: (б) Activate answers 500: the new clone is discarded (create_failed) [canon]
+PASS T3 [WA] session: (б) the Wappi webhook answers 502: the new clone is discarded (create_failed) [canon]
+PASS T3 [WA] session: (б) the Wappi webhook types time out: the new clone is discarded (create_failed) [canon]
+PASS T3 [WA] session: (б) Bind Workflow Id: a query error ×3: the new clone is discarded (create_failed) [canon]
+PASS T3 [WA] session: (б) Bind Workflow Id: an error thrown outside the query ×3: the new clone is discarded (create_failed) [canon]
+PASS T3 [WA] session: (б) Bind Workflow Id: no items: the new clone is discarded (create_failed) [canon]
+PASS T3 [WA] session: (б) Bind Workflow Id: bound = false (a concurrent Create won): the new clone is discarded (create_failed) [canon]
+PASS T3 [WA] session: (б) Activate fails AND the discard answers 500: the new clone is journaled for the sweep [canon]
+PASS T3 [WA] session: (б) Activate fails, the discard AND the journal fail: the ONE named residual (Tier 2) [canon]
+PASS T3 [WA] session: Clone Plan: a query error ×3: nothing is created (clone_plan_unavailable) [canon]
+PASS T3 [WA] session: Clone Plan: an error thrown outside the query ×3: nothing is created (clone_plan_unavailable) [canon]
+PASS T3 [WA] session: Clone Plan: no items: nothing is created (clone_plan_unavailable) [canon]
+PASS T3 [WA] session: F2 R1: life → sweep (trial over) → purchase → reconnect with PreviousProfileId: everything under the new connection, the prior clone deleted [canon]
+PASS T3 [WA] session: F2 R4: the same pair again (the answer was lost): the bound clone is reused, nothing moves twice [canon]
+PASS T3 [WA] session: F2 R9: a two-channel bot reconnects this channel with the other id moved away (-1): only this channel moves [canon]
+PASS T3 [WA] session: F2 R9: this channel joins a bot of the other channel (the pre-F1 -1 rule still holds) [canon]
+PASS T3 [WA] session: negative: another install's bot with the same bot key is never touched [canon]
+PASS T3 [WA] session: negative: a wizard Create (a NEW bot in a reused slot) never adopts, even naming the old profile [canon]
+PASS T3 [WA] legacy: negative: a legacy Create on a profile an install owns is refused (profile_owned), nothing created [canon]
+PASS T3 [WA] legacy: legacy: fresh [canon]
+PASS T3 [WA] legacy: legacy: reuse an owner-less binding [canon]
+PASS T3 [WA] legacy: legacy: the owner-less binding is gone (404): a new clone, the old id booked [canon]
+PASS T3 [WA] legacy: legacy: Activate fails: the new clone is discarded [canon]
+PASS T3 [WA] legacy: legacy: a second profile of an owner-less bot replaces nothing (no proof): the old clone stays bound [canon]
+PASS T3 [TG] session: fresh (wizard, a new bot) [canon]
+PASS T3 [TG] session: reuse: the bound clone, inactive (channel saved off / session over): activated [canon]
+PASS T3 [TG] session: reuse: the bound clone, active (toggle off→on without saving): not activated again [canon]
+PASS T3 [TG] session: the bound clone is gone (404): a new clone takes its price lists, the old id is booked [canon]
+PASS T3 [TG] session: the bound clone is archived: a new clone, the archived one deleted [canon]
+PASS T3 [TG] session: the probe answers 500: nothing is created (clone_unavailable) [canon]
+PASS T3 [TG] session: the probe cannot reach n8n: nothing is created (clone_unavailable) [canon]
+PASS T3 [TG] session: (а3) a new profile of the same bot: the old clone replaced, its data moved, DELETE ok [canon]
+PASS T3 [TG] session: (а3) … and the replaced clone's DELETE fails: it stays booked for the sweep [canon]
+PASS T3 [TG] session: (б) Activate cannot reach n8n: the new clone is discarded (create_failed) [canon]
+PASS T3 [TG] session: (б) Activate refused: an orphan holds the webhook path: the new clone is discarded (create_failed) [canon]
+PASS T3 [TG] session: (б) Activate answers 500: the new clone is discarded (create_failed) [canon]
+PASS T3 [TG] session: (б) the Wappi webhook answers 502: the new clone is discarded (create_failed) [canon]
+PASS T3 [TG] session: (б) the Wappi webhook types time out: the new clone is discarded (create_failed) [canon]
+PASS T3 [TG] session: (б) Bind Workflow Id: a query error ×3: the new clone is discarded (create_failed) [canon]
+PASS T3 [TG] session: (б) Bind Workflow Id: an error thrown outside the query ×3: the new clone is discarded (create_failed) [canon]
+PASS T3 [TG] session: (б) Bind Workflow Id: no items: the new clone is discarded (create_failed) [canon]
+PASS T3 [TG] session: (б) Bind Workflow Id: bound = false (a concurrent Create won): the new clone is discarded (create_failed) [canon]
+PASS T3 [TG] session: (б) Activate fails AND the discard answers 500: the new clone is journaled for the sweep [canon]
+PASS T3 [TG] session: (б) Activate fails, the discard AND the journal fail: the ONE named residual (Tier 2) [canon]
+PASS T3 [TG] session: Clone Plan: a query error ×3: nothing is created (clone_plan_unavailable) [canon]
+PASS T3 [TG] session: Clone Plan: an error thrown outside the query ×3: nothing is created (clone_plan_unavailable) [canon]
+PASS T3 [TG] session: Clone Plan: no items: nothing is created (clone_plan_unavailable) [canon]
+PASS T3 [TG] session: F2 R1: life → sweep (trial over) → purchase → reconnect with PreviousProfileId: everything under the new connection, the prior clone deleted [canon]
+PASS T3 [TG] session: F2 R4: the same pair again (the answer was lost): the bound clone is reused, nothing moves twice [canon]
+PASS T3 [TG] session: F2 R9: a two-channel bot reconnects this channel with the other id moved away (-1): only this channel moves [canon]
+PASS T3 [TG] session: F2 R9: this channel joins a bot of the other channel (the pre-F1 -1 rule still holds) [canon]
+PASS T3 [TG] session: negative: another install's bot with the same bot key is never touched [canon]
+PASS T3 [TG] session: negative: a wizard Create (a NEW bot in a reused slot) never adopts, even naming the old profile [canon]
+PASS T3 [TG] legacy: negative: a legacy Create on a profile an install owns is refused (profile_owned), nothing created [canon]
+PASS T3 [TG] legacy: legacy: fresh [canon]
+PASS T3 [TG] legacy: legacy: reuse an owner-less binding [canon]
+PASS T3 [TG] legacy: legacy: the owner-less binding is gone (404): a new clone, the old id booked [canon]
+PASS T3 [TG] legacy: legacy: Activate fails: the new clone is discarded [canon]
+PASS T3 [TG] legacy: legacy: a second profile of an owner-less bot replaces nothing (no proof): the old clone stays bound [canon]
+
+70 pass, 0 fail
+exit=0
+
+## 2. python3 Tools/n8n/tests/test_create_seed.py   (R8 / R8-deletefail on the new chain: Clone Plan + Bind answered, E pins Activate too)
+
+PASS R8 F: concurrent drives of the WA and TG graphs each run their own graph (no shared temp file)
+
+53 pass, 0 fail
+exit=0
+
+## 3. Generators (canonical Create WA/TG written ONLY by them)
+
+$ python3 apply-clone-lifecycle.py   (first run on the HEAD canon: patched both; then apply-auth-gate / apply-reply-mode-v2 / apply-slot-count-fix / apply-history-handoff / inject-prompts)
+$ python3 apply-clone-lifecycle.py  (second run)
+up to date  XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json
+up to date  Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json
+$ python3 apply-auth-gate.py  (second run)
+up to date  SCLcpn6DMDG3Z4VN-Set_Reply_Mode.json
+up to date  XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json
+up to date  Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json
+$ python3 apply-reply-mode-v2.py  (second run)
+up to date  SCLcpn6DMDG3Z4VN-Set_Reply_Mode.json
+up to date  XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json
+up to date  Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json
+$ python3 apply-slot-count-fix.py  (second run)
+up-to-date  XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json
+up-to-date  Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json
+$ python3 apply-history-handoff.py  (second run)
+up to date  XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json
+up to date  Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json
+XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json: kind=create up-to-date
+Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json: kind=create up-to-date
+second run of every Create generator: byte-identical (no diff)
+
+apply-auth-gate.py --check rc=0
+apply-clone-lifecycle.py --check rc=0
+apply-history-handoff.py --check rc=0
+apply-outcome-stamps.py --check rc=0
+apply-reply-mode-v2.py --check rc=0
+apply-reply-pipeline-v2.py --check rc=0
+apply-slot-count-fix.py --check rc=0
+apply-suggest-v2.py --check rc=0
+apply-sweep-clone-deactivate.py --check rc=0
+build-auth-workflows.py --check rc=0
+build-handoff-workflows.py --check rc=0
+build-price-search.py --check rc=0
+build-test-dialog.py --check rc=0
+inject-panel-prompts.py --check rc=0
+clone_lineage.py --check rc=0
+inject-prompts.py --check (tiktoken venv) rc=0
+apply-delete-history.py --check rc=1 (RETIRED by design, exits 1)
+
+## 4. Verifiers
+
+verify-auth-gate.py rc=0 — ALL AUTH GATE ASSERTS PASSED
+verify-history-handoff.py rc=0 — ALL HISTORY/HANDOFF ASSERTS PASSED
+verify-message-batching.py rc=0 — ALL BATCHING ASSERTS PASSED
+verify-reply-mode.py rc=0 — ALL REPLY MODE ASSERTS PASSED
+verify-reply-pipeline.py rc=0 — ALL REPLY PIPELINE ASSERTS PASSED
+verify-telegram-parity.py rc=0 — ALL PARITY ASSERTS PASSED
+verify-sql-comments.py rc=0 — OK  85 Postgres node(s) in 28 workflow file(s): no placeholder outside code, no {{ }}, no modifier, no leading =
+SELF-TEST PASSED: 33/33 cases
+verify-panel-prompts.js rc=0
+verify_rag.py all rc=0
+
+## 5. Staging (n8n 2.36.7 + Wappi mock + staging Postgres; nothing else)
+
+$ python3 Tools/n8n/staging/bootstrap.py --bot wa:stgwa001 --bot tg:stgtg001   → imported 28 workflows + 2 staging bots; published 28
+  (the new Create WA/TG were accepted and PUBLISHED by the real n8n: the n8n Admin API placeholder remapped by name)
+$ python3 Tools/n8n/verify-deployed.py --base http://localhost:5678   → exit 0
+base http://localhost:5678: canonical 27 (diff 0), clones 2 (behind template 0, of them prompt head behind 0; custom prompts 2, not counted), archived clones 0 (not counted), other 2
+  prompt map = Create/Edit Vertical Prompt as introduced in d7796c32 (sha256 c89accf86308)
+  OK      Uz6HBBUpAiUqVysB Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json  active=True names=True graph=True published=True
+  OK      XuvOp7TxOImOAmlj XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json  active=True names=True graph=True published=True
+  clone   stgtg40da979c774 'STAGING TG stgtg001' [telegram] active=True nodes=60 graph=898aeda200bb published=898aeda200bb sticky=None AT-CANONICAL  prompt=custom (custom prompt — kept verbatim by update-clones, not counted: no Create/Edit grammar (Business Type line + Additional Instructions marker))
+  clone   stgwab77f282533c 'STAGING WA stgwa001' [whatsapp] active=True nodes=60 graph=d850bc30efb0 published=d850bc30efb0 sticky=None AT-CANONICAL  prompt=custom (custom prompt — kept verbatim by update-clones, not counted: no Create/Edit grammar (Business Type line + Additional Instructions marker))
+
+$ python3 Tools/n8n/staging/e2e-auth.py   (no model calls; its Create scenarios run the NEW graph end to end on the real n8n)
+PASS  session_bootstrap_and_refresh (0.4s) — bootstrap mints an install; refresh with the secret returns a token; a wrong secret is 401
+PASS  session_bad_request_is_400 (0.2s) — a malformed AuthSession body answers 400, never a token
+PASS  proxy_requires_token (0.3s) — WappiProxy without / with a forged / with an expired token → 401 and NO transport call
+PASS  proxy_profile_add_binds_owner (1.1s) — profile.add creates the Wappi profile, binds it to the install and returns a token carrying it
+PASS  proxy_owner_isolation (1.2s) — owner B cannot read/act on owner A's profile through ANY proxy op (403, no transport call)
+PASS  proxy_legit_ops_pass_through (0.6s) — the owner's own ops reach the transport with the server credential and get Wappi's body back
+PASS  proxy_unknown_op_rejected (0.2s) — an op outside the allow-list is refused without a transport call
+PASS  hooks_reject_foreign_ids (1.2s) — gated webhooks refuse owner B's ids on owner A's token (and refuse no token) before any side effect
+PASS  claim_by_code_transfers_ownership (0.8s) — a legacy/other-install profile: claim.start sends a code to the bot's OWN chat; claim.verify binds it to the claiming install
+PASS  claim_reauth_then_code_binds (2.2s) — V2: an UNAUTHORISED legacy profile: claim.start → reauth; a pairing alone binds NOTHING (claim.status); claim.start then sends ONE code into the paired 
+PASS  claim_reauth_independent_reconnect_not_transferred (5.6s) — V2: the claimant requests a QR, the OWNER reconnects the owner-less profile independently → the claimant gets nothing (claim.statu
+PASS  claim_code_send_failure_is_reported (2.2s) — V2: a code the transport refuses is reported (502 code_send_failed) and cleared — the retry sends a NEW code (never «reused») and that code bin
+PASS  claim_reauth_owned_profile_not_transferred (2.8s) — R1: a stranger's pending claim on an OWNED profile + the owner's own later re-pairing → the stranger gets nothing, claim.status sends no c
+PASS  claim_stale_capability_cannot_pair (1.3s) — R1: once another install takes over a pending claim, the first claimant's token capability no longer starts a pairing (403 claim_not_pending, no tra
+PASS  claim_unauthenticated_writes_nothing (1.1s) — R1: a claim.* call with a wrong secret is refused (401) before Claim Start — no row inserted, a pending claim untouched
+PASS  replymode_reordered_versions_keep_newest (0.7s) — SetReplyMode v2: a later request with an OLDER version is not applied; the reply reports the server's newer value
+PASS  replymode_bot_default_covers_both_channels_atomically (0.7s) — SetReplyMode v2: a bot-default write for WA+TG travels as ONE request and both rows land (all-or-nothing); a stale follow-up for 
+PASS  replymode_legacy_body_still_writes (0.2s) — SetReplyMode v2: a legacy body (no version) is applied with a server-assigned version and reads success + written
+PASS  replymode_invalid_is_400 (0.0s) — SetReplyMode v2: a malformed body answers 400 (was 200 + success:false)
+PASS  create_seeds_reply_mode_before_activation (2.7s) — CreateWhatsappWorkflow with ReplyMode=semi: the '*' row exists after create, the clone id is bound to the profile, the token learns it, and S
+PASS  create_slot_count_excludes_own_profile_and_retires_refused (1.7s) — 2026-09-24 hotfix: on a 1-channel plan the FIRST channel is accepted (the A1-registered row of the profile being created is 
+PASS  refresh_db_outage_keeps_install (0.5s) — R11: a refresh while the database fails answers 503 db_unavailable (never the 401 that makes the client discard its install); the SAME credentials refr
+PASS  billing_id_first_bind (3.0s) — R2/V3: a second install naming a billing id another install holds — WITH a live bot or WITHOUT one (a paying owner before the first bot) — gets NO billing id
+PASS  create_rejects_empty_appuserid_in_session (0.8s) — R2: CreateWhatsappWorkflow/CreateTelegramWorkflow with an EMPTY AppUserID in session mode are refused before any write (the empty id skipped 
+PASS  create_seed_failure_keeps_clone_inactive (8.5s) — R8 + R8-deletefail: a «Вместе» create whose reply-mode seed fails (a real Postgres failure on staging, scoped to this profile) answers
+PASS  sql_comment_values_run_nothing (3.4s) — V1: a value whose newline would end an SQL comment stays a literal on the real n8n Postgres node — Delete File (session token and token-less), Suggest
+PASS  upload_price_list_multipart (4.6s) — R3: a real .txt price list sent the way WWWForm sends it passes the gate with its file, is registered FIRST, reaches extraction (a staging `documents` row 
+PASS  retired_bot_owner_can_delete (3.6s) — V12: the owner of a bot the sweep retired (trial over: its rows deleted, its token lists nothing) deletes its memory, history and files (200, real counter
+PASS  claim_on_retired_profile_is_refused (3.5s) — M4: claim.start / claim.status / claim.verify on a bot profile the sweep retired (trial over) → 410 profile_retired, retiredReason for its owner 
+PASS  stale_token_cannot_unlink_a_claimed_profile (3.2s) — V12 / M5: a token issued while install A owned a profile still lists it after install B took the profile over — A's profile.delete / prof
+PASS  sweep_deactivates_retired_clone (4.3s) — V12: the sweep's clone branch (the derived canonical nodes, run on the real n8n) deactivates the clone of a bot IT retired (trial_expiry), stamps it an
+31 pass, 0 fail
+  Real execution data of a successful Create (staging SQLite, execution_data): Send New Workflows Id = {id, created:true, adoptedProfiles:[…]}
+
+## 6. python3 Tools/n8n/tests/run_all.py   (T3 state)
+
+OK   test_auth_refresh.py: 12 pass, 0 fail
+OK   test_billing_identity.py: 24 pass, 0 fail
+OK   test_claim.py: 19 pass, 0 fail
+OK   test_clone_lineage_sql.py: 50 pass, 0 fail
+OK   test_create_clone.py: 70 pass, 0 fail
+OK   test_create_seed.py: 53 pass, 0 fail
+OK   test_deploy_canonical.py: 20 pass, 0 fail
+OK   test_handoff_notifier.py: 14 pass, 0 fail
+OK   test_harness_selfcheck.py: 2 pass, 0 fail
+OK   test_legacy_generators.py: 5 pass, 0 fail
+OK   test_price_search.py: 36 pass, 0 fail
+OK   test_reply_lost_send.py: 5 pass, 0 fail
+OK   test_reply_memory.py: 44 pass, 0 fail
+OK   test_reply_memory_concurrent.py: 9 pass, 0 fail
+OK   test_reply_mode.py: 43 pass, 0 fail
+OK   test_reply_order.py: 44 pass, 0 fail
+OK   test_reply_reconcile.py: 66 pass, 0 fail
+OK   test_retired_delete.py: 13 pass, 0 fail
+OK   test_sql_comment_injection.py: 36 pass, 0 fail
+OK   test_suggest_catalog.py: 24 pass, 0 fail
+OK   test_suggest_lang.py: 11 pass, 0 fail
+OK   test_suggest_price.py: 16 pass, 0 fail
+OK   test_suggest_query.py: 37 pass, 0 fail
+OK   test_test_dialog.py: 17 pass, 0 fail
+OK   test_upload.py: 45 pass, 0 fail
+OK   test_verify_deployed.py: 48 pass, 0 fail
+OK   test_verify_parity.py: 38 pass, 0 fail
+OK   test_verify_sql_comments.py: 53 pass, 0 fail
+exit=0
+
+## 7. Traces: python3 Tools/n8n/tests/test_create_clone.py --verbose (every run: node trace, n8n/Wappi calls with statuses, clones created / deleted / left, clone_retirements)
+
+--- WA session: fresh (wizard, a new bot) (run 1)
+    trace: Retire Same Bot Slot -> Register Profile -> Seed Reply Mode -> Seed Saved? -> Clone Plan -> Plan Read? -> Legacy Owned? -> Reuse? -> Get Sample Workflow -> Set Fields -> Create Workflow -> Get Created Workflow Id -> Clone Id -> Already Active? -> Activate Created Workflow -> Activated? -> Set Wappi Webhook -> Webhook Set? -> Set Wappi Webhook Types -> Types Set? -> Bind Workflow Id -> Bound? -> Replaced Items -> Has Replaced? -> Send New Workflows Id
+    answer: {'id': 'WAnew10000000000', 'created': True, 'adoptedProfiles': []} stopped: None
+    n8n/Wappi calls: [('Get Sample Workflow', 'GET', 200), ('Create Workflow', 'POST', 200), ('Activate Created Workflow', 'POST', 200), ('Set Wappi Webhook', 'POST', 200), ('Set Wappi Webhook Types', 'POST', 200)]
+    created ['WAnew10000000000'] deleted [] left ['WAnew10000000000']
+    clone_retirements: []
+--- WA session: reuse: the bound clone, inactive (channel saved off / session over): activated (run 1)
+    trace: Retire Same Bot Slot -> Register Profile -> Seed Reply Mode -> Seed Saved? -> Clone Plan -> Plan Read? -> Legacy Owned? -> Reuse? -> Probe Bound Clone -> Bound Clone Usable? -> Reused Clone Id -> Clone Id -> Already Active? -> Activate Created Workflow -> Activated? -> Set Wappi Webhook -> Webhook Set? -> Set Wappi Webhook Types -> Types Set? -> Bind Workflow Id -> Bound? -> Replaced Items -> Has Replaced? -> Send New Workflows Id
+    answer: {'id': 'WAold00000000000', 'created': False, 'adoptedProfiles': []} stopped: None
+    n8n/Wappi calls: [('Probe Bound Clone', 'GET', 200), ('Activate Created Workflow', 'POST', 200), ('Set Wappi Webhook', 'POST', 200), ('Set Wappi Webhook Types', 'POST', 200)]
+    created [] deleted [] left ['WAold00000000000']
+    clone_retirements: []
+--- WA session: reuse: the bound clone, active (toggle off→on without saving): not activated again (run 1)
+    trace: Retire Same Bot Slot -> Register Profile -> Seed Reply Mode -> Seed Saved? -> Clone Plan -> Plan Read? -> Legacy Owned? -> Reuse? -> Probe Bound Clone -> Bound Clone Usable? -> Reused Clone Id -> Clone Id -> Already Active? -> Set Wappi Webhook -> Webhook Set? -> Set Wappi Webhook Types -> Types Set? -> Bind Workflow Id -> Bound? -> Replaced Items -> Has Replaced? -> Send New Workflows Id
+    answer: {'id': 'WAold00000000000', 'created': False, 'adoptedProfiles': []} stopped: None
+    n8n/Wappi calls: [('Probe Bound Clone', 'GET', 200), ('Set Wappi Webhook', 'POST', 200), ('Set Wappi Webhook Types', 'POST', 200)]
+    created [] deleted [] left ['WAold00000000000']
+    clone_retirements: []
+--- WA session: the bound clone is gone (404): a new clone takes its price lists, the old id is booked (run 1)
+    trace: Retire Same Bot Slot -> Register Profile -> Seed Reply Mode -> Seed Saved? -> Clone Plan -> Plan Read? -> Legacy Owned? -> Reuse? -> Probe Bound Clone -> Bound Clone Usable? -> Bound Clone Gone? -> Get Sample Workflow -> Set Fields -> Create Workflow -> Get Created Workflow Id -> Clone Id -> Already Active? -> Activate Created Workflow -> Activated? -> Set Wappi Webhook -> Webhook Set? -> Set Wappi Webhook Types -> Types Set? -> Bind Workflow Id -> Bound? -> Replaced Items -> Has Replaced? -> Delete Replaced Clone -> Send New Workflows Id
+    answer: {'id': 'WAnew10000000000', 'created': True, 'adoptedProfiles': []} stopped: None
+    n8n/Wappi calls: [('Probe Bound Clone', 'GET', 404), ('Get Sample Workflow', 'GET', 200), ('Create Workflow', 'POST', 200), ('Activate Created Workflow', 'POST', 200), ('Set Wappi Webhook', 'POST', 200), ('Set Wappi Webhook Types', 'POST', 200), ('Delete Replaced Clone', 'DELETE', 404)]
+    created ['WAnew10000000000'] deleted [] left ['WAnew10000000000']
+    clone_retirements: [{'workflow_id': 'WAold00000000000', 'reason': 'replaced', 'replaced_by': 'WAnew10000000000'}]
+--- WA session: the bound clone is archived: a new clone, the archived one deleted (run 1)
+    trace: Retire Same Bot Slot -> Register Profile -> Seed Reply Mode -> Seed Saved? -> Clone Plan -> Plan Read? -> Legacy Owned? -> Reuse? -> Probe Bound Clone -> Bound Clone Usable? -> Bound Clone Gone? -> Get Sample Workflow -> Set Fields -> Create Workflow -> Get Created Workflow Id -> Clone Id -> Already Active? -> Activate Created Workflow -> Activated? -> Set Wappi Webhook -> Webhook Set? -> Set Wappi Webhook Types -> Types Set? -> Bind Workflow Id -> Bound? -> Replaced Items -> Has Replaced? -> Delete Replaced Clone -> Send New Workflows Id
+    answer: {'id': 'WAnew10000000000', 'created': True, 'adoptedProfiles': []} stopped: None
+    n8n/Wappi calls: [('Probe Bound Clone', 'GET', 200), ('Get Sample Workflow', 'GET', 200), ('Create Workflow', 'POST', 200), ('Activate Created Workflow', 'POST', 200), ('Set Wappi Webhook', 'POST', 200), ('Set Wappi Webhook Types', 'POST', 200), ('Delete Replaced Clone', 'DELETE', 200)]
+    created ['WAnew10000000000'] deleted ['WAold00000000000'] left ['WAnew10000000000']
+    clone_retirements: [{'workflow_id': 'WAold00000000000', 'reason': 'replaced', 'replaced_by': 'WAnew10000000000'}]
+--- WA session: the probe answers 500: nothing is created (clone_unavailable) (run 1)
+    trace: Retire Same Bot Slot -> Register Profile -> Seed Reply Mode -> Seed Saved? -> Clone Plan -> Plan Read? -> Legacy Owned? -> Reuse? -> Probe Bound Clone -> Bound Clone Usable? -> Bound Clone Gone? -> Respond Clone Unavailable
+    answer: {'success': False, 'error': 'clone_unavailable'} stopped: None
+    n8n/Wappi calls: [('Probe Bound Clone', 'GET', 500)]
+    created [] deleted [] left ['WAold00000000000']
+    clone_retirements: []
+--- WA session: the probe cannot reach n8n: nothing is created (clone_unavailable) (run 1)
+    trace: Retire Same Bot Slot -> Register Profile -> Seed Reply Mode -> Seed Saved? -> Clone Plan -> Plan Read? -> Legacy Owned? -> Reuse? -> Probe Bound Clone -> Bound Clone Usable? -> Bound Clone Gone? -> Respond Clone Unavailable
+    answer: {'success': False, 'error': 'clone_unavailable'} stopped: None
+    n8n/Wappi calls: [('Probe Bound Clone', 'GET', 'throw'), ('Probe Bound Clone', 'GET', 'throw')]
+    created [] deleted [] left ['WAold00000000000']
+    clone_retirements: []
+--- WA session: (а3) a new profile of the same bot: the old clone replaced, its data moved, DELETE ok (run 1)
+    trace: Retire Same Bot Slot -> Register Profile -> Seed Reply Mode -> Seed Saved? -> Clone Plan -> Plan Read? -> Legacy Owned? -> Reuse? -> Get Sample Workflow -> Set Fields -> Create Workflow -> Get Created Workflow Id -> Clone Id -> Already Active? -> Activate Created Workflow -> Activated? -> Set Wappi Webhook -> Webhook Set? -> Set Wappi Webhook Types -> Types Set? -> Bind Workflow Id -> Bound? -> Replaced Items -> Has Replaced? -> Delete Replaced Clone -> Send New Workflows Id
+    answer: {'id': 'WAnew10000000000', 'created': True, 'adoptedProfiles': ['wa-p1']} stopped: None
+    n8n/Wappi calls: [('Get Sample Workflow', 'GET', 200), ('Create Workflow', 'POST', 200), ('Activate Created Workflow', 'POST', 200), ('Set Wappi Webhook', 'POST', 200), ('Set Wappi Webhook Types', 'POST', 200), ('Delete Replaced Clone', 'DELETE', 200)]
+    created ['WAnew10000000000'] deleted ['WAold00000000000'] left ['WAnew10000000000']
+    clone_retirements: [{'workflow_id': 'WAold00000000000', 'reason': 'replaced', 'replaced_by': 'WAnew10000000000'}]
+--- WA session: (а3) … and the replaced clone's DELETE fails: it stays booked for the sweep (run 1)
+    trace: Retire Same Bot Slot -> Register Profile -> Seed Reply Mode -> Seed Saved? -> Clone Plan -> Plan Read? -> Legacy Owned? -> Reuse? -> Get Sample Workflow -> Set Fields -> Create Workflow -> Get Created Workflow Id -> Clone Id -> Already Active? -> Activate Created Workflow -> Activated? -> Set Wappi Webhook -> Webhook Set? -> Set Wappi Webhook Types -> Types Set? -> Bind Workflow Id -> Bound? -> Replaced Items -> Has Replaced? -> Delete Replaced Clone -> Send New Workflows Id
+    answer: {'id': 'WAnew10000000000', 'created': True, 'adoptedProfiles': ['wa-p1']} stopped: None
+    n8n/Wappi calls: [('Get Sample Workflow', 'GET', 200), ('Create Workflow', 'POST', 200), ('Activate Created Workflow', 'POST', 200), ('Set Wappi Webhook', 'POST', 200), ('Set Wappi Webhook Types', 'POST', 200), ('Delete Replaced Clone', 'DELETE', 500)]
+    created ['WAnew10000000000'] deleted [] left ['WAnew10000000000', 'WAold00000000000']
+    clone_retirements: [{'workflow_id': 'WAold00000000000', 'reason': 'replaced', 'replaced_by': 'WAnew10000000000'}]
+--- WA session: (б) Activate cannot reach n8n: the new clone is discarded (create_failed) (run 1)
+    trace: Retire Same Bot Slot -> Register Profile -> Seed Reply Mode -> Seed Saved? -> Clone Plan -> Plan Read? -> Legacy Owned? -> Reuse? -> Get Sample Workflow -> Set Fields -> Create Workflow -> Get Created Workflow Id -> Clone Id -> Already Active? -> Activate Created Workflow -> Activated? -> Discard? -> Discard New Clone -> Discarded? -> Respond Create Failed
+    answer: {'success': False, 'error': 'create_failed'} stopped: None
+    n8n/Wappi calls: [('Get Sample Workflow', 'GET', 200), ('Create Workflow', 'POST', 200), ('Activate Created Workflow', 'POST', 'throw'), ('Discard New Clone', 'DELETE', 200)]
+    created ['WAnew10000000000'] deleted ['WAnew10000000000'] left []
+    clone_retirements: []
+--- WA session: (б) Activate refused: an orphan holds the webhook path: the new clone is discarded (create_failed) (run 1)
+    trace: Retire Same Bot Slot -> Register Profile -> Seed Reply Mode -> Seed Saved? -> Clone Plan -> Plan Read? -> Legacy Owned? -> Reuse? -> Get Sample Workflow -> Set Fields -> Create Workflow -> Get Created Workflow Id -> Clone Id -> Already Active? -> Activate Created Workflow -> Activated? -> Discard? -> Discard New Clone -> Discarded? -> Respond Create Failed
+    answer: {'success': False, 'error': 'create_failed'} stopped: None
+    n8n/Wappi calls: [('Get Sample Workflow', 'GET', 200), ('Create Workflow', 'POST', 200), ('Activate Created Workflow', 'POST', 409), ('Discard New Clone', 'DELETE', 200)]
+    created ['WAnew10000000000'] deleted ['WAnew10000000000'] left ['WAorph0000000000']
+    clone_retirements: []
+--- WA session: (б) Activate answers 500: the new clone is discarded (create_failed) (run 1)
+    trace: Retire Same Bot Slot -> Register Profile -> Seed Reply Mode -> Seed Saved? -> Clone Plan -> Plan Read? -> Legacy Owned? -> Reuse? -> Get Sample Workflow -> Set Fields -> Create Workflow -> Get Created Workflow Id -> Clone Id -> Already Active? -> Activate Created Workflow -> Activated? -> Discard? -> Discard New Clone -> Discarded? -> Respond Create Failed
+    answer: {'success': False, 'error': 'create_failed'} stopped: None
+    n8n/Wappi calls: [('Get Sample Workflow', 'GET', 200), ('Create Workflow', 'POST', 200), ('Activate Created Workflow', 'POST', 500), ('Discard New Clone', 'DELETE', 200)]
+    created ['WAnew10000000000'] deleted ['WAnew10000000000'] left []
+    clone_retirements: []
+--- WA session: (б) the Wappi webhook answers 502: the new clone is discarded (create_failed) (run 1)
+    trace: Retire Same Bot Slot -> Register Profile -> Seed Reply Mode -> Seed Saved? -> Clone Plan -> Plan Read? -> Legacy Owned? -> Reuse? -> Get Sample Workflow -> Set Fields -> Create Workflow -> Get Created Workflow Id -> Clone Id -> Already Active? -> Activate Created Workflow -> Activated? -> Set Wappi Webhook -> Webhook Set? -> Discard? -> Discard New Clone -> Discarded? -> Respond Create Failed
+    answer: {'success': False, 'error': 'create_failed'} stopped: None
+    n8n/Wappi calls: [('Get Sample Workflow', 'GET', 200), ('Create Workflow', 'POST', 200), ('Activate Created Workflow', 'POST', 200), ('Set Wappi Webhook', 'POST', 502), ('Discard New Clone', 'DELETE', 200)]
+    created ['WAnew10000000000'] deleted ['WAnew10000000000'] left []
+    clone_retirements: []
+--- WA session: (б) the Wappi webhook types time out: the new clone is discarded (create_failed) (run 1)
+    trace: Retire Same Bot Slot -> Register Profile -> Seed Reply Mode -> Seed Saved? -> Clone Plan -> Plan Read? -> Legacy Owned? -> Reuse? -> Get Sample Workflow -> Set Fields -> Create Workflow -> Get Created Workflow Id -> Clone Id -> Already Active? -> Activate Created Workflow -> Activated? -> Set Wappi Webhook -> Webhook Set? -> Set Wappi Webhook Types -> Types Set? -> Discard? -> Discard New Clone -> Discarded? -> Respond Create Failed
+    answer: {'success': False, 'error': 'create_failed'} stopped: None
+    n8n/Wappi calls: [('Get Sample Workflow', 'GET', 200), ('Create Workflow', 'POST', 200), ('Activate Created Workflow', 'POST', 200), ('Set Wappi Webhook', 'POST', 200), ('Set Wappi Webhook Types', 'POST', 'throw'), ('Discard New Clone', 'DELETE', 200)]
+    created ['WAnew10000000000'] deleted ['WAnew10000000000'] left []
+    clone_retirements: []
+--- WA session: (б) Bind Workflow Id: a query error ×3: the new clone is discarded (create_failed) (run 1)
+    trace: Retire Same Bot Slot -> Register Profile -> Seed Reply Mode -> Seed Saved? -> Clone Plan -> Plan Read? -> Legacy Owned? -> Reuse? -> Get Sample Workflow -> Set Fields -> Create Workflow -> Get Created Workflow Id -> Clone Id -> Already Active? -> Activate Created Workflow -> Activated? -> Set Wappi Webhook -> Webhook Set? -> Set Wappi Webhook Types -> Types Set? -> Bind Workflow Id -> Bound? -> Discard? -> Discard New Clone -> Discarded? -> Respond Create Failed
+    answer: {'success': False, 'error': 'create_failed'} stopped: None
+    n8n/Wappi calls: [('Get Sample Workflow', 'GET', 200), ('Create Workflow', 'POST', 200), ('Activate Created Workflow', 'POST', 200), ('Set Wappi Webhook', 'POST', 200), ('Set Wappi Webhook Types', 'POST', 200), ('Discard New Clone', 'DELETE', 200)]
+    created ['WAnew10000000000'] deleted ['WAnew10000000000'] left []
+    clone_retirements: []
+--- WA session: (б) Bind Workflow Id: an error thrown outside the query ×3: the new clone is discarded (create_failed) (run 1)
+    trace: Retire Same Bot Slot -> Register Profile -> Seed Reply Mode -> Seed Saved? -> Clone Plan -> Plan Read? -> Legacy Owned? -> Reuse? -> Get Sample Workflow -> Set Fields -> Create Workflow -> Get Created Workflow Id -> Clone Id -> Already Active? -> Activate Created Workflow -> Activated? -> Set Wappi Webhook -> Webhook Set? -> Set Wappi Webhook Types -> Types Set? -> Bind Workflow Id -> Bound? -> Discard? -> Discard New Clone -> Discarded? -> Respond Create Failed
+    answer: {'success': False, 'error': 'create_failed'} stopped: None
+    n8n/Wappi calls: [('Get Sample Workflow', 'GET', 200), ('Create Workflow', 'POST', 200), ('Activate Created Workflow', 'POST', 200), ('Set Wappi Webhook', 'POST', 200), ('Set Wappi Webhook Types', 'POST', 200), ('Discard New Clone', 'DELETE', 200)]
+    created ['WAnew10000000000'] deleted ['WAnew10000000000'] left []
+    clone_retirements: []
+--- WA session: (б) Bind Workflow Id: no items: the new clone is discarded (create_failed) (run 1)
+    trace: Retire Same Bot Slot -> Register Profile -> Seed Reply Mode -> Seed Saved? -> Clone Plan -> Plan Read? -> Legacy Owned? -> Reuse? -> Get Sample Workflow -> Set Fields -> Create Workflow -> Get Created Workflow Id -> Clone Id -> Already Active? -> Activate Created Workflow -> Activated? -> Set Wappi Webhook -> Webhook Set? -> Set Wappi Webhook Types -> Types Set? -> Bind Workflow Id -> Bound? -> Discard? -> Discard New Clone -> Discarded? -> Respond Create Failed
+    answer: {'success': False, 'error': 'create_failed'} stopped: None
+    n8n/Wappi calls: [('Get Sample Workflow', 'GET', 200), ('Create Workflow', 'POST', 200), ('Activate Created Workflow', 'POST', 200), ('Set Wappi Webhook', 'POST', 200), ('Set Wappi Webhook Types', 'POST', 200), ('Discard New Clone', 'DELETE', 200)]
+    created ['WAnew10000000000'] deleted ['WAnew10000000000'] left []
+    clone_retirements: []
+--- WA session: (б) Bind Workflow Id: bound = false (a concurrent Create won): the new clone is discarded (create_failed) (run 1)
+    trace: Retire Same Bot Slot -> Register Profile -> Seed Reply Mode -> Seed Saved? -> Clone Plan -> Plan Read? -> Legacy Owned? -> Reuse? -> Get Sample Workflow -> Set Fields -> Create Workflow -> Get Created Workflow Id -> Clone Id -> Already Active? -> Activate Created Workflow -> Activated? -> Set Wappi Webhook -> Webhook Set? -> Set Wappi Webhook Types -> Types Set? -> Bind Workflow Id -> Bound? -> Discard? -> Discard New Clone -> Discarded? -> Respond Create Failed
+    answer: {'success': False, 'error': 'create_failed'} stopped: None
+    n8n/Wappi calls: [('Get Sample Workflow', 'GET', 200), ('Create Workflow', 'POST', 200), ('Activate Created Workflow', 'POST', 200), ('Set Wappi Webhook', 'POST', 200), ('Set Wappi Webhook Types', 'POST', 200), ('Discard New Clone', 'DELETE', 200)]
+    created ['WAnew10000000000'] deleted ['WAnew10000000000'] left []
+    clone_retirements: []
+--- WA session: (б) Activate fails AND the discard answers 500: the new clone is journaled for the sweep (run 1)
+    trace: Retire Same Bot Slot -> Register Profile -> Seed Reply Mode -> Seed Saved? -> Clone Plan -> Plan Read? -> Legacy Owned? -> Reuse? -> Get Sample Workflow -> Set Fields -> Create Workflow -> Get Created Workflow Id -> Clone Id -> Already Active? -> Activate Created Workflow -> Activated? -> Discard? -> Discard New Clone -> Discarded? -> Record Discard Failure -> Respond Create Failed
+    answer: {'success': False, 'error': 'create_failed'} stopped: None
+    n8n/Wappi calls: [('Get Sample Workflow', 'GET', 200), ('Create Workflow', 'POST', 200), ('Activate Created Workflow', 'POST', 500), ('Discard New Clone', 'DELETE', 500)]
+    created ['WAnew10000000000'] deleted [] left ['WAnew10000000000']
+    clone_retirements: [{'workflow_id': 'WAnew10000000000', 'reason': 'discard_failed', 'replaced_by': None}]
+--- WA session: (б) Activate fails, the discard AND the journal fail: the ONE named residual (Tier 2) (run 1)
+    trace: Retire Same Bot Slot -> Register Profile -> Seed Reply Mode -> Seed Saved? -> Clone Plan -> Plan Read? -> Legacy Owned? -> Reuse? -> Get Sample Workflow -> Set Fields -> Create Workflow -> Get Created Workflow Id -> Clone Id -> Already Active? -> Activate Created Workflow -> Activated? -> Discard? -> Discard New Clone -> Discarded? -> Record Discard Failure -> Respond Create Failed
+    answer: {'success': False, 'error': 'create_failed'} stopped: None
+    n8n/Wappi calls: [('Get Sample Workflow', 'GET', 200), ('Create Workflow', 'POST', 200), ('Activate Created Workflow', 'POST', 500), ('Discard New Clone', 'DELETE', 500)]
+    created ['WAnew10000000000'] deleted [] left ['WAnew10000000000']
+    clone_retirements: []
+--- WA session: Clone Plan: a query error ×3: nothing is created (clone_plan_unavailable) (run 1)
+    trace: Retire Same Bot Slot -> Register Profile -> Seed Reply Mode -> Seed Saved? -> Clone Plan -> Plan Read? -> Respond Plan Unavailable
+    answer: {'success': False, 'error': 'clone_plan_unavailable'} stopped: None
+    n8n/Wappi calls: []
+    created [] deleted [] left ['WAold00000000000']
+    clone_retirements: []
+--- WA session: Clone Plan: an error thrown outside the query ×3: nothing is created (clone_plan_unavailable) (run 1)
+    trace: Retire Same Bot Slot -> Register Profile -> Seed Reply Mode -> Seed Saved? -> Clone Plan -> Plan Read? -> Respond Plan Unavailable
+    answer: {'success': False, 'error': 'clone_plan_unavailable'} stopped: None
+    n8n/Wappi calls: []
+    created [] deleted [] left ['WAold00000000000']
+    clone_retirements: []
+--- WA session: Clone Plan: no items: nothing is created (clone_plan_unavailable) (run 1)
+    trace: Retire Same Bot Slot -> Register Profile -> Seed Reply Mode -> Seed Saved? -> Clone Plan -> Plan Read? -> Respond Plan Unavailable
+    answer: {'success': False, 'error': 'clone_plan_unavailable'} stopped: None
+    n8n/Wappi calls: []
+    created [] deleted [] left ['WAold00000000000']
+    clone_retirements: []
+--- WA session: F2 R1: life → sweep (trial over) → purchase → reconnect with PreviousProfileId: everything under the new connection, the prior clone deleted (run 1)
+    trace: Retire Same Bot Slot -> Register Profile -> Seed Reply Mode -> Seed Saved? -> Clone Plan -> Plan Read? -> Legacy Owned? -> Reuse? -> Get Sample Workflow -> Set Fields -> Create Workflow -> Get Created Workflow Id -> Clone Id -> Already Active? -> Activate Created Workflow -> Activated? -> Set Wappi Webhook -> Webhook Set? -> Set Wappi Webhook Types -> Types Set? -> Bind Workflow Id -> Bound? -> Replaced Items -> Has Replaced? -> Delete Replaced Clone -> Send New Workflows Id
+    answer: {'id': 'WAnew10000000000', 'created': True, 'adoptedProfiles': ['wa-p1']} stopped: None
+    n8n/Wappi calls: [('Get Sample Workflow', 'GET', 200), ('Create Workflow', 'POST', 200), ('Activate Created Workflow', 'POST', 200), ('Set Wappi Webhook', 'POST', 200), ('Set Wappi Webhook Types', 'POST', 200), ('Delete Replaced Clone', 'DELETE', 200)]
+    created ['WAnew10000000000'] deleted ['WAold00000000000'] left ['WAnew10000000000']
+    clone_retirements: [{'workflow_id': 'WAold00000000000', 'reason': 'replaced', 'replaced_by': 'WAnew10000000000'}]
+--- WA session: F2 R4: the same pair again (the answer was lost): the bound clone is reused, nothing moves twice (run 1)
+    trace: Retire Same Bot Slot -> Register Profile -> Seed Reply Mode -> Seed Saved? -> Clone Plan -> Plan Read? -> Legacy Owned? -> Reuse? -> Get Sample Workflow -> Set Fields -> Create Workflow -> Get Created Workflow Id -> Clone Id -> Already Active? -> Activate Created Workflow -> Activated? -> Set Wappi Webhook -> Webhook Set? -> Set Wappi Webhook Types -> Types Set? -> Bind Workflow Id -> Bound? -> Replaced Items -> Has Replaced? -> Delete Replaced Clone -> Send New Workflows Id
+    answer: {'id': 'WAnew10000000000', 'created': True, 'adoptedProfiles': ['wa-p1']} stopped: None
+--- WA session: F2 R4: the same pair again (the answer was lost): the bound clone is reused, nothing moves twice (run 2)
+    trace: Retire Same Bot Slot -> Register Profile -> Seed Reply Mode -> Seed Saved? -> Clone Plan -> Plan Read? -> Legacy Owned? -> Reuse? -> Probe Bound Clone -> Bound Clone Usable? -> Reused Clone Id -> Clone Id -> Already Active? -> Set Wappi Webhook -> Webhook Set? -> Set Wappi Webhook Types -> Types Set? -> Bind Workflow Id -> Bound? -> Replaced Items -> Has Replaced? -> Delete Replaced Clone -> Send New Workflows Id
+    answer: {'id': 'WAnew10000000000', 'created': False, 'adoptedProfiles': ['wa-p1']} stopped: None
+    n8n/Wappi calls: [('Get Sample Workflow', 'GET', 200), ('Create Workflow', 'POST', 200), ('Activate Created Workflow', 'POST', 200), ('Set Wappi Webhook', 'POST', 200), ('Set Wappi Webhook Types', 'POST', 200), ('Delete Replaced Clone', 'DELETE', 200), ('Probe Bound Clone', 'GET', 200), ('Set Wappi Webhook', 'POST', 200), ('Set Wappi Webhook Types', 'POST', 200), ('Delete Replaced Clone', 'DELETE', 404)]
+    created ['WAnew10000000000'] deleted ['WAold00000000000'] left ['WAnew10000000000']
+    clone_retirements: [{'workflow_id': 'WAold00000000000', 'reason': 'replaced', 'replaced_by': 'WAnew10000000000'}]
+--- WA session: F2 R9: a two-channel bot reconnects this channel with the other id moved away (-1): only this channel moves (run 1)
+    trace: Retire Same Bot Slot -> Register Profile -> Seed Reply Mode -> Seed Saved? -> Clone Plan -> Plan Read? -> Legacy Owned? -> Reuse? -> Get Sample Workflow -> Set Fields -> Create Workflow -> Get Created Workflow Id -> Clone Id -> Already Active? -> Activate Created Workflow -> Activated? -> Set Wappi Webhook -> Webhook Set? -> Set Wappi Webhook Types -> Types Set? -> Bind Workflow Id -> Bound? -> Replaced Items -> Has Replaced? -> Delete Replaced Clone -> Send New Workflows Id
+    answer: {'id': 'WAnew10000000000', 'created': True, 'adoptedProfiles': ['wa-p1']} stopped: None
+    n8n/Wappi calls: [('Get Sample Workflow', 'GET', 200), ('Create Workflow', 'POST', 200), ('Activate Created Workflow', 'POST', 200), ('Set Wappi Webhook', 'POST', 200), ('Set Wappi Webhook Types', 'POST', 200), ('Delete Replaced Clone', 'DELETE', 200)]
+    created ['WAnew10000000000'] deleted ['WAold00000000000'] left ['TGtwin0000000000', 'WAnew10000000000']
+    clone_retirements: [{'workflow_id': 'WAold00000000000', 'reason': 'replaced', 'replaced_by': 'WAnew10000000000'}]
+--- WA session: F2 R9: this channel joins a bot of the other channel (the pre-F1 -1 rule still holds) (run 1)
+    trace: Retire Same Bot Slot -> Register Profile -> Seed Reply Mode -> Seed Saved? -> Clone Plan -> Plan Read? -> Legacy Owned? -> Reuse? -> Get Sample Workflow -> Set Fields -> Create Workflow -> Get Created Workflow Id -> Clone Id -> Already Active? -> Activate Created Workflow -> Activated? -> Set Wappi Webhook -> Webhook Set? -> Set Wappi Webhook Types -> Types Set? -> Bind Workflow Id -> Bound? -> Replaced Items -> Has Replaced? -> Send New Workflows Id
+    answer: {'id': 'WAnew10000000000', 'created': True, 'adoptedProfiles': []} stopped: None
+    n8n/Wappi calls: [('Get Sample Workflow', 'GET', 200), ('Create Workflow', 'POST', 200), ('Activate Created Workflow', 'POST', 200), ('Set Wappi Webhook', 'POST', 200), ('Set Wappi Webhook Types', 'POST', 200)]
+    created ['WAnew10000000000'] deleted [] left ['TGtwin0000000000', 'WAnew10000000000']
+    clone_retirements: []
+--- WA session: negative: another install's bot with the same bot key is never touched (run 1)
+    trace: Retire Same Bot Slot -> Register Profile -> Seed Reply Mode -> Seed Saved? -> Clone Plan -> Plan Read? -> Legacy Owned? -> Reuse? -> Get Sample Workflow -> Set Fields -> Create Workflow -> Get Created Workflow Id -> Clone Id -> Already Active? -> Activate Created Workflow -> Activated? -> Set Wappi Webhook -> Webhook Set? -> Set Wappi Webhook Types -> Types Set? -> Bind Workflow Id -> Bound? -> Replaced Items -> Has Replaced? -> Send New Workflows Id
+    answer: {'id': 'WAnew10000000000', 'created': True, 'adoptedProfiles': []} stopped: None
+    n8n/Wappi calls: [('Get Sample Workflow', 'GET', 200), ('Create Workflow', 'POST', 200), ('Activate Created Workflow', 'POST', 200), ('Set Wappi Webhook', 'POST', 200), ('Set Wappi Webhook Types', 'POST', 200)]
+    created ['WAnew10000000000'] deleted [] left ['WAfrgn0000000000', 'WAnew10000000000']
+    clone_retirements: []
+--- WA session: negative: a wizard Create (a NEW bot in a reused slot) never adopts, even naming the old profile (run 1)
+    trace: Retire Same Bot Slot -> Register Profile -> Seed Reply Mode -> Seed Saved? -> Clone Plan -> Plan Read? -> Legacy Owned? -> Reuse? -> Get Sample Workflow -> Set Fields -> Create Workflow -> Get Created Workflow Id -> Clone Id -> Already Active? -> Activate Created Workflow -> Activated? -> Set Wappi Webhook -> Webhook Set? -> Set Wappi Webhook Types -> Types Set? -> Bind Workflow Id -> Bound? -> Replaced Items -> Has Replaced? -> Send New Workflows Id
+    answer: {'id': 'WAnew10000000000', 'created': True, 'adoptedProfiles': []} stopped: None
+    n8n/Wappi calls: [('Get Sample Workflow', 'GET', 200), ('Create Workflow', 'POST', 200), ('Activate Created Workflow', 'POST', 200), ('Set Wappi Webhook', 'POST', 200), ('Set Wappi Webhook Types', 'POST', 200)]
+    created ['WAnew10000000000'] deleted [] left ['WAnew10000000000', 'WAold00000000000']
+    clone_retirements: []
+--- WA legacy: negative: a legacy Create on a profile an install owns is refused (profile_owned), nothing created (run 1)
+    trace: If Has AppUserID? -> Seed Reply Mode -> Seed Saved? -> Clone Plan -> Plan Read? -> Legacy Owned? -> Respond Profile Owned
+    answer: {'success': False, 'error': 'profile_owned'} stopped: None
+    n8n/Wappi calls: []
+    created [] deleted [] left ['WAold00000000000']
+    clone_retirements: []
+--- WA legacy: legacy: fresh (run 1)
+    trace: If Has AppUserID? -> Seed Reply Mode -> Seed Saved? -> Clone Plan -> Plan Read? -> Legacy Owned? -> Reuse? -> Get Sample Workflow -> Set Fields -> Create Workflow -> Get Created Workflow Id -> Clone Id -> Already Active? -> Activate Created Workflow -> Activated? -> Set Wappi Webhook -> Webhook Set? -> Set Wappi Webhook Types -> Types Set? -> Bind Workflow Id -> Bound? -> Replaced Items -> Has Replaced? -> Send New Workflows Id
+    answer: {'id': 'WAnew10000000000', 'created': True, 'adoptedProfiles': []} stopped: None
+    n8n/Wappi calls: [('Get Sample Workflow', 'GET', 200), ('Create Workflow', 'POST', 200), ('Activate Created Workflow', 'POST', 200), ('Set Wappi Webhook', 'POST', 200), ('Set Wappi Webhook Types', 'POST', 200)]
+    created ['WAnew10000000000'] deleted [] left ['WAnew10000000000']
+    clone_retirements: []
+--- WA legacy: legacy: reuse an owner-less binding (run 1)
+    trace: If Has AppUserID? -> Seed Reply Mode -> Seed Saved? -> Clone Plan -> Plan Read? -> Legacy Owned? -> Reuse? -> Probe Bound Clone -> Bound Clone Usable? -> Reused Clone Id -> Clone Id -> Already Active? -> Activate Created Workflow -> Activated? -> Set Wappi Webhook -> Webhook Set? -> Set Wappi Webhook Types -> Types Set? -> Bind Workflow Id -> Bound? -> Replaced Items -> Has Replaced? -> Send New Workflows Id
+    answer: {'id': 'WAold00000000000', 'created': False, 'adoptedProfiles': []} stopped: None
+    n8n/Wappi calls: [('Probe Bound Clone', 'GET', 200), ('Activate Created Workflow', 'POST', 200), ('Set Wappi Webhook', 'POST', 200), ('Set Wappi Webhook Types', 'POST', 200)]
+    created [] deleted [] left ['WAold00000000000']
+    clone_retirements: []
+--- WA legacy: legacy: the owner-less binding is gone (404): a new clone, the old id booked (run 1)
+    trace: If Has AppUserID? -> Seed Reply Mode -> Seed Saved? -> Clone Plan -> Plan Read? -> Legacy Owned? -> Reuse? -> Probe Bound Clone -> Bound Clone Usable? -> Bound Clone Gone? -> Get Sample Workflow -> Set Fields -> Create Workflow -> Get Created Workflow Id -> Clone Id -> Already Active? -> Activate Created Workflow -> Activated? -> Set Wappi Webhook -> Webhook Set? -> Set Wappi Webhook Types -> Types Set? -> Bind Workflow Id -> Bound? -> Replaced Items -> Has Replaced? -> Delete Replaced Clone -> Send New Workflows Id
+    answer: {'id': 'WAnew10000000000', 'created': True, 'adoptedProfiles': []} stopped: None
+    n8n/Wappi calls: [('Probe Bound Clone', 'GET', 404), ('Get Sample Workflow', 'GET', 200), ('Create Workflow', 'POST', 200), ('Activate Created Workflow', 'POST', 200), ('Set Wappi Webhook', 'POST', 200), ('Set Wappi Webhook Types', 'POST', 200), ('Delete Replaced Clone', 'DELETE', 404)]
+    created ['WAnew10000000000'] deleted [] left ['WAnew10000000000']
+    clone_retirements: [{'workflow_id': 'WAold00000000000', 'reason': 'replaced', 'replaced_by': 'WAnew10000000000'}]
+--- WA legacy: legacy: Activate fails: the new clone is discarded (run 1)
+    trace: If Has AppUserID? -> Seed Reply Mode -> Seed Saved? -> Clone Plan -> Plan Read? -> Legacy Owned? -> Reuse? -> Get Sample Workflow -> Set Fields -> Create Workflow -> Get Created Workflow Id -> Clone Id -> Already Active? -> Activate Created Workflow -> Activated? -> Discard? -> Discard New Clone -> Discarded? -> Respond Create Failed
+    answer: {'success': False, 'error': 'create_failed'} stopped: None
+    n8n/Wappi calls: [('Get Sample Workflow', 'GET', 200), ('Create Workflow', 'POST', 200), ('Activate Created Workflow', 'POST', 500), ('Discard New Clone', 'DELETE', 200)]
+    created ['WAnew10000000000'] deleted ['WAnew10000000000'] left []
+    clone_retirements: []
+--- WA legacy: legacy: a second profile of an owner-less bot replaces nothing (no proof): the old clone stays bound (run 1)
+    trace: If Has AppUserID? -> Seed Reply Mode -> Seed Saved? -> Clone Plan -> Plan Read? -> Legacy Owned? -> Reuse? -> Get Sample Workflow -> Set Fields -> Create Workflow -> Get Created Workflow Id -> Clone Id -> Already Active? -> Activate Created Workflow -> Activated? -> Set Wappi Webhook -> Webhook Set? -> Set Wappi Webhook Types -> Types Set? -> Bind Workflow Id -> Bound? -> Replaced Items -> Has Replaced? -> Send New Workflows Id
+    answer: {'id': 'WAnew10000000000', 'created': True, 'adoptedProfiles': []} stopped: None
+    n8n/Wappi calls: [('Get Sample Workflow', 'GET', 200), ('Create Workflow', 'POST', 200), ('Activate Created Workflow', 'POST', 200), ('Set Wappi Webhook', 'POST', 200), ('Set Wappi Webhook Types', 'POST', 200)]
+    created ['WAnew10000000000'] deleted [] left ['WAnew10000000000', 'WAold00000000000']
+    clone_retirements: []
+--- TG session: fresh (wizard, a new bot) (run 1)
+    trace: Retire Same Bot Slot -> Register Profile -> Seed Reply Mode -> Seed Saved? -> Clone Plan -> Plan Read? -> Legacy Owned? -> Reuse? -> Get Sample Workflow -> Set Fields -> Create Workflow -> Get Created Workflow Id -> Clone Id -> Already Active? -> Activate Created Workflow -> Activated? -> Set Wappi Webhook -> Webhook Set? -> Set Wappi Webhook Types -> Types Set? -> Bind Workflow Id -> Bound? -> Replaced Items -> Has Replaced? -> Send New Workflows Id
+    answer: {'id': 'TGnew10000000000', 'created': True, 'adoptedProfiles': []} stopped: None
+    n8n/Wappi calls: [('Get Sample Workflow', 'GET', 200), ('Create Workflow', 'POST', 200), ('Activate Created Workflow', 'POST', 200), ('Set Wappi Webhook', 'POST', 200), ('Set Wappi Webhook Types', 'POST', 200)]
+    created ['TGnew10000000000'] deleted [] left ['TGnew10000000000']
+    clone_retirements: []
+--- TG session: reuse: the bound clone, inactive (channel saved off / session over): activated (run 1)
+    trace: Retire Same Bot Slot -> Register Profile -> Seed Reply Mode -> Seed Saved? -> Clone Plan -> Plan Read? -> Legacy Owned? -> Reuse? -> Probe Bound Clone -> Bound Clone Usable? -> Reused Clone Id -> Clone Id -> Already Active? -> Activate Created Workflow -> Activated? -> Set Wappi Webhook -> Webhook Set? -> Set Wappi Webhook Types -> Types Set? -> Bind Workflow Id -> Bound? -> Replaced Items -> Has Replaced? -> Send New Workflows Id
+    answer: {'id': 'TGold00000000000', 'created': False, 'adoptedProfiles': []} stopped: None
+    n8n/Wappi calls: [('Probe Bound Clone', 'GET', 200), ('Activate Created Workflow', 'POST', 200), ('Set Wappi Webhook', 'POST', 200), ('Set Wappi Webhook Types', 'POST', 200)]
+    created [] deleted [] left ['TGold00000000000']
+    clone_retirements: []
+--- TG session: reuse: the bound clone, active (toggle off→on without saving): not activated again (run 1)
+    trace: Retire Same Bot Slot -> Register Profile -> Seed Reply Mode -> Seed Saved? -> Clone Plan -> Plan Read? -> Legacy Owned? -> Reuse? -> Probe Bound Clone -> Bound Clone Usable? -> Reused Clone Id -> Clone Id -> Already Active? -> Set Wappi Webhook -> Webhook Set? -> Set Wappi Webhook Types -> Types Set? -> Bind Workflow Id -> Bound? -> Replaced Items -> Has Replaced? -> Send New Workflows Id
+    answer: {'id': 'TGold00000000000', 'created': False, 'adoptedProfiles': []} stopped: None
+    n8n/Wappi calls: [('Probe Bound Clone', 'GET', 200), ('Set Wappi Webhook', 'POST', 200), ('Set Wappi Webhook Types', 'POST', 200)]
+    created [] deleted [] left ['TGold00000000000']
+    clone_retirements: []
+--- TG session: the bound clone is gone (404): a new clone takes its price lists, the old id is booked (run 1)
+    trace: Retire Same Bot Slot -> Register Profile -> Seed Reply Mode -> Seed Saved? -> Clone Plan -> Plan Read? -> Legacy Owned? -> Reuse? -> Probe Bound Clone -> Bound Clone Usable? -> Bound Clone Gone? -> Get Sample Workflow -> Set Fields -> Create Workflow -> Get Created Workflow Id -> Clone Id -> Already Active? -> Activate Created Workflow -> Activated? -> Set Wappi Webhook -> Webhook Set? -> Set Wappi Webhook Types -> Types Set? -> Bind Workflow Id -> Bound? -> Replaced Items -> Has Replaced? -> Delete Replaced Clone -> Send New Workflows Id
+    answer: {'id': 'TGnew10000000000', 'created': True, 'adoptedProfiles': []} stopped: None
+    n8n/Wappi calls: [('Probe Bound Clone', 'GET', 404), ('Get Sample Workflow', 'GET', 200), ('Create Workflow', 'POST', 200), ('Activate Created Workflow', 'POST', 200), ('Set Wappi Webhook', 'POST', 200), ('Set Wappi Webhook Types', 'POST', 200), ('Delete Replaced Clone', 'DELETE', 404)]
+    created ['TGnew10000000000'] deleted [] left ['TGnew10000000000']
+    clone_retirements: [{'workflow_id': 'TGold00000000000', 'reason': 'replaced', 'replaced_by': 'TGnew10000000000'}]
+--- TG session: the bound clone is archived: a new clone, the archived one deleted (run 1)
+    trace: Retire Same Bot Slot -> Register Profile -> Seed Reply Mode -> Seed Saved? -> Clone Plan -> Plan Read? -> Legacy Owned? -> Reuse? -> Probe Bound Clone -> Bound Clone Usable? -> Bound Clone Gone? -> Get Sample Workflow -> Set Fields -> Create Workflow -> Get Created Workflow Id -> Clone Id -> Already Active? -> Activate Created Workflow -> Activated? -> Set Wappi Webhook -> Webhook Set? -> Set Wappi Webhook Types -> Types Set? -> Bind Workflow Id -> Bound? -> Replaced Items -> Has Replaced? -> Delete Replaced Clone -> Send New Workflows Id
+    answer: {'id': 'TGnew10000000000', 'created': True, 'adoptedProfiles': []} stopped: None
+    n8n/Wappi calls: [('Probe Bound Clone', 'GET', 200), ('Get Sample Workflow', 'GET', 200), ('Create Workflow', 'POST', 200), ('Activate Created Workflow', 'POST', 200), ('Set Wappi Webhook', 'POST', 200), ('Set Wappi Webhook Types', 'POST', 200), ('Delete Replaced Clone', 'DELETE', 200)]
+    created ['TGnew10000000000'] deleted ['TGold00000000000'] left ['TGnew10000000000']
+    clone_retirements: [{'workflow_id': 'TGold00000000000', 'reason': 'replaced', 'replaced_by': 'TGnew10000000000'}]
+--- TG session: the probe answers 500: nothing is created (clone_unavailable) (run 1)
+    trace: Retire Same Bot Slot -> Register Profile -> Seed Reply Mode -> Seed Saved? -> Clone Plan -> Plan Read? -> Legacy Owned? -> Reuse? -> Probe Bound Clone -> Bound Clone Usable? -> Bound Clone Gone? -> Respond Clone Unavailable
+    answer: {'success': False, 'error': 'clone_unavailable'} stopped: None
+    n8n/Wappi calls: [('Probe Bound Clone', 'GET', 500)]
+    created [] deleted [] left ['TGold00000000000']
+    clone_retirements: []
+--- TG session: the probe cannot reach n8n: nothing is created (clone_unavailable) (run 1)
+    trace: Retire Same Bot Slot -> Register Profile -> Seed Reply Mode -> Seed Saved? -> Clone Plan -> Plan Read? -> Legacy Owned? -> Reuse? -> Probe Bound Clone -> Bound Clone Usable? -> Bound Clone Gone? -> Respond Clone Unavailable
+    answer: {'success': False, 'error': 'clone_unavailable'} stopped: None
+    n8n/Wappi calls: [('Probe Bound Clone', 'GET', 'throw'), ('Probe Bound Clone', 'GET', 'throw')]
+    created [] deleted [] left ['TGold00000000000']
+    clone_retirements: []
+--- TG session: (а3) a new profile of the same bot: the old clone replaced, its data moved, DELETE ok (run 1)
+    trace: Retire Same Bot Slot -> Register Profile -> Seed Reply Mode -> Seed Saved? -> Clone Plan -> Plan Read? -> Legacy Owned? -> Reuse? -> Get Sample Workflow -> Set Fields -> Create Workflow -> Get Created Workflow Id -> Clone Id -> Already Active? -> Activate Created Workflow -> Activated? -> Set Wappi Webhook -> Webhook Set? -> Set Wappi Webhook Types -> Types Set? -> Bind Workflow Id -> Bound? -> Replaced Items -> Has Replaced? -> Delete Replaced Clone -> Send New Workflows Id
+    answer: {'id': 'TGnew10000000000', 'created': True, 'adoptedProfiles': ['tg-p1']} stopped: None
+    n8n/Wappi calls: [('Get Sample Workflow', 'GET', 200), ('Create Workflow', 'POST', 200), ('Activate Created Workflow', 'POST', 200), ('Set Wappi Webhook', 'POST', 200), ('Set Wappi Webhook Types', 'POST', 200), ('Delete Replaced Clone', 'DELETE', 200)]
+    created ['TGnew10000000000'] deleted ['TGold00000000000'] left ['TGnew10000000000']
+    clone_retirements: [{'workflow_id': 'TGold00000000000', 'reason': 'replaced', 'replaced_by': 'TGnew10000000000'}]
+--- TG session: (а3) … and the replaced clone's DELETE fails: it stays booked for the sweep (run 1)
+    trace: Retire Same Bot Slot -> Register Profile -> Seed Reply Mode -> Seed Saved? -> Clone Plan -> Plan Read? -> Legacy Owned? -> Reuse? -> Get Sample Workflow -> Set Fields -> Create Workflow -> Get Created Workflow Id -> Clone Id -> Already Active? -> Activate Created Workflow -> Activated? -> Set Wappi Webhook -> Webhook Set? -> Set Wappi Webhook Types -> Types Set? -> Bind Workflow Id -> Bound? -> Replaced Items -> Has Replaced? -> Delete Replaced Clone -> Send New Workflows Id
+    answer: {'id': 'TGnew10000000000', 'created': True, 'adoptedProfiles': ['tg-p1']} stopped: None
+    n8n/Wappi calls: [('Get Sample Workflow', 'GET', 200), ('Create Workflow', 'POST', 200), ('Activate Created Workflow', 'POST', 200), ('Set Wappi Webhook', 'POST', 200), ('Set Wappi Webhook Types', 'POST', 200), ('Delete Replaced Clone', 'DELETE', 500)]
+    created ['TGnew10000000000'] deleted [] left ['TGnew10000000000', 'TGold00000000000']
+    clone_retirements: [{'workflow_id': 'TGold00000000000', 'reason': 'replaced', 'replaced_by': 'TGnew10000000000'}]
+--- TG session: (б) Activate cannot reach n8n: the new clone is discarded (create_failed) (run 1)
+    trace: Retire Same Bot Slot -> Register Profile -> Seed Reply Mode -> Seed Saved? -> Clone Plan -> Plan Read? -> Legacy Owned? -> Reuse? -> Get Sample Workflow -> Set Fields -> Create Workflow -> Get Created Workflow Id -> Clone Id -> Already Active? -> Activate Created Workflow -> Activated? -> Discard? -> Discard New Clone -> Discarded? -> Respond Create Failed
+    answer: {'success': False, 'error': 'create_failed'} stopped: None
+    n8n/Wappi calls: [('Get Sample Workflow', 'GET', 200), ('Create Workflow', 'POST', 200), ('Activate Created Workflow', 'POST', 'throw'), ('Discard New Clone', 'DELETE', 200)]
+    created ['TGnew10000000000'] deleted ['TGnew10000000000'] left []
+    clone_retirements: []
+--- TG session: (б) Activate refused: an orphan holds the webhook path: the new clone is discarded (create_failed) (run 1)
+    trace: Retire Same Bot Slot -> Register Profile -> Seed Reply Mode -> Seed Saved? -> Clone Plan -> Plan Read? -> Legacy Owned? -> Reuse? -> Get Sample Workflow -> Set Fields -> Create Workflow -> Get Created Workflow Id -> Clone Id -> Already Active? -> Activate Created Workflow -> Activated? -> Discard? -> Discard New Clone -> Discarded? -> Respond Create Failed
+    answer: {'success': False, 'error': 'create_failed'} stopped: None
+    n8n/Wappi calls: [('Get Sample Workflow', 'GET', 200), ('Create Workflow', 'POST', 200), ('Activate Created Workflow', 'POST', 409), ('Discard New Clone', 'DELETE', 200)]
+    created ['TGnew10000000000'] deleted ['TGnew10000000000'] left ['TGorph0000000000']
+    clone_retirements: []
+--- TG session: (б) Activate answers 500: the new clone is discarded (create_failed) (run 1)
+    trace: Retire Same Bot Slot -> Register Profile -> Seed Reply Mode -> Seed Saved? -> Clone Plan -> Plan Read? -> Legacy Owned? -> Reuse? -> Get Sample Workflow -> Set Fields -> Create Workflow -> Get Created Workflow Id -> Clone Id -> Already Active? -> Activate Created Workflow -> Activated? -> Discard? -> Discard New Clone -> Discarded? -> Respond Create Failed
+    answer: {'success': False, 'error': 'create_failed'} stopped: None
+    n8n/Wappi calls: [('Get Sample Workflow', 'GET', 200), ('Create Workflow', 'POST', 200), ('Activate Created Workflow', 'POST', 500), ('Discard New Clone', 'DELETE', 200)]
+    created ['TGnew10000000000'] deleted ['TGnew10000000000'] left []
+    clone_retirements: []
+--- TG session: (б) the Wappi webhook answers 502: the new clone is discarded (create_failed) (run 1)
+    trace: Retire Same Bot Slot -> Register Profile -> Seed Reply Mode -> Seed Saved? -> Clone Plan -> Plan Read? -> Legacy Owned? -> Reuse? -> Get Sample Workflow -> Set Fields -> Create Workflow -> Get Created Workflow Id -> Clone Id -> Already Active? -> Activate Created Workflow -> Activated? -> Set Wappi Webhook -> Webhook Set? -> Discard? -> Discard New Clone -> Discarded? -> Respond Create Failed
+    answer: {'success': False, 'error': 'create_failed'} stopped: None
+    n8n/Wappi calls: [('Get Sample Workflow', 'GET', 200), ('Create Workflow', 'POST', 200), ('Activate Created Workflow', 'POST', 200), ('Set Wappi Webhook', 'POST', 502), ('Discard New Clone', 'DELETE', 200)]
+    created ['TGnew10000000000'] deleted ['TGnew10000000000'] left []
+    clone_retirements: []
+--- TG session: (б) the Wappi webhook types time out: the new clone is discarded (create_failed) (run 1)
+    trace: Retire Same Bot Slot -> Register Profile -> Seed Reply Mode -> Seed Saved? -> Clone Plan -> Plan Read? -> Legacy Owned? -> Reuse? -> Get Sample Workflow -> Set Fields -> Create Workflow -> Get Created Workflow Id -> Clone Id -> Already Active? -> Activate Created Workflow -> Activated? -> Set Wappi Webhook -> Webhook Set? -> Set Wappi Webhook Types -> Types Set? -> Discard? -> Discard New Clone -> Discarded? -> Respond Create Failed
+    answer: {'success': False, 'error': 'create_failed'} stopped: None
+    n8n/Wappi calls: [('Get Sample Workflow', 'GET', 200), ('Create Workflow', 'POST', 200), ('Activate Created Workflow', 'POST', 200), ('Set Wappi Webhook', 'POST', 200), ('Set Wappi Webhook Types', 'POST', 'throw'), ('Discard New Clone', 'DELETE', 200)]
+    created ['TGnew10000000000'] deleted ['TGnew10000000000'] left []
+    clone_retirements: []
+--- TG session: (б) Bind Workflow Id: a query error ×3: the new clone is discarded (create_failed) (run 1)
+    trace: Retire Same Bot Slot -> Register Profile -> Seed Reply Mode -> Seed Saved? -> Clone Plan -> Plan Read? -> Legacy Owned? -> Reuse? -> Get Sample Workflow -> Set Fields -> Create Workflow -> Get Created Workflow Id -> Clone Id -> Already Active? -> Activate Created Workflow -> Activated? -> Set Wappi Webhook -> Webhook Set? -> Set Wappi Webhook Types -> Types Set? -> Bind Workflow Id -> Bound? -> Discard? -> Discard New Clone -> Discarded? -> Respond Create Failed
+    answer: {'success': False, 'error': 'create_failed'} stopped: None
+    n8n/Wappi calls: [('Get Sample Workflow', 'GET', 200), ('Create Workflow', 'POST', 200), ('Activate Created Workflow', 'POST', 200), ('Set Wappi Webhook', 'POST', 200), ('Set Wappi Webhook Types', 'POST', 200), ('Discard New Clone', 'DELETE', 200)]
+    created ['TGnew10000000000'] deleted ['TGnew10000000000'] left []
+    clone_retirements: []
+--- TG session: (б) Bind Workflow Id: an error thrown outside the query ×3: the new clone is discarded (create_failed) (run 1)
+    trace: Retire Same Bot Slot -> Register Profile -> Seed Reply Mode -> Seed Saved? -> Clone Plan -> Plan Read? -> Legacy Owned? -> Reuse? -> Get Sample Workflow -> Set Fields -> Create Workflow -> Get Created Workflow Id -> Clone Id -> Already Active? -> Activate Created Workflow -> Activated? -> Set Wappi Webhook -> Webhook Set? -> Set Wappi Webhook Types -> Types Set? -> Bind Workflow Id -> Bound? -> Discard? -> Discard New Clone -> Discarded? -> Respond Create Failed
+    answer: {'success': False, 'error': 'create_failed'} stopped: None
+    n8n/Wappi calls: [('Get Sample Workflow', 'GET', 200), ('Create Workflow', 'POST', 200), ('Activate Created Workflow', 'POST', 200), ('Set Wappi Webhook', 'POST', 200), ('Set Wappi Webhook Types', 'POST', 200), ('Discard New Clone', 'DELETE', 200)]
+    created ['TGnew10000000000'] deleted ['TGnew10000000000'] left []
+    clone_retirements: []
+--- TG session: (б) Bind Workflow Id: no items: the new clone is discarded (create_failed) (run 1)
+    trace: Retire Same Bot Slot -> Register Profile -> Seed Reply Mode -> Seed Saved? -> Clone Plan -> Plan Read? -> Legacy Owned? -> Reuse? -> Get Sample Workflow -> Set Fields -> Create Workflow -> Get Created Workflow Id -> Clone Id -> Already Active? -> Activate Created Workflow -> Activated? -> Set Wappi Webhook -> Webhook Set? -> Set Wappi Webhook Types -> Types Set? -> Bind Workflow Id -> Bound? -> Discard? -> Discard New Clone -> Discarded? -> Respond Create Failed
+    answer: {'success': False, 'error': 'create_failed'} stopped: None
+    n8n/Wappi calls: [('Get Sample Workflow', 'GET', 200), ('Create Workflow', 'POST', 200), ('Activate Created Workflow', 'POST', 200), ('Set Wappi Webhook', 'POST', 200), ('Set Wappi Webhook Types', 'POST', 200), ('Discard New Clone', 'DELETE', 200)]
+    created ['TGnew10000000000'] deleted ['TGnew10000000000'] left []
+    clone_retirements: []
+--- TG session: (б) Bind Workflow Id: bound = false (a concurrent Create won): the new clone is discarded (create_failed) (run 1)
+    trace: Retire Same Bot Slot -> Register Profile -> Seed Reply Mode -> Seed Saved? -> Clone Plan -> Plan Read? -> Legacy Owned? -> Reuse? -> Get Sample Workflow -> Set Fields -> Create Workflow -> Get Created Workflow Id -> Clone Id -> Already Active? -> Activate Created Workflow -> Activated? -> Set Wappi Webhook -> Webhook Set? -> Set Wappi Webhook Types -> Types Set? -> Bind Workflow Id -> Bound? -> Discard? -> Discard New Clone -> Discarded? -> Respond Create Failed
+    answer: {'success': False, 'error': 'create_failed'} stopped: None
+    n8n/Wappi calls: [('Get Sample Workflow', 'GET', 200), ('Create Workflow', 'POST', 200), ('Activate Created Workflow', 'POST', 200), ('Set Wappi Webhook', 'POST', 200), ('Set Wappi Webhook Types', 'POST', 200), ('Discard New Clone', 'DELETE', 200)]
+    created ['TGnew10000000000'] deleted ['TGnew10000000000'] left []
+    clone_retirements: []
+--- TG session: (б) Activate fails AND the discard answers 500: the new clone is journaled for the sweep (run 1)
+    trace: Retire Same Bot Slot -> Register Profile -> Seed Reply Mode -> Seed Saved? -> Clone Plan -> Plan Read? -> Legacy Owned? -> Reuse? -> Get Sample Workflow -> Set Fields -> Create Workflow -> Get Created Workflow Id -> Clone Id -> Already Active? -> Activate Created Workflow -> Activated? -> Discard? -> Discard New Clone -> Discarded? -> Record Discard Failure -> Respond Create Failed
+    answer: {'success': False, 'error': 'create_failed'} stopped: None
+    n8n/Wappi calls: [('Get Sample Workflow', 'GET', 200), ('Create Workflow', 'POST', 200), ('Activate Created Workflow', 'POST', 500), ('Discard New Clone', 'DELETE', 500)]
+    created ['TGnew10000000000'] deleted [] left ['TGnew10000000000']
+    clone_retirements: [{'workflow_id': 'TGnew10000000000', 'reason': 'discard_failed', 'replaced_by': None}]
+--- TG session: (б) Activate fails, the discard AND the journal fail: the ONE named residual (Tier 2) (run 1)
+    trace: Retire Same Bot Slot -> Register Profile -> Seed Reply Mode -> Seed Saved? -> Clone Plan -> Plan Read? -> Legacy Owned? -> Reuse? -> Get Sample Workflow -> Set Fields -> Create Workflow -> Get Created Workflow Id -> Clone Id -> Already Active? -> Activate Created Workflow -> Activated? -> Discard? -> Discard New Clone -> Discarded? -> Record Discard Failure -> Respond Create Failed
+    answer: {'success': False, 'error': 'create_failed'} stopped: None
+    n8n/Wappi calls: [('Get Sample Workflow', 'GET', 200), ('Create Workflow', 'POST', 200), ('Activate Created Workflow', 'POST', 500), ('Discard New Clone', 'DELETE', 500)]
+    created ['TGnew10000000000'] deleted [] left ['TGnew10000000000']
+    clone_retirements: []
+--- TG session: Clone Plan: a query error ×3: nothing is created (clone_plan_unavailable) (run 1)
+    trace: Retire Same Bot Slot -> Register Profile -> Seed Reply Mode -> Seed Saved? -> Clone Plan -> Plan Read? -> Respond Plan Unavailable
+    answer: {'success': False, 'error': 'clone_plan_unavailable'} stopped: None
+    n8n/Wappi calls: []
+    created [] deleted [] left ['TGold00000000000']
+    clone_retirements: []
+--- TG session: Clone Plan: an error thrown outside the query ×3: nothing is created (clone_plan_unavailable) (run 1)
+    trace: Retire Same Bot Slot -> Register Profile -> Seed Reply Mode -> Seed Saved? -> Clone Plan -> Plan Read? -> Respond Plan Unavailable
+    answer: {'success': False, 'error': 'clone_plan_unavailable'} stopped: None
+    n8n/Wappi calls: []
+    created [] deleted [] left ['TGold00000000000']
+    clone_retirements: []
+--- TG session: Clone Plan: no items: nothing is created (clone_plan_unavailable) (run 1)
+    trace: Retire Same Bot Slot -> Register Profile -> Seed Reply Mode -> Seed Saved? -> Clone Plan -> Plan Read? -> Respond Plan Unavailable
+    answer: {'success': False, 'error': 'clone_plan_unavailable'} stopped: None
+    n8n/Wappi calls: []
+    created [] deleted [] left ['TGold00000000000']
+    clone_retirements: []
+--- TG session: F2 R1: life → sweep (trial over) → purchase → reconnect with PreviousProfileId: everything under the new connection, the prior clone deleted (run 1)
+    trace: Retire Same Bot Slot -> Register Profile -> Seed Reply Mode -> Seed Saved? -> Clone Plan -> Plan Read? -> Legacy Owned? -> Reuse? -> Get Sample Workflow -> Set Fields -> Create Workflow -> Get Created Workflow Id -> Clone Id -> Already Active? -> Activate Created Workflow -> Activated? -> Set Wappi Webhook -> Webhook Set? -> Set Wappi Webhook Types -> Types Set? -> Bind Workflow Id -> Bound? -> Replaced Items -> Has Replaced? -> Delete Replaced Clone -> Send New Workflows Id
+    answer: {'id': 'TGnew10000000000', 'created': True, 'adoptedProfiles': ['tg-p1']} stopped: None
+    n8n/Wappi calls: [('Get Sample Workflow', 'GET', 200), ('Create Workflow', 'POST', 200), ('Activate Created Workflow', 'POST', 200), ('Set Wappi Webhook', 'POST', 200), ('Set Wappi Webhook Types', 'POST', 200), ('Delete Replaced Clone', 'DELETE', 200)]
+    created ['TGnew10000000000'] deleted ['TGold00000000000'] left ['TGnew10000000000']
+    clone_retirements: [{'workflow_id': 'TGold00000000000', 'reason': 'replaced', 'replaced_by': 'TGnew10000000000'}]
+--- TG session: F2 R4: the same pair again (the answer was lost): the bound clone is reused, nothing moves twice (run 1)
+    trace: Retire Same Bot Slot -> Register Profile -> Seed Reply Mode -> Seed Saved? -> Clone Plan -> Plan Read? -> Legacy Owned? -> Reuse? -> Get Sample Workflow -> Set Fields -> Create Workflow -> Get Created Workflow Id -> Clone Id -> Already Active? -> Activate Created Workflow -> Activated? -> Set Wappi Webhook -> Webhook Set? -> Set Wappi Webhook Types -> Types Set? -> Bind Workflow Id -> Bound? -> Replaced Items -> Has Replaced? -> Delete Replaced Clone -> Send New Workflows Id
+    answer: {'id': 'TGnew10000000000', 'created': True, 'adoptedProfiles': ['tg-p1']} stopped: None
+--- TG session: F2 R4: the same pair again (the answer was lost): the bound clone is reused, nothing moves twice (run 2)
+    trace: Retire Same Bot Slot -> Register Profile -> Seed Reply Mode -> Seed Saved? -> Clone Plan -> Plan Read? -> Legacy Owned? -> Reuse? -> Probe Bound Clone -> Bound Clone Usable? -> Reused Clone Id -> Clone Id -> Already Active? -> Set Wappi Webhook -> Webhook Set? -> Set Wappi Webhook Types -> Types Set? -> Bind Workflow Id -> Bound? -> Replaced Items -> Has Replaced? -> Delete Replaced Clone -> Send New Workflows Id
+    answer: {'id': 'TGnew10000000000', 'created': False, 'adoptedProfiles': ['tg-p1']} stopped: None
+    n8n/Wappi calls: [('Get Sample Workflow', 'GET', 200), ('Create Workflow', 'POST', 200), ('Activate Created Workflow', 'POST', 200), ('Set Wappi Webhook', 'POST', 200), ('Set Wappi Webhook Types', 'POST', 200), ('Delete Replaced Clone', 'DELETE', 200), ('Probe Bound Clone', 'GET', 200), ('Set Wappi Webhook', 'POST', 200), ('Set Wappi Webhook Types', 'POST', 200), ('Delete Replaced Clone', 'DELETE', 404)]
+    created ['TGnew10000000000'] deleted ['TGold00000000000'] left ['TGnew10000000000']
+    clone_retirements: [{'workflow_id': 'TGold00000000000', 'reason': 'replaced', 'replaced_by': 'TGnew10000000000'}]
+--- TG session: F2 R9: a two-channel bot reconnects this channel with the other id moved away (-1): only this channel moves (run 1)
+    trace: Retire Same Bot Slot -> Register Profile -> Seed Reply Mode -> Seed Saved? -> Clone Plan -> Plan Read? -> Legacy Owned? -> Reuse? -> Get Sample Workflow -> Set Fields -> Create Workflow -> Get Created Workflow Id -> Clone Id -> Already Active? -> Activate Created Workflow -> Activated? -> Set Wappi Webhook -> Webhook Set? -> Set Wappi Webhook Types -> Types Set? -> Bind Workflow Id -> Bound? -> Replaced Items -> Has Replaced? -> Delete Replaced Clone -> Send New Workflows Id
+    answer: {'id': 'TGnew10000000000', 'created': True, 'adoptedProfiles': ['tg-p1']} stopped: None
+    n8n/Wappi calls: [('Get Sample Workflow', 'GET', 200), ('Create Workflow', 'POST', 200), ('Activate Created Workflow', 'POST', 200), ('Set Wappi Webhook', 'POST', 200), ('Set Wappi Webhook Types', 'POST', 200), ('Delete Replaced Clone', 'DELETE', 200)]
+    created ['TGnew10000000000'] deleted ['TGold00000000000'] left ['TGnew10000000000', 'WAtwin0000000000']
+    clone_retirements: [{'workflow_id': 'TGold00000000000', 'reason': 'replaced', 'replaced_by': 'TGnew10000000000'}]
+--- TG session: F2 R9: this channel joins a bot of the other channel (the pre-F1 -1 rule still holds) (run 1)
+    trace: Retire Same Bot Slot -> Register Profile -> Seed Reply Mode -> Seed Saved? -> Clone Plan -> Plan Read? -> Legacy Owned? -> Reuse? -> Get Sample Workflow -> Set Fields -> Create Workflow -> Get Created Workflow Id -> Clone Id -> Already Active? -> Activate Created Workflow -> Activated? -> Set Wappi Webhook -> Webhook Set? -> Set Wappi Webhook Types -> Types Set? -> Bind Workflow Id -> Bound? -> Replaced Items -> Has Replaced? -> Send New Workflows Id
+    answer: {'id': 'TGnew10000000000', 'created': True, 'adoptedProfiles': []} stopped: None
+    n8n/Wappi calls: [('Get Sample Workflow', 'GET', 200), ('Create Workflow', 'POST', 200), ('Activate Created Workflow', 'POST', 200), ('Set Wappi Webhook', 'POST', 200), ('Set Wappi Webhook Types', 'POST', 200)]
+    created ['TGnew10000000000'] deleted [] left ['TGnew10000000000', 'WAtwin0000000000']
+    clone_retirements: []
+--- TG session: negative: another install's bot with the same bot key is never touched (run 1)
+    trace: Retire Same Bot Slot -> Register Profile -> Seed Reply Mode -> Seed Saved? -> Clone Plan -> Plan Read? -> Legacy Owned? -> Reuse? -> Get Sample Workflow -> Set Fields -> Create Workflow -> Get Created Workflow Id -> Clone Id -> Already Active? -> Activate Created Workflow -> Activated? -> Set Wappi Webhook -> Webhook Set? -> Set Wappi Webhook Types -> Types Set? -> Bind Workflow Id -> Bound? -> Replaced Items -> Has Replaced? -> Send New Workflows Id
+    answer: {'id': 'TGnew10000000000', 'created': True, 'adoptedProfiles': []} stopped: None
+    n8n/Wappi calls: [('Get Sample Workflow', 'GET', 200), ('Create Workflow', 'POST', 200), ('Activate Created Workflow', 'POST', 200), ('Set Wappi Webhook', 'POST', 200), ('Set Wappi Webhook Types', 'POST', 200)]
+    created ['TGnew10000000000'] deleted [] left ['TGfrgn0000000000', 'TGnew10000000000']
+    clone_retirements: []
+--- TG session: negative: a wizard Create (a NEW bot in a reused slot) never adopts, even naming the old profile (run 1)
+    trace: Retire Same Bot Slot -> Register Profile -> Seed Reply Mode -> Seed Saved? -> Clone Plan -> Plan Read? -> Legacy Owned? -> Reuse? -> Get Sample Workflow -> Set Fields -> Create Workflow -> Get Created Workflow Id -> Clone Id -> Already Active? -> Activate Created Workflow -> Activated? -> Set Wappi Webhook -> Webhook Set? -> Set Wappi Webhook Types -> Types Set? -> Bind Workflow Id -> Bound? -> Replaced Items -> Has Replaced? -> Send New Workflows Id
+    answer: {'id': 'TGnew10000000000', 'created': True, 'adoptedProfiles': []} stopped: None
+    n8n/Wappi calls: [('Get Sample Workflow', 'GET', 200), ('Create Workflow', 'POST', 200), ('Activate Created Workflow', 'POST', 200), ('Set Wappi Webhook', 'POST', 200), ('Set Wappi Webhook Types', 'POST', 200)]
+    created ['TGnew10000000000'] deleted [] left ['TGnew10000000000', 'TGold00000000000']
+    clone_retirements: []
+--- TG legacy: negative: a legacy Create on a profile an install owns is refused (profile_owned), nothing created (run 1)
+    trace: If Has AppUserID? -> Seed Reply Mode -> Seed Saved? -> Clone Plan -> Plan Read? -> Legacy Owned? -> Respond Profile Owned
+    answer: {'success': False, 'error': 'profile_owned'} stopped: None
+    n8n/Wappi calls: []
+    created [] deleted [] left ['TGold00000000000']
+    clone_retirements: []
+--- TG legacy: legacy: fresh (run 1)
+    trace: If Has AppUserID? -> Seed Reply Mode -> Seed Saved? -> Clone Plan -> Plan Read? -> Legacy Owned? -> Reuse? -> Get Sample Workflow -> Set Fields -> Create Workflow -> Get Created Workflow Id -> Clone Id -> Already Active? -> Activate Created Workflow -> Activated? -> Set Wappi Webhook -> Webhook Set? -> Set Wappi Webhook Types -> Types Set? -> Bind Workflow Id -> Bound? -> Replaced Items -> Has Replaced? -> Send New Workflows Id
+    answer: {'id': 'TGnew10000000000', 'created': True, 'adoptedProfiles': []} stopped: None
+    n8n/Wappi calls: [('Get Sample Workflow', 'GET', 200), ('Create Workflow', 'POST', 200), ('Activate Created Workflow', 'POST', 200), ('Set Wappi Webhook', 'POST', 200), ('Set Wappi Webhook Types', 'POST', 200)]
+    created ['TGnew10000000000'] deleted [] left ['TGnew10000000000']
+    clone_retirements: []
+--- TG legacy: legacy: reuse an owner-less binding (run 1)
+    trace: If Has AppUserID? -> Seed Reply Mode -> Seed Saved? -> Clone Plan -> Plan Read? -> Legacy Owned? -> Reuse? -> Probe Bound Clone -> Bound Clone Usable? -> Reused Clone Id -> Clone Id -> Already Active? -> Activate Created Workflow -> Activated? -> Set Wappi Webhook -> Webhook Set? -> Set Wappi Webhook Types -> Types Set? -> Bind Workflow Id -> Bound? -> Replaced Items -> Has Replaced? -> Send New Workflows Id
+    answer: {'id': 'TGold00000000000', 'created': False, 'adoptedProfiles': []} stopped: None
+    n8n/Wappi calls: [('Probe Bound Clone', 'GET', 200), ('Activate Created Workflow', 'POST', 200), ('Set Wappi Webhook', 'POST', 200), ('Set Wappi Webhook Types', 'POST', 200)]
+    created [] deleted [] left ['TGold00000000000']
+    clone_retirements: []
+--- TG legacy: legacy: the owner-less binding is gone (404): a new clone, the old id booked (run 1)
+    trace: If Has AppUserID? -> Seed Reply Mode -> Seed Saved? -> Clone Plan -> Plan Read? -> Legacy Owned? -> Reuse? -> Probe Bound Clone -> Bound Clone Usable? -> Bound Clone Gone? -> Get Sample Workflow -> Set Fields -> Create Workflow -> Get Created Workflow Id -> Clone Id -> Already Active? -> Activate Created Workflow -> Activated? -> Set Wappi Webhook -> Webhook Set? -> Set Wappi Webhook Types -> Types Set? -> Bind Workflow Id -> Bound? -> Replaced Items -> Has Replaced? -> Delete Replaced Clone -> Send New Workflows Id
+    answer: {'id': 'TGnew10000000000', 'created': True, 'adoptedProfiles': []} stopped: None
+    n8n/Wappi calls: [('Probe Bound Clone', 'GET', 404), ('Get Sample Workflow', 'GET', 200), ('Create Workflow', 'POST', 200), ('Activate Created Workflow', 'POST', 200), ('Set Wappi Webhook', 'POST', 200), ('Set Wappi Webhook Types', 'POST', 200), ('Delete Replaced Clone', 'DELETE', 404)]
+    created ['TGnew10000000000'] deleted [] left ['TGnew10000000000']
+    clone_retirements: [{'workflow_id': 'TGold00000000000', 'reason': 'replaced', 'replaced_by': 'TGnew10000000000'}]
+--- TG legacy: legacy: Activate fails: the new clone is discarded (run 1)
+    trace: If Has AppUserID? -> Seed Reply Mode -> Seed Saved? -> Clone Plan -> Plan Read? -> Legacy Owned? -> Reuse? -> Get Sample Workflow -> Set Fields -> Create Workflow -> Get Created Workflow Id -> Clone Id -> Already Active? -> Activate Created Workflow -> Activated? -> Discard? -> Discard New Clone -> Discarded? -> Respond Create Failed
+    answer: {'success': False, 'error': 'create_failed'} stopped: None
+    n8n/Wappi calls: [('Get Sample Workflow', 'GET', 200), ('Create Workflow', 'POST', 200), ('Activate Created Workflow', 'POST', 500), ('Discard New Clone', 'DELETE', 200)]
+    created ['TGnew10000000000'] deleted ['TGnew10000000000'] left []
+    clone_retirements: []
+--- TG legacy: legacy: a second profile of an owner-less bot replaces nothing (no proof): the old clone stays bound (run 1)
+    trace: If Has AppUserID? -> Seed Reply Mode -> Seed Saved? -> Clone Plan -> Plan Read? -> Legacy Owned? -> Reuse? -> Get Sample Workflow -> Set Fields -> Create Workflow -> Get Created Workflow Id -> Clone Id -> Already Active? -> Activate Created Workflow -> Activated? -> Set Wappi Webhook -> Webhook Set? -> Set Wappi Webhook Types -> Types Set? -> Bind Workflow Id -> Bound? -> Replaced Items -> Has Replaced? -> Send New Workflows Id
+    answer: {'id': 'TGnew10000000000', 'created': True, 'adoptedProfiles': []} stopped: None
+    n8n/Wappi calls: [('Get Sample Workflow', 'GET', 200), ('Create Workflow', 'POST', 200), ('Activate Created Workflow', 'POST', 200), ('Set Wappi Webhook', 'POST', 200), ('Set Wappi Webhook Types', 'POST', 200)]
+    created ['TGnew10000000000'] deleted [] left ['TGnew10000000000', 'TGold00000000000']
+    clone_retirements: []
+

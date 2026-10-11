@@ -31,7 +31,13 @@ empty-result rule; n8n-core's retry / continue-on-error semantics) from the slot
 Part C proves the checks catch the naive «continueErrorOutput» variant (a thrown error still goes live there).
 Part D keeps the books of every clone a run touches — created − deleted − handed to the client = LOST — over both
 entries into the clone chain (`Register Profile` and the legacy `If Has AppUserID?` false branch), every failure form,
-with the compensating DELETE succeeding and failing.
+with the line's DELETEs (Discard New Clone / Delete Replaced Clone) succeeding and failing.
+
+F1 + F2 (T3, 2026-10-11): the clone chain starts at `Clone Plan` (apply-clone-lifecycle.py) — plan → reuse the bound clone
+| template → Create → Clone Id → Activate → Wappi → Bind (positive `bound`) — so a run here answers the plan and the bind
+with their success rows (their real SQL is tests/test_clone_lineage_sql.py's, the whole line end to end
+tests/test_create_clone.py's) and a success answer is {id, created, adoptedProfiles}. A reply-mode refusal still reads no
+template, creates nothing and activates nothing (part E also pins Activate: the plan may REUSE a clone).
 
     python3 Tools/n8n/tests/test_create_seed.py
 """
@@ -103,8 +109,10 @@ def touched(rep, name):
 FAIL = {'query_error': [{'queryError': 'connection terminated unexpectedly'}],
         'thrown': [{'throw': 'Connection pool exhausted'}],
         'empty': [{'noItems': True}]}
-CREATED = 'WFr8new'
-DELETE_FAILED = {'error': {'message': 'getaddrinfo EAI_AGAIN n8n.choosereply.com', 'name': 'NodeApiError'}}
+CREATED = 'WFr8new000000001'
+DELETE_FAILED = {'statusCode': 500, 'body': {'message': 'Internal Server Error'}}   # every DELETE of the line fails
+PLAN_OK = [{'rows': [{'planned': True, 'own_id': None, 'foreign': False, 'replace_ids': [], 'pred_profiles': []}]}]
+BIND_OK = [{'rows': [{'bound': True, 'workflow_id': CREATED, 'adopted_profiles': [], 'retired_ids': []}]}]
 ENTRIES = {'register': ('Register Profile', '$RCAnonymousID:r8'),   # the slot-allowed branch (session clients)
            'legacy': ('If Has AppUserID?', None)}                     # a body without AppUserID: the If's FALSE branch
 
@@ -113,7 +121,8 @@ def scenarios(field, app_user_id, start, http=None):
     """Every seed outcome × mode the graph must answer: «Вместе» failures refuse, everything else goes live."""
     sc = {}
     mk = lambda mode, seed_: {'body': body(field, 'p-r8', mode, 150, app_user_id), 'createdId': CREATED, 'seed': seed_,
-                              'start': start, 'http': dict(http or {})}
+                              'start': start, 'http': dict(http or {}),
+                              'pg': {'Clone Plan': PLAN_OK, 'Bind Workflow Id': BIND_OK}}
     for kind, attempts in FAIL.items():
         sc[f'semi:{kind}'] = mk('semi', attempts)
     sc['semi:ok'] = mk('semi', [{'rows': OK_ROWS}])
@@ -147,8 +156,9 @@ def judge(k, r, no_clone=True):
     else:
         if len(created) != 1 or not (act and act[0]['url'].endswith(f'/workflows/{CREATED}/activate') and hook and bound):
             bad.append(f'{k}: a create that must succeed did not go live exactly once: trace={r["trace"]}')
-        if resp != {'id': CREATED} or touched(r, 'Delete Unseeded Workflow'):
-            bad.append(f'{k}: answered {resp}, deleted={touched(r, "Delete Unseeded Workflow")}')
+        if (resp or {}).get('id') != CREATED or (resp or {}).get('created') is not True or 'success' in (resp or {}) \
+                or [e for e in r['effects'] if e.get('method') == 'DELETE']:
+            bad.append(f'{k}: answered {resp}, deleted={[e for e in r["effects"] if e.get("method") == "DELETE"]}')
     if k == 'semi:transient' and r['seedCalls'] < 2:
         bad.append(f'{k}: a transient seed failure was not retried (calls={r["seedCalls"]})')
     return bad
@@ -163,8 +173,8 @@ def violations(w, field):
 def lost(r, delete_ok):
     """Clone books of one run: created − deleted − handed to the client. A DELETE counts only when it reached n8n."""
     created = len(touched(r, 'Create Workflow'))
-    deleted = len([e for e in touched(r, 'Delete Unseeded Workflow')
-                   if e['method'] == 'DELETE' and e['url'].endswith(f'/api/v1/workflows/{CREATED}')]) if delete_ok else 0
+    deleted = len([e for e in r['effects'] if e.get('method') == 'DELETE' and e['url'].endswith(f'/api/v1/workflows/{CREATED}')
+                   and e.get('status') in (200, 404)]) if delete_ok else 0
     returned = 1 if ((r['response'] or {}).get('json') or {}).get('id') == CREATED else 0
     return created - deleted - returned
 
@@ -218,7 +228,8 @@ for ch, (fname, field) in CREATES.items():
     for entry, (start, app_user_id) in ENTRIES.items():
         runs = {}
         for delete_ok in (True, False):
-            sc = scenarios(field, app_user_id, start, None if delete_ok else {'Delete Unseeded Workflow': DELETE_FAILED})
+            sc = scenarios(field, app_user_id, start, None if delete_ok else {'Discard New Clone': DELETE_FAILED,
+                                                                              'Delete Replaced Clone': DELETE_FAILED})
             for k, r in drive(W, sc).items():
                 if must_refuse(k) or delete_ok:          # a DELETE outcome only matters where a refusal could compensate
                     runs[f'{k}:{"delete_ok" if delete_ok else "delete_failed"}' if must_refuse(k) else k] = (k, r, delete_ok)
@@ -239,12 +250,12 @@ for ch, (fname, field) in CREATES.items():
             w['connections']['If Has AppUserID?']['main'][1] = [{'node': dst, 'type': 'main', 'index': 0}]
 
         def pre_fix(w):         # the 2026-09-27 shape: clone first, seed after Create, a compensating DELETE on refusal
-            entries_to(w, 'Get Sample Workflow')
-            w['connections']['Get Created Workflow Id'] = link('Seed Reply Mode')
+            entries_to(w, 'Clone Plan')
+            w['connections']['Clone Id'] = link('Seed Reply Mode')
             w['connections']['Seed Saved?'] = link('Activate Created Workflow', 'Respond Reply Mode Not Saved')
 
-        def bypass(w):          # a later generator re-adds Register Profile → Get Sample: the slot-allowed branch skips the gate
-            w['connections']['Register Profile'] = link('Seed Reply Mode', 'Get Sample Workflow')
+        def bypass(w):          # a later generator re-adds Register Profile → the plan: the slot-allowed branch skips the gate
+            w['connections']['Register Profile'] = link('Seed Reply Mode', 'Clone Plan')
             w['connections']['Register Profile']['main'] = [w['connections']['Register Profile']['main'][0]
                                                            + w['connections']['Register Profile']['main'][1]]
 
@@ -252,14 +263,23 @@ for ch, (fname, field) in CREATES.items():
             entries_to(w, 'Seed Saved?')
 
         def legacy_skips(w):    # only the legacy (no AppUserID) branch goes around the gate
-            w['connections']['If Has AppUserID?']['main'][1] = [{'node': 'Get Sample Workflow', 'type': 'main', 'index': 0}]
+            w['connections']['If Has AppUserID?']['main'][1] = [{'node': 'Clone Plan', 'type': 'main', 'index': 0}]
+
+        def template_around_plan(w):   # Seed Saved?[0] straight to the template: the plan (reuse / foreign refusal) bypassed
+            w['connections']['Seed Saved?']['main'][0] = [{'node': 'Get Sample Workflow', 'type': 'main', 'index': 0}]
+
+        def reuse_around_gate(w):      # F1: the REUSE branch reachable around the gate — an existing clone activated unseeded
+            w['connections']['Register Profile']['main'][0] = [{'node': 'Seed Reply Mode', 'type': 'main', 'index': 0},
+                                                               {'node': 'Reused Clone Id', 'type': 'main', 'index': 0}]
 
         try:
             vrm.check_create(fname, field, copy.deepcopy(W))
         except AssertionError as e:
             c.check(False, f'canonical graph rejected: {e}')
         for label, mutate in (('pre-fix (seed after Create)', pre_fix), ('Register Profile bypass', bypass),
-                              ('seed unreachable', unseeded), ('legacy branch bypass', legacy_skips)):
+                              ('seed unreachable', unseeded), ('legacy branch bypass', legacy_skips),
+                              ('template read around the plan', template_around_plan),
+                              ('reuse branch around the gate', reuse_around_gate)):
             bad = copy.deepcopy(W)
             mutate(bad)
             c.check(bad != W, f'{label}: mutation did not apply')
