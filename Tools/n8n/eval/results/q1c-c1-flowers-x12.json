@@ -1,0 +1,616 @@
+{
+ "summary": {
+  "label": "q1c-c1-flowers-x12",
+  "prompts_ref": "83fc5dfb81875d3c832d973bed1889c3863fca3e",
+  "scenario_version": "v1.3 (2026-10-09: Q1 — the owner's agreement in the chat history: a6_owner_agreement_* ×3 verticals, q1p_* paraphrases (other words, facts, verticals), q1c_* negative controls (no agreement / the CLIENT names the time) with not_mentions:15:00 against echoing the client's own time as agreed; harness h6)",
+  "harness": "h6 (2026-10-09, Q1: not_mentions:X — X stated in no un-refused clause and not merely quoted as the client's words, for the client-time echo; mentions:H:MM reads a time of day; on top of h5 2026-10-08, V9-r2: no_conflict_claim / no_price_caveat for a price list that AGREES with the catalog; on top of h4 2026-10-07 V9: «расхождение» + negated conflict, zero-price / elliptical free delivery, «итого по N позициям» partial, «нужен» / the car or device by name, a word inside the installment claim, Kazakh = no Russian sentence, «18,000»; h3 2026-09-27 R14; checks pinned by test_checks.py)",
+  "model": "gpt-5.4-mini",
+  "reasoning_effort": null,
+  "dropped_params": [],
+  "panel_model": null,
+  "max_tokens": 200,
+  "search_simulation": "Price List Search sub-workflow (Reconcile Prices at 83fc5dfb81875d3c832d973bed1889c3863fca3e)",
+  "scenarios": 2,
+  "runs": 24,
+  "pass_all": 1,
+  "flaky": 1,
+  "fail": 0,
+  "error_runs": 0,
+  "finish_reason_length_runs": 0,
+  "prompt_tokens": 146673,
+  "cached_tokens": 143104,
+  "completion_tokens": 1043,
+  "reasoning_tokens": 0,
+  "cost_usd_auto_path": 0.0181,
+  "prices_usd_per_1m": [
+   0.75,
+   0.075,
+   4.5
+  ],
+  "latency_ms": {
+   "auto": {
+    "n": 24,
+    "median": 1551,
+    "p90": 2867,
+    "max": 3403
+   },
+   "panel": null
+  },
+  "seconds": 47,
+  "by_check": {
+   "mentions:15": "12/12",
+   "mentions:19": "7/12",
+   "mentions:Марин": "12/12",
+   "mentions:Санжар": "1/12"
+  }
+ },
+ "results": [
+  {
+   "id": "a6_owner_agreement_flowers",
+   "vertical": "flowers",
+   "mode": "auto",
+   "lang": "ru",
+   "tags": [
+    "memory",
+    "key"
+   ],
+   "repeats": 12,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "mentions:15": true,
+      "mentions:Марин": true
+     },
+     "text": "Завтра в 15:00, спросите Марину.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4276,
+      "completion_tokens": 23,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1268,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:15": true,
+      "mentions:Марин": true
+     },
+     "text": "Завтра в 15:00, спросите Марину.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4276,
+      "completion_tokens": 23,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1101,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:15": true,
+      "mentions:Марин": true
+     },
+     "text": "Завтра в 15:00, спросите Марину.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4276,
+      "completion_tokens": 17,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1023,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:15": true,
+      "mentions:Марин": true
+     },
+     "text": "Завтра в 15:00, спросите Марину.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4276,
+      "completion_tokens": 17,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1023,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:15": true,
+      "mentions:Марин": true
+     },
+     "text": "Завтра в 15:00, спросите Марину.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4276,
+      "completion_tokens": 17,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1051,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:15": true,
+      "mentions:Марин": true
+     },
+     "text": "Завтра в 15:00, спросите Марину.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4276,
+      "completion_tokens": 17,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1289,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:15": true,
+      "mentions:Марин": true
+     },
+     "text": "Завтра в 15:00, спросить Марину.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4276,
+      "completion_tokens": 17,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1202,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:15": true,
+      "mentions:Марин": true
+     },
+     "text": "Завтра в 15:00, спросите Марину.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4276,
+      "completion_tokens": 23,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1368,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:15": true,
+      "mentions:Марин": true
+     },
+     "text": "Завтра в 15:00, спросите Марину.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4276,
+      "completion_tokens": 23,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1551,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:15": true,
+      "mentions:Марин": true
+     },
+     "text": "Завтра в 15:00, спросите Марину.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4276,
+      "completion_tokens": 23,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1276,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:15": true,
+      "mentions:Марин": true
+     },
+     "text": "Завтра в 15:00, спросите Марину.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4276,
+      "completion_tokens": 17,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1056,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:15": true,
+      "mentions:Марин": true
+     },
+     "text": "Завтра в 15:00, спросите Марину.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4276,
+      "completion_tokens": 23,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1336,
+     "status": null
+    }
+   ]
+  },
+  {
+   "id": "q1p_delivery_flowers",
+   "vertical": "flowers",
+   "mode": "auto",
+   "lang": "ru",
+   "tags": [
+    "memory"
+   ],
+   "repeats": 12,
+   "pass_rate": 0.08333333333333333,
+   "runs": [
+    {
+     "verdicts": {
+      "mentions:19": false,
+      "mentions:Санжар": false
+     },
+     "text": "Передал флористу — он подтвердит заказ.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "summary": "Клиент хочет букет 25 роз с доставкой сегодня к 19:00. Нужно подтвердить время доставки и детали заказа."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8674,
+      "completion_tokens": 63,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2614,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:19": true,
+      "mentions:Санжар": false
+     },
+     "text": "К 19:00.\nПозвонит флорист или курьер перед доставкой.\n\nПередал флористу — он подтвердит заказ.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "summary": "Клиент хочет букет 25 роз с доставкой сегодня к 19:00. Просит подтвердить время и кто позвонит."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8676,
+      "completion_tokens": 83,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2849,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:19": true,
+      "mentions:Санжар": false
+     },
+     "text": "К 19:00.\nКурьер позвонит за 30 минут.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4285,
+      "completion_tokens": 26,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1314,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:19": true,
+      "mentions:Санжар": false
+     },
+     "text": "К 19:00.\nПозвонит курьер.\n\nПередал флористу — он подтвердит заказ.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "summary": "Клиент хочет букет 25 роз с доставкой сегодня к 19:00. Просит уточнить время и кто позвонит. Детали заказа уже частично согласованы в переписке.",
+        "name": "",
+        "phone": ""
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8694,
+      "completion_tokens": 95,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3403,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:19": false,
+      "mentions:Санжар": false
+     },
+     "text": "Передал флористу — он подтвердит заказ.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "summary": "Клиент хочет букет 25 роз с доставкой сегодня к 19:00. Нужно подтвердить время доставки и детали заказа."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8674,
+      "completion_tokens": 63,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2498,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:19": true,
+      "mentions:Санжар": false
+     },
+     "text": "К 19:00.\nКурьер позвонит за 30 минут.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4285,
+      "completion_tokens": 26,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2939,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:19": false,
+      "mentions:Санжар": false
+     },
+     "text": "Передал флористу — он подтвердит заказ.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "summary": "Клиент хочет букет 25 роз с доставкой сегодня к 19:00. Нужно подтвердить время доставки и детали заказа."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8674,
+      "completion_tokens": 63,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2858,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:19": true,
+      "mentions:Санжар": true
+     },
+     "text": "К 19:00.\nПозвонит курьер Санжар за 30 минут до доставки.\n\nПередал флористу — он подтвердит заказ.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "summary": "Клиент хочет букет 25 роз с доставкой сегодня к 19:00. Просит подтвердить время и кто позвонит."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8676,
+      "completion_tokens": 86,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2860,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:19": true,
+      "mentions:Санжар": false
+     },
+     "text": "К 19:00.\nПередал флористу — он подтвердит заказ.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "summary": "Клиент хочет букет 25 роз с доставкой сегодня к 19:00. Просит подтвердить время и кто позвонит."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8676,
+      "completion_tokens": 71,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2774,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:19": false,
+      "mentions:Санжар": false
+     },
+     "text": "Передал флористу — он подтвердит заказ.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "summary": "Клиент хочет букет 25 роз с доставкой сегодня к 19:00. Уточняет время и кто позвонит. Нужна проверка и подтверждение заказа флористом.",
+        "name": "",
+        "phone": ""
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8693,
+      "completion_tokens": 82,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2867,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:19": false,
+      "mentions:Санжар": false
+     },
+     "text": "Передал флористу — он подтвердит заказ.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "summary": "Клиент хочет букет 25 роз с доставкой сегодня к 19:00. Нужно подтвердить время доставки и детали заказа."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8674,
+      "completion_tokens": 63,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2629,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:19": true,
+      "mentions:Санжар": false
+     },
+     "text": "К 19:00.\nПозвонит курьер.\n\nПередал владельцу, он свяжется с вами.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "summary": "Клиент хочет букет 25 роз с доставкой сегодня к 19:00. Просит уточнить, к какому времени и кто позвонит."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8680,
+      "completion_tokens": 82,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2760,
+     "status": null
+    }
+   ]
+  }
+ ]
+}

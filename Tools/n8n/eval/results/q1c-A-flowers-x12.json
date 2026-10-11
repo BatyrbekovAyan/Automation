@@ -1,0 +1,532 @@
+{
+ "summary": {
+  "label": "q1c-A-flowers-x12",
+  "prompts_ref": "f02b6674",
+  "scenario_version": "v1.3 (2026-10-09: Q1 — the owner's agreement in the chat history: a6_owner_agreement_* ×3 verticals, q1p_* paraphrases (other words, facts, verticals), q1c_* negative controls (no agreement / the CLIENT names the time) with not_mentions:15:00 against echoing the client's own time as agreed; harness h6)",
+  "harness": "h6 (2026-10-09, Q1: not_mentions:X — X stated in no un-refused clause and not merely quoted as the client's words, for the client-time echo; mentions:H:MM reads a time of day; on top of h5 2026-10-08, V9-r2: no_conflict_claim / no_price_caveat for a price list that AGREES with the catalog; on top of h4 2026-10-07 V9: «расхождение» + negated conflict, zero-price / elliptical free delivery, «итого по N позициям» partial, «нужен» / the car or device by name, a word inside the installment claim, Kazakh = no Russian sentence, «18,000»; h3 2026-09-27 R14; checks pinned by test_checks.py)",
+  "model": "gpt-5.4-mini",
+  "reasoning_effort": null,
+  "dropped_params": [],
+  "panel_model": null,
+  "max_tokens": 200,
+  "search_simulation": "Price List Search sub-workflow (Reconcile Prices at f02b6674)",
+  "scenarios": 2,
+  "runs": 24,
+  "pass_all": 1,
+  "flaky": 1,
+  "fail": 0,
+  "error_runs": 0,
+  "finish_reason_length_runs": 0,
+  "prompt_tokens": 102780,
+  "cached_tokens": 100864,
+  "completion_tokens": 527,
+  "reasoning_tokens": 0,
+  "cost_usd_auto_path": 0.0114,
+  "prices_usd_per_1m": [
+   0.75,
+   0.075,
+   4.5
+  ],
+  "latency_ms": {
+   "auto": {
+    "n": 24,
+    "median": 1132,
+    "p90": 1393,
+    "max": 1680
+   },
+   "panel": null
+  },
+  "seconds": 28,
+  "by_check": {
+   "mentions:15": "12/12",
+   "mentions:19": "12/12",
+   "mentions:Марин": "12/12",
+   "mentions:Санжар": "1/12"
+  }
+ },
+ "results": [
+  {
+   "id": "a6_owner_agreement_flowers",
+   "vertical": "flowers",
+   "mode": "auto",
+   "lang": "ru",
+   "tags": [
+    "memory",
+    "key"
+   ],
+   "repeats": 12,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "mentions:15": true,
+      "mentions:Марин": true
+     },
+     "text": "Завтра в 15:00, спросите Марину.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4278,
+      "completion_tokens": 23,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1166,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:15": true,
+      "mentions:Марин": true
+     },
+     "text": "Завтра в 15:00, спросите Марину.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4278,
+      "completion_tokens": 17,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1016,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:15": true,
+      "mentions:Марин": true
+     },
+     "text": "Завтра в 15:00, спросите Марину.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4278,
+      "completion_tokens": 17,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1393,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:15": true,
+      "mentions:Марин": true
+     },
+     "text": "Завтра в 15:00, спросите Марину.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4278,
+      "completion_tokens": 17,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1132,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:15": true,
+      "mentions:Марин": true
+     },
+     "text": "Завтра в 15:00, спросите Марину.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4278,
+      "completion_tokens": 17,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1277,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:15": true,
+      "mentions:Марин": true
+     },
+     "text": "Завтра в 15:00, спросите Марину.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4278,
+      "completion_tokens": 17,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1058,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:15": true,
+      "mentions:Марин": true
+     },
+     "text": "Завтра в 15:00, спросите Марину.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4278,
+      "completion_tokens": 17,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1150,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:15": true,
+      "mentions:Марин": true
+     },
+     "text": "Завтра в 15:00, спросите Марину.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4278,
+      "completion_tokens": 17,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1007,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:15": true,
+      "mentions:Марин": true
+     },
+     "text": "Завтра в 15:00, спросите Марину.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4278,
+      "completion_tokens": 17,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 979,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:15": true,
+      "mentions:Марин": true
+     },
+     "text": "Завтра в 15:00, спросите Марину.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4278,
+      "completion_tokens": 17,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1051,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:15": true,
+      "mentions:Марин": true
+     },
+     "text": "Завтра в 15:00, спросите Марину.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4278,
+      "completion_tokens": 17,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1056,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:15": true,
+      "mentions:Марин": true
+     },
+     "text": "Завтра в 15:00, спросите Марину.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4278,
+      "completion_tokens": 17,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1037,
+     "status": null
+    }
+   ]
+  },
+  {
+   "id": "q1p_delivery_flowers",
+   "vertical": "flowers",
+   "mode": "auto",
+   "lang": "ru",
+   "tags": [
+    "memory"
+   ],
+   "repeats": 12,
+   "pass_rate": 0.08333333333333333,
+   "runs": [
+    {
+     "verdicts": {
+      "mentions:19": true,
+      "mentions:Санжар": false
+     },
+     "text": "К 19:00.\nКурьер позвонит за 30 минут.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4287,
+      "completion_tokens": 26,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1187,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:19": true,
+      "mentions:Санжар": false
+     },
+     "text": "К 19:00.\nКурьер позвонит за 30 минут.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4287,
+      "completion_tokens": 26,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1521,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:19": true,
+      "mentions:Санжар": false
+     },
+     "text": "К 19:00.\nКурьер позвонит за 30 минут.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4287,
+      "completion_tokens": 26,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1085,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:19": true,
+      "mentions:Санжар": false
+     },
+     "text": "К 19:00.\nКурьер позвонит за 30 минут.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4287,
+      "completion_tokens": 26,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1330,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:19": true,
+      "mentions:Санжар": false
+     },
+     "text": "К 19:00.\nКурьер позвонит за 30 минут.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4287,
+      "completion_tokens": 26,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1182,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:19": true,
+      "mentions:Санжар": false
+     },
+     "text": "К 19:00.\nКурьер позвонит за 30 минут.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4287,
+      "completion_tokens": 26,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1680,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:19": true,
+      "mentions:Санжар": false
+     },
+     "text": "К 19:00.\nКурьер позвонит за 30 минут.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4287,
+      "completion_tokens": 26,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1116,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:19": true,
+      "mentions:Санжар": false
+     },
+     "text": "К 19:00.\nКурьер позвонит за 30 минут.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4287,
+      "completion_tokens": 26,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1259,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:19": true,
+      "mentions:Санжар": true
+     },
+     "text": "К 19:00.\nКурьер Санжар позвонит за 30 минут.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4287,
+      "completion_tokens": 29,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1169,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:19": true,
+      "mentions:Санжар": false
+     },
+     "text": "К 19:00.\nКурьер позвонит за 30 минут.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4287,
+      "completion_tokens": 26,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1115,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:19": true,
+      "mentions:Санжар": false
+     },
+     "text": "К 19:00.\n\nКурьер позвонит за 30 минут до доставки.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4287,
+      "completion_tokens": 28,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1108,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "mentions:19": true,
+      "mentions:Санжар": false
+     },
+     "text": "К 19:00.\nКурьер позвонит за 30 минут.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4287,
+      "completion_tokens": 26,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1099,
+     "status": null
+    }
+   ]
+  }
+ ]
+}
