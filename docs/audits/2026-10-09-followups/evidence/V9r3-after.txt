@@ -1,0 +1,146 @@
+# V9-r3 AFTER (2026-10-11): the fix in Tools/n8n/build-price-search.py (RECONCILE_JS), regenerated canon
+# (crPriceSearch001-Price_List_Search.json + 9PTyYcelRQI7bGDb-Suggest_Replies.json; Test Dialog / bot templates unchanged), on top of HEAD 25a5e556.
+# Before: V9r3-before.txt (same two test files at HEAD: 31/36 and 12/16 — every failure is a new S1/S2 case).
+
+## 1. The two price suites (python3 Tools/n8n/tests/test_price_search.py ; python3 Tools/n8n/tests/test_suggest_price.py)
+PASS sub-workflow: Guard → Valid? → Search Price Lists (the bot's own documents, fail-open) → Reconcile Prices
+PASS [WA] template: the price-list tool goes through the sub-workflow with the clone's own id, key and PUBLISHED prompt
+PASS [TG] template: the price-list tool goes through the sub-workflow with the clone's own id, key and PUBLISHED prompt
+PASS Test Dialog: its tool is the same sub-workflow, fed with the bot's id/key (Validate) and the published prompt it read (Compose)
+PASS Guard: a search runs only for a real bot id under botWaId / botTgId
+PASS ap_source_conflict: one mark under the price-list row — the item, 3200 and 3900, «Цены расходятся»
+PASS base documents of every vertical, at their own catalog prices, come back byte for byte
+PASS price-list shapes the converter / OCR / PDF / free text produce: a different price is marked
+PASS V9-r2 F2(b): a bare number at the end of a PDF/DOCX line (no currency, no label) is at most the soft mark, still naming both numbers
+PASS all price columns are compared: опт/розн — no mark when either equals the catalog, both named when neither does
+PASS ambiguous prices («от», a range) get the catalog price only — never «Цены расходятся»
+PASS no mark: price on the next line, a longer code, a bare year, an analogue mention or column, no article, «договорная»
+PASS grades, sizes and specs are not articles; an accessory with the same model code is only a soft mark
+PASS adversarial (own review): analogue rows, promo prices, joined specs, two amounts — never a false «Цены расходятся»
+PASS V9-r2 corpus: rows about another item / prices that are not comparable — never the firm «Цены расходятся»
+PASS V9-r2 corpus: the catalog price on the row, or the article at the catalog price elsewhere in the result — no mark
+PASS V9-r2 corpus: the same item, positively identified, at another price — exactly one firm mark, under its own row
+PASS V9-r3 S1: another pack size / pack unit of the same item, or a pack the other side does not name — exactly one SOFT mark, never «Цены расходятся»
+PASS V9-r3: the SAME pack (unit and quantity) on both sides, or a stock / quantity number beside the price column — the firm mark is kept
+PASS V9-r3 S2: a row that is not the item at its price (accessory, cross-reference, kit, used, stock / qty, bare number, pack, currency, «от») never erases the genuine conflict of another row — in another document or in the same one
+PASS V9-r3 S2: the accepted V9-r2 rule stays — the item's own row at the catalog price clears every other row naming its article
+PASS V9-r3 S2 fuzz: rows about other items / non-price numbers at the catalog number, mixed with one genuine conflict — the conflict keeps its firm mark
+PASS V9-r2 F6: a mark-like text anywhere in a document row never reaches the model — only the reconciler writes marks
+PASS V9-r2: a header label inside the mark is clipped (a document header never writes a long text into the authoritative line)
+PASS fuzz (V9-r2/r3): rows about other items never get a firm mark; a price list that AGREES (the item at the catalog PRICE) gets no mark; a bare-number original settles nothing and is never marked itself; another pack size is never firm
+PASS catalog prices with a unit (тг/шт, тг/мес) take part; a different unit is not a conflict
+PASS a three-row chunk: only the conflicting row is marked; variants at the line price are no conflict
+PASS idempotent: a second pass is byte-identical, a forged mark line is dropped, a corrected catalog clears the mark
+PASS fuzz: 400 random price-list rows — never throws, only INSERTS mark lines (a forged mark text is cut off its row), idempotent, nothing without a catalog
+PASS search failure, an invalid call and an empty result never read as «позиции нет»
+PASS [WA] panel: RAG and exact-match rows are reconciled with the SAME function and the prompt says what a mark means
+PASS [TG] panel: RAG and exact-match rows are reconciled with the SAME function and the prompt says what a mark means
+PASS ONE function: the sub-workflow and the panel carry the generator's RECONCILE_JS byte for byte
+PASS Set Workflow State refuses to touch the price search
+PASS staging derivation: the price search reads the staging documents stub (no embeddings there), never the real project
+PASS eval runner: the simulated search runs the canonical Reconcile Prices when the measured template routes to it
+
+36 pass, 0 fail
+exit=0
+
+PASS [WA] F4: a firm conflict pushes the hard rule; soft marks only — the soft rule, never the hard one
+PASS [WA] one call: an exact-match row at the catalog price clears the RAG rows naming that article
+PASS [WA] V9-r3 S1: another pack size of the same item (review: pack_size_changed / _text / box_vs_pack) — the soft rule, never «РАСХОЖДЕНИЕ ЦЕН»
+PASS [WA] V9-r3 S2: an accessory / stock number at the catalog price never erases the genuine conflict (review: control_conflict, cross_reference_at_catalog_price, stock_equals_catalog)
+PASS [WA] F5: the conflicting row at the end of a full window keeps its WHOLE mark, and the rule follows the window
+PASS [WA] F5: a row the window held before V9 is not pushed out by a mark above it
+PASS [WA] F5: the window is cut at a line boundary — never half a row; a row past the window is not marked
+PASS [WA] F5: a single row longer than the whole window is still shown (cut), as before V9 — never an empty window
+PASS [TG] F4: a firm conflict pushes the hard rule; soft marks only — the soft rule, never the hard one
+PASS [TG] one call: an exact-match row at the catalog price clears the RAG rows naming that article
+PASS [TG] V9-r3 S1: another pack size of the same item (review: pack_size_changed / _text / box_vs_pack) — the soft rule, never «РАСХОЖДЕНИЕ ЦЕН»
+PASS [TG] V9-r3 S2: an accessory / stock number at the catalog price never erases the genuine conflict (review: control_conflict, cross_reference_at_catalog_price, stock_equals_catalog)
+PASS [TG] F5: the conflicting row at the end of a full window keeps its WHOLE mark, and the rule follows the window
+PASS [TG] F5: a row the window held before V9 is not pushed out by a mark above it
+PASS [TG] F5: the window is cut at a line boundary — never half a row; a row past the window is not marked
+PASS [TG] F5: a single row longer than the whole window is still shown (cut), as before V9 — never an empty window
+
+16 pass, 0 fail
+exit=0
+
+## 2. Generators: second run changes nothing, --check clean
+python3 Tools/n8n/build-price-search.py; python3 Tools/n8n/apply-suggest-v2.py   (second run: every file 'up to date')
+price search: OK
+exit=0
+suggest v2: OK
+exit=0
+test dialog: OK
+exit=0
+related verifiers: inject-panel-prompts.py --check (up-to-date), node verify-panel-prompts.js (PASS), verify-sql-comments.py (OK 82 Postgres nodes), verify-telegram-parity.py (ALL PARITY ASSERTS PASSED) — all exit 0
+
+## 3. Full backend suite: python3 Tools/n8n/tests/run_all.py (ran concurrently with the staging bootstrap + e2e below)
+OK   test_auth_refresh.py: 12 pass, 0 fail
+OK   test_billing_identity.py: 19 pass, 0 fail
+OK   test_claim.py: 19 pass, 0 fail
+FAIL test_create_seed.py: 49 pass, 3 fail
+OK   test_deploy_canonical.py: 15 pass, 0 fail
+OK   test_handoff_notifier.py: 14 pass, 0 fail
+OK   test_harness_selfcheck.py: 2 pass, 0 fail
+OK   test_legacy_generators.py: 5 pass, 0 fail
+OK   test_price_search.py: 36 pass, 0 fail
+OK   test_reply_lost_send.py: 5 pass, 0 fail
+OK   test_reply_memory.py: 44 pass, 0 fail
+OK   test_reply_mode.py: 43 pass, 0 fail
+OK   test_reply_order.py: 44 pass, 0 fail
+OK   test_reply_reconcile.py: 66 pass, 0 fail
+OK   test_retired_delete.py: 13 pass, 0 fail
+OK   test_sql_comment_injection.py: 36 pass, 0 fail
+OK   test_suggest_catalog.py: 24 pass, 0 fail
+OK   test_suggest_lang.py: 11 pass, 0 fail
+OK   test_suggest_price.py: 16 pass, 0 fail
+OK   test_suggest_query.py: 37 pass, 0 fail
+OK   test_test_dialog.py: 17 pass, 0 fail
+OK   test_upload.py: 45 pass, 0 fail
+OK   test_verify_deployed.py: 48 pass, 0 fail
+OK   test_verify_parity.py: 38 pass, 0 fail
+OK   test_verify_sql_comments.py: 53 pass, 0 fail
+exit=1
+# test_create_seed.py: 3 transient failures (R8-deletefail [TG] register/semi:*:delete_failed) in the concurrent run — Create WA/TG
+# are NOT touched by this change (git status: only the two price workflows); re-run alone right after: 52 pass, 0 fail, exit 0.
+# test_deploy_canonical.py is another session's untracked work in progress (not part of this change).
+
+## 4. Staging (n8n 2.36.7 + task runners, Postgres 5433, Wappi mock): bootstrap.py --bot wa:stgwa001 --bot tg:stgtg001 → reimport
+python3 Tools/n8n/verify-deployed.py --base http://localhost:5678 → exit 0
+base http://localhost:5678: canonical 27 (diff 0), clones 2 (behind template 0, of them prompt head behind 0; custom prompts 2, not counted), archived clones 0 (not counted), other 2
+  OK      9PTyYcelRQI7bGDb 9PTyYcelRQI7bGDb-Suggest_Replies.json  active=True names=True graph=True published=True
+  OK      crPriceSearch001 crPriceSearch001-Price_List_Search.json  active=True names=True graph=True published=True
+
+python3 Tools/n8n/staging/e2e-test-dialog.py --only price_search_subworkflow_runs_on_n8n   (no model; extended with V9-r3 S2 wrench + S1 pack)
+PASS  price_search_subworkflow_runs_on_n8n (12s) — V9: the deployed Price List Search (Guard → the bot's own rows → Reconcile Prices) on the real n8n task runner, called with the tool's inputs �
+1 pass, 0 fail
+'r3_wrench': ['Ключ для фильтра 90915-YZZE1 — 3200 тг', 'Фильтр масляный Toyota 90915-YZZE1 — 3900 тг\n[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1» — 3200 тг, в прайсе — 3900 тг. Цены расходятся.]
+'r3_pack': ['Фильтр масляный Toyota 90915-YZZE1 упаковка 10 шт — 32000 тг\n[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1 упаковка 2 шт» — 6400 тг; цену этой строки прайса однозначно сопоставить с каталогом не удалось.]
+
+python3 Tools/n8n/staging/e2e-reply.py --only price_conflict_reaches_the_agent_marked   (model, once, WA + TG)
+PASS  price_conflict_reaches_the_agent_marked [llm][wa]
+      {'premise_published_catalog': True, 'tool_calls': 1, 'marked': True, 'documents': ['Фильтр масляный 90915-YZZE1 — 3900 тг, оригинал\n[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1» — 3200 тг, в прайсе — 3900 тг. Ц'], 'sends': 1, 'reply': 'Фильтр масляный Toyota 909
+PASS  price_conflict_reaches_the_agent_marked [llm][tg]
+      {'premise_published_catalog': True, 'tool_calls': 1, 'marked': True, 'documents': ['Фильтр масляный 90915-YZZE1 — 3900 тг, оригинал\n[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1» — 3200 тг, в прайсе — 3900 тг. Ц'], 'sends': 1, 'reply': 'Фильтр масляный Toyota 909
+2 pass, 0 fail
+
+python3 Tools/n8n/staging/e2e-suggest.py --only price_conflict_marked_for_the_panel   (model, once)
+PASS  price_conflict_marked_for_the_panel
+      http=200/200 mark=['[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1» — 3200 тг, в прайсе — 3900 тг. Цены расходятся.]'] rule=True/False catalogItems=[{'kind': 'product', 'name': 'Фильтр масляный Toyota 90915-YZZE1', 'price': '3200 тг'}] exact2='Фильтр масляный 90
+1 pass, 0 fail
+
+## 5. Eval (set v1.3, harness h6) — the model's tool input, then x8 on the two price scenarios
+# deterministic: run-eval.py's simulate_search over every auto scenario, HEAD's Reconcile Prices vs the worktree's:
+v1.3: 66 auto scenarios — simulated price-list search output HEAD (V9-r2) vs worktree (V9-r3): 0 changed; 1 carry a mark after
+# → the V9-r3 change reaches no eval scenario's model input; ap_source_conflict / ap_price_agrees_analogues are identical in v1.2 and v1.3.
+python3 Tools/n8n/eval/run-eval.py --skip-panel --only ap_source_conflict,ap_price_agrees_analogues --repeat 8 --repeat-all --label v9r3-after-price-x8
+prompts: `worktree` · auto model `gpt-5.4-mini` · reasoning_effort (model default) · panel model `None` · max_tokens 200 · 2 scenarios / 16 runs · 62 s
+pass 2 · flaky 0 · fail 0 · error runs 0 · finish_reason=length in 0 runs
+| scenario | vertical | mode | pass rate | failed checks |
+|---|---|---|---|---|
+| ap_source_conflict | auto_parts | auto | 1.00 (8×) |  |
+| ap_price_agrees_analogues | auto_parts | auto | 1.00 (8×) |  |
+# compare v9r2-after-price-x8 (v1.2, h5, 2026-10-08): ap_source_conflict 1.00 (8x), ap_price_agrees_analogues 1.00 (8x) — the same.
+# ap_source_conflict: 8/8 «цены в каталоге и прайсе расходятся: 3200 / 3900, точную цену подтвердит менеджер»; agrees: 8/8 3200, no conflict claim.
+
+## 6. Cost (V9-adversarial perf.js: 300 catalog items, 10 converter chunks), unloaded machine, 3 runs each
+# HEAD (V9-r2) per-call 10.7–10.8 ms; V9-r3 11.1–11.9 ms (+~8%); marks 55 both.

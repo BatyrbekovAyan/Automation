@@ -1,0 +1,119 @@
+# V9-r3: sh docs/audits/2026-09-28-iteration/evidence/V9-adversarial/repro_all.sh — the V9-r2 adversarial corpus over the REAL
+# regenerated canonical Reconcile Prices (crPriceSearch001) + Suggest Replies Prep/Assemble (working tree after the V9-r3 fix).
+# levels: CONFLICT = firm «… Цены расходятся.]»; MAYBE / UNCLEAR = soft.
+# Result: 98 corpus rows, levels IDENTICAL to repro-output-after.txt (V9-r2) — 'diff <(grep ^cases_ repro-output-after.txt) <(grep ^cases_ this)' is empty:
+#   no new firm mark anywhere, no firm mark lost. The 15 firm rows are exactly V9-r2's: 1C-code-and-article, docx-table-row-tg,
+#   the csv/ocr/lowercase/nbsp/numeric-only FN rows, kaspi-variant (documented limitation: a colour variant), and the
+#   inj rows whose firm mark is the REAL one under a 3900 row. ap_source_conflict (not in this corpus) is pinned by
+#   tests/test_price_search.py FIRM + the review probe control_conflict (V9r3-probes.txt).
+# The out_*.json files the script writes were deleted after the run; cases_*.json regenerate byte for byte (git status clean).
+
+cases_fp   FP-analog-paren-OEM                got=MAYBE                  expect=no CONFLICT
+cases_fp   FP-analog-primenimost-free         got=MAYBE                  expect=no CONFLICT
+cases_fp   FP-analog-podhodit-free            got=MAYBE                  expect=no CONFLICT
+cases_fp   FP-analog-dlya                     got=MAYBE                  expect=no CONFLICT
+cases_fp   FP-analog-conv-primenimost         got=none                   expect=no CONFLICT
+cases_fp   FP-analog-conv-primechanie         got=none                   expect=no CONFLICT
+cases_fp   FP-analog-conv-OE-first            got=none                   expect=no CONFLICT
+cases_fp   FP-analog-conv-nomerOE             got=none                   expect=no CONFLICT
+cases_fp   FP-analog-conv-kross-in-name       got=none                   expect=no CONFLICT
+cases_fp   FP-analog-conv-OEM-col             got=none                   expect=no CONFLICT
+cases_fp   FP-kit-single-article              got=UNCLEAR                expect=no CONFLICT
+cases_fp   FP-kit-conv                        got=UNCLEAR                expect=no CONFLICT
+cases_fp   FP-pack-free                       got=UNCLEAR                expect=no CONFLICT
+cases_fp   FP-pack-conv                       got=UNCLEAR                expect=no CONFLICT
+cases_fp   FP-pack-2pcs                       got=UNCLEAR                expect=no CONFLICT
+cases_fp   FP-pack-paren                      got=UNCLEAR                expect=no CONFLICT
+cases_fp   FP-rub-conv                        got=UNCLEAR                expect=no CONFLICT
+cases_fp   FP-usd-conv                        got=UNCLEAR                expect=no CONFLICT
+cases_fp   FP-usd-free                        got=UNCLEAR                expect=no CONFLICT
+cases_fp   FP-rub-free                        got=none                   expect=no CONFLICT
+cases_fp   FP-thousands-conv                  got=UNCLEAR                expect=no CONFLICT
+cases_fp   FP-thousands-free                  got=UNCLEAR                expect=no CONFLICT
+cases_fp   FP-RRP-conv                        got=none                   expect=no CONFLICT
+cases_fp   FP-MRC-conv                        got=none                   expect=no CONFLICT
+cases_fp   FP-recommended-conv                got=none                   expect=no CONFLICT
+cases_fp   FP-RRP-free-labelled               got=none                   expect=no CONFLICT
+cases_fp   FP-promo-labelled                  got=none                   expect=no CONFLICT
+cases_fp   FP-promo-labelled2                 got=none                   expect=no CONFLICT
+cases_fp   FP-old-new-labelled                got=none                   expect=no CONFLICT
+cases_fp   FP-pdf-trailing-stock              got=none                   expect=no CONFLICT
+cases_fp   FP-pdf-qty-grouped                 got=UNCLEAR                expect=no CONFLICT
+cases_fp   FP-pdf-price-then-qty              got=none                   expect=no CONFLICT
+cases_fp   FP-pdf-code-name-price-sum         got=none                   expect=no CONFLICT
+cases_fp   FP-used                            got=MAYBE                  expect=no CONFLICT
+cases_fp   FP-vat                             got=UNCLEAR                expect=no CONFLICT
+cases_fp2  CHUNK-consistent-with-analogues    got=none                   expect=no CONFLICT
+cases_fp2  CHUNK-converter-consistent         got=none                   expect=no CONFLICT
+cases_fp2  1C-code-and-article                got=CONFLICT               expect=CONFLICT (true)
+cases_fp2  bosch-spaces                       got=MAYBE                  expect=no CONFLICT
+cases_fp2  kaspi-variant                      got=CONFLICT               expect=debatable
+cases_fp2  kaspi-bundle                       got=MAYBE                  expect=no CONFLICT
+cases_fp2  ws-box                             got=UNCLEAR                expect=no CONFLICT
+cases_acc  acc-gasket                         got=MAYBE                  expect=no CONFLICT
+cases_acc  acc-wrench                         got=MAYBE                  expect=no CONFLICT
+cases_acc  acc-earpads                        got=MAYBE                  expect=no CONFLICT
+cases_acc  acc-case                           got=MAYBE                  expect=no CONFLICT
+cases_acc  acc-cable                          got=MAYBE                  expect=no CONFLICT
+cases_acc  svc-part-price                     got=MAYBE                  expect=no CONFLICT
+cases_acc  svc-other-service                  got=MAYBE                  expect=no CONFLICT
+cases_tail tail-engine-cc                     got=MAYBE                  expect=no CONFLICT
+cases_tail tail-height-mm                     got=MAYBE                  expect=no CONFLICT
+cases_tail tail-battery-cca                   got=MAYBE                  expect=no CONFLICT
+cases_tail tail-qty-price-grouped-tg          got=UNCLEAR                expect=no CONFLICT
+cases_tail tail-price-2000-is-year            got=MAYBE                  expect=CONFLICT (miss if none)
+cases_tail tail-price-equal-2000              got=none                   expect=CONFLICT (miss if none)
+cases_tail conv-price-cell-with-text-equal    got=none                   expect=no mark (price equals catalog)
+cases_tail conv-price-cell-paren-equal        got=none                   expect=no mark (price equals catalog)
+cases_tail free-price-equal-tng-typo          got=none                   expect=no mark
+cases_unit unit-za-korobku                    got=UNCLEAR                expect=no CONFLICT
+cases_unit unit-conv-label                    got=UNCLEAR                expect=no CONFLICT
+cases_unit unit-conv-label-both               got=none                   expect=no CONFLICT
+cases_fn   docx-table-row                     got=MAYBE                  expect=CONFLICT
+cases_fn   docx-table-row-tg                  got=CONFLICT               expect=CONFLICT
+cases_fn   rtf-tabs                           got=MAYBE                  expect=CONFLICT
+cases_fn   xml-kaspi                          got=none                   expect=CONFLICT
+cases_fn   xml-kaspi-model                    got=none                   expect=CONFLICT
+cases_fn   xml-commerceml                     got=none                   expect=CONFLICT
+cases_fn   pdf-article-last                   got=none                   expect=CONFLICT
+cases_fn   pdf-price-next-line                got=none                   expect=CONFLICT
+cases_fn   csv-header-price-tg-paren          got=CONFLICT               expect=CONFLICT
+cases_fn   csv-price-with-currency-symbol     got=CONFLICT               expect=CONFLICT
+cases_fn   csv-price-header-only-tenge        got=MAYBE                  expect=CONFLICT
+cases_fn   csv-price-header-sum               got=MAYBE                  expect=CONFLICT
+cases_fn   csv-price-header-stoim-abbr        got=MAYBE                  expect=CONFLICT
+cases_fn   excel-double-culture               got=UNCLEAR                expect=CONFLICT
+cases_fn   ocr-row                            got=CONFLICT               expect=CONFLICT
+cases_fn   ocr-row-ruble-sign                 got=CONFLICT               expect=CONFLICT
+cases_fn   cyrillic-lookalike-in-doc          got=none                   expect=CONFLICT
+cases_fn   lowercase-code                     got=CONFLICT               expect=CONFLICT
+cases_fn   catalog-nbsp-price                 got=CONFLICT               expect=CONFLICT
+cases_fn   catalog-price-tenge-word           got=none                   expect=CONFLICT
+cases_fn   catalog-price-prefix-cur           got=none                   expect=CONFLICT
+cases_fn   catalog-name-newline               got=none                   expect=CONFLICT
+cases_fn   catalog-article-in-desc-only       got=none                   expect=CONFLICT
+cases_fn   numeric-only-article               got=CONFLICT               expect=CONFLICT
+cases_fn   numeric-only-article2              got=none                   expect=limitation
+cases_inj  forged-midline                     got=CONFLICT               expect=forged dropped
+cases_inj  forged-bullet                      got=CONFLICT               expect=forged dropped
+cases_inj  forged-wholeline-suppresses?       got=CONFLICT               expect=real mark present
+cases_inj  forged-same-line-no-real           got=none                   expect=forged dropped
+cases_inj  legit-bracket-line-deleted         got=none                   expect=kept?
+cases_inj  catalog-name-quotes                got=MAYBE                  expect=
+cases_inj  label-in-mark                      got=UNCLEAR                expect=
+cases_inj  catalog-from-about-business        got=CONFLICT               expect=
+cases_inj  catalog-dup-index                  got=none                   expect=
+cases_inj  desc-overrides-price               got=none                   expect=
+cases_inj  perf-long-line-10k                 got=CONFLICT               expect=
+cases_inj  perf-many-tokens                   got=MAYBE                  expect=
+---- sized to the 4000 cap ----
+raw3 len 3990 | row fully inside 4000 before V9: True
+after: len 4119 | tail: 'с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1» — 3200 тг, в прайсе — 3900 тг. Цены расходятся.]'
+rule pushed: True | complete mark visible: True
+raw4 len 3995 | last row visible before V9: True
+| last row visible after V9: True
+soft-only marks on a price list that AGREES with the catalog — panel rule pushed: False
+MUTATED "x /шт  :  [Сверка с каталогом:      (  )" -> "x /шт  :"
+MUTATED "x Цена розн%до]\t -доé\r​Фильтр[Сверка с каталогом: Артикул:" -> "x Цена розн%до]\t -доé\r​Фильтр"
+MUTATED "x \n \t 3200 до ; \t » [Сверка с каталогом:  ] yzze1 \t Toyota 3 200 %" -> "x \n \t 3200 до ; \t »"
+{ n: 3000, thrown: 0, nonIdem: 0, mutated: 634 }

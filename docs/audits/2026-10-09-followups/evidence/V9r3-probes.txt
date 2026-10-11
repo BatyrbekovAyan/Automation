@@ -1,0 +1,30 @@
+# V9-r3: the review's own probe script (docs/audits/2026-10-09-independent-review-evidence/suggestions-probes.py), run as a COPY
+# (only ROOT pinned to the repo; the original and its suggestions-probes.json are untouched) over the regenerated canonical
+# crPriceSearch001 «Reconcile Prices» and Suggest Replies Prep/Assemble. Offline: node only, no network, no model.
+# Table: price-search marks before (the review's saved JSON, code f02b6674) → after; panel = hard «РАСХОЖДЕНИЕ ЦЕН» / soft «СВЕРКА ЦЕН» rule per channel.
+
+control_conflict                   marks FIRM     → FIRM     | WA hard True →True  soft False→False | TG hard True →True  soft False→False
+pack_size_changed                  marks FIRM     → UNCLEAR  | WA hard True →False soft False→True  | TG hard True →False soft False→True 
+pack_size_changed_text             marks FIRM     → UNCLEAR 
+box_vs_pack                        marks FIRM     → UNCLEAR 
+stock_equals_catalog               marks none     → FIRM     | WA hard False→True  soft False→False | TG hard False→True  soft False→False
+stock_equals_catalog_text          marks none     → FIRM    
+two_sources_actual_conflict        marks none     → none    
+cross_reference_at_catalog_price   marks none     → FIRM     | WA hard False→True  soft False→False | TG hard False→True  soft False→False
+decimal_difference                 marks none     → none    
+V8_original_whatsapp               latest_preserved before=True after=True
+V8_original_telegram               latest_preserved before=True after=True
+
+# --- stdout of the copy (after) ---
+control_conflict {"documents": ["Фильтр масляный Toyota 90915-YZZE1 — 3900 тг\n[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1» — 3200 тг, в прайсе — 3900 тг. Цены расходятся.]"]}
+pack_size_changed {"documents": ["product[1]: Артикул: 90915-YZZE1; Наименование: Фильтр масляный Toyota упаковка 10 шт; Цена: 32000 тг\n[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1 упаковка 2 шт» — 6400 тг; цену этой строки прайса однозначно сопоставить с каталогом не удалось.]"]}
+pack_size_changed_text {"documents": ["Фильтр масляный Toyota 90915-YZZE1 упаковка 10 шт — 32000 тг\n[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1 упаковка 2 шт» — 6400 тг; цену этой строки прайса однозначно сопоставить с каталогом не удалось.]"]}
+box_vs_pack {"documents": ["product[1]: Артикул: 90915-YZZE1; Наименование: Фильтр масляный Toyota; Цена за коробку: 32000 тг\n[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1 упаковка 2 шт» — 6400 тг; цену этой строки прайса однозначно сопоставить с каталогом не удалось.]"]}
+stock_equals_catalog {"documents": ["product[1]: Артикул: 90915-YZZE1; Наименование: Фильтр масляный Toyota; Цена: 3900 тг; Остаток: 3200\n[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1» — 3200 тг, в прайсе — 3900 тг. Цены расходятся.]"]}
+stock_equals_catalog_text {"documents": ["Фильтр масляный Toyota 90915-YZZE1 — 3900 тг; Остаток: 3200 шт\n[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1» — 3200 тг, в прайсе — 3900 тг. Цены расходятся.]"]}
+two_sources_actual_conflict {"documents": ["Фильтр масляный Toyota 90915-YZZE1 — 3200 тг", "Фильтр масляный Toyota 90915-YZZE1 — 3900 тг"]}
+cross_reference_at_catalog_price {"documents": ["Фильтр масляный Toyota 90915-YZZE1 — 3900 тг\n[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1» — 3200 тг, в прайсе — 3900 тг. Цены расходятся.]", "Ключ для фильтра 90915-YZZE1 — 3200 тг"]}
+decimal_difference {"documents": ["Фильтр масляный Toyota 90915-YZZE1 — 3200.90 тг"]}
+V8_original_whatsapp {"latest_preserved": true}
+V8_original_telegram {"latest_preserved": true}
+

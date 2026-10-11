@@ -386,16 +386,19 @@ def price_search_probe(run_id):
     return wid, f"{BASE}/webhook/{path}"
 
 
-@scenario("price_search_subworkflow_runs_on_n8n", "V9: the deployed Price List Search (Guard → the bot's own rows → Reconcile Prices) on the real n8n task runner, called with the tool's inputs — no model: a 3900 row against a 3200 catalog comes back marked, the catalog price unmarked, a foreign bot's row and a '-1' id never searched; V9-r2: a price list that AGREES with the catalog plus analogue rows (two documents of one search) comes back with no mark at all, a lone analogue row only with the soft mark")
+@scenario("price_search_subworkflow_runs_on_n8n", "V9: the deployed Price List Search (Guard → the bot's own rows → Reconcile Prices) on the real n8n task runner, called with the tool's inputs — no model: a 3900 row against a 3200 catalog comes back marked, the catalog price unmarked, a foreign bot's row and a '-1' id never searched; V9-r2: a price list that AGREES with the catalog plus analogue rows (two documents of one search) comes back with no mark at all, a lone analogue row only with the soft mark; V9-r3: an accessory row at the catalog price in another document does not erase the genuine conflict (S2), another pack size of the catalog's pack is only the soft mark (S1)")
 def s_price_search(ctx):
     t = Target(ctx, "tps")
     tag = f"tps-{ctx.run_id}"
     agree_id, lone_id = f"wfV9r2Agree{ctx.run_id}"[:40], f"wfV9r2Alone{ctx.run_id}"[:40]
+    wrench_id, pack_id = f"wfV9r3Wrench{ctx.run_id}"[:40], f"wfV9r3Pack{ctx.run_id}"[:40]
+    r3_conflict, r3_wrench = "Фильтр масляный Toyota 90915-YZZE1 — 3900 тг", "Ключ для фильтра 90915-YZZE1 — 3200 тг"
+    r3_pack = "Фильтр масляный Toyota 90915-YZZE1 упаковка 10 шт — 32000 тг"
     agree = ["Фильтр масляный Toyota 90915-YZZE1 (оригинал) — 3200 тг\nФильтр масляный Knecht OC 91 (90915-YZZE1) — 1400 тг",
              "Фильтр масляный Mahle OC 217 (90915-YZZE1) — 1600 тг"]
     rows = [("Фильтр масляный 90915-YZZE1 — 3900 тг, оригинал", t.wf_id), ("Колодки тормозные 04465-02220 — 18500 тг", t.wf_id),
             ("Фильтр масляный 90915-YZZE1 — 1 тг, чужой бот", "wfForeignBot0001"), (agree[0], agree_id), (agree[1], agree_id),
-            ("Фильтр масляный Knecht OC 91 (90915-YZZE1) — 1400 тг", lone_id)]
+            ("Фильтр масляный Knecht OC 91 (90915-YZZE1) — 1400 тг", lone_id), (r3_conflict, wrench_id), (r3_wrench, wrench_id), (r3_pack, pack_id)]
     for content, bot in rows:
         psql(f"insert into documents (content, metadata) values (E'{content.replace(chr(10), chr(92) + 'n')}', '{{\"botWaId\": \"{bot}\", \"fileId\": \"{tag}\"}}'::jsonb);")
     prompt = ("Business Type: Автозапчасти\n\nAbout Business: x\n\nProducts:\nProduct1: Фильтр масляный Toyota 90915-YZZE1\nProduct1 Price: 3200 тг\n"
@@ -409,6 +412,10 @@ def s_price_search(ctx):
         st2, d2 = http("POST", url, dict(body, botId="-1"), timeout=60)
         st3, d3 = http("POST", url, dict(body, botId=agree_id), timeout=60)
         st4, d4 = http("POST", url, dict(body, botId=lone_id), timeout=60)
+        st5, d5 = http("POST", url, dict(body, botId=wrench_id), timeout=60)
+        pack_prompt = prompt.replace("Product1: Фильтр масляный Toyota 90915-YZZE1\nProduct1 Price: 3200 тг",
+                                     "Product1: Фильтр масляный Toyota 90915-YZZE1 упаковка 2 шт\nProduct1 Price: 6400 тг")
+        st6, d6 = http("POST", url, dict(body, botId=pack_id, prompt=pack_prompt), timeout=60)
     finally:
         if wid:
             rest("POST", f"/workflows/{wid}/deactivate")
@@ -425,7 +432,15 @@ def s_price_search(ctx):
     ok_agree = st3 == 200 and agreed == sorted(agree)
     lone = ((d4 or {}).get("documents") or []) if isinstance(d4, dict) else []
     ok_lone = st4 == 200 and len(lone) == 1 and "(артикул совпадает, но строка может быть о другой позиции)" in lone[0] and "Цены расходятся.]" not in lone[0]
-    return ok and ok_agree and ok_lone, {"status": st, "documents": docs, "sentinel_id": d2, "agreeing": agreed, "lone_analogue": lone}
+    # V9-r3 S2: the wrench row at 3200 (another document of the same search) settles nothing — the filter row keeps its firm mark
+    wrench = ((d5 or {}).get("documents") or []) if isinstance(d5, dict) else []
+    ok_wrench = st5 == 200 and len(wrench) == 2 and any(x.startswith(r3_conflict + "\n[Сверка с каталогом:") and x.endswith("Цены расходятся.]") for x in wrench) \
+        and r3_wrench in wrench
+    # V9-r3 S1: a pack of 10 against the catalog's pack of 2 — the soft «однозначно сопоставить не удалось», never «Цены расходятся»
+    pack = ((d6 or {}).get("documents") or []) if isinstance(d6, dict) else []
+    ok_pack = st6 == 200 and len(pack) == 1 and "однозначно сопоставить" in pack[0] and "Цены расходятся.]" not in pack[0] and "упаковка 2 шт" in pack[0]
+    return ok and ok_agree and ok_lone and ok_wrench and ok_pack, {"status": st, "documents": docs, "sentinel_id": d2, "agreeing": agreed, "lone_analogue": lone,
+                                                                    "r3_wrench": wrench, "r3_pack": pack}
 
 
 @scenario("handoffs_status_lists_last_outcomes_owner_scoped", "7.3: op status returns the ledger's last states for the owner's profiles (chat tail only), 403 for a foreign install")

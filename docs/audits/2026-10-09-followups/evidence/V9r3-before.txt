@@ -1,0 +1,157 @@
+# V9-r3 BEFORE: the new S1/S2 tests against the canonical workflows at HEAD f69aa614 (generator unchanged; only the two test files edited)
+# python3 Tools/n8n/tests/test_price_search.py ; python3 Tools/n8n/tests/test_suggest_price.py
+
+PASS sub-workflow: Guard → Valid? → Search Price Lists (the bot's own documents, fail-open) → Reconcile Prices
+PASS [WA] template: the price-list tool goes through the sub-workflow with the clone's own id, key and PUBLISHED prompt
+PASS [TG] template: the price-list tool goes through the sub-workflow with the clone's own id, key and PUBLISHED prompt
+PASS Test Dialog: its tool is the same sub-workflow, fed with the bot's id/key (Validate) and the published prompt it read (Compose)
+PASS Guard: a search runs only for a real bot id under botWaId / botTgId
+PASS ap_source_conflict: one mark under the price-list row — the item, 3200 and 3900, «Цены расходятся»
+PASS base documents of every vertical, at their own catalog prices, come back byte for byte
+PASS price-list shapes the converter / OCR / PDF / free text produce: a different price is marked
+PASS V9-r2 F2(b): a bare number at the end of a PDF/DOCX line (no currency, no label) is at most the soft mark, still naming both numbers
+PASS all price columns are compared: опт/розн — no mark when either equals the catalog, both named when neither does
+PASS ambiguous prices («от», a range) get the catalog price only — never «Цены расходятся»
+PASS no mark: price on the next line, a longer code, a bare year, an analogue mention or column, no article, «договорная»
+PASS grades, sizes and specs are not articles; an accessory with the same model code is only a soft mark
+PASS adversarial (own review): analogue rows, promo prices, joined specs, two amounts — never a false «Цены расходятся»
+PASS V9-r2 corpus: rows about another item / prices that are not comparable — never the firm «Цены расходятся»
+PASS V9-r2 corpus: the catalog price on the row, or the article at the catalog price elsewhere in the result — no mark
+PASS V9-r2 corpus: the same item, positively identified, at another price — exactly one firm mark, under its own row
+FAIL V9-r3 S1: another pack size / pack unit of the same item, or a pack the other side does not name — exactly one SOFT mark, never «Цены расходятся»
+      - pack_size_changed (review): ['conflict'] ['product[1]: Артикул: 90915-YZZE1; Наименование: Фильтр масляный Toyota упаковка 10 шт; Цена: 32000 тг\n[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1 упаковка 2 шт» — 6400 тг, в прайсе — 32000 тг. Цены расходятся.]']
+      - pack_size_changed_text (review): ['conflict'] ['Фильтр масляный Toyota 90915-YZZE1 упаковка 10 шт — 32000 тг\n[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1 упаковка 2 шт» — 6400 тг, в прайсе — 32000 тг. Цены расходятся.]']
+      - box_vs_pack (review): ['conflict'] ['product[1]: Артикул: 90915-YZZE1; Наименование: Фильтр масляный Toyota; Цена за коробку: 32000 тг\n[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1 упаковка 2 шт» — 6400 тг, в прайсе — 32000 тг. Цены расходятся.]']
+      - the catalog names a pack, the row none: ['conflict'] ['Фильтр масляный Toyota 90915-YZZE1 — 3900 тг\n[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1 упаковка 2 шт» — 6400 тг, в прайсе — 3900 тг. Цены расходятся.]']
+      - the row's pack quantity is not stated: ['conflict'] ['Фильтр масляный Toyota 90915-YZZE1 упаковка — 7000 тг\n[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1 упаковка 2 шт» — 6400 тг, в прайсе — 7000 тг. Цены расходятся.]']
+      - the count before the pack word: ['conflict'] ['Фильтр масляный Toyota 90915-YZZE1, 10 шт в упаковке — 32000 тг\n[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1 упаковка 2 шт» — 6400 тг, в прайсе — 32000 тг. Цены расходятся.]']
+      - «за N шт» is another wording than the catalog's pack: ['conflict'] ['Фильтр масляный Toyota 90915-YZZE1 — 7000 тг за 2 шт\n[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1 упаковка 2 шт» — 6400 тг, в прайсе — 7000 тг. Цены расходятся.]']
+      - converter: an «В упаковке» column: ['conflict'] ['product[1]: Артикул: 90915-YZZE1; Наименование: Фильтр масляный Toyota; В упаковке: 10 шт; Цена: 32000; \n[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1 упаковка 2 шт» — 6400 тг, в прайсе — 32000. Цены расходятся.]']
+      - the catalog's pack plus another one: ['conflict'] ['Фильтр масляный Toyota 90915-YZZE1 упаковка 2 шт, коробка 20 шт — 64000 тг\n[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1 упаковка 2 шт» — 6400 тг, в прайсе — 64000 тг. Цены расходятся.]']
+      - another pack unit, same count: ['conflict'] ['Фильтр масляный Toyota 90915-YZZE1 коробка 2 шт — 7000 тг\n[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1 упаковка 2 шт» — 6400 тг, в прайсе — 7000 тг. Цены расходятся.]']
+FAIL V9-r3: the SAME pack (unit and quantity) on both sides, or a stock / quantity number beside the price column — the firm mark is kept
+      - stock_equals_catalog (review): a stock column is not the price: [] ['product[1]: Артикул: 90915-YZZE1; Наименование: Фильтр масляный Toyota; Цена: 3900 тг; Остаток: 3200']
+      - stock_equals_catalog_text (review): [] ['Фильтр масляный Toyota 90915-YZZE1 — 3900 тг; Остаток: 3200 шт']
+      - a quantity column equal to the catalog number: [] ['product[1]: Артикул: 90915-YZZE1; Наименование: Фильтр масляный Toyota; Кол-во: 3200; Цена: 3900; ']
+FAIL V9-r3 S2: a row that is not the item at its price (accessory, cross-reference, kit, used, stock / qty, bare number, pack, currency, «от») never erases the genuine conflict of another row — in another document or in the same one
+      - accessory (review: cross_reference_at_catalog_price): the conflict lost its firm mark: ['Фильтр масляный Toyota 90915-YZZE1 — 3900 тг', 'Ключ для фильтра 90915-YZZE1 — 3200 тг']
+      - accessory (review: cross_reference_at_catalog_price): the conflict lost its firm mark: ['Ключ для фильтра 90915-YZZE1 — 3200 тг', 'Фильтр масляный Toyota 90915-YZZE1 — 3900 тг']
+      - accessory (review: cross_reference_at_catalog_price): the conflict lost its firm mark: ['Фильтр масляный Toyota 90915-YZZE1 — 3900 тг\nКлюч для фильтра 90915-YZZE1 — 3200 тг']
+      - accessory (review: cross_reference_at_catalog_price): the conflict lost its firm mark: ['Ключ для фильтра 90915-YZZE1 — 3200 тг\nФильтр масляный Toyota 90915-YZZE1 — 3900 тг']
+      - accessory, gasket: the conflict lost its firm mark: ['Фильтр масляный Toyota 90915-YZZE1 — 3900 тг', 'Прокладка фильтра масляного 90915-YZZE1 — 3200 тг']
+      - accessory, gasket: the conflict lost its firm mark: ['Прокладка фильтра масляного 90915-YZZE1 — 3200 тг', 'Фильтр масляный Toyota 90915-YZZE1 — 3900 тг']
+      - accessory, gasket: the conflict lost its firm mark: ['Фильтр масляный Toyota 90915-YZZE1 — 3900 тг\nПрокладка фильтра масляного 90915-YZZE1 — 3200 тг']
+      - accessory, gasket: the conflict lost its firm mark: ['Прокладка фильтра масляного 90915-YZZE1 — 3200 тг\nФильтр масляный Toyota 90915-YZZE1 — 3900 тг']
+      - cross-reference in brackets: the conflict lost its firm mark: ['Фильтр масляный Toyota 90915-YZZE1 — 3900 тг', 'Фильтр масляный Knecht OC 91 (90915-YZZE1) — 3200 тг']
+      - cross-reference in brackets: the conflict lost its firm mark: ['Фильтр масляный Knecht OC 91 (90915-YZZE1) — 3200 тг', 'Фильтр масляный Toyota 90915-YZZE1 — 3900 тг']
+      - cross-reference in brackets: the conflict lost its firm mark: ['Фильтр масляный Toyota 90915-YZZE1 — 3900 тг\nФильтр масляный Knecht OC 91 (90915-YZZE1) — 3200 тг']
+      - cross-reference in brackets: the conflict lost its firm mark: ['Фильтр масляный Knecht OC 91 (90915-YZZE1) — 3200 тг\nФильтр масляный Toyota 90915-YZZE1 — 3900 тг']
+      - cross-reference «для»: the conflict lost its firm mark: ['Фильтр масляный Toyota 90915-YZZE1 — 3900 тг', 'Фильтр масляный Bosch для 90915-YZZE1 — 3200 тг']
+      - cross-reference «для»: the conflict lost its firm mark: ['Фильтр масляный Bosch для 90915-YZZE1 — 3200 тг', 'Фильтр масляный Toyota 90915-YZZE1 — 3900 тг']
+      - cross-reference «для»: the conflict lost its firm mark: ['Фильтр масляный Toyota 90915-YZZE1 — 3900 тг\nФильтр масляный Bosch для 90915-YZZE1 — 3200 тг']
+      - cross-reference «для»: the conflict lost its firm mark: ['Фильтр масляный Bosch для 90915-YZZE1 — 3200 тг\nФильтр масляный Toyota 90915-YZZE1 — 3900 тг']
+      - cross-reference «применимость»: the conflict lost its firm mark: ['Фильтр масляный Toyota 90915-YZZE1 — 3900 тг', 'Фильтр масляный MANN W 68/3, применимость: Toyota 90915-YZZE1 — 3200 тг']
+      - cross-reference «применимость»: the conflict lost its firm mark: ['Фильтр масляный MANN W 68/3, применимость: Toyota 90915-YZZE1 — 3200 тг', 'Фильтр масляный Toyota 90915-YZZE1 — 3900 тг']
+      - cross-reference «применимость»: the conflict lost its firm mark: ['Фильтр масляный Toyota 90915-YZZE1 — 3900 тг\nФильтр масляный MANN W 68/3, применимость: Toyota 90915-YZZE1 — 3200 тг']
+      - cross-reference «применимость»: the conflict lost its firm mark: ['Фильтр масляный MANN W 68/3, применимость: Toyota 90915-YZZE1 — 3200 тг\nФильтр масляный Toyota 90915-YZZE1 — 3900 тг']
+      - converter: another code in the article column: the conflict lost its firm mark: ['Фильтр масляный Toyota 90915-YZZE1 — 3900 тг', 'product[2]: Артикул: C-1139; Наименование: Фильтр масляный Sakura 90915-YZZE1; Цена: 3200; ']
+      - converter: another code in the article column: the conflict lost its firm mark: ['product[2]: Артикул: C-1139; Наименование: Фильтр масляный Sakura 90915-YZZE1; Цена: 3200; ', 'Фильтр масляный Toyota 90915-YZZE1 — 3900 тг']
+      - converter: another code in the article column: the conflict lost its firm mark: ['Фильтр масляный Toyota 90915-YZZE1 — 3900 тг\nproduct[2]: Артикул: C-1139; Наименование: Фильтр масляный Sakura 90915-YZZE1; Цена: 3200; ']
+      - converter: another code in the article column: the conflict lost its firm mark: ['product[2]: Артикул: C-1139; Наименование: Фильтр масляный Sakura 90915-YZZE1; Цена: 3200; \nФильтр масляный Toyota 90915-YZZE1 — 3900 тг']
+      - a kit: the conflict lost its firm mark: ['Фильтр масляный Toyota 90915-YZZE1 — 3900 тг', 'Комплект ТО Toyota: фильтр масляный 90915-YZZE1 + масло 5W-30 4л — 3200 тг']
+      - a kit: the conflict lost its firm mark: ['Комплект ТО Toyota: фильтр масляный 90915-YZZE1 + масло 5W-30 4л — 3200 тг', 'Фильтр масляный Toyota 90915-YZZE1 — 3900 тг']
+      - a kit: the conflict lost its firm mark: ['Фильтр масляный Toyota 90915-YZZE1 — 3900 тг\nКомплект ТО Toyota: фильтр масляный 90915-YZZE1 + масло 5W-30 4л — 3200 тг']
+      - a kit: the conflict lost its firm mark: ['Комплект ТО Toyota: фильтр масляный 90915-YZZE1 + масло 5W-30 4л — 3200 тг\nФильтр масляный Toyota 90915-YZZE1 — 3900 тг']
+      - a used one: the conflict lost its firm mark: ['Фильтр масляный Toyota 90915-YZZE1 — 3900 тг', 'Фильтр масляный 90915-YZZE1 б/у — 3200 тг']
+      - a used one: the conflict lost its firm mark: ['Фильтр масляный 90915-YZZE1 б/у — 3200 тг', 'Фильтр масляный Toyota 90915-YZZE1 — 3900 тг']
+      - a used one: the conflict lost its firm mark: ['Фильтр масляный Toyota 90915-YZZE1 — 3900 тг\nФильтр масляный 90915-YZZE1 б/у — 3200 тг']
+      - a used one: the conflict lost its firm mark: ['Фильтр масляный 90915-YZZE1 б/у — 3200 тг\nФильтр масляный Toyota 90915-YZZE1 — 3900 тг']
+      - a stock column (review: stock_equals_catalog): the conflict lost its firm mark: ['Фильтр масляный Toyota 90915-YZZE1 — 3900 тг', 'product[1]: Артикул: 90915-YZZE1; Наименование: Фильтр масляный Toyota; Цена: 4100 тг; Остаток: 3200']
+      - a stock column (review: stock_equals_catalog): the conflict lost its firm mark: ['product[1]: Артикул: 90915-YZZE1; Наименование: Фильтр масляный Toyota; Цена: 4100 тг; Остаток: 3200', 'Фильтр масляный Toyota 90915-YZZE1 — 3900 тг']
+      - a stock column (review: stock_equals_catalog): the conflict lost its firm mark: ['Фильтр масляный Toyota 90915-YZZE1 — 3900 тг\nproduct[1]: Артикул: 90915-YZZE1; Наименование: Фильтр масляный Toyota; Цена: 4100 тг; Остаток: 3200']
+      - a stock column (review: stock_equals_catalog): the conflict lost its firm mark: ['product[1]: Артикул: 90915-YZZE1; Наименование: Фильтр масляный Toyota; Цена: 4100 тг; Остаток: 3200\nФильтр масляный Toyota 90915-YZZE1 — 3900 тг']
+      - stock in text (review: stock_equals_catalog_text): the conflict lost its firm mark: ['Фильтр масляный Toyota 90915-YZZE1 — 3900 тг', 'Фильтр масляный Toyota 90915-YZZE1 — 4100 тг; Остаток: 3200 шт']
+      - stock in text (review: stock_equals_catalog_text): the conflict lost its firm mark: ['Фильтр масляный Toyota 90915-YZZE1 — 4100 тг; Остаток: 3200 шт', 'Фильтр масляный Toyota 90915-YZZE1 — 3900 тг']
+      - stock in text (review: stock_equals_catalog_text): the conflict lost its firm mark: ['Фильтр масляный Toyota 90915-YZZE1 — 3900 тг\nФильтр масляный Toyota 90915-YZZE1 — 4100 тг; Остаток: 3200 шт']
+      - stock in text (review: stock_equals_catalog_text): the conflict lost its firm mark: ['Фильтр масляный Toyota 90915-YZZE1 — 4100 тг; Остаток: 3200 шт\nФильтр масляный Toyota 90915-YZZE1 — 3900 тг']
+      - a quantity in stock, no price: the conflict lost its firm mark: ['Фильтр масляный Toyota 90915-YZZE1 — 3900 тг', 'Фильтр масляный Toyota 90915-YZZE1, в наличии 3200 шт']
+      - a quantity in stock, no price: the conflict lost its firm mark: ['Фильтр масляный Toyota 90915-YZZE1, в наличии 3200 шт', 'Фильтр масляный Toyota 90915-YZZE1 — 3900 тг']
+      - a quantity in stock, no price: the conflict lost its firm mark: ['Фильтр масляный Toyota 90915-YZZE1 — 3900 тг\nФильтр масляный Toyota 90915-YZZE1, в наличии 3200 шт']
+      - a quantity in stock, no price: the conflict lost its firm mark: ['Фильтр масляный Toyota 90915-YZZE1, в наличии 3200 шт\nФильтр масляный Toyota 90915-YZZE1 — 3900 тг']
+      - a bare trailing number (stock / qty / spec): the conflict lost its firm mark: ['Фильтр масляный Toyota 90915-YZZE1 — 3900 тг', '90915-YZZE1 Фильтр масляный Toyota 3200']
+      - a bare trailing number (stock / qty / spec): the conflict lost its firm mark: ['90915-YZZE1 Фильтр масляный Toyota 3200', 'Фильтр масляный Toyota 90915-YZZE1 — 3900 тг']
+      - a bare trailing number (stock / qty / spec): the conflict lost its firm mark: ['Фильтр масляный Toyota 90915-YZZE1 — 3900 тг\n90915-YZZE1 Фильтр масляный Toyota 3200']
+      - a bare trailing number (stock / qty / spec): the conflict lost its firm mark: ['90915-YZZE1 Фильтр масляный Toyota 3200\nФильтр масляный Toyota 90915-YZZE1 — 3900 тг']
+      - the catalog number for another pack: the conflict lost its firm mark: ['Фильтр масляный Toyota 90915-YZZE1 — 3900 тг', 'Фильтр масляный Toyota 90915-YZZE1 — 3200 тг за 2 шт']
+      - the catalog number for another pack: the conflict lost its firm mark: ['Фильтр масляный Toyota 90915-YZZE1 — 3200 тг за 2 шт', 'Фильтр масляный Toyota 90915-YZZE1 — 3900 тг']
+      - the catalog number for another pack: the conflict lost its firm mark: ['Фильтр масляный Toyota 90915-YZZE1 — 3900 тг\nФильтр масляный Toyota 90915-YZZE1 — 3200 тг за 2 шт']
+      - the catalog number for another pack: the conflict lost its firm mark: ['Фильтр масляный Toyota 90915-YZZE1 — 3200 тг за 2 шт\nФильтр масляный Toyota 90915-YZZE1 — 3900 тг']
+      - the catalog number in another currency: the conflict lost its firm mark: ['Фильтр масляный Toyota 90915-YZZE1 — 3900 тг', 'Фильтр масляный Toyota 90915-YZZE1 — Цена: 3200 руб.']
+      - the catalog number in another currency: the conflict lost its firm mark: ['Фильтр масляный Toyota 90915-YZZE1 — Цена: 3200 руб.', 'Фильтр масляный Toyota 90915-YZZE1 — 3900 тг']
+      - the catalog number in another currency: the conflict lost its firm mark: ['Фильтр масляный Toyota 90915-YZZE1 — 3900 тг\nФильтр масляный Toyota 90915-YZZE1 — Цена: 3200 руб.']
+      - the catalog number in another currency: the conflict lost its firm mark: ['Фильтр масляный Toyota 90915-YZZE1 — Цена: 3200 руб.\nФильтр масляный Toyota 90915-YZZE1 — 3900 тг']
+      - the catalog number after «от»: the conflict lost its firm mark: ['Фильтр масляный Toyota 90915-YZZE1 — 3900 тг', 'Фильтр масляный Toyota 90915-YZZE1 — от 3200 тг']
+      - the catalog number after «от»: the conflict lost its firm mark: ['Фильтр масляный Toyota 90915-YZZE1 — от 3200 тг', 'Фильтр масляный Toyota 90915-YZZE1 — 3900 тг']
+      - the catalog number after «от»: the conflict lost its firm mark: ['Фильтр масляный Toyota 90915-YZZE1 — 3900 тг\nФильтр масляный Toyota 90915-YZZE1 — от 3200 тг']
+      - the catalog number after «от»: the conflict lost its firm mark: ['Фильтр масляный Toyota 90915-YZZE1 — от 3200 тг\nФильтр масляный Toyota 90915-YZZE1 — 3900 тг']
+PASS V9-r3 S2: the accepted V9-r2 rule stays — the item's own row at the catalog price clears every other row naming its article
+FAIL V9-r3 S2 fuzz: rows about other items / non-price numbers at the catalog number, mixed with one genuine conflict — the conflict keeps its firm mark
+      - 193 genuine conflicts lost their firm mark, e.g. [('product[2]: Артикул: C-1139; Наименование: Фильтр масляный Sakura 90915-YZZE1; Цена: 3200; \nproduct[1]: Артикул: 90915-YZZE1; Наименование: Фильтр масляный Toyota; Цена: 3900; \nproduct[2]: Артикул: OC 91; Бренд: Knecht; Наименование: Фильтр масляный; Применимость: 90915-yzze1; Цена: 3200; \nКолодки тормозные передние Toyota 04465-02220 — 18500 тг\nФильтр масляный Toyota 90915YZZE1 — от 3200 тг\nФильтр масляный Knecht OC 91 (90915-yzze1) — 3200 тг', 'product[2]: Артикул: C-1139; Наименование: Фильтр масляный Sakura 90915-YZZE1; Цена: 3200; \
+PASS V9-r2 F6: a mark-like text anywhere in a document row never reaches the model — only the reconciler writes marks
+PASS V9-r2: a header label inside the mark is clipped (a document header never writes a long text into the authoritative line)
+FAIL fuzz (V9-r2/r3): rows about other items never get a firm mark; a price list that AGREES (the item at the catalog PRICE) gets no mark; a bare-number original settles nothing and is never marked itself; another pack size is never firm
+      - 468 firm marks against a catalog pack of 2 (another pack size / no pack on the row), e.g. [('product[1]: Артикул: 90915-YZZE1; Наименование: Фильтр масляный Toyota упаковка 10 шт; Цена: 6750 тг\nФильтр масляный Toyota 90915-yzze1 — 4100 тг\nФильтр масляный JS для 90915-YZZE1 — 1600 тг\n90915-yzze1 Фильтр масляный Toyota 3200 200', '[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1 упаковка 2 шт» — 6400 тг, в прайсе — 6750 тг. Цены расходятся.]'), ('product[1]: Артикул: 90915-YZZE1; Наименование: Фильтр масляный Toyota упаковка 10 шт; Цена: 6750 тг\nФильтр масляный 
+PASS catalog prices with a unit (тг/шт, тг/мес) take part; a different unit is not a conflict
+PASS a three-row chunk: only the conflicting row is marked; variants at the line price are no conflict
+PASS idempotent: a second pass is byte-identical, a forged mark line is dropped, a corrected catalog clears the mark
+PASS fuzz: 400 random price-list rows — never throws, only INSERTS mark lines (a forged mark text is cut off its row), idempotent, nothing without a catalog
+PASS search failure, an invalid call and an empty result never read as «позиции нет»
+PASS [WA] panel: RAG and exact-match rows are reconciled with the SAME function and the prompt says what a mark means
+PASS [TG] panel: RAG and exact-match rows are reconciled with the SAME function and the prompt says what a mark means
+PASS ONE function: the sub-workflow and the panel carry the generator's RECONCILE_JS byte for byte
+PASS Set Workflow State refuses to touch the price search
+PASS staging derivation: the price search reads the staging documents stub (no embeddings there), never the real project
+PASS eval runner: the simulated search runs the canonical Reconcile Prices when the measured template routes to it
+
+31 pass, 5 fail
+exit=1
+
+PASS [WA] F4: a firm conflict pushes the hard rule; soft marks only — the soft rule, never the hard one
+PASS [WA] one call: an exact-match row at the catalog price clears the RAG rows naming that article
+FAIL [WA] V9-r3 S1: another pack size of the same item (review: pack_size_changed / _text / box_vs_pack) — the soft rule, never «РАСХОЖДЕНИЕ ЦЕН»
+      - 'product[1]: Артикул: 90915-YZZE1; Наименование: Фильтр масляный Toyota упаковка 10 шт; Цена: 32000 тг': 'product[1]: Артикул: 90915-YZZE1; Наименование: Фильтр масляный Toyota упаковка 10 шт; Цена: 32000 тг\n[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1 упаковка 2 шт» — 6400 тг, в прайсе — 32000 тг. Цены расходятся.]'
+      - 'Фильтр масляный Toyota 90915-YZZE1 упаковка 10 шт — 32000 тг': 'Фильтр масляный Toyota 90915-YZZE1 упаковка 10 шт — 32000 тг\n[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1 упаковка 2 шт» — 6400 тг, в прайсе — 32000 тг. Цены расходятся.]'
+      - 'product[1]: Артикул: 90915-YZZE1; Наименование: Фильтр масляный Toyota; Цена за коробку: 32000 тг': 'product[1]: Артикул: 90915-YZZE1; Наименование: Фильтр масляный Toyota; Цена за коробку: 32000 тг\n[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1 упаковка 2 шт» — 6400 тг, в прайсе — 32000 тг. Цены расходятся.]'
+      - 'Фильтр масляный Toyota 90915-YZZE1 — 3900 тг': 'Фильтр масляный Toyota 90915-YZZE1 — 3900 тг\n[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1 упаковка 2 шт» — 6400 тг, в прайсе — 3900 тг. Цены расходятся.]'
+FAIL [WA] V9-r3 S2: an accessory / stock number at the catalog price never erases the genuine conflict (review: control_conflict, cross_reference_at_catalog_price, stock_equals_catalog)
+      - ['Фильтр масляный Toyota 90915-YZZE1 — 3900 тг', 'Ключ для фильтра 90915-YZZE1 — 3200 тг'] / []: 'Фильтр масляный Toyota 90915-YZZE1 — 3900 тг\n---\nКлюч для фильтра 90915-YZZE1 — 3200 тг' / ''
+      - ['Фильтр масляный Toyota 90915-YZZE1 — 3900 тг'] / ['Ключ для фильтра 90915-YZZE1 — 3200 тг']: 'Фильтр масляный Toyota 90915-YZZE1 — 3900 тг' / 'Ключ для фильтра 90915-YZZE1 — 3200 тг'
+      - ['Ключ для фильтра 90915-YZZE1 — 3200 тг'] / ['Фильтр масляный Toyota 90915-YZZE1 — 3900 тг']: 'Ключ для фильтра 90915-YZZE1 — 3200 тг' / 'Фильтр масляный Toyota 90915-YZZE1 — 3900 тг'
+      - ['Фильтр масляный Toyota 90915-YZZE1 — 3900 тг\nКлюч для фильтра 90915-YZZE1 — 3200 тг'] / []: 'Фильтр масляный Toyota 90915-YZZE1 — 3900 тг\nКлюч для фильтра 90915-YZZE1 — 3200 тг' / ''
+      - a stock number is not the price: 'product[1]: Артикул: 90915-YZZE1; Наименование: Фильтр масляный Toyota; Цена: 3900 тг; Остаток: 3200'
+      - a stock number is not the price: 'Фильтр масляный Toyota 90915-YZZE1 — 3900 тг; Остаток: 3200 шт'
+PASS [WA] F5: the conflicting row at the end of a full window keeps its WHOLE mark, and the rule follows the window
+PASS [WA] F5: a row the window held before V9 is not pushed out by a mark above it
+PASS [WA] F5: the window is cut at a line boundary — never half a row; a row past the window is not marked
+PASS [WA] F5: a single row longer than the whole window is still shown (cut), as before V9 — never an empty window
+PASS [TG] F4: a firm conflict pushes the hard rule; soft marks only — the soft rule, never the hard one
+PASS [TG] one call: an exact-match row at the catalog price clears the RAG rows naming that article
+FAIL [TG] V9-r3 S1: another pack size of the same item (review: pack_size_changed / _text / box_vs_pack) — the soft rule, never «РАСХОЖДЕНИЕ ЦЕН»
+      - 'product[1]: Артикул: 90915-YZZE1; Наименование: Фильтр масляный Toyota упаковка 10 шт; Цена: 32000 тг': 'product[1]: Артикул: 90915-YZZE1; Наименование: Фильтр масляный Toyota упаковка 10 шт; Цена: 32000 тг\n[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1 упаковка 2 шт» — 6400 тг, в прайсе — 32000 тг. Цены расходятся.]'
+      - 'Фильтр масляный Toyota 90915-YZZE1 упаковка 10 шт — 32000 тг': 'Фильтр масляный Toyota 90915-YZZE1 упаковка 10 шт — 32000 тг\n[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1 упаковка 2 шт» — 6400 тг, в прайсе — 32000 тг. Цены расходятся.]'
+      - 'product[1]: Артикул: 90915-YZZE1; Наименование: Фильтр масляный Toyota; Цена за коробку: 32000 тг': 'product[1]: Артикул: 90915-YZZE1; Наименование: Фильтр масляный Toyota; Цена за коробку: 32000 тг\n[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1 упаковка 2 шт» — 6400 тг, в прайсе — 32000 тг. Цены расходятся.]'
+      - 'Фильтр масляный Toyota 90915-YZZE1 — 3900 тг': 'Фильтр масляный Toyota 90915-YZZE1 — 3900 тг\n[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1 упаковка 2 шт» — 6400 тг, в прайсе — 3900 тг. Цены расходятся.]'
+FAIL [TG] V9-r3 S2: an accessory / stock number at the catalog price never erases the genuine conflict (review: control_conflict, cross_reference_at_catalog_price, stock_equals_catalog)
+      - ['Фильтр масляный Toyota 90915-YZZE1 — 3900 тг', 'Ключ для фильтра 90915-YZZE1 — 3200 тг'] / []: 'Фильтр масляный Toyota 90915-YZZE1 — 3900 тг\n---\nКлюч для фильтра 90915-YZZE1 — 3200 тг' / ''
+      - ['Фильтр масляный Toyota 90915-YZZE1 — 3900 тг'] / ['Ключ для фильтра 90915-YZZE1 — 3200 тг']: 'Фильтр масляный Toyota 90915-YZZE1 — 3900 тг' / 'Ключ для фильтра 90915-YZZE1 — 3200 тг'
+      - ['Ключ для фильтра 90915-YZZE1 — 3200 тг'] / ['Фильтр масляный Toyota 90915-YZZE1 — 3900 тг']: 'Ключ для фильтра 90915-YZZE1 — 3200 тг' / 'Фильтр масляный Toyota 90915-YZZE1 — 3900 тг'
+      - ['Фильтр масляный Toyota 90915-YZZE1 — 3900 тг\nКлюч для фильтра 90915-YZZE1 — 3200 тг'] / []: 'Фильтр масляный Toyota 90915-YZZE1 — 3900 тг\nКлюч для фильтра 90915-YZZE1 — 3200 тг' / ''
+      - a stock number is not the price: 'product[1]: Артикул: 90915-YZZE1; Наименование: Фильтр масляный Toyota; Цена: 3900 тг; Остаток: 3200'
+      - a stock number is not the price: 'Фильтр масляный Toyota 90915-YZZE1 — 3900 тг; Остаток: 3200 шт'
+PASS [TG] F5: the conflicting row at the end of a full window keeps its WHOLE mark, and the rule follows the window
+PASS [TG] F5: a row the window held before V9 is not pushed out by a mark above it
+PASS [TG] F5: the window is cut at a line boundary — never half a row; a row past the window is not marked
+PASS [TG] F5: a single row longer than the whole window is still shown (cut), as before V9 — never an empty window
+
+12 pass, 4 fail
+exit=1

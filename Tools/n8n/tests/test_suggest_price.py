@@ -13,7 +13,10 @@ Contract:
     the marks are added: a row the window held before V9 is never pushed out by a mark, a mark never stands without its
     row (or is cut in half), and the rules follow only the marks that are in the window;
   * one call: the RAG chunks and the exact-match rows are reconciled together — a row with the article at the catalog
-    price clears the other rows naming that article in both blocks.
+    price clears the other rows naming that article in both blocks;
+  * V9-r3 (independent review 2026-10-09, S1/S2): another pack size of the same item gets the soft rule, never the hard
+    one; only the item's own row with the catalog price as a PRICE clears the article — an accessory or a stock number at
+    the catalog price never takes the hard rule away from a genuine conflict.
 
     python3 Tools/n8n/tests/test_suggest_price.py
 """
@@ -31,6 +34,9 @@ HARD, SOFT = 'РАСХОЖДЕНИЕ ЦЕН', 'СВЕРКА ЦЕН'
 ITEMS = [{'kind': 'product', 'name': 'Фильтр масляный Toyota 90915-YZZE1', 'price': '3200 тг', 'description': 'Оригинал'},
          {'kind': 'service', 'name': 'Замена масла', 'price': '5000 тг', 'description': ''}]
 CONFLICT_ROW = 'Фильтр масляный 90915-YZZE1 — 3900 тг, оригинал'
+# V9-r3 (independent review 2026-10-09, S1/S2): the review's control row and a catalog that sells the item in a pack of 2
+CONTROL_ROW = 'Фильтр масляный Toyota 90915-YZZE1 — 3900 тг'
+PACK2_ITEMS = [{'kind': 'product', 'name': 'Фильтр масляный Toyota 90915-YZZE1 упаковка 2 шт', 'price': '6400 тг', 'description': ''}]
 
 
 def panel(ch, rag=(), exact=(), items=ITEMS):
@@ -79,6 +85,29 @@ for ch in CH:
     with Case(f'[{ch}] one call: an exact-match row at the catalog price clears the RAG rows naming that article') as c:
         sp, rag, ex = panel(ch, rag=['Фильтр масляный Mahle OC 217 (90915-YZZE1) — 1600 тг'], exact=['Фильтр масляный Toyota 90915-YZZE1 — 3200 тг'])
         c.check(not marks(rag + ex) and HARD not in sp and SOFT not in sp, f'{rag!r} / {ex!r}')
+
+    with Case(f'[{ch}] V9-r3 S1: another pack size of the same item (review: pack_size_changed / _text / box_vs_pack) — the soft rule, never «{HARD}»') as c:
+        for row in ('product[1]: Артикул: 90915-YZZE1; Наименование: Фильтр масляный Toyota упаковка 10 шт; Цена: 32000 тг',
+                    'Фильтр масляный Toyota 90915-YZZE1 упаковка 10 шт — 32000 тг',
+                    'product[1]: Артикул: 90915-YZZE1; Наименование: Фильтр масляный Toyota; Цена за коробку: 32000 тг',
+                    'Фильтр масляный Toyota 90915-YZZE1 — 3900 тг'):
+            sp, rag, ex = panel(ch, rag=[row], items=PACK2_ITEMS)
+            c.check(len(marks(rag)) == 1 and not firm(marks(rag)[0]) and HARD not in sp and SOFT in sp, f'{row!r}: {rag!r}')
+        sp, rag, ex = panel(ch, rag=['Фильтр масляный Toyota 90915-YZZE1 упаковка 2 шт — 7000 тг'], items=PACK2_ITEMS)
+        c.check(len(marks(rag)) == 1 and firm(marks(rag)[0]) and HARD in sp, f'the same pack at another price stays a conflict: {rag!r}')
+
+    with Case(f'[{ch}] V9-r3 S2: an accessory / stock number at the catalog price never erases the genuine conflict (review: control_conflict, '
+              f'cross_reference_at_catalog_price, stock_equals_catalog)') as c:
+        wrench = 'Ключ для фильтра 90915-YZZE1 — 3200 тг'
+        for rag_in, ex_in in (([CONTROL_ROW, wrench], []), ([CONTROL_ROW], [wrench]), ([wrench], [CONTROL_ROW]), ([CONTROL_ROW + '\n' + wrench], [])):
+            sp, rag, ex = panel(ch, rag=rag_in, exact=ex_in)
+            c.check(HARD in sp and any(firm(m) for m in marks(rag + '\n' + ex)), f'{rag_in} / {ex_in}: {rag!r} / {ex!r}')
+        for row in ('product[1]: Артикул: 90915-YZZE1; Наименование: Фильтр масляный Toyota; Цена: 3900 тг; Остаток: 3200',
+                    'Фильтр масляный Toyota 90915-YZZE1 — 3900 тг; Остаток: 3200 шт'):
+            sp, rag, ex = panel(ch, rag=[row])
+            c.check(HARD in sp and len(marks(rag)) == 1 and firm(marks(rag)[0]), f'a stock number is not the price: {rag!r}')
+        sp, rag, ex = panel(ch, rag=[CONTROL_ROW, wrench, 'Фильтр масляный Toyota 90915-YZZE1 (оригинал) — 3200 тг'])
+        c.check(not marks(rag) and HARD not in sp and SOFT not in sp, f'the item\'s own row at the catalog price still settles the article: {rag!r}')
 
     with Case(f'[{ch}] F5: the conflicting row at the end of a full window keeps its WHOLE mark, and the rule follows the window') as c:
         row = 'Фильтр масляный 90915-YZZE1 — 3900 тг'
