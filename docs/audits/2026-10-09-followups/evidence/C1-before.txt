@@ -1,0 +1,110 @@
+# C1 before — HEAD ed41c5dd (client code = HEAD; the NEW tests only), 2026-10-11T10:35:58Z
+# Assets/Scripts/Main/BotServerDeletion.cs unchanged; BotServerDeletionPolicyTests + BotDeletionWiringTests extended.
+
+## Client: Tools/run-tests-headless.sh 'BotServerDeletion|BotDeletion'
+PASSED BotDeletionWiringTests.DeletePopup_BodyClearsTheButtons_InThePrefab
+PASSED BotDeletionWiringTests.FullWipe_ClearsPrefsOnlyAfterEveryBotIsSettled
+PASSED BotDeletionWiringTests.LocalWipe_ClearsTheRetiredChannelMarkers
+PASSED BotDeletionWiringTests.LocalWipe_TalksToNoServer_AndTheOldOneCallDeleteIsGone
+PASSED BotDeletionWiringTests.ServerCanon_ACloneAlreadyGone_IsConfirmed_NotRefused
+PASSED BotDeletionWiringTests.ServerCanon_AnswersA2xxOnlyWithThePositiveWord("lmjYsdNcQA2IE5rl-Delete_Bot_Files.json")
+PASSED BotDeletionWiringTests.ServerCanon_AnswersA2xxOnlyWithThePositiveWord("0DP79STI3pafXO9B-Set_Workflow_State.json")
+PASSED BotDeletionWiringTests.ServerDeleteAnswers_AreClassifiedWithTheirBodies
+PASSED BotDeletionWiringTests.ServerHalf_UnlinksTheProfileFirst_ReadsEveryAnswer_AndHoldsTheQueue
+PASSED BotDeletionWiringTests.SettingsDelete_RemovesTheBotOnlyOnTheVerdict_OrTheOwnersPhoneOnlyChoice
+PASSED BotServerDeletionPolicyTests.A4xx_StaysTheServersFinalWord_WhateverItsBody
+PASSED BotServerDeletionPolicyTests.AFinalRefusal_KeepsTheBot_AndNamesWhy
+PASSED BotServerDeletionPolicyTests.ANeverAuthorisedBot_HasNoServerTrace
+FAILED BotServerDeletionPolicyTests.AnUnconfirmed2xx_IsARetry_NeverADeletion(200,"")
+      200 «» is not the server's word that the data is gone
+        Expected: Transient
+        But was:  Ok
+FAILED BotServerDeletionPolicyTests.AnUnconfirmed2xx_IsARetry_NeverADeletion(200,null)
+      200 «» is not the server's word that the data is gone
+        Expected: Transient
+        But was:  Ok
+FAILED BotServerDeletionPolicyTests.AnUnconfirmed2xx_IsARetry_NeverADeletion(200,"   ")
+      200 «   » is not the server's word that the data is gone
+        Expected: Transient
+        But was:  Ok
+FAILED BotServerDeletionPolicyTests.AnUnconfirmed2xx_IsARetry_NeverADeletion(200,"{}")
+      200 «{}» is not the server's word that the data is gone
+        Expected: Transient
+        But was:  Ok
+FAILED BotServerDeletionPolicyTests.AnUnconfirmed2xx_IsARetry_NeverADeletion(200,"{\"message\":\"Workflow executed successfully\"}")
+      200 «{"message":"Workflow executed successfully"}» is not the server's word that the data is gone
+        Expected: Transient
+        But was:  Ok
+FAILED BotServerDeletionPolicyTests.AnUnconfirmed2xx_IsARetry_NeverADeletion(200,"<html>upstream error</html>")
+      200 «<html>upstream error</html>» is not the server's word that the data is gone
+        Expected: Transient
+        But was:  Ok
+PASSED BotServerDeletionPolicyTests.AnUnconfirmed2xx_IsARetry_NeverADeletion(200,"{\"success\":false}")
+FAILED BotServerDeletionPolicyTests.AnUnconfirmed2xx_IsARetry_NeverADeletion(200,"{\"success\":\"true\"}")
+      200 «{"success":"true"}» is not the server's word that the data is gone
+        Expected: Transient
+        But was:  Ok
+FAILED BotServerDeletionPolicyTests.AnUnconfirmed2xx_IsARetry_NeverADeletion(200,"{\"success\":1}")
+      200 «{"success":1}» is not the server's word that the data is gone
+        Expected: Transient
+        But was:  Ok
+FAILED BotServerDeletionPolicyTests.AnUnconfirmed2xx_IsARetry_NeverADeletion(200,"{\"success\":null}")
+      200 «{"success":null}» is not the server's word that the data is gone
+        Expected: Transient
+        But was:  Ok
+FAILED BotServerDeletionPolicyTests.AnUnconfirmed2xx_IsARetry_NeverADeletion(200,"{\"Success\":true}")
+      200 «{"Success":true}» is not the server's word that the data is gone
+        Expected: Transient
+        But was:  Ok
+FAILED BotServerDeletionPolicyTests.AnUnconfirmed2xx_IsARetry_NeverADeletion(200,"{\"data\":{\"success\":true}}")
+      200 «{"data":{"success":true}}» is not the server's word that the data is gone
+        Expected: Transient
+        But was:  Ok
+FAILED BotServerDeletionPolicyTests.AnUnconfirmed2xx_IsARetry_NeverADeletion(200,"[{\"success\":true}]")
+      200 «[{"success":true}]» is not the server's word that the data is gone
+        Expected: Transient
+        But was:  Ok
+FAILED BotServerDeletionPolicyTests.AnUnconfirmed2xx_IsARetry_NeverADeletion(200,"true")
+      200 «true» is not the server's word that the data is gone
+        Expected: Transient
+        But was:  Ok
+FAILED BotServerDeletionPolicyTests.AnUnconfirmed2xx_IsARetry_NeverADeletion(200,"{\"success\":true")
+      200 «{"success":true» is not the server's word that the data is gone
+        Expected: Transient
+        But was:  Ok
+FAILED BotServerDeletionPolicyTests.AnUnconfirmed2xx_IsARetry_NeverADeletion(200,"{\"success\":false,\"success\":true}")
+      200 «{"success":false,"success":true}» is not the server's word that the data is gone
+        Expected: Transient
+        But was:  Ok
+FAILED BotServerDeletionPolicyTests.AnUnconfirmed2xx_IsARetry_NeverADeletion(201,"{}")
+      201 «{}» is not the server's word that the data is gone
+        Expected: Transient
+        But was:  Ok
+FAILED BotServerDeletionPolicyTests.AnUnconfirmed2xx_IsARetry_NeverADeletion(204,"")
+      204 «» is not the server's word that the data is gone
+        Expected: Transient
+        But was:  Ok
+PASSED BotServerDeletionPolicyTests.Copy_IsHonestAboutWhereTheDataStays
+PASSED BotServerDeletionPolicyTests.Done_OnlyWhenEveryStepSaidSo
+PASSED BotServerDeletionPolicyTests.OnlyTheServersPositiveWord_IsADeletion
+PASSED BotServerDeletionPolicyTests.ProfileUnlink_AnyDefinitiveAnswerLetsTheDeletionGoOn
+PASSED BotServerDeletionPolicyTests.TheFirstStepThatIsNotOk_Decides
+PASSED BotServerDeletionPolicyTests.no answer at all (no connection / timeout)
+PASSED BotServerDeletionPolicyTests.TransientAnswers_KeepTheBot_ForARetry(500)
+PASSED BotServerDeletionPolicyTests.TransientAnswers_KeepTheBot_ForARetry(502)
+PASSED BotServerDeletionPolicyTests.TransientAnswers_KeepTheBot_ForARetry(503)
+PASSED BotServerDeletionPolicyTests.TransientAnswers_KeepTheBot_ForARetry(504)
+PASSED BotServerDeletionPolicyTests.a session the one refresh did not cure
+PASSED BotServerDeletionPolicyTests.TransientAnswers_KeepTheBot_ForARetry(408)
+PASSED BotServerDeletionPolicyTests.TransientAnswers_KeepTheBot_ForARetry(429)
+PASSED BotServerDeletionPolicyTests.WipeRefusedBody_AgreesWithTheCount(1,"1 бота")
+PASSED BotServerDeletionPolicyTests.WipeRefusedBody_AgreesWithTheCount(2,"2 ботов")
+PASSED BotServerDeletionPolicyTests.WipeRefusedBody_AgreesWithTheCount(5,"5 ботов")
+PASSED BotServerDeletionPolicyTests.WipeRefusedBody_AgreesWithTheCount(11,"11 ботов")
+PASSED BotServerDeletionPolicyTests.WipeRefusedBody_AgreesWithTheCount(21,"21 бота")
+
+================ EditMode test results (headless) ================
+  result=Failed(Child)  total=49  passed=32  failed=17  skipped=0  inconclusive=0
+  Failing / inconclusive tests:
+=================================================================
+NOT GREEN ❌  (unity exit=2).

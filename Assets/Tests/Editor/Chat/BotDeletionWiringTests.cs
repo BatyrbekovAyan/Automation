@@ -1,5 +1,6 @@
 using System.IO;
 using System.Text.RegularExpressions;
+using Newtonsoft.Json.Linq;
 using NUnit.Framework;
 using UnityEngine;
 
@@ -78,6 +79,68 @@ public class BotDeletionWiringTests
             "every answer must be classified — a 403 is final, a 5xx/no answer is a retry");
         Assert.IsTrue(m.Contains("ReplyModeSyncService.Existing?.Release("), "a bot that stays must get its queue back");
         Assert.IsTrue(m.Contains("BotServerDeletion.HasServerTrace("), "a never-authorised bot needs no network to go");
+    }
+
+    [Test]
+    public void ServerDeleteAnswers_AreClassifiedWithTheirBodies()
+    {
+        // C1: a step is done only on the body's positive word, so a request that cannot read its body would make every
+        // deletion a retry forever. Both factories DeleteBotOnServer uses must carry a body reader, and both answers
+        // must reach the classifier with their own body.
+        string manager = Src("Scripts/Main/Manager.cs");
+        string m = MethodBody(manager, "public IEnumerator DeleteBotOnServer");
+        Assert.IsTrue(m.Contains("AuthorizedRequest.JsonPost(") && m.Contains("NewWorkflowStateRequest("),
+            "Delete Bot Files goes through JsonPost, the clone through NewWorkflowStateRequest");
+        Assert.IsTrue(MethodBody(manager, "private static UnityWebRequest NewWorkflowStateRequest").Contains("new DownloadHandlerBuffer()"),
+            "Set Workflow State's answer must be readable");
+        Assert.IsTrue(MethodBody(Src("Scripts/Auth/AuthorizedRequest.cs"), "public static UnityWebRequest JsonPost").Contains("new DownloadHandlerBuffer()"),
+            "Delete Bot Files' answer must be readable");
+        Assert.AreEqual(2, Regex.Matches(m, @"ClassifyServerDelete\((\w+)\.responseCode,\s*\1\.downloadHandler\?\.text\)").Count,
+            "each server delete is classified by its own status AND body");
+    }
+
+    [TestCase("lmjYsdNcQA2IE5rl-Delete_Bot_Files.json")]
+    [TestCase("0DP79STI3pafXO9B-Set_Workflow_State.json")]
+    public void ServerCanon_AnswersA2xxOnlyWithThePositiveWord(string workflowFile)
+    {
+        // The premise of C1, read from the server canon: the client's ONLY success sign is `"success": true`, so every
+        // 200 these webhooks answer must carry it, and every `"success": false` must go out with a non-2xx status.
+        // Change the server's success shape and every bot deletion becomes a retry — this fails first.
+        var workflow = JObject.Parse(File.ReadAllText(Path.Combine(Application.dataPath, "..", "Tools", "n8n", "workflows", workflowFile)));
+        var positive = new Regex(@"""success""\s*:\s*true");
+        var negative = new Regex(@"""success""\s*:\s*false");
+        int successNodes = 0;
+        foreach (var node in workflow["nodes"])
+        {
+            if ((string)node["type"] != "n8n-nodes-base.respondToWebhook") continue;
+            string name = (string)node["name"];
+            string body = (string)node["parameters"]?["responseBody"] ?? "";
+            string status = node["parameters"]?["options"]?["responseCode"]?.ToString();
+            if (status == null)
+            {
+                Assert.IsTrue(positive.IsMatch(body), $"{workflowFile} «{name}» answers 200 without \"success\": true: {body}");
+                successNodes++;
+            }
+            else if (negative.IsMatch(body))
+                Assert.IsFalse(Regex.IsMatch(status, @"(^|\D)2\d\d(\D|$)"), $"{workflowFile} «{name}» refuses with a 2xx status: {status}");
+        }
+        Assert.Greater(successNodes, 0, $"{workflowFile}: no success answer found");
+    }
+
+    [Test]
+    public void ServerCanon_ACloneAlreadyGone_IsConfirmed_NotRefused()
+    {
+        // Set Workflow State turns the n8n API's 404 (the clone is already deleted) into its 200 success:true — a repeated
+        // delete is Done. Without it the client would see no positive word and retry a finished deletion forever.
+        var workflow = JObject.Parse(File.ReadAllText(Path.Combine(Application.dataPath, "..", "Tools", "n8n", "workflows",
+                                                                   "0DP79STI3pafXO9B-Set_Workflow_State.json")));
+        JToken gone = null;
+        foreach (var node in workflow["nodes"])
+            if ((string)node["name"] == "Workflow Gone?") gone = node;
+        Assert.IsNotNull(gone, "Set Workflow State: «Workflow Gone?» not found");
+        StringAssert.Contains("404", gone["parameters"].ToString(), "an already-deleted clone (404) counts as gone");
+        Assert.AreEqual("Respond OK", (string)workflow["connections"]?["Workflow Gone?"]?["main"]?[0]?[0]?["node"],
+            "«gone» answers with the success Respond");
     }
 
     [Test]
