@@ -650,6 +650,65 @@
         3410,
         320
       ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "0dc28b9b-2588-5551-a61b-33eb1a0c9e03",
+              "leftValue": "={{ $json.billingConflict === true }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "97c0912f-1148-5fc2-8caf-5f6a327de654",
+      "name": "Conflict?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        3630,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- V3 journal (T1, 2026-10-11): a refresh answered billingConflict. Parameters, in order: the requested\n-- billing id, the refused install (Issue Token's verified install id). Written after the answer; never read by the flow.\ninsert into billing_conflicts (app_user_id, claimant_install_id, holder_install_id)\nselect b.app_user_id, i.install_id, b.install_id\nfrom billing_bindings b\njoin installs i on i.install_id = $2 and i.revoked_at is null\nwhere b.app_user_id = $1 and b.install_id <> i.install_id\non conflict (app_user_id, claimant_install_id) do update set\n  holder_install_id = excluded.holder_install_id, last_seen_at = now(), attempts = billing_conflicts.attempts + 1\nreturning app_user_id, claimant_install_id, holder_install_id, attempts;",
+        "options": {
+          "queryReplacement": "={{ [ $('Route').first().json.appUserId, $json.installId ] }}"
+        }
+      },
+      "id": "cd7d8f79-97a6-5ea3-849f-046953120151",
+      "name": "Log Billing Conflict",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        3850,
+        320
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "vvRrFiEXzLVqKjOx",
+          "name": "Postgres"
+        }
+      },
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
     }
   ],
   "connections": {
@@ -952,6 +1011,28 @@
         [
           {
             "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respond": {
+      "main": [
+        [
+          {
+            "node": "Conflict?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Conflict?": {
+      "main": [
+        [
+          {
+            "node": "Log Billing Conflict",
             "type": "main",
             "index": 0
           }

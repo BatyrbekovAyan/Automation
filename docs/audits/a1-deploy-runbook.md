@@ -106,3 +106,41 @@ docker compose up -d n8n && docker compose logs --tail 20 n8n
   убедиться по `bot_profiles`/`installs.last_seen_at`, что держатель действительно мёртв, затем через `sql-oneoff.py`
   `update installs set revoked_at = now() where install_id = '<мёртвая установка>';` — id перейдёт на следующем refresh новой
   (клиент повторяет его при возврате в приложение). Ботов новая установка забирает кодом из чата бота (claim).
+- **Журнал конфликтов привязки (V3, T1 доработок 2026-10-11).** Первая привязка RevenueCat id не доказывает владения:
+  установка, узнавшая чужой ещё не привязанный id, привязывает его первой (ограничение принято владельцем 2026-10-11 — id
+  случайный, приложение его не показывает). Поэтому каждый refresh, ответивший `billingConflict`, оставляет строку в
+  `billing_conflicts` (одна на пару «запрошенный id + просившая установка»: держатель — ТЕКУЩИЙ из `billing_bindings`,
+  первый/последний раз, число попыток). Пишет её узел `Log Billing Conflict` Auth Session ПОСЛЕ ответа: refresh не
+  замедляется и не меняется, сбой журнала ответ не трогает. Выкладка: SQL `Tools/n8n/sql/2026-10-11-billing-conflicts.sql`
+  раньше `crAuthSession001` (без таблицы журнал молча не пишется). Запрос поддержки (только чтение, `sql-oneoff.py`):
+  ```sql
+  select c.app_user_id, c.claimant_install_id, c.holder_install_id, c.attempts, c.first_seen_at, c.last_seen_at,
+         (b.install_id = c.holder_install_id) as holder_still_bound,
+         h.revoked_at as holder_revoked, h.created_at as holder_created, h.last_seen_at as holder_last_seen, h.platform as holder_platform,
+         cl.created_at as claimant_created, cl.last_seen_at as claimant_last_seen, cl.platform as claimant_platform, cl.app_version as claimant_version,
+         (select count(*) from bot_profiles bp where bp.owner_id = c.holder_install_id and bp.deleted_at is null) as holder_live_bots,
+         (select count(*) from bot_profiles bp where bp.owner_id = c.claimant_install_id and bp.deleted_at is null) as claimant_live_bots
+  from billing_conflicts c
+  left join billing_bindings b on b.app_user_id = c.app_user_id
+  left join installs h on h.install_id = c.holder_install_id
+  left join installs cl on cl.install_id = c.claimant_install_id
+  where c.last_seen_at > now() - interval '30 days'   -- или: where c.app_user_id = '<id из обращения>'
+  order by c.last_seen_at desc;
+  ```
+  Порядок решения: (1) обращение владельца («подписка куплена, а в приложении её нет») — по его покупке (чек App Store /
+  Google Play → клиент в RevenueCat) найти `app_user_id` и строку журнала; без строки конфликта нет — искать в другом
+  месте (RevenueCat Events, `subscribers`);
+  (2) `holder_still_bound = false` или `holder_revoked` не пуст — строка устарела: попросить владельца вернуться в
+  приложение (refresh) и перечитать её — либо id перешёл к нему (`billing_bindings`), либо строка назовёт нового держателя;
+  (3) иначе выяснить, чья установка держит id, и убедиться,
+  что просившая — действительно телефон владельца (`claimant_last_seen` свежий, платформа совпадает): (а) старый телефон
+  самого владельца (потерянный секрет, переустановка) — `holder_last_seen` давно не обновлялся, его живые боты
+  (`holder_live_bots`) — боты владельца (сверить с ним имена ботов / номера каналов; после отзыва он забирает их кодом из
+  чата бота, claim) → отзывать; (б) чужая установка, привязавшая id первой (остаток V3 first-bind), — владелец её не
+  узнаёт → отзывать; (в) второй телефон владельца, которым он пользуется, — НЕ отзывать (один id = одна установка,
+  объяснить владельцу); при сомнении — не отзывать, спросить владельца; (4) отозвать держателя:
+  `update installs set revoked_at = now() where install_id = '<holder_install_id>';` — id перейдёт на следующем refresh
+  просившей установки (клиент повторяет его при возврате в приложение, ≤ 1 раза в минуту), отозванная установка получит 401
+  и начнёт заново (bootstrap) без id; (5) проверить: `select install_id from billing_bindings where app_user_id = '<id>';` =
+  установка владельца, новая строка журнала с этим claimant больше не растёт. Строки журнала не удаляются процедурой —
+  это история обращений; таблицу никто, кроме поддержки, не читает (RLS, без доступа `anon`/`authenticated`).

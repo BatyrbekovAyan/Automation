@@ -383,6 +383,26 @@ if (claimInfo) { out.claimMethod = claimInfo.claimMethod; out.claimProfileId = c
 return [{ json: out, pairedItem: { item: 0 } }];
 """
 
+# V3 journal (T1, follow-ups 2026-10-11; table: sql/2026-10-11-billing-conflicts.sql): the owner accepted the first-bind
+# limitation on condition that support SEES every refused install (a1-deploy-runbook.md §5 — then revokes the wrong
+# one). Runs AFTER Respond (each Postgres node ≈ 1.9 s on prod: the refresh is neither delayed nor changed, even when
+# this statement fails — continueRegularOutput, no retry, nothing after it), only when the answer said billingConflict
+# (Issue Token's verdict = Verify Install's billing_conflict on a refresh; Respond passes its input item on). The
+# holder is read from billing_bindings — never from the request — and the claimant must be a live install other than
+# the holder. One row per (requested id, claimant): a repeat bumps attempts + last_seen_at and records the current holder.
+LOG_BILLING_CONFLICT_SQL = """-- V3 journal (T1, 2026-10-11): a refresh answered billingConflict. Parameters, in order: the requested
+-- billing id, the refused install (Issue Token's verified install id). Written after the answer; never read by the flow.
+insert into billing_conflicts (app_user_id, claimant_install_id, holder_install_id)
+select b.app_user_id, i.install_id, b.install_id
+from billing_bindings b
+join installs i on i.install_id = $2 and i.revoked_at is null
+where b.app_user_id = $1 and b.install_id <> i.install_id
+on conflict (app_user_id, claimant_install_id) do update set
+  holder_install_id = excluded.holder_install_id, last_seen_at = now(), attempts = billing_conflicts.attempts + 1
+returning app_user_id, claimant_install_id, holder_install_id, attempts;"""
+LOG_BILLING_CONFLICT_PARAMS = "={{ [ $('Route').first().json.appUserId, $json.installId ] }}"
+CONFLICT_EXPR = "={{ $json.billingConflict === true }}"
+
 NEEDS_STATUS_EXPR = "={{ $('Route').first().json.op !== 'claim.verify' && $json.retired !== true }}"
 CLAIM_STATUS_QUERY = "={{ JSON.stringify({ profile_id: $('Route').first().json.profileId }) }}"
 CLAIM_STATUS_URL = "={{ ($('Route').first().json.channel === 'telegram' ? 'https://wappi.pro/tapi/' : 'https://wappi.pro/api/') + 'sync/get/status' }}"
@@ -456,6 +476,10 @@ def build_session():
     edge(c, "Code Sent?", "Reload Ownership", 0); edge(c, "Code Sent?", "Clear Claim Code", 1)
     edge(c, "Clear Claim Code", "Reload Ownership")
     edge(c, "Reload Ownership", "Issue Token"); edge(c, "Issue Token", "Respond")
+    # V3 journal (T1): after the answer is on the wire, a refused billing id is recorded for support (no false branch).
+    n.append(if_true("Conflict?", CONFLICT_EXPR, [3630, 320]))
+    n.append(postgres("Log Billing Conflict", LOG_BILLING_CONFLICT_SQL, LOG_BILLING_CONFLICT_PARAMS, [3850, 320]))
+    edge(c, "Respond", "Conflict?"); edge(c, "Conflict?", "Log Billing Conflict", 0)
     return workflow(SESSION_ID, SESSION_NAME, n, c)
 
 

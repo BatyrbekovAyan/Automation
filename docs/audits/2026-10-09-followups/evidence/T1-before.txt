@@ -1,0 +1,85 @@
+# T1 before — V3 journal (billing conflicts) on HEAD 8f342f89: canonical crAuthSession001 + verify-auth-gate.py as at HEAD, only the new tests added
+
+## 1) HEAD as is (no migration file): python3 Tools/n8n/tests/test_billing_identity.py — 2026-10-11T13:54:14Z
+PASS R2 B1: a second install naming a billing id another install holds (with a live bot) gets NO billing identity + billingConflict
+PASS R2 B2: a refresh naming another install's billing id does not move it (the caller keeps its own / nothing)
+PASS R2 B3: the holder's own repeated refresh is idempotent (no conflict)
+PASS R2 B4: a REVOKED holder releases the id — the next install that names it takes it over
+PASS V3 B5: a live holder WITHOUT a live bot (a paying owner before the first bot) keeps its id — another install naming it gets nothing, on bootstrap AND refresh, and cannot pass Get Usage
+PASS V3 B8: the holder deleted its ONLY bot (deleted_at set, as Delete Bot Files does) — the id still does not move
+PASS V3 B9: «Удалить все данные» keeps the install — all its profiles retired, the same install refreshes with the same id: same u, no conflict, nothing owned
+PASS V3 B10: no ping-pong — after a conflict, repeated refreshes of the holder and of the other install never move the holder
+PASS V3 B11: the unauthenticated bootstrap binds NOTHING — an orphaned bootstrap (answer lost) never holds the id, the real install's refresh binds it
+PASS R2 B6: a device-id fallback is never bound (not a RevenueCat id) — no identity, no conflict; the RC id binds later
+PASS R2 B7: exactly one live install ever holds a billing id
+PASS R2 M1: the migration seed keeps ONE live holder per id (the most recently seen) and clears the others
+FAIL V3-journal B12: a refresh answered billingConflict writes ONE row — the requested id, the claimant, the holder FROM billing_bindings, attempts 1; a second claimant gets its own row
+      - EXCEPTION FileNotFoundError: [Errno 2] No such file or directory: '/Users/ayan/Projects/Automation/Tools/n8n/sql/2026-10-11-billing-conflicts.sql'
+FAIL V3-journal B13: a repeated conflict bumps attempts + last_seen_at (first_seen_at kept, holder = the CURRENT holder); a refresh WITHOUT a conflict writes nothing
+      - EXCEPTION FileNotFoundError: [Errno 2] No such file or directory: '/Users/ayan/Projects/Automation/Tools/n8n/sql/2026-10-11-billing-conflicts.sql'
+FAIL V3-journal B14: the journal failing (its table missing) changes NOTHING in the refresh answer; it runs only after Respond, on continueRegularOutput, without retries, with nothing after it
+      - EXCEPTION FileNotFoundError: [Errno 2] No such file or directory: '/Users/ayan/Projects/Automation/Tools/n8n/sql/2026-10-11-billing-conflicts.sql'
+FAIL V3-journal B15: the statement itself records only a real refusal — never the holder as claimant, an unknown or revoked claimant, an id nobody holds, nor a holder named by the request
+      - EXCEPTION FileNotFoundError: [Errno 2] No such file or directory: '/Users/ayan/Projects/Automation/Tools/n8n/sql/2026-10-11-billing-conflicts.sql'
+PASS R2 T1: Issue Token signs u = null and tells the client billingConflict
+PASS R2 G1/G2: a token WITHOUT a billing identity cannot name any billing id (GetUsage, SuggestReplies)
+PASS R2 G3/G4: a token with u = R passes its own id and refuses another
+PASS R2 G5: Create WA/TG refuse an EMPTY AppUserID in session mode (it skipped the channel count and the quota)
+PASS R2 G7: Delete Bot Files is not blocked by its audit-only appUserId (a conflicted install can still delete its bot)
+PASS R2 negative: verify-auth-gate.py rejects an Auth Session that adopts the named billing id directly
+PASS V3 negative: verify-auth-gate.py rejects a bootstrap that binds (or adopts the named id), and a bind that moves the id from a holder without live bots
+FAIL V3-journal negative: verify-auth-gate.py rejects a journal that runs before the answer, on every refresh, stops or retries the workflow, or logs ids that are not the requested one
+      - journal before the answer: verifier passed: )
+OK  Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json (workflow id + owner bound to the profile)
+OK  Delete Bot Files / Set Workflow State (V12: database ownership, honest answer, idempotent delete)
+OK  Set Workflow State (protected list carries Auth Session + Wappi Proxy)
+ALL AUTH GATE ASSERTS PASSED
+
+      - EXCEPTION StopIteration: 
+
+19 pass, 5 fail
+exit=1
+
+## 2) HEAD canon + ONLY the new migration file present — the behavioural failure itself (the refresh answers billingConflict, nothing is recorded) — 2026-10-11T13:54:25Z
+PASS R2 B1: a second install naming a billing id another install holds (with a live bot) gets NO billing identity + billingConflict
+PASS R2 B2: a refresh naming another install's billing id does not move it (the caller keeps its own / nothing)
+PASS R2 B3: the holder's own repeated refresh is idempotent (no conflict)
+PASS R2 B4: a REVOKED holder releases the id — the next install that names it takes it over
+PASS V3 B5: a live holder WITHOUT a live bot (a paying owner before the first bot) keeps its id — another install naming it gets nothing, on bootstrap AND refresh, and cannot pass Get Usage
+PASS V3 B8: the holder deleted its ONLY bot (deleted_at set, as Delete Bot Files does) — the id still does not move
+PASS V3 B9: «Удалить все данные» keeps the install — all its profiles retired, the same install refreshes with the same id: same u, no conflict, nothing owned
+PASS V3 B10: no ping-pong — after a conflict, repeated refreshes of the holder and of the other install never move the holder
+PASS V3 B11: the unauthenticated bootstrap binds NOTHING — an orphaned bootstrap (answer lost) never holds the id, the real install's refresh binds it
+PASS R2 B6: a device-id fallback is never bound (not a RevenueCat id) — no identity, no conflict; the RC id binds later
+PASS R2 B7: exactly one live install ever holds a billing id
+PASS R2 M1: the migration seed keeps ONE live holder per id (the most recently seen) and clears the others
+FAIL V3-journal B12: a refresh answered billingConflict writes ONE row — the requested id, the claimant, the holder FROM billing_bindings, attempts 1; a second claimant gets its own row
+      - journal: returned None rows []
+      - two claimants: []
+FAIL V3-journal B13: a repeated conflict bumps attempts + last_seen_at (first_seen_at kept, holder = the CURRENT holder); a refresh WITHOUT a conflict writes nothing
+      - repeat: [] -> []
+      - the holder must be the current one: {'success': True, 'installId': 'inst-B', 'token': 'v1.eyJpIjoiaW5zdC1CIiwidSI6bnVsbCwicCI6W10sInciOltdLCJjIjpbXSwiZSI6MTc5MTc3MDA3MCwibiI6MX0.tAFQY1NU6obXaMuJR-PHAQOyichVrKPDE5Bq5RsYg9E', 'expiresAt': 1791770070, 'appUserId': None, 'profiles': [], 'workflows': [], 'claimPending': [], 'billingConflict': True} []
+FAIL V3-journal B14: the journal failing (its table missing) changes NOTHING in the refresh answer; it runs only after Respond, on continueRegularOutput, without retries, with nothing after it
+      - with the table the journal must write: None
+      - without the table the journal statement must fail (the case under test): None
+      - EXCEPTION StopIteration: 
+FAIL V3-journal B15: the statement itself records only a real refusal — never the holder as claimant, an unknown or revoked claimant, an id nobody holds, nor a holder named by the request
+      - EXCEPTION StopIteration: 
+PASS R2 T1: Issue Token signs u = null and tells the client billingConflict
+PASS R2 G1/G2: a token WITHOUT a billing identity cannot name any billing id (GetUsage, SuggestReplies)
+PASS R2 G3/G4: a token with u = R passes its own id and refuses another
+PASS R2 G5: Create WA/TG refuse an EMPTY AppUserID in session mode (it skipped the channel count and the quota)
+PASS R2 G7: Delete Bot Files is not blocked by its audit-only appUserId (a conflicted install can still delete its bot)
+PASS R2 negative: verify-auth-gate.py rejects an Auth Session that adopts the named billing id directly
+PASS V3 negative: verify-auth-gate.py rejects a bootstrap that binds (or adopts the named id), and a bind that moves the id from a holder without live bots
+FAIL V3-journal negative: verify-auth-gate.py rejects a journal that runs before the answer, on every refresh, stops or retries the workflow, or logs ids that are not the requested one
+      - journal before the answer: verifier passed: )
+OK  Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json (workflow id + owner bound to the profile)
+OK  Delete Bot Files / Set Workflow State (V12: database ownership, honest answer, idempotent delete)
+OK  Set Workflow State (protected list carries Auth Session + Wappi Proxy)
+ALL AUTH GATE ASSERTS PASSED
+
+      - EXCEPTION StopIteration: 
+
+19 pass, 5 fail
+exit=1

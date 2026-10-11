@@ -9,7 +9,8 @@ Pins, per canonical JSON:
   * Wappi Proxy: allow-list present, no legacy mode, ownership check for every op with a profile,
     executions of successful calls not stored;
   * Auth Session: bootstrap cap, secret hash compare, single-round-trip refresh, token TTL; claim scoping (V2) and the
-    retired-row refusal (M4: never 'owned', no pending claim, no Wappi call — 410 profile_retired);
+    retired-row refusal (M4: never 'owned', no pending claim, no Wappi call — 410 profile_retired); the V3 conflict
+    journal (T1, 2026-10-11: after the answer, only on billingConflict, the generator's statement, never failing the run);
   * bot templates: the callback binding condition (profile_id == webhook path);
   * Upload File validates the decoded multipart ids (session ownership, GUID fileId) and only then registers
     the upload BEFORE the ingest chain; Delete File deletes chunks and storage only when `allowed`; both decide a
@@ -210,7 +211,49 @@ def check_session():
     vc = node(wf, "Verify Claim Code")["parameters"]["query"]
     assert "claim_code_expires_at > now()" in vc and "claim_pending_by = $2" in vc and "(owner_id is null or owner_id <> $2)" in vc, \
         "claim verify must be scoped to the claiming install, expiring, and allow a proven transfer"
-    print("OK  crAuthSession001-Auth_Session.json (cap, hash compare, single round-trip refresh, TTL, claim scoping, M4 retired refusal)")
+    check_conflict_journal(wf)
+    print("OK  crAuthSession001-Auth_Session.json (cap, hash compare, single round-trip refresh, TTL, claim scoping, M4 retired refusal, V3 conflict journal)")
+
+
+def load_builder():
+    spec = importlib.util.spec_from_file_location("build_auth_workflows", os.path.join(HERE, "build-auth-workflows.py"))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def check_conflict_journal(wf):
+    """V3-journal (T1, follow-ups 2026-10-11): a refresh answered billingConflict leaves ONE row for support
+    (billing_conflicts) — AFTER the answer (Respond → Conflict? → Log Billing Conflict, never delaying or changing the
+    refresh), ONLY on that answer, with the generator's statement (holder read from billing_bindings, the claimant a live
+    install other than the holder, a repeat bumps attempts), continueRegularOutput, no retries, nothing after it."""
+    gen = load_builder()
+    E = lambda n: {"node": n, "type": "main", "index": 0}
+    srcs = lambda dst: sorted(s for s, outs in wf["connections"].items() for out in outs.get("main", []) for c in out if c["node"] == dst)
+    assert edges(wf, "Respond") == [E("Conflict?")] and srcs("Conflict?") == ["Respond"], \
+        f"V3-journal: the conflict journal must hang off Respond ONLY (it runs after the answer): Respond -> {edges(wf, 'Respond')}, into Conflict? {srcs('Conflict?')}"
+    cj = node(wf, "Conflict?")
+    conds = cj["parameters"]["conditions"]
+    assert cj["type"] == "n8n-nodes-base.if" and conds["combinator"] == "and" and len(conds["conditions"]) == 1 and \
+        conds["conditions"][0]["leftValue"] == "={{ $json.billingConflict === true }}" == gen.CONFLICT_EXPR and \
+        conds["conditions"][0]["operator"].get("operation") == "true", \
+        f"V3-journal: Conflict? must route ONLY an answer that said billingConflict: {conds['conditions']}"
+    assert edges(wf, "Conflict?", 0) == [E("Log Billing Conflict")] and edges(wf, "Conflict?", 1) == [] and srcs("Log Billing Conflict") == ["Conflict?"], \
+        "V3-journal: Log Billing Conflict must be reachable only from Conflict? true (no false branch)"
+    log = node(wf, "Log Billing Conflict")
+    q = log["parameters"]["query"]
+    assert log["type"] == "n8n-nodes-base.postgres" and q == gen.LOG_BILLING_CONFLICT_SQL and \
+        log["parameters"]["options"].get("queryReplacement") == gen.LOG_BILLING_CONFLICT_PARAMS, \
+        "V3-journal: Log Billing Conflict is stale against build-auth-workflows.py (re-run it)"
+    for frag in ("insert into billing_conflicts", "from billing_bindings b", "where b.app_user_id = $1 and b.install_id <> i.install_id",
+                 "i.install_id = $2 and i.revoked_at is null", "on conflict (app_user_id, claimant_install_id) do update set",
+                 "attempts = billing_conflicts.attempts + 1"):
+        assert frag in q, f"V3-journal: the journal statement lost {frag!r} (holder from billing_bindings, the requested id only, a live claimant, one row per claimant)"
+    assert log["parameters"]["options"]["queryReplacement"] == "={{ [ $('Route').first().json.appUserId, $json.installId ] }}", \
+        "V3-journal: the journal must name the requested id (Route) and the verified install (the answer)"
+    assert log.get("onError") == "continueRegularOutput" and not log.get("retryOnFail") and edges(wf, "Log Billing Conflict") == [], \
+        f"V3-journal: the journal must never fail the execution, never retry, and nothing may follow it: onError={log.get('onError')} retryOnFail={log.get('retryOnFail')}"
+    assert "Log Billing Conflict" not in reachable(wf, "Webhook", cut=("Respond", 0)), "V3-journal: a path reaches the journal without passing Respond"
 
 
 def check_bots():

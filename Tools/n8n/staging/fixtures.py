@@ -109,6 +109,9 @@ def main():
             psql("delete from handoff_requests where profile_id = :'p0';", pid)
         n = psql("with a as (delete from suggestion_counts where app_user_id = :'p0' returning 1), b as (delete from dialog_counts where app_user_id = :'p0' returning 1), c as (delete from bot_profiles where app_user_id = :'p0' returning 1), d as (delete from subscribers where app_user_id = :'p0' returning 1), e as (delete from billing_bindings where app_user_id = :'p0' returning 1) select (select count(*) from a) + (select count(*) from b) + (select count(*) from c) + (select count(*) from d) + (select count(*) from e);",
                  a.app_user_id)
+        # V3 journal (T1, 2026-10-11): the refusals a fixture identity collected (only once the migration is applied)
+        if psql("select to_regclass('public.billing_conflicts') is not null;") == "t":
+            n = int(n or 0) + int(psql("with a as (delete from billing_conflicts where app_user_id = :'p0' returning 1) select count(*) from a;", a.app_user_id) or 0)
         print(f"deleted rows: {n}")
 
 

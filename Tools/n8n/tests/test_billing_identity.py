@@ -20,7 +20,7 @@ import re
 import time
 from pathlib import Path
 
-from harness import N8N, Case, PgSession, bind, code, module, node, report, run_js, wf
+from harness import N8N, Case, PgSession, bind, code, expr, module, node, report, run_js, wf
 
 W = wf('crAuthSession001-Auth_Session.json')
 Q = lambda name: node(W, name)['parameters']['query']
@@ -179,6 +179,146 @@ with Case('R2 M1: the migration seed keeps ONE live holder per id (the most rece
             binds = {r['app_user_id']: r['install_id'] for r in pg.q('select app_user_id, install_id from billing_bindings')}
             c.check(rows == {'old': None, 'new': R, 'dev': None, 'rev': R2} and binds == {R: 'new'}, f'installs {rows} bindings {binds}')
 
+# ---- V3 journal (T1, 2026-10-11): a refused billing id leaves a record for support, AFTER the answer ----
+# The owner accepted the first-bind limitation (2026-10-11) on condition that support can SEE a conflict and revoke the
+# wrong install by the runbook (a1-deploy-runbook.md §5). Each refresh that answers billingConflict writes / bumps ONE
+# row (requested id, claimant install, holder install from billing_bindings, first/last seen, attempts). It runs after
+# Respond, so the refresh answer is never delayed (each Postgres node ≈ 1.9 s on prod) nor changed — not even when the
+# journal itself fails. Here: the REAL Verify Install / Create Install SQL → the REAL Issue Token → n8n's own engine on
+# Respond's body/code (the answer) and on the post-response If → the REAL journal SQL (an error becomes an item, as
+# continueRegularOutput does), on session temp tables; the journal table comes from the migration's own DDL.
+M1_MIGRATION = N8N / 'sql' / '2026-10-11-billing-conflicts.sql'
+LOG_NODE, LOG_IF = 'Log Billing Conflict', 'Conflict?'
+NOW = int(time.time())
+
+
+def conflicts_ddl():
+    text = M1_MIGRATION.read_text(encoding='utf-8')
+    block = text.split('-- TABLE-BEGIN')[1].split('\n', 1)[1].split('-- TABLE-END')[0]
+    return block.replace('create table if not exists public.', 'create temp table ')
+
+
+def out_edges(src, idx=0):
+    outs = W['connections'].get(src, {}).get('main', [])
+    return [c['node'] for c in outs[idx]] if idx < len(outs) else []
+
+
+def session_answer(pg, op, install, app_user_id, secret=None):
+    """One AuthSession call as the client sees it + what runs after the answer is on the wire.
+    Returns (answer, journal): answer = (status, body) of Respond; journal = None when the If does not route to the
+    journal, its RETURNING rows when it does, {'error': …} when the journal statement fails."""
+    route = {'op': op, 'installId': install, 'nowSec': NOW, 'appUserId': app_user_id,
+             'installSecret': ('sec-' + install) if op == 'bootstrap' else ''}
+    if op == 'bootstrap':
+        row = boot(pg, install, app_user_id)
+    else:
+        row = pg.q(bind(Q('Verify Install'), [install, secret or ('h-' + install), app_user_id]))[0]
+    out = code(W, 'Issue Token', {'json': row}, named={'Route': route})[0]['json']
+    rp = node(W, 'Respond')['parameters']
+    answer = (expr(rp['options']['responseCode'], out), expr(rp['responseBody'], out))
+    journal = None
+    for nxt in out_edges('Respond'):                    # Respond passes its input item on (n8n RespondToWebhook)
+        cond = node(W, nxt)['parameters']['conditions']['conditions'][0]['leftValue']
+        if expr(cond, out) is True:
+            for log in out_edges(nxt, 0):
+                params = expr(node(W, log)['parameters']['options']['queryReplacement'], out, named={'Route': route})
+                try:
+                    journal = pg.q(bind(node(W, log)['parameters']['query'], params))
+                except RuntimeError as e:
+                    journal = {'error': str(e)[:200]}
+    return answer, journal
+
+
+def journal_rows(pg):
+    return pg.q("select app_user_id, claimant_install_id, holder_install_id, attempts, first_seen_at, last_seen_at "
+                "from billing_conflicts order by app_user_id, claimant_install_id")
+
+
+LOG_SETUP = lambda: SETUP + '\n' + conflicts_ddl()
+
+with Case('V3-journal B12: a refresh answered billingConflict writes ONE row — the requested id, the claimant, the holder FROM billing_bindings, attempts 1; a second claimant gets its own row') as c:
+    with PgSession(LOG_SETUP()) as pg:
+        join(pg, 'inst-A', R); own_bot(pg, 'inst-A', 'wa-A')
+        boot(pg, 'inst-B', R)
+        (st, body), j = session_answer(pg, 'refresh', 'inst-B', R)
+        rows = journal_rows(pg)
+        c.check(st == 200 and body.get('billingConflict') is True and body.get('appUserId') is None, f'the refresh must still answer the conflict: {st} {body}')
+        c.check(isinstance(j, list) and len(rows) == 1, f'journal: returned {j} rows {rows}')
+        if rows:
+            r0 = rows[0]
+            c.check((r0['app_user_id'], r0['claimant_install_id'], r0['holder_install_id'], r0['attempts']) == (R, 'inst-B', 'inst-A', 1)
+                    and r0['first_seen_at'] == r0['last_seen_at'], f'row {r0}')
+        boot(pg, 'inst-C', R)
+        session_answer(pg, 'refresh', 'inst-C', R)
+        rows = journal_rows(pg)
+        c.check([(r['claimant_install_id'], r['holder_install_id'], r['attempts']) for r in rows] == [('inst-B', 'inst-A', 1), ('inst-C', 'inst-A', 1)],
+                f'two claimants: {rows}')
+
+with Case('V3-journal B13: a repeated conflict bumps attempts + last_seen_at (first_seen_at kept, holder = the CURRENT holder); a refresh WITHOUT a conflict writes nothing') as c:
+    with PgSession(LOG_SETUP()) as pg:
+        join(pg, 'inst-A', R)
+        boot(pg, 'inst-B', R)
+        session_answer(pg, 'refresh', 'inst-B', R)
+        first = journal_rows(pg)
+        session_answer(pg, 'refresh', 'inst-B', R)
+        again = journal_rows(pg)
+        c.check(len(first) == 1 and len(again) == 1 and again[0]['attempts'] == 2 and again[0]['first_seen_at'] == first[0]['first_seen_at']
+                and again[0]['last_seen_at'] > first[0]['last_seen_at'], f'repeat: {first} -> {again}')
+        # the holder changes: A revoked, C takes the id over first — B's next conflict names C
+        pg.x("update installs set revoked_at = now() where install_id = 'inst-A';")
+        join(pg, 'inst-C', R)
+        (st, body), _ = session_answer(pg, 'refresh', 'inst-B', R)
+        now_rows = journal_rows(pg)
+        c.check(body.get('billingConflict') is True and [(r['claimant_install_id'], r['holder_install_id'], r['attempts']) for r in now_rows] == [('inst-B', 'inst-C', 3)],
+                f'the holder must be the current one: {body} {now_rows}')
+    with PgSession(LOG_SETUP()) as pg:
+        quiet = []
+        boot(pg, 'inst-F', R2)
+        quiet.append(('free id, first bind', session_answer(pg, 'refresh', 'inst-F', R2)))
+        join(pg, 'inst-A', R); own_bot(pg, 'inst-A', 'wa-A')
+        quiet.append(("the holder's own refresh", session_answer(pg, 'refresh', 'inst-A', R)))
+        quiet.append(('bootstrap naming a held id (binds nothing, no conflict)', session_answer(pg, 'bootstrap', 'inst-B', R)))
+        quiet.append(('device-id fallback (never bound)', session_answer(pg, 'refresh', 'inst-B', DEVICE)))
+        quiet.append(('wrong secret (install_revoked)', session_answer(pg, 'refresh', 'inst-B', R, secret='h-wrong')))
+        pg.x("update installs set revoked_at = now() where install_id = 'inst-A';")
+        quiet.append(('takeover from a REVOKED holder', session_answer(pg, 'refresh', 'inst-B', R)))
+        for label, ((st, body), j) in quiet:
+            c.check(j is None and not body.get('billingConflict'), f'{label}: routed to the journal ({j}) / {st} {body}')
+        c.check(journal_rows(pg) == [], f'rows written without a conflict: {journal_rows(pg)}')
+
+with Case('V3-journal B14: the journal failing (its table missing) changes NOTHING in the refresh answer; it runs only after Respond, on continueRegularOutput, without retries, with nothing after it') as c:
+    answers = {}
+    # «missing»: the session sees ONLY its temp tables — a migrated staging DB has public.billing_conflicts, which the
+    # default `pg_temp, public` search path would otherwise reach (and write a row into)
+    for label, setup in (('with table', LOG_SETUP()), ('table missing', SETUP + '\nset search_path = pg_temp;')):
+        with PgSession(setup) as pg:
+            join(pg, 'inst-A', R); own_bot(pg, 'inst-A', 'wa-A')
+            boot(pg, 'inst-B', R)
+            answers[label] = session_answer(pg, 'refresh', 'inst-B', R)
+    (a_ok, j_ok), (a_bad, j_bad) = answers['with table'], answers['table missing']
+    c.check(isinstance(j_ok, list) and len(j_ok) == 1, f'with the table the journal must write: {j_ok}')
+    c.check(isinstance(j_bad, dict) and 'error' in j_bad, f'without the table the journal statement must fail (the case under test): {j_bad}')
+    c.check(a_ok == a_bad and a_ok[0] == 200 and a_ok[1].get('billingConflict') is True, f'the answer changed: {a_ok} vs {a_bad}')
+    log = node(W, LOG_NODE)
+    c.check(out_edges('Respond') == [LOG_IF] and out_edges(LOG_IF, 0) == [LOG_NODE] and out_edges(LOG_IF, 1) == [], 'the journal must hang off Respond → Conflict?[0] only')
+    into_log = sorted(s for s, o in W['connections'].items() for out in o.get('main', []) for x in out if x['node'] == LOG_NODE)
+    c.check(into_log == [LOG_IF] and out_edges(LOG_NODE) == [], f'reached from {into_log}, followed by {out_edges(LOG_NODE)}')
+    c.check(log.get('onError') == 'continueRegularOutput' and not log.get('retryOnFail'), f"onError={log.get('onError')} retryOnFail={log.get('retryOnFail')}")
+
+with Case('V3-journal B15: the statement itself records only a real refusal — never the holder as claimant, an unknown or revoked claimant, an id nobody holds, nor a holder named by the request') as c:
+    with PgSession(LOG_SETUP()) as pg:
+        join(pg, 'inst-A', R); own_bot(pg, 'inst-A', 'wa-A')
+        boot(pg, 'inst-B', R); boot(pg, 'inst-REV', R)
+        pg.x("update installs set revoked_at = now() where install_id = 'inst-REV';")
+        log_q = node(W, LOG_NODE)['parameters']['query']
+        for label, vals in (('the holder itself', [R, 'inst-A']), ('an unknown install', [R, 'inst-NOPE']),
+                            ('a revoked install', [R, 'inst-REV']), ('an id nobody holds', [R2, 'inst-B']),
+                            ('a device-id fallback', [DEVICE, 'inst-B'])):
+            c.check(pg.q(bind(log_q, vals)) == [], f'{label}: recorded')
+        c.check(journal_rows(pg) == [], f'rows: {journal_rows(pg)}')
+        got = pg.q(bind(log_q, [R, 'inst-B']))
+        c.check([(g['claimant_install_id'], g['holder_install_id'], g['attempts']) for g in got] == [('inst-B', 'inst-A', 1)], f'the real refusal: {got}')
+
 # ---- tokens and gates (compat window CLOSED) ----
 ROUTE = {'op': 'refresh', 'installId': 'inst-B', 'nowSec': int(time.time()), 'installSecret': ''}
 
@@ -277,6 +417,55 @@ with Case('V3 negative: verify-auth-gate.py rejects a bootstrap that binds (or a
             f.write_text(_json.dumps(w, indent=2, ensure_ascii=False) + '\n', encoding='utf-8')
             r = subprocess.run([sys.executable, str(N8N / 'verify-auth-gate.py'), '--dir', str(d)], capture_output=True, text=True)
             c.check(r.returncode != 0 and 'V3' in r.stdout, f'{label}: verifier passed: {r.stdout[-300:]}')
+        finally:
+            shutil.rmtree(d, ignore_errors=True)
+
+
+def _before_answer(w):
+    w['connections']['Respond'] = {'main': [[]]}
+    w['connections']['Issue Token']['main'][0].append({'node': LOG_IF, 'type': 'main', 'index': 0})
+
+
+def _always(w):
+    next(x for x in w['nodes'] if x['name'] == LOG_IF)['parameters']['conditions']['conditions'][0]['leftValue'] = '={{ true }}'
+
+
+def _node_set(field, value):
+    def f(w):
+        n = next(x for x in w['nodes'] if x['name'] == LOG_NODE)
+        if value is None:
+            n.pop(field, None)
+        else:
+            n[field] = value
+    return f
+
+
+def _any_id(w):
+    n = next(x for x in w['nodes'] if x['name'] == LOG_NODE)
+    n['parameters']['query'] = n['parameters']['query'].replace('where b.app_user_id = $1', 'where true', 1)
+
+
+with Case('V3-journal negative: verify-auth-gate.py rejects a journal that runs before the answer, on every refresh, stops or retries the workflow, or logs ids that are not the requested one') as c:
+    import json as _json
+    import shutil
+    import subprocess
+    import sys
+    import tempfile
+    for label, mutate in (('journal before the answer', _before_answer), ('If always true', _always),
+                          ('no continueRegularOutput', _node_set('onError', None)), ('retries', _node_set('retryOnFail', True)),
+                          ('any bound id, not the requested one', _any_id)):
+        d = Path(tempfile.mkdtemp(prefix='v3j-neg-'))
+        try:
+            for p in (N8N / 'workflows').glob('*.json'):
+                shutil.copy(p, d / p.name)
+            f = d / 'crAuthSession001-Auth_Session.json'
+            w = _json.loads(f.read_text(encoding='utf-8'))
+            before = _json.dumps(w, sort_keys=True)
+            mutate(w)
+            c.check(_json.dumps(w, sort_keys=True) != before, f'{label}: the mutation did not apply')
+            f.write_text(_json.dumps(w, indent=2, ensure_ascii=False) + '\n', encoding='utf-8')
+            r = subprocess.run([sys.executable, str(N8N / 'verify-auth-gate.py'), '--dir', str(d)], capture_output=True, text=True)
+            c.check(r.returncode != 0 and 'V3-journal' in r.stdout, f'{label}: verifier passed: {r.stdout[-300:]}')
         finally:
             shutil.rmtree(d, ignore_errors=True)
 

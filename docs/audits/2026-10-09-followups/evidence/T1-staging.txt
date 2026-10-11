@@ -1,0 +1,60 @@
+# T1 staging probe — V3 journal on the real n8n 2.36.7 (staging localhost:5678 + local Postgres, after pg.sh migrate + bootstrap.py from the T1 canon; verify-deployed exit 0)
+# script: scratchpad t1_probe.py (reuses e2e-auth.py helpers; not committed — the committed scenario is T10's billing_conflict_is_logged)
+2026-10-11T13:48:07Z
+
+PASS  holder refresh: no conflict, nothing logged
+      http=200 conflict=False exec=success ran_journal=False rows=[] (0.15s)
+PASS  conflict refresh writes one row (claimant B, holder A, attempts 1)
+      rows=[{'claimant': '97fc626e-4038-4b3f-8471-5cbec1c24f96', 'holder': '81698aff-e9ec-4a3f-883c-069726551921', 'attempts': 1}]
+PASS  repeat bumps attempts; the execution succeeds and ran the journal after Respond
+      http=200 conflict=True exec=success journal_out={'app_user_id': '$RCAnonymousID:e2e0e2e0fbd316bdb3de1d1fb8309364', 'claimant_install_id': '97fc626e-4038-4b3f-8471-5cbec1c24f96', 'holder_install_id': '81698aff-e9ec-4a3f-883c-069726551921', 'attempts': 2} rows=[{'claimant': '97fc626e-4038-4b3f-8471-5cbec1c24f96', 'holder': '81698aff-e9ec-4a3f-883c-069726551921', 'attempts': 2}] (0.13s)
+PASS  journal failing (table missing): identical answer (status + every field but the fresh token/expiry), execution still success
+      http=200 same_answer=True keys=['appUserId', 'billingConflict', 'claimPending', 'expiresAt', 'installId', 'profiles', 'success', 'token', 'workflows'] exec=success journal_out={'message': 'relation "billing_conflicts" does not exist', 'error': {'level': 'warning', 'shouldReport': True, 'description': "Failed query: -- V3 journal (T1,  (0.11s)
+PASS  table restored, the failed attempt left nothing
+      rows=[{'claimant': '97fc626e-4038-4b3f-8471-5cbec1c24f96', 'holder': '81698aff-e9ec-4a3f-883c-069726551921', 'attempts': 2}]
+   cleanup t1a deleted rows: 3
+   cleanup t1b deleted rows: 0
+   journal rows left for fixture ids: 0
+
+5 pass, 0 fail
+exit=0
+
+## Full e2e-auth on the T1 canon (staging, model-free), finished 2026-10-11T13:57:25Z — python3 Tools/n8n/staging/e2e-auth.py
+PASS  session_bootstrap_and_refresh (0.4s) — bootstrap mints an install; refresh with the secret returns a token; a wrong secret is 401
+PASS  session_bad_request_is_400 (0.3s) — a malformed AuthSession body answers 400, never a token
+PASS  proxy_requires_token (0.3s) — WappiProxy without / with a forged / with an expired token → 401 and NO transport call
+PASS  proxy_profile_add_binds_owner (1.2s) — profile.add creates the Wappi profile, binds it to the install and returns a token carrying it
+PASS  proxy_owner_isolation (1.5s) — owner B cannot read/act on owner A's profile through ANY proxy op (403, no transport call)
+PASS  proxy_legit_ops_pass_through (0.6s) — the owner's own ops reach the transport with the server credential and get Wappi's body back
+PASS  proxy_unknown_op_rejected (0.3s) — an op outside the allow-list is refused without a transport call
+PASS  hooks_reject_foreign_ids (1.3s) — gated webhooks refuse owner B's ids on owner A's token (and refuse no token) before any side effect
+PASS  claim_by_code_transfers_ownership (0.9s) — a legacy/other-install profile: claim.start sends a code to the bot's OWN chat; claim.verify binds it to the claiming install
+PASS  claim_reauth_then_code_binds (2.3s) — V2: an UNAUTHORISED legacy profile: claim.start → reauth; a pairing alone binds NOTHING (claim.status); claim.start then sends ONE code into the paired account's own chat and claim.verify binds it
+PASS  claim_reauth_independent_reconnect_not_transferred (6.6s) — V2: the claimant requests a QR, the OWNER reconnects the owner-less profile independently → the claimant gets nothing (claim.status), its claim.start sends the code into the OWNER's chat, a wrong code is 403 and the row stays owner-less — WhatsApp and Telegram
+PASS  claim_code_send_failure_is_reported (3.5s) — V2: a code the transport refuses is reported (502 code_send_failed) and cleared — the retry sends a NEW code (never «reused») and that code binds; a Telegram code goes to the authorised account (account.phone), not the top-level phone
+PASS  claim_reauth_owned_profile_not_transferred (5.1s) — R1: a stranger's pending claim on an OWNED profile + the owner's own later re-pairing → the stranger gets nothing, claim.status sends no code, the owner keeps the profile
+PASS  claim_stale_capability_cannot_pair (3.4s) — R1: once another install takes over a pending claim, the first claimant's token capability no longer starts a pairing (403 claim_not_pending, no transport call)
+PASS  claim_unauthenticated_writes_nothing (3.1s) — R1: a claim.* call with a wrong secret is refused (401) before Claim Start — no row inserted, a pending claim untouched
+PASS  replymode_reordered_versions_keep_newest (2.1s) — SetReplyMode v2: a later request with an OLDER version is not applied; the reply reports the server's newer value
+PASS  replymode_bot_default_covers_both_channels_atomically (2.0s) — SetReplyMode v2: a bot-default write for WA+TG travels as ONE request and both rows land (all-or-nothing); a stale follow-up for one of them is refused per profile
+PASS  replymode_legacy_body_still_writes (0.6s) — SetReplyMode v2: a legacy body (no version) is applied with a server-assigned version and reads success + written
+PASS  replymode_invalid_is_400 (0.1s) — SetReplyMode v2: a malformed body answers 400 (was 200 + success:false)
+PASS  create_seeds_reply_mode_before_activation (4.4s) — CreateWhatsappWorkflow with ReplyMode=semi: the '*' row exists after create, the clone id is bound to the profile, the token learns it, and SetWorkflowState can delete it
+PASS  create_slot_count_excludes_own_profile_and_retires_refused (4.3s) — 2026-09-24 hotfix: on a 1-channel plan the FIRST channel is accepted (the A1-registered row of the profile being created is not counted) and a refused second profile is deleted at Wappi AND retired in bot_profiles
+PASS  refresh_db_outage_keeps_install (1.1s) — R11: a refresh while the database fails answers 503 db_unavailable (never the 401 that makes the client discard its install); the SAME credentials refresh fine once it is back
+PASS  billing_id_first_bind (7.3s) — R2/V3: a second install naming a billing id another install holds — WITH a live bot or WITHOUT one (a paying owner before the first bot) — gets NO billing identity + billingConflict on bootstrap AND refresh; its GetUsage/profile.add on that id are refused; the bootstrap itself binds nothing; the id follows only once the holder is revoked
+PASS  create_rejects_empty_appuserid_in_session (1.7s) — R2: CreateWhatsappWorkflow/CreateTelegramWorkflow with an EMPTY AppUserID in session mode are refused before any write (the empty id skipped Count Channels and let the quota fail open)
+PASS  create_seed_failure_keeps_clone_inactive (12.8s) — R8 + R8-deletefail: a «Вместе» create whose reply-mode seed fails (a real Postgres failure on staging, scoped to this profile) answers reply_mode_not_saved and never CREATES a clone (the execution reads no template and runs no Create Workflow, so nothing is active, bound, hooked or left to delete); the retry once the DB is back creates exactly ONE live clone with the '*' row — WhatsApp and Telegram
+PASS  sql_comment_values_run_nothing (8.4s) — V1: a value whose newline would end an SQL comment stays a literal on the real n8n Postgres node — Delete File (session token and token-less), Suggest Replies, AuthSession bootstrap, Create WhatsApp and Create Telegram each run their statement WITH the value (row proof) and no extra statement (no marker table)
+PASS  upload_price_list_multipart (12.9s) — R3: a real .txt price list sent the way WWWForm sends it passes the gate with its file, is registered FIRST, reaches extraction (a staging `documents` row with the text + the bot's ids); a foreign workflow id, a non-GUID fileId or another install's fileId is 403 before any write; an unreadable PDF is 422, an empty file writes nothing, an own repeat keeps one registry row. V4: another bot's owner-less file (WhatsApp) and another bot's unregistered chunks (Telegram) are neither taken nor deleted by a session (403, row and chunk untouched); the caller's own compat-window file and its own upload are deleted (200)
+PASS  retired_bot_owner_can_delete (10.4s) — V12: the owner of a bot the sweep retired (trial over: its rows deleted, its token lists nothing) deletes its memory, history and files (200, real counters) and both clones (200; a repeat is 200 — idempotent); activating the retired clone and another install naming the same ids are 403 (reason owned_elsewhere) — WhatsApp and Telegram
+PASS  claim_on_retired_profile_is_refused (7.9s) — M4: claim.start / claim.status / claim.verify on a bot profile the sweep retired (trial over) → 410 profile_retired, retiredReason for its owner only (another install: the same 410 without it), Wappi is never asked, no pending claim, no token; the owner's V12 delete of that same bot then goes through (profile.delete answers a FINAL code the client steps over — not in the token, 403; DeleteBotFiles and SetWorkflowState delete = 200, the clones gone) — WhatsApp and Telegram
+PASS  stale_token_cannot_unlink_a_claimed_profile (6.5s) — V12 / M5: a token issued while install A owned a profile still lists it after install B took the profile over — A's profile.delete / profile.logout (proxy), DeleteBotFiles and SetWorkflowState(delete) are all refused (403) and the transport is never called; B's own profile.delete passes — WhatsApp and Telegram
+PASS  sweep_deactivates_retired_clone (6.7s) — V12: the sweep's clone branch (the derived canonical nodes, run on the real n8n) deactivates the clone of a bot IT retired (trial_expiry), stamps it and never calls it again; a liveness-retired bot's clone stays ACTIVE; nothing is deleted — WhatsApp and Telegram
+31 pass, 0 fail
+exit=0
+billing_conflicts rows left on staging after the suite (fixture cleanup): 0
+
+## verify-deployed --base http://localhost:5678 after bootstrap.py from the T1 canon
+  OK      crAuthSession001 crAuthSession001-Auth_Session.json  active=True names=True graph=True published=True
+verify-deployed exit=0
