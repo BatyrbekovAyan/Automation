@@ -266,11 +266,13 @@ public partial class ChatManager : MonoBehaviour
         // while the chat was open. The startup ShowChatList(true) uses the instant path,
         // which never raises this event, so there's no launch-time double sync.
         SwipeToBack.OnSlideOutComplete += RefreshActiveBotChats;
+        ProfileRetirement.Changed += HandleChannelRetirementChanged;   // T9: «Бот отключён» the moment the claim loop learns it
     }
 
     void OnDisable()
     {
         SwipeToBack.OnSlideOutComplete -= RefreshActiveBotChats;
+        ProfileRetirement.Changed -= HandleChannelRetirementChanged;
     }
 
     public ChatViewModel GetChat(string chatId)
@@ -2428,4 +2430,6 @@ public enum EmptyStateReason
     NoBotsExist,
     BotHasNoWhatsApp,
     BotHasNoTelegram,
+    /// <summary>F2 (T9): the server retired the active channel — «Бот отключён», reconnect in the bot's settings.</summary>
+    BotChannelRetired,
 }

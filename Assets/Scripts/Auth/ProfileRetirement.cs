@@ -98,6 +98,43 @@ public static class ProfileRetirement
         }
     }
 
+    /// <summary>
+    /// T9: before a reconnect of one channel — a marker the M4 build wrote for the channel's own current id is moved aside
+    /// now (the same move <see cref="TransferLegacyMarkers"/> makes at boot), so the reconnect takes the fresh path.
+    /// </summary>
+    public static void MoveAsideIfMarked(Bot bot, ChatChannel channel, InstallSession.TokenClaims claims)
+    {
+        if (bot == null) return;
+        RetiredChannelPolicy.Channel state = Load(bot, channel);
+        if (RetiredChannelPolicy.NeedsMoveAside(state, claims)) Mark(bot, channel, state.ProfileId, state.RetiredReason);
+    }
+
+    /// <summary>T9: the channel as the device holds it (the bot's live fields + its retired set) — what the screens decide on.</summary>
+    public static RetiredChannelPolicy.Channel ChannelOf(Bot bot, ChatChannel channel) =>
+        bot == null ? default : Load(bot, channel);
+
+    /// <summary>T9: every channel of the bots under <paramref name="botsRoot"/> that waits for its reconnect (the post-purchase sheet).</summary>
+    public static List<RetiredChannelPolicy.Candidate> ReconnectCandidates(Transform botsRoot, InstallSession.TokenClaims claims)
+    {
+        var bots = new List<RetiredChannelPolicy.BotChannels>();
+        if (botsRoot != null)
+        {
+            for (int i = 0; i < botsRoot.childCount; i++)
+            {
+                var bot = botsRoot.GetChild(i).GetComponent<Bot>();
+                if (bot == null) continue;
+                bots.Add(new RetiredChannelPolicy.BotChannels
+                {
+                    BotKey = bot.name,
+                    BotName = bot.BotName != null ? bot.BotName.text : bot.name,
+                    Whatsapp = Load(bot, ChatChannel.WhatsApp),
+                    Telegram = Load(bot, ChatChannel.Telegram),
+                });
+            }
+        }
+        return RetiredChannelPolicy.Candidates(bots, claims);
+    }
+
     /// <summary>The profile id the channel was marked retired for ("" = never).</summary>
     public static string MarkerId(string botKey, ChatChannel channel) =>
         string.IsNullOrEmpty(botKey) ? "" : PlayerPrefs.GetString($"{botKey}{ProfileIdSuffix(channel)}", "");

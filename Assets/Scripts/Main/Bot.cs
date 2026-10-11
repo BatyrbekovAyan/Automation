@@ -98,6 +98,13 @@ public class Bot : MonoBehaviour
 
     private Tween sublineBlink;
     private Color lastObservedStatusColor = new(-1f, -1f, -1f);
+
+    // T9: the capsule's face — «Авто» (the bot's ReplyMode) or «Подключить» when no channel of the bot is live. The
+    // authored «Авто» geometry is captured once, the first time the capsule is painted, so it can be restored exactly.
+    private bool showsConnect;
+    private bool pillGeometryCaptured;
+    private string authoredPillText;
+    private float authoredLabelWidth;
     private bool cardStateReady;
     private Coroutine initRoutine;
 
@@ -402,6 +409,14 @@ public class Bot : MonoBehaviour
         autoPillButton.transform.localScale = Vector3.one;
         autoPillButton.transform.DOPunchScale(Vector3.one * -0.04f, 0.18f, 1, 0.5f);
 
+        // T9: a bot with no live channel has no reply mode to switch — «Подключить» opens its settings on the channel
+        // rows, where each retired channel's hint starts the reconnect.
+        if (showsConnect)
+        {
+            OpenSettingsAtGeneralTab();
+            return;
+        }
+
         // The header pill's asymmetry: enabling confirms (the bot starts
         // messaging real clients), switching back to «Вместе» is instant.
         // RequestEnableAuto can't be reused here — its popup lives under the
@@ -475,16 +490,62 @@ public class Bot : MonoBehaviour
         if (!cardStateReady) return;
         if (Status != null) lastObservedStatusColor = Status.color;
 
+        // M4/F2: a channel the server retired — its ids moved aside (RetiredChannelPolicy), or an unfinished app delete whose
+        // marker names the current id and the token does not list it — honest subline, gray icon; T9: and «Подключить»
+        // in place of «Авто» when no channel of the bot is live.
+        var claims = AuthClient.Existing != null ? AuthClient.Existing.Claims : null;
+        string waRetired = ProfileRetirement.ActiveReason(transform.name, ChatChannel.WhatsApp, whatsappProfileId, claims);
+        string tgRetired = ProfileRetirement.ActiveReason(transform.name, ChatChannel.Telegram, telegramProfileId, claims);
+        showsConnect = BotCardModel.ShowConnectPill(whatsappProfileId, waRetired, telegramProfileId, tgRetired);
+
         // The capsule is the chats-header «Авто» pill 1:1 — one painter, one
         // look, and since the unification one STORE (the bot's ReplyMode).
         // Kill first, exactly like ReplyModeToggleBinder.SetVisualMode: an
         // in-flight DOColor from a previous animated paint would otherwise keep
         // writing its OLD target over these colours until the tween ends.
         KillPillTweens();
-        ReplyModeToggleBinder.PaintChip(AutoOn, autoPillRing, autoPillFill,
+        ApplyPillFace();
+        if (showsConnect) PaintConnectPill();
+        else ReplyModeToggleBinder.PaintChip(AutoOn, autoPillRing, autoPillFill,
             autoPillLabel, autoPillDotRing, autoPillDotCore, animatePill);
 
-        RefreshSubline();
+        RefreshSubline(waRetired, tgRetired);
+    }
+
+    // T9: the capsule's text, lamp and width for its current face. «Подключить» is measured with the label's own font and
+    // the capsule grows to fit it (BotCardModel.PillWidth); «Авто» gets its authored geometry back.
+    private void ApplyPillFace()
+    {
+        if (autoPillLabel == null || autoPillButton == null) return;
+        var rootLayout = autoPillButton.GetComponent<LayoutElement>();
+        var labelRect = autoPillLabel.rectTransform;
+        if (!pillGeometryCaptured)
+        {
+            pillGeometryCaptured = true;
+            authoredPillText = autoPillLabel.text;
+            authoredLabelWidth = labelRect.sizeDelta.x;
+        }
+
+        string text = showsConnect ? RetiredChannelCopy.ConnectPill : authoredPillText;
+        float labelWidth = showsConnect ? Mathf.Ceil(autoPillLabel.GetPreferredValues(text).x) : authoredLabelWidth;
+        float pillWidth = BotCardModel.PillWidth(showsConnect, labelWidth);
+        if (autoPillLabel.text == text && Mathf.Approximately(labelRect.sizeDelta.x, labelWidth)
+            && (rootLayout == null || Mathf.Approximately(rootLayout.preferredWidth, pillWidth))) return;
+
+        autoPillLabel.text = text;
+        labelRect.sizeDelta = new Vector2(labelWidth, labelRect.sizeDelta.y);
+        if (autoPillDotRing != null) autoPillDotRing.gameObject.SetActive(!showsConnect);
+        if (rootLayout != null) rootLayout.minWidth = rootLayout.preferredWidth = pillWidth;
+        if (autoPillButton.transform.parent is RectTransform row) LayoutRebuilder.MarkLayoutForRebuild(row);
+    }
+
+    // «Подключить» is a call to action: the accent fill and its on-fill ink, the house's primary-button pair.
+    private void PaintConnectPill()
+    {
+        Color accent = Theme.Color(ThemeRole.AccentFill);
+        if (autoPillFill != null) autoPillFill.color = accent;
+        if (autoPillRing != null) autoPillRing.color = accent;
+        if (autoPillLabel != null) autoPillLabel.color = Theme.Color(ThemeRole.AccentOnFill);
     }
 
     private void KillPillTweens()
@@ -496,16 +557,11 @@ public class Bot : MonoBehaviour
         if (autoPillDotCore != null) autoPillDotCore.DOKill();
     }
 
-    private void RefreshSubline()
+    private void RefreshSubline(string waRetired, string tgRetired)
     {
         if (BotDesc == null) return;
 
         bool connecting = Status != null && ColorsClose(Status.color, blue);
-        // M4/F2: a channel the server retired — its ids moved aside (RetiredChannelPolicy), or an unfinished app delete whose
-        // marker names the current id and the token does not list it — honest subline, gray icon.
-        var claims = AuthClient.Existing != null ? AuthClient.Existing.Claims : null;
-        string waRetired = ProfileRetirement.ActiveReason(transform.name, ChatChannel.WhatsApp, whatsappProfileId, claims);
-        string tgRetired = ProfileRetirement.ActiveReason(transform.name, ChatChannel.Telegram, telegramProfileId, claims);
         string retiredText = BotCardModel.RetiredSubline(waRetired, tgRetired);
         var sync = ReplyModeSyncService.Existing;
         var kind = BotCardModel.SublineKind(connecting, retiredText != null,

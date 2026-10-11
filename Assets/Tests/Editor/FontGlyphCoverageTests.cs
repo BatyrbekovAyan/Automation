@@ -302,6 +302,7 @@ public class FontGlyphCoverageTests
             typeof(BotReadinessCopy),   // stage 7.1/7.2 test-dialog + readiness copy (2026-09-22)
             typeof(BotDeletionCopy),    // V12 refused / failed bot deletion (2026-10-07)
             typeof(ProfileRetirementCopy), // M4 retired-channel subline of the bot card (2026-10-09)
+            typeof(RetiredChannelCopy),    // F2 reconnect screens: banner, row hint, «Подключить», sheet, server wait (2026-10-11)
         };
         foreach (var t in constTypes)
             foreach (var f in t.GetFields(BindingFlags.Public | BindingFlags.Static))
@@ -367,6 +368,12 @@ public class FontGlyphCoverageTests
 
         foreach (var reason in new[] { "trial_expiry", "churn_grace", "liveness", "app_delete", "channel_limit", "", null })
             yield return ($"ProfileRetirementCopy.SublineFor({reason ?? "null"})", ProfileRetirementCopy.SublineFor(reason));
+        foreach (var reason in new[] { "trial_expiry", "churn_grace", "liveness", "", null })
+            yield return ($"RetiredChannelCopy.BannerBody({reason ?? "null"})", RetiredChannelCopy.BannerBody(reason));
+        yield return ("RetiredChannelCopy.PreviousNumber", RetiredChannelCopy.PreviousNumber("77071234567"));
+        // The sheet row's authored half (the bot's own name stands in as placeholder text the app does not control).
+        yield return ("RetiredChannelCopy.SheetRow(wa)", RetiredChannelCopy.SheetRow("Бот", ChatChannel.WhatsApp));
+        yield return ("RetiredChannelCopy.SheetRow(tg)", RetiredChannelCopy.SheetRow("Бот", ChatChannel.Telegram));
 
         foreach (OutcomeStatus s in Enum.GetValues(typeof(OutcomeStatus)))
             yield return ($"DashboardStatusInfo.Label({s})", DashboardStatusInfo.Label(s));

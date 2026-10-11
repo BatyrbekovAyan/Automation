@@ -99,4 +99,37 @@ public static class BotCardModel
     /// </summary>
     public static string SublineText(bool connecting, string businessDisplayName) =>
         connecting ? ConnectingText : businessDisplayName ?? "";
+
+    // ---------------- T9: «Подключить» in place of «Авто» ----------------
+
+    /// <summary>The capsule's authored width (BotCardAutoPillBuilder) — «Авто» with its lamp.</summary>
+    public const float AutoPillWidth = 190f;
+
+    /// <summary>Side padding of «Подключить» inside the capsule — the pill's own 76u height keeps it a full pill.</summary>
+    public const float ConnectPillPadding = 28f;
+
+    /// <summary>
+    /// F2 (plan §5.3): the capsule turns into «Подключить» only when the bot has NO live channel and at least one the
+    /// server retired — the reply mode it would switch has nothing to act on. A retired channel's reason is non-null
+    /// (<see cref="RetiredChannelPolicy.ActiveReason"/>, "" when the server named none); a channel with a real profile and no
+    /// reason is live. An unfinished app delete anywhere on the bot keeps «Авто»: its screens only offer «Удалить ещё раз».
+    /// </summary>
+    public static bool ShowConnectPill(string whatsappProfileId, string whatsappRetiredReason,
+                                       string telegramProfileId, string telegramRetiredReason)
+    {
+        if (whatsappRetiredReason == null && telegramRetiredReason == null) return false;
+        if (whatsappRetiredReason == ProfileRetirement.ReasonAppDelete
+            || telegramRetiredReason == ProfileRetirement.ReasonAppDelete) return false;
+        bool whatsappLive = whatsappRetiredReason == null && IsConnected(whatsappProfileId);
+        bool telegramLive = telegramRetiredReason == null && IsConnected(telegramProfileId);
+        return !whatsappLive && !telegramLive;
+    }
+
+    /// <summary>
+    /// The capsule's width: the authored 190 for «Авто»; for «Подключить» its measured label plus the padding on both
+    /// sides, never narrower than the authored capsule (the lamp is hidden, so the label is alone in the pill).
+    /// </summary>
+    public static float PillWidth(bool connect, float labelPreferredWidth) =>
+        connect ? System.Math.Max(AutoPillWidth, (float)System.Math.Ceiling(labelPreferredWidth) + 2f * ConnectPillPadding)
+                : AutoPillWidth;
 }

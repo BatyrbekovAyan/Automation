@@ -90,6 +90,17 @@ public partial class BotSettings
                 yield break;
             }
 
+            // F2 (T9): the server must have seen the payment before a profile is paired — a Create refused with
+            // channel_limit would delete the profile the owner has just paired (plan §5.1). Waits only when the last
+            // GetUsage snapshot definitely says «no free channel»; gives up without pairing.
+            bool slot = false;
+            yield return WaitForServerChannelSlot(ChatChannel.WhatsApp, ok => slot = ok);
+            if (!slot || (WhatsappToggle != null && !WhatsappToggle.isOn))
+            {
+                SetChannelRowQuiet(whatsappRow, false);
+                yield break;
+            }
+
             // Fresh auth path: provision a new Wappi profile for this bot, then
             // show Manager's shared auth page using the newly assigned id.
             Manager.Instance.GetCreateWhatsappProfile(BotNameField.Value);
@@ -309,6 +320,15 @@ public partial class BotSettings
             if (!EntitlementGate.CanConnectChannel(EntitlementGate.ConnectedChannelCount()))
             {
                 EntitlementGate.RequestPaywall(PaywallTrigger.ChannelLimit);
+                SetChannelRowQuiet(telegramRow, false);
+                yield break;
+            }
+
+            // F2 (T9): the server's wait for the payment — see the WhatsApp twin above.
+            bool slot = false;
+            yield return WaitForServerChannelSlot(ChatChannel.Telegram, ok => slot = ok);
+            if (!slot || (TelegramToggle != null && !TelegramToggle.isOn))
+            {
                 SetChannelRowQuiet(telegramRow, false);
                 yield break;
             }

@@ -336,6 +336,19 @@ public class EmptyStateView : MonoBehaviour
                     primaryButton.onClick.AddListener(OpenCurrentBotAuth);
                 }
                 break;
+
+            case EmptyStateReason.BotChannelRetired:
+                // F2 (T9): the server retired this channel (trial over, subscription lapsed, gone from Wappi). Its
+                // reconnect lives in the bot's settings — the channel row's hint starts the fresh pairing there.
+                if (titleLabel != null) titleLabel.text = RetiredChannelCopy.EmptyTitle;
+                if (bodyLabel != null) bodyLabel.text = RetiredChannelCopy.EmptyBody;
+                if (primaryButtonLabel != null) primaryButtonLabel.text = RetiredChannelCopy.EmptyCta;
+                if (primaryButton != null)
+                {
+                    primaryButton.onClick.RemoveAllListeners();
+                    primaryButton.onClick.AddListener(OpenCurrentBotAuth);
+                }
+                break;
         }
 
         // All three reasons share the same green CTA/icon accents; recolor them per the

@@ -16,7 +16,10 @@ using UnityEngine;
 /// <item>«Сменить номер» only logs the profile out: the clone stays, and the Create after the new pairing reuses it
 /// (deleting it fire-and-forget could land AFTER that reuse and leave the bot silent — F1 §2.10).</item>
 /// </list>
-/// T9 extends this class with the purchase → re-claim → sheet wiring.
+/// T9 (plan §5): the screens around it — after a purchase the session is refreshed, the boot claim loop runs again (it
+/// finds channels the sweep retired after launch) and only then the «Подключите ботов снова» sheet is offered; the
+/// server's wait for the payment stands between the client gate and <c>profile.add</c>; the card, the chats empty state
+/// and the settings screen name a retired channel; the paywall stays the only gate subscriber.
 /// </summary>
 public class ReconnectWiringTests
 {
@@ -187,5 +190,110 @@ public class ReconnectWiringTests
         string manager = Src("Scripts/Main/Manager.cs");
         foreach (string entry in new[] { "public void GetCreateWhatsappWorkflow(", "public void GetCreateTelegramWorkflow(" })
             StringAssert.Contains("IsCreateInFlight(", MethodBody(manager, entry), $"{entry}: one Create per channel at a time");
+    }
+
+    // ---------------- T9: screens, purchase, texts ----------------
+
+    private static int At(string body, string needle, string what)
+    {
+        int i = body.IndexOf(needle, System.StringComparison.Ordinal);
+        Assert.GreaterOrEqual(i, 0, $"{what}: «{needle}» not found");
+        return i;
+    }
+
+    [Test]
+    public void APurchase_RefreshesTheSession_ReClaims_ThenOffersTheSheet()
+    {
+        string host = Src("Scripts/Main/ReconnectAfterPurchase.cs");
+        StringAssert.Contains("BillingService.OnEntitlementChanged += ", host,
+            "the sheet follows the entitlement change itself — not the paywall request (PaywallController owns that one)");
+        StringAssert.DoesNotContain("OnPaywallRequested", host, "a second gate subscriber would open the sheet AND the paywall");
+        StringAssert.Contains("ReconnectSettlePolicy.IsPurchaseTransition(", host,
+            "only a move from no paid plan to a paid one is a purchase — the boot resolution of an existing plan is not");
+
+        string routine = MethodBody(host, "private static IEnumerator AfterPurchase(");
+        int refresh = At(routine, ".ForceRefresh()", "the token must list today's live rows before the claim loop reads it");
+        int claim = At(routine, "ProfileClaimFlow.RunAtBoot(", "the boot claim loop runs again after the purchase");
+        int list = At(routine, "ProfileRetirement.ReconnectCandidates(", "the candidates are the channels the server retired");
+        int show = At(routine, "ReconnectBotsSheet.Show(", "the sheet is offered");
+        Assert.IsTrue(refresh < claim && claim < list && list < show,
+            "refresh → re-claim (marks channels the sweep retired after launch) → list → sheet, in that order");
+        StringAssert.Contains("ProfileClaimFlow.IsRunning", routine, "a claim loop still running from boot is waited for, never skipped");
+    }
+
+    [Test]
+    public void ThePaywall_StaysTheOnlyGateSubscriber()
+    {
+        string scripts = Path.Combine(Application.dataPath, "Scripts");
+        foreach (string file in Directory.GetFiles(scripts, "*.cs", SearchOption.AllDirectories))
+        {
+            if (Path.GetFileName(file) == "PaywallController.cs") continue;
+            StringAssert.DoesNotContain("OnPaywallRequested +=", File.ReadAllText(file),
+                $"{Path.GetFileName(file)}: PaywallController.HandlePaywallRequested is the ONLY subscriber (sheet-vs-paywall is decided there)");
+        }
+    }
+
+    [Test]
+    public void TheServerWait_StandsBetweenTheClientGate_AndProfileAdd()
+    {
+        string auth = Src("Scripts/Main/BotSettings.Auth.cs");
+        foreach (var (check, add, ch) in new[]
+                 {
+                     ("private IEnumerator CheckWhatsappAuthorization(", "GetCreateWhatsappProfile(", "ChatChannel.WhatsApp"),
+                     ("private IEnumerator CheckTelegramAuthorization(", "GetCreateTelegramProfile(", "ChatChannel.Telegram"),
+                 })
+        {
+            string body = MethodBody(auth, check);
+            int gate = At(body, "EntitlementGate.CanConnectChannel(", check);
+            int wait = At(body, "WaitForServerChannelSlot(" + ch, $"{check}: the server must have seen the payment before a profile is created");
+            int create = At(body, add, check);
+            Assert.IsTrue(gate < wait && wait < create,
+                $"{check}: client gate → server wait → profile.add (a pairing refused by Create would delete the paired profile)");
+        }
+        string reconnect = Src("Scripts/Main/BotSettings.Reconnect.cs");
+        string waitBody = MethodBody(reconnect, "private IEnumerator WaitForServerChannelSlot(");
+        StringAssert.Contains("ReconnectSettlePolicy.ShouldWaitBeforePairing(UsageStore.Current)", waitBody, "the decision is the pure policy's");
+        StringAssert.Contains("ReconnectSettlePolicy.DelayBeforeRead(", waitBody, "the re-reads follow the settle schedule");
+        StringAssert.Contains("UsageClient.FetchRoutine()", waitBody, "each step re-reads GetUsage");
+        StringAssert.Contains("RetiredChannelCopy.Settling", waitBody, "the owner sees «Подтверждаем оплату…» while it waits");
+        StringAssert.Contains("RetiredChannelCopy.SettleTimedOut", waitBody, "and why nothing was paired when it gave up");
+    }
+
+    [Test]
+    public void TheCard_OffersConnect_OnlyWhenNoChannelIsLive()
+    {
+        string bot = Src("Scripts/Main/Bot.cs");
+        StringAssert.Contains("BotCardModel.ShowConnectPill(", bot, "the capsule's state is the pure model's decision");
+        string tap = MethodBody(bot, "private void OnAutoPillTapped(");
+        int connect = At(tap, "showsConnect", "the capsule knows which face it wears");
+        At(tap, "OpenSettingsAtGeneralTab()", "«Подключить» opens the bot's settings on the channel rows");
+        Assert.Less(connect, tap.IndexOf("ReplyModeToggleBinder", System.StringComparison.Ordinal),
+            "a «Подключить» tap never flips the reply mode of a bot with no live channel");
+    }
+
+    [Test]
+    public void TheChatsEmptyState_NamesARetiredChannel()
+    {
+        string state = MethodBody(Src("Scripts/Main/ChatManager.BotState.cs"), "private EmptyStateReason NoConnectionEmptyState(");
+        StringAssert.Contains("EmptyStateReason.BotChannelRetired", state, "«Бот отключён» instead of the plain «… не подключён»");
+        StringAssert.Contains("RetiredChannelPolicy", state, "the retired verdict is the policy's");
+        string view = Src("Scripts/UI/EmptyStateView.cs");
+        int @case = At(view, "case EmptyStateReason.BotChannelRetired:", "EmptyStateView");
+        StringAssert.Contains("RetiredChannelCopy.EmptyTitle", view.Substring(@case));
+        StringAssert.Contains("OpenCurrentBotAuth", view.Substring(@case), "the CTA opens the bot's settings");
+    }
+
+    [Test]
+    public void TheSettingsScreen_BuildsItsReconnectUi_AtRuntime()
+    {
+        string settings = Src("Scripts/Main/BotSettings.cs");
+        StringAssert.Contains("RefreshReconnectUi();", MethodBody(settings, "public void OnEnable("),
+            "the banner and the row hints are runtime-added on every open (the prefab stays untouched)");
+        StringAssert.Contains("openBotSettings.RefreshReconnectUi();", MethodBody(Src("Scripts/Main/Manager.cs"), "public void SaveSettings("),
+            "a save re-shows the number fields — a retired channel's must stay hidden behind its hint");
+        string reconnect = Src("Scripts/Main/BotSettings.Reconnect.cs");
+        StringAssert.Contains("RetiredChannelPolicy.SettingsRow(", reconnect, "each row's state is the policy's");
+        StringAssert.Contains("RetiredChannelPolicy.ShowBanner(", reconnect, "so is the banner's");
+        StringAssert.Contains("EntitlementGate.RequestPaywall(", reconnect, "«Выбрать тариф» opens the paywall through the gate");
     }
 }

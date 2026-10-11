@@ -171,4 +171,118 @@ public class RetiredChannelPolicyTests
         Assert.AreEqual(0, EntitlementGate.CountChannels(new List<(bool wa, bool tg)> { (occupied, false) }));
         Assert.AreEqual(1, EntitlementGate.CountChannels(new List<(bool wa, bool tg)> { (ProfileClaimPolicy.IsAuthedId(Live().ProfileId), false) }));
     }
+
+    // ---------------- T9: the screens' decisions ----------------
+
+    private static RetiredChannelPolicy.Channel Never() =>
+        new RetiredChannelPolicy.Channel { ProfileId = Sentinel, WorkflowId = Sentinel, IsOn = false, RetiredProfileId = "", RetiredWorkflowId = "", RetiredReason = "" };
+
+    [Test]
+    public void SettingsRow_ALiveOrNeverConnectedChannel_IsNormal()
+    {
+        Assert.AreEqual(RetiredChannelPolicy.SettingsRowState.Normal, RetiredChannelPolicy.SettingsRow(Live(), Token("wa-1")));
+        Assert.AreEqual(RetiredChannelPolicy.SettingsRowState.Normal, RetiredChannelPolicy.SettingsRow(Never(), Token()));
+        Assert.AreEqual(RetiredChannelPolicy.SettingsRowState.Normal, RetiredChannelPolicy.SettingsRow(default, null),
+            "no bot at all reads as an ordinary row");
+    }
+
+    [TestCase("trial_expiry")]
+    [TestCase("churn_grace")]
+    [TestCase("liveness")]
+    [TestCase("channel_limit")]
+    [TestCase("")]
+    public void SettingsRow_AMovedChannel_OffersTheReconnect(string reason)
+    {
+        var moved = RetiredChannelPolicy.Retire(Live(), "wa-1", reason);
+        Assert.AreEqual(RetiredChannelPolicy.SettingsRowState.Reconnect, RetiredChannelPolicy.SettingsRow(moved, Token()));
+        Assert.AreEqual(RetiredChannelPolicy.SettingsRowState.Reconnect, RetiredChannelPolicy.SettingsRow(moved, null),
+            "before the session is known the moved ids already say it");
+    }
+
+    [Test]
+    public void SettingsRow_AnUnfinishedAppDelete_OffersOnlyTheDelete()
+    {
+        var marked = RetiredChannelPolicy.Retire(Live(), "wa-1", ProfileRetirement.ReasonAppDelete);
+        Assert.AreEqual(RetiredChannelPolicy.SettingsRowState.DeleteUnfinished, RetiredChannelPolicy.SettingsRow(marked, Token()));
+        Assert.AreEqual(RetiredChannelPolicy.SettingsRowState.Normal, RetiredChannelPolicy.SettingsRow(marked, Token("wa-1")),
+            "the token lists the profile again — the marker yields (M4)");
+    }
+
+    [Test]
+    public void SettingsRow_AnM4MarkerNotMovedYet_IsAReconnect_ThatMovesItFirst()
+    {
+        var legacy = Live();
+        legacy.RetiredProfileId = "wa-1";               // the M4 build marked the current id and kept the ids
+        legacy.RetiredReason = "trial_expiry";
+        Assert.AreEqual(RetiredChannelPolicy.SettingsRowState.Reconnect, RetiredChannelPolicy.SettingsRow(legacy, Token()));
+        Assert.IsTrue(RetiredChannelPolicy.NeedsMoveAside(legacy, Token()), "the reconnect moves it aside first (ProfileRetirement.MoveAsideIfMarked)");
+    }
+
+    [Test]
+    public void SettingsRow_AReconnectInProgress_IsNormalAgain()
+    {
+        var reconnecting = RetiredChannelPolicy.Retire(Live(), "wa-1", "trial_expiry");
+        reconnecting.ProfileId = "wa-2";                // profile.add answered, the pairing is on screen
+        Assert.AreEqual(RetiredChannelPolicy.SettingsRowState.Normal, RetiredChannelPolicy.SettingsRow(reconnecting, Token("wa-2")));
+        Assert.AreEqual("wa-1", RetiredChannelPolicy.PreviousProfileId(reconnecting, "wa-2"), "…while Create still names the predecessor");
+    }
+
+    [Test]
+    public void Banner_OnlyWhileAChannelWaitsAndNoPlanIsActive()
+    {
+        var moved = RetiredChannelPolicy.Retire(Live(), "wa-1", "trial_expiry");
+        Assert.IsTrue(RetiredChannelPolicy.ShowBanner(moved, Never(), Token(), PlanTier.None), "trial over, nothing bought: «Бот отключён»");
+        Assert.IsTrue(RetiredChannelPolicy.ShowBanner(Never(), moved, Token(), PlanTier.None), "Telegram's channel the same");
+        foreach (PlanTier active in new[] { PlanTier.Trial, PlanTier.Start, PlanTier.Business, PlanTier.Network })
+            Assert.IsFalse(RetiredChannelPolicy.ShowBanner(moved, Never(), Token(), active),
+                $"{active}: a plan is active — the row hint carries the reconnect, no «после оплаты»");
+        Assert.IsFalse(RetiredChannelPolicy.ShowBanner(Live(), Never(), Token("wa-1"), PlanTier.None),
+            "nothing retired — an expired plan alone is the paywall's business, not this banner's");
+        var appDelete = RetiredChannelPolicy.Retire(Live(), "wa-1", ProfileRetirement.ReasonAppDelete);
+        Assert.IsFalse(RetiredChannelPolicy.ShowBanner(appDelete, Never(), Token(), PlanTier.None),
+            "an unfinished delete is never told to pay and reconnect");
+    }
+
+    [Test]
+    public void BannerReason_WhatsappFirst_ThenTelegram()
+    {
+        var waTrial = RetiredChannelPolicy.Retire(Live(), "wa-1", "trial_expiry");
+        var tgChurn = RetiredChannelPolicy.Retire(Live("tg-1", "wfClone00002"), "tg-1", "churn_grace");
+        Assert.AreEqual("trial_expiry", RetiredChannelPolicy.BannerReason(waTrial, tgChurn, Token()));
+        Assert.AreEqual("churn_grace", RetiredChannelPolicy.BannerReason(Never(), tgChurn, Token()));
+        Assert.AreEqual("", RetiredChannelPolicy.BannerReason(Never(), Never(), Token()));
+    }
+
+    [Test]
+    public void Candidates_EveryWaitingChannel_InCardOrder_NeverALiveOrHalfDeletedOne()
+    {
+        var bots = new[]
+        {
+            new RetiredChannelPolicy.BotChannels
+            {
+                BotKey = "Bot0", BotName = "Цветы",
+                Whatsapp = RetiredChannelPolicy.Retire(Live(), "wa-1", "trial_expiry"),
+                Telegram = RetiredChannelPolicy.Retire(Live("tg-1", "wfClone00002"), "tg-1", "trial_expiry"),
+            },
+            new RetiredChannelPolicy.BotChannels
+            {
+                BotKey = "Bot1", BotName = "Запчасти",
+                Whatsapp = Live("wa-9"),
+                Telegram = RetiredChannelPolicy.Retire(Live("tg-9", "wfClone00009"), "tg-9", ProfileRetirement.ReasonAppDelete),
+            },
+            new RetiredChannelPolicy.BotChannels
+            {
+                BotKey = "Bot2", BotName = "Ремонт",
+                Whatsapp = Never(),
+                Telegram = RetiredChannelPolicy.Retire(Live("tg-5", "wfClone00005"), "tg-5", "churn_grace"),
+            },
+        };
+        List<RetiredChannelPolicy.Candidate> rows = RetiredChannelPolicy.Candidates(bots, Token("wa-9"));
+        Assert.AreEqual(3, rows.Count);
+        Assert.AreEqual(("Bot0", ChatChannel.WhatsApp), (rows[0].BotKey, rows[0].Channel));
+        Assert.AreEqual(("Bot0", ChatChannel.Telegram), (rows[1].BotKey, rows[1].Channel));
+        Assert.AreEqual(("Bot2", ChatChannel.Telegram), (rows[2].BotKey, rows[2].Channel));
+        Assert.AreEqual("Ремонт", rows[2].BotName);
+        Assert.IsEmpty(RetiredChannelPolicy.Candidates(null, Token()));
+    }
 }

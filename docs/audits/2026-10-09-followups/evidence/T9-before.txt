@@ -1,0 +1,55 @@
+# T9 before — HEAD 50309e18 (client code = HEAD; the NEW T9 tests only), 2026-10-11T14:14:39Z
+# Only tests that compile against HEAD run here: the source guards added to ReconnectWiringTests (T9 block) and BackNavigationTests
+# (router entry of the reconnect sheet). They read the sources: on HEAD the post-purchase host, the server wait before profile.add,
+# the card's «Подключить», the chats empty state for a retired channel, the runtime reconnect UI of the settings screen and the
+# sheet's Back target do not exist. ThePaywall_StaysTheOnlyGateSubscriber is an invariant pin (passes on HEAD and after).
+# The pure-seam tests (ReconnectSettlePolicyTests, RetiredChannelCopyTests, the T9 blocks of RetiredChannelPolicyTests /
+# BotCardModelTests, ReconnectBotsSheetTests, FontGlyphCoverageTests' new seam) reference members added with the fix.
+
+## Client (Unity 6000.3.9f1 EditMode, headless, Editor closed): Tools/run-tests-headless.sh 'ReconnectWiringTests|BackNavigationTests'
+PASSED BackNavigationTests.ATornDownProbe_IsTreatedAsClosed
+PASSED BackNavigationTests.FirstOpenSurface_TakesThePress_AndNothingBelowIsAsked
+PASSED BackNavigationTests.NothingOpen_ReturnsNull_AndClosesNothing
+PASSED BackNavigationTests.NullEntries_AreSkipped
+PASSED BackNavigationTests.SwallowingCover_ConsumesThePress_WithoutClosing
+FAILED BackNavigationTests.TheReconnectSheet_IsOnTheRouter_AndBackDoesWhatItsLaterDoes
+        the sheet must be a Back target, closed by its own «Позже» action
+          Expected: greater than or equal to 0
+          But was:  -1
+FAILED ReconnectWiringTests.APurchase_RefreshesTheSession_ReClaims_ThenOffersTheSheet
+        System.IO.FileNotFoundException : Could not find file "/Users/ayan/Projects/Automation/Assets/Scripts/Main/ReconnectAfterPurchase.cs"
+PASSED ReconnectWiringTests.ARefusedCreateFromSettings_KeepsThePairedProfile_UnlessTheServerDeletedIt
+PASSED ReconnectWiringTests.AnAuthorisedProfileWithAFailedCreate_RetriesTheCreate
+PASSED ReconnectWiringTests.ChangeNumber_LogsOutOnly_TheCloneStaysForTheReuse
+PASSED ReconnectWiringTests.CreateFromSettings_ClearsTheRetiredSet_OnlyForAnAdoptedProfile
+PASSED ReconnectWiringTests.CreateFromSettings_NamesTheRetiredProfile_AndItsOrigin
+PASSED ReconnectWiringTests.CreateFromTheWizard_NeverNamesAPredecessor
+PASSED ReconnectWiringTests.EveryCreate_Waits45Seconds_AndReadsTheAnswerThroughTheContract
+FAILED ReconnectWiringTests.TheCard_OffersConnect_OnlyWhenNoChannelIsLive
+        the capsule's state is the pure model's decision
+          Expected: String containing "BotCardModel.ShowConnectPill("
+          But was:  "using UnityEngine;
+        using UnityEngine.UI;
+        using DG.Tweening;
+        using System.Collections;
+FAILED ReconnectWiringTests.TheChatsEmptyState_NamesARetiredChannel
+        «Бот отключён» instead of the plain «… не подключён»
+          Expected: String containing "EmptyStateReason.BotChannelRetired"
+          But was:  "{
+                if (!long.TryParse(raw, out syncUntilUnixMs)) { syncUntilUnixMs = 0L; return false; }
+                return WhatsAppSyncGate.IsSyncing(syncUntilUnixMs, nowUnixMs);
+            }"
+PASSED ReconnectWiringTests.ThePaywall_StaysTheOnlyGateSubscriber
+FAILED ReconnectWiringTests.TheServerWait_StandsBetweenTheClientGate_AndProfileAdd
+        private IEnumerator CheckWhatsappAuthorization(: the server must have seen the payment before a profile is created: «WaitForServerChannelSlot(ChatChannel.WhatsApp» not found
+          Expected: greater than or equal to 0
+          But was:  -1
+FAILED ReconnectWiringTests.TheSettingsScreen_BuildsItsReconnectUi_AtRuntime
+        the banner and the row hints are runtime-added on every open (the prefab stays untouched)
+          Expected: String containing "RefreshReconnectUi();"
+          But was:  "{
+                // Defense-in-depth: never carry a stranded "Saving.." pill into a fresh
+                // open. The pill is normally hidden by its own settle coroutine, but if
+                // an edge ever left its activeSelf true on this persistent clone it
+
+# total=19 passed=13 failed=6 skipped=0 result=Failed(Child)

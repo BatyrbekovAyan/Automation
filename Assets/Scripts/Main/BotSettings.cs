@@ -166,6 +166,8 @@ public partial class BotSettings : MonoBehaviour
         // under its platform toggle. The rebuilder groups both numbers after
         // both toggles, so re-order at runtime once references are bound.
         PlaceNumberFieldsUnderToggles();
+        // F2 (T9): the reconnect hints follow the number fields that were just moved under their rows.
+        RefreshReconnectUi();
 
         // Editing a phone number must be gated by the "really change number?"
         // confirmation. An invisible button over each number field intercepts
@@ -341,6 +343,8 @@ public partial class BotSettings : MonoBehaviour
         BindUploadCenter(); // uploads run outside this screen — re-attach to their progress
         RefreshUploadedFiles();
         EnsureTestRow();    // stage 7: the «Проверить бота» row is runtime-added, never authored into the prefab
+        BindReconnectEvents();
+        RefreshReconnectUi();   // F2 (T9): banner + row hints of a retired channel, runtime-added like the test row
     }
     
     // Mirrors the bot's current name onto the header. Called on enable, after
@@ -362,6 +366,8 @@ public partial class BotSettings : MonoBehaviour
         // latch one of them was holding has to be released here.
         ResetReplacePopupState();
         ResetPromptMutationState();
+        UnbindReconnectEvents();
+        ResetReconnectNotices();   // the server wait that set them died with the screen
     }
 
     // Returns the vertical ScrollRect under the currently-active tab root, if

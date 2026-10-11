@@ -99,4 +99,80 @@ public static class RetiredChannelPolicy
         }
         return channel;
     }
+
+    // ---------------- T9: the screens around a retired channel ----------------
+
+    /// <summary>What the settings screen offers on one channel's row (plan §5.1).</summary>
+    public enum SettingsRowState
+    {
+        /// <summary>The channel is live or was never connected — the row as it always was.</summary>
+        Normal,
+        /// <summary>The server retired it: the row is off, the hint says «нажмите, чтобы подключить снова».</summary>
+        Reconnect,
+        /// <summary>An app delete that did not finish: only «Удалить ещё раз», never «Подключить».</summary>
+        DeleteUnfinished,
+    }
+
+    /// <summary>
+    /// The row of this channel. A marker the M4 build wrote for the current id (ids not moved yet) is a reconnect too —
+    /// the reconnect moves it aside first (<see cref="NeedsMoveAside"/>); an app delete never offers one (the server
+    /// would not take that row as a predecessor, the bot is half-deleted).
+    /// </summary>
+    public static SettingsRowState SettingsRow(Channel channel, InstallSession.TokenClaims claims)
+    {
+        string reason = ActiveReason(channel, claims);
+        if (reason == null) return SettingsRowState.Normal;
+        return MovesIdsAside(reason) ? SettingsRowState.Reconnect : SettingsRowState.DeleteUnfinished;
+    }
+
+    /// <summary>
+    /// The «Бот отключён» banner: a channel waits for its reconnect and no plan is active, so the only way back is a
+    /// purchase. With an active plan (a trial still running, a paid tier) the row hints carry the reconnect themselves.
+    /// </summary>
+    public static bool ShowBanner(Channel whatsapp, Channel telegram, InstallSession.TokenClaims claims, PlanTier currentTier) =>
+        currentTier == PlanTier.None
+        && (SettingsRow(whatsapp, claims) == SettingsRowState.Reconnect || SettingsRow(telegram, claims) == SettingsRowState.Reconnect);
+
+    /// <summary>The reason the banner speaks of — WhatsApp's first (the card's order), "" when the server named none.</summary>
+    public static string BannerReason(Channel whatsapp, Channel telegram, InstallSession.TokenClaims claims)
+    {
+        if (SettingsRow(whatsapp, claims) == SettingsRowState.Reconnect) return ActiveReason(whatsapp, claims) ?? "";
+        if (SettingsRow(telegram, claims) == SettingsRowState.Reconnect) return ActiveReason(telegram, claims) ?? "";
+        return "";
+    }
+
+    /// <summary>One channel the post-purchase sheet offers to connect again.</summary>
+    public struct Candidate
+    {
+        public string BotKey;
+        public string BotName;
+        public ChatChannel Channel;
+    }
+
+    /// <summary>One bot as the sheet reads it: its key (the GameObject name), its shown name and both channels.</summary>
+    public struct BotChannels
+    {
+        public string BotKey;
+        public string BotName;
+        public Channel Whatsapp;
+        public Channel Telegram;
+    }
+
+    /// <summary>
+    /// The sheet's rows: every channel waiting for its reconnect, in card order, WhatsApp before Telegram. An unfinished
+    /// app delete and a live channel are never offered.
+    /// </summary>
+    public static List<Candidate> Candidates(IEnumerable<BotChannels> bots, InstallSession.TokenClaims claims)
+    {
+        var rows = new List<Candidate>();
+        if (bots == null) return rows;
+        foreach (BotChannels bot in bots)
+        {
+            if (SettingsRow(bot.Whatsapp, claims) == SettingsRowState.Reconnect)
+                rows.Add(new Candidate { BotKey = bot.BotKey, BotName = bot.BotName, Channel = ChatChannel.WhatsApp });
+            if (SettingsRow(bot.Telegram, claims) == SettingsRowState.Reconnect)
+                rows.Add(new Candidate { BotKey = bot.BotKey, BotName = bot.BotName, Channel = ChatChannel.Telegram });
+        }
+        return rows;
+    }
 }

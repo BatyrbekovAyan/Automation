@@ -206,12 +206,33 @@ public partial class ChatManager
     /// <summary>
     /// The empty-state reason for "active channel has no connected profile" — WhatsApp or
     /// Telegram copy depending on ActiveChannel so a Telegram-only bot no longer dead-ends
-    /// on the WhatsApp empty state.
+    /// on the WhatsApp empty state. F2 (T9): a channel the server retired (its ids moved aside)
+    /// says so — «Бот отключён», reconnect in the bot's settings — instead of «… не подключён».
     /// </summary>
-    private EmptyStateReason NoConnectionEmptyState() =>
-        ActiveChannel == ChatChannel.Telegram
+    private EmptyStateReason NoConnectionEmptyState()
+    {
+        Bot bot = Manager.Instance != null ? Manager.Instance.FindBotByName(CurrentBotId) : null;
+        var claims = AuthClient.Existing != null ? AuthClient.Existing.Claims : null;
+        if (bot != null && RetiredChannelPolicy.SettingsRow(ProfileRetirement.ChannelOf(bot, ActiveChannel), claims)
+            == RetiredChannelPolicy.SettingsRowState.Reconnect)
+            return EmptyStateReason.BotChannelRetired;
+        return ActiveChannel == ChatChannel.Telegram
             ? EmptyStateReason.BotHasNoTelegram
             : EmptyStateReason.BotHasNoWhatsApp;
+    }
+
+    /// <summary>
+    /// T9: the claim loop just moved one of a bot's channels aside (or a reconnect cleared it). When that is the channel on
+    /// screen and it has no profile any more, the chats say so now — the list was loaded under the profile the server
+    /// deleted, and nothing else would re-derive the empty state until a channel or bot switch.
+    /// </summary>
+    private void HandleChannelRetirementChanged(string botKey)
+    {
+        if (botKey != CurrentBotId) return;
+        Bot bot = Manager.Instance != null ? Manager.Instance.FindBotByName(CurrentBotId) : null;
+        if (bot == null || IsValidProfileId(ProfileIdForChannel(bot, ActiveChannel))) return;
+        OnEmptyState?.Invoke(NoConnectionEmptyState());
+    }
 
     /// <summary>PlayerPrefs key suffix holding a bot's WhatsApp sync-window end (Unix ms).</summary>
     private const string SyncUntilKeySuffix = "WhatsappSyncUntil";

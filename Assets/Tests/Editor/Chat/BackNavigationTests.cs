@@ -1,5 +1,7 @@
 using System.Collections.Generic;
+using System.IO;
 using NUnit.Framework;
+using UnityEngine;
 
 /// <summary>
 /// Pins the Android Back rule (2026-09-06): exactly one surface reacts to a press — the
@@ -72,5 +74,27 @@ public class BackNavigationTests
 
         Assert.AreEqual("x", BackNavigation.Dispatch(targets));
         Assert.IsNull(BackNavigation.Dispatch(null));
+    }
+
+    /// <summary>
+    /// T9: the «Подключите ботов снова» sheet (a runtime overlay, sortingOrder 3) is a closeable surface, so it joins the
+    /// router in its z-order — above the scene popups and the paywall it can sit over — and Back does exactly what its own
+    /// «Позже» does: <c>ReconnectBotsSheet.Dismiss</c>, which closes the sheet and connects nothing. Source guard (the
+    /// router reads the live scene); the dismiss behaviour itself is pinned on the real sheet by ReconnectBotsSheetTests.
+    /// </summary>
+    [Test]
+    public void TheReconnectSheet_IsOnTheRouter_AndBackDoesWhatItsLaterDoes()
+    {
+        string router = File.ReadAllText(Path.Combine(Application.dataPath, "Scripts/Main/AndroidBackRouter.cs"));
+        const string entry = "new BackTarget(\"reconnect-bots-sheet\", () => ReconnectBotsSheet.IsOpen, ReconnectBotsSheet.Dismiss)";
+        int sheet = router.IndexOf(entry, System.StringComparison.Ordinal);
+        Assert.GreaterOrEqual(sheet, 0, "the sheet must be a Back target, closed by its own «Позже» action");
+        foreach (string below in new[] { "new BackTarget(\"popup\"", "new BackTarget(\"paywall\"", "new BackTarget(\"bot-settings\"" })
+            Assert.Less(sheet, router.IndexOf(below, System.StringComparison.Ordinal), $"the overlay sheet sits above {below}");
+        Assert.Greater(sheet, router.IndexOf("new BackTarget(\"loading\"", System.StringComparison.Ordinal),
+            "a loading cover still swallows Back first");
+
+        string sheetSrc = File.ReadAllText(Path.Combine(Application.dataPath, "Scripts/Main/ReconnectBotsSheet.cs"));
+        StringAssert.Contains("PopupUI.WireFingerUp(button, Dismiss)", sheetSrc, "«Позже» is Dismiss — the action Back repeats");
     }
 }

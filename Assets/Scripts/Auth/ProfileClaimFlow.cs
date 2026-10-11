@@ -30,6 +30,12 @@ public static class ProfileClaimFlow
     private static readonly HashSet<string> Snoozed = new HashSet<string>();
     private static bool running;
 
+    /// <summary>
+    /// T9: a run is in progress (the boot one, or a re-run after a purchase). A second <see cref="RunAtBoot"/> started now
+    /// returns at once — so the post-purchase re-run waits for this to clear before it starts its own.
+    /// </summary>
+    public static bool IsRunning => running;
+
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void Bootstrap()
     {

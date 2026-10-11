@@ -1010,6 +1010,10 @@ public partial class Manager : MonoBehaviour
 
         // Prefs now reflect current UI; re-run the dirty check to flip save off.
         EnableSave();
+
+        // F2 (T9): the number fields were just re-shown above by their value — a retired channel's must stay hidden behind
+        // its «Отключён · нажмите, чтобы подключить снова» hint (tapping the old number would log out a deleted profile).
+        openBotSettings.RefreshReconnectUi();
     }
 
     public void CloseSettings()

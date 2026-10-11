@@ -1,4 +1,5 @@
 using NUnit.Framework;
+using UnityEngine;
 
 /// <summary>
 /// Pins the C2 bot-card decision matrix (sketch 006, locked 2026-08-13):
@@ -106,5 +107,102 @@ public class BotCardModelTests
         Assert.AreEqual(BotSublineKind.SyncPending, BotCardModel.SublineKind(false, false, true, true));
         Assert.AreEqual(BotSublineKind.SyncFailed, BotCardModel.SublineKind(false, false, false, true));
         Assert.AreEqual(BotSublineKind.Business, BotCardModel.SublineKind(false, false, false, false));
+    }
+
+    // ---- T9: «Подключить» in place of «Авто» ------------------------------------
+
+    private const string Sentinel = "-1";
+
+    [TestCase("trial_expiry")]
+    [TestCase("churn_grace")]
+    [TestCase("liveness")]
+    [TestCase("channel_limit")]
+    [TestCase("")]
+    public void ConnectPill_WhenEveryChannelOfTheBotIsRetired(string reason)
+    {
+        Assert.IsTrue(BotCardModel.ShowConnectPill(Sentinel, reason, Sentinel, null),
+            "WhatsApp retired (ids moved aside), Telegram never connected — nothing for «Авто» to act on");
+        Assert.IsTrue(BotCardModel.ShowConnectPill(Sentinel, reason, Sentinel, reason), "both channels retired");
+        Assert.IsTrue(BotCardModel.ShowConnectPill(Sentinel, null, Sentinel, reason), "Telegram-only bot, retired");
+    }
+
+    [Test]
+    public void AutoStays_WhileAnyChannelIsLive()
+    {
+        Assert.IsFalse(BotCardModel.ShowConnectPill("wa-live", null, Sentinel, "trial_expiry"),
+            "one live channel: «Авто» keeps driving its reply mode, the retired one is the subline + gray icon (§5.3)");
+        Assert.IsFalse(BotCardModel.ShowConnectPill(Sentinel, "churn_grace", "tg-live", null));
+        Assert.IsFalse(BotCardModel.ShowConnectPill("wa-new", null, Sentinel, null),
+            "a reconnect in progress (a new profile, the marker names the old one → no reason) is live again");
+    }
+
+    [Test]
+    public void AutoStays_OnABotWithNothingRetired()
+    {
+        Assert.IsFalse(BotCardModel.ShowConnectPill(Sentinel, null, Sentinel, null), "a bot that was never connected is not «отключён»");
+        Assert.IsFalse(BotCardModel.ShowConnectPill("wa-1", null, "tg-1", null));
+    }
+
+    [Test]
+    public void AnUnfinishedAppDelete_NeverOffersConnect()
+    {
+        Assert.IsFalse(BotCardModel.ShowConnectPill("wa-1", ProfileRetirement.ReasonAppDelete, Sentinel, null),
+            "app_delete: only «Удалить ещё раз» — the server would not take that row as a predecessor");
+        Assert.IsFalse(BotCardModel.ShowConnectPill(Sentinel, "trial_expiry", "tg-1", ProfileRetirement.ReasonAppDelete),
+            "a half-deleted bot gets no reconnect button even when its other channel is merely expired");
+    }
+
+    [Test]
+    public void PillWidth_AutoKeepsItsAuthoredWidth_ConnectFitsItsLabel()
+    {
+        Assert.AreEqual(BotCardModel.AutoPillWidth, BotCardModel.PillWidth(false, 400f), "«Авто» never resizes");
+        Assert.AreEqual(BotCardModel.AutoPillWidth, BotCardModel.PillWidth(true, 50f), "never narrower than the authored capsule");
+        Assert.AreEqual(Mathf.Ceil(165.2f) + 2f * BotCardModel.ConnectPillPadding, BotCardModel.PillWidth(true, 165.2f),
+            "the measured label (rounded up) plus the padding on both sides");
+    }
+
+    /// <summary>
+    /// The real capsule: «Подключить» measured with the label's own font and size from Bot.prefab (BotCardAutoPillBuilder's
+    /// label is 96 wide for «Авто»). The runtime grows the capsule to the label plus its padding — this pins that the word
+    /// does need that growth and that the grown capsule still leaves the card's name column room on a 1080 card.
+    /// </summary>
+    [Test]
+    public void TheRealCapsuleLabel_FitsConnect_OnceTheCapsuleGrows()
+    {
+        var prefab = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/Bot.prefab");
+        Assert.IsNotNull(prefab, "Bot.prefab");
+        var card = Object.Instantiate(prefab);
+        try
+        {
+            Transform pill = FindDeep(card.transform, "AutoPill");
+            Assert.IsNotNull(pill, "the C2 capsule (BotCardAutoPillBuilder)");
+            var label = FindDeep(pill, "Label").GetComponent<TMPro.TextMeshProUGUI>();
+            float connect = label.GetPreferredValues(RetiredChannelCopy.ConnectPill).x;
+            float auto = label.GetPreferredValues(label.text).x;
+            Assert.Greater(connect, 0f, "the label measures (a font is assigned)");
+            Assert.Greater(connect, label.rectTransform.sizeDelta.x,
+                "«Подключить» does not fit the authored «Авто» label box — the runtime must grow it (else it overflows the pill)");
+            float width = BotCardModel.PillWidth(true, connect);
+            TestContext.Out.WriteLine($"label «{label.text}» {auto:F1}u in a {label.rectTransform.sizeDelta.x:F0}u box; " +
+                                      $"«{RetiredChannelCopy.ConnectPill}» {connect:F1}u → capsule {width:F0}u (authored {BotCardModel.AutoPillWidth:F0}u)");
+            Assert.GreaterOrEqual(width, connect + 2f * BotCardModel.ConnectPillPadding - 0.01f, "the label sits inside the pill");
+            Assert.LessOrEqual(width, 320f, $"the grown capsule ({width:F0}u) must leave the name column room");
+            Assert.LessOrEqual(auto, label.rectTransform.sizeDelta.x + 0.5f, "«Авто» still fits its authored box");
+        }
+        finally
+        {
+            Object.DestroyImmediate(card);
+        }
+    }
+
+    private static Transform FindDeep(Transform root, string name)
+    {
+        if (root.name == name) return root;
+        for (int i = 0; i < root.childCount; i++)
+        {
+            Transform hit = FindDeep(root.GetChild(i), name);
+            if (hit != null) return hit;
+        }
+        return null;
     }
 }
