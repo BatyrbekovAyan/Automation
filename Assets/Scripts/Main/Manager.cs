@@ -3829,6 +3829,10 @@ public partial class Manager : MonoBehaviour
                 Debug.LogWarning($"CreateWhatsappWorkflow refused: {result.Error} — the server deleted the profile");
                 ApplyCreateProfileGone(bot, ChatChannel.WhatsApp);
                 FailSavePanel();
+                // F2 (plan §5.2 step 5): the server counted no free channel — the existing limit sheet says why the
+                // channel is off again (PaywallController routes ChannelLimit to BillingGateSheet). After the reset
+                // above, so the gate already counts the freed slot.
+                EntitlementGate.RequestPaywall(PaywallTrigger.ChannelLimit);
                 break;
             case CreateWorkflowResponse.Kind.Retryable:
                 // Any other refusal, no answer, an unreadable one: the paired profile stays and the Create is
@@ -4039,6 +4043,10 @@ public partial class Manager : MonoBehaviour
                 Debug.LogWarning($"CreateTelegramWorkflow refused: {result.Error} — the server deleted the profile");
                 ApplyCreateProfileGone(bot, ChatChannel.Telegram);
                 FailSavePanel();
+                // F2 (plan §5.2 step 5): the server counted no free channel — the existing limit sheet says why the
+                // channel is off again (PaywallController routes ChannelLimit to BillingGateSheet). After the reset
+                // above, so the gate already counts the freed slot.
+                EntitlementGate.RequestPaywall(PaywallTrigger.ChannelLimit);
                 break;
             case CreateWorkflowResponse.Kind.Retryable:
                 // Any other refusal, no answer, an unreadable one: the paired profile stays and the Create is

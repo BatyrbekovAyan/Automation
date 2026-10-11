@@ -259,6 +259,34 @@ public class ReconnectWiringTests
         StringAssert.Contains("RetiredChannelCopy.SettleTimedOut", waitBody, "and why nothing was paired when it gave up");
     }
 
+    /// <summary>
+    /// Plan §5.2 step 5: a Create from settings refused with <c>channel_limit</c> (the server counted no free channel and
+    /// deleted the paired profile) opens the existing channel-limit sheet — the owner learns why the channel is off again
+    /// instead of a bare «Не удалось сохранить». Every other refusal keeps the profile and repeats the Create: never a limit.
+    /// </summary>
+    [Test]
+    public void ARefusedCreateFromSettings_ForChannelLimit_OpensTheChannelLimitSheet()
+    {
+        string manager = Src("Scripts/Main/Manager.cs");
+        foreach (var (method, _, ch) in FromEdit)
+        {
+            string body = MethodBody(manager, method);
+            int gone = At(body, "case CreateWorkflowResponse.Kind.ProfileGone:", method);
+            int retry = At(body, "case CreateWorkflowResponse.Kind.Retryable:", method);
+            Assert.Less(gone, retry, $"{method}: the channel_limit case is read before the retry case");
+            string goneCase = body.Substring(gone, retry - gone);
+            string retryCase = body.Substring(retry);
+
+            int applied = At(goneCase, $"ApplyCreateProfileGone(bot, {ch})", method);
+            int sheet = At(goneCase, "EntitlementGate.RequestPaywall(PaywallTrigger.ChannelLimit)",
+                $"{method}: channel_limit opens the channel-limit sheet (PaywallController routes it to BillingGateSheet)");
+            Assert.Less(applied, sheet, $"{method}: the sheet comes after the channel is reset, so the gate counts the freed slot");
+
+            StringAssert.DoesNotContain("RequestPaywall", retryCase,
+                $"{method}: a retryable refusal is not a limit — the paired profile stays and the Create repeats");
+        }
+    }
+
     [Test]
     public void TheCard_OffersConnect_OnlyWhenNoChannelIsLive()
     {

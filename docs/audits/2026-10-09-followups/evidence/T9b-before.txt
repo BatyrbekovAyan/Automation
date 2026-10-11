@@ -1,0 +1,24 @@
+# T9b before — HEAD e9a2f3ad (client code = HEAD; the NEW guard only), 2026-10-11T18:10:54Z
+# Plan §5.2 step 5: a Create from settings refused with channel_limit opens the existing channel-limit sheet.
+# On HEAD the ProfileGone branch of Create*WorkflowFromEdit only resets the channel and shows «Не удалось сохранить» — no sheet.
+
+## Client (Unity 6000.3.9f1 EditMode, headless, Editor closed): Tools/run-tests-headless.sh 'ReconnectWiringTests'
+PASSED ReconnectWiringTests.AnAuthorisedProfileWithAFailedCreate_RetriesTheCreate
+PASSED ReconnectWiringTests.APurchase_RefreshesTheSession_ReClaims_ThenOffersTheSheet
+FAILED ReconnectWiringTests.ARefusedCreateFromSettings_ForChannelLimit_OpensTheChannelLimitSheet
+        private IEnumerator CreateWhatsappWorkflowFromEdit(: channel_limit opens the channel-limit sheet (PaywallController routes it to BillingGateSheet): «EntitlementGate.RequestPaywall(PaywallTrigger.ChannelLimit)» not found
+          Expected: greater than or equal to 0
+          But was:  -1
+PASSED ReconnectWiringTests.ARefusedCreateFromSettings_KeepsThePairedProfile_UnlessTheServerDeletedIt
+PASSED ReconnectWiringTests.ChangeNumber_LogsOutOnly_TheCloneStaysForTheReuse
+PASSED ReconnectWiringTests.CreateFromSettings_ClearsTheRetiredSet_OnlyForAnAdoptedProfile
+PASSED ReconnectWiringTests.CreateFromSettings_NamesTheRetiredProfile_AndItsOrigin
+PASSED ReconnectWiringTests.CreateFromTheWizard_NeverNamesAPredecessor
+PASSED ReconnectWiringTests.EveryCreate_Waits45Seconds_AndReadsTheAnswerThroughTheContract
+PASSED ReconnectWiringTests.TheCard_OffersConnect_OnlyWhenNoChannelIsLive
+PASSED ReconnectWiringTests.TheChatsEmptyState_NamesARetiredChannel
+PASSED ReconnectWiringTests.ThePaywall_StaysTheOnlyGateSubscriber
+PASSED ReconnectWiringTests.TheServerWait_StandsBetweenTheClientGate_AndProfileAdd
+PASSED ReconnectWiringTests.TheSettingsScreen_BuildsItsReconnectUi_AtRuntime
+
+# total=14 passed=13 failed=1 skipped=0 result=Failed(Child)
