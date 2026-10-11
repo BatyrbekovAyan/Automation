@@ -294,3 +294,20 @@ e2e-handoff 12/14 в полном прогоне — оба провала (`not
 
 Попутно: `sql-oneoff.py --help` исполнил строку `--help` как SQL (комментарий, без эффекта); его временный workflow удалён (снимок «до» — other 0).
 **Не проверено на проде (нужен живой бот с новой сборки):** canary §4 пакета — загрузка .txt-прайса, вопрос о цене с артикулом, Test Dialog, заявка → self-message, удаление бота.
+
+## Развёртывание 2026-10-11 (прод, по явному «да» владельца на серверные доработки M4 + V9-r3 + V6-concurrent)
+
+Журнал доработок: `docs/audits/2026-10-09-followups/README.md`. Клиентские части (M4 клиент, C1/C1b) — в новой сборке, не здесь.
+
+| Шаг | Результат | Доказательство |
+|---|---|---|
+| Снимок «до» | `verify-deployed`: канон 27, DIFF 5 (шаблоны WA/TG, Suggest Replies, Auth Session, Price List Search), Create/Edit совпадают (Q1 A снят), клонов 0, архивный «13» | `docs/audits/2026-10-11-prod-before.json` |
+| Бэкап | `~/backups/n8n-2026-10-11-predeploy.tar.gz` (13:05 UTC, 29 записей), утренний — `…-0315.tar.gz` | `ls ~/backups` |
+| Миграции | нет | — |
+| 5 workflow | `deploy-canonical.py` dry-run → `--apply --yes`: updated 5, failed 0, read-back ok у каждого; активные (Suggest Replies, Auth Session, Price List Search) опубликованы самим PUT — новый путь D1 «без окна deactivate» впервые подтверждён на настоящем n8n; шаблоны неактивны по определению | `docs/audits/2026-10-11-deploy-rollback-pointers.txt` |
+| Read-back | `verify-deployed --base prod` exit 0: канон 27, diff 0; Notifier активен; клонов 0 | `docs/audits/2026-10-11-prod-after.json` |
+| Smoke (без изменения данных) | WappiProxy без токена → 401; AuthSession nonsense / claim.start без токена → 400; SetWorkflowState на `crPriceSearch001` → 400 `protected_workflow`; SupportMessage пустой → 400 | curl |
+| Логи 15 мин | ни одной строки с ошибкой | `docker compose logs` |
+
+Не проверено на проде (нужен живой бот с новой сборки): M4 — бот после триала получает 410 один раз; V9-r3 — пометки на реальном прайсе; V6 — параллельные ответы.
+
