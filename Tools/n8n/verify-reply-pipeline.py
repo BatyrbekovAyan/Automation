@@ -142,6 +142,20 @@ def verify(fname):
                  "message->>'content' = $6", "as draft_row_id"):
         check(frag in q, f"{f}: Stamp Draft lacks {frag!r}")
     check("delete" not in q.lower(), f"{f}: Stamp Draft must only mark, never delete")
+    # V6-concurrent: the candidate is LOCKED as it is chosen (a row another run's stamp holds is skipped, never waited
+    # for and overwritten), and the UPDATE re-checks on the row it writes that nobody stamped it meanwhile
+    check("order by id\n              limit 1\n              for update skip locked)" in q,
+          f"{f}: Stamp Draft must pick its row with order by id limit 1 for update skip locked (V6-concurrent)")
+    head, _, outer = q.partition("for update skip locked)")
+    check(all(frag in outer for frag in ("(message->'additional_kwargs'->>'execution_id') is null", "message->>'content' = $6",
+                                         "(message->'additional_kwargs'->>'source') is null", "id > $5::bigint",
+                                         "session_id = $1 || ':' || $2", "message->>'type' = 'ai'"))
+          and outer.index("execution_id') is null") < outer.index("returning id"),
+          f"{f}: Stamp Draft's UPDATE must re-check every condition (not stamped, own text, above the watermark) on the row it writes")
+    # negative (V6-concurrent): an aggregate pick (min/max over the unstamped rows) cannot be locked — two runs choose the
+    # same row, the second waits on the first's lock and then overwrites its execution_id (review 2026-10-11)
+    check(not re.search(r"\b(min|max)\s*\(\s*id\s*\)", q),
+          f"{f}: Stamp Draft picks its row with min/max(id) (V6-concurrent: the same row is stamped twice)")
     sp = sd["parameters"]["options"]["queryReplacement"]
     check("$execution.id" in sp and "$('Claim Event').first().json.history_watermark" in sp
           and sp.rstrip().endswith("String($('AI Agent').first().json.output || '') ])($('Webhook').first().json.body.messages[0]) }}"),

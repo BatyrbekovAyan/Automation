@@ -202,16 +202,27 @@ STAMP_DRAFT_SQL = """-- V6: tie the agent's memory row to THIS execution, right 
 -- output. delivery starts as draft; Record Send turns it into sent or unknown (a refused one is removed). Rows
 -- below the watermark, owner rows and rows another run stamped are never touched. Returns the stamped row id
 -- (null = no stamp: the later records then touch nothing in memory).
+-- V6-concurrent: ownership is exclusive. The candidate is LOCKED as it is chosen, and a row another run's stamp
+-- holds right now is skipped (skip locked): the loser of a race takes the next matching row or none, never waits
+-- to overwrite. The update re-checks every condition on the row it writes, so a row stamped meanwhile is never
+-- stamped again.
 with draft as (
   update n8n_chat_histories
   set message = jsonb_set(message, '{additional_kwargs}',
         (case when jsonb_typeof(message->'additional_kwargs') = 'object' then message->'additional_kwargs' else '{}'::jsonb end)
         || jsonb_build_object('execution_id', $4::text, 'event_id', $3::text, 'delivery', 'draft'))
-  where id = (select min(id) from n8n_chat_histories
+  where id = (select id from n8n_chat_histories
               where session_id = $1 || ':' || $2 and id > $5::bigint and message->>'type' = 'ai'
                 and (message->'additional_kwargs'->>'source') is null
                 and (message->'additional_kwargs'->>'execution_id') is null
-                and message->>'content' = $6)
+                and message->>'content' = $6
+              order by id
+              limit 1
+              for update skip locked)
+    and session_id = $1 || ':' || $2 and id > $5::bigint and message->>'type' = 'ai'
+    and (message->'additional_kwargs'->>'source') is null
+    and (message->'additional_kwargs'->>'execution_id') is null
+    and message->>'content' = $6
   returning id
 )
 select (select id from draft) as draft_row_id;"""

@@ -1,0 +1,58 @@
+# V6-concurrent — BEFORE (templates of HEAD 0adac3f4: Stamp Draft = nested min(id), the outer UPDATE checks only the id)
+# python3 Tools/n8n/tests/test_reply_memory_concurrent.py — staging Postgres 127.0.0.1:5433 (PG 16.2), two real connections, fixture schema per case; 2026-10-11T11:59:05Z
+# D cases need the fixed statement's shape to derive the variants — on HEAD they error by design (the variant IS the HEAD statement)
+  [WA] A: rows new=2 old=4; stamps new=2 old=2 second-waited=True; owners after both={2: 'exec-old', 4: None}
+  [WA] A: record_new={'outcome': 'sent', 'transport_message_id': 'confirmed-new-send', 'recorded': True, 'released': True, 'dropped_ai_rows': 0, 'marked_ai_rows': 0} cancel_old={'outcome': 'superseded', 'dropped_ai_rows': 1, 'recorded': True, 'remembered': False} memory=[(1, 'human', None, None), (3, 'human', None, None), (4, 'ai', None, None)]
+  [WA] B: rows new=2 old=4; stamps old=2 new=2 second-waited=True; owners after both={2: 'exec-new', 4: None}
+  [WA] B: record_new={'outcome': 'sent', 'transport_message_id': 'confirmed-new-send', 'recorded': True, 'released': True, 'dropped_ai_rows': 0, 'marked_ai_rows': 1} cancel_old={'outcome': 'superseded', 'dropped_ai_rows': 0, 'recorded': True, 'remembered': False} memory=[(1, 'human', None, None), (2, 'ai', 'exec-new', 'sent'), (3, 'human', None, None), (4, 'ai', None, None)]
+  [WA] C: row new=2; stamps new=2 old=2 second-waited=True; owners after both={2: 'exec-old'}
+  [WA] C: record_new={'outcome': 'sent', 'transport_message_id': 'confirmed-new-send', 'recorded': True, 'released': True, 'dropped_ai_rows': 0, 'marked_ai_rows': 0} cancel_old={'outcome': 'superseded', 'dropped_ai_rows': 1, 'recorded': True, 'remembered': False} memory=[(1, 'human', None, None)]
+  [TG] A: rows new=2 old=4; stamps new=2 old=2 second-waited=True; owners after both={2: 'exec-old', 4: None}
+  [TG] A: record_new={'outcome': 'sent', 'transport_message_id': 'confirmed-new-send', 'recorded': True, 'released': True, 'dropped_ai_rows': 0, 'marked_ai_rows': 0} cancel_old={'outcome': 'superseded', 'dropped_ai_rows': 1, 'recorded': True, 'remembered': False} memory=[(1, 'human', None, None), (3, 'human', None, None), (4, 'ai', None, None)]
+  [TG] B: rows new=2 old=4; stamps old=2 new=2 second-waited=True; owners after both={2: 'exec-new', 4: None}
+  [TG] B: record_new={'outcome': 'sent', 'transport_message_id': 'confirmed-new-send', 'recorded': True, 'released': True, 'dropped_ai_rows': 0, 'marked_ai_rows': 1} cancel_old={'outcome': 'superseded', 'dropped_ai_rows': 0, 'recorded': True, 'remembered': False} memory=[(1, 'human', None, None), (2, 'ai', 'exec-new', 'sent'), (3, 'human', None, None), (4, 'ai', None, None)]
+  [TG] C: row new=2; stamps new=2 old=2 second-waited=True; owners after both={2: 'exec-old'}
+  [TG] C: record_new={'outcome': 'sent', 'transport_message_id': 'confirmed-new-send', 'recorded': True, 'released': True, 'dropped_ai_rows': 0, 'marked_ai_rows': 0} cancel_old={'outcome': 'superseded', 'dropped_ai_rows': 1, 'recorded': True, 'remembered': False} memory=[(1, 'human', None, None)]
+FAIL V6c [WA] A (review order): NEW stamps under its lock while OLD stamps — each run gets ITS OWN row; the send marks only NEW's, the cancel deletes only OLD's
+      - each run must stamp its own row: new→{'draft_row_id': 2} (row 2) old→{'draft_row_id': 2} (row 4)
+      - a stamped row changed hands: owners={2: 'exec-old', 4: None}
+      - the send must mark exactly its row: new=sent record={'outcome': 'sent', 'transport_message_id': 'confirmed-new-send', 'recorded': True, 'released': True, 'dropped_ai_rows': 0, 'marked_ai_rows': 0}
+      - NEW's physical row must survive, sent: None memory=[(1, 'human', None, None), (3, 'human', None, None), (4, 'ai', None, None)]
+      - OLD's own draft must be gone: [(1, 'human', None, None), (3, 'human', None, None), (4, 'ai', None, None)]
+      - an ai row was left without an owner: [(1, 'human', None, None), (3, 'human', None, None), (4, 'ai', None, None)]
+FAIL V6c [WA] B (reverse order): OLD stamps under its lock while NEW stamps — two distinct owners, nobody overwritten; exactly one row survives, the sent one (residual: the stamps follow lock order between same-text rows)
+      - the two runs must own two distinct rows: old→{'draft_row_id': 2} new→{'draft_row_id': 2}
+      - a stamp was overwritten: owners={2: 'exec-new', 4: None} old→{'draft_row_id': 2} new→{'draft_row_id': 2}
+      - the cancel must drop exactly its row: old=superseded cancel={'outcome': 'superseded', 'dropped_ai_rows': 0, 'recorded': True, 'remembered': False}
+      - exactly NEW's sent row must survive: [(1, 'human', None, None), (2, 'ai', 'exec-new', 'sent'), (3, 'human', None, None), (4, 'ai', None, None)]
+      - documented residual shape changed (update the docs if it was closed): old→{'draft_row_id': 2} new→{'draft_row_id': 2}
+FAIL V6c [WA] C (one candidate): the row NEW holds is never taken over — OLD stamps nothing, its cancel deletes nothing, NEW's row goes out marked
+      - the loser must stamp nothing: new→{'draft_row_id': 2} old→{'draft_row_id': 2}
+      - NEW's row changed hands: owners={2: 'exec-old'}
+      - the send marks its row, the loser deletes nothing: record={'outcome': 'sent', 'transport_message_id': 'confirmed-new-send', 'recorded': True, 'released': True, 'dropped_ai_rows': 0, 'marked_ai_rows': 0} cancel={'outcome': 'superseded', 'dropped_ai_rows': 1, 'recorded': True, 'remembered': False}
+      - NEW's sent row must survive: [(1, 'human', None, None)]
+FAIL V6c [TG] A (review order): NEW stamps under its lock while OLD stamps — each run gets ITS OWN row; the send marks only NEW's, the cancel deletes only OLD's
+      - each run must stamp its own row: new→{'draft_row_id': 2} (row 2) old→{'draft_row_id': 2} (row 4)
+      - a stamped row changed hands: owners={2: 'exec-old', 4: None}
+      - the send must mark exactly its row: new=sent record={'outcome': 'sent', 'transport_message_id': 'confirmed-new-send', 'recorded': True, 'released': True, 'dropped_ai_rows': 0, 'marked_ai_rows': 0}
+      - NEW's physical row must survive, sent: None memory=[(1, 'human', None, None), (3, 'human', None, None), (4, 'ai', None, None)]
+      - OLD's own draft must be gone: [(1, 'human', None, None), (3, 'human', None, None), (4, 'ai', None, None)]
+      - an ai row was left without an owner: [(1, 'human', None, None), (3, 'human', None, None), (4, 'ai', None, None)]
+FAIL V6c [TG] B (reverse order): OLD stamps under its lock while NEW stamps — two distinct owners, nobody overwritten; exactly one row survives, the sent one (residual: the stamps follow lock order between same-text rows)
+      - the two runs must own two distinct rows: old→{'draft_row_id': 2} new→{'draft_row_id': 2}
+      - a stamp was overwritten: owners={2: 'exec-new', 4: None} old→{'draft_row_id': 2} new→{'draft_row_id': 2}
+      - the cancel must drop exactly its row: old=superseded cancel={'outcome': 'superseded', 'dropped_ai_rows': 0, 'recorded': True, 'remembered': False}
+      - exactly NEW's sent row must survive: [(1, 'human', None, None), (2, 'ai', 'exec-new', 'sent'), (3, 'human', None, None), (4, 'ai', None, None)]
+      - documented residual shape changed (update the docs if it was closed): old→{'draft_row_id': 2} new→{'draft_row_id': 2}
+FAIL V6c [TG] C (one candidate): the row NEW holds is never taken over — OLD stamps nothing, its cancel deletes nothing, NEW's row goes out marked
+      - the loser must stamp nothing: new→{'draft_row_id': 2} old→{'draft_row_id': 2}
+      - NEW's row changed hands: owners={2: 'exec-old'}
+      - the send marks its row, the loser deletes nothing: record={'outcome': 'sent', 'transport_message_id': 'confirmed-new-send', 'recorded': True, 'released': True, 'dropped_ai_rows': 0, 'marked_ai_rows': 0} cancel={'outcome': 'superseded', 'dropped_ai_rows': 1, 'recorded': True, 'remembered': False}
+      - NEW's sent row must survive: [(1, 'human', None, None)]
+FAIL V6c [WA] D: the checks reject the pre-fix nested min(id) statement (its race re-assigns or loses a row)
+      - EXCEPTION AssertionError: canonical Stamp Draft changed shape: update D
+FAIL V6c [WA] D: the checks reject the «min → max» statement (its race re-assigns or loses a row)
+      - EXCEPTION AssertionError: canonical Stamp Draft changed shape: update D
+
+0 pass, 8 fail
+exit=1

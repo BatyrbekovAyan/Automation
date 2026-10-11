@@ -1,0 +1,78 @@
+# V6-concurrent — AFTER (Stamp Draft: candidate picked with order by id limit 1 for update skip locked; the UPDATE re-checks every condition on the row it writes)
+# python3 Tools/n8n/tests/test_reply_memory_concurrent.py — staging Postgres 127.0.0.1:5433 (PG 16.2), two real connections, fixture schema per case; 2026-10-11T12:12:16Z
+  [WA] A: rows new=2 old=4; stamps new=2 old=4 second-waited=False; owners after both={2: 'exec-new', 4: 'exec-old'}
+  [WA] A: record_new={'outcome': 'sent', 'transport_message_id': 'confirmed-new-send', 'recorded': True, 'released': True, 'dropped_ai_rows': 0, 'marked_ai_rows': 1} cancel_old={'outcome': 'superseded', 'dropped_ai_rows': 1, 'recorded': True, 'remembered': False} memory=[(1, 'human', None, None), (2, 'ai', 'exec-new', 'sent'), (3, 'human', None, None)]
+  [WA] B: rows new=2 old=4; stamps old=2 new=4 second-waited=False; owners after both={2: 'exec-old', 4: 'exec-new'}
+  [WA] B: record_new={'outcome': 'sent', 'transport_message_id': 'confirmed-new-send', 'recorded': True, 'released': True, 'dropped_ai_rows': 0, 'marked_ai_rows': 1} cancel_old={'outcome': 'superseded', 'dropped_ai_rows': 1, 'recorded': True, 'remembered': False} memory=[(1, 'human', None, None), (3, 'human', None, None), (4, 'ai', 'exec-new', 'sent')]
+  [WA] C: row new=2; stamps new=2 old=None second-waited=False; owners after both={2: 'exec-new'}
+  [WA] C: record_new={'outcome': 'sent', 'transport_message_id': 'confirmed-new-send', 'recorded': True, 'released': True, 'dropped_ai_rows': 0, 'marked_ai_rows': 1} cancel_old={'outcome': 'superseded', 'dropped_ai_rows': 0, 'recorded': True, 'remembered': False} memory=[(1, 'human', None, None), (2, 'ai', 'exec-new', 'sent')]
+  [TG] A: rows new=2 old=4; stamps new=2 old=4 second-waited=False; owners after both={2: 'exec-new', 4: 'exec-old'}
+  [TG] A: record_new={'outcome': 'sent', 'transport_message_id': 'confirmed-new-send', 'recorded': True, 'released': True, 'dropped_ai_rows': 0, 'marked_ai_rows': 1} cancel_old={'outcome': 'superseded', 'dropped_ai_rows': 1, 'recorded': True, 'remembered': False} memory=[(1, 'human', None, None), (2, 'ai', 'exec-new', 'sent'), (3, 'human', None, None)]
+  [TG] B: rows new=2 old=4; stamps old=2 new=4 second-waited=False; owners after both={2: 'exec-old', 4: 'exec-new'}
+  [TG] B: record_new={'outcome': 'sent', 'transport_message_id': 'confirmed-new-send', 'recorded': True, 'released': True, 'dropped_ai_rows': 0, 'marked_ai_rows': 1} cancel_old={'outcome': 'superseded', 'dropped_ai_rows': 1, 'recorded': True, 'remembered': False} memory=[(1, 'human', None, None), (3, 'human', None, None), (4, 'ai', 'exec-new', 'sent')]
+  [TG] C: row new=2; stamps new=2 old=None second-waited=False; owners after both={2: 'exec-new'}
+  [TG] C: record_new={'outcome': 'sent', 'transport_message_id': 'confirmed-new-send', 'recorded': True, 'released': True, 'dropped_ai_rows': 0, 'marked_ai_rows': 1} cancel_old={'outcome': 'superseded', 'dropped_ai_rows': 0, 'recorded': True, 'remembered': False} memory=[(1, 'human', None, None), (2, 'ai', 'exec-new', 'sent')]
+  [WA] D min(id): 15 violation(s) found, e.g. ["A: each run must stamp its own row: new→{'draft_row_id': 2} (row 2) old→{'draft_row_id': 2} (row 4)", "A: a stamped row changed hands: owners={2: 'exec-old', 4: None}"]
+  [WA] D max(id): 14 violation(s) found, e.g. ["A: each run must stamp its own row: new→{'draft_row_id': 4} (row 2) old→{'draft_row_id': 4} (row 4)", "A: a stamped row changed hands: owners={2: None, 4: 'exec-old'}"]
+PASS V6c [WA] A (review order): NEW stamps under its lock while OLD stamps — each run gets ITS OWN row; the send marks only NEW's, the cancel deletes only OLD's
+PASS V6c [WA] B (reverse order): OLD stamps under its lock while NEW stamps — two distinct owners, nobody overwritten; exactly one row survives, the sent one (residual: the stamps follow lock order between same-text rows)
+PASS V6c [WA] C (one candidate): the row NEW holds is never taken over — OLD stamps nothing, its cancel deletes nothing, NEW's row goes out marked
+PASS V6c [TG] A (review order): NEW stamps under its lock while OLD stamps — each run gets ITS OWN row; the send marks only NEW's, the cancel deletes only OLD's
+PASS V6c [TG] B (reverse order): OLD stamps under its lock while NEW stamps — two distinct owners, nobody overwritten; exactly one row survives, the sent one (residual: the stamps follow lock order between same-text rows)
+PASS V6c [TG] C (one candidate): the row NEW holds is never taken over — OLD stamps nothing, its cancel deletes nothing, NEW's row goes out marked
+PASS V6c [WA] D: the checks reject the pre-fix nested min(id) statement (its race re-assigns or loses a row)
+PASS V6c [WA] D: the checks reject the «min → max» statement (its race re-assigns or loses a row)
+PASS V6c E: verify-reply-pipeline accepts the canonical Stamp Draft and rejects the unlocked / un-rechecked shapes
+
+9 pass, 0 fail
+exit=0
+
+# --- staging (n8n 2.36.7 + task runners, 127.0.0.1:5678), 2026-10-11, the fixed templates:
+# python3 Tools/n8n/staging/bootstrap.py --bot wa:stgwa001 --bot tg:stgtg001 → imported 28 + 2 staging bots, published 28
+# python3 Tools/n8n/verify-deployed.py --base http://localhost:5678 → exit 0 (every canonical OK; stgwa001/stgtg001 AT-CANONICAL, published = stored)
+# python3 Tools/n8n/staging/e2e-reply.py (full, once; the [llm] scenarios once each):
+PASS  dup_parallel_once[wa] (37s)
+PASS  dup_parallel_once[tg] (29s)
+PASS  dup_sequential_once[wa] (31s)
+PASS  dup_sequential_once[tg] (29s)
+PASS  restart_stale_claim_reclaims[wa] (33s)
+PASS  restart_stale_claim_reclaims[tg] (30s)
+PASS  two_chats_parallel_independent[wa] (28s)
+PASS  two_chats_parallel_independent[tg] (28s)
+PASS  newer_incoming_during_llm_supersedes[wa] (28s)
+PASS  newer_incoming_during_llm_supersedes[tg] (28s)
+PASS  owner_reply_before_send_cancels[wa] (28s)
+PASS  owner_reply_before_send_cancels[tg] (28s)
+PASS  auto_off_mid_flight_cancels[wa] (28s)
+PASS  auto_off_mid_flight_cancels[tg] (28s)
+PASS  typing_failure_still_sends[wa] (27s)
+PASS  typing_failure_still_sends[tg] (27s)
+PASS  expired_lock_does_not_block[wa] (27s)
+PASS  expired_lock_does_not_block[tg] (27s)
+PASS  live_lock_blocks_send[wa] (28s)
+PASS  live_lock_blocks_send[tg] (28s)
+PASS  accept_then_drop_reconciles_sent[wa] (31s)
+PASS  accept_then_drop_reconciles_sent[tg] (29s)
+PASS  send_500_is_send_failed[wa] (28s)
+PASS  send_500_is_send_failed[tg] (27s)
+PASS  send_timeout_reconciles_from_echo[wa] (60s)
+PASS  send_timeout_reconciles_from_echo[tg] (60s)
+PASS  dropped_without_echo_stays_send_unknown[wa] (30s)
+PASS  dropped_without_echo_stays_send_unknown[tg] (32s)
+PASS  reordered_webhooks_one_reply[wa] (29s)
+PASS  reordered_webhooks_one_reply[tg] (29s)
+PASS  crossed_reconcile_stays_send_unknown[wa] (13s)
+PASS  crossed_reconcile_stays_send_unknown[tg] (13s)
+PASS  same_second_peer_after_final_fetch[wa] (49s)
+PASS  same_second_peer_after_final_fetch[tg] (49s)
+PASS  same_second_peer_wappi_lists_older[wa] (39s)
+PASS  same_second_peer_wappi_lists_older[tg] (39s)
+PASS  unmarked_echo_stays_send_unknown[wa] (13s)
+PASS  unmarked_echo_stays_send_unknown[tg] (13s)
+PASS  owner_app_same_text_stays_send_unknown[wa] (13s)
+PASS  owner_app_same_text_stays_send_unknown[tg] (13s)
+PASS  media_message_gets_the_ru_ask_for_text[wa] (9s)
+PASS  media_message_gets_the_ru_ask_for_text[tg] (9s)
+PASS  price_conflict_reaches_the_agent_marked [llm][wa] (32s)
+PASS  price_conflict_reaches_the_agent_marked [llm][tg] (32s)
+44 pass, 0 fail
