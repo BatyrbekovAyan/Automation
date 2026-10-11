@@ -37,7 +37,9 @@ with the compensating DELETE succeeding and failing.
 """
 import copy
 import json
+import os
 import subprocess
+import tempfile
 
 from harness import N8N, Case, PgSession, bind, expr, module, node, report, wf
 
@@ -80,12 +82,15 @@ def row(pg, pid):
 
 
 def drive(w, scenarios):
-    tmp = N8N / 'tests' / '.r8-wf.json'
-    tmp.write_text(json.dumps(w), encoding='utf-8')
+    """Run the driver over graph `w`. The graph goes through a temp file of ITS OWN (unique per call, outside the
+    repo, removed afterwards) — never a fixed path: concurrent runs of this file would read or unlink each other's."""
+    fd, tmp = tempfile.mkstemp(prefix='r8-wf-', suffix='.json')
     try:
-        r = subprocess.run(['node', str(DRIVER), str(tmp)], input=json.dumps(scenarios), text=True, capture_output=True)
+        with os.fdopen(fd, 'w', encoding='utf-8') as f:
+            json.dump(w, f)
+        r = subprocess.run(['node', str(DRIVER), tmp], input=json.dumps(scenarios), text=True, capture_output=True)
     finally:
-        tmp.unlink()
+        os.unlink(tmp)
     if r.returncode != 0:
         raise RuntimeError('driver failed: ' + r.stderr.strip()[-2000:])
     return json.loads(r.stdout)
@@ -263,5 +268,41 @@ for ch, (fname, field) in CREATES.items():
                 c.check(False, f'{label}: the tripwire accepted it')
             except AssertionError:
                 pass
+
+# F (isolation, 2026-10-11): two runs of this file at once (run_all in two shells) shared ONE fixed temp path for the
+# graph handed to the driver — one run read the other's workflow or lost its file to the other's unlink (seen twice).
+# Every drive() writes its own temp file now; concurrent drives of the WA and TG graphs must each see their own graph.
+with Case('R8 F: concurrent drives of the WA and TG graphs each run their own graph (no shared temp file)') as c:
+    import threading
+    graphs = {ch: (wf(fname), field) for ch, (fname, field) in CREATES.items()}
+    host = {'WA': 'https://wappi.pro/api/', 'TG': 'https://wappi.pro/tapi/'}
+    for rnd in range(3):
+        jobs = [ch for ch in graphs for _ in range(3)]
+        gate_ = threading.Barrier(len(jobs))
+        out = [None] * len(jobs)
+
+        def go(i, ch):
+            w, field = graphs[ch]
+            sc = {'semi:ok': scenarios(field, ENTRIES['register'][1], ENTRIES['register'][0])['semi:ok']}
+            gate_.wait()
+            try:
+                out[i] = drive(w, sc)['semi:ok']
+            except Exception as e:      # a lost or swapped file surfaces here as a driver/unlink failure
+                out[i] = e
+        ts = [threading.Thread(target=go, args=(i, ch)) for i, ch in enumerate(jobs)]
+        for t in ts:
+            t.start()
+        for t in ts:
+            t.join()
+        for i, ch in enumerate(jobs):
+            r = out[i]
+            if isinstance(r, Exception):
+                c.check(False, f'round {rnd} {ch}#{i}: {type(r).__name__}: {str(r)[:300]}')
+                continue
+            hook = touched(r, 'Set Wappi Webhook')
+            c.check(len(hook) == 1 and hook[0]['url'].startswith(host[ch]),
+                    f'round {rnd} {ch}#{i}: ran another graph (Set Wappi Webhook={[e["url"] for e in hook]})')
+    stray = N8N / 'tests' / '.r8-wf.json'
+    c.check(not stray.exists(), f'a temp graph was left in the repo: {stray}')
 
 report()
