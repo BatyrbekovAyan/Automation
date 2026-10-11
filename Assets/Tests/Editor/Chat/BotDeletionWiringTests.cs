@@ -1,7 +1,11 @@
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text.RegularExpressions;
 using Newtonsoft.Json.Linq;
 using NUnit.Framework;
+using TMPro;
+using UnityEditor;
 using UnityEngine;
 
 /// <summary>
@@ -127,6 +131,105 @@ public class BotDeletionWiringTests
         Assert.Greater(successNodes, 0, $"{workflowFile}: no success answer found");
     }
 
+    // C1b: the 4xx answers a deleting webhook can give — the client reads a 4xx as a refusal only with one of these
+    // bodies. Every responder whose status can be a 4xx (other than 401, a session fault) must be one of these known
+    // nodes; a new one fails here until the client is taught it, instead of reading as a retry forever.
+    private static readonly HashSet<string> KnownRefusalResponders = new HashSet<string>
+        { "Respond Owner Refused", "Respond 401", "Respond Rejected", "Respond Forbidden" };
+
+    [TestCase("lmjYsdNcQA2IE5rl-Delete_Bot_Files.json")]
+    [TestCase("0DP79STI3pafXO9B-Set_Workflow_State.json")]
+    public void ServerCanon_EveryRefusalItSends_IsReadAsARefusal(string workflowFile)
+    {
+        var workflow = Canon(workflowFile);
+        int refusals = 0;
+        foreach (var node in workflow["nodes"])
+        {
+            if ((string)node["type"] != "n8n-nodes-base.respondToWebhook") continue;
+            string name = (string)node["name"];
+            string status = node["parameters"]?["options"]?["responseCode"]?.ToString() ?? "";
+            if (!Regex.IsMatch(status, @"(?<!\d)4(?!01)\d\d(?!\d)")) continue;
+            Assert.IsTrue(KnownRefusalResponders.Contains(name),
+                $"{workflowFile} «{name}» can answer a 4xx ({status}) the client does not know — teach BotServerDeletion its body");
+            refusals += AssertRefusalsOf(workflow, workflowFile, name, status, (string)node["parameters"]["responseBody"]);
+        }
+        Assert.Greater(refusals, 0, $"{workflowFile}: no refusal found");
+    }
+
+    /// <summary>Checks one known refusal responder's bodies against the client; returns how many bodies it checked.</summary>
+    private static int AssertRefusalsOf(JObject workflow, string file, string name, string status, string body)
+    {
+        switch (name)
+        {
+            case "Respond Owner Refused":
+            {
+                // Delete Ownership: allowed=false → 403 forbidden + its reason; a DB fault → 503 db_unavailable.
+                StringAssert.Contains("=== false ? 403 : 503", status, $"{file} «{name}»");
+                StringAssert.Contains("=== false ? \"forbidden\" : \"db_unavailable\"", body, $"{file} «{name}»");
+                StringAssert.Contains("($json.reason || \"unproven\")", body, $"{file} «{name}»");
+                var reasons = new HashSet<string>();
+                foreach (Match m in Regex.Matches(NodeParameter(workflow, "Delete Ownership", "query"), @"then '(\w+)'"))
+                    if (m.Groups[1].Value != "ok") reasons.Add(m.Groups[1].Value);
+                CollectionAssert.AreEquivalent(new[] { BotServerDeletion.ReasonOwnedElsewhere, BotServerDeletion.ReasonUnproven }, reasons,
+                    $"{file}: Delete Ownership's refusal reasons");
+                foreach (string reason in reasons)
+                    AssertRefused(403, $"{{\"success\":false,\"error\":\"forbidden\",\"reason\":\"{reason}\"}}", reason);
+                AssertRetry(403, "{\"success\":false,\"error\":\"db_unavailable\",\"reason\":null}");
+                return reasons.Count;
+            }
+            case "Respond 401":
+            {
+                // The gate: 'forbidden:<field>' → 403, 'unauthorized:<why>' → 401 (a session fault, retried by status).
+                StringAssert.Contains("startsWith('forbidden') ? 403 : 401", status, $"{file} «{name}»");
+                StringAssert.Contains("\"error\": \"unauthorized\", \"reason\": $json.crAuth.reason", body, $"{file} «{name}»");
+                StringAssert.Contains("deny = 'forbidden:' + f", NodeParameter(workflow, "Auth Gate", "jsCode"), $"{file}: the gate's refusal reason");
+                AssertRefused(403, "{\"success\":false,\"error\":\"unauthorized\",\"reason\":\"forbidden:workflowId\"}", BotServerDeletion.ReasonUnproven);
+                return 1;
+            }
+            case "Respond Rejected":
+            {
+                // Set Workflow State's Validate: a malformed id/action or a protected infra id — 400, final.
+                Assert.AreEqual("400", status, $"{file} «{name}»");
+                StringAssert.Contains("\"error\": $json.error", body, $"{file} «{name}»");
+                var errors = new HashSet<string>();
+                foreach (Match m in Regex.Matches(NodeParameter(workflow, "Validate", "jsCode"), @"error: '(\w+)'"))
+                    errors.Add(m.Groups[1].Value);
+                Assert.IsNotEmpty(errors, $"{file}: Validate names no error");
+                foreach (string error in errors)
+                    AssertRefused(400, $"{{\"success\":false,\"error\":\"{error}\"}}", BotServerDeletion.ReasonUnproven);
+                return errors.Count;
+            }
+            default:
+            {
+                // A literal body (Respond Forbidden): the exact JSON the client receives.
+                string literal = Regex.Match(body, @"^=\{\{\s*(\{.*\})\s*\}\}$", RegexOptions.Singleline).Groups[1].Value;
+                Assert.IsNotEmpty(literal, $"{file} «{name}»: expected a literal body, got {body}");
+                AssertRefused(int.Parse(status), JObject.Parse(literal).ToString(), BotServerDeletion.ReasonUnproven);
+                return 1;
+            }
+        }
+    }
+
+    private static void AssertRefused(long code, string body, string reason)
+    {
+        Assert.AreEqual(BotServerDeletion.Step.Refused, BotServerDeletion.ClassifyServerDelete(code, body), $"{code} {body}");
+        Assert.AreEqual(reason, BotServerDeletion.Combine(new[] { (BotServerDeletion.Step.Refused, body) }).Reason, body);
+    }
+
+    private static void AssertRetry(long code, string body) =>
+        Assert.AreEqual(BotServerDeletion.Step.Transient, BotServerDeletion.ClassifyServerDelete(code, body), $"{code} {body}");
+
+    private static JObject Canon(string workflowFile) =>
+        JObject.Parse(File.ReadAllText(Path.Combine(Application.dataPath, "..", "Tools", "n8n", "workflows", workflowFile)));
+
+    private static string NodeParameter(JObject workflow, string node, string parameter)
+    {
+        foreach (var n in workflow["nodes"])
+            if ((string)n["name"] == node) return (string)n["parameters"]?[parameter] ?? "";
+        Assert.Fail($"node «{node}» not found");
+        return null;
+    }
+
     [Test]
     public void ServerCanon_ACloneAlreadyGone_IsConfirmed_NotRefused()
     {
@@ -185,47 +288,122 @@ public class BotDeletionWiringTests
     {
         // ConfirmCardFitter grows the card by the texts' overflow and so PRESERVES the authored body-to-button gap —
         // including a negative one (the DeleteChatConfirmPanel lesson). Check that gap from the prefab itself.
-        string prefab = File.ReadAllText("Assets/Prefabs/BotSettings.prefab");
-        float cardH = Rect(prefab, "Content", "DeleteBotConfirmPopup").size.y;
-        var body = Rect(prefab, "Body", "Content");
-        var button = Rect(prefab, "ConfirmButton", "Content");
+        // Resolved by PATH from the popup (C1b): «Content/Body» alone named the first of SIX confirm popups in this prefab
+        // that have one — ConfirmChangeWhatsappNumberPopup, whose 180u body made the gap read 72u instead of the real 32u.
+        string prefab = File.ReadAllText(BotSettingsPrefab);
+        float cardH = RectAt(prefab, DeletePopup, "Content").size.y;
+        var body = RectAt(prefab, DeletePopup, "Content", "Body");
         float bodyBottomFromTop = -body.pos.y + body.size.y;
-        float buttonTopFromTop = cardH - (button.pos.y + button.size.y);
-        Assert.GreaterOrEqual(buttonTopFromTop - bodyBottomFromTop, 24f,
-            $"DeleteBotConfirmPopup: Body ends at {bodyBottomFromTop}u, buttons start at {buttonTopFromTop}u (card {cardH}u)");
+        foreach (string buttonName in new[] { "ConfirmButton", "CancelButton" })
+        {
+            var button = RectAt(prefab, DeletePopup, "Content", buttonName);
+            float buttonTopFromTop = cardH - (button.pos.y + button.size.y);
+            Assert.GreaterOrEqual(buttonTopFromTop - bodyBottomFromTop, 24f,
+                $"{DeletePopup}: Body ends at {bodyBottomFromTop}u, {buttonName} starts at {buttonTopFromTop}u (card {cardH}u)");
+        }
     }
 
-    private struct RectInfo { public Vector2 pos, size; }
-
-    /// <summary>The RectTransform of the GameObject named <paramref name="name"/> whose parent is named <paramref name="parent"/>.</summary>
-    private static RectInfo Rect(string yaml, string name, string parent)
+    [Test]
+    public void DeletePopup_EveryStatesBody_FitsItsAuthoredBox()
     {
-        var docs = Regex.Split(yaml, @"^--- !u!", RegexOptions.Multiline);
-        string goId = null, rectOfParent = null;
-        foreach (var d in docs)
+        // The popup is re-used for Ask / Retry / Refused and ConfirmCardFitter grows the card for a longer body — but the
+        // server-state copy is the app's own, so it is held to the authored box: no state needs the growth, and a copy
+        // change that would need it fails here first (measured with the real font, size and column of the prefab).
+        string prefab = File.ReadAllText(BotSettingsPrefab);
+        float cardW = RectAt(prefab, DeletePopup, "Content").size.x;
+        var box = RectAt(prefab, DeletePopup, "Content", "Body");
+        Assert.AreEqual(0f, box.anchorMin.x, "the body stretches across the card");
+        Assert.AreEqual(1f, box.anchorMax.x, "the body stretches across the card");
+        float width = cardW + box.size.x;
+        var (fontGuid, fontSize) = TextStyle(prefab, box.goId);
+        var font = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(AssetDatabase.GUIDToAssetPath(fontGuid));
+        Assert.IsNotNull(font, $"the body's font (guid {fontGuid})");
+
+        var canvas = new GameObject("Canvas", typeof(Canvas), typeof(RectTransform));
+        try
         {
-            if (!d.StartsWith("1 &")) continue;
-            var nm = Regex.Match(d, @"m_Name: (.*)");
-            if (!nm.Success || nm.Groups[1].Value.Trim() != parent) continue;
-            string pid = Regex.Match(d, @"^1 &(\d+)").Groups[1].Value;
-            foreach (var r in docs)
-                if (r.StartsWith("224 &") && r.Contains($"m_GameObject: {{fileID: {pid}}}"))
-                    rectOfParent = Regex.Match(r, @"^224 &(\d+)").Groups[1].Value;
-            if (rectOfParent == null) continue;
-            foreach (var r in docs)
+            var textGo = new GameObject("Body", typeof(RectTransform));
+            textGo.transform.SetParent(canvas.transform, false);
+            var tmp = textGo.AddComponent<TextMeshProUGUI>();
+            tmp.font = font;
+            tmp.fontSize = fontSize;
+            tmp.textWrappingMode = TextWrappingModes.Normal;
+            tmp.rectTransform.sizeDelta = new Vector2(width, box.size.y);
+            foreach (var (state, text) in new[]
+                     {
+                         ("Retry", BotDeletionCopy.RetryBody),
+                         ("Refused unproven", BotDeletionCopy.RefusedBody(BotServerDeletion.ReasonUnproven)),
+                         ("Refused owned_elsewhere", BotDeletionCopy.RefusedBody(BotServerDeletion.ReasonOwnedElsewhere)),
+                     })
             {
-                if (!r.StartsWith("224 &") || !r.Contains($"m_Father: {{fileID: {rectOfParent}}}")) continue;
-                string g = Regex.Match(r, @"m_GameObject: \{fileID: (\d+)\}").Groups[1].Value;
-                foreach (var gd in docs)
-                    if (gd.StartsWith($"1 &{g}") && Regex.Match(gd, @"m_Name: (.*)").Groups[1].Value.Trim() == name)
-                    {
-                        goId = g;
-                        return new RectInfo { pos = Vec(r, "m_AnchoredPosition"), size = Vec(r, "m_SizeDelta") };
-                    }
+                tmp.text = text;
+                float height = tmp.GetPreferredValues(width, 32767f).y;
+                Assert.Greater(height, fontSize, $"{state}: nothing was measured");
+                Assert.LessOrEqual(height, box.size.y, $"{state}: «{text}» needs {height}u in a {width}×{box.size.y}u box");
             }
         }
-        Assert.Fail($"{parent}/{name} not found in the prefab (goId {goId})");
+        finally
+        {
+            Object.DestroyImmediate(canvas);
+        }
+    }
+
+    /// <summary>The font guid and size of the TMP on the GameObject <paramref name="goId"/>.</summary>
+    private static (string guid, float size) TextStyle(string yaml, string goId)
+    {
+        foreach (var d in Regex.Split(yaml, @"^--- !u!", RegexOptions.Multiline))
+        {
+            if (!d.StartsWith("114 &") || !d.Contains($"m_GameObject: {{fileID: {goId}}}") || !d.Contains("m_fontAsset:")) continue;
+            string guid = Regex.Match(d, @"m_fontAsset: \{fileID: \d+, guid: (\w+)").Groups[1].Value;
+            float size = float.Parse(Regex.Match(d, @"m_fontSize: ([\d.]+)").Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture);
+            return (guid, size);
+        }
+        Assert.Fail($"GameObject {goId}: no TextMeshPro component");
         return default;
+    }
+
+    private struct RectInfo { public Vector2 pos, size, anchorMin, anchorMax; public string goId; }
+
+    private const string BotSettingsPrefab = "Assets/Prefabs/BotSettings.prefab";
+    private const string DeletePopup = "DeleteBotConfirmPopup";
+
+    /// <summary>
+    /// The RectTransform at <paramref name="path"/>: a GameObject name that is unique in the prefab, then child names,
+    /// each of which must name exactly one child. A bare «parent/child» pair is ambiguous here — six confirm popups in
+    /// BotSettings.prefab have a «Content/Body».
+    /// </summary>
+    private static RectInfo RectAt(string yaml, params string[] path)
+    {
+        var names = new Dictionary<string, string>();                                 // GameObject fileID → m_Name
+        var rects = new Dictionary<string, (string go, string father, string doc)>(); // RectTransform fileID → …
+        foreach (var d in Regex.Split(yaml, @"^--- !u!", RegexOptions.Multiline))
+        {
+            var head = Regex.Match(d, @"^(\d+) &(\d+)");
+            if (!head.Success) continue;
+            if (head.Groups[1].Value == "1")
+                names[head.Groups[2].Value] = Regex.Match(d, @"m_Name: (.*)").Groups[1].Value.Trim();
+            else if (head.Groups[1].Value == "224")
+                rects[head.Groups[2].Value] = (Regex.Match(d, @"m_GameObject: \{fileID: (\d+)\}").Groups[1].Value,
+                                               Regex.Match(d, @"m_Father: \{fileID: (\d+)\}").Groups[1].Value, d);
+        }
+        string NameOf(string rect) => names.TryGetValue(rects[rect].go, out var n) ? n : null;
+
+        var matches = rects.Keys.Where(r => NameOf(r) == path[0]).ToList();
+        Assert.AreEqual(1, matches.Count, $"«{path[0]}» must name exactly one object in the prefab");
+        string current = matches[0];
+        for (int i = 1; i < path.Length; i++)
+        {
+            string parent = current;
+            matches = rects.Keys.Where(r => rects[r].father == parent && NameOf(r) == path[i]).ToList();
+            Assert.AreEqual(1, matches.Count, $"{string.Join("/", path, 0, i + 1)}: expected exactly one");
+            current = matches[0];
+        }
+        string doc = rects[current].doc;
+        return new RectInfo
+        {
+            pos = Vec(doc, "m_AnchoredPosition"), size = Vec(doc, "m_SizeDelta"),
+            anchorMin = Vec(doc, "m_AnchorMin"), anchorMax = Vec(doc, "m_AnchorMax"), goId = rects[current].go,
+        };
     }
 
     private static Vector2 Vec(string doc, string key)

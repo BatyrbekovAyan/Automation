@@ -5,9 +5,11 @@ using UnityEngine;
 // BotSettingsDeleteBotPopupBuilder); its confirm asks the SERVER first (Manager.DeleteBotOnServer) and the bot leaves
 // the phone only on that verdict — V12 (iteration 2026-09-28; owner decision 2026-10-07):
 //   * Done / NothingOnServer → the bot goes (FinishDeleteLocally);
-//   * Retry (no connection, a server/database fault) → the bot stays; the same popup says so and offers «Повторить»;
-//   * Refused (the server's final word: another install owns it, or it cannot be proven this install's) → the bot
-//     stays; the popup tells where the data stays and offers «Удалить только с телефона», which removes it locally.
+//   * Retry (no confirmation came: no connection, a server/database fault, an answer that is neither the server's
+//     `success: true` nor its refusal body — C1/C1b) → the bot stays; the same popup says so and offers «Повторить»;
+//   * Refused (the server's final word, a 4xx carrying its refusal body: another install owns it, or it cannot be
+//     proven this install's) → the bot stays; the popup tells where the data stays and offers «Удалить только с
+//     телефона», which removes it locally.
 // The popup is re-used for all three states: its texts are swapped and the card is fitted to them after Show
 // (ConfirmCardFitter — the prefab's authored body-to-button clearance is pinned by BotDeletionWiringTests).
 public partial class BotSettings

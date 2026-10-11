@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -77,16 +78,30 @@ public static class BotServerDeletion
     /// Files' «Respond», reached only past «Deletion Settled?»; Set Workflow State's «Respond OK», which also answers a
     /// clone the n8n API no longer has — the server turns that 404 into this 200). Any other 2xx — an empty body, not
     /// JSON, <c>{}</c>, n8n's own «Workflow executed successfully» for a run that ended before its Respond node, an
-    /// explicit <c>success:false</c> — proves nothing (C1, review 2026-10-09): it is a retry, the bot stays. Never a
-    /// refusal: the server named no reason, and both steps are idempotent, so retrying a deletion that did happen costs
-    /// one round trip. A 4xx is the server's final word.
+    /// explicit <c>success:false</c> — proves nothing (C1, review 2026-10-09): it is a retry, the bot stays.
+    /// A step is REFUSED only on the server's own refusal (C1b, 2026-10-11): a 4xx whose body is that refusal
+    /// (<see cref="IsServerRefusal"/>). A 4xx without it — n8n's 404 for a webhook that is not registered (the workflow
+    /// is off), a proxy's 403 page, an empty body — is a failure, not a decision: a retry, like any other answer that is
+    /// neither the positive word nor the refusal. Both steps are idempotent, so a retry costs one round trip.
     /// </summary>
     public static Step ClassifyServerDelete(long code, string body)
     {
         if (IsTransient(code)) return Step.Transient;
         if (code >= 200 && code < 300) return ConfirmsSuccess(body) ? Step.Ok : Step.Transient;
-        return Step.Refused;
+        return code >= 400 && code < 500 && IsServerRefusal(body) ? Step.Refused : Step.Transient;
     }
+
+    /// <summary>
+    /// The <c>error</c> words the two deleting webhooks refuse with: Delete Ownership's «forbidden» (with its reason),
+    /// Set Workflow State's Validate — «bad_request» (a malformed id/action), «protected_workflow» (an infra id). The
+    /// faults those webhooks also name (db_unavailable, delete_failed, storage_unavailable…) are deliberately absent:
+    /// they travel with a 5xx and are retries whatever their status. BotDeletionWiringTests reads every 4xx answer of
+    /// both canonical workflows and fails on one this set (or <see cref="IsRefusalReason"/>) does not cover.
+    /// </summary>
+    private static readonly HashSet<string> RefusalErrors = new HashSet<string> { "forbidden", "bad_request", "protected_workflow" };
+
+    /// <summary>The auth gate's refusal reason: <c>forbidden:&lt;field&gt;</c> — a body field the token does not own.</summary>
+    private const string GateRefusalPrefix = "forbidden:";
 
     private static readonly JsonLoadSettings StrictLoad = new JsonLoadSettings
     {
@@ -94,17 +109,48 @@ public static class BotServerDeletion
     };
 
     /// <summary>True only for a JSON object whose own <c>success</c> is the boolean true; a repeated key is ambiguous.</summary>
-    private static bool ConfirmsSuccess(string body)
+    private static bool ConfirmsSuccess(string body) => SuccessFlagIs(ParseObject(body), true);
+
+    /// <summary>
+    /// Our server's refusal: a JSON object whose own <c>success</c> is the boolean false and that names a refusal —
+    /// an <c>error</c> from <see cref="RefusalErrors"/> or a refusal <c>reason</c>. Anything else (n8n's own error
+    /// envelope, a proxy page, a fault word) proves no decision was made.
+    /// </summary>
+    private static bool IsServerRefusal(string body)
     {
-        if (string.IsNullOrWhiteSpace(body)) return false;
+        JObject answer = ParseObject(body);
+        return SuccessFlagIs(answer, false) && (IsRefusalError(answer["error"]) || IsRefusalReason(answer["reason"]));
+    }
+
+    private static bool IsRefusalError(JToken error) =>
+        error != null && error.Type == JTokenType.String && RefusalErrors.Contains(error.Value<string>());
+
+    /// <summary>Delete Ownership's <see cref="ReasonOwnedElsewhere"/> / <see cref="ReasonUnproven"/>, or the gate's <c>forbidden:&lt;field&gt;</c>.</summary>
+    private static bool IsRefusalReason(JToken reason)
+    {
+        if (reason == null || reason.Type != JTokenType.String) return false;
+        string text = reason.Value<string>();
+        return text == ReasonOwnedElsewhere || text == ReasonUnproven
+               || (text.Length > GateRefusalPrefix.Length && text.StartsWith(GateRefusalPrefix, StringComparison.Ordinal));
+    }
+
+    private static bool SuccessFlagIs(JObject answer, bool expected)
+    {
+        JToken flag = answer?["success"];
+        return flag != null && flag.Type == JTokenType.Boolean && flag.Value<bool>() == expected;
+    }
+
+    /// <summary>The body as a JSON object; null for no body, not JSON, not an object, or a repeated key.</summary>
+    private static JObject ParseObject(string body)
+    {
+        if (string.IsNullOrWhiteSpace(body)) return null;
         try
         {
-            JToken flag = JObject.Parse(body, StrictLoad)["success"];
-            return flag != null && flag.Type == JTokenType.Boolean && flag.Value<bool>();
+            return JObject.Parse(body, StrictLoad);
         }
         catch (JsonException)
         {
-            return false;
+            return null;
         }
     }
 
@@ -148,11 +194,14 @@ public static class BotServerDeletion
 /// <summary>
 /// V12: the copy of a refused or failed bot deletion (RU only, every glyph in the static SF Pro atlases — pinned by
 /// FontGlyphCoverageTests). The texts are honest about where the data stays.
+/// The retry texts (C1b, 2026-10-11) say only what holds for EVERY retry — no connection, a 5xx, a session the refresh
+/// did not cure, a 2xx without the positive word, a 4xx without the refusal: no confirmation came and the bot is still
+/// on the phone. They do not open with «Сервер не подтвердил» — that is how the refusal texts read.
 /// </summary>
 public static class BotDeletionCopy
 {
     public const string RetryTitle = "Не удалось удалить бота";
-    public const string RetryBody = "Нет связи с сервером. Бот не удалён — попробуйте ещё раз.";
+    public const string RetryBody = "Подтверждение удаления от сервера не получено. Бот остался на телефоне — попробуйте ещё раз.";
     public const string RetryAction = "Повторить";
     public const string RefusedTitle = "Удаление не подтверждено";
     public const string RefusedBodyUnproven =
@@ -161,7 +210,7 @@ public static class BotDeletionCopy
         "Бот подключён на другом устройстве — данные на сервере принадлежат тому устройству и останутся там.";
     public const string PhoneOnlyAction = "Удалить только с телефона";
     public const string WipeRetryTitle = "Не удалось удалить все данные";
-    public const string WipeRetryBody = "Нет связи с сервером. Часть данных не удалена — попробуйте ещё раз.";
+    public const string WipeRetryBody = "Подтверждение удаления от сервера не получено. Часть данных не удалена — попробуйте ещё раз.";
 
     public static string RefusedBody(string reason) =>
         reason == BotServerDeletion.ReasonOwnedElsewhere ? RefusedBodyElsewhere : RefusedBodyUnproven;

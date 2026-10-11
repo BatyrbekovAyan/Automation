@@ -123,16 +123,79 @@ public class BotServerDeletionPolicyTests
         Assert.IsTrue(all.RemovesBot);
     }
 
-    [Test]
-    public void A4xx_StaysTheServersFinalWord_WhateverItsBody()
+    // C1b (2026-10-11, the C1 remainder): a 4xx counted as the server's final word whatever its body — so n8n's own 404
+    // for a webhook that is not registered (the workflow switched off), a proxy's 403 page or an empty 403 ended in
+    // «Сервер не подтвердил, что бот ваш» and the «Удалить только с телефона» exit, although the server had decided
+    // nothing. A refusal is a 4xx that carries OUR server's refusal body: a JSON object with the boolean
+    // `"success": false` and an `error` / `reason` the two deleting webhooks refuse with (BotDeletionWiringTests reads
+    // them from the canon). Any other 4xx (and any other non-2xx) proves nothing: a retry, the bot stays.
+    private const string WebhookNotRegistered =
+        "{\"code\":404,\"message\":\"The requested webhook \\\"POST DeleteBotFiles\\\" is not registered.\"," +
+        "\"hint\":\"The workflow must be active for a production URL to run successfully.\"}";
+
+    [TestCase(404, WebhookNotRegistered, TestName = "404 n8n webhook not registered")]
+    [TestCase(404, "", TestName = "404 empty")]
+    [TestCase(403, "", TestName = "403 empty")]
+    [TestCase(403, null, TestName = "403 null")]
+    [TestCase(403, "<html>forbidden</html>", TestName = "403 proxy page")]
+    [TestCase(403, "{}", TestName = "403 empty object")]
+    [TestCase(403, "{\"success\":false}", TestName = "403 success false without error or reason")]
+    [TestCase(403, "{\"success\":false,\"error\":\"\",\"reason\":\"\"}", TestName = "403 blank error and reason")]
+    [TestCase(403, "{\"success\":false,\"error\":\"db_unavailable\",\"reason\":null}", TestName = "403 db fault body")]
+    [TestCase(400, "{\"success\":false,\"error\":\"delete_failed\"}", TestName = "400 delete_failed")]
+    [TestCase(400, "{\"success\":false,\"error\":\"storage_unavailable\"}", TestName = "400 storage_unavailable")]
+    [TestCase(403, "{\"success\":false,\"error\":\"unauthorized\",\"reason\":\"unauthorized:expired\"}", TestName = "403 a session fault")]
+    [TestCase(403, "{\"success\":false,\"error\":\"unauthorized\",\"reason\":\"forbidden:\"}", TestName = "403 gate prefix without a field")]
+    [TestCase(403, "{\"error\":\"forbidden\",\"reason\":\"owned_elsewhere\"}", TestName = "403 refusal words without success false")]
+    [TestCase(403, "{\"success\":\"false\",\"error\":\"forbidden\",\"reason\":\"owned_elsewhere\"}", TestName = "403 success as a string")]
+    [TestCase(403, "{\"success\":0,\"error\":\"forbidden\"}", TestName = "403 success as a number")]
+    [TestCase(403, "{\"success\":false,\"error\":\"Forbidden\"}", TestName = "403 another case of the error")]
+    [TestCase(403, "{\"success\":false,\"error\":[\"forbidden\"]}", TestName = "403 error as an array")]
+    [TestCase(403, "{\"data\":{\"success\":false,\"error\":\"forbidden\"}}", TestName = "403 refusal nested")]
+    [TestCase(403, "[{\"success\":false,\"error\":\"forbidden\"}]", TestName = "403 refusal in an array")]
+    [TestCase(403, "{\"success\":false,\"error\":\"forbidden\",\"success\":false}", TestName = "403 repeated key")]
+    [TestCase(403, "{\"success\":false,\"error\":\"forbidden\"", TestName = "403 truncated refusal")]
+    [TestCase(400, "{\"success\":true}", TestName = "400 with the success word")]
+    [TestCase(409, "{\"message\":\"conflict\"}", TestName = "409 foreign body")]
+    [TestCase(413, "<html>Request Entity Too Large</html>", TestName = "413 proxy page")]
+    [TestCase(302, "", TestName = "302 redirect")]
+    public void A4xxWithoutTheServersRefusal_IsARetry_NeverARefusal(long code, string body)
     {
-        // C1 changes only the 2xx side: a 4xx is still a refusal, its reason read from the body when there is one.
-        Assert.AreEqual(BotServerDeletion.Step.Refused, BotServerDeletion.ClassifyServerDelete(403, "<html>forbidden</html>"));
-        Assert.AreEqual(BotServerDeletion.Step.Refused, BotServerDeletion.ClassifyServerDelete(403, ""));
-        Assert.AreEqual(BotServerDeletion.Step.Refused, BotServerDeletion.ClassifyServerDelete(400, WorkflowStateOk));
-        var unreadable = BotServerDeletion.Combine(new[] { (BotServerDeletion.ClassifyServerDelete(403, ""), "") });
-        Assert.AreEqual(BotServerDeletion.Verdict.Refused, unreadable.Verdict);
-        Assert.AreEqual(BotServerDeletion.ReasonUnproven, unreadable.Reason);
+        var step = BotServerDeletion.ClassifyServerDelete(code, body);
+        Assert.AreEqual(BotServerDeletion.Step.Transient, step, $"{code} «{body}» is not the server's refusal");
+        var outcome = BotServerDeletion.Combine(new[] { (BotServerDeletion.Step.Ok, ""), (step, body) });
+        Assert.AreEqual(BotServerDeletion.Verdict.Retry, outcome.Verdict, "no phone-only exit without the server's own refusal");
+        Assert.IsFalse(outcome.RemovesBot, "the bot must stay on the phone");
+    }
+
+    [TestCase(403, "{\"success\":false,\"error\":\"forbidden\",\"reason\":\"owned_elsewhere\"}", BotServerDeletion.ReasonOwnedElsewhere,
+              TestName = "403 Delete Ownership owned_elsewhere")]
+    [TestCase(403, "{\"success\":false,\"error\":\"forbidden\",\"reason\":\"unproven\"}", BotServerDeletion.ReasonUnproven,
+              TestName = "403 Delete Ownership unproven")]
+    [TestCase(403, "{\"success\":false,\"error\":\"unauthorized\",\"reason\":\"forbidden:workflowId\"}", BotServerDeletion.ReasonUnproven,
+              TestName = "403 the gate's forbidden field")]
+    [TestCase(400, "{\"success\":false,\"error\":\"bad_request\"}", BotServerDeletion.ReasonUnproven,
+              TestName = "400 Set Workflow State bad_request")]
+    [TestCase(400, "{\"success\":false,\"error\":\"protected_workflow\"}", BotServerDeletion.ReasonUnproven,
+              TestName = "400 Set Workflow State protected_workflow")]
+    [TestCase(403, " {\n \"success\" : false , \"error\" : \"forbidden\" , \"reason\" : \"owned_elsewhere\" }\n", BotServerDeletion.ReasonOwnedElsewhere,
+              TestName = "403 refusal with whitespace")]
+    public void OnlyTheServersRefusalBody_IsARefusal(long code, string body, string reason)
+    {
+        var step = BotServerDeletion.ClassifyServerDelete(code, body);
+        Assert.AreEqual(BotServerDeletion.Step.Refused, step, $"{code} «{body}» is the server's final word");
+        var outcome = BotServerDeletion.Combine(new[] { (BotServerDeletion.Step.Ok, ""), (step, body) });
+        Assert.AreEqual(BotServerDeletion.Verdict.Refused, outcome.Verdict);
+        Assert.AreEqual(reason, outcome.Reason);
+        Assert.IsFalse(outcome.RemovesBot, "a refusal keeps the bot until the owner chooses the phone-only exit");
+    }
+
+    [Test]
+    public void ARefusalBody_UnderASessionFault_IsStillARetry()
+    {
+        // 401 = a session the one refresh did not cure: whatever the body says, the next attempt may succeed.
+        Assert.AreEqual(BotServerDeletion.Step.Transient, BotServerDeletion.ClassifyServerDelete(401, Elsewhere));
+        Assert.AreEqual(BotServerDeletion.Step.Transient, BotServerDeletion.ClassifyServerDelete(503, Unproven));
     }
 
     [Test]
@@ -154,6 +217,25 @@ public class BotServerDeletionPolicyTests
         StringAssert.DoesNotContain("поддержк", BotDeletionCopy.RefusedBody(BotServerDeletion.ReasonOwnedElsewhere),
             "another install's data is not something support should delete on this owner's request");
         Assert.AreEqual("Удалить только с телефона", BotDeletionCopy.PhoneOnlyAction);
+    }
+
+    [Test]
+    public void RetryCopy_IsTrueForEveryRetry()
+    {
+        // C1b: a retry is no connection, a 5xx, a session the refresh did not cure, a 2xx without the server's
+        // `success: true` and a 4xx without its refusal body — «Нет связи с сервером» was true only for the first.
+        // The copy says what is known in every case: no confirmation came, the bot is still on the phone, try again.
+        foreach (var (name, text) in new[] { ("RetryBody", BotDeletionCopy.RetryBody), ("WipeRetryBody", BotDeletionCopy.WipeRetryBody) })
+        {
+            StringAssert.DoesNotContain("связ", text, $"{name}: a retry is not always a lost connection");
+            StringAssert.Contains("подтверждение удаления", text.ToLowerInvariant(), $"{name}: says that the server's confirmation did not come");
+            StringAssert.Contains("попробуйте ещё раз", text, $"{name}: a retry offers the retry");
+            StringAssert.DoesNotContain("поддержк", text, $"{name}: support is the refusal's way out, not the retry's");
+            StringAssert.DoesNotContain("Сервер не подтвердил", text,
+                $"{name}: that is how the REFUSAL texts open — the retry must not read like the server's decision");
+        }
+        StringAssert.Contains("Бот остался на телефоне", BotDeletionCopy.RetryBody,
+            "the one thing known for sure: the bot is still on the phone (an unconfirmed 2xx may have deleted the server data)");
     }
 
     [TestCase(1, "1 бота")]

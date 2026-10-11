@@ -1,0 +1,96 @@
+# C1b before — HEAD f69aa614 (client code = HEAD; the NEW/changed tests only), 2026-10-11T10:50:16Z
+# Assets/Scripts/Main/BotServerDeletion.cs unchanged; BotServerDeletionPolicyTests + BotDeletionWiringTests extended.
+# Note: DeletePopup_* now resolve DeleteBotConfirmPopup/Content/Body by path — the old «Content/Body» lookup matched
+# ConfirmChangeWhatsappNumberPopup (Body 180u) instead of the delete popup (Body 220u).
+
+## Client: Tools/run-tests-headless.sh 'BotServerDeletion|BotDeletion'
+PASSED BotDeletionWiringTests.DeletePopup_BodyClearsTheButtons_InThePrefab
+PASSED BotDeletionWiringTests.DeletePopup_EveryStatesBody_FitsItsAuthoredBox
+PASSED BotDeletionWiringTests.FullWipe_ClearsPrefsOnlyAfterEveryBotIsSettled
+PASSED BotDeletionWiringTests.LocalWipe_ClearsTheRetiredChannelMarkers
+PASSED BotDeletionWiringTests.LocalWipe_TalksToNoServer_AndTheOldOneCallDeleteIsGone
+PASSED BotDeletionWiringTests.ServerCanon_ACloneAlreadyGone_IsConfirmed_NotRefused
+PASSED BotDeletionWiringTests.ServerCanon_AnswersA2xxOnlyWithThePositiveWord("lmjYsdNcQA2IE5rl-Delete_Bot_Files.json")
+PASSED BotDeletionWiringTests.ServerCanon_AnswersA2xxOnlyWithThePositiveWord("0DP79STI3pafXO9B-Set_Workflow_State.json")
+FAILED BotDeletionWiringTests.ServerCanon_EveryRefusalItSends_IsReadAsARefusal("lmjYsdNcQA2IE5rl-Delete_Bot_Files.json") — 403 {"success":false,"error":"db_unavailable","reason":null}
+FAILED BotDeletionWiringTests.ServerCanon_EveryRefusalItSends_IsReadAsARefusal("0DP79STI3pafXO9B-Set_Workflow_State.json") — 403 {"success":false,"error":"db_unavailable","reason":null}
+PASSED BotDeletionWiringTests.ServerDeleteAnswers_AreClassifiedWithTheirBodies
+PASSED BotDeletionWiringTests.ServerHalf_UnlinksTheProfileFirst_ReadsEveryAnswer_AndHoldsTheQueue
+PASSED BotDeletionWiringTests.SettingsDelete_RemovesTheBotOnlyOnTheVerdict_OrTheOwnersPhoneOnlyChoice
+FAILED BotServerDeletionPolicyTests.404 n8n webhook not registered — 404 «{"code":404,"message":"The requested webhook \"POST DeleteBotFiles\" is not registered.","hint":"The workflow must be active for a production URL to run successfully."}» is not the server's refusal
+FAILED BotServerDeletionPolicyTests.404 empty — 404 «» is not the server's refusal
+FAILED BotServerDeletionPolicyTests.403 empty — 403 «» is not the server's refusal
+FAILED BotServerDeletionPolicyTests.403 null — 403 «» is not the server's refusal
+FAILED BotServerDeletionPolicyTests.403 proxy page — 403 «<html>forbidden</html>» is not the server's refusal
+FAILED BotServerDeletionPolicyTests.403 empty object — 403 «{}» is not the server's refusal
+FAILED BotServerDeletionPolicyTests.403 success false without error or reason — 403 «{"success":false}» is not the server's refusal
+FAILED BotServerDeletionPolicyTests.403 blank error and reason — 403 «{"success":false,"error":"","reason":""}» is not the server's refusal
+FAILED BotServerDeletionPolicyTests.403 db fault body — 403 «{"success":false,"error":"db_unavailable","reason":null}» is not the server's refusal
+FAILED BotServerDeletionPolicyTests.400 delete_failed — 400 «{"success":false,"error":"delete_failed"}» is not the server's refusal
+FAILED BotServerDeletionPolicyTests.400 storage_unavailable — 400 «{"success":false,"error":"storage_unavailable"}» is not the server's refusal
+FAILED BotServerDeletionPolicyTests.403 a session fault — 403 «{"success":false,"error":"unauthorized","reason":"unauthorized:expired"}» is not the server's refusal
+FAILED BotServerDeletionPolicyTests.403 gate prefix without a field — 403 «{"success":false,"error":"unauthorized","reason":"forbidden:"}» is not the server's refusal
+FAILED BotServerDeletionPolicyTests.403 refusal words without success false — 403 «{"error":"forbidden","reason":"owned_elsewhere"}» is not the server's refusal
+FAILED BotServerDeletionPolicyTests.403 success as a string — 403 «{"success":"false","error":"forbidden","reason":"owned_elsewhere"}» is not the server's refusal
+FAILED BotServerDeletionPolicyTests.403 success as a number — 403 «{"success":0,"error":"forbidden"}» is not the server's refusal
+FAILED BotServerDeletionPolicyTests.403 another case of the error — 403 «{"success":false,"error":"Forbidden"}» is not the server's refusal
+FAILED BotServerDeletionPolicyTests.403 error as an array — 403 «{"success":false,"error":["forbidden"]}» is not the server's refusal
+FAILED BotServerDeletionPolicyTests.403 refusal nested — 403 «{"data":{"success":false,"error":"forbidden"}}» is not the server's refusal
+FAILED BotServerDeletionPolicyTests.403 refusal in an array — 403 «[{"success":false,"error":"forbidden"}]» is not the server's refusal
+FAILED BotServerDeletionPolicyTests.403 repeated key — 403 «{"success":false,"error":"forbidden","success":false}» is not the server's refusal
+FAILED BotServerDeletionPolicyTests.403 truncated refusal — 403 «{"success":false,"error":"forbidden"» is not the server's refusal
+FAILED BotServerDeletionPolicyTests.400 with the success word — 400 «{"success":true}» is not the server's refusal
+FAILED BotServerDeletionPolicyTests.409 foreign body — 409 «{"message":"conflict"}» is not the server's refusal
+FAILED BotServerDeletionPolicyTests.413 proxy page — 413 «<html>Request Entity Too Large</html>» is not the server's refusal
+FAILED BotServerDeletionPolicyTests.302 redirect — 302 «» is not the server's refusal
+PASSED BotServerDeletionPolicyTests.AFinalRefusal_KeepsTheBot_AndNamesWhy
+PASSED BotServerDeletionPolicyTests.ANeverAuthorisedBot_HasNoServerTrace
+PASSED BotServerDeletionPolicyTests.AnUnconfirmed2xx_IsARetry_NeverADeletion(200,"")
+PASSED BotServerDeletionPolicyTests.AnUnconfirmed2xx_IsARetry_NeverADeletion(200,null)
+PASSED BotServerDeletionPolicyTests.AnUnconfirmed2xx_IsARetry_NeverADeletion(200,"   ")
+PASSED BotServerDeletionPolicyTests.AnUnconfirmed2xx_IsARetry_NeverADeletion(200,"{}")
+PASSED BotServerDeletionPolicyTests.AnUnconfirmed2xx_IsARetry_NeverADeletion(200,"{\"message\":\"Workflow executed successfully\"}")
+PASSED BotServerDeletionPolicyTests.AnUnconfirmed2xx_IsARetry_NeverADeletion(200,"<html>upstream error</html>")
+PASSED BotServerDeletionPolicyTests.AnUnconfirmed2xx_IsARetry_NeverADeletion(200,"{\"success\":false}")
+PASSED BotServerDeletionPolicyTests.AnUnconfirmed2xx_IsARetry_NeverADeletion(200,"{\"success\":\"true\"}")
+PASSED BotServerDeletionPolicyTests.AnUnconfirmed2xx_IsARetry_NeverADeletion(200,"{\"success\":1}")
+PASSED BotServerDeletionPolicyTests.AnUnconfirmed2xx_IsARetry_NeverADeletion(200,"{\"success\":null}")
+PASSED BotServerDeletionPolicyTests.AnUnconfirmed2xx_IsARetry_NeverADeletion(200,"{\"Success\":true}")
+PASSED BotServerDeletionPolicyTests.AnUnconfirmed2xx_IsARetry_NeverADeletion(200,"{\"data\":{\"success\":true}}")
+PASSED BotServerDeletionPolicyTests.AnUnconfirmed2xx_IsARetry_NeverADeletion(200,"[{\"success\":true}]")
+PASSED BotServerDeletionPolicyTests.AnUnconfirmed2xx_IsARetry_NeverADeletion(200,"true")
+PASSED BotServerDeletionPolicyTests.AnUnconfirmed2xx_IsARetry_NeverADeletion(200,"{\"success\":true")
+PASSED BotServerDeletionPolicyTests.AnUnconfirmed2xx_IsARetry_NeverADeletion(200,"{\"success\":false,\"success\":true}")
+PASSED BotServerDeletionPolicyTests.AnUnconfirmed2xx_IsARetry_NeverADeletion(201,"{}")
+PASSED BotServerDeletionPolicyTests.AnUnconfirmed2xx_IsARetry_NeverADeletion(204,"")
+PASSED BotServerDeletionPolicyTests.ARefusalBody_UnderASessionFault_IsStillARetry
+PASSED BotServerDeletionPolicyTests.Copy_IsHonestAboutWhereTheDataStays
+PASSED BotServerDeletionPolicyTests.Done_OnlyWhenEveryStepSaidSo
+PASSED BotServerDeletionPolicyTests.OnlyTheServersPositiveWord_IsADeletion
+PASSED BotServerDeletionPolicyTests.403 Delete Ownership owned_elsewhere
+PASSED BotServerDeletionPolicyTests.403 Delete Ownership unproven
+PASSED BotServerDeletionPolicyTests.403 the gate's forbidden field
+PASSED BotServerDeletionPolicyTests.400 Set Workflow State bad_request
+PASSED BotServerDeletionPolicyTests.400 Set Workflow State protected_workflow
+PASSED BotServerDeletionPolicyTests.403 refusal with whitespace
+PASSED BotServerDeletionPolicyTests.ProfileUnlink_AnyDefinitiveAnswerLetsTheDeletionGoOn
+FAILED BotServerDeletionPolicyTests.RetryCopy_IsTrueForEveryRetry — RetryBody: a retry is not always a lost connection
+PASSED BotServerDeletionPolicyTests.TheFirstStepThatIsNotOk_Decides
+PASSED BotServerDeletionPolicyTests.no answer at all (no connection / timeout)
+PASSED BotServerDeletionPolicyTests.TransientAnswers_KeepTheBot_ForARetry(500)
+PASSED BotServerDeletionPolicyTests.TransientAnswers_KeepTheBot_ForARetry(502)
+PASSED BotServerDeletionPolicyTests.TransientAnswers_KeepTheBot_ForARetry(503)
+PASSED BotServerDeletionPolicyTests.TransientAnswers_KeepTheBot_ForARetry(504)
+PASSED BotServerDeletionPolicyTests.a session the one refresh did not cure
+PASSED BotServerDeletionPolicyTests.TransientAnswers_KeepTheBot_ForARetry(408)
+PASSED BotServerDeletionPolicyTests.TransientAnswers_KeepTheBot_ForARetry(429)
+PASSED BotServerDeletionPolicyTests.WipeRefusedBody_AgreesWithTheCount(1,"1 бота")
+PASSED BotServerDeletionPolicyTests.WipeRefusedBody_AgreesWithTheCount(2,"2 ботов")
+PASSED BotServerDeletionPolicyTests.WipeRefusedBody_AgreesWithTheCount(5,"5 ботов")
+PASSED BotServerDeletionPolicyTests.WipeRefusedBody_AgreesWithTheCount(11,"11 ботов")
+PASSED BotServerDeletionPolicyTests.WipeRefusedBody_AgreesWithTheCount(21,"21 бота")
+
+================ EditMode test results (headless) ================
+  result=Failed(Child)  total=85  passed=56  failed=29  skipped=0  inconclusive=0
+  Failing / inconclusive tests:
+  (failing list: the FAILED lines above)
