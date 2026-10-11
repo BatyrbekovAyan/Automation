@@ -1,0 +1,180 @@
+# T2 after — 2026-10-11 23:27 +0500, base HEAD 5b4bb62a (T2 files uncommitted at the time of these runs)
+
+## 1. python3 Tools/n8n/tests/test_clone_lineage_sql.py   (the line: L1–L19 × WA/TG, C1–C2 races × WA/TG, M1–M8)
+
+      timing (s): {"WA": {"pre-F1": 0.001, "line": 0.113}, "TG": {"pre-F1": 0.002, "line": 0.112}}
+PASS L1 [WA] reconnect after a purchase (F2 R1): the new clone takes the bot's memory, history, outcomes, handoffs, ledger, state, chat flags, price lists and file registry; the prior row is superseded, the prior clone booked [line]
+PASS L1 [TG] reconnect after a purchase (F2 R1): the new clone takes the bot's memory, history, outcomes, handoffs, ledger, state, chat flags, price lists and file registry; the prior row is superseded, the prior clone booked [line]
+PASS L2 [WA] the same profile, its bound clone gone (F1 а1: 404 / archived): the new clone takes the old binding's price lists, the old clone is booked, nothing is superseded or moved between profiles [line]
+PASS L2 [TG] the same profile, its bound clone gone (F1 а1: 404 / archived): the new clone takes the old binding's price lists, the old clone is booked, nothing is superseded or moved between profiles [line]
+PASS L3 [WA] the same profile, its bound clone usable (F1 а1/а2): the plan names it, the Create reuses it — no new clone, nothing moved or booked [line]
+PASS L3 [TG] the same profile, its bound clone usable (F1 а1/а2): the plan names it, the Create reuses it — no new clone, nothing moved or booked [line]
+PASS L4 [WA] a new profile after Retire Same Bot Slot (F1 а3, an older client: no CreateOrigin, no PreviousProfileId): the bot key proves the predecessor; its NULL reason becomes replaced [line]
+PASS L4 [TG] a new profile after Retire Same Bot Slot (F1 а3, an older client: no CreateOrigin, no PreviousProfileId): the bot key proves the predecessor; its NULL reason becomes replaced [line]
+PASS L5 [WA] a wizard Create (CreateOrigin=start, a NEW bot in a reused slot) never looks for a predecessor, even with the same bot key and a named previous profile [line]
+PASS L5 [TG] a wizard Create (CreateOrigin=start, a NEW bot in a reused slot) never looks for a predecessor, even with the same bot key and a named previous profile [line]
+PASS L6 [WA] PreviousProfileId proves a predecessor that has no bot key (a row from before bot_key / the proxy's row); a DIFFERENT bot key refuses it [line]
+PASS L6 [TG] PreviousProfileId proves a predecessor that has no bot key (a row from before bot_key / the proxy's row); a DIFFERENT bot key refuses it [line]
+PASS L7 [WA] refusals of the predecessor rule — plan and bind: another install, an owner-less row, app_delete, another channel, another bot key, a row another profile took over, the new profile itself, a revoked install, a new profile someone else owns [line]
+PASS L7 [TG] refusals of the predecessor rule — plan and bind: another install, an owner-less row, app_delete, another channel, another bot key, a row another profile took over, the new profile itself, a revoked install, a new profile someone else owns [line]
+PASS L8 [WA] two predecessors with the same chat: one row per key under the new profile — the FRESHEST — no unique violation; both memories kept in order [line]
+PASS L9 [WA] the new profile's own row wins over both predecessors (new wins); their duplicates are dropped [line]
+PASS L8 [TG] two predecessors with the same chat: one row per key under the new profile — the FRESHEST — no unique violation; both memories kept in order [line]
+PASS L9 [TG] the new profile's own row wins over both predecessors (new wins); their duplicates are dropped [line]
+PASS L10 [WA] a retry after retryOnFail (or a repeated Create whose answer was lost) is idempotent: same answer, nothing moved or booked twice [line]
+PASS L10 [TG] a retry after retryOnFail (or a repeated Create whose answer was lost) is idempotent: same answer, nothing moved or booked twice [line]
+PASS L11 [WA] legacy (compat window): reuse only an owner-less binding, never replace or adopt; a profile an install owns is foreign — and the bind refuses it too (Q3) [line]
+PASS L11 [TG] legacy (compat window): reuse only an owner-less binding, never replace or adopt; a profile an install owns is foreign — and the bind refuses it too (Q3) [line]
+PASS L12 [WA] a sentinel profile (-1 / empty) binds nothing and SAYS so (bound = false) [line]
+PASS L12 [TG] a sentinel profile (-1 / empty) binds nothing and SAYS so (bound = false) [line]
+PASS L13 [WA] the pre-F1 rule: a second channel joining a bot of the other channel takes the chunks that carry the -1 sentinel for this channel [line]
+PASS L13 [TG] the pre-F1 rule: a second channel joining a bot of the other channel takes the chunks that carry the -1 sentinel for this channel [line]
+PASS L14 [WA] protected ids are never reused, replaced, moved, booked or bound [line]
+PASS L14 [TG] protected ids are never reused, replaced, moved, booked or bound [line]
+PASS L15 [WA] a clone another bot's LIVE row drives is never replaced (plan) nor moved or booked (bind) [line]
+PASS L15 [TG] a clone another bot's LIVE row drives is never replaced (plan) nor moved or booked (bind) [line]
+PASS L16 [WA] a concurrent Create of the same profile bound another clone between our plan and our bind: the binding the upsert overwrites is booked and its price lists move (no unbound clone) [line]
+PASS L16 [TG] a concurrent Create of the same profile bound another clone between our plan and our bind: the binding the upsert overwrites is booked and its price lists move (no unbound clone) [line]
+PASS L17 [WA] Bind re-checks the row it writes: another install's profile (a stale token, M5) and a profile of the other channel are refused (bound = false), never rebound [line]
+PASS L17 [TG] Bind re-checks the row it writes: another install's profile (a stale token, M5) and a profile of the other channel are refused (bound = false), never rebound [line]
+PASS L18 [WA] a superseded row bound again loses the mark (F1); the original reason is kept for a liveness row [line]
+PASS L18 [TG] a superseded row bound again loses the mark (F1); the original reason is kept for a liveness row [line]
+PASS L19 [WA] a clone booked for deletion is never offered for reuse: the superseded profile comes back (a stale retry of its Create) and gets a NEW clone; no live row ever drives a booked clone [line]
+PASS L19 [TG] a clone booked for deletion is never offered for reuse: the superseded profile comes back (a stale retry of its Create) and gets a NEW clone; no live row ever drives a booked clone [line]
+PASS C1 [WA] two Creates of the SAME profile race (a client retry while the first still runs; both probes said the bound clone is gone): exactly one bind wins and SAYS so, the loser answers bound = false (the graph discards its clone) — no clone is lost and the price lists follow the bound one [line]
+PASS C1 [TG] two Creates of the SAME profile race (a client retry while the first still runs; both probes said the bound clone is gone): exactly one bind wins and SAYS so, the loser answers bound = false (the graph discards its clone) — no clone is lost and the price lists follow the bound one [line]
+PASS C2 [WA] two new profiles of the same bot adopt the same predecessor at once: everything it had lands under ONE of them (the first committer) — nothing split, nothing deleted; the predecessor is marked once; the loser does not claim the adoption [line]
+PASS C2 [TG] two new profiles of the same bot adopt the same predecessor at once: everything it had lands under ONE of them (the first committer) — nothing split, nothing deleted; the predecessor is marked once; the loser does not claim the adoption [line]
+PASS M1 Clone Plan ALWAYS answers one row with planned = true (garbage, empty and unknown inputs included)
+PASS M2 the sweep's branch A takes booked clones older than 10 minutes — never one a LIVE row drives, never a protected or malformed id, never a removed one; least-tried first; the stamps settle 200/404 and count the rest
+PASS M3 Record Discard Failure books an undeletable new clone once (discard_failed) — never a protected or malformed id
+PASS M4 the bot's line (Delete Bot Files, T5): every row of this install with the named rows' bot key, both channels, plus the superseded chain — never another install's rows, another bot key or a protected id; legacy / revoked: the named ids only
+PASS M5 the moved tables are EXACTLY the tables Delete Chat Memory clears (current canon); the bind names each; PROTECTED = build-client-webhooks.PROTECTED_IDS + Set Workflow State + the support relay; CHANNELS match the Create canons
+PASS M6 V1: every statement of the module passes verify-sql-comments (no $N in a comment or literal, no {{, no modifier, no leading =)
+PASS M7 cost on a big history: 10 000 memory rows of the predecessor among 30 000, 5 000 chunks — the line's plan + bind stay within 1 s of the pre-F1 Restamp + Bind
+PASS M8 the bind's chunk moves can use the RAG store's expression indexes (prod documents_metadata_bot_wa_idx / _tg_idx) — the replaced clones' chunks and the -1 rule alike, both channels
+
+50 pass, 0 fail
+exit=0
+
+## 2. python3 Tools/n8n/tests/test_clone_lineage_sql.py --head   (the same matrix against the pre-F1 canon e9a2f3ad — must fail)
+
+FAIL L1 [WA] reconnect after a purchase (F2 R1): the new clone takes the bot's memory, history, outcomes, handoffs, ledger, state, chat flags, price lists and file registry; the prior row is superseded, the prior clone booked [HEAD]
+FAIL L1 [TG] reconnect after a purchase (F2 R1): the new clone takes the bot's memory, history, outcomes, handoffs, ledger, state, chat flags, price lists and file registry; the prior row is superseded, the prior clone booked [HEAD]
+FAIL L2 [WA] the same profile, its bound clone gone (F1 а1: 404 / archived): the new clone takes the old binding's price lists, the old clone is booked, nothing is superseded or moved between profiles [HEAD]
+FAIL L2 [TG] the same profile, its bound clone gone (F1 а1: 404 / archived): the new clone takes the old binding's price lists, the old clone is booked, nothing is superseded or moved between profiles [HEAD]
+FAIL L3 [WA] the same profile, its bound clone usable (F1 а1/а2): the plan names it, the Create reuses it — no new clone, nothing moved or booked [HEAD]
+FAIL L3 [TG] the same profile, its bound clone usable (F1 а1/а2): the plan names it, the Create reuses it — no new clone, nothing moved or booked [HEAD]
+FAIL L4 [WA] a new profile after Retire Same Bot Slot (F1 а3, an older client: no CreateOrigin, no PreviousProfileId): the bot key proves the predecessor; its NULL reason becomes replaced [HEAD]
+FAIL L4 [TG] a new profile after Retire Same Bot Slot (F1 а3, an older client: no CreateOrigin, no PreviousProfileId): the bot key proves the predecessor; its NULL reason becomes replaced [HEAD]
+PASS L5 [WA] a wizard Create (CreateOrigin=start, a NEW bot in a reused slot) never looks for a predecessor, even with the same bot key and a named previous profile [HEAD]
+PASS L5 [TG] a wizard Create (CreateOrigin=start, a NEW bot in a reused slot) never looks for a predecessor, even with the same bot key and a named previous profile [HEAD]
+FAIL L6 [WA] PreviousProfileId proves a predecessor that has no bot key (a row from before bot_key / the proxy's row); a DIFFERENT bot key refuses it [HEAD]
+FAIL L6 [TG] PreviousProfileId proves a predecessor that has no bot key (a row from before bot_key / the proxy's row); a DIFFERENT bot key refuses it [HEAD]
+FAIL L7 [WA] refusals of the predecessor rule — plan and bind: another install, an owner-less row, app_delete, another channel, another bot key, a row another profile took over, the new profile itself, a revoked install, a new profile someone else owns [HEAD]
+FAIL L7 [TG] refusals of the predecessor rule — plan and bind: another install, an owner-less row, app_delete, another channel, another bot key, a row another profile took over, the new profile itself, a revoked install, a new profile someone else owns [HEAD]
+FAIL L8 [WA] two predecessors with the same chat: one row per key under the new profile — the FRESHEST — no unique violation; both memories kept in order [HEAD]
+FAIL L9 [WA] the new profile's own row wins over both predecessors (new wins); their duplicates are dropped [HEAD]
+FAIL L8 [TG] two predecessors with the same chat: one row per key under the new profile — the FRESHEST — no unique violation; both memories kept in order [HEAD]
+FAIL L9 [TG] the new profile's own row wins over both predecessors (new wins); their duplicates are dropped [HEAD]
+FAIL L10 [WA] a retry after retryOnFail (or a repeated Create whose answer was lost) is idempotent: same answer, nothing moved or booked twice [HEAD]
+FAIL L10 [TG] a retry after retryOnFail (or a repeated Create whose answer was lost) is idempotent: same answer, nothing moved or booked twice [HEAD]
+FAIL L11 [WA] legacy (compat window): reuse only an owner-less binding, never replace or adopt; a profile an install owns is foreign — and the bind refuses it too (Q3) [HEAD]
+FAIL L11 [TG] legacy (compat window): reuse only an owner-less binding, never replace or adopt; a profile an install owns is foreign — and the bind refuses it too (Q3) [HEAD]
+FAIL L12 [WA] a sentinel profile (-1 / empty) binds nothing and SAYS so (bound = false) [HEAD]
+FAIL L12 [TG] a sentinel profile (-1 / empty) binds nothing and SAYS so (bound = false) [HEAD]
+PASS L13 [WA] the pre-F1 rule: a second channel joining a bot of the other channel takes the chunks that carry the -1 sentinel for this channel [HEAD]
+PASS L13 [TG] the pre-F1 rule: a second channel joining a bot of the other channel takes the chunks that carry the -1 sentinel for this channel [HEAD]
+FAIL L14 [WA] protected ids are never reused, replaced, moved, booked or bound [HEAD]
+FAIL L14 [TG] protected ids are never reused, replaced, moved, booked or bound [HEAD]
+PASS L15 [WA] a clone another bot's LIVE row drives is never replaced (plan) nor moved or booked (bind) [HEAD]
+PASS L15 [TG] a clone another bot's LIVE row drives is never replaced (plan) nor moved or booked (bind) [HEAD]
+FAIL L16 [WA] a concurrent Create of the same profile bound another clone between our plan and our bind: the binding the upsert overwrites is booked and its price lists move (no unbound clone) [HEAD]
+FAIL L16 [TG] a concurrent Create of the same profile bound another clone between our plan and our bind: the binding the upsert overwrites is booked and its price lists move (no unbound clone) [HEAD]
+FAIL L17 [WA] Bind re-checks the row it writes: another install's profile (a stale token, M5) and a profile of the other channel are refused (bound = false), never rebound [HEAD]
+FAIL L17 [TG] Bind re-checks the row it writes: another install's profile (a stale token, M5) and a profile of the other channel are refused (bound = false), never rebound [HEAD]
+FAIL L18 [WA] a superseded row bound again loses the mark (F1); the original reason is kept for a liveness row [HEAD]
+FAIL L18 [TG] a superseded row bound again loses the mark (F1); the original reason is kept for a liveness row [HEAD]
+FAIL L19 [WA] a clone booked for deletion is never offered for reuse: the superseded profile comes back (a stale retry of its Create) and gets a NEW clone; no live row ever drives a booked clone [HEAD]
+FAIL L19 [TG] a clone booked for deletion is never offered for reuse: the superseded profile comes back (a stale retry of its Create) and gets a NEW clone; no live row ever drives a booked clone [HEAD]
+FAIL C1 [WA] two Creates of the SAME profile race (a client retry while the first still runs; both probes said the bound clone is gone): exactly one bind wins and SAYS so, the loser answers bound = false (the graph discards its clone) — no clone is lost and the price lists follow the bound one [HEAD]
+FAIL C1 [TG] two Creates of the SAME profile race (a client retry while the first still runs; both probes said the bound clone is gone): exactly one bind wins and SAYS so, the loser answers bound = false (the graph discards its clone) — no clone is lost and the price lists follow the bound one [HEAD]
+FAIL C2 [WA] two new profiles of the same bot adopt the same predecessor at once: everything it had lands under ONE of them (the first committer) — nothing split, nothing deleted; the predecessor is marked once; the loser does not claim the adoption [HEAD]
+FAIL C2 [TG] two new profiles of the same bot adopt the same predecessor at once: everything it had lands under ONE of them (the first committer) — nothing split, nothing deleted; the predecessor is marked once; the loser does not claim the adoption [HEAD]
+6 pass, 36 fail
+exit=1
+
+## 3. Migration M2 on staging (Tools/n8n/staging/pg.sh migrate; listed after 2026-10-11-billing-conflicts.sql)
+
+first apply: ok (pg.sh migrate); second apply of the file alone: exit 0, every statement «already exists, skipping»
+post-checks: superseded_by/_at columns 2; clone_retirements relrowsecurity t; 9 columns; indexes bot_profiles_lineage_idx, clone_retirements_open;
+             anon select / authenticated insert privilege f / f; CHECK reason in (replaced, discard_failed, bot_deleted, inventory)
+after all runs: leftover race fixture schemas 0; public.clone_retirements rows 0; public.bot_profiles superseded rows 0 (no test leak)
+
+## 4. python3 Tools/n8n/clone_lineage.py --check
+
+clone_lineage: 8 statements, 0 findings
+
+## 5. Every generator --check (canonical workflows untouched by T2: git status of Tools/n8n/workflows identical before/after)
+
+apply-auth-gate.py --check rc=0
+apply-history-handoff.py --check rc=0
+apply-outcome-stamps.py --check rc=0
+apply-reply-mode-v2.py --check rc=0
+apply-reply-pipeline-v2.py --check rc=0
+apply-slot-count-fix.py --check rc=0
+apply-suggest-v2.py --check rc=0
+apply-sweep-clone-deactivate.py --check rc=0
+build-auth-workflows.py --check rc=0
+build-handoff-workflows.py --check rc=0
+build-price-search.py --check rc=0
+build-test-dialog.py --check rc=0
+inject-panel-prompts.py --check rc=0
+clone_lineage.py --check rc=0
+inject-prompts.py --check (tiktoken venv) rc=0
+apply-delete-history.py --check rc=1 (RETIRED by design: prints the superseded note and exits 1)
+
+## 6. Verifiers + staging read-back
+
+verify-auth-gate.py rc=0
+verify-history-handoff.py rc=0
+verify-message-batching.py rc=0
+verify-reply-mode.py rc=0
+verify-reply-pipeline.py rc=0
+verify-telegram-parity.py rc=0
+verify-sql-comments.py: OK  83 Postgres node(s) in 28 workflow file(s): no placeholder outside code, no {{ }}, no modifier, no leading =
+verify-panel-prompts.js rc=0
+verify_rag.py all rc=0
+verify-deployed.py --base http://localhost:5678 (staging) rc=0
+
+## 7. python3 Tools/n8n/tests/run_all.py (27 files) with the T2 files in the tree
+
+2026-10-11T18:25:43Z
+OK   test_auth_refresh.py: 12 pass, 0 fail
+OK   test_billing_identity.py: 24 pass, 0 fail
+OK   test_claim.py: 19 pass, 0 fail
+OK   test_clone_lineage_sql.py: 50 pass, 0 fail
+OK   test_create_seed.py: 53 pass, 0 fail
+OK   test_deploy_canonical.py: 20 pass, 0 fail
+OK   test_handoff_notifier.py: 14 pass, 0 fail
+OK   test_harness_selfcheck.py: 2 pass, 0 fail
+OK   test_legacy_generators.py: 5 pass, 0 fail
+OK   test_price_search.py: 36 pass, 0 fail
+OK   test_reply_lost_send.py: 5 pass, 0 fail
+OK   test_reply_memory.py: 44 pass, 0 fail
+OK   test_reply_memory_concurrent.py: 9 pass, 0 fail
+OK   test_reply_mode.py: 43 pass, 0 fail
+OK   test_reply_order.py: 44 pass, 0 fail
+OK   test_reply_reconcile.py: 66 pass, 0 fail
+OK   test_retired_delete.py: 13 pass, 0 fail
+OK   test_sql_comment_injection.py: 36 pass, 0 fail
+OK   test_suggest_catalog.py: 24 pass, 0 fail
+OK   test_suggest_lang.py: 11 pass, 0 fail
+OK   test_suggest_price.py: 16 pass, 0 fail
+OK   test_suggest_query.py: 37 pass, 0 fail
+OK   test_test_dialog.py: 17 pass, 0 fail
+OK   test_upload.py: 45 pass, 0 fail
+OK   test_verify_deployed.py: 48 pass, 0 fail
+OK   test_verify_parity.py: 38 pass, 0 fail
+OK   test_verify_sql_comments.py: 53 pass, 0 fail
+exit=0

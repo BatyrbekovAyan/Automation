@@ -93,6 +93,16 @@ prompt editing, RAG file upload/delete, and (in progress) live reply suggestions
   article; the panel cuts its windows on line boundaries before marking and pushes «РАСХОЖДЕНИЕ ЦЕН» only for a firm mark.
   Staging: the sub-workflow reads the `documents` stub (`derive-staging.py isolate_supabase_readers`); `eval/run-eval.py`
   runs the ref's own Reconcile Prices in its simulated search (harness h5) — see CLAUDE.md «V9 price reconciliation».
+  F1 + F2 «линия бота» (follow-ups 2026-10-11, plan `docs/audits/2026-10-09-followups/F1F2-plan.md`; T2 = the SQL core,
+  not wired into any workflow yet — T3 Create WA/TG, T5 the sweep's branch A + Delete Bot Files): `clone_lineage.py`
+  holds every statement once — `Clone Plan` (reuse / refuse / replace / adopt, the predecessor proven in the DATABASE),
+  `Bind Workflow Id` per channel (bind + move the predecessors' memory, history, outcomes, handoffs, reply ledger, chat
+  state and chat flags, the replaced clones' chunks and file registry, mark superseded, book the replaced clones — every
+  condition re-checked on the committed row version; a concurrent bind of the same profile that committed first wins),
+  `Record Discard Failure`, the sweep's `Clone Retirements` + stamps, and `lineage_cte` (the bot's line for Delete Bot
+  Files); `--check` runs verify-sql-comments over all of them. Migration M2 `sql/2026-10-11-bot-lineage.sql`
+  (`bot_profiles.superseded_by/_at`, `clone_retirements`). Behaviour: `tests/test_clone_lineage_sql.py` (real staging
+  Postgres; L-matrix WA+TG, C-races on two connections, `--head` runs the same matrix against the pre-F1 canon).
   `$execution.id` as correlationId). `verify-message-batching.py` / `verify-telegram-parity.py` pin the
   stamp's wiring and the winner → billing-gate → Input type path (their pre-2026-09 expectations were
   stale and failed every run).

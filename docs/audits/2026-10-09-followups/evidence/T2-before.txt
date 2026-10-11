@@ -1,0 +1,478 @@
+# T2 before — 2026-10-11 20:37 +05, HEAD e9a2f3ad
+
+## 1. python3 Tools/n8n/tests/test_clone_lineage_sql.py --head   (the requirement matrix against the pre-F1 canon e9a2f3ad: Restamp RAG Chunks + the A1 Bind Workflow Id)
+
+FAIL L1 [WA] reconnect after a purchase (F2 R1): the new clone takes the bot's memory, history, outcomes, handoffs, ledger, state, chat flags, price lists and file registry; the prior row is superseded, the prior clone booked [HEAD]
+      - plan {'planned': None, 'own_id': None, 'foreign': None, 'replace_ids': [], 'pred_profiles': []}
+      - plan {'planned': None, 'own_id': None, 'foreign': None, 'replace_ids': [], 'pred_profiles': []}
+      - bind has no positive marker: {'bound': None, 'adopted_profiles': None, 'retired_ids': None}
+      - bind {'bound': None, 'adopted_profiles': None, 'retired_ids': None}
+      - chunks old/new/neighbour = (2, 0, 1)
+      - file registry ['WAold00000000000', 'WAold00000000000', 'WAold00000000000']
+      - prior row not marked: {'workflow_id': 'WAold00000000000', 'superseded_by': None, 'sup_at': False, 'retired': True, 'deleted_reason': 'trial_expiry', 'owner_id': 'inst-A'}
+      - prior clone not booked: []
+      - left under the old profile: {'mem': 2, 'hist': 1, 'outc': 1, 'hand': 1, 'ev': 1, 'st': 1, 'fl': 1, 'star': 1}
+      - new profile: {'mem': 0, 'hist': 0, 'outc': 0, 'hand': 0, 'ev': 0, 'st': 0, 'fl': 0, 'star': 1}
+      - memory row ids not preserved: [16427, 16428] -> []
+      - after the delete: old {'mem': 2, 'hist': 1, 'outc': 1, 'hand': 1, 'ev': 1, 'st': 1, 'fl': 1, 'star': 1} new {'mem': 0, 'hist': 0, 'outc': 0, 'hand': 0, 'ev': 0, 'st': 0, 'fl': 0, 'star': 0}
+      - chunks after the delete
+FAIL L1 [TG] reconnect after a purchase (F2 R1): the new clone takes the bot's memory, history, outcomes, handoffs, ledger, state, chat flags, price lists and file registry; the prior row is superseded, the prior clone booked [HEAD]
+      - plan {'planned': None, 'own_id': None, 'foreign': None, 'replace_ids': [], 'pred_profiles': []}
+      - plan {'planned': None, 'own_id': None, 'foreign': None, 'replace_ids': [], 'pred_profiles': []}
+      - bind has no positive marker: {'bound': None, 'adopted_profiles': None, 'retired_ids': None}
+      - bind {'bound': None, 'adopted_profiles': None, 'retired_ids': None}
+      - chunks old/new/neighbour = (2, 0, 1)
+      - file registry ['TGold00000000000', 'TGold00000000000', 'TGold00000000000']
+      - prior row not marked: {'workflow_id': 'TGold00000000000', 'superseded_by': None, 'sup_at': False, 'retired': True, 'deleted_reason': 'trial_expiry', 'owner_id': 'inst-A'}
+      - prior clone not booked: []
+      - left under the old profile: {'mem': 2, 'hist': 1, 'outc': 1, 'hand': 1, 'ev': 1, 'st': 1, 'fl': 1, 'star': 1}
+      - new profile: {'mem': 0, 'hist': 0, 'outc': 0, 'hand': 0, 'ev': 0, 'st': 0, 'fl': 0, 'star': 1}
+      - memory row ids not preserved: [16429, 16430] -> []
+      - after the delete: old {'mem': 2, 'hist': 1, 'outc': 1, 'hand': 1, 'ev': 1, 'st': 1, 'fl': 1, 'star': 1} new {'mem': 0, 'hist': 0, 'outc': 0, 'hand': 0, 'ev': 0, 'st': 0, 'fl': 0, 'star': 0}
+      - chunks after the delete
+FAIL L2 [WA] the same profile, its bound clone gone (F1 а1: 404 / archived): the new clone takes the old binding's price lists, the old clone is booked, nothing is superseded or moved between profiles [HEAD]
+      - plan {'planned': None, 'own_id': None, 'foreign': None, 'replace_ids': [], 'pred_profiles': []}
+      - bind {'bound': None, 'adopted_profiles': None, 'retired_ids': None}
+      - price lists stayed under the gone clone: (2, 0)
+      - retirements []
+      - the old clone is reachable by nobody
+FAIL L2 [TG] the same profile, its bound clone gone (F1 а1: 404 / archived): the new clone takes the old binding's price lists, the old clone is booked, nothing is superseded or moved between profiles [HEAD]
+      - plan {'planned': None, 'own_id': None, 'foreign': None, 'replace_ids': [], 'pred_profiles': []}
+      - bind {'bound': None, 'adopted_profiles': None, 'retired_ids': None}
+      - price lists stayed under the gone clone: (2, 0)
+      - retirements []
+      - the old clone is reachable by nobody
+FAIL L3 [WA] the same profile, its bound clone usable (F1 а1/а2): the plan names it, the Create reuses it — no new clone, nothing moved or booked [HEAD]
+      - a new clone was created for a profile whose bound clone is usable
+      - bind {'bound': None, 'adopted_profiles': None, 'retired_ids': None}
+      - row {'workflow_id': 'WAnew00000000000', 'superseded_by': None, 'sup_at': False, 'retired': False, 'deleted_reason': None, 'owner_id': 'inst-A'} chunks 2 retirements []
+FAIL L3 [TG] the same profile, its bound clone usable (F1 а1/а2): the plan names it, the Create reuses it — no new clone, nothing moved or booked [HEAD]
+      - a new clone was created for a profile whose bound clone is usable
+      - bind {'bound': None, 'adopted_profiles': None, 'retired_ids': None}
+      - row {'workflow_id': 'TGnew00000000000', 'superseded_by': None, 'sup_at': False, 'retired': False, 'deleted_reason': None, 'owner_id': 'inst-A'} chunks 2 retirements []
+FAIL L4 [WA] a new profile after Retire Same Bot Slot (F1 а3, an older client: no CreateOrigin, no PreviousProfileId): the bot key proves the predecessor; its NULL reason becomes replaced [HEAD]
+      - plan {'planned': None, 'own_id': None, 'foreign': None, 'replace_ids': [], 'pred_profiles': []}
+      - bind {'bound': None, 'adopted_profiles': None, 'retired_ids': None} row {'workflow_id': 'WAold00000000000', 'superseded_by': None, 'sup_at': False, 'retired': True, 'deleted_reason': None, 'owner_id': 'inst-A'}
+      - chunks
+      - old {'mem': 2, 'hist': 1, 'outc': 1, 'hand': 1, 'ev': 1, 'st': 1, 'fl': 1, 'star': 1} new {'mem': 0, 'hist': 0, 'outc': 0, 'hand': 0, 'ev': 0, 'st': 0, 'fl': 0, 'star': 0}
+FAIL L4 [TG] a new profile after Retire Same Bot Slot (F1 а3, an older client: no CreateOrigin, no PreviousProfileId): the bot key proves the predecessor; its NULL reason becomes replaced [HEAD]
+      - plan {'planned': None, 'own_id': None, 'foreign': None, 'replace_ids': [], 'pred_profiles': []}
+      - bind {'bound': None, 'adopted_profiles': None, 'retired_ids': None} row {'workflow_id': 'TGold00000000000', 'superseded_by': None, 'sup_at': False, 'retired': True, 'deleted_reason': None, 'owner_id': 'inst-A'}
+      - chunks
+      - old {'mem': 2, 'hist': 1, 'outc': 1, 'hand': 1, 'ev': 1, 'st': 1, 'fl': 1, 'star': 1} new {'mem': 0, 'hist': 0, 'outc': 0, 'hand': 0, 'ev': 0, 'st': 0, 'fl': 0, 'star': 0}
+PASS L5 [WA] a wizard Create (CreateOrigin=start, a NEW bot in a reused slot) never looks for a predecessor, even with the same bot key and a named previous profile [HEAD]
+PASS L5 [TG] a wizard Create (CreateOrigin=start, a NEW bot in a reused slot) never looks for a predecessor, even with the same bot key and a named previous profile [HEAD]
+FAIL L6 [WA] PreviousProfileId proves a predecessor that has no bot key (a row from before bot_key / the proxy's row); a DIFFERENT bot key refuses it [HEAD]
+      - plan {'planned': None, 'own_id': None, 'foreign': None, 'replace_ids': [], 'pred_profiles': []}
+      - bind {'bound': None, 'adopted_profiles': None, 'retired_ids': None}
+FAIL L6 [TG] PreviousProfileId proves a predecessor that has no bot key (a row from before bot_key / the proxy's row); a DIFFERENT bot key refuses it [HEAD]
+      - plan {'planned': None, 'own_id': None, 'foreign': None, 'replace_ids': [], 'pred_profiles': []}
+      - bind {'bound': None, 'adopted_profiles': None, 'retired_ids': None}
+FAIL L7 [WA] refusals of the predecessor rule — plan and bind: another install, an owner-less row, app_delete, another channel, another bot key, a row another profile took over, the new profile itself, a revoked install, a new profile someone else owns [HEAD]
+      - revoked: {'planned': None, 'own_id': None, 'foreign': None, 'replace_ids': [], 'pred_profiles': []}
+      - foreign new profile: {'planned': None, 'own_id': None, 'foreign': None, 'replace_ids': [], 'pred_profiles': []}
+      - bound another install's profile: {'bound': None, 'adopted_profiles': None, 'retired_ids': None} {'workflow_id': 'WAnew00000000000', 'superseded_by': None, 'sup_at': False, 'retired': False, 'deleted_reason': None, 'owner_id': 'inst-B'}
+FAIL L7 [TG] refusals of the predecessor rule — plan and bind: another install, an owner-less row, app_delete, another channel, another bot key, a row another profile took over, the new profile itself, a revoked install, a new profile someone else owns [HEAD]
+      - revoked: {'planned': None, 'own_id': None, 'foreign': None, 'replace_ids': [], 'pred_profiles': []}
+      - foreign new profile: {'planned': None, 'own_id': None, 'foreign': None, 'replace_ids': [], 'pred_profiles': []}
+      - bound another install's profile: {'bound': None, 'adopted_profiles': None, 'retired_ids': None} {'workflow_id': 'TGnew00000000000', 'superseded_by': None, 'sup_at': False, 'retired': False, 'deleted_reason': None, 'owner_id': 'inst-B'}
+FAIL L8 [WA] two predecessors with the same chat: one row per key under the new profile — the FRESHEST — no unique violation; both memories kept in order [HEAD]
+      - plan {'planned': None, 'own_id': None, 'foreign': None, 'replace_ids': [], 'pred_profiles': []}
+      - bind {'bound': None, 'adopted_profiles': None, 'retired_ids': None}
+      - winner {'hist': None, 'outc': None, 'hand': None, 'ev': None, 'st': None, 'fl': None} != {'hist': 'p1', 'outc': 'p1', 'hand': 'p1', 'ev': 'p1', 'st': 'p1', 'fl': True}
+      - a chat only P0 had: {'hist': None, 'outc': None, 'hand': None, 'ev': None, 'st': None, 'fl': None}
+      - left: {'mem': 4, 'hist': 2, 'outc': 2, 'hand': 2, 'ev': 2, 'st': 2, 'fl': 2, 'star': 1} {'mem': 2, 'hist': 1, 'outc': 1, 'hand': 1, 'ev': 1, 'st': 1, 'fl': 1, 'star': 1}
+      - new profile {'mem': 0, 'hist': 0, 'outc': 0, 'hand': 0, 'ev': 0, 'st': 0, 'fl': 0, 'star': 0}
+      - memory order []
+      - chunks
+      - booked []
+FAIL L9 [WA] the new profile's own row wins over both predecessors (new wins); their duplicates are dropped [HEAD]
+      - plan {'planned': None, 'own_id': None, 'foreign': None, 'replace_ids': [], 'pred_profiles': []}
+      - bind {'bound': None, 'adopted_profiles': None, 'retired_ids': None}
+      - a chat only P0 had: {'hist': None, 'outc': None, 'hand': None, 'ev': None, 'st': None, 'fl': None}
+      - left: {'mem': 4, 'hist': 2, 'outc': 2, 'hand': 2, 'ev': 2, 'st': 2, 'fl': 2, 'star': 1} {'mem': 2, 'hist': 1, 'outc': 1, 'hand': 1, 'ev': 1, 'st': 1, 'fl': 1, 'star': 1}
+      - new profile {'mem': 2, 'hist': 1, 'outc': 1, 'hand': 1, 'ev': 1, 'st': 1, 'fl': 1, 'star': 1}
+      - memory order ['new m0', 'new m1']
+      - chunks
+      - booked []
+FAIL L8 [TG] two predecessors with the same chat: one row per key under the new profile — the FRESHEST — no unique violation; both memories kept in order [HEAD]
+      - plan {'planned': None, 'own_id': None, 'foreign': None, 'replace_ids': [], 'pred_profiles': []}
+      - bind {'bound': None, 'adopted_profiles': None, 'retired_ids': None}
+      - winner {'hist': None, 'outc': None, 'hand': None, 'ev': None, 'st': None, 'fl': None} != {'hist': 'p1', 'outc': 'p1', 'hand': 'p1', 'ev': 'p1', 'st': 'p1', 'fl': True}
+      - a chat only P0 had: {'hist': None, 'outc': None, 'hand': None, 'ev': None, 'st': None, 'fl': None}
+      - left: {'mem': 4, 'hist': 2, 'outc': 2, 'hand': 2, 'ev': 2, 'st': 2, 'fl': 2, 'star': 1} {'mem': 2, 'hist': 1, 'outc': 1, 'hand': 1, 'ev': 1, 'st': 1, 'fl': 1, 'star': 1}
+      - new profile {'mem': 0, 'hist': 0, 'outc': 0, 'hand': 0, 'ev': 0, 'st': 0, 'fl': 0, 'star': 0}
+      - memory order []
+      - chunks
+      - booked []
+FAIL L9 [TG] the new profile's own row wins over both predecessors (new wins); their duplicates are dropped [HEAD]
+      - plan {'planned': None, 'own_id': None, 'foreign': None, 'replace_ids': [], 'pred_profiles': []}
+      - bind {'bound': None, 'adopted_profiles': None, 'retired_ids': None}
+      - a chat only P0 had: {'hist': None, 'outc': None, 'hand': None, 'ev': None, 'st': None, 'fl': None}
+      - left: {'mem': 4, 'hist': 2, 'outc': 2, 'hand': 2, 'ev': 2, 'st': 2, 'fl': 2, 'star': 1} {'mem': 2, 'hist': 1, 'outc': 1, 'hand': 1, 'ev': 1, 'st': 1, 'fl': 1, 'star': 1}
+      - new profile {'mem': 2, 'hist': 1, 'outc': 1, 'hand': 1, 'ev': 1, 'st': 1, 'fl': 1, 'star': 1}
+      - memory order ['new m0', 'new m1']
+      - chunks
+      - booked []
+FAIL L10 [WA] a retry after retryOnFail (or a repeated Create whose answer was lost) is idempotent: same answer, nothing moved or booked twice [HEAD]
+      - retry {'bound': None, 'adopted_profiles': None, 'retired_ids': None}
+      - repeat plan {'planned': None, 'own_id': None, 'foreign': None, 'replace_ids': [], 'pred_profiles': []}
+FAIL L10 [TG] a retry after retryOnFail (or a repeated Create whose answer was lost) is idempotent: same answer, nothing moved or booked twice [HEAD]
+      - retry {'bound': None, 'adopted_profiles': None, 'retired_ids': None}
+      - repeat plan {'planned': None, 'own_id': None, 'foreign': None, 'replace_ids': [], 'pred_profiles': []}
+FAIL L11 [WA] legacy (compat window): reuse only an owner-less binding, never replace or adopt; a profile an install owns is foreign — and the bind refuses it too (Q3) [HEAD]
+      - legacy own {'planned': None, 'own_id': None, 'foreign': None, 'replace_ids': [], 'pred_profiles': []}
+      - legacy on an owned profile {'planned': None, 'own_id': None, 'foreign': None, 'replace_ids': [], 'pred_profiles': []}
+      - legacy bind {'bound': None, 'adopted_profiles': None, 'retired_ids': None}
+      - legacy chunks
+      - legacy booked []
+      - legacy bound an install's profile: {'bound': None, 'adopted_profiles': None, 'retired_ids': None} {'workflow_id': 'WAhj000000000000', 'superseded_by': None, 'sup_at': False, 'retired': False, 'deleted_reason': None, 'owner_id': 'inst-A'}
+FAIL L11 [TG] legacy (compat window): reuse only an owner-less binding, never replace or adopt; a profile an install owns is foreign — and the bind refuses it too (Q3) [HEAD]
+      - legacy own {'planned': None, 'own_id': None, 'foreign': None, 'replace_ids': [], 'pred_profiles': []}
+      - legacy on an owned profile {'planned': None, 'own_id': None, 'foreign': None, 'replace_ids': [], 'pred_profiles': []}
+      - legacy bind {'bound': None, 'adopted_profiles': None, 'retired_ids': None}
+      - legacy chunks
+      - legacy booked []
+      - legacy bound an install's profile: {'bound': None, 'adopted_profiles': None, 'retired_ids': None} {'workflow_id': 'TGhj000000000000', 'superseded_by': None, 'sup_at': False, 'retired': False, 'deleted_reason': None, 'owner_id': 'inst-A'}
+FAIL L12 [WA] a sentinel profile (-1 / empty) binds nothing and SAYS so (bound = false) [HEAD]
+      - '-1': {'bound': None, 'adopted_profiles': None, 'retired_ids': None}
+      - '': {'bound': None, 'adopted_profiles': None, 'retired_ids': None}
+FAIL L12 [TG] a sentinel profile (-1 / empty) binds nothing and SAYS so (bound = false) [HEAD]
+      - '-1': {'bound': None, 'adopted_profiles': None, 'retired_ids': None}
+      - '': {'bound': None, 'adopted_profiles': None, 'retired_ids': None}
+PASS L13 [WA] the pre-F1 rule: a second channel joining a bot of the other channel takes the chunks that carry the -1 sentinel for this channel [HEAD]
+PASS L13 [TG] the pre-F1 rule: a second channel joining a bot of the other channel takes the chunks that carry the -1 sentinel for this channel [HEAD]
+FAIL L14 [WA] protected ids are never reused, replaced, moved, booked or bound [HEAD]
+      - bound a protected id: {'bound': None, 'adopted_profiles': None, 'retired_ids': None}
+FAIL L14 [TG] protected ids are never reused, replaced, moved, booked or bound [HEAD]
+      - bound a protected id: {'bound': None, 'adopted_profiles': None, 'retired_ids': None}
+PASS L15 [WA] a clone another bot's LIVE row drives is never replaced (plan) nor moved or booked (bind) [HEAD]
+PASS L15 [TG] a clone another bot's LIVE row drives is never replaced (plan) nor moved or booked (bind) [HEAD]
+FAIL L16 [WA] a concurrent Create of the same profile bound another clone between our plan and our bind: the binding the upsert overwrites is booked and its price lists move (no unbound clone) [HEAD]
+      - the overwritten clone is lost: {'bound': None, 'adopted_profiles': None, 'retired_ids': None} []
+      - its price lists stayed behind
+FAIL L16 [TG] a concurrent Create of the same profile bound another clone between our plan and our bind: the binding the upsert overwrites is booked and its price lists move (no unbound clone) [HEAD]
+      - the overwritten clone is lost: {'bound': None, 'adopted_profiles': None, 'retired_ids': None} []
+      - its price lists stayed behind
+FAIL L17 [WA] Bind re-checks the row it writes: another install's profile (a stale token, M5) and a profile of the other channel are refused (bound = false), never rebound [HEAD]
+      - hijacked: {'bound': None, 'adopted_profiles': None, 'retired_ids': None} {'workflow_id': 'WAhj000000000000', 'superseded_by': None, 'sup_at': False, 'retired': False, 'deleted_reason': None, 'owner_id': 'inst-B'}
+      - cross-channel bind: {'bound': None, 'adopted_profiles': None, 'retired_ids': None}
+FAIL L17 [TG] Bind re-checks the row it writes: another install's profile (a stale token, M5) and a profile of the other channel are refused (bound = false), never rebound [HEAD]
+      - hijacked: {'bound': None, 'adopted_profiles': None, 'retired_ids': None} {'workflow_id': 'TGhj000000000000', 'superseded_by': None, 'sup_at': False, 'retired': False, 'deleted_reason': None, 'owner_id': 'inst-B'}
+      - cross-channel bind: {'bound': None, 'adopted_profiles': None, 'retired_ids': None}
+FAIL L18 [WA] a superseded row bound again loses the mark (F1); the original reason is kept for a liveness row [HEAD]
+      - superseded {'workflow_id': 'WAold00000000000', 'superseded_by': None, 'sup_at': False, 'retired': True, 'deleted_reason': 'liveness', 'owner_id': 'inst-A'}
+FAIL L18 [TG] a superseded row bound again loses the mark (F1); the original reason is kept for a liveness row [HEAD]
+      - superseded {'workflow_id': 'TGold00000000000', 'superseded_by': None, 'sup_at': False, 'retired': True, 'deleted_reason': 'liveness', 'owner_id': 'inst-A'}
+
+6 pass, 30 fail
+exit 1
+
+## 2. python3 Tools/n8n/tests/test_clone_lineage_sql.py   (normal mode: Tools/n8n/clone_lineage.py does not exist yet)
+
+Traceback (most recent call last):
+  File "/Users/ayan/Projects/Automation/Tools/n8n/tests/test_clone_lineage_sql.py", line 852, in <module>
+    fn(ch)
+  File "/Users/ayan/Projects/Automation/Tools/n8n/tests/test_clone_lineage_sql.py", line 278, in reconnect_after_purchase
+    with Case(tagged(f'L1 [{ch}] reconnect after a purchase (F2 R1): the new clone takes the bot\'s memory, history, outcomes, '
+  File "/Users/ayan/Projects/Automation/Tools/n8n/tests/test_clone_lineage_sql.py", line 270, in tagged
+    return f'{title} [{impl().label}]'
+  File "/Users/ayan/Projects/Automation/Tools/n8n/tests/test_clone_lineage_sql.py", line 253, in impl
+    IMPL = Line()
+  File "/Users/ayan/Projects/Automation/Tools/n8n/tests/test_clone_lineage_sql.py", line 223, in __init__
+    self.m = module('clone_lineage.py')
+  File "/Users/ayan/Projects/Automation/Tools/n8n/tests/harness.py", line 76, in module
+    spec.loader.exec_module(m)
+  File "<frozen importlib._bootstrap_external>", line 846, in exec_module
+  File "<frozen importlib._bootstrap_external>", line 982, in get_code
+  File "<frozen importlib._bootstrap_external>", line 1039, in get_data
+FileNotFoundError: [Errno 2] No such file or directory: '/Users/ayan/Projects/Automation/Tools/n8n/clone_lineage.py'
+exit 1
+
+## 3. 2026-10-11 23:18 +0500, HEAD 5b4bb62a — the extended matrix (+ L7 refusals «empty bot key, nothing named» / «retired new profile», the
+##    current-ids deletion invariant in L4/L8, L19 booked clone, C1/C2 races on two real connections) against the FIRST DRAFT
+##    of Tools/n8n/clone_lineage.py left by the interrupted attempt (before the review fixes)
+
+$ python3 Tools/n8n/tests/test_clone_lineage_sql.py   (failing cases only; the other 43 pass)
+
+      timing (s): {"WA": {"pre-F1": 0.001, "line": 0.103}, "TG": {"pre-F1": 0.001, "line": 0.106}}
+FAIL L19 [WA] a clone booked for deletion is never offered for reuse: the superseded profile comes back (a stale retry of its Create) and gets a NEW clone; no live row ever drives a booked clone [line]
+      - a booked clone was offered for reuse: {'planned': True, 'own_id': 'WAold00000000000', 'foreign': False, 'replace_ids': ['WAnew00000000000'], 'pred_profiles': ['wa-P2']}
+      - row {'workflow_id': 'WAold00000000000', 'superseded_by': None, 'sup_at': False, 'retired': False, 'deleted_reason': 'trial_expiry', 'owner_id': 'inst-A'}
+      - a live row drives a booked clone: ['WAold00000000000']
+FAIL L19 [TG] a clone booked for deletion is never offered for reuse: the superseded profile comes back (a stale retry of its Create) and gets a NEW clone; no live row ever drives a booked clone [line]
+      - a booked clone was offered for reuse: {'planned': True, 'own_id': 'TGold00000000000', 'foreign': False, 'replace_ids': ['TGnew00000000000'], 'pred_profiles': ['tg-P2']}
+      - row {'workflow_id': 'TGold00000000000', 'superseded_by': None, 'sup_at': False, 'retired': False, 'deleted_reason': 'trial_expiry', 'owner_id': 'inst-A'}
+      - a live row drives a booked clone: ['TGold00000000000']
+FAIL C1 [WA] two Creates of the SAME profile race (a client retry while the first still runs; both probes said the bound clone is gone): exactly one bind wins and SAYS so, the loser answers bound = false (the graph discards its clone) — no clone is lost and the price lists follow the bound one [line]
+      - the first committer lost its binding: row WAcb000000000000, first {'bound': True, 'workflow_id': 'WAca000000000000', 'adopted_profiles': [], 'retired_ids': ['WAold00000000000'], 'restamped_chunks': 2, 'restamped_files': 0, 'superseded_rows': 0, 'booked': 1, 'moved_memory': 0, 'moved_history': 0, 'moved_outcomes': 0, 'moved_handoffs': 0, 'moved_events': 0, 'moved_states': 0, 'moved_flags': 0, 'dropped_rows': 0}
+      - the second bind claims success over a binding it never saw: {'bound': True, 'workflow_id': 'WAcb000000000000', 'adopted_profiles': [], 'retired_ids': ['WAold00000000000'], 'restamped_chunks': 0, 'restamped_files': 0, 'superseded_rows': 0, 'booked': 0, 'moved_memory': 0, 'moved_history': 0, 'moved_outcomes': 0, 'moved_handoffs': 0, 'moved_events': 0, 'moved_states': 0, 'moved_flags': 0, 'dropped_rows': 0}
+      - price lists stranded: [('WAold00000000000', 0), ('WAca000000000000', 2), ('WAcb000000000000', 0)]
+      - clones nobody names, books or discards: ['WAca000000000000']
+FAIL C1 [TG] two Creates of the SAME profile race (a client retry while the first still runs; both probes said the bound clone is gone): exactly one bind wins and SAYS so, the loser answers bound = false (the graph discards its clone) — no clone is lost and the price lists follow the bound one [line]
+      - the first committer lost its binding: row TGcb000000000000, first {'bound': True, 'workflow_id': 'TGca000000000000', 'adopted_profiles': [], 'retired_ids': ['TGold00000000000'], 'restamped_chunks': 2, 'restamped_files': 0, 'superseded_rows': 0, 'booked': 1, 'moved_memory': 0, 'moved_history': 0, 'moved_outcomes': 0, 'moved_handoffs': 0, 'moved_events': 0, 'moved_states': 0, 'moved_flags': 0, 'dropped_rows': 0}
+      - the second bind claims success over a binding it never saw: {'bound': True, 'workflow_id': 'TGcb000000000000', 'adopted_profiles': [], 'retired_ids': ['TGold00000000000'], 'restamped_chunks': 0, 'restamped_files': 0, 'superseded_rows': 0, 'booked': 0, 'moved_memory': 0, 'moved_history': 0, 'moved_outcomes': 0, 'moved_handoffs': 0, 'moved_events': 0, 'moved_states': 0, 'moved_flags': 0, 'dropped_rows': 0}
+      - price lists stranded: [('TGold00000000000', 0), ('TGca000000000000', 2), ('TGcb000000000000', 0)]
+      - clones nobody names, books or discards: ['TGca000000000000']
+FAIL C2 [WA] two new profiles of the same bot adopt the same predecessor at once: everything it had lands under ONE of them (the first committer) — nothing split, nothing deleted; the predecessor is marked once; the loser does not claim the adoption [line]
+      - not all under the first committer: {'mem': 4, 'hist': 0, 'outc': 2, 'hand': 0, 'ev': 2, 'st': 2, 'fl': 2, 'star': 0} of {'mem': 4, 'hist': 2, 'outc': 2, 'hand': 2, 'ev': 2, 'st': 2, 'fl': 2}
+      - split to the second: {'mem': 0, 'hist': 2, 'outc': 0, 'hand': 2, 'ev': 0, 'st': 0, 'fl': 0, 'star': 0}
+      - the predecessor is marked by the loser: {'workflow_id': 'WAold00000000000', 'superseded_by': 'wa-P3', 'sup_at': True, 'retired': True, 'deleted_reason': 'trial_expiry', 'owner_id': 'inst-A'}
+      - adoption claimed by ['wa-P1'] / ['wa-P1']
+FAIL C2 [TG] two new profiles of the same bot adopt the same predecessor at once: everything it had lands under ONE of them (the first committer) — nothing split, nothing deleted; the predecessor is marked once; the loser does not claim the adoption [line]
+      - not all under the first committer: {'mem': 4, 'hist': 0, 'outc': 2, 'hand': 0, 'ev': 2, 'st': 2, 'fl': 2, 'star': 0} of {'mem': 4, 'hist': 2, 'outc': 2, 'hand': 2, 'ev': 2, 'st': 2, 'fl': 2}
+      - split to the second: {'mem': 0, 'hist': 2, 'outc': 0, 'hand': 2, 'ev': 0, 'st': 0, 'fl': 0, 'star': 0}
+      - the predecessor is marked by the loser: {'workflow_id': 'TGold00000000000', 'superseded_by': 'tg-P3', 'sup_at': True, 'retired': True, 'deleted_reason': 'trial_expiry', 'owner_id': 'inst-A'}
+      - adoption claimed by ['tg-P1'] / ['tg-P1']
+
+43 pass, 6 fail
+exit 1
+
+## 4. the same extended matrix against the pre-F1 canon
+
+$ python3 Tools/n8n/tests/test_clone_lineage_sql.py --head
+
+FAIL L1 [WA] reconnect after a purchase (F2 R1): the new clone takes the bot's memory, history, outcomes, handoffs, ledger, state, chat flags, price lists and file registry; the prior row is superseded, the prior clone booked [HEAD]
+      - plan {'planned': None, 'own_id': None, 'foreign': None, 'replace_ids': [], 'pred_profiles': []}
+      - plan {'planned': None, 'own_id': None, 'foreign': None, 'replace_ids': [], 'pred_profiles': []}
+      - bind has no positive marker: {'bound': None, 'adopted_profiles': None, 'retired_ids': None}
+      - bind {'bound': None, 'adopted_profiles': None, 'retired_ids': None}
+      - chunks old/new/neighbour = (2, 0, 1)
+      - file registry ['WAold00000000000', 'WAold00000000000', 'WAold00000000000']
+      - prior row not marked: {'workflow_id': 'WAold00000000000', 'superseded_by': None, 'sup_at': False, 'retired': True, 'deleted_reason': 'trial_expiry', 'owner_id': 'inst-A'}
+      - prior clone not booked: []
+      - left under the old profile: {'mem': 2, 'hist': 1, 'outc': 1, 'hand': 1, 'ev': 1, 'st': 1, 'fl': 1, 'star': 1}
+      - new profile: {'mem': 0, 'hist': 0, 'outc': 0, 'hand': 0, 'ev': 0, 'st': 0, 'fl': 0, 'star': 1}
+      - memory row ids not preserved: [380699, 380700] -> []
+      - after the delete: old {'mem': 2, 'hist': 1, 'outc': 1, 'hand': 1, 'ev': 1, 'st': 1, 'fl': 1, 'star': 1} new {'mem': 0, 'hist': 0, 'outc': 0, 'hand': 0, 'ev': 0, 'st': 0, 'fl': 0, 'star': 0}
+      - chunks after the delete
+FAIL L1 [TG] reconnect after a purchase (F2 R1): the new clone takes the bot's memory, history, outcomes, handoffs, ledger, state, chat flags, price lists and file registry; the prior row is superseded, the prior clone booked [HEAD]
+      - plan {'planned': None, 'own_id': None, 'foreign': None, 'replace_ids': [], 'pred_profiles': []}
+      - plan {'planned': None, 'own_id': None, 'foreign': None, 'replace_ids': [], 'pred_profiles': []}
+      - bind has no positive marker: {'bound': None, 'adopted_profiles': None, 'retired_ids': None}
+      - bind {'bound': None, 'adopted_profiles': None, 'retired_ids': None}
+      - chunks old/new/neighbour = (2, 0, 1)
+      - file registry ['TGold00000000000', 'TGold00000000000', 'TGold00000000000']
+      - prior row not marked: {'workflow_id': 'TGold00000000000', 'superseded_by': None, 'sup_at': False, 'retired': True, 'deleted_reason': 'trial_expiry', 'owner_id': 'inst-A'}
+      - prior clone not booked: []
+      - left under the old profile: {'mem': 2, 'hist': 1, 'outc': 1, 'hand': 1, 'ev': 1, 'st': 1, 'fl': 1, 'star': 1}
+      - new profile: {'mem': 0, 'hist': 0, 'outc': 0, 'hand': 0, 'ev': 0, 'st': 0, 'fl': 0, 'star': 1}
+      - memory row ids not preserved: [380701, 380702] -> []
+      - after the delete: old {'mem': 2, 'hist': 1, 'outc': 1, 'hand': 1, 'ev': 1, 'st': 1, 'fl': 1, 'star': 1} new {'mem': 0, 'hist': 0, 'outc': 0, 'hand': 0, 'ev': 0, 'st': 0, 'fl': 0, 'star': 0}
+      - chunks after the delete
+FAIL L2 [WA] the same profile, its bound clone gone (F1 а1: 404 / archived): the new clone takes the old binding's price lists, the old clone is booked, nothing is superseded or moved between profiles [HEAD]
+      - plan {'planned': None, 'own_id': None, 'foreign': None, 'replace_ids': [], 'pred_profiles': []}
+      - bind {'bound': None, 'adopted_profiles': None, 'retired_ids': None}
+      - price lists stayed under the gone clone: (2, 0)
+      - retirements []
+      - the old clone is reachable by nobody
+FAIL L2 [TG] the same profile, its bound clone gone (F1 а1: 404 / archived): the new clone takes the old binding's price lists, the old clone is booked, nothing is superseded or moved between profiles [HEAD]
+      - plan {'planned': None, 'own_id': None, 'foreign': None, 'replace_ids': [], 'pred_profiles': []}
+      - bind {'bound': None, 'adopted_profiles': None, 'retired_ids': None}
+      - price lists stayed under the gone clone: (2, 0)
+      - retirements []
+      - the old clone is reachable by nobody
+FAIL L3 [WA] the same profile, its bound clone usable (F1 а1/а2): the plan names it, the Create reuses it — no new clone, nothing moved or booked [HEAD]
+      - a new clone was created for a profile whose bound clone is usable
+      - bind {'bound': None, 'adopted_profiles': None, 'retired_ids': None}
+      - row {'workflow_id': 'WAnew00000000000', 'superseded_by': None, 'sup_at': False, 'retired': False, 'deleted_reason': None, 'owner_id': 'inst-A'} chunks 2 retirements []
+FAIL L3 [TG] the same profile, its bound clone usable (F1 а1/а2): the plan names it, the Create reuses it — no new clone, nothing moved or booked [HEAD]
+      - a new clone was created for a profile whose bound clone is usable
+      - bind {'bound': None, 'adopted_profiles': None, 'retired_ids': None}
+      - row {'workflow_id': 'TGnew00000000000', 'superseded_by': None, 'sup_at': False, 'retired': False, 'deleted_reason': None, 'owner_id': 'inst-A'} chunks 2 retirements []
+FAIL L4 [WA] a new profile after Retire Same Bot Slot (F1 а3, an older client: no CreateOrigin, no PreviousProfileId): the bot key proves the predecessor; its NULL reason becomes replaced [HEAD]
+      - plan {'planned': None, 'own_id': None, 'foreign': None, 'replace_ids': [], 'pred_profiles': []}
+      - bind {'bound': None, 'adopted_profiles': None, 'retired_ids': None} row {'workflow_id': 'WAold00000000000', 'superseded_by': None, 'sup_at': False, 'retired': True, 'deleted_reason': None, 'owner_id': 'inst-A'}
+      - chunks
+      - old {'mem': 2, 'hist': 1, 'outc': 1, 'hand': 1, 'ev': 1, 'st': 1, 'fl': 1, 'star': 1} new {'mem': 0, 'hist': 0, 'outc': 0, 'hand': 0, 'ev': 0, 'st': 0, 'fl': 0, 'star': 0}
+      - left after the delete by the current ids: {'wa-P1': {'mem': 2, 'hist': 1, 'outc': 1, 'hand': 1, 'ev': 1, 'st': 1, 'fl': 1, 'star': 1}}
+      - chunks left after the delete by the current ids: {'WAold00000000000': 2}
+FAIL L4 [TG] a new profile after Retire Same Bot Slot (F1 а3, an older client: no CreateOrigin, no PreviousProfileId): the bot key proves the predecessor; its NULL reason becomes replaced [HEAD]
+      - plan {'planned': None, 'own_id': None, 'foreign': None, 'replace_ids': [], 'pred_profiles': []}
+      - bind {'bound': None, 'adopted_profiles': None, 'retired_ids': None} row {'workflow_id': 'TGold00000000000', 'superseded_by': None, 'sup_at': False, 'retired': True, 'deleted_reason': None, 'owner_id': 'inst-A'}
+      - chunks
+      - old {'mem': 2, 'hist': 1, 'outc': 1, 'hand': 1, 'ev': 1, 'st': 1, 'fl': 1, 'star': 1} new {'mem': 0, 'hist': 0, 'outc': 0, 'hand': 0, 'ev': 0, 'st': 0, 'fl': 0, 'star': 0}
+      - left after the delete by the current ids: {'tg-P1': {'mem': 2, 'hist': 1, 'outc': 1, 'hand': 1, 'ev': 1, 'st': 1, 'fl': 1, 'star': 1}}
+      - chunks left after the delete by the current ids: {'TGold00000000000': 2}
+PASS L5 [WA] a wizard Create (CreateOrigin=start, a NEW bot in a reused slot) never looks for a predecessor, even with the same bot key and a named previous profile [HEAD]
+PASS L5 [TG] a wizard Create (CreateOrigin=start, a NEW bot in a reused slot) never looks for a predecessor, even with the same bot key and a named previous profile [HEAD]
+FAIL L6 [WA] PreviousProfileId proves a predecessor that has no bot key (a row from before bot_key / the proxy's row); a DIFFERENT bot key refuses it [HEAD]
+      - plan {'planned': None, 'own_id': None, 'foreign': None, 'replace_ids': [], 'pred_profiles': []}
+      - bind {'bound': None, 'adopted_profiles': None, 'retired_ids': None}
+FAIL L6 [TG] PreviousProfileId proves a predecessor that has no bot key (a row from before bot_key / the proxy's row); a DIFFERENT bot key refuses it [HEAD]
+      - plan {'planned': None, 'own_id': None, 'foreign': None, 'replace_ids': [], 'pred_profiles': []}
+      - bind {'bound': None, 'adopted_profiles': None, 'retired_ids': None}
+FAIL L7 [WA] refusals of the predecessor rule — plan and bind: another install, an owner-less row, app_delete, another channel, another bot key, a row another profile took over, the new profile itself, a revoked install, a new profile someone else owns [HEAD]
+      - revoked: {'planned': None, 'own_id': None, 'foreign': None, 'replace_ids': [], 'pred_profiles': []}
+      - foreign new profile: {'planned': None, 'own_id': None, 'foreign': None, 'replace_ids': [], 'pred_profiles': []}
+      - bound another install's profile: {'bound': None, 'adopted_profiles': None, 'retired_ids': None} {'workflow_id': 'WAnew00000000000', 'superseded_by': None, 'sup_at': False, 'retired': False, 'deleted_reason': None, 'owner_id': 'inst-B'}
+FAIL L7 [TG] refusals of the predecessor rule — plan and bind: another install, an owner-less row, app_delete, another channel, another bot key, a row another profile took over, the new profile itself, a revoked install, a new profile someone else owns [HEAD]
+      - revoked: {'planned': None, 'own_id': None, 'foreign': None, 'replace_ids': [], 'pred_profiles': []}
+      - foreign new profile: {'planned': None, 'own_id': None, 'foreign': None, 'replace_ids': [], 'pred_profiles': []}
+      - bound another install's profile: {'bound': None, 'adopted_profiles': None, 'retired_ids': None} {'workflow_id': 'TGnew00000000000', 'superseded_by': None, 'sup_at': False, 'retired': False, 'deleted_reason': None, 'owner_id': 'inst-B'}
+FAIL L8 [WA] two predecessors with the same chat: one row per key under the new profile — the FRESHEST — no unique violation; both memories kept in order [HEAD]
+      - plan {'planned': None, 'own_id': None, 'foreign': None, 'replace_ids': [], 'pred_profiles': []}
+      - bind {'bound': None, 'adopted_profiles': None, 'retired_ids': None}
+      - winner {'hist': None, 'outc': None, 'hand': None, 'ev': None, 'st': None, 'fl': None} != {'hist': 'p1', 'outc': 'p1', 'hand': 'p1', 'ev': 'p1', 'st': 'p1', 'fl': True}
+      - a chat only P0 had: {'hist': None, 'outc': None, 'hand': None, 'ev': None, 'st': None, 'fl': None}
+      - left: {'mem': 4, 'hist': 2, 'outc': 2, 'hand': 2, 'ev': 2, 'st': 2, 'fl': 2, 'star': 1} {'mem': 2, 'hist': 1, 'outc': 1, 'hand': 1, 'ev': 1, 'st': 1, 'fl': 1, 'star': 1}
+      - new profile {'mem': 0, 'hist': 0, 'outc': 0, 'hand': 0, 'ev': 0, 'st': 0, 'fl': 0, 'star': 0}
+      - memory order []
+      - chunks
+      - booked []
+      - left after the delete by the current ids: {'wa-P0': {'mem': 4, 'hist': 2, 'outc': 2, 'hand': 2, 'ev': 2, 'st': 2, 'fl': 2, 'star': 1}, 'wa-P1': {'mem': 2, 'hist': 1, 'outc': 1, 'hand': 1, 'ev': 1, 'st': 1, 'fl': 1, 'star': 1}}
+      - chunks left after the delete by the current ids: {'WAp0000000000000': 1, 'WAp1000000000000': 2}
+FAIL L9 [WA] the new profile's own row wins over both predecessors (new wins); their duplicates are dropped [HEAD]
+      - plan {'planned': None, 'own_id': None, 'foreign': None, 'replace_ids': [], 'pred_profiles': []}
+      - bind {'bound': None, 'adopted_profiles': None, 'retired_ids': None}
+      - a chat only P0 had: {'hist': None, 'outc': None, 'hand': None, 'ev': None, 'st': None, 'fl': None}
+      - left: {'mem': 4, 'hist': 2, 'outc': 2, 'hand': 2, 'ev': 2, 'st': 2, 'fl': 2, 'star': 1} {'mem': 2, 'hist': 1, 'outc': 1, 'hand': 1, 'ev': 1, 'st': 1, 'fl': 1, 'star': 1}
+      - new profile {'mem': 2, 'hist': 1, 'outc': 1, 'hand': 1, 'ev': 1, 'st': 1, 'fl': 1, 'star': 1}
+      - memory order ['new m0', 'new m1']
+      - chunks
+      - booked []
+      - left after the delete by the current ids: {'wa-P0': {'mem': 4, 'hist': 2, 'outc': 2, 'hand': 2, 'ev': 2, 'st': 2, 'fl': 2, 'star': 1}, 'wa-P1': {'mem': 2, 'hist': 1, 'outc': 1, 'hand': 1, 'ev': 1, 'st': 1, 'fl': 1, 'star': 1}}
+      - chunks left after the delete by the current ids: {'WAp0000000000000': 1, 'WAp1000000000000': 2}
+FAIL L8 [TG] two predecessors with the same chat: one row per key under the new profile — the FRESHEST — no unique violation; both memories kept in order [HEAD]
+      - plan {'planned': None, 'own_id': None, 'foreign': None, 'replace_ids': [], 'pred_profiles': []}
+      - bind {'bound': None, 'adopted_profiles': None, 'retired_ids': None}
+      - winner {'hist': None, 'outc': None, 'hand': None, 'ev': None, 'st': None, 'fl': None} != {'hist': 'p1', 'outc': 'p1', 'hand': 'p1', 'ev': 'p1', 'st': 'p1', 'fl': True}
+      - a chat only P0 had: {'hist': None, 'outc': None, 'hand': None, 'ev': None, 'st': None, 'fl': None}
+      - left: {'mem': 4, 'hist': 2, 'outc': 2, 'hand': 2, 'ev': 2, 'st': 2, 'fl': 2, 'star': 1} {'mem': 2, 'hist': 1, 'outc': 1, 'hand': 1, 'ev': 1, 'st': 1, 'fl': 1, 'star': 1}
+      - new profile {'mem': 0, 'hist': 0, 'outc': 0, 'hand': 0, 'ev': 0, 'st': 0, 'fl': 0, 'star': 0}
+      - memory order []
+      - chunks
+      - booked []
+      - left after the delete by the current ids: {'tg-P0': {'mem': 4, 'hist': 2, 'outc': 2, 'hand': 2, 'ev': 2, 'st': 2, 'fl': 2, 'star': 1}, 'tg-P1': {'mem': 2, 'hist': 1, 'outc': 1, 'hand': 1, 'ev': 1, 'st': 1, 'fl': 1, 'star': 1}}
+      - chunks left after the delete by the current ids: {'TGp0000000000000': 1, 'TGp1000000000000': 2}
+FAIL L9 [TG] the new profile's own row wins over both predecessors (new wins); their duplicates are dropped [HEAD]
+      - plan {'planned': None, 'own_id': None, 'foreign': None, 'replace_ids': [], 'pred_profiles': []}
+      - bind {'bound': None, 'adopted_profiles': None, 'retired_ids': None}
+      - a chat only P0 had: {'hist': None, 'outc': None, 'hand': None, 'ev': None, 'st': None, 'fl': None}
+      - left: {'mem': 4, 'hist': 2, 'outc': 2, 'hand': 2, 'ev': 2, 'st': 2, 'fl': 2, 'star': 1} {'mem': 2, 'hist': 1, 'outc': 1, 'hand': 1, 'ev': 1, 'st': 1, 'fl': 1, 'star': 1}
+      - new profile {'mem': 2, 'hist': 1, 'outc': 1, 'hand': 1, 'ev': 1, 'st': 1, 'fl': 1, 'star': 1}
+      - memory order ['new m0', 'new m1']
+      - chunks
+      - booked []
+      - left after the delete by the current ids: {'tg-P0': {'mem': 4, 'hist': 2, 'outc': 2, 'hand': 2, 'ev': 2, 'st': 2, 'fl': 2, 'star': 1}, 'tg-P1': {'mem': 2, 'hist': 1, 'outc': 1, 'hand': 1, 'ev': 1, 'st': 1, 'fl': 1, 'star': 1}}
+      - chunks left after the delete by the current ids: {'TGp0000000000000': 1, 'TGp1000000000000': 2}
+FAIL L10 [WA] a retry after retryOnFail (or a repeated Create whose answer was lost) is idempotent: same answer, nothing moved or booked twice [HEAD]
+      - retry {'bound': None, 'adopted_profiles': None, 'retired_ids': None}
+      - repeat plan {'planned': None, 'own_id': None, 'foreign': None, 'replace_ids': [], 'pred_profiles': []}
+FAIL L10 [TG] a retry after retryOnFail (or a repeated Create whose answer was lost) is idempotent: same answer, nothing moved or booked twice [HEAD]
+      - retry {'bound': None, 'adopted_profiles': None, 'retired_ids': None}
+      - repeat plan {'planned': None, 'own_id': None, 'foreign': None, 'replace_ids': [], 'pred_profiles': []}
+FAIL L11 [WA] legacy (compat window): reuse only an owner-less binding, never replace or adopt; a profile an install owns is foreign — and the bind refuses it too (Q3) [HEAD]
+      - legacy own {'planned': None, 'own_id': None, 'foreign': None, 'replace_ids': [], 'pred_profiles': []}
+      - legacy on an owned profile {'planned': None, 'own_id': None, 'foreign': None, 'replace_ids': [], 'pred_profiles': []}
+      - legacy bind {'bound': None, 'adopted_profiles': None, 'retired_ids': None}
+      - legacy chunks
+      - legacy booked []
+      - legacy bound an install's profile: {'bound': None, 'adopted_profiles': None, 'retired_ids': None} {'workflow_id': 'WAhj000000000000', 'superseded_by': None, 'sup_at': False, 'retired': False, 'deleted_reason': None, 'owner_id': 'inst-A'}
+FAIL L11 [TG] legacy (compat window): reuse only an owner-less binding, never replace or adopt; a profile an install owns is foreign — and the bind refuses it too (Q3) [HEAD]
+      - legacy own {'planned': None, 'own_id': None, 'foreign': None, 'replace_ids': [], 'pred_profiles': []}
+      - legacy on an owned profile {'planned': None, 'own_id': None, 'foreign': None, 'replace_ids': [], 'pred_profiles': []}
+      - legacy bind {'bound': None, 'adopted_profiles': None, 'retired_ids': None}
+      - legacy chunks
+      - legacy booked []
+      - legacy bound an install's profile: {'bound': None, 'adopted_profiles': None, 'retired_ids': None} {'workflow_id': 'TGhj000000000000', 'superseded_by': None, 'sup_at': False, 'retired': False, 'deleted_reason': None, 'owner_id': 'inst-A'}
+FAIL L12 [WA] a sentinel profile (-1 / empty) binds nothing and SAYS so (bound = false) [HEAD]
+      - '-1': {'bound': None, 'adopted_profiles': None, 'retired_ids': None}
+      - '': {'bound': None, 'adopted_profiles': None, 'retired_ids': None}
+FAIL L12 [TG] a sentinel profile (-1 / empty) binds nothing and SAYS so (bound = false) [HEAD]
+      - '-1': {'bound': None, 'adopted_profiles': None, 'retired_ids': None}
+      - '': {'bound': None, 'adopted_profiles': None, 'retired_ids': None}
+PASS L13 [WA] the pre-F1 rule: a second channel joining a bot of the other channel takes the chunks that carry the -1 sentinel for this channel [HEAD]
+PASS L13 [TG] the pre-F1 rule: a second channel joining a bot of the other channel takes the chunks that carry the -1 sentinel for this channel [HEAD]
+FAIL L14 [WA] protected ids are never reused, replaced, moved, booked or bound [HEAD]
+      - bound a protected id: {'bound': None, 'adopted_profiles': None, 'retired_ids': None}
+FAIL L14 [TG] protected ids are never reused, replaced, moved, booked or bound [HEAD]
+      - bound a protected id: {'bound': None, 'adopted_profiles': None, 'retired_ids': None}
+PASS L15 [WA] a clone another bot's LIVE row drives is never replaced (plan) nor moved or booked (bind) [HEAD]
+PASS L15 [TG] a clone another bot's LIVE row drives is never replaced (plan) nor moved or booked (bind) [HEAD]
+FAIL L16 [WA] a concurrent Create of the same profile bound another clone between our plan and our bind: the binding the upsert overwrites is booked and its price lists move (no unbound clone) [HEAD]
+      - the overwritten clone is lost: {'bound': None, 'adopted_profiles': None, 'retired_ids': None} []
+      - its price lists stayed behind
+FAIL L16 [TG] a concurrent Create of the same profile bound another clone between our plan and our bind: the binding the upsert overwrites is booked and its price lists move (no unbound clone) [HEAD]
+      - the overwritten clone is lost: {'bound': None, 'adopted_profiles': None, 'retired_ids': None} []
+      - its price lists stayed behind
+FAIL L17 [WA] Bind re-checks the row it writes: another install's profile (a stale token, M5) and a profile of the other channel are refused (bound = false), never rebound [HEAD]
+      - hijacked: {'bound': None, 'adopted_profiles': None, 'retired_ids': None} {'workflow_id': 'WAhj000000000000', 'superseded_by': None, 'sup_at': False, 'retired': False, 'deleted_reason': None, 'owner_id': 'inst-B'}
+      - cross-channel bind: {'bound': None, 'adopted_profiles': None, 'retired_ids': None}
+FAIL L17 [TG] Bind re-checks the row it writes: another install's profile (a stale token, M5) and a profile of the other channel are refused (bound = false), never rebound [HEAD]
+      - hijacked: {'bound': None, 'adopted_profiles': None, 'retired_ids': None} {'workflow_id': 'TGhj000000000000', 'superseded_by': None, 'sup_at': False, 'retired': False, 'deleted_reason': None, 'owner_id': 'inst-B'}
+      - cross-channel bind: {'bound': None, 'adopted_profiles': None, 'retired_ids': None}
+FAIL L18 [WA] a superseded row bound again loses the mark (F1); the original reason is kept for a liveness row [HEAD]
+      - superseded {'workflow_id': 'WAold00000000000', 'superseded_by': None, 'sup_at': False, 'retired': True, 'deleted_reason': 'liveness', 'owner_id': 'inst-A'}
+FAIL L18 [TG] a superseded row bound again loses the mark (F1); the original reason is kept for a liveness row [HEAD]
+      - superseded {'workflow_id': 'TGold00000000000', 'superseded_by': None, 'sup_at': False, 'retired': True, 'deleted_reason': 'liveness', 'owner_id': 'inst-A'}
+FAIL L19 [WA] a clone booked for deletion is never offered for reuse: the superseded profile comes back (a stale retry of its Create) and gets a NEW clone; no live row ever drives a booked clone [HEAD]
+      - setup: []
+      - the booked clone left the books
+FAIL L19 [TG] a clone booked for deletion is never offered for reuse: the superseded profile comes back (a stale retry of its Create) and gets a NEW clone; no live row ever drives a booked clone [HEAD]
+      - setup: []
+      - the booked clone left the books
+FAIL C1 [WA] two Creates of the SAME profile race (a client retry while the first still runs; both probes said the bound clone is gone): exactly one bind wins and SAYS so, the loser answers bound = false (the graph discards its clone) — no clone is lost and the price lists follow the bound one [HEAD]
+      - the first committer lost its binding: row WAcb000000000000, first {'bound': None, 'adopted_profiles': None, 'retired_ids': None}
+      - the second bind claims success over a binding it never saw: {'bound': None, 'adopted_profiles': None, 'retired_ids': None}
+      - price lists stranded: [('WAold00000000000', 2), ('WAca000000000000', 0), ('WAcb000000000000', 0)]
+      - clones nobody names, books or discards: ['WAca000000000000', 'WAold00000000000']
+FAIL C1 [TG] two Creates of the SAME profile race (a client retry while the first still runs; both probes said the bound clone is gone): exactly one bind wins and SAYS so, the loser answers bound = false (the graph discards its clone) — no clone is lost and the price lists follow the bound one [HEAD]
+      - the first committer lost its binding: row TGcb000000000000, first {'bound': None, 'adopted_profiles': None, 'retired_ids': None}
+      - the second bind claims success over a binding it never saw: {'bound': None, 'adopted_profiles': None, 'retired_ids': None}
+      - price lists stranded: [('TGold00000000000', 2), ('TGca000000000000', 0), ('TGcb000000000000', 0)]
+      - clones nobody names, books or discards: ['TGca000000000000', 'TGold00000000000']
+FAIL C2 [WA] two new profiles of the same bot adopt the same predecessor at once: everything it had lands under ONE of them (the first committer) — nothing split, nothing deleted; the predecessor is marked once; the loser does not claim the adoption [HEAD]
+      - the race did not happen: the second bind never waited on the first
+      - not all under the first committer: {'mem': 0, 'hist': 0, 'outc': 0, 'hand': 0, 'ev': 0, 'st': 0, 'fl': 0, 'star': 0} of {'mem': 4, 'hist': 2, 'outc': 2, 'hand': 2, 'ev': 2, 'st': 2, 'fl': 2}
+      - left under the predecessor: {'mem': 4, 'hist': 2, 'outc': 2, 'hand': 2, 'ev': 2, 'st': 2, 'fl': 2, 'star': 1}
+      - the predecessor is marked by the loser: {'workflow_id': 'WAold00000000000', 'superseded_by': None, 'sup_at': False, 'retired': True, 'deleted_reason': 'trial_expiry', 'owner_id': 'inst-A'}
+      - chunks [('WAold00000000000', 2), ('WAca000000000000', 0), ('WAcb000000000000', 0)]
+      - adoption claimed by None / None
+FAIL C2 [TG] two new profiles of the same bot adopt the same predecessor at once: everything it had lands under ONE of them (the first committer) — nothing split, nothing deleted; the predecessor is marked once; the loser does not claim the adoption [HEAD]
+      - the race did not happen: the second bind never waited on the first
+      - not all under the first committer: {'mem': 0, 'hist': 0, 'outc': 0, 'hand': 0, 'ev': 0, 'st': 0, 'fl': 0, 'star': 0} of {'mem': 4, 'hist': 2, 'outc': 2, 'hand': 2, 'ev': 2, 'st': 2, 'fl': 2}
+      - left under the predecessor: {'mem': 4, 'hist': 2, 'outc': 2, 'hand': 2, 'ev': 2, 'st': 2, 'fl': 2, 'star': 1}
+      - the predecessor is marked by the loser: {'workflow_id': 'TGold00000000000', 'superseded_by': None, 'sup_at': False, 'retired': True, 'deleted_reason': 'trial_expiry', 'owner_id': 'inst-A'}
+      - chunks [('TGold00000000000', 2), ('TGca000000000000', 0), ('TGcb000000000000', 0)]
+      - adoption claimed by None / None
+
+6 pass, 36 fail
+exit 1
+
+## 5. M8 (the chunk moves must reach the prod RAG store's expression indexes) against the draft's jsonb-containment predicates
+##    (d.metadata @> …, restored in memory by a scratch driver; on the staging GIN stub they only reach documents_metadata_idx,
+##    on prod — btree on metadata->>'botWaId' / 'botTgId' only — a full scan of the store)
+
+FAIL M8 the bind's chunk moves can use the RAG store's expression indexes (prod documents_metadata_bot_wa_idx / _tg_idx) — the replaced clones' chunks and the -1 rule alike, both channels
+      - WA: a chunk move that does not go through the expression indexes:
+    ->  Update on documents d  (cost=5.91..29.83 rows=1 width=94)
+                      ->  Bitmap Heap Scan on documents d  (cost=5.89..9.90 rows=1 width=38)
+                            ->  Bitmap Index Scan on documents_metadata_idx  (cost=0.00..5.89 rows=1 width=0)
+    ->  Update on documents d_1  (cost=21.86..25.88 rows=1 width=38)
+                ->  Bitmap Heap Scan on documents d_1  (cost=21.84..25.85 rows=1 width=38)
+                      ->  Bitmap Index Scan on documents_metadata_idx  (cost=0.00..21.84 rows=1 width=0)
+      - TG: a chunk move that does not go through the expression indexes:
+    ->  Update on documents d  (cost=5.91..29.83 rows=1 width=94)
+                      ->  Bitmap Heap Scan on documents d  (cost=5.89..9.90 rows=1 width=38)
+                            ->  Bitmap Index Scan on documents_metadata_idx  (cost=0.00..5.89 rows=1 width=0)
+    ->  Update on documents d_1  (cost=21.86..25.88 rows=1 width=38)
+                ->  Bitmap Heap Scan on documents d_1  (cost=21.84..25.85 rows=1 width=38)
+                      ->  Bitmap Index Scan on documents_metadata_idx  (cost=0.00..21.84 rows=1 width=0)
+
+0 pass, 1 fail
+exit 1
+
+## 6. deviation check — L1 against the plan's LITERAL file rule (§1.5 «uploaded_files … только при owner_id = установка»,
+##    swapped in memory by a scratch driver): the owner-less compat registry row stays under the replaced clone, so the
+##    real Delete File Chunks (V4 proof: every workflow id the file is known under must be the token's) refuses the owner
+
+FAIL L1 [WA] reconnect after a purchase (F2 R1): the new clone takes the bot's memory, history, outcomes, handoffs, ledger, state, chat flags, price lists and file registry; the prior row is superseded, the prior clone booked [line]
+      - file registry ['WAnew00000000000', 'WAold00000000000', 'WAold00000000000']
+      - the owner cannot delete his compat file after the move: ['WAnew00000000000'] {'deletedChunks': 0, 'allowed': False}
+FAIL L1 [TG] reconnect after a purchase (F2 R1): the new clone takes the bot's memory, history, outcomes, handoffs, ledger, state, chat flags, price lists and file registry; the prior row is superseded, the prior clone booked [line]
+      - file registry ['TGnew00000000000', 'TGold00000000000', 'TGold00000000000']
+      - the owner cannot delete his compat file after the move: ['TGnew00000000000'] {'deletedChunks': 0, 'allowed': False}
+
+0 pass, 2 fail
+exit 1
