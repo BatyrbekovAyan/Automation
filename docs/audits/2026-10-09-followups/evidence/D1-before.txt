@@ -1,0 +1,102 @@
+# D1 before — HEAD f69aa614: Tools/n8n/deploy-canonical.py as committed (extracted with git archive HEAD into a scratch tree), the FINAL
+# new test Tools/n8n/tests/test_deploy_canonical.py copied beside it; 2026-10-11T10:48:00Z.
+# Fake n8n 2.36.7 public API in memory (no network, no staging, no prod). The 8 D1 cases fail on HEAD: the stored graph
+# matches the canon, the PUBLISHED one does not, and the tool prints «up to date» after one GET (exit 0). The 6 ordinary-path
+# controls pass on HEAD (a counter HEAD does not report reads as 0); the 9th failure is the new «inactive although it must
+# run» report — HEAD counts such a workflow «up to date».
+
+$ python3 Tools/n8n/tests/test_deploy_canonical.py
+FAIL D1 stored canonical, PUBLISHED version older: --apply publishes the stored version in place, read-back confirms (exit 0, republished=1)
+      - {'considered': 1, 'missing': 0, 'up_to_date': 1, 'would_update': 0, 'updated': 0, 'failed': 0}
+      - exactly one publish, pinned to the STORED versionId SCLcpn-v2: [('GET', '/workflows/SCLcpn6DMDG3Z4VN', None)]
+      - no PUT and no deactivate — the old version serves until the new one does: []
+      - the publish must be confirmed by READING the instance afterwards: [('GET', '/workflows/SCLcpn6DMDG3Z4VN')]
+      - the instance must serve the canonical stored version: SCLcpn-v1 vs SCLcpn-v2
+      - the rollback pointer (the previously published version SCLcpn-v1) must be printed:
+= SCLcpn6DMDG3Z4VN 'Set Reply Mode' up to date
+{"considered": 1, "missing": 0, "up_to_date": 1, "would_update": 0, "updated": 0, "failed": 0}
+
+      - the read-back verdict must be printed:
+= SCLcpn6DMDG3Z4VN 'Set Reply Mode' up to date
+{"considered": 1, "missing": 0, "up_to_date": 1, "would_update": 0, "updated": 0, "failed": 0}
+
+FAIL D1 dry-run: the same state is «would publish» with the rollback pointer, nothing is written (exit 0)
+      - {'considered': 1, 'missing': 0, 'up_to_date': 1, 'would_update': 0, 'updated': 0, 'failed': 0}
+      - the plan must name the version it would publish (SCLcpn-v2) and the rollback pointer (SCLcpn-v1):
+= SCLcpn6DMDG3Z4VN 'Set Reply Mode' up to date
+{"considered": 1, "missing": 0, "up_to_date": 1, "would_update": 0, "updated": 0, "failed": 0}
+
+FAIL D1 origin: a PUT whose own publish was refused (400, version saved) fails the run; the RE-RUN repairs it and confirms
+      - run 2 must repair: exit 0 {'considered': 1, 'missing': 0, 'up_to_date': 1, 'would_update': 0, 'updated': 0, 'failed': 0}
+= SCLcpn6DMDG3Z4VN 'Set Reply Mode' up to date
+{"considered": 1, "missing": 0, "up_to_date": 1, "would_update": 0, "updated": 0, "failed": 0}
+
+      - run 2 publishes only (no second PUT): []
+      - after run 2 the canonical graph is served
+      - run 3 is a no-op (idempotent): exit 0 {'considered': 1, 'missing': 0, 'up_to_date': 1, 'would_update': 0, 'updated': 0, 'failed': 0} writes=[]
+FAIL D1 an instance that reports version ids only (no activeVersion graph): activeVersionId != versionId is republished, then confirmed by the ids
+      - exit 0 {'considered': 1, 'missing': 0, 'up_to_date': 1, 'would_update': 0, 'updated': 0, 'failed': 0}
+= SCLcpn6DMDG3Z4VN 'Set Reply Mode' up to date
+{"considered": 1, "missing": 0, "up_to_date": 1, "would_update": 0, "updated": 0, "failed": 0}
+
+      - served = stored after the publish
+FAIL D1 an active workflow whose stored version still carries an unbound placeholder is NOT published (refused, exit 1)
+      - exit 0 {'considered': 1, 'missing': 0, 'up_to_date': 1, 'would_update': 0, 'updated': 0, 'failed': 0}
+= crTestDialog0001 'Test Dialog' up to date
+{"considered": 1, "missing": 0, "up_to_date": 1, "would_update": 0, "updated": 0, "failed": 0}
+
+      - the refusal must name the placeholder:
+= crTestDialog0001 'Test Dialog' up to date
+{"considered": 1, "missing": 0, "up_to_date": 1, "would_update": 0, "updated": 0, "failed": 0}
+
+      - bound control: exit 0 {'considered': 1, 'missing': 0, 'up_to_date': 1, 'would_update': 0, 'updated': 0, 'failed': 0}
+= crTestDialog0001 'Test Dialog' up to date
+{"considered": 1, "missing": 0, "up_to_date": 1, "would_update": 0, "updated": 0, "failed": 0}
+
+FAIL D1 NEG publish refused (400, n8n validated before switching): exit 1, failed=1, republished=0, the old served version is named
+      - exit 0
+= SCLcpn6DMDG3Z4VN 'Set Reply Mode' up to date
+{"considered": 1, "missing": 0, "up_to_date": 1, "would_update": 0, "updated": 0, "failed": 0}
+
+      - {'considered': 1, 'missing': 0, 'up_to_date': 1, 'would_update': 0, 'updated': 0, 'failed': 0}
+      - one publish attempt, no deactivate (the old version keeps serving): []
+      - the failure and the version STILL served (SCLcpn-v1) must be printed after it:
+= SCLcpn6DMDG3Z4VN 'Set Reply Mode' up to date
+{"considered": 1, "missing": 0, "up_to_date": 1, "would_update": 0, "updated": 0, "failed": 0}
+
+FAIL D1 NEG publish answered 200 but the served version did not change: the read-back fails the run (exit 1)
+      - exit 0 {'considered': 1, 'missing': 0, 'up_to_date': 1, 'would_update': 0, 'updated': 0, 'failed': 0}
+= SCLcpn6DMDG3Z4VN 'Set Reply Mode' up to date
+{"considered": 1, "missing": 0, "up_to_date": 1, "would_update": 0, "updated": 0, "failed": 0}
+
+      - the read-back must say FAILED:
+= SCLcpn6DMDG3Z4VN 'Set Reply Mode' up to date
+{"considered": 1, "missing": 0, "up_to_date": 1, "would_update": 0, "updated": 0, "failed": 0}
+
+FAIL D1 NEG publish rolled back by n8n (trigger registration failed → INACTIVE): exit 1, the read-back names the outage
+      - exit 0 {'considered': 1, 'missing': 0, 'up_to_date': 1, 'would_update': 0, 'updated': 0, 'failed': 0}
+= SCLcpn6DMDG3Z4VN 'Set Reply Mode' up to date
+{"considered": 1, "missing": 0, "up_to_date": 1, "would_update": 0, "updated": 0, "failed": 0}
+
+      - the output must say the workflow is now inactive:
+= SCLcpn6DMDG3Z4VN 'Set Reply Mode' up to date
+{"considered": 1, "missing": 0, "up_to_date": 1, "would_update": 0, "updated": 0, "failed": 0}
+
+PASS NEG ordinary DIFF: PUT, then (active) deactivate → activate, read-back ok — updated=1, exit 0, the path unchanged
+PASS NEG ordinary DIFF dry-run: would_update=1, would_publish=0, nothing written
+PASS NEG fully matching (stored = published = canonical): up_to_date=1, only GETs, exit 0
+PASS NEG inactive bot template with a canonical stored graph: up_to_date, never published or activated
+PASS NEG inactive bot template whose stored graph differs: PUT only, it stays inactive (no publish)
+FAIL NEG a workflow that must run but is INACTIVE (canonical stored): reported, never activated, not counted up to date, exit 0
+      - exit 0 {'considered': 1, 'missing': 0, 'up_to_date': 1, 'would_update': 0, 'updated': 0, 'failed': 0}
+= SCLcpn6DMDG3Z4VN 'Set Reply Mode' up to date
+{"considered": 1, "missing": 0, "up_to_date": 1, "would_update": 0, "updated": 0, "failed": 0}
+
+      - reported only: []
+= SCLcpn6DMDG3Z4VN 'Set Reply Mode' up to date
+{"considered": 1, "missing": 0, "up_to_date": 1, "would_update": 0, "updated": 0, "failed": 0}
+
+PASS NEG whole healthy canonical set (placeholders bound, templates inactive): --apply writes NOTHING, every workflow up to date
+
+6 pass, 9 fail
+exit=1

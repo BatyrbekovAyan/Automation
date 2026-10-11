@@ -1,0 +1,77 @@
+# D1 after — HEAD f69aa614 + the fix in Tools/n8n/deploy-canonical.py (published version judged like verify-deployed.py; a stale publish of an
+# active workflow is «would publish» / republished in place via POST /workflows/{id}/activate {versionId: <stored>} and confirmed by
+# a read-back; inactive workflows untouched), same test file as D1-before.txt; 2026-10-11T10:51:27Z.
+# Fake n8n 2.36.7 public API in memory (no network, no staging, no prod).
+
+$ python3 Tools/n8n/tests/test_deploy_canonical.py
+PASS D1 stored canonical, PUBLISHED version older: --apply publishes the stored version in place, read-back confirms (exit 0, republished=1)
+PASS D1 dry-run: the same state is «would publish» with the rollback pointer, nothing is written (exit 0)
+PASS D1 origin: a PUT whose own publish was refused (400, version saved) fails the run; the RE-RUN repairs it and confirms
+PASS D1 an instance that reports version ids only (no activeVersion graph): activeVersionId != versionId is republished, then confirmed by the ids
+PASS D1 an active workflow whose stored version still carries an unbound placeholder is NOT published (refused, exit 1)
+PASS D1 NEG publish refused (400, n8n validated before switching): exit 1, failed=1, republished=0, the old served version is named
+PASS D1 NEG publish answered 200 but the served version did not change: the read-back fails the run (exit 1)
+PASS D1 NEG publish rolled back by n8n (trigger registration failed → INACTIVE): exit 1, the read-back names the outage
+PASS NEG ordinary DIFF: PUT, then (active) deactivate → activate, read-back ok — updated=1, exit 0, the path unchanged
+PASS NEG ordinary DIFF dry-run: would_update=1, would_publish=0, nothing written
+PASS NEG fully matching (stored = published = canonical): up_to_date=1, only GETs, exit 0
+PASS NEG inactive bot template with a canonical stored graph: up_to_date, never published or activated
+PASS NEG inactive bot template whose stored graph differs: PUT only, it stays inactive (no publish)
+PASS NEG a workflow that must run but is INACTIVE (canonical stored): reported, never activated, not counted up to date, exit 0
+PASS NEG whole healthy canonical set (placeholders bound, templates inactive): --apply writes NOTHING, every workflow up to date
+
+15 pass, 0 fail
+exit=0
+
+# The D1 counterexample run by hand on the same fake (stored = canonical Set Reply Mode, served = the older version with its
+# first node disabled — the review's fixture), dry-run then --apply then a re-run:
+
+$ deploy-canonical.py --only SCLcpn6DMDG3Z4VN dry-run   -> exit 0
+^ SCLcpn6DMDG3Z4VN 'Set Reply Mode' stored graph is canonical, but n8n SERVES another version: activeVersionId SCLcpn-v1 (published graph e320283fc056) != stored versionId SCLcpn-v2
+    rollback pointer: activeVersionId SCLcpn-v1 (POST /workflows/SCLcpn6DMDG3Z4VN/activate {"versionId": "SCLcpn-v1"} serves it again)
+    would publish the stored versionId SCLcpn-v2 in place (no PUT, no deactivate)
+{"considered": 1, "missing": 0, "up_to_date": 0, "would_update": 0, "updated": 0, "would_publish": 1, "republished": 0, "inactive_must_run": 0, "failed": 0}
+requests: ['GET /workflows/SCLcpn6DMDG3Z4VN']
+
+$ deploy-canonical.py --only SCLcpn6DMDG3Z4VN --apply --yes   -> exit 0
+^ SCLcpn6DMDG3Z4VN 'Set Reply Mode' stored graph is canonical, but n8n SERVES another version: activeVersionId SCLcpn-v1 (published graph e320283fc056) != stored versionId SCLcpn-v2
+    rollback pointer: activeVersionId SCLcpn-v1 (POST /workflows/SCLcpn6DMDG3Z4VN/activate {"versionId": "SCLcpn-v1"} serves it again)
+    publishing the stored versionId SCLcpn-v2 in place (POST /workflows/SCLcpn6DMDG3Z4VN/activate — n8n validates it before it swaps the served version; no deactivate window)
+    read-back: ok — serving the stored versionId SCLcpn-v2, published graph canonical
+{"considered": 1, "missing": 0, "up_to_date": 0, "would_update": 0, "updated": 0, "would_publish": 0, "republished": 1, "inactive_must_run": 0, "failed": 0}
+requests: ['GET /workflows/SCLcpn6DMDG3Z4VN', 'POST /workflows/SCLcpn6DMDG3Z4VN/activate {"versionId": "SCLcpn-v2"}', 'GET /workflows/SCLcpn6DMDG3Z4VN']
+
+$ deploy-canonical.py --only SCLcpn6DMDG3Z4VN re-run --apply --yes   -> exit 0
+= SCLcpn6DMDG3Z4VN 'Set Reply Mode' up to date (stored and published)
+{"considered": 1, "missing": 0, "up_to_date": 1, "would_update": 0, "updated": 0, "would_publish": 0, "republished": 0, "inactive_must_run": 0, "failed": 0}
+requests: ['GET /workflows/SCLcpn6DMDG3Z4VN']
+
+# Full suite, 2026-10-11T10:51:49Z .. 11:41Z: python3 Tools/n8n/tests/run_all.py -> 24/25 OK; the 25th, test_create_seed.py, crashed
+# on its FIXED temp file Tools/n8n/tests/.r8-wf.json, which a parallel session's run of the same test unlinked (pid seen running
+# concurrently); re-run alone after that session finished: 52 pass, 0 fail. test_create_seed does not touch deploy-canonical.
+OK   test_auth_refresh.py: 12 pass, 0 fail
+OK   test_billing_identity.py: 19 pass, 0 fail
+OK   test_claim.py: 19 pass, 0 fail
+FAIL test_create_seed.py: (no output)
+OK   test_deploy_canonical.py: 15 pass, 0 fail
+OK   test_handoff_notifier.py: 14 pass, 0 fail
+OK   test_harness_selfcheck.py: 2 pass, 0 fail
+OK   test_legacy_generators.py: 5 pass, 0 fail
+OK   test_price_search.py: 36 pass, 0 fail
+OK   test_reply_lost_send.py: 5 pass, 0 fail
+OK   test_reply_memory.py: 44 pass, 0 fail
+OK   test_reply_mode.py: 43 pass, 0 fail
+OK   test_reply_order.py: 44 pass, 0 fail
+OK   test_reply_reconcile.py: 66 pass, 0 fail
+OK   test_retired_delete.py: 13 pass, 0 fail
+OK   test_sql_comment_injection.py: 36 pass, 0 fail
+OK   test_suggest_catalog.py: 24 pass, 0 fail
+OK   test_suggest_lang.py: 11 pass, 0 fail
+OK   test_suggest_price.py: 16 pass, 0 fail
+OK   test_suggest_query.py: 37 pass, 0 fail
+OK   test_test_dialog.py: 17 pass, 0 fail
+OK   test_upload.py: 45 pass, 0 fail
+OK   test_verify_deployed.py: 48 pass, 0 fail
+OK   test_verify_parity.py: 38 pass, 0 fail
+OK   test_verify_sql_comments.py: 53 pass, 0 fail
+$ python3 Tools/n8n/tests/test_create_seed.py   (alone) -> 52 pass, 0 fail
