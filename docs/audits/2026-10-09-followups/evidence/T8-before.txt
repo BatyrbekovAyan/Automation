@@ -1,0 +1,184 @@
+# T8 before — HEAD 8f342f89 (client code = HEAD; the NEW/changed tests only), 2026-10-11T13:45:01Z
+# Only tests that compile against HEAD run here: the source guards (ReconnectWiringTests — new; ProfileClaimWiringTests, BotDeletionWiringTests — changed)
+# and the behavioural V12 regression BotServerDeletionPolicyTests.ABotWithOnlyRetiredIds_IsStillDeletedOnTheServer, which drives the REAL
+# Manager.DeleteBotOnServer with the state after the transfer (current ids -1, the former ones under {bot}{Ch}Retired*) — HEAD answers
+# NothingOnServer (the bot would leave the phone with its server data in place). The pure-seam tests (RetiredChannelPolicyTests,
+# CreateWorkflowResponseTests, the BotServerIds/ComposeAll blocks, the updated ProfileRetirementTests / BotCardModelTests) reference members added with the fix.
+
+## Client (Unity 6000.3.9f1 EditMode, headless, Editor closed): Tools/run-tests-headless.sh 'ReconnectWiringTests|ProfileClaimWiringTests|BotDeletionWiringTests|BotServerDeletionPolicyTests'
+PASSED BotDeletionWiringTests.DeletePopup_BodyClearsTheButtons_InThePrefab
+PASSED BotDeletionWiringTests.DeletePopup_EveryStatesBody_FitsItsAuthoredBox
+PASSED BotDeletionWiringTests.FullWipe_ClearsPrefsOnlyAfterEveryBotIsSettled
+FAILED BotDeletionWiringTests.LocalWipe_ClearsTheRetiredChannelMarkers
+        retired-set key suffix WhatsappRetiredWorkflowId must be declared in ProfileRetirement
+          Expected: True
+          But was:  False
+PASSED BotDeletionWiringTests.LocalWipe_TalksToNoServer_AndTheOldOneCallDeleteIsGone
+PASSED BotDeletionWiringTests.ServerCanon_ACloneAlreadyGone_IsConfirmed_NotRefused
+PASSED BotDeletionWiringTests.ServerCanon_AnswersA2xxOnlyWithThePositiveWord("0DP79STI3pafXO9B-Set_Workflow_State.json")
+PASSED BotDeletionWiringTests.ServerCanon_AnswersA2xxOnlyWithThePositiveWord("lmjYsdNcQA2IE5rl-Delete_Bot_Files.json")
+PASSED BotDeletionWiringTests.ServerCanon_EveryRefusalItSends_IsReadAsARefusal("0DP79STI3pafXO9B-Set_Workflow_State.json")
+PASSED BotDeletionWiringTests.ServerCanon_EveryRefusalItSends_IsReadAsARefusal("lmjYsdNcQA2IE5rl-Delete_Bot_Files.json")
+PASSED BotDeletionWiringTests.ServerDeleteAnswers_AreClassifiedWithTheirBodies
+FAILED BotDeletionWiringTests.ServerHalf_DeletesTheRetiredSetToo_ButUnlinksOnlyTheCurrentProfiles
+        the trace check sees the retired ids too (else NothingOnServer — the V12 regression)
+          Expected: True
+          But was:  False
+PASSED BotDeletionWiringTests.ServerHalf_UnlinksTheProfileFirst_ReadsEveryAnswer_AndHoldsTheQueue
+PASSED BotDeletionWiringTests.SettingsDelete_RemovesTheBotOnlyOnTheVerdict_OrTheOwnersPhoneOnlyChoice
+PASSED BotServerDeletionPolicyTests.302 redirect
+PASSED BotServerDeletionPolicyTests.400 Set Workflow State bad_request
+PASSED BotServerDeletionPolicyTests.400 Set Workflow State protected_workflow
+PASSED BotServerDeletionPolicyTests.400 delete_failed
+PASSED BotServerDeletionPolicyTests.400 storage_unavailable
+PASSED BotServerDeletionPolicyTests.400 with the success word
+PASSED BotServerDeletionPolicyTests.403 Delete Ownership owned_elsewhere
+PASSED BotServerDeletionPolicyTests.403 Delete Ownership unproven
+PASSED BotServerDeletionPolicyTests.403 a session fault
+PASSED BotServerDeletionPolicyTests.403 another case of the error
+PASSED BotServerDeletionPolicyTests.403 blank error and reason
+PASSED BotServerDeletionPolicyTests.403 db fault body
+PASSED BotServerDeletionPolicyTests.403 empty
+PASSED BotServerDeletionPolicyTests.403 empty object
+PASSED BotServerDeletionPolicyTests.403 error as an array
+PASSED BotServerDeletionPolicyTests.403 gate prefix without a field
+PASSED BotServerDeletionPolicyTests.403 null
+PASSED BotServerDeletionPolicyTests.403 proxy page
+PASSED BotServerDeletionPolicyTests.403 refusal in an array
+PASSED BotServerDeletionPolicyTests.403 refusal nested
+PASSED BotServerDeletionPolicyTests.403 refusal with whitespace
+PASSED BotServerDeletionPolicyTests.403 refusal words without success false
+PASSED BotServerDeletionPolicyTests.403 repeated key
+PASSED BotServerDeletionPolicyTests.403 success as a number
+PASSED BotServerDeletionPolicyTests.403 success as a string
+PASSED BotServerDeletionPolicyTests.403 success false without error or reason
+PASSED BotServerDeletionPolicyTests.403 the gate's forbidden field
+PASSED BotServerDeletionPolicyTests.403 truncated refusal
+PASSED BotServerDeletionPolicyTests.404 empty
+PASSED BotServerDeletionPolicyTests.404 n8n webhook not registered
+PASSED BotServerDeletionPolicyTests.409 foreign body
+PASSED BotServerDeletionPolicyTests.413 proxy page
+FAILED BotServerDeletionPolicyTests.ABotWithOnlyRetiredIds_IsStillDeletedOnTheServer("Telegram")
+        Telegram: a bot whose only ids are retired ones still has memory, history and a clone on the server — NothingOnServer would remove it from the phone and leave all of it there (the V12 regression)
+          Expected: False
+          But was:  True
+FAILED BotServerDeletionPolicyTests.ABotWithOnlyRetiredIds_IsStillDeletedOnTheServer("Whatsapp")
+        Whatsapp: a bot whose only ids are retired ones still has memory, history and a clone on the server — NothingOnServer would remove it from the phone and leave all of it there (the V12 regression)
+          Expected: False
+          But was:  True
+PASSED BotServerDeletionPolicyTests.AFinalRefusal_KeepsTheBot_AndNamesWhy
+PASSED BotServerDeletionPolicyTests.ANeverAuthorisedBot_HasNoServerTrace
+PASSED BotServerDeletionPolicyTests.ARefusalBody_UnderASessionFault_IsStillARetry
+PASSED BotServerDeletionPolicyTests.AnUnconfirmed2xx_IsARetry_NeverADeletion(200,"   ")
+PASSED BotServerDeletionPolicyTests.AnUnconfirmed2xx_IsARetry_NeverADeletion(200,"")
+PASSED BotServerDeletionPolicyTests.AnUnconfirmed2xx_IsARetry_NeverADeletion(200,"<html>upstream error</html>")
+PASSED BotServerDeletionPolicyTests.AnUnconfirmed2xx_IsARetry_NeverADeletion(200,"[{\"success\":true}]")
+PASSED BotServerDeletionPolicyTests.AnUnconfirmed2xx_IsARetry_NeverADeletion(200,"true")
+PASSED BotServerDeletionPolicyTests.AnUnconfirmed2xx_IsARetry_NeverADeletion(200,"{\"Success\":true}")
+PASSED BotServerDeletionPolicyTests.AnUnconfirmed2xx_IsARetry_NeverADeletion(200,"{\"data\":{\"success\":true}}")
+PASSED BotServerDeletionPolicyTests.AnUnconfirmed2xx_IsARetry_NeverADeletion(200,"{\"message\":\"Workflow executed successfully\"}")
+PASSED BotServerDeletionPolicyTests.AnUnconfirmed2xx_IsARetry_NeverADeletion(200,"{\"success\":1}")
+PASSED BotServerDeletionPolicyTests.AnUnconfirmed2xx_IsARetry_NeverADeletion(200,"{\"success\":\"true\"}")
+PASSED BotServerDeletionPolicyTests.AnUnconfirmed2xx_IsARetry_NeverADeletion(200,"{\"success\":false,\"success\":true}")
+PASSED BotServerDeletionPolicyTests.AnUnconfirmed2xx_IsARetry_NeverADeletion(200,"{\"success\":false}")
+PASSED BotServerDeletionPolicyTests.AnUnconfirmed2xx_IsARetry_NeverADeletion(200,"{\"success\":null}")
+PASSED BotServerDeletionPolicyTests.AnUnconfirmed2xx_IsARetry_NeverADeletion(200,"{\"success\":true")
+PASSED BotServerDeletionPolicyTests.AnUnconfirmed2xx_IsARetry_NeverADeletion(200,"{}")
+PASSED BotServerDeletionPolicyTests.AnUnconfirmed2xx_IsARetry_NeverADeletion(200,null)
+PASSED BotServerDeletionPolicyTests.AnUnconfirmed2xx_IsARetry_NeverADeletion(201,"{}")
+PASSED BotServerDeletionPolicyTests.AnUnconfirmed2xx_IsARetry_NeverADeletion(204,"")
+PASSED BotServerDeletionPolicyTests.Copy_IsHonestAboutWhereTheDataStays
+PASSED BotServerDeletionPolicyTests.Done_OnlyWhenEveryStepSaidSo
+PASSED BotServerDeletionPolicyTests.OnlyTheServersPositiveWord_IsADeletion
+PASSED BotServerDeletionPolicyTests.ProfileUnlink_AnyDefinitiveAnswerLetsTheDeletionGoOn
+PASSED BotServerDeletionPolicyTests.RetryCopy_IsTrueForEveryRetry
+PASSED BotServerDeletionPolicyTests.TheFirstStepThatIsNotOk_Decides
+PASSED BotServerDeletionPolicyTests.TransientAnswers_KeepTheBot_ForARetry(408)
+PASSED BotServerDeletionPolicyTests.TransientAnswers_KeepTheBot_ForARetry(429)
+PASSED BotServerDeletionPolicyTests.TransientAnswers_KeepTheBot_ForARetry(500)
+PASSED BotServerDeletionPolicyTests.TransientAnswers_KeepTheBot_ForARetry(502)
+PASSED BotServerDeletionPolicyTests.TransientAnswers_KeepTheBot_ForARetry(503)
+PASSED BotServerDeletionPolicyTests.TransientAnswers_KeepTheBot_ForARetry(504)
+PASSED BotServerDeletionPolicyTests.WipeRefusedBody_AgreesWithTheCount(1,"1 бота")
+PASSED BotServerDeletionPolicyTests.WipeRefusedBody_AgreesWithTheCount(11,"11 ботов")
+PASSED BotServerDeletionPolicyTests.WipeRefusedBody_AgreesWithTheCount(2,"2 ботов")
+PASSED BotServerDeletionPolicyTests.WipeRefusedBody_AgreesWithTheCount(21,"21 бота")
+PASSED BotServerDeletionPolicyTests.WipeRefusedBody_AgreesWithTheCount(5,"5 ботов")
+PASSED BotServerDeletionPolicyTests.a session the one refresh did not cure
+PASSED BotServerDeletionPolicyTests.no answer at all (no connection / timeout)
+PASSED ProfileClaimWiringTests.AfterChannelAuthorized_AsksForTheCode_NeverPollsClaimStatus
+PASSED ProfileClaimWiringTests.AuthClient_Claim_ReadsRetiredReason
+PASSED ProfileClaimWiringTests.AuthPollers_CreateNothing_UntilTheClaimSucceeded
+FAILED ProfileClaimWiringTests.ClaimOne_OnProfileRetired_MarksTheChannelAndMovesOn
+        M4: profile_retired → mark the bot's channel (with the server's reason) → finished(true): the loop goes on to the next bot
+          Expected: True
+          But was:  False
+PASSED ProfileClaimWiringTests.ConnectedProfiles_CarryTheBotKeyAndItsRetiredMarker
+FAILED ProfileClaimWiringTests.Retirement_MovesTheIdsAside_InOnePlace_WithOneSave
+        the transfer decision (stale answer, app_delete, idempotence) belongs to the pure policy
+          Expected: String containing "RetiredChannelPolicy.Retire("
+          But was:  "{
+                if (string.IsNullOrEmpty(botKey) || !ProfileClaimPolicy.IsAuthedId(profileId)) return;
+                PlayerPrefs.SetString($"{botKey}{ProfileIdSuffix(channel)}", profileId);
+                PlayerPrefs.SetString($"{botKey}{ReasonSuffix(channel)}", reason ?? "");
+FAILED ProfileClaimWiringTests.RunAtBoot_NeverAsksTheSameProfileTwiceInOneRun
+        F2: the M4 markers are moved aside after the session (the token still decides whether a marker applies) and before the loop
+          Expected: True
+          But was:  False
+FAILED ReconnectWiringTests.ARefusedCreateFromSettings_KeepsThePairedProfile_UnlessTheServerDeletedIt
+        private IEnumerator CreateWhatsappWorkflowFromEdit(: both refusals must be handled by name
+          Expected: True
+          But was:  False
+FAILED ReconnectWiringTests.AnAuthorisedProfileWithAFailedCreate_RetriesTheCreate
+        private IEnumerator CheckWhatsappAuthorization(: an authorised profile with a failed Create (or no clone) must repeat the Create
+          Expected: True
+          But was:  False
+FAILED ReconnectWiringTests.ChangeNumber_LogsOutOnly_TheCloneStaysForTheReuse
+        public void ConfirmChangeWhatsappNumber(: the clone must stay — the Create after the new pairing reuses it (GetDeleteWhatsappWorkflow)
+          Expected: not String containing "GetDeleteWhatsappWorkflow"
+          But was:  "{
+                StartCoroutine(UnauthorizeWhatsapp());
+                PopupUI.Hide(ConfirmChangeWhatsappNumberPopup);
+                ShowWhatsappAuthFromSettings(Manager.openBot.GetComponent<Bot>().whatsappProfileId);
+FAILED ReconnectWiringTests.CreateFromSettings_ClearsTheRetiredSet_OnlyForAnAdoptedProfile
+        private IEnumerator CreateWhatsappWorkflowFromEdit(: the retired keys go only when the server named that profile among the adopted ones
+          Expected: String containing "ProfileRetirement.AfterCreate(bot, ChatChannel.WhatsApp, result.AdoptedProfiles)"
+          But was:  "{
+                LoadingPanel.SetActive(true);
+        
+                _saveHadError = false;
+FAILED ReconnectWiringTests.CreateFromSettings_NamesTheRetiredProfile_AndItsOrigin
+        private IEnumerator CreateWhatsappWorkflowFromEdit(: settings tell the server this is an existing bot (it may adopt the channel's predecessor)
+          Expected: String containing "form.AddField(CreateWorkflowResponse.FieldCreateOrigin, CreateWorkflowResponse.OriginEdit)"
+          But was:  "{
+                LoadingPanel.SetActive(true);
+        
+                _saveHadError = false;
+FAILED ReconnectWiringTests.CreateFromTheWizard_NeverNamesAPredecessor
+        private IEnumerator CreateWhatsappWorkflowFromStart(: a new bot from the wizard never inherits anything by its slot name
+          Expected: String containing "form.AddField(CreateWorkflowResponse.FieldCreateOrigin, CreateWorkflowResponse.OriginStart)"
+          But was:  "{
+                LoadingPanel.SetActive(true);
+        
+                WWWForm form = new();
+FAILED ReconnectWiringTests.EveryCreate_Waits45Seconds_AndReadsTheAnswerThroughTheContract
+        System.IO.FileNotFoundException : Could not find file "/Users/ayan/Projects/Automation/Assets/Scripts/Main/CreateWorkflowResponse.cs"
+
+================ EditMode test results (headless) ================
+  result=Failed(Child)  total=102  passed=88  failed=14  skipped=0  inconclusive=0
+  Failing / inconclusive tests:
+    - BotDeletionWiringTests.LocalWipe_ClearsTheRetiredChannelMarkers
+    - BotDeletionWiringTests.ServerHalf_DeletesTheRetiredSetToo_ButUnlinksOnlyTheCurrentProfiles
+    - BotServerDeletionPolicyTests.ABotWithOnlyRetiredIds_IsStillDeletedOnTheServer(&quot;Whatsapp&quot;)
+    - BotServerDeletionPolicyTests.ABotWithOnlyRetiredIds_IsStillDeletedOnTheServer(&quot;Telegram&quot;)
+    - ProfileClaimWiringTests.ClaimOne_OnProfileRetired_MarksTheChannelAndMovesOn
+    - ProfileClaimWiringTests.Retirement_MovesTheIdsAside_InOnePlace_WithOneSave
+    - ProfileClaimWiringTests.RunAtBoot_NeverAsksTheSameProfileTwiceInOneRun
+    - ReconnectWiringTests.AnAuthorisedProfileWithAFailedCreate_RetriesTheCreate
+    - ReconnectWiringTests.ARefusedCreateFromSettings_KeepsThePairedProfile_UnlessTheServerDeletedIt
+    - ReconnectWiringTests.ChangeNumber_LogsOutOnly_TheCloneStaysForTheReuse
+    - ReconnectWiringTests.CreateFromSettings_ClearsTheRetiredSet_OnlyForAnAdoptedProfile
+    - ReconnectWiringTests.CreateFromSettings_NamesTheRetiredProfile_AndItsOrigin
+    - ReconnectWiringTests.CreateFromTheWizard_NeverNamesAPredecessor
+    - ReconnectWiringTests.EveryCreate_Waits45Seconds_AndReadsTheAnswerThroughTheContract
+=================================================================

@@ -1,4 +1,5 @@
 using System.IO;
+using System.Text.RegularExpressions;
 using NUnit.Framework;
 using UnityEngine;
 
@@ -58,6 +59,12 @@ public class ProfileClaimWiringTests
         Assert.IsTrue(create >= 0 && loop > create, "M4: ONE run per boot run, created before the loop (a per-turn one would forget what it asked)");
         Assert.IsTrue(take > loop && claim > take, "M4: the next profile comes from the run — recorded as asked BEFORE ClaimOne");
         Assert.IsFalse(run.Contains("ProfileClaimPolicy.NextUnowned("), "M4: the loop must not pick a profile past the run's asked set");
+        // F2 (T8): a marker the M4 build wrote (ids kept) is moved aside once the session is known — before the loop reads
+        // the connected profiles, so a moved channel is never asked again and its reconnect takes the fresh path.
+        int session = run.IndexOf("yield return auth.EnsureSession()", System.StringComparison.Ordinal);
+        int legacy = run.IndexOf("ProfileRetirement.TransferLegacyMarkers(botsRoot, auth.Claims)", System.StringComparison.Ordinal);
+        Assert.IsTrue(session >= 0 && legacy > session && loop > legacy,
+            "F2: the M4 markers are moved aside after the session (the token still decides whether a marker applies) and before the loop");
         string takeNext = MethodBody(Src("Scripts/Auth/ProfileClaimPolicy.cs"), "TakeNext(");
         int pick = takeNext.IndexOf("NextUnowned(", System.StringComparison.Ordinal);
         int add = takeNext.IndexOf(".Add(", System.StringComparison.Ordinal);
@@ -80,7 +87,9 @@ public class ProfileClaimWiringTests
         string flow = Src("Scripts/Auth/ProfileClaimFlow.cs");
         string one = MethodBody(flow, "private static IEnumerator ClaimOne(");
         int retired = one.IndexOf("ProfileClaimPolicy.IsRetired(start", System.StringComparison.Ordinal);
-        int mark = retired < 0 ? -1 : one.IndexOf("ProfileRetirement.Mark(c.BotKey, c.Channel, c.ProfileId, start.RetiredReason)", retired, System.StringComparison.Ordinal);
+        // F2 (T8): the mark now moves the channel's ids aside, so it needs the bot itself (its fields and its PlayerPrefs
+        // are written in one place) — resolved from the bot key the candidate carries.
+        int mark = retired < 0 ? -1 : one.IndexOf("ProfileRetirement.Mark(BotFor(botsRoot, c.BotKey), c.Channel, c.ProfileId, start.RetiredReason)", retired, System.StringComparison.Ordinal);
         int moveOn = mark < 0 ? -1 : one.IndexOf("finished(true)", mark, System.StringComparison.Ordinal);
         int stop = one.IndexOf("if (!usable)", System.StringComparison.Ordinal);
         Assert.IsTrue(retired >= 0 && mark > retired && moveOn > mark,
@@ -89,10 +98,28 @@ public class ProfileClaimWiringTests
         int owned = one.IndexOf("SheetMode.Owned", System.StringComparison.Ordinal);
         Assert.IsTrue(owned >= 0 && one.IndexOf("auth.Owns(c.ProfileId)", owned, System.StringComparison.Ordinal) > owned,
             "M4: «owned» without the profile in the token is a server anomaly — logged, never re-asked (the run's asked set)");
-        foreach (string src in new[] { flow, Src("Scripts/Auth/ProfileRetirement.cs") })
-            foreach (string write in new[] { "whatsappProfileId =", "telegramProfileId =", "whatsappWorkflowId =", "telegramWorkflowId =",
-                                             "\"WhatsappProfileId\"", "\"TelegramProfileId\"", "\"WhatsappWorkflowId\"", "\"TelegramWorkflowId\"" })
-                Assert.IsFalse(src.Contains(write), $"M4: the bot's profile / workflow ids must stay as they are — V12 deletes the server traces by them ({write})");
+        // The claim flow itself never writes a bot's ids: the one place that moves them aside is ProfileRetirement.
+        foreach (string write in new[] { "whatsappProfileId =", "telegramProfileId =", "whatsappWorkflowId =", "telegramWorkflowId =",
+                                         "\"WhatsappProfileId\"", "\"TelegramProfileId\"", "\"WhatsappWorkflowId\"", "\"TelegramWorkflowId\"" })
+            Assert.IsFalse(flow.Contains(write), $"the claim flow must not write the bot's ids itself ({write}) — ProfileRetirement.Mark does");
+    }
+
+    [Test]
+    public void Retirement_MovesTheIdsAside_InOnePlace_WithOneSave()
+    {
+        // F2 (T8) replaces M4's «ids stay»: a retired channel's ids go to {bot}{Ch}Retired*, the current ones become -1 and
+        // the channel is off — every reader of the ~110 sites then sees «not connected» by itself. The Bot's fields and its
+        // PlayerPrefs are written in ONE method with ONE Save (plan T8 risk 2), and the decision is the pure policy's.
+        string retirement = Src("Scripts/Auth/ProfileRetirement.cs");
+        StringAssert.Contains("RetiredChannelPolicy.Retire(", MethodBody(retirement, "public static void Mark("),
+            "the transfer decision (stale answer, app_delete, idempotence) belongs to the pure policy");
+        string store = MethodBody(retirement, "private static void Store(");
+        foreach (string write in new[] { "bot.whatsappProfileId =", "bot.telegramProfileId =", "bot.whatsappWorkflowId =", "bot.telegramWorkflowId =" })
+        {
+            StringAssert.Contains(write, store, $"Store writes the Bot field ({write})");
+            Assert.AreEqual(1, Regex.Matches(retirement, Regex.Escape(write)).Count, $"{write}: only Store may write it");
+        }
+        StringAssert.Contains("PlayerPrefs.Save()", store, "one Save after the batch");
     }
 
     [Test]

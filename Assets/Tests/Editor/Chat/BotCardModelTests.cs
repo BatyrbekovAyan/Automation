@@ -73,8 +73,13 @@ public class BotCardModelTests
             "a retired channel never shows in brand colour — the bot cannot answer there");
         Assert.AreEqual(BotChannelIconState.Muted, BotCardModel.IconState("profile1", false, retired: true));
         Assert.AreEqual(BotChannelIconState.Colored, BotCardModel.IconState("profile1", true, retired: false));
-        Assert.AreEqual(BotChannelIconState.Hidden, BotCardModel.IconState(Bot.UnauthedProfileSentinel, true, retired: true),
-            "no profile, no icon — a marker cannot conjure one");
+        // F2 (T8): a retired channel's ids are moved aside — its current profile id is the sentinel and the icon stays gray
+        // (plan §5.3). Whether it IS retired is RetiredChannelPolicy's call (a marker for another id is not — tested there).
+        Assert.AreEqual(BotChannelIconState.Muted, BotCardModel.IconState(Bot.UnauthedProfileSentinel, true, retired: true),
+            "a channel whose ids were moved aside still shows, gray");
+        Assert.AreEqual(BotChannelIconState.Hidden, BotCardModel.IconState(Bot.UnauthedProfileSentinel, true, retired: false),
+            "no profile and not retired — no icon");
+        Assert.AreEqual(BotChannelIconState.Hidden, BotCardModel.IconState(Bot.UnauthedProfileSentinel, false, retired: false));
     }
 
     [Test]

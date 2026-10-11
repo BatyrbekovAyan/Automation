@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Newtonsoft.Json;
 
 /// <summary>
@@ -43,6 +44,33 @@ public static class DeleteBotFilesPayload
             tgProfileId,
             appUserId = appUserId ?? ""
         });
+    }
+
+    /// <summary>
+    /// F2 (T8): every Delete Bot Files body a bot's deletion sends, retired sets included. A channel normally holds either
+    /// its current ids or its retired ones (moved aside when the server retired its profile), so ONE call carries, per
+    /// channel, whichever it has. Only a channel holding BOTH (a reconnect whose Create did not adopt the retired profile)
+    /// needs a second call — with the retired ids of such channels and the sentinel elsewhere. Empty for a bot with no
+    /// server trace at all.
+    /// </summary>
+    public static IReadOnlyList<string> ComposeAll(BotServerDeletion.BotServerIds ids, string appUserId)
+    {
+        var bodies = new List<string>();
+        var wa = ids.Whatsapp;
+        var tg = ids.Telegram;
+        string first = Compose(
+            wa.HasCurrent ? wa.WorkflowId : wa.SeparateRetiredWorkflowId, tg.HasCurrent ? tg.WorkflowId : tg.SeparateRetiredWorkflowId,
+            wa.HasCurrent ? wa.ProfileId : wa.SeparateRetiredProfileId, tg.HasCurrent ? tg.ProfileId : tg.SeparateRetiredProfileId,
+            appUserId);
+        if (first != null) bodies.Add(first);
+        bool waBoth = wa.HasCurrent && wa.HasSeparateRetired;
+        bool tgBoth = tg.HasCurrent && tg.HasSeparateRetired;
+        string second = waBoth || tgBoth
+            ? Compose(waBoth ? wa.SeparateRetiredWorkflowId : null, tgBoth ? tg.SeparateRetiredWorkflowId : null,
+                      waBoth ? wa.SeparateRetiredProfileId : null, tgBoth ? tg.SeparateRetiredProfileId : null, appUserId)
+            : null;
+        if (second != null) bodies.Add(second);
+        return bodies;
     }
 
     private static string Normalize(string id) =>

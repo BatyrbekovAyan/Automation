@@ -1,4 +1,6 @@
+using System.Collections;
 using NUnit.Framework;
+using UnityEngine;
 
 /// <summary>
 /// V12 (iteration 2026-09-28): the pure verdict of a bot's server deletion (<see cref="BotServerDeletion"/>) and its copy.
@@ -19,6 +21,106 @@ public class BotServerDeletionPolicyTests
         Assert.IsFalse(BotServerDeletion.HasServerTrace(null, "", "-1", null));
         Assert.IsTrue(BotServerDeletion.HasServerTrace("-1", "-1", "wa-profile", "-1"), "a profile without a clone still has rows to delete");
         Assert.IsTrue(BotServerDeletion.HasServerTrace("-1", "wfCloneTg0001", "-1", "-1"));
+    }
+
+    // ---- F2 (T8): the retired set must reach the server deletion ------------------------------------------
+
+    private static BotServerDeletion.ChannelServerIds Ch(string profile, string workflow, string retiredProfile = null, string retiredWorkflow = null) =>
+        new BotServerDeletion.ChannelServerIds(profile, workflow, retiredProfile, retiredWorkflow);
+
+    private static BotServerDeletion.BotServerIds Ids(BotServerDeletion.ChannelServerIds wa, BotServerDeletion.ChannelServerIds tg) =>
+        new BotServerDeletion.BotServerIds(wa, tg);
+
+    [Test]
+    public void ABotWithOnlyRetiredIds_HasAServerTrace()
+    {
+        Assert.IsTrue(BotServerDeletion.HasServerTrace(Ids(Ch("-1", "-1", "wa-retired", "wfRetiredWa001"), Ch("-1", "-1"))),
+            "after the move a bot may hold retired ids alone — its memory, history and clone are still on the server");
+        Assert.IsTrue(BotServerDeletion.HasServerTrace(Ids(Ch("-1", "-1"), Ch("-1", "-1", "tg-retired", "-1"))), "a retired profile alone");
+        Assert.IsTrue(BotServerDeletion.HasServerTrace(Ids(Ch("-1", "-1", "", "wfRetiredWa001"), Ch("-1", "-1"))), "a former clone alone");
+        Assert.IsFalse(BotServerDeletion.HasServerTrace(Ids(Ch("-1", "-1", "", "-1"), Ch(null, "", null, null))),
+            "a never-authorised bot: no current and no retired id");
+        Assert.IsFalse(BotServerDeletion.HasServerTrace(default(BotServerDeletion.BotServerIds)), "no bot");
+        Assert.IsTrue(BotServerDeletion.HasServerTrace(Ids(Ch("wa-1", "-1"), Ch("-1", "-1"))), "the current ids still count");
+    }
+
+    [Test]
+    public void OnlyTheCurrentProfiles_AreUnlinked()
+    {
+        var ids = Ids(Ch("wa-2", "wfCloneWa002", "wa-1", "wfCloneWa001"), Ch("-1", "-1", "tg-1", "wfCloneTg001"));
+        CollectionAssert.AreEqual(new[] { ("wa-2", ChatChannel.WhatsApp) }, BotServerDeletion.ProfilesToUnlink(ids),
+            "a retired profile is already gone at Wappi — never unlinked");
+        CollectionAssert.IsEmpty(BotServerDeletion.ProfilesToUnlink(Ids(Ch("-1", "-1", "wa-1", "w"), Ch("", null, "tg-1", "w"))));
+    }
+
+    [Test]
+    public void TheCurrentAndTheFormerClones_AreDeleted_EachOnce()
+    {
+        var ids = Ids(Ch("wa-2", "wfCloneWa002", "wa-1", "wfCloneWa001"), Ch("-1", "-1", "tg-1", "wfCloneTg001"));
+        CollectionAssert.AreEqual(new[] { "wfCloneWa002", "wfCloneWa001", "wfCloneTg001" }, BotServerDeletion.ClonesToDelete(ids));
+        var same = Ids(Ch("wa-1", "wfCloneWa001", "wa-1", "wfCloneWa001"), Ch("-1", "-1"));
+        CollectionAssert.AreEqual(new[] { "wfCloneWa001" }, BotServerDeletion.ClonesToDelete(same), "one clone, one delete");
+        CollectionAssert.IsEmpty(BotServerDeletion.ClonesToDelete(Ids(Ch("wa-1", "-1", "", ""), Ch("-1", null))), "no clone at all");
+    }
+
+    [Test]
+    public void AnAppDeleteMarker_IsNotASecondSet()
+    {
+        // M4's marker of an unfinished app delete names the CURRENT profile (its ids stay): nothing separate to delete.
+        var marked = Ch("wa-1", "wfCloneWa001", "wa-1", "");
+        Assert.IsTrue(marked.HasCurrent);
+        Assert.IsFalse(marked.HasSeparateRetired);
+        Assert.AreEqual("-1", marked.SeparateRetiredProfileId);
+    }
+
+    private const string RetiredBotKey = "F2RetiredDeletionTestBot";
+
+    private static readonly string[] RetiredKeys =
+    {
+        "WhatsappRetiredProfileId", "WhatsappRetiredReason", "WhatsappRetiredWorkflowId",
+        "TelegramRetiredProfileId", "TelegramRetiredReason", "TelegramRetiredWorkflowId",
+    };
+
+    /// <summary>
+    /// The behaviour the plan forbids to ship: once a retired channel's ids are moved aside (current ids -1, the former
+    /// ones under {bot}{Ch}Retired*), the bot's deletion must still go to the server — on HEAD the trace check saw four
+    /// sentinels, answered NothingOnServer and the bot left the phone with its memory, history and clone on the server
+    /// (exactly V12). Drives the REAL Manager.DeleteBotOnServer up to its first server request (nothing is sent: the
+    /// request coroutine is never iterated).
+    /// </summary>
+    [TestCase("Whatsapp")]
+    [TestCase("Telegram")]
+    public void ABotWithOnlyRetiredIds_IsStillDeletedOnTheServer(string channel)
+    {
+        var managerGo = new GameObject("F2DeletionManager");
+        var botGo = new GameObject(RetiredBotKey);
+        try
+        {
+            var manager = managerGo.AddComponent<Manager>();
+            var bot = botGo.AddComponent<Bot>();
+            bot.whatsappProfileId = bot.telegramProfileId = Bot.UnauthedProfileSentinel;
+            bot.whatsappWorkflowId = bot.telegramWorkflowId = Bot.UnauthedProfileSentinel;
+            PlayerPrefs.SetString(RetiredBotKey + channel + "RetiredProfileId", "retired-profile-1");
+            PlayerPrefs.SetString(RetiredBotKey + channel + "RetiredReason", "trial_expiry");
+            PlayerPrefs.SetString(RetiredBotKey + channel + "RetiredWorkflowId", "wfRetiredClone01");
+
+            BotServerDeletion.Outcome? outcome = null;
+            IEnumerator run = manager.DeleteBotOnServer(bot, o => outcome = o, showLoading: false);
+            bool wentToTheServer = run.MoveNext();
+
+            Assert.IsFalse(outcome.HasValue && outcome.Value.Verdict == BotServerDeletion.Verdict.NothingOnServer,
+                $"{channel}: a bot whose only ids are retired ones still has memory, history and a clone on the server — NothingOnServer " +
+                "would remove it from the phone and leave all of it there (the V12 regression)");
+            Assert.IsTrue(wentToTheServer, $"{channel}: the deletion must ask the server");
+            Assert.IsFalse(outcome.HasValue, $"{channel}: no verdict before the server answered");
+        }
+        finally
+        {
+            foreach (string suffix in RetiredKeys) PlayerPrefs.DeleteKey(RetiredBotKey + suffix);
+            ReplyModeSyncService.Existing?.Release(RetiredBotKey);
+            Object.DestroyImmediate(botGo);
+            Object.DestroyImmediate(managerGo);
+        }
     }
 
     [TestCase(0, TestName = "no answer at all (no connection / timeout)")]

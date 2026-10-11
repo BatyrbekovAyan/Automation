@@ -114,6 +114,7 @@ public partial class BotSettings
 
         Manager.Instance.LoadingPanel.SetActive(true);
 
+        bool retryCreate = false;
         UnityWebRequest www = null;
         yield return WappiProxy.Send(WappiProxy.Op.Status, ChatChannel.WhatsApp, new { profile_id = bot.whatsappProfileId }, r => www = r);
         using var wwwScope = www;
@@ -154,6 +155,11 @@ public partial class BotSettings
                         WhatsappNumberField.Value = phone;
                         Manager.Instance.EnableSave();
                     }
+
+                    // F1 (T8): the channel is paired but its Create failed (or it never got a clone) — repeat it now
+                    // that the owner asked for the channel; the server reuses whatever it already bound.
+                    retryCreate = CreateWorkflowResponse.RetryOnChannelOn(true, OwnsProfile(bot.whatsappProfileId),
+                        Manager.IsCreatePending(bot, ChatChannel.WhatsApp), bot.whatsappWorkflowId);
                 }
                 else
                 {
@@ -163,7 +169,12 @@ public partial class BotSettings
         }
 
         Manager.Instance.LoadingPanel.SetActive(false);
+        // After this check's cover is down — the Create raises its own (and its «Сохранение..» pill).
+        if (retryCreate) Manager.Instance.GetCreateWhatsappWorkflow();
     }
+
+    /// <summary>Create's gate refuses a profile the session token does not list — a retry would only fail again.</summary>
+    private static bool OwnsProfile(string profileId) => AuthClient.Existing != null && AuthClient.Existing.Owns(profileId);
 
     private void ShowWhatsappAuthFromSettings(string profileId)
     {
@@ -232,6 +243,12 @@ public partial class BotSettings
             // `!TryGetAuthorized(...) || !isAuthorized` condition.
             if (WappiStatusParser.TryGetAuthorized(response, out bool isAuthorized))
             {
+                var bot = Manager.openBot.GetComponent<Bot>();
+                // F1 (T8): a Create from these settings failed earlier for this (still paired) profile — repeat it now.
+                if (CreateWorkflowResponse.RetryOnSettingsOpen(isAuthorized, OwnsProfile(bot.whatsappProfileId),
+                        Manager.IsCreatePending(bot, ChatChannel.WhatsApp)))
+                    Manager.Instance.GetCreateWhatsappWorkflow();
+
                 if (!isAuthorized && !Manager.openBot.GetComponent<Bot>().whatsappProfileId.Equals(Bot.UnauthedProfileSentinel))
                 {
                     WhatsappNumberField.Value = "";
@@ -263,8 +280,8 @@ public partial class BotSettings
 
         if (www.result == UnityWebRequest.Result.Success)
         {
-            Manager.Instance.GetDeleteWhatsappWorkflow(Manager.openBot.GetComponent<Bot>().whatsappWorkflowId);
-
+            // F1 (T8): only a logout — the clone and its id stay. The Create after the new pairing (same profile) reuses
+            // the bound clone; deleting it here, fire-and-forget, could land AFTER that reuse and leave the bot silent.
             WhatsappNumberField.gameObject.SetActive(false);
             WhatsappNumberField.Value = "";
 
@@ -318,6 +335,7 @@ public partial class BotSettings
 
         Manager.Instance.LoadingPanel.SetActive(true);
 
+        bool retryCreate = false;
         UnityWebRequest www = null;
         yield return WappiProxy.Send(WappiProxy.Op.Status, ChatChannel.Telegram, new { profile_id = bot.telegramProfileId }, r => www = r);
         using var wwwScope = www;
@@ -341,6 +359,10 @@ public partial class BotSettings
                         TelegramNumberField.Value = phone;
                         Manager.Instance.EnableSave();
                     }
+
+                    // F1 (T8): see the WhatsApp twin — a paired channel whose Create failed repeats it now.
+                    retryCreate = CreateWorkflowResponse.RetryOnChannelOn(true, OwnsProfile(bot.telegramProfileId),
+                        Manager.IsCreatePending(bot, ChatChannel.Telegram), bot.telegramWorkflowId);
                 }
                 else
                 {
@@ -350,6 +372,7 @@ public partial class BotSettings
         }
 
         Manager.Instance.LoadingPanel.SetActive(false);
+        if (retryCreate) Manager.Instance.GetCreateTelegramWorkflow();
     }
 
     private void ShowTelegramAuthFromSettings(string profileId)
@@ -419,7 +442,14 @@ public partial class BotSettings
             // abandoned-pairing profile whose id was never reset to "-1") cannot silently delete
             // a live profile. The WhatsApp twin stays byte-identical (proven safe on compact
             // api/sync JSON) and deliberately does NOT get this extra gate.
-            if (WappiStatusParser.TryGetAuthorized(response, out bool isAuthorized)
+            bool parsed = WappiStatusParser.TryGetAuthorized(response, out bool isAuthorized);
+            var bot = Manager.openBot.GetComponent<Bot>();
+            // F1 (T8): see the WhatsApp twin — a failed Create of this paired profile is repeated on settings open.
+            if (parsed && CreateWorkflowResponse.RetryOnSettingsOpen(isAuthorized, OwnsProfile(bot.telegramProfileId),
+                    Manager.IsCreatePending(bot, ChatChannel.Telegram)))
+                Manager.Instance.GetCreateTelegramWorkflow();
+
+            if (parsed
                 && !isAuthorized
                 && PlayerPrefs.GetInt(Manager.openBot.name + "isOnTelegram", 0) == 1
                 && !Manager.openBot.GetComponent<Bot>().telegramProfileId.Equals(Bot.UnauthedProfileSentinel))
@@ -447,8 +477,7 @@ public partial class BotSettings
 
         if (www.result == UnityWebRequest.Result.Success)
         {
-            Manager.Instance.GetDeleteTelegramWorkflow(Manager.openBot.GetComponent<Bot>().telegramWorkflowId);
-
+            // F1 (T8): only a logout — see the WhatsApp twin (the clone stays for the reuse).
             TelegramNumberField.gameObject.SetActive(false);
             TelegramNumberField.Value = "";
 

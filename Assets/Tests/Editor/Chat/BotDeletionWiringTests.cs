@@ -58,12 +58,41 @@ public class BotDeletionWiringTests
     {
         // M4 (2026-10-09): a channel the server retired is remembered per bot — {bot}{Whatsapp|Telegram}Retired{ProfileId|Reason}.
         // Per-bot keys like any other: a deleted bot must not leave them behind (bot-persistence).
+        // F2 (T8): the retired set also holds the channel's former clone ({bot}{Ch}RetiredWorkflowId), and a Create that
+        // failed from settings leaves {bot}{Ch}CreatePending — both are per-bot keys that must go with the bot.
         string local = MethodBody(Src("Scripts/Main/Bot.cs"), "public void DeleteBotLocally");
         Assert.IsTrue(local.Contains("ProfileRetirement.Clear(transform.name)"), "the local wipe must clear the retired-channel markers");
         string retirement = Src("Scripts/Auth/ProfileRetirement.cs");
-        foreach (var suffix in new[] { "WhatsappRetiredProfileId", "WhatsappRetiredReason", "TelegramRetiredProfileId", "TelegramRetiredReason" })
-            Assert.IsTrue(retirement.Contains($"\"{suffix}\""), $"marker key suffix {suffix} must be declared in ProfileRetirement");
+        foreach (var suffix in new[] { "WhatsappRetiredProfileId", "WhatsappRetiredReason", "TelegramRetiredProfileId", "TelegramRetiredReason",
+                                       "WhatsappRetiredWorkflowId", "TelegramRetiredWorkflowId" })
+            Assert.IsTrue(retirement.Contains($"\"{suffix}\""), $"retired-set key suffix {suffix} must be declared in ProfileRetirement");
         Assert.IsTrue(MethodBody(retirement, "public static void Clear").Contains("KeySuffixes"), "Clear deletes every declared marker key");
+        Assert.IsTrue(local.Contains("PlayerPrefs.DeleteKey(transform.name + CreateWorkflowResponse.PendingSuffix(channel))"),
+            "the local wipe must clear the pending-Create flag of both channels");
+        string response = Src("Scripts/Main/CreateWorkflowResponse.cs");
+        foreach (var suffix in new[] { "WhatsappCreatePending", "TelegramCreatePending" })
+            Assert.IsTrue(response.Contains($"\"{suffix}\""), $"pending-Create key suffix {suffix} must be declared in CreateWorkflowResponse");
+    }
+
+    [Test]
+    public void ServerHalf_DeletesTheRetiredSetToo_ButUnlinksOnlyTheCurrentProfiles()
+    {
+        // F2 (T8): after the transfer a retired channel's ids live in {bot}{Ch}Retired* and the current ones are -1. V12
+        // must still delete what the server holds under them (plan: «перенос без чтения retired-id при удалении выпускать
+        // нельзя»): Delete Bot Files gets the retired set (a second call only when the channel ALSO has current ids), the
+        // retired clone is deleted, and only CURRENT profiles are unlinked — a retired one is already gone at Wappi.
+        string m = MethodBody(Src("Scripts/Main/Manager.cs"), "public IEnumerator DeleteBotOnServer");
+        int ids = m.IndexOf("ProfileRetirement.ServerIdsOf(bot)", System.StringComparison.Ordinal);
+        int trace = m.IndexOf("BotServerDeletion.HasServerTrace(ids)", System.StringComparison.Ordinal);
+        Assert.IsTrue(ids >= 0 && trace > ids, "the trace check sees the retired ids too (else NothingOnServer — the V12 regression)");
+        StringAssert.Contains("BotServerDeletion.ProfilesToUnlink(ids)", m, "the unlink loop walks the current profiles only");
+        StringAssert.Contains("DeleteBotFilesPayload.ComposeAll(ids, BillingIdentity.AppUserId)", m, "every Delete Bot Files payload, retired set included");
+        StringAssert.Contains("BotServerDeletion.ClonesToDelete(ids)", m, "the clones, retired one included");
+        string deletion = Src("Scripts/Main/BotServerDeletion.cs");
+        StringAssert.DoesNotContain("Retired", MethodBody(deletion, "public static IEnumerable<(string profileId, ChatChannel channel)> ProfilesToUnlink"),
+            "a retired profile is never unlinked — Wappi deleted it already");
+        StringAssert.Contains("RetiredWorkflowId", MethodBody(deletion, "public static IEnumerable<string> ClonesToDelete"),
+            "the channel's former clone is deleted too");
     }
 
     [Test]

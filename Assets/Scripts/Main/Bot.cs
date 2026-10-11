@@ -274,7 +274,9 @@ public class Bot : MonoBehaviour
             PlayerPrefs.DeleteKey(transform.name + "TelegramSyncUntil");
             PlayerPrefs.DeleteKey(transform.name + "ReplyMode");
             PlayerPrefs.DeleteKey(transform.name + BotTestSheet.LastTestKeySuffix);   // R16: the «Проверка бота» verdict
-            ProfileRetirement.Clear(transform.name);                                  // M4: the retired-channel markers
+            ProfileRetirement.Clear(transform.name);                                  // M4/F2: the retired set of both channels
+            foreach (var channel in new[] { ChatChannel.WhatsApp, ChatChannel.Telegram })          // F1: a failed Create to repeat
+                PlayerPrefs.DeleteKey(transform.name + CreateWorkflowResponse.PendingSuffix(channel));
 
             if (PlayerPrefs.GetInt(transform.name + "ProductsNumber", 0) > 0)
             {
@@ -499,7 +501,8 @@ public class Bot : MonoBehaviour
         if (BotDesc == null) return;
 
         bool connecting = Status != null && ColorsClose(Status.color, blue);
-        // M4: a channel the server retired (marker for THIS id, the token does not list it) — honest subline, gray icon.
+        // M4/F2: a channel the server retired — its ids moved aside (RetiredChannelPolicy), or an unfinished app delete whose
+        // marker names the current id and the token does not list it — honest subline, gray icon.
         var claims = AuthClient.Existing != null ? AuthClient.Existing.Claims : null;
         string waRetired = ProfileRetirement.ActiveReason(transform.name, ChatChannel.WhatsApp, whatsappProfileId, claims);
         string tgRetired = ProfileRetirement.ActiveReason(transform.name, ChatChannel.Telegram, telegramProfileId, claims);

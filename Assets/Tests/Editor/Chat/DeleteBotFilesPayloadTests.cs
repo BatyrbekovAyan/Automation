@@ -93,4 +93,66 @@ public class DeleteBotFilesPayloadTests
 
         Assert.AreEqual("", (string)j["appUserId"]);
     }
+
+    // ---- F2 (T8): the retired set rides Delete Bot Files ---------------------------------------------------
+
+    private static BotServerDeletion.ChannelServerIds Ch(string profile, string workflow, string retiredProfile = null, string retiredWorkflow = null) =>
+        new BotServerDeletion.ChannelServerIds(profile, workflow, retiredProfile, retiredWorkflow);
+
+    private static System.Collections.Generic.IReadOnlyList<string> All(BotServerDeletion.ChannelServerIds wa, BotServerDeletion.ChannelServerIds tg) =>
+        DeleteBotFilesPayload.ComposeAll(new BotServerDeletion.BotServerIds(wa, tg), "user1");
+
+    [Test]
+    public void ABotWithOnlyRetiredIds_SendsThemInOneCall()
+    {
+        // The state after the move: the current ids are the sentinel, the former ones in the retired set. Without them the
+        // server would keep this channel's memory, history, chunks and slot row (the V12 regression).
+        var bodies = All(Ch("-1", "-1", "wa-retired", "wfRetiredWa001"), Ch("-1", "-1"));
+        Assert.AreEqual(1, bodies.Count);
+        Assert.AreEqual(
+            "{\"botWaId\":\"wfRetiredWa001\",\"botTgId\":\"-1\",\"waProfileId\":\"wa-retired\"," +
+            "\"tgProfileId\":\"-1\",\"appUserId\":\"user1\"}",
+            bodies[0]);
+    }
+
+    [Test]
+    public void OneChannelLiveAndTheOtherRetired_StillOneCall()
+    {
+        var bodies = All(Ch("wa-1", "wfCloneWa001"), Ch("-1", "-1", "tg-retired", "wfRetiredTg001"));
+        Assert.AreEqual(1, bodies.Count, "each channel holds one set — it rides its own slot");
+        var j = JObject.Parse(bodies[0]);
+        Assert.AreEqual("wfCloneWa001", (string)j["botWaId"]);
+        Assert.AreEqual("wa-1", (string)j["waProfileId"]);
+        Assert.AreEqual("wfRetiredTg001", (string)j["botTgId"]);
+        Assert.AreEqual("tg-retired", (string)j["tgProfileId"]);
+    }
+
+    [Test]
+    public void AChannelHoldingBothSets_GetsASecondCall_ForItsRetiredIdsOnly()
+    {
+        // A reconnect whose Create did not adopt the retired profile: the channel has its new ids AND the retired set.
+        var bodies = All(Ch("wa-2", "wfCloneWa002", "wa-1", "wfCloneWa001"), Ch("tg-1", "wfCloneTg001"));
+        Assert.AreEqual(2, bodies.Count);
+        var first = JObject.Parse(bodies[0]);
+        Assert.AreEqual("wfCloneWa002", (string)first["botWaId"], "the first call carries the current ids");
+        Assert.AreEqual("wa-2", (string)first["waProfileId"]);
+        Assert.AreEqual("wfCloneTg001", (string)first["botTgId"]);
+        var second = JObject.Parse(bodies[1]);
+        Assert.AreEqual("wfCloneWa001", (string)second["botWaId"], "the second, the retired set of that channel");
+        Assert.AreEqual("wa-1", (string)second["waProfileId"]);
+        Assert.AreEqual("-1", (string)second["botTgId"], "the other channel was covered by the first call");
+        Assert.AreEqual("-1", (string)second["tgProfileId"]);
+    }
+
+    [Test]
+    public void NoRetiredSet_ExactlyTheOldSingleBody()
+    {
+        var bodies = All(Ch("prof_wa", "wf_wa"), Ch("-1", "-1"));
+        CollectionAssert.AreEqual(new[] { DeleteBotFilesPayload.Compose("wf_wa", "-1", "prof_wa", "-1", "user1") }, bodies,
+            "a bot without a retired set sends what it always sent");
+        CollectionAssert.IsEmpty(All(Ch("-1", "-1"), Ch("", null)), "a never-authorised bot sends nothing");
+        CollectionAssert.AreEqual(new[] { DeleteBotFilesPayload.Compose("wf_wa", "-1", "prof_wa", "-1", "user1") },
+            All(Ch("prof_wa", "wf_wa", "prof_wa", ""), Ch("-1", "-1")),
+            "an app-delete marker names the current profile — no second call");
+    }
 }

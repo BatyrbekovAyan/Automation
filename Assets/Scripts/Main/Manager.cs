@@ -3287,12 +3287,81 @@ public partial class Manager : MonoBehaviour
 
     public void GetCreateWhatsappWorkflow()
     {
-        StartCoroutine(CreateWhatsappWorkflowFromEdit());
+        if (IsCreateInFlight(openBot, ChatChannel.WhatsApp)) return;   // the Create in flight answers for this profile
+        StartCoroutine(TrackCreateFlight(openBot, ChatChannel.WhatsApp, CreateWhatsappWorkflowFromEdit()));
     }
 
     public void GetCreateTelegramWorkflow()
     {
-        StartCoroutine(CreateTelegramWorkflowFromEdit());
+        if (IsCreateInFlight(openBot, ChatChannel.Telegram)) return;
+        StartCoroutine(TrackCreateFlight(openBot, ChatChannel.Telegram, CreateTelegramWorkflowFromEdit()));
+    }
+
+    // F1 (T8): Create from the settings is idempotent on the server, so a failed one is repeated (CreatePending) — but
+    // one at a time per channel: the settings-open retry and a switch-on retry must not race each other.
+    private readonly HashSet<string> createsInFlight = new();
+
+    private static string CreateFlightKey(Bot bot, ChatChannel channel) => $"{(bot != null ? bot.name : "")}:{channel}";
+
+    private bool IsCreateInFlight(GameObject botObject, ChatChannel channel) =>
+        botObject != null && createsInFlight.Contains(CreateFlightKey(botObject.GetComponent<Bot>(), channel));
+
+    private IEnumerator TrackCreateFlight(GameObject botObject, ChatChannel channel, IEnumerator create)
+    {
+        string flight = CreateFlightKey(botObject != null ? botObject.GetComponent<Bot>() : null, channel);
+        createsInFlight.Add(flight);
+        try
+        {
+            yield return create;
+        }
+        finally
+        {
+            createsInFlight.Remove(flight);
+        }
+    }
+
+    /// <summary>F1 (T8): a Create from the settings failed for a profile the bot keeps — repeat it at the next chance.</summary>
+    public static bool IsCreatePending(Bot bot, ChatChannel channel) =>
+        bot != null && PlayerPrefs.GetInt(bot.name + CreateWorkflowResponse.PendingSuffix(channel), 0) == 1;
+
+    // Records the failed Create, and settles the pending-profile ledger: the paired profile belongs to the bot now (its id
+    // is in the bot's PlayerPrefs) — left pending, the quit-time settle would delete it from Wappi.
+    private static void MarkCreatePending(Bot bot, ChatChannel channel)
+    {
+        PlayerPrefs.SetInt(bot.name + CreateWorkflowResponse.PendingSuffix(channel), 1);
+        if (channel == ChatChannel.Telegram) PendingProfileLedger.MarkTelegramClaimed();
+        else PendingProfileLedger.MarkWhatsappClaimed();
+        PlayerPrefs.Save();
+    }
+
+    private static void ClearCreatePending(Bot bot, ChatChannel channel)
+    {
+        PlayerPrefs.DeleteKey(bot.name + CreateWorkflowResponse.PendingSuffix(channel));
+        PlayerPrefs.Save();
+    }
+
+    // channel_limit (plan §1.2 #13): the server refused the channel AND deleted its profile. The id goes and the channel is
+    // off; the channel's retired set (if any) is left as it is — the next attempt names the same predecessor.
+    private void ApplyCreateProfileGone(Bot bot, ChatChannel channel)
+    {
+        bool telegram = channel == ChatChannel.Telegram;
+        string word = telegram ? "Telegram" : "Whatsapp";
+        string profileId = telegram ? bot.telegramProfileId : bot.whatsappProfileId;
+        if (telegram) bot.telegramProfileId = Bot.UnauthedProfileSentinel;
+        else bot.whatsappProfileId = Bot.UnauthedProfileSentinel;
+        PlayerPrefs.SetString(bot.name + word + "ProfileId", Bot.UnauthedProfileSentinel);
+        PlayerPrefs.SetInt(bot.name + "isOn" + word, 0);
+        PlayerPrefs.DeleteKey(bot.name + CreateWorkflowResponse.PendingSuffix(channel));
+        if (telegram) PendingProfileLedger.ClearTelegramIfMatches(profileId);
+        else PendingProfileLedger.ClearWhatsappIfMatches(profileId);
+        PlayerPrefs.Save();
+        if (openBot == bot.gameObject && openBotSettings != null)
+        {
+            var row = telegram ? openBotSettings.telegramRow : openBotSettings.whatsappRow;
+            if (row != null) row.SetIsOnQuiet(false);
+            EnableSave();
+        }
+        bot.RefreshCardSubline();
     }
 
     public void GetEnableWhatsappWorkflow(string whatsappWorkflowId, bool enabled)
@@ -3303,16 +3372,6 @@ public partial class Manager : MonoBehaviour
     public void GetEnableTelegramWorkflow(string telegramWorkflowId, bool enabled)
     {
         StartCoroutine(EnableTelegramWorkflow(telegramWorkflowId, enabled));
-    }
-
-    public void GetDeleteWhatsappWorkflow(string whatsappWorkflowId)
-    {
-        StartCoroutine(DeleteWhatsappWorkflow(whatsappWorkflowId, false));
-    }
-
-    public void GetDeleteTelegramWorkflow(string telegramWorkflowId)
-    {
-        StartCoroutine(DeleteTelegramWorkflow(telegramWorkflowId, false));
     }
 
 
@@ -3351,11 +3410,10 @@ public partial class Manager : MonoBehaviour
     public IEnumerator DeleteBotOnServer(Bot bot, Action<BotServerDeletion.Outcome> done, bool showLoading = true)
     {
         string botId = bot != null ? bot.name : "";
-        string waProfile = bot != null ? bot.whatsappProfileId : null;
-        string tgProfile = bot != null ? bot.telegramProfileId : null;
-        string waWorkflow = bot != null ? bot.whatsappWorkflowId : null;
-        string tgWorkflow = bot != null ? bot.telegramWorkflowId : null;
-        if (!BotServerDeletion.HasServerTrace(waWorkflow, tgWorkflow, waProfile, tgProfile))
+        // F2 (T8): a channel the server retired holds its former ids in the retired set — they count as a server trace,
+        // reach Delete Bot Files and the clone delete, but are never unlinked (Wappi deleted that profile already).
+        BotServerDeletion.BotServerIds ids = ProfileRetirement.ServerIdsOf(bot);
+        if (!BotServerDeletion.HasServerTrace(ids))
         {
             done?.Invoke(BotServerDeletion.Outcome.NothingOnServer);
             yield break;
@@ -3371,9 +3429,9 @@ public partial class Manager : MonoBehaviour
             yield return null;
         BotServerDeletion.Outcome? stop = null;
 
-        foreach (var (profileId, channel) in new[] { (waProfile, ChatChannel.WhatsApp), (tgProfile, ChatChannel.Telegram) })
+        foreach (var (profileId, channel) in BotServerDeletion.ProfilesToUnlink(ids))
         {
-            if (stop.HasValue || BotServerDeletion.IsSentinel(profileId)) continue;
+            if (stop.HasValue) break;
             UnityWebRequest unlink = null;
             yield return WappiProxy.Send(WappiProxy.Op.ProfileDelete, channel, new { profile_id = profileId }, r => unlink = r);
             using (unlink)
@@ -3384,9 +3442,10 @@ public partial class Manager : MonoBehaviour
             }
         }
 
-        string filesBody = DeleteBotFilesPayload.Compose(waWorkflow, tgWorkflow, waProfile, tgProfile, BillingIdentity.AppUserId);
-        if (!stop.HasValue && filesBody != null)
+        // One call normally; a second only for a channel that holds both current and retired ids.
+        foreach (string filesBody in DeleteBotFilesPayload.ComposeAll(ids, BillingIdentity.AppUserId))
         {
+            if (stop.HasValue) break;
             string url = $"{n8nBaseUrl}/webhook/DeleteBotFiles";
             UnityWebRequest files = null;
             yield return AuthorizedRequest.Send(() => AuthorizedRequest.JsonPost(url, filesBody, 60), r => files = r);
@@ -3395,9 +3454,9 @@ public partial class Manager : MonoBehaviour
                                                 files.downloadHandler?.text);
         }
 
-        foreach (string workflowId in new[] { waWorkflow, tgWorkflow })
+        foreach (string workflowId in BotServerDeletion.ClonesToDelete(ids))
         {
-            if (stop.HasValue || BotServerDeletion.IsSentinel(workflowId)) continue;
+            if (stop.HasValue) break;
             UnityWebRequest clone = null;
             yield return AuthorizedRequest.Send(() => NewWorkflowStateRequest(workflowId, WorkflowStateRequest.Delete), r => clone = r);
             using (clone)
@@ -3584,13 +3643,17 @@ public partial class Manager : MonoBehaviour
         // server-side slot backstop retire the SAME bot's old channel row on a
         // re-register (e.g. change-number) instead of counting it as a second slot.
         form.AddField("BotKey", bot != null ? bot.name : "");
+        // F1 + F2 (plan §1.7): a NEW bot from the wizard — the server never looks for a predecessor (a slot name like
+        // «Bot0» is reused after a full wipe and must not inherit another bot's conversations).
+        form.AddField(CreateWorkflowResponse.FieldCreateOrigin, CreateWorkflowResponse.OriginStart);
 
         // Without a timeout a connected-but-silent n8n parks this coroutine forever:
         // neither branch below runs, so the card's controls stay disabled and the
-        // LoadingPanel never lifts. 30s matches every other request in this file.
+        // LoadingPanel never lifts. 45 s since F1 (plan §1.7): a Create that finished on the
+        // server after the client gave up is harmless — the next Create reuses the bound clone.
         UnityWebRequest www = null;
         yield return AuthorizedRequest.Send(
-            () => { var r = UnityWebRequest.Post($"{n8nBaseUrl}/webhook/CreateWhatsappWorkflow", form); r.timeout = 30; return r; },
+            () => { var r = UnityWebRequest.Post($"{n8nBaseUrl}/webhook/CreateWhatsappWorkflow", form); r.timeout = CreateWorkflowResponse.TimeoutSeconds; return r; },
             r => www = r);
         using var wwwScope = www;
 
@@ -3604,16 +3667,14 @@ public partial class Manager : MonoBehaviour
             yield break;
         }
 
-        // A channel_limit rejection is a real HTTP 200 with no "id" (the billing
-        // slot backstop's contract — see Task 8) — so success can no longer be judged
-        // from www.result alone; the body must be inspected too.
-        string response = www.result == UnityWebRequest.Result.Success ? www.downloadHandler.text : null;
-        bool serverRejected = response != null && response.Contains("\"error\"");
+        // A refusal (channel_limit, reply_mode_not_saved, …) is a real HTTP 200 WITHOUT an id
+        // (plan §1.7) — only the id is success. The wizard keeps its old answer to any refusal:
+        // the profile it just created is deleted, the card shows the channel unconnected.
+        var result = CreateWorkflowResponse.Classify(www.responseCode, www.downloadHandler?.text);
 
-        if (www.result != UnityWebRequest.Result.Success || serverRejected)
+        if (result.Kind != CreateWorkflowResponse.Kind.Success)
         {
-            if (serverRejected)
-                Debug.LogWarning($"CreateWhatsappWorkflow rejected: {response}");
+            Debug.LogWarning($"CreateWhatsappWorkflow refused ({result.Kind}, {result.Error}) [{www.responseCode}] {www.error}");
 
             // The card SURVIVES this failure (DeleteWhatsappProfile only resets the
             // local id to the unauthed sentinel), so hand its controls back — the
@@ -3642,15 +3703,14 @@ public partial class Manager : MonoBehaviour
             startedBot.EditButton.interactable = true;
             startedBot.SetActivationInteractable(true);
 
-            if (response.Contains("\"id\":"))
+            startedBot.whatsappWorkflowId = result.Id;
+            yield return AuthClient.Instance.ForceRefresh();   // the new clone id must enter the session token before SetWorkflowState/Edit
+            if (startedBot != null)
             {
-
-                bot.GetComponent<Bot>().whatsappWorkflowId = ExtractWorkflowId(response);
-                yield return AuthClient.Instance.ForceRefresh();   // the new clone id must enter the session token before SetWorkflowState/Edit
-                PlayerPrefs.SetString(bot.name + "WhatsappWorkflowId", bot.GetComponent<Bot>().whatsappWorkflowId);
-                PlayerPrefs.SetString(bot.name + "WhatsappProfileId", bot.GetComponent<Bot>().whatsappProfileId);
+                PlayerPrefs.SetString(bot.name + "WhatsappWorkflowId", startedBot.whatsappWorkflowId);
+                PlayerPrefs.SetString(bot.name + "WhatsappProfileId", startedBot.whatsappProfileId);
                 PendingProfileLedger.MarkWhatsappClaimed();
-                SeedReplyModeDefaultForProfile(bot.name, bot.GetComponent<Bot>().whatsappProfileId);   // WR-02: '*' row for a channel authed after a Вместе default
+                SeedReplyModeDefaultForProfile(bot.name, startedBot.whatsappProfileId);   // WR-02: '*' row for a channel authed after a Вместе default
             }
         }
 
@@ -3662,12 +3722,13 @@ public partial class Manager : MonoBehaviour
 
     private IEnumerator CreateWhatsappWorkflowFromEdit()
     {
+        // The answer belongs to the bot that ASKED — the owner may leave for another bot's settings while it is in flight.
+        var bot = openBot.GetComponent<Bot>();
         LoadingPanel.SetActive(true);
 
         _saveHadError = false;
         openBotSettings.Saved.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text = SavingText;
         openBotSettings.Saved.SetActive(true);
-
 
         string productsList = "";
 
@@ -3685,7 +3746,6 @@ public partial class Manager : MonoBehaviour
             }
         }
 
-
         string servicesList = "";
 
         for (int i = 0; i < openBotSettings.ServicesParent.transform.childCount; i++)
@@ -3702,14 +3762,13 @@ public partial class Manager : MonoBehaviour
             }
         }
 
-
         WWWForm form = new();
 
         form.AddField("Name", openBotSettings.BotNameField.Value);
         AddBusinessTypeFields(form);
-        form.AddField("WhatsappProfileId", openBot.GetComponent<Bot>().whatsappProfileId);
-        string tgId = openBot.GetComponent<Bot>().telegramWorkflowId;
-        form.AddField("TelegramWorkflowId", string.IsNullOrEmpty(tgId) ? Bot.UnauthedProfileSentinel : tgId);
+        form.AddField("WhatsappProfileId", bot.whatsappProfileId);
+        string otherWorkflowId = bot.telegramWorkflowId;
+        form.AddField("TelegramWorkflowId", string.IsNullOrEmpty(otherWorkflowId) ? Bot.UnauthedProfileSentinel : otherWorkflowId);
 
         form.AddField("Business", ComposeBusinessKnowledge(openBotSettings));
         form.AddField("Prompt", openBotSettings.PromptField.Value);
@@ -3718,53 +3777,62 @@ public partial class Manager : MonoBehaviour
         form.AddField("AppUserID", BillingIdentity.AppUserId);
         // A2: the server seeds this profile's '*' reply-mode row BEFORE activating the clone, so a
         // «Вместе» bot can never answer in the gap between activation and the client's own write.
-        AddReplyModeFields(form, openBot != null ? openBot.name : "");
+        AddReplyModeFields(form, bot.name);
         // BotKey = this (existing) bot's stable slot name — lets a re-auth/change-number
         // save on the SAME bot retire its own old channel row server-side.
-        form.AddField("BotKey", openBot != null ? openBot.name : "");
+        form.AddField("BotKey", bot.name);
+        // F1 + F2 (plan §1.7): an existing bot. The server may adopt this channel's predecessor — proven in its own
+        // database; the retired profile the device moved aside is named so that a row without a bot key is found too.
+        form.AddField(CreateWorkflowResponse.FieldCreateOrigin, CreateWorkflowResponse.OriginEdit);
+        form.AddField(CreateWorkflowResponse.FieldPreviousProfileId, ProfileRetirement.PreviousProfileId(bot, ChatChannel.WhatsApp, bot.whatsappProfileId));
 
         UnityWebRequest www = null;
         yield return AuthorizedRequest.Send(
-            () => { var r = UnityWebRequest.Post($"{n8nBaseUrl}/webhook/CreateWhatsappWorkflow", form); r.timeout = 30; return r; },
+            () => { var r = UnityWebRequest.Post($"{n8nBaseUrl}/webhook/CreateWhatsappWorkflow", form); r.timeout = CreateWorkflowResponse.TimeoutSeconds; return r; },
             r => www = r);
         using var wwwScope = www;
 
-        bool resolved = false;
-        if (www.result == UnityWebRequest.Result.Success)
+        var result = CreateWorkflowResponse.Classify(www.responseCode, www.downloadHandler?.text);
+        if (bot == null)
         {
-            string response = www.downloadHandler.text;
-
-            if (response.Contains("\"id\":"))
-            {
-
-                openBot.GetComponent<Bot>().whatsappWorkflowId = ExtractWorkflowId(response);
+            LoadingPanel.SetActive(false);   // the bot was deleted while the Create was in flight
+            yield break;
+        }
+        switch (result.Kind)
+        {
+            case CreateWorkflowResponse.Kind.Success:
+                bot.whatsappWorkflowId = result.Id;
                 yield return AuthClient.Instance.ForceRefresh();   // see the start-path twin
-                PlayerPrefs.SetString(openBot.name + "WhatsappWorkflowId", openBot.GetComponent<Bot>().whatsappWorkflowId);
+                if (bot == null) break;
+                PlayerPrefs.SetString(bot.name + "WhatsappWorkflowId", bot.whatsappWorkflowId);
                 PendingProfileLedger.MarkWhatsappClaimed();
-                SeedReplyModeDefaultForProfile(openBot.name, openBot.GetComponent<Bot>().whatsappProfileId);   // WR-02: '*' row for a channel authed after a Вместе default
+                ClearCreatePending(bot, ChatChannel.WhatsApp);
+                // F2: the retired set goes only for a profile the server says it adopted.
+                ProfileRetirement.AfterCreate(bot, ChatChannel.WhatsApp, result.AdoptedProfiles);
+                SeedReplyModeDefaultForProfile(bot.name, bot.whatsappProfileId);   // WR-02: '*' row for a channel authed after a Вместе default
 
-                // The CreateWhatsappWorkflow webhook ACTIVATES the new workflow before it
-                // responds. Honor the channel toggle — the only activation gate since the
-                // capsule↔ReplyMode unification (a Вместе default is enforced separately:
-                // SeedReplyModeDefaultForProfile above writes the '*' suppression row).
-                if (PlayerPrefs.GetInt(openBot.name + "isOnWhatsapp", 1) != 1)
-                {
-                    StartCoroutine(SetWorkflowActiveRoutine(openBot.GetComponent<Bot>().whatsappWorkflowId, false));
-                }
+                // The CreateWhatsappWorkflow webhook ACTIVATES the clone before it responds. Honor the
+                // channel toggle — the only activation gate since the capsule↔ReplyMode unification (a
+                // Вместе default is enforced separately: SeedReplyModeDefaultForProfile writes the '*' row).
+                if (PlayerPrefs.GetInt(bot.name + "isOnWhatsapp", 1) != 1)
+                    StartCoroutine(SetWorkflowActiveRoutine(bot.whatsappWorkflowId, false));
 
                 CreateWhatsappWorkflowFromEditSuccess = true;
-                resolved = true;
                 Saved();
-            }
-        }
-
-        // Failure or a 200 without an "id" left the "Saving.." pill stranded
-        // forever (no else branch). Always settle it — show the error briefly,
-        // then hide — so the pill can never hang.
-        if (!resolved)
-        {
-            Debug.LogError($"[{www.responseCode}] CreateWhatsappWorkflow failed or returned no id: {www.error}");
-            FailSavePanel();
+                break;
+            case CreateWorkflowResponse.Kind.ProfileGone:
+                // channel_limit: the server refused the channel and deleted the profile.
+                Debug.LogWarning($"CreateWhatsappWorkflow refused: {result.Error} — the server deleted the profile");
+                ApplyCreateProfileGone(bot, ChatChannel.WhatsApp);
+                FailSavePanel();
+                break;
+            case CreateWorkflowResponse.Kind.Retryable:
+                // Any other refusal, no answer, an unreadable one: the paired profile stays and the Create is
+                // repeated at the next settings open / channel switch-on (idempotent on the server since F1).
+                Debug.LogError($"[{www.responseCode}] CreateWhatsappWorkflow failed or returned no id ({result.Error}): {www.error}");
+                MarkCreatePending(bot, ChatChannel.WhatsApp);
+                FailSavePanel();
+                break;
         }
 
         LoadingPanel.SetActive(false);
@@ -3793,12 +3861,14 @@ public partial class Manager : MonoBehaviour
         AddReplyModeFields(form, bot != null ? bot.name : "");
         // See the WhatsApp twin: BotKey = this bot's already-assigned stable slot name.
         form.AddField("BotKey", bot != null ? bot.name : "");
+        // See the WhatsApp twin: a new bot never names nor inherits a predecessor.
+        form.AddField(CreateWorkflowResponse.FieldCreateOrigin, CreateWorkflowResponse.OriginStart);
 
         // See the WhatsApp twin: no timeout means a silent n8n parks this coroutine
-        // forever and neither branch below ever runs.
+        // forever and neither branch below ever runs (45 s — plan §1.7).
         UnityWebRequest www = null;
         yield return AuthorizedRequest.Send(
-            () => { var r = UnityWebRequest.Post($"{n8nBaseUrl}/webhook/CreateTelegramWorkflow", form); r.timeout = 30; return r; },
+            () => { var r = UnityWebRequest.Post($"{n8nBaseUrl}/webhook/CreateTelegramWorkflow", form); r.timeout = CreateWorkflowResponse.TimeoutSeconds; return r; },
             r => www = r);
         using var wwwScope = www;
 
@@ -3814,15 +3884,13 @@ public partial class Manager : MonoBehaviour
         // NOTE: this check was left inverted (debug flip, correct line commented
         // beside it) — on success it deleted the just-authorized profile and on
         // failure marked the bot active. Restored to mirror the WhatsApp twin.
-        // Also see the WhatsApp twin: a channel_limit rejection is a real HTTP 200
-        // with no "id" (Task 8 billing backstop), so the body must be inspected too.
-        string response = www.result == UnityWebRequest.Result.Success ? www.downloadHandler.text : null;
-        bool serverRejected = response != null && response.Contains("\"error\"");
+        // Also see the WhatsApp twin: a refusal is a real HTTP 200 WITHOUT an id (plan §1.7) —
+        // only the id is success.
+        var result = CreateWorkflowResponse.Classify(www.responseCode, www.downloadHandler?.text);
 
-        if (www.result != UnityWebRequest.Result.Success || serverRejected)
+        if (result.Kind != CreateWorkflowResponse.Kind.Success)
         {
-            if (serverRejected)
-                Debug.LogWarning($"CreateTelegramWorkflow rejected: {response}");
+            Debug.LogWarning($"CreateTelegramWorkflow refused ({result.Kind}, {result.Error}) [{www.responseCode}] {www.error}");
 
             // Mirror of the WhatsApp twin: the card survives, so give its Edit
             // button and «Авто» capsule back instead of stranding them disabled,
@@ -3845,15 +3913,14 @@ public partial class Manager : MonoBehaviour
             startedBot.EditButton.interactable = true;
             startedBot.SetActivationInteractable(true);
 
-            if (response.Contains("\"id\":"))
+            startedBot.telegramWorkflowId = result.Id;
+            yield return AuthClient.Instance.ForceRefresh();   // the new clone id must enter the session token before SetWorkflowState/Edit
+            if (startedBot != null)
             {
-
-                bot.GetComponent<Bot>().telegramWorkflowId = ExtractWorkflowId(response);
-                yield return AuthClient.Instance.ForceRefresh();   // the new clone id must enter the session token before SetWorkflowState/Edit
-                PlayerPrefs.SetString(bot.name + "TelegramWorkflowId", bot.GetComponent<Bot>().telegramWorkflowId);
-                PlayerPrefs.SetString(bot.name + "TelegramProfileId", bot.GetComponent<Bot>().telegramProfileId);
+                PlayerPrefs.SetString(bot.name + "TelegramWorkflowId", startedBot.telegramWorkflowId);
+                PlayerPrefs.SetString(bot.name + "TelegramProfileId", startedBot.telegramProfileId);
                 PendingProfileLedger.MarkTelegramClaimed();
-                SeedReplyModeDefaultForProfile(bot.name, bot.GetComponent<Bot>().telegramProfileId);   // WR-02: '*' row for a channel authed after a Вместе default
+                SeedReplyModeDefaultForProfile(bot.name, startedBot.telegramProfileId);   // WR-02: '*' row for a channel authed after a Вместе default
             }
         }
 
@@ -3865,12 +3932,13 @@ public partial class Manager : MonoBehaviour
 
     private IEnumerator CreateTelegramWorkflowFromEdit()
     {
+        // The answer belongs to the bot that ASKED — the owner may leave for another bot's settings while it is in flight.
+        var bot = openBot.GetComponent<Bot>();
         LoadingPanel.SetActive(true);
 
         _saveHadError = false;
         openBotSettings.Saved.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text = SavingText;
         openBotSettings.Saved.SetActive(true);
-
 
         string productsList = "";
 
@@ -3888,7 +3956,6 @@ public partial class Manager : MonoBehaviour
             }
         }
 
-
         string servicesList = "";
 
         for (int i = 0; i < openBotSettings.ServicesParent.transform.childCount; i++)
@@ -3905,14 +3972,13 @@ public partial class Manager : MonoBehaviour
             }
         }
 
-
         WWWForm form = new();
 
         form.AddField("Name", openBotSettings.BotNameField.Value);
         AddBusinessTypeFields(form);
-        form.AddField("TelegramProfileId", openBot.GetComponent<Bot>().telegramProfileId);
-        string waId = openBot.GetComponent<Bot>().whatsappWorkflowId;
-        form.AddField("WhatsappWorkflowId", string.IsNullOrEmpty(waId) ? Bot.UnauthedProfileSentinel : waId);
+        form.AddField("TelegramProfileId", bot.telegramProfileId);
+        string otherWorkflowId = bot.whatsappWorkflowId;
+        form.AddField("WhatsappWorkflowId", string.IsNullOrEmpty(otherWorkflowId) ? Bot.UnauthedProfileSentinel : otherWorkflowId);
 
         form.AddField("Business", ComposeBusinessKnowledge(openBotSettings));
         form.AddField("Prompt", openBotSettings.PromptField.Value);
@@ -3921,50 +3987,62 @@ public partial class Manager : MonoBehaviour
         form.AddField("AppUserID", BillingIdentity.AppUserId);
         // A2: the server seeds this profile's '*' reply-mode row BEFORE activating the clone, so a
         // «Вместе» bot can never answer in the gap between activation and the client's own write.
-        AddReplyModeFields(form, openBot != null ? openBot.name : "");
-        // See the WhatsApp twin: BotKey = this (existing) bot's stable slot name.
-        form.AddField("BotKey", openBot != null ? openBot.name : "");
+        AddReplyModeFields(form, bot.name);
+        // BotKey = this (existing) bot's stable slot name — lets a re-auth/change-number
+        // save on the SAME bot retire its own old channel row server-side.
+        form.AddField("BotKey", bot.name);
+        // F1 + F2 (plan §1.7): an existing bot. The server may adopt this channel's predecessor — proven in its own
+        // database; the retired profile the device moved aside is named so that a row without a bot key is found too.
+        form.AddField(CreateWorkflowResponse.FieldCreateOrigin, CreateWorkflowResponse.OriginEdit);
+        form.AddField(CreateWorkflowResponse.FieldPreviousProfileId, ProfileRetirement.PreviousProfileId(bot, ChatChannel.Telegram, bot.telegramProfileId));
 
         UnityWebRequest www = null;
         yield return AuthorizedRequest.Send(
-            () => { var r = UnityWebRequest.Post($"{n8nBaseUrl}/webhook/CreateTelegramWorkflow", form); r.timeout = 30; return r; },
+            () => { var r = UnityWebRequest.Post($"{n8nBaseUrl}/webhook/CreateTelegramWorkflow", form); r.timeout = CreateWorkflowResponse.TimeoutSeconds; return r; },
             r => www = r);
         using var wwwScope = www;
 
-        bool resolved = false;
-        if (www.result == UnityWebRequest.Result.Success)
+        var result = CreateWorkflowResponse.Classify(www.responseCode, www.downloadHandler?.text);
+        if (bot == null)
         {
-            string response = www.downloadHandler.text;
-
-            if (response.Contains("\"id\":"))
-            {
-
-                openBot.GetComponent<Bot>().telegramWorkflowId = ExtractWorkflowId(response);
+            LoadingPanel.SetActive(false);   // the bot was deleted while the Create was in flight
+            yield break;
+        }
+        switch (result.Kind)
+        {
+            case CreateWorkflowResponse.Kind.Success:
+                bot.telegramWorkflowId = result.Id;
                 yield return AuthClient.Instance.ForceRefresh();   // see the start-path twin
-                PlayerPrefs.SetString(openBot.name + "TelegramWorkflowId", openBot.GetComponent<Bot>().telegramWorkflowId);
+                if (bot == null) break;
+                PlayerPrefs.SetString(bot.name + "TelegramWorkflowId", bot.telegramWorkflowId);
                 PendingProfileLedger.MarkTelegramClaimed();
-                SeedReplyModeDefaultForProfile(openBot.name, openBot.GetComponent<Bot>().telegramProfileId);   // WR-02: '*' row for a channel authed after a Вместе default
+                ClearCreatePending(bot, ChatChannel.Telegram);
+                // F2: the retired set goes only for a profile the server says it adopted.
+                ProfileRetirement.AfterCreate(bot, ChatChannel.Telegram, result.AdoptedProfiles);
+                SeedReplyModeDefaultForProfile(bot.name, bot.telegramProfileId);   // WR-02: '*' row for a channel authed after a Вместе default
 
-                // See CreateWhatsappWorkflowFromEdit: the webhook activates the new workflow
-                // before responding — honor the channel toggle, the only activation gate
-                // since the capsule↔ReplyMode unification.
-                if (PlayerPrefs.GetInt(openBot.name + "isOnTelegram", 1) != 1)
-                {
-                    StartCoroutine(SetWorkflowActiveRoutine(openBot.GetComponent<Bot>().telegramWorkflowId, false));
-                }
+                // The CreateTelegramWorkflow webhook ACTIVATES the clone before it responds. Honor the
+                // channel toggle — the only activation gate since the capsule↔ReplyMode unification (a
+                // Вместе default is enforced separately: SeedReplyModeDefaultForProfile writes the '*' row).
+                if (PlayerPrefs.GetInt(bot.name + "isOnTelegram", 1) != 1)
+                    StartCoroutine(SetWorkflowActiveRoutine(bot.telegramWorkflowId, false));
 
                 CreateTelegramWorkflowFromEditSuccess = true;
-                resolved = true;
                 Saved();
-            }
-        }
-
-        // Mirror of CreateWhatsappWorkflowFromEdit: never leave the pill stuck
-        // on "Saving.." when the webhook fails or returns no id.
-        if (!resolved)
-        {
-            Debug.LogError($"[{www.responseCode}] CreateTelegramWorkflow failed or returned no id: {www.error}");
-            FailSavePanel();
+                break;
+            case CreateWorkflowResponse.Kind.ProfileGone:
+                // channel_limit: the server refused the channel and deleted the profile.
+                Debug.LogWarning($"CreateTelegramWorkflow refused: {result.Error} — the server deleted the profile");
+                ApplyCreateProfileGone(bot, ChatChannel.Telegram);
+                FailSavePanel();
+                break;
+            case CreateWorkflowResponse.Kind.Retryable:
+                // Any other refusal, no answer, an unreadable one: the paired profile stays and the Create is
+                // repeated at the next settings open / channel switch-on (idempotent on the server since F1).
+                Debug.LogError($"[{www.responseCode}] CreateTelegramWorkflow failed or returned no id ({result.Error}): {www.error}");
+                MarkCreatePending(bot, ChatChannel.Telegram);
+                FailSavePanel();
+                break;
         }
 
         LoadingPanel.SetActive(false);
@@ -4079,44 +4157,6 @@ public partial class Manager : MonoBehaviour
         Saved();
 
         LoadingPanel.SetActive(false);
-    }
-
-    private IEnumerator DeleteWhatsappWorkflow(string whatsappWorkflowId, bool deletingBot)
-    {
-        // Sentinel ids ("" / "-1") have no n8n workflow — same skip as the Enable paths.
-        if (string.IsNullOrEmpty(whatsappWorkflowId) || whatsappWorkflowId.Equals("-1")) yield break;
-
-        UnityWebRequest whatsappRequest = null;
-        yield return AuthorizedRequest.Send(() => NewWorkflowStateRequest(whatsappWorkflowId, WorkflowStateRequest.Delete), r => whatsappRequest = r);
-        using var whatsappScope = whatsappRequest;
-
-        if (!deletingBot)
-        {
-            if (whatsappRequest.result == UnityWebRequest.Result.Success)
-            {
-                openBot.GetComponent<Bot>().whatsappWorkflowId = "-1";
-                PlayerPrefs.SetString(openBot.name + "WhatsappWorkflowId", "-1");
-            }
-        }
-    }
-
-    private IEnumerator DeleteTelegramWorkflow(string telegramWorkflowId, bool deletingBot)
-    {
-        // Sentinel ids ("" / "-1") have no n8n workflow — same skip as the Enable paths.
-        if (string.IsNullOrEmpty(telegramWorkflowId) || telegramWorkflowId.Equals("-1")) yield break;
-
-        UnityWebRequest telegramRequest = null;
-        yield return AuthorizedRequest.Send(() => NewWorkflowStateRequest(telegramWorkflowId, WorkflowStateRequest.Delete), r => telegramRequest = r);
-        using var telegramScope = telegramRequest;
-
-        if (!deletingBot)
-        {
-            if (telegramRequest.result == UnityWebRequest.Result.Success)
-            {
-                openBot.GetComponent<Bot>().telegramWorkflowId = "-1";
-                PlayerPrefs.SetString(openBot.name + "TelegramWorkflowId", "-1");
-            }
-        }
     }
 
     // previousWhatsappOn / previousTelegramOn are the persisted channel states

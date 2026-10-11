@@ -20,6 +20,10 @@ using UnityEngine;
 /// unfinished delete) answers 410 profile_retired: the bot's channel is marked (<see cref="ProfileRetirement"/>), the
 /// card says the channel is off, and the loop goes on to the next bot. Each profile is asked at most once per run
 /// (<see cref="ProfileClaimRun"/>) — the server used to answer «owned» for such a row, which spun this loop forever.
+///
+/// F2 (plan 2026-10-11, task T8): the mark now MOVES the channel's ids aside (<see cref="ProfileRetirement.Mark"/>), so the
+/// channel reads as disconnected everywhere and its reconnect takes the fresh path. Markers the M4 build wrote (ids kept)
+/// are moved the same way at boot, once the session is known.
 /// </summary>
 public static class ProfileClaimFlow
 {
@@ -64,6 +68,18 @@ public static class ProfileClaimFlow
         return bot != null && bot.BotName != null ? bot.BotName.font : null;
     }
 
+    /// <summary>The bot card whose GameObject name is <paramref name="botKey"/> (null when it is gone).</summary>
+    private static Bot BotFor(Transform botsRoot, string botKey)
+    {
+        if (botsRoot == null || string.IsNullOrEmpty(botKey)) return null;
+        for (int i = 0; i < botsRoot.childCount; i++)
+        {
+            var bot = botsRoot.GetChild(i).GetComponent<Bot>();
+            if (bot != null && bot.name == botKey) return bot;
+        }
+        return null;
+    }
+
     private static ProfileClaimPolicy.Candidate CandidateFor(Transform botsRoot, string profileId, ChatChannel channel)
     {
         foreach (var c in ConnectedProfiles(botsRoot))
@@ -81,13 +97,15 @@ public static class ProfileClaimFlow
             var auth = AuthClient.Instance;
             if (auth == null) yield break;
             yield return auth.EnsureSession();
+            // F2: an M4 marker kept the channel's ids — move them aside before the loop reads the connected profiles.
+            ProfileRetirement.TransferLegacyMarkers(botsRoot, auth.Claims);
             var run = new ProfileClaimRun();   // M4: each profile at most once per run — bounded by the connected profiles
             while (true)
             {
                 var next = run.TakeNext(ConnectedProfiles(botsRoot), auth.Claims, Snoozed);
                 if (next == null) yield break;
                 bool done = false;
-                yield return ClaimOne(next.Value, FontFrom(botsRoot), ok => done = ok);
+                yield return ClaimOne(next.Value, botsRoot, ok => done = ok);
                 if (!done) yield break;   // snoozed or failed: stop for this session, the next launch retries
             }
         }
@@ -97,17 +115,18 @@ public static class ProfileClaimFlow
         }
     }
 
-    private static IEnumerator ClaimOne(ProfileClaimPolicy.Candidate c, TMP_FontAsset font, System.Action<bool> finished)
+    private static IEnumerator ClaimOne(ProfileClaimPolicy.Candidate c, Transform botsRoot, System.Action<bool> finished)
     {
         var auth = AuthClient.Instance;
+        TMP_FontAsset font = FontFrom(botsRoot);
         AuthClient.ClaimResult start = null;
         yield return auth.Claim("claim.start", c.ProfileId, c.Channel, null, r => start = r);
         if (start != null && ProfileClaimPolicy.IsRetired(start.Error))
         {
-            // M4: the server retired this profile. Remember it on the bot's channel (the card says so, the next launch
-            // does not ask again) and go on to the next bot. The bot's profile / workflow ids stay as they are — V12
-            // deletes the server traces (memory, history, clone) by them when the owner deletes the bot.
-            ProfileRetirement.Mark(c.BotKey, c.Channel, c.ProfileId, start.RetiredReason);
+            // M4: the server retired this profile. Record it on the bot's channel (the card says so, the next launch
+            // does not ask again) and go on to the next bot. F2: the channel's ids move aside to its retired set (V12
+            // deletes the server traces by those too); an unfinished app delete keeps them.
+            ProfileRetirement.Mark(BotFor(botsRoot, c.BotKey), c.Channel, c.ProfileId, start.RetiredReason);
             finished(true);
             yield break;
         }

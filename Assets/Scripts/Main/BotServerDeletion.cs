@@ -57,6 +57,77 @@ public static class BotServerDeletion
           && IsSentinel(whatsappProfileId) && IsSentinel(telegramProfileId));
 
     /// <summary>
+    /// F2 (T8): one channel's ids for the server deletion — the current pair and the retired pair the device moved aside
+    /// when the server retired the channel's profile (<see cref="ProfileRetirement"/>). Normally a channel has one or the
+    /// other; both only when a reconnect's Create did not adopt the retired profile.
+    /// </summary>
+    public readonly struct ChannelServerIds
+    {
+        public readonly string ProfileId;
+        public readonly string WorkflowId;
+        public readonly string RetiredProfileId;
+        public readonly string RetiredWorkflowId;
+
+        public ChannelServerIds(string profileId, string workflowId, string retiredProfileId = null, string retiredWorkflowId = null)
+        {
+            ProfileId = profileId;
+            WorkflowId = workflowId;
+            RetiredProfileId = retiredProfileId;
+            RetiredWorkflowId = retiredWorkflowId;
+        }
+
+        public bool HasCurrent => !IsSentinel(ProfileId) || !IsSentinel(WorkflowId);
+
+        /// <summary>The retired profile unless it IS the current one (an M4 marker of an unfinished app delete names it).</summary>
+        public string SeparateRetiredProfileId =>
+            !IsSentinel(RetiredProfileId) && RetiredProfileId != ProfileId ? RetiredProfileId : Bot.UnauthedProfileSentinel;
+
+        public string SeparateRetiredWorkflowId =>
+            !IsSentinel(RetiredWorkflowId) && RetiredWorkflowId != WorkflowId ? RetiredWorkflowId : Bot.UnauthedProfileSentinel;
+
+        public bool HasSeparateRetired => !IsSentinel(SeparateRetiredProfileId) || !IsSentinel(SeparateRetiredWorkflowId);
+    }
+
+    /// <summary>F2 (T8): both channels' ids for the server deletion.</summary>
+    public readonly struct BotServerIds
+    {
+        public readonly ChannelServerIds Whatsapp;
+        public readonly ChannelServerIds Telegram;
+
+        public BotServerIds(ChannelServerIds whatsapp, ChannelServerIds telegram)
+        {
+            Whatsapp = whatsapp;
+            Telegram = telegram;
+        }
+    }
+
+    /// <summary>
+    /// False only for a bot that never reached the server: no current id AND no retired one. After the F2 move a bot may
+    /// hold retired ids alone — its memory, history and clone are still on the server (else: the V12 regression).
+    /// </summary>
+    public static bool HasServerTrace(BotServerIds ids) =>
+        ids.Whatsapp.HasCurrent || ids.Telegram.HasCurrent || ids.Whatsapp.HasSeparateRetired || ids.Telegram.HasSeparateRetired;
+
+    /// <summary>
+    /// The Wappi profiles to unlink: the CURRENT ones only. A retired profile is already deleted at Wappi (the sweep or
+    /// the refused Create did it) — the proxy would refuse it anyway.
+    /// </summary>
+    public static IEnumerable<(string profileId, ChatChannel channel)> ProfilesToUnlink(BotServerIds ids)
+    {
+        if (!IsSentinel(ids.Whatsapp.ProfileId)) yield return (ids.Whatsapp.ProfileId, ChatChannel.WhatsApp);
+        if (!IsSentinel(ids.Telegram.ProfileId)) yield return (ids.Telegram.ProfileId, ChatChannel.Telegram);
+    }
+
+    /// <summary>The clones to delete (Set Workflow State, idempotent): the current ones, then each channel's former clone.</summary>
+    public static IEnumerable<string> ClonesToDelete(BotServerIds ids)
+    {
+        var seen = new HashSet<string>();
+        foreach (string id in new[] { ids.Whatsapp.WorkflowId, ids.Telegram.WorkflowId,
+                                      ids.Whatsapp.RetiredWorkflowId, ids.Telegram.RetiredWorkflowId })
+            if (!IsSentinel(id) && seen.Add(id)) yield return id;
+    }
+
+    /// <summary>
     /// A failure the next attempt may not repeat: no HTTP answer at all (code 0 — no connection, a timeout), a server
     /// error or a database fault the server reports as 503, a session the one refresh did not cure, a throttle.
     /// </summary>

@@ -60,12 +60,15 @@ public static class BotCardModel
 
     /// <summary>
     /// M4: a channel the server retired keeps its icon (the bot still HAS that channel — its ids are what V12 deletes
-    /// the server traces by) but never in brand colour: gray, whatever its toggle says.
+    /// the server traces by) but never in brand colour: gray, whatever its toggle says. F2 (T8): once its ids are moved
+    /// aside the current profile id is the sentinel — the icon stays gray all the same (the plan's card, §5.3); whether
+    /// the channel IS retired is <see cref="RetiredChannelPolicy"/>'s call, never this method's.
     /// </summary>
     public static BotChannelIconState IconState(string profileId, bool channelEnabled, bool retired)
     {
+        if (retired) return BotChannelIconState.Muted;
         if (!IsConnected(profileId)) return BotChannelIconState.Hidden;
-        return channelEnabled && !retired ? BotChannelIconState.Colored : BotChannelIconState.Muted;
+        return channelEnabled ? BotChannelIconState.Colored : BotChannelIconState.Muted;
     }
 
     /// <summary>
