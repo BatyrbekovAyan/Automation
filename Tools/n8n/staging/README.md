@@ -34,6 +34,9 @@ Tools/n8n/staging/pg.sh start
 WAPPI_MOCK_LOG=Tools/test-output/wappi-mock.jsonl python3 Tools/n8n/staging/wappi-mock.py &
 python3 Tools/n8n/staging/bootstrap.py --bot wa:stgwa001 --bot tg:stgtg001   # переимпорт канона + старт
 python3 Tools/n8n/staging/e2e.py                              # сценарии этапа 0.4/3
+python3 Tools/n8n/staging/vertical-bots.py --vertical education  # клоны с промптом Create (ниша + _core) вместо промпта шаблона —
+#   для модельных e2e, которые должны видеть правку Tools/n8n/prompts/ (Q1 A6); --prompts-ref <ref> — голова старой карты;
+#   назад к промпту шаблона — обычный bootstrap.py --bot …
 python3 Tools/n8n/staging/bootstrap.py --stop                 # остановить сервер
 ```
 Проверка изоляции: `grep -c 'wappi.pro\|n8n.choosereply.com' Tools/n8n/workflows-staging/*.json` → везде 0

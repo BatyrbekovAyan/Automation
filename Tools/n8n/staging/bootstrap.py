@@ -188,6 +188,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--creds-file", help="encrypted, name-filtered dev credential export (step 1)")
     ap.add_argument("--bot", action="append", default=[], help="passed to derive-staging.py")
+    ap.add_argument("--prompt-file", help="passed to derive-staging.py: the systemMessage the staging bot clones carry "
+                                          "(default: the template's own prompt; vertical-bots.py composes a Create-style one)")
     ap.add_argument("--restart", action="store_true")
     ap.add_argument("--stop", action="store_true")
     ap.add_argument("--skip-workflows", action="store_true")
@@ -242,7 +244,8 @@ def main():
     # 5. workflows
     if not a.skip_workflows:
         stop_server()
-        r = sh(sys.executable, os.path.join(HERE, "derive-staging.py"), *[x for b in a.bot for x in ("--bot", b)])
+        r = sh(sys.executable, os.path.join(HERE, "derive-staging.py"), *[x for b in a.bot for x in ("--bot", b)],
+               *(("--prompt-file", a.prompt_file) if a.prompt_file else ()))
         n8n("import:workflow", "--separate", f"--input={os.path.join(N8N_DIR, 'workflows-staging')}")
         manifest = json.load(open(os.path.join(N8N_DIR, "workflows-staging", "_manifest.json")))
         for wid in ACTIVE_CANONICAL + [b["workflowId"] for b in manifest["bots"]]:
