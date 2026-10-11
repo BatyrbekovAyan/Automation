@@ -111,7 +111,13 @@ prompt editing, RAG file upload/delete, and (in progress) live reply suggestions
   `n8n Admin API` placeholder credential. It owns those nodes; `apply-reply-mode-v2.py` keeps the seed chain
   (CLONE_CHAIN = Clone Plan), `apply-auth-gate.py` only the gate. Behaviour: `tests/test_create_clone.py` (the canonical
   graph through `tests/create_seed_chain.js` in BRIDGE mode — real SQL on temp tables + a fake n8n/Wappi; the books of
-  clones, the answer contract, F2 R1/R4/R9; `--head` = the pre-F1 graph, `--verbose` = traces).
+  clones, the answer contract, F2 R1/R4/R9; `--head` = the pre-F1 graph, `--verbose` = traces). Shape:
+  `verify-clone-lifecycle.py` (T4: the chain entered only through the seed gate AND the plan, the id answered only on
+  Bind's positive marker, every «no» after the clone discarding only a NEW clone, every n8n API / Wappi call with
+  fullResponse + neverError + a status If, refusals without an id, localhost + the placeholder credential, protected lists
+  = PROTECTED_IDS, `PreviousProfileId`/`CreateOrigin` never in the gate RULE, seven Postgres nodes on the hot path, WA = TG;
+  `--rev 5ac9b2f9` shows the pre-F1 canon failing); its 21 mutations × WA/TG: `tests/test_verify_clone_lifecycle.py`
+  (`--existing-guards` runs them against verify-reply-mode / verify-auth-gate / verify-telegram-parity instead).
   `$execution.id` as correlationId). `verify-message-batching.py` / `verify-telegram-parity.py` pin the
   stamp's wiring and the winner → billing-gate → Input type path (their pre-2026-09 expectations were
   stale and failed every run).

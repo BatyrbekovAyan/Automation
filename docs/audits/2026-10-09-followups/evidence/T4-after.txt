@@ -1,0 +1,171 @@
+# T4 after — 2026-10-12 01:57 +0500, base HEAD 7126ef70 (T3) + the T4 working tree
+
+## 1. python3 Tools/n8n/tests/test_verify_clone_lifecycle.py   (21 mutations × WA/TG + control + the pre-F1 canon)
+
+PASS T4 [verify-clone-lifecycle] control: the unmodified canonical set passes
+PASS T4 [verify-clone-lifecycle] the pre-F1 canon (5ac9b2f9: Restamp, no plan, no marker gate, the public API) is rejected — both files
+PASS T4 [verify-clone-lifecycle] NEG bind_bypasses_marker [WA] is rejected
+PASS T4 [verify-clone-lifecycle] NEG bind_bypasses_marker [TG] is rejected
+PASS T4 [verify-clone-lifecycle] NEG discard_edge_removed [WA] is rejected
+PASS T4 [verify-clone-lifecycle] NEG discard_edge_removed [TG] is rejected
+PASS T4 [verify-clone-lifecycle] NEG discard_edge_cut [WA] is rejected
+PASS T4 [verify-clone-lifecycle] NEG discard_edge_cut [TG] is rejected
+PASS T4 [verify-clone-lifecycle] NEG activate_without_never_error [WA] is rejected
+PASS T4 [verify-clone-lifecycle] NEG activate_without_never_error [TG] is rejected
+PASS T4 [verify-clone-lifecycle] NEG seed_saved_to_template [WA] is rejected
+PASS T4 [verify-clone-lifecycle] NEG seed_saved_to_template [TG] is rejected
+PASS T4 [verify-clone-lifecycle] NEG refusal_with_id [WA] is rejected
+PASS T4 [verify-clone-lifecycle] NEG refusal_with_id [TG] is rejected
+PASS T4 [verify-clone-lifecycle] NEG refusal_merges_input [WA] is rejected
+PASS T4 [verify-clone-lifecycle] NEG refusal_merges_input [TG] is rejected
+PASS T4 [verify-clone-lifecycle] NEG previous_profile_in_rule [WA] is rejected
+PASS T4 [verify-clone-lifecycle] NEG previous_profile_in_rule [TG] is rejected
+PASS T4 [verify-clone-lifecycle] NEG protected_drift_reuse [WA] is rejected
+PASS T4 [verify-clone-lifecycle] NEG protected_drift_reuse [TG] is rejected
+PASS T4 [verify-clone-lifecycle] NEG protected_drift_replaced [WA] is rejected
+PASS T4 [verify-clone-lifecycle] NEG protected_drift_replaced [TG] is rejected
+PASS T4 [verify-clone-lifecycle] NEG api_public_host [WA] is rejected
+PASS T4 [verify-clone-lifecycle] NEG api_public_host [TG] is rejected
+PASS T4 [verify-clone-lifecycle] NEG api_bound_credential [WA] is rejected
+PASS T4 [verify-clone-lifecycle] NEG api_bound_credential [TG] is rejected
+PASS T4 [verify-clone-lifecycle] NEG bound_reads_success [WA] is rejected
+PASS T4 [verify-clone-lifecycle] NEG bound_reads_success [TG] is rejected
+PASS T4 [verify-clone-lifecycle] NEG plan_without_retry [WA] is rejected
+PASS T4 [verify-clone-lifecycle] NEG plan_without_retry [TG] is rejected
+PASS T4 [verify-clone-lifecycle] NEG plan_read_continues [WA] is rejected
+PASS T4 [verify-clone-lifecycle] NEG plan_read_continues [TG] is rejected
+PASS T4 [verify-clone-lifecycle] NEG new_clone_skips_activation [WA] is rejected
+PASS T4 [verify-clone-lifecycle] NEG new_clone_skips_activation [TG] is rejected
+PASS T4 [verify-clone-lifecycle] NEG discard_reused [WA] is rejected
+PASS T4 [verify-clone-lifecycle] NEG discard_reused [TG] is rejected
+PASS T4 [verify-clone-lifecycle] NEG probe_unchecked [WA] is rejected
+PASS T4 [verify-clone-lifecycle] NEG probe_unchecked [TG] is rejected
+PASS T4 [verify-clone-lifecycle] NEG restamp_back [WA] is rejected
+PASS T4 [verify-clone-lifecycle] NEG restamp_back [TG] is rejected
+PASS T4 [verify-clone-lifecycle] NEG bind_sql_drift [WA] is rejected
+PASS T4 [verify-clone-lifecycle] NEG bind_sql_drift [TG] is rejected
+PASS T4 [verify-clone-lifecycle] NEG answer_without_adopted [WA] is rejected
+PASS T4 [verify-clone-lifecycle] NEG answer_without_adopted [TG] is rejected
+
+44 pass, 0 fail
+exit=0
+
+## 2. python3 Tools/n8n/verify-clone-lifecycle.py   (canon)
+
+OK  XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json (the bot's line: plan → reuse | create → bind on its marker → discard on every no)
+OK  Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json (the bot's line: plan → reuse | create → bind on its marker → discard on every no)
+OK  Create WA / TG are one graph
+ALL CLONE LIFECYCLE ASSERTS PASSED
+exit=0
+
+## 3. python3 Tools/n8n/verify-clone-lifecycle.py --rev 5ac9b2f9   (the pre-F1 canon — must fail; every failing section is reported)
+
+OK  Create WA / TG are one graph
+CLONE LIFECYCLE FAIL [XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json (9) the retired node]: XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json: Restamp RAG Chunks is retired (its -1 rule lives in Bind)
+CLONE LIFECYCLE FAIL [XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json (1) entry: seed gate → plan → (foreign refused) → reuse | te]: XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json: Create Workflow is reachable around Plan Read?[0] — the clone chain must pass the seed gate, the plan and the foreig
+CLONE LIFECYCLE FAIL [XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json (2) the answer only on the positive bind; every «no» after t]: XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json: Send New Workflows Id (the id answer) must be reachable ONLY through Bound?[0]
+CLONE LIFECYCLE FAIL [XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json (3) checked calls]: node 'Probe Bound Clone' missing
+CLONE LIFECYCLE FAIL [XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json (4) the Postgres decisions]: node 'Clone Plan' missing
+CLONE LIFECYCLE FAIL [XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json (5) refusals carry no id; the success answer]: XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json: Send New Workflows Id must be the terminal, executeOnce, merging nothing
+CLONE LIFECYCLE FAIL [XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json (6) n8n API: localhost + the placeholder credential; nothing]: XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json: Get Sample Workflow must call http://localhost:5678/api/v1/workflows: https://n8n.choosereply.com/api/v1/workflows/4wYitz5ek
+CLONE LIFECYCLE FAIL [XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json (7) protected ids]: node 'Reuse?' missing
+CLONE LIFECYCLE FAIL [XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json (9) activation skipped only for a reused clone; the Postgres]: XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json: Clone Id → Already Active? → (reused + serving: Set Wappi Webhook | Activate)
+CLONE LIFECYCLE FAIL [Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json (9) the retired node]: Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json: Restamp RAG Chunks is retired (its -1 rule lives in Bind)
+CLONE LIFECYCLE FAIL [Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json (1) entry: seed gate → plan → (foreign refused) → reuse | te]: Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json: Create Workflow is reachable around Plan Read?[0] — the clone chain must pass the seed gate, the plan and the foreig
+CLONE LIFECYCLE FAIL [Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json (2) the answer only on the positive bind; every «no» after t]: Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json: Send New Workflows Id (the id answer) must be reachable ONLY through Bound?[0]
+CLONE LIFECYCLE FAIL [Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json (3) checked calls]: node 'Probe Bound Clone' missing
+CLONE LIFECYCLE FAIL [Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json (4) the Postgres decisions]: node 'Clone Plan' missing
+CLONE LIFECYCLE FAIL [Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json (5) refusals carry no id; the success answer]: Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json: Send New Workflows Id must be the terminal, executeOnce, merging nothing
+CLONE LIFECYCLE FAIL [Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json (6) n8n API: localhost + the placeholder credential; nothing]: Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json: Get Sample Workflow must call http://localhost:5678/api/v1/workflows: https://n8n.choosereply.com/api/v1/workflows/4VN3gsFaC
+CLONE LIFECYCLE FAIL [Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json (7) protected ids]: node 'Reuse?' missing
+CLONE LIFECYCLE FAIL [Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json (9) activation skipped only for a reused clone; the Postgres]: Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json: Clone Id → Already Active? → (reused + serving: Set Wappi Webhook | Activate)
+CLONE LIFECYCLE FAILED: 18 check(s)
+exit=1
+
+## 4. python3 Tools/n8n/tests/test_verify_parity.py   (38 → 52: + F1_MUTATIONS — the -1 rule inside Bind, its guard, the 9th value, Restamp back, the public API host, the old credentials, a localhost callback)
+
+PASS D2 NEG bind_sentinel_unguarded [WA] is detected while the canonical control passes
+PASS D2 NEG bind_sentinel_unguarded [TG] is detected while the canonical control passes
+PASS D2 NEG bind_rule_dropped [WA] is detected while the canonical control passes
+PASS D2 NEG bind_rule_dropped [TG] is detected while the canonical control passes
+PASS D2 NEG bind_other_field_swapped [WA] is detected while the canonical control passes
+PASS D2 NEG bind_other_field_swapped [TG] is detected while the canonical control passes
+PASS D2 NEG restamp_restored [WA] is detected while the canonical control passes
+PASS D2 NEG restamp_restored [TG] is detected while the canonical control passes
+PASS D2 NEG api_public_host [WA] is detected while the canonical control passes
+PASS D2 NEG api_public_host [TG] is detected while the canonical control passes
+PASS D2 NEG api_old_credentials [WA] is detected while the canonical control passes
+PASS D2 NEG api_old_credentials [TG] is detected while the canonical control passes
+PASS D2 NEG localhost_callback [WA] is detected while the canonical control passes
+PASS D2 NEG localhost_callback [TG] is detected while the canonical control passes
+52 pass, 0 fail
+
+## 5. Generators --check and verifiers
+
+apply-auth-gate.py --check rc=0
+apply-clone-lifecycle.py --check rc=0
+apply-history-handoff.py --check rc=0
+apply-outcome-stamps.py --check rc=0
+apply-reply-mode-v2.py --check rc=0
+apply-reply-pipeline-v2.py --check rc=0
+apply-slot-count-fix.py --check rc=0
+apply-suggest-v2.py --check rc=0
+apply-sweep-clone-deactivate.py --check rc=0
+build-auth-workflows.py --check rc=0
+build-handoff-workflows.py --check rc=0
+build-price-search.py --check rc=0
+build-test-dialog.py --check rc=0
+inject-panel-prompts.py --check rc=0
+clone_lineage.py --check rc=0
+inject-prompts.py --check (tiktoken venv) rc=0
+
+verify-clone-lifecycle.py rc=0 — ALL CLONE LIFECYCLE ASSERTS PASSED
+verify-auth-gate.py rc=0 — ALL AUTH GATE ASSERTS PASSED
+verify-history-handoff.py rc=0 — ALL HISTORY/HANDOFF ASSERTS PASSED
+verify-message-batching.py rc=0 — ALL BATCHING ASSERTS PASSED
+verify-reply-mode.py rc=0 — ALL REPLY MODE ASSERTS PASSED
+verify-reply-pipeline.py rc=0 — ALL REPLY PIPELINE ASSERTS PASSED
+verify-telegram-parity.py rc=0 — ALL PARITY ASSERTS PASSED
+verify-sql-comments.py rc=0 — OK  85 Postgres node(s) in 28 workflow file(s): no placeholder outside code, no {{ }}, no modifier, no leading =
+SELF-TEST PASSED: 33/33 cases
+verify-panel-prompts.js rc=0
+verify_rag.py all rc=0
+(canonical workflows: no change in T4)
+
+## 6. Staging read-back (canon unchanged by T4)
+
+$ python3 Tools/n8n/verify-deployed.py --base http://localhost:5678 → exit 0
+base http://localhost:5678: canonical 27 (diff 0), clones 2 (behind template 0, of them prompt head behind 0; custom prompts 2, not counted), archived clones 0 (not counted), other 2
+
+## 7. python3 Tools/n8n/tests/run_all.py   (final, T3 + T4)
+
+OK   test_auth_refresh.py: 12 pass, 0 fail
+OK   test_billing_identity.py: 24 pass, 0 fail
+OK   test_claim.py: 19 pass, 0 fail
+OK   test_clone_lineage_sql.py: 50 pass, 0 fail
+OK   test_create_clone.py: 70 pass, 0 fail
+OK   test_create_seed.py: 53 pass, 0 fail
+OK   test_deploy_canonical.py: 20 pass, 0 fail
+OK   test_handoff_notifier.py: 14 pass, 0 fail
+OK   test_harness_selfcheck.py: 2 pass, 0 fail
+OK   test_legacy_generators.py: 5 pass, 0 fail
+OK   test_price_search.py: 36 pass, 0 fail
+OK   test_reply_lost_send.py: 5 pass, 0 fail
+OK   test_reply_memory.py: 44 pass, 0 fail
+OK   test_reply_memory_concurrent.py: 9 pass, 0 fail
+OK   test_reply_mode.py: 43 pass, 0 fail
+OK   test_reply_order.py: 44 pass, 0 fail
+OK   test_reply_reconcile.py: 66 pass, 0 fail
+OK   test_retired_delete.py: 13 pass, 0 fail
+OK   test_sql_comment_injection.py: 36 pass, 0 fail
+OK   test_suggest_catalog.py: 24 pass, 0 fail
+OK   test_suggest_lang.py: 11 pass, 0 fail
+OK   test_suggest_price.py: 16 pass, 0 fail
+OK   test_suggest_query.py: 37 pass, 0 fail
+OK   test_test_dialog.py: 17 pass, 0 fail
+OK   test_upload.py: 45 pass, 0 fail
+OK   test_verify_clone_lifecycle.py: 44 pass, 0 fail
+OK   test_verify_deployed.py: 48 pass, 0 fail
+OK   test_verify_parity.py: 52 pass, 0 fail
+OK   test_verify_sql_comments.py: 53 pass, 0 fail
+exit=0

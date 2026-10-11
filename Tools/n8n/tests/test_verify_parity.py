@@ -12,6 +12,10 @@ What is executed:
     of bot_profiles/subscribers in the local staging Postgres (BEGIN … ROLLBACK) — proving the chain's rules are
     behaviour, not decoration: without the retire a refused profile keeps a slot; without its `workflow_id is null`
     guard a refusal frees a LIVE bot's slot (a second channel on a one-channel plan).
+  * F1 + F2 (T4, 2026-10-11): the pre-F1 Restamp rule now inside Bind Workflow Id (its -1 rule, the clone-id guard, the
+    other channel's id as the 9th value) and the n8n API calls of Create on localhost with the `n8n Admin API`
+    placeholder — negatives F1_MUTATIONS through the same oracle (the full graph of the line: verify-clone-lifecycle.py
+    and tests/test_verify_clone_lifecycle.py).
 No n8n, no network, nothing written outside a temp dir.
 
     python3 Tools/n8n/tests/test_verify_parity.py
@@ -190,6 +194,52 @@ for fn, title in ((m_tool_filter_wa, 'the Telegram price-list tool filtering und
             mutate(d, TG_BOT, fn)
             rc, out = run_parity('--dir', str(d))
         c.check(rc == 1 and ('crPriceSearch001' in out or 'retrieve filter' in out), f'exit {rc}:\n{out[-600:]}')
+
+
+
+# ---- F1 + F2 (T4, 2026-10-11): the pre-F1 Restamp rule lives inside Bind Workflow Id, and the n8n API calls of Create
+# go to localhost with the `n8n Admin API` placeholder credential — each a way that can rot -----------------------------
+def m_bind_sentinel_unguarded(w, *_):         # a '-1' / '' other-channel id would claim every fully-unauthed chunk
+    p = nd(w, 'Bind Workflow Id')['parameters']
+    p['query'] = p['query'].replace("$9 ~ '^[A-Za-z0-9]{8,36}$'", "$9 <> ''")
+
+
+def m_bind_rule_dropped(w, *_):               # the second channel no longer takes the other channel's -1 chunks
+    p = nd(w, 'Bind Workflow Id')['parameters']
+    p['query'] = p['query'].replace("= '-1'\n", "= 'never'\n", 1)
+
+
+def m_bind_other_field_swapped(w, own, other):  # the 9th value names this channel's profile instead of the other clone
+    o = nd(w, 'Bind Workflow Id')['parameters']['options']
+    o['queryReplacement'] = o['queryReplacement'].rsplit("String($('Unity Webhook').first().json.body.", 1)[0] + \
+        "String($('Unity Webhook').first().json.body." + own + " || '') ] }}"
+
+
+def m_restamp_restored(w, *_):                # a stale generator re-adds the retired node
+    w['nodes'].append({'parameters': {'operation': 'executeQuery', 'query': 'select 1;', 'options': {}}, 'id': 'mut-restamp',
+                       'name': 'Restamp RAG Chunks', 'type': 'n8n-nodes-base.postgres', 'typeVersion': 2.6, 'position': [0, 0],
+                       'credentials': {'postgres': {'id': 'vvRrFiEXzLVqKjOx', 'name': 'Postgres'}}})
+
+
+def m_api_public_host(w, *_):                 # DNS + Caddy back on the hot path
+    p = nd(w, 'Get Sample Workflow')['parameters']
+    p['url'] = p['url'].replace('http://localhost:5678', 'https://n8n.choosereply.com')
+
+
+def m_api_old_credentials(w, *_):             # a raw dev / live re-export: bound ids instead of the placeholder
+    nd(w, 'Create Workflow')['credentials'] = {'n8nApi': {'id': 'X1k4igOAG65Fb3oz', 'name': 'n8n account'},
+                                                'httpHeaderAuth': {'id': 'RV7m661NMLPXEcvm', 'name': 'n8nAPIKey'}}
+
+
+def m_localhost_callback(w, own, *_):        # Wappi would be told to call localhost (unreachable from Wappi)
+    for q in nd(w, 'Set Wappi Webhook')['parameters']['queryParameters']['parameters']:
+        if q['name'] == 'url':
+            q['value'] = "=http://localhost:5678/webhook/{{ $('Unity Webhook').first().json.body." + own + " }}"
+
+
+F1_MUTATIONS = [m_bind_sentinel_unguarded, m_bind_rule_dropped, m_bind_other_field_swapped, m_restamp_restored,
+                m_api_public_host, m_api_old_credentials, m_localhost_callback]
+MUTATIONS = MUTATIONS + F1_MUTATIONS
 
 CONTROL_RC, CONTROL_OUT = run_parity()
 for fn in MUTATIONS:

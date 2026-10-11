@@ -1,0 +1,92 @@
+# T4 before — 2026-10-12 01:18 +0500, base HEAD 7126ef70 (T3 committed: the new Create graph + the existing guards updated to its shape)
+
+The NEW mutation test tests/test_verify_clone_lifecycle.py: 21 ways the bot's line in Create can rot, each applied to ONE
+Create file (WA, then TG) in a temp copy of the canonical set. Run against the guards that existed before T4
+(verify-reply-mode.py + verify-auth-gate.py + verify-telegram-parity.py, subprocess --dir, rejected = ANY of them exits ≠ 0).
+
+Summary: 26 of 42 negative cases slip through the existing guards (13 mutations × WA/TG): the discard edge removed or cut,
+Activate without neverError, a refusal carrying an id or merging its input, protected-id drift in Reuse? / Replaced Items,
+Clone Plan without retry, Plan Read? continuing on an error item, a NEW clone skipping activation, Discard? deleting a
+REUSED clone, the probe unchecked, the answer without adoptedProfiles. (Caught already: the bind bypassing its marker, the
+seed gate bypass, PreviousProfileId in the RULE, the public API host / a bound credential, Bound? on «success», the Restamp
+node back, a hand-edited Bind statement.) Without verify-clone-lifecycle.py the test itself fails every case (§2).
+
+## 1. python3 Tools/n8n/tests/test_verify_clone_lifecycle.py --existing-guards
+
+PASS T4 [existing guards] control: the unmodified canonical set passes
+PASS T4 [existing guards] NEG bind_bypasses_marker [WA] is rejected
+PASS T4 [existing guards] NEG bind_bypasses_marker [TG] is rejected
+FAIL T4 [existing guards] NEG discard_edge_removed [WA] is rejected
+      - NOT detected: [verify-reply-mode.py exit 0] ALL REPLY MODE ASSERTS PASSED | [verify-auth-gate.py exit 0] ALL AUTH GATE ASSERTS PASSED | [verify-telegram-parity.py exit 0] ALL PARITY ASSERTS PASSED
+FAIL T4 [existing guards] NEG discard_edge_removed [TG] is rejected
+      - NOT detected: [verify-reply-mode.py exit 0] ALL REPLY MODE ASSERTS PASSED | [verify-auth-gate.py exit 0] ALL AUTH GATE ASSERTS PASSED | [verify-telegram-parity.py exit 0] ALL PARITY ASSERTS PASSED
+FAIL T4 [existing guards] NEG discard_edge_cut [WA] is rejected
+      - NOT detected: [verify-reply-mode.py exit 0] ALL REPLY MODE ASSERTS PASSED | [verify-auth-gate.py exit 0] ALL AUTH GATE ASSERTS PASSED | [verify-telegram-parity.py exit 0] ALL PARITY ASSERTS PASSED
+FAIL T4 [existing guards] NEG discard_edge_cut [TG] is rejected
+      - NOT detected: [verify-reply-mode.py exit 0] ALL REPLY MODE ASSERTS PASSED | [verify-auth-gate.py exit 0] ALL AUTH GATE ASSERTS PASSED | [verify-telegram-parity.py exit 0] ALL PARITY ASSERTS PASSED
+FAIL T4 [existing guards] NEG activate_without_never_error [WA] is rejected
+      - NOT detected: [verify-reply-mode.py exit 0] ALL REPLY MODE ASSERTS PASSED | [verify-auth-gate.py exit 0] ALL AUTH GATE ASSERTS PASSED | [verify-telegram-parity.py exit 0] ALL PARITY ASSERTS PASSED
+FAIL T4 [existing guards] NEG activate_without_never_error [TG] is rejected
+      - NOT detected: [verify-reply-mode.py exit 0] ALL REPLY MODE ASSERTS PASSED | [verify-auth-gate.py exit 0] ALL AUTH GATE ASSERTS PASSED | [verify-telegram-parity.py exit 0] ALL PARITY ASSERTS PASSED
+PASS T4 [existing guards] NEG seed_saved_to_template [WA] is rejected
+PASS T4 [existing guards] NEG seed_saved_to_template [TG] is rejected
+FAIL T4 [existing guards] NEG refusal_with_id [WA] is rejected
+      - NOT detected: [verify-reply-mode.py exit 0] ALL REPLY MODE ASSERTS PASSED | [verify-auth-gate.py exit 0] ALL AUTH GATE ASSERTS PASSED | [verify-telegram-parity.py exit 0] ALL PARITY ASSERTS PASSED
+FAIL T4 [existing guards] NEG refusal_with_id [TG] is rejected
+      - NOT detected: [verify-reply-mode.py exit 0] ALL REPLY MODE ASSERTS PASSED | [verify-auth-gate.py exit 0] ALL AUTH GATE ASSERTS PASSED | [verify-telegram-parity.py exit 0] ALL PARITY ASSERTS PASSED
+FAIL T4 [existing guards] NEG refusal_merges_input [WA] is rejected
+      - NOT detected: [verify-reply-mode.py exit 0] ALL REPLY MODE ASSERTS PASSED | [verify-auth-gate.py exit 0] ALL AUTH GATE ASSERTS PASSED | [verify-telegram-parity.py exit 0] ALL PARITY ASSERTS PASSED
+FAIL T4 [existing guards] NEG refusal_merges_input [TG] is rejected
+      - NOT detected: [verify-reply-mode.py exit 0] ALL REPLY MODE ASSERTS PASSED | [verify-auth-gate.py exit 0] ALL AUTH GATE ASSERTS PASSED | [verify-telegram-parity.py exit 0] ALL PARITY ASSERTS PASSED
+PASS T4 [existing guards] NEG previous_profile_in_rule [WA] is rejected
+PASS T4 [existing guards] NEG previous_profile_in_rule [TG] is rejected
+FAIL T4 [existing guards] NEG protected_drift_reuse [WA] is rejected
+      - NOT detected: [verify-reply-mode.py exit 0] ALL REPLY MODE ASSERTS PASSED | [verify-auth-gate.py exit 0] ALL AUTH GATE ASSERTS PASSED | [verify-telegram-parity.py exit 0] ALL PARITY ASSERTS PASSED
+FAIL T4 [existing guards] NEG protected_drift_reuse [TG] is rejected
+      - NOT detected: [verify-reply-mode.py exit 0] ALL REPLY MODE ASSERTS PASSED | [verify-auth-gate.py exit 0] ALL AUTH GATE ASSERTS PASSED | [verify-telegram-parity.py exit 0] ALL PARITY ASSERTS PASSED
+FAIL T4 [existing guards] NEG protected_drift_replaced [WA] is rejected
+      - NOT detected: [verify-reply-mode.py exit 0] ALL REPLY MODE ASSERTS PASSED | [verify-auth-gate.py exit 0] ALL AUTH GATE ASSERTS PASSED | [verify-telegram-parity.py exit 0] ALL PARITY ASSERTS PASSED
+FAIL T4 [existing guards] NEG protected_drift_replaced [TG] is rejected
+      - NOT detected: [verify-reply-mode.py exit 0] ALL REPLY MODE ASSERTS PASSED | [verify-auth-gate.py exit 0] ALL AUTH GATE ASSERTS PASSED | [verify-telegram-parity.py exit 0] ALL PARITY ASSERTS PASSED
+PASS T4 [existing guards] NEG api_public_host [WA] is rejected
+PASS T4 [existing guards] NEG api_public_host [TG] is rejected
+PASS T4 [existing guards] NEG api_bound_credential [WA] is rejected
+PASS T4 [existing guards] NEG api_bound_credential [TG] is rejected
+PASS T4 [existing guards] NEG bound_reads_success [WA] is rejected
+PASS T4 [existing guards] NEG bound_reads_success [TG] is rejected
+FAIL T4 [existing guards] NEG plan_without_retry [WA] is rejected
+      - NOT detected: [verify-reply-mode.py exit 0] ALL REPLY MODE ASSERTS PASSED | [verify-auth-gate.py exit 0] ALL AUTH GATE ASSERTS PASSED | [verify-telegram-parity.py exit 0] ALL PARITY ASSERTS PASSED
+FAIL T4 [existing guards] NEG plan_without_retry [TG] is rejected
+      - NOT detected: [verify-reply-mode.py exit 0] ALL REPLY MODE ASSERTS PASSED | [verify-auth-gate.py exit 0] ALL AUTH GATE ASSERTS PASSED | [verify-telegram-parity.py exit 0] ALL PARITY ASSERTS PASSED
+FAIL T4 [existing guards] NEG plan_read_continues [WA] is rejected
+      - NOT detected: [verify-reply-mode.py exit 0] ALL REPLY MODE ASSERTS PASSED | [verify-auth-gate.py exit 0] ALL AUTH GATE ASSERTS PASSED | [verify-telegram-parity.py exit 0] ALL PARITY ASSERTS PASSED
+FAIL T4 [existing guards] NEG plan_read_continues [TG] is rejected
+      - NOT detected: [verify-reply-mode.py exit 0] ALL REPLY MODE ASSERTS PASSED | [verify-auth-gate.py exit 0] ALL AUTH GATE ASSERTS PASSED | [verify-telegram-parity.py exit 0] ALL PARITY ASSERTS PASSED
+FAIL T4 [existing guards] NEG new_clone_skips_activation [WA] is rejected
+      - NOT detected: [verify-reply-mode.py exit 0] ALL REPLY MODE ASSERTS PASSED | [verify-auth-gate.py exit 0] ALL AUTH GATE ASSERTS PASSED | [verify-telegram-parity.py exit 0] ALL PARITY ASSERTS PASSED
+FAIL T4 [existing guards] NEG new_clone_skips_activation [TG] is rejected
+      - NOT detected: [verify-reply-mode.py exit 0] ALL REPLY MODE ASSERTS PASSED | [verify-auth-gate.py exit 0] ALL AUTH GATE ASSERTS PASSED | [verify-telegram-parity.py exit 0] ALL PARITY ASSERTS PASSED
+FAIL T4 [existing guards] NEG discard_reused [WA] is rejected
+      - NOT detected: [verify-reply-mode.py exit 0] ALL REPLY MODE ASSERTS PASSED | [verify-auth-gate.py exit 0] ALL AUTH GATE ASSERTS PASSED | [verify-telegram-parity.py exit 0] ALL PARITY ASSERTS PASSED
+FAIL T4 [existing guards] NEG discard_reused [TG] is rejected
+      - NOT detected: [verify-reply-mode.py exit 0] ALL REPLY MODE ASSERTS PASSED | [verify-auth-gate.py exit 0] ALL AUTH GATE ASSERTS PASSED | [verify-telegram-parity.py exit 0] ALL PARITY ASSERTS PASSED
+FAIL T4 [existing guards] NEG probe_unchecked [WA] is rejected
+      - NOT detected: [verify-reply-mode.py exit 0] ALL REPLY MODE ASSERTS PASSED | [verify-auth-gate.py exit 0] ALL AUTH GATE ASSERTS PASSED | [verify-telegram-parity.py exit 0] ALL PARITY ASSERTS PASSED
+FAIL T4 [existing guards] NEG probe_unchecked [TG] is rejected
+      - NOT detected: [verify-reply-mode.py exit 0] ALL REPLY MODE ASSERTS PASSED | [verify-auth-gate.py exit 0] ALL AUTH GATE ASSERTS PASSED | [verify-telegram-parity.py exit 0] ALL PARITY ASSERTS PASSED
+PASS T4 [existing guards] NEG restamp_back [WA] is rejected
+PASS T4 [existing guards] NEG restamp_back [TG] is rejected
+PASS T4 [existing guards] NEG bind_sql_drift [WA] is rejected
+PASS T4 [existing guards] NEG bind_sql_drift [TG] is rejected
+FAIL T4 [existing guards] NEG answer_without_adopted [WA] is rejected
+      - NOT detected: [verify-reply-mode.py exit 0] ALL REPLY MODE ASSERTS PASSED | [verify-auth-gate.py exit 0] ALL AUTH GATE ASSERTS PASSED | [verify-telegram-parity.py exit 0] ALL PARITY ASSERTS PASSED
+FAIL T4 [existing guards] NEG answer_without_adopted [TG] is rejected
+      - NOT detected: [verify-reply-mode.py exit 0] ALL REPLY MODE ASSERTS PASSED | [verify-auth-gate.py exit 0] ALL AUTH GATE ASSERTS PASSED | [verify-telegram-parity.py exit 0] ALL PARITY ASSERTS PASSED
+
+17 pass, 26 fail
+exit=1
+
+## 2. python3 Tools/n8n/tests/test_verify_clone_lifecycle.py   (verify-clone-lifecycle.py absent — the state before T4)
+
+0 pass, 44 fail
+exit=1
