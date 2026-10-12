@@ -311,3 +311,29 @@ e2e-handoff 12/14 в полном прогоне — оба провала (`not
 
 Не проверено на проде (нужен живой бот с новой сборки): M4 — бот после триала получает 410 один раз; V9-r3 — пометки на реальном прайсе; V6 — параллельные ответы.
 
+## Развёртывание 2026-10-13 (прод, по явному «да» владельца на серверную часть блока F1 + F2 + Q1 B + V6-unknown + V3)
+
+Пакет: `docs/audits/2026-10-09-followups/README.md`, раздел «Пакет выкладки блока»; репетиция — `evidence/T12-rehearsal.txt`.
+Время — UTC 2026-10-12 20:03–20:35 (по Алматы 2026-10-13 01:03–01:35). Клиентская часть (T8/T9) — в новой сборке, не здесь.
+
+| Шаг | Результат | Доказательство |
+|---|---|---|
+| Снимок «до» | `verify-deployed`: канон 27, DIFF ровно 12 из пакета, хэши «до» = таблица пакета 12/12 (прод не менялся с 2026-10-11); клонов 0, архивный «13», other 0 | `docs/audits/2026-10-13-prod-before.json` |
+| Инвентаризация (read-only, F1 Q5) | `bot_profiles`: живых 1, удалённых 17 (trial_expiry 2, liveness 3, channel_limit 3, churn_grace 2, app_delete 6, без причины 1); единственный названный workflow `dt6hHFUVrW07unTj` давно отключён Sweep'ом и в n8n отсутствует; архивный «13» не назван ни одной строкой; installs 1 — бродячих клонов нет | `sql-oneoff` |
+| Сбой DNS (не наш) | 20:03:56–20:05:30 контейнер n8n не разрешал `aws-1-ap-southeast-1.pooler.supabase.com` (EAI_AGAIN, 16 строк; за сутки до этого — ни одной); первые два запроса инвентаризации ответили 500, после — хост и контейнер разрешают, повтор 200 | `docker compose logs` |
+| Бэкап | `~/backups/n8n-2026-10-13-predeploy.tar.gz` (20:08 UTC, 29 workflow); утренний сохранён как `n8n-2026-10-12-0315.tar.gz` | `ls ~/backups` |
+| Dry-run | `deploy-canonical.py`: would_update 12 — ровно пакет; точки отката | `docs/audits/2026-10-13-deploy-rollback-pointers.txt` |
+| Права `n8n Admin API` | самоудаляющаяся проба: GET шаблона 200, POST create 200, activate 200, DELETE 200, остатков 0 | `evidence/deploy-1013-admin-cred-probe.txt` |
+| M1, M2 | обе 200; пост-проверки: M1 RLS t, 6 колонок, 2 индекса; M2 2 колонки, RLS t, 9 колонок, 2 индекса; обе таблицы пусты | `sql-oneoff` |
+| 12 workflow (шаги 3–8) | по порядку пакета, `--only … --apply --yes`: updated 12, failed 0, read-back ok у каждого; все активные опубликованы самим PUT (без окна deactivate); шаблоны неактивны; в живых Create / Sweep / Set Workflow State одна и та же учётка `n8n Admin API`, плейсхолдеров нет | вывод инструмента |
+| `update-clones.py` | клонов 0 — обновлять нечего; архивный «13» пропущен | вывод инструмента |
+| M3 | до: помечать нечего (0 и 0 из 272 строк памяти); применена (200), пост-проверки 0 и 0 | `sql-oneoff` |
+| Read-back | `verify-deployed --base prod` exit 0: канон 27, diff 0, хэши «после» = таблица пакета 12/12; клонов 0; Notifier и Sweep активны; other 0 | `docs/audits/2026-10-13-prod-after.json` |
+| Smoke (без изменения данных) | WappiProxy без токена → 401; AuthSession nonsense / claim.start без токена → 400; SetWorkflowState на `crPriceSearch001` → 400 `protected_workflow`; SupportMessage пустой → 400; Create WA/TG с поддельным токеном → HTTP 200 `unauthorized` (`bad_signature`); DeleteBotFiles с поддельным токеном → 401 — всё как на репетиции; после smoke other 0 | curl |
+| Insights (наш побочный эффект) | проба прав удалила свой workflow сразу после выполнения → с 20:11:19 каждые 30 с «Error while saving insights metadata and raw data» (сброс insights называл удалённый workflow); на исполнение не влияло; `docker compose restart n8n` в 20:19:37, healthz 200 через ~12 с, verify-deployed 0 после рестарта. Правило: временный workflow живёт ≥ 35 с после выполнения (так делает `sql-oneoff`; скрипт пробы в evidence исправлен) | `docker compose logs` |
+| Логи 15 мин после рестарта | 20:19:40–20:35:11: ни одной строки с ошибкой (insights 0, EAI_AGAIN 0); только стартовые сообщения рестарта | `docker compose logs` |
+
+Дальше (каждое — по отдельному «да» владельца): шаг 12 пакета — через сутки, если журнал ветки A Sweep'а (`Log Would Remove`) чист,
+`RETIREMENTS_DRY_RUN = False` и выкладка Sweep'а; новая клиентская сборка с HEAD → `inspect-artifact.sh` → device-pass §5.4 → живой
+canary → сторы. **Не проверено на проде (нужен живой бот с новой сборки):** переподключение после истёкшего триала с переносом данных,
+«Сменить номер» / «Получить код ещё раз» без второго клона, удаление бота по линии, Q1 на живом боте, журнал V3 на реальном конфликте.

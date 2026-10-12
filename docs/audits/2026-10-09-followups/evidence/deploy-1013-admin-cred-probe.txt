@@ -1,0 +1,12 @@
+# Проба прав учётки «n8n Admin API» на проде, 2026-10-12 ~20:10 UTC (шаг 1 пакета блока)
+# Скрипт: deploy-1013-admin-cred-probe.py (рядом). Ключ API берётся инструментами (update-clones.api_key), в вывод не попадает.
+# Результат: GET шаблона 200, POST create 200, activate 200 (active=true), DELETE 200; временные workflow удалены, остатков 0.
+# Побочный эффект: проба удалила себя сразу после выполнения → n8n не смог сбросить insights (ошибка каждые 30 с с 20:11:19);
+# устранено docker compose restart n8n в 20:19:37 (healthz 200 через ~12 с). Правило: временный workflow живёт ≥ 35 с после выполнения.
+
+create probe: 200
+activate probe: 200 True
+probe answer: (200, '{"get":200,"get_ok":true,"create":200,"created_id":"YpQnXikirbyj58iV","activate":200,"active_after":true,"delete":200}')
+deactivate probe: 200
+delete probe: 200
+leftovers after cleanup: []
