@@ -1,0 +1,1235 @@
+{
+ "summary": {
+  "label": "q1b2-kz2-x20-before",
+  "prompts_ref": "661431c9",
+  "search_ref": "661431c9",
+  "side": "before",
+  "block": "kz2-x20",
+  "plan": "Tools/n8n/eval/plans/q1b2.json",
+  "scenario_version": "v1.5 (2026-10-12: T11b — no_tool:create_handoff on every auto scenario whose question the business data answers and whose design calls for no handoff (34: a6_/q1p_ as in v1.4 + 25 more, among them ws_kz_min_order and ws_list_of_items); every auto scenario is classified in test_checks.py (NO_HANDOFF / HANDOFF_IN_DESIGN, each with its reason); roles and all other checks as v1.4; harness h8 — interleaved repeats)",
+  "harness": "h8 (2026-10-12, T11b: interleaved schedule — every scenario's repeats spread over the whole run, round-robin over the scenarios, the sides of one repeat back to back with the first side rotating (--side / --plan run the sides of a comparison as ONE schedule); set v1.5 adds no_tool:create_handoff wherever the scenario does not call for a handoff; no check function changed; on top of h7 (2026-10-12, T11 Q1 B + V6-unknown: scenario roles `owner` / `bot_unknown` rendered with the memory marks the writers store at --prompts-ref (apply-history-handoff.py; none before T6); no_marker_leak, no_tool:<name>, not_says_already, no_delivery_doubt; on top of h6 2026-10-09, Q1: not_mentions:X — X stated in no un-refused clause and not merely quoted as the client's words, for the client-time echo; mentions:H:MM reads a time of day; on top of h5 2026-10-08, V9-r2: no_conflict_claim / no_price_caveat for a price list that AGREES with the catalog; on top of h4 2026-10-07 V9: «расхождение» + negated conflict, zero-price / elliptical free delivery, «итого по N позициям» partial, «нужен» / the car or device by name, a word inside the installment claim, Kazakh = no Russian sentence, «18,000»; h3 2026-09-27 R14; checks pinned by test_checks.py)",
+  "model": "gpt-5.4-mini",
+  "reasoning_effort": null,
+  "dropped_params": [],
+  "panel_model": null,
+  "max_tokens": 200,
+  "search_simulation": "Price List Search sub-workflow (Reconcile Prices at 661431c9)",
+  "memory_marks": {
+   "owner": "",
+   "bot_unknown": ""
+  },
+  "workers": 4,
+  "scenarios": 2,
+  "runs": 40,
+  "pass_all": 0,
+  "flaky": 2,
+  "fail": 0,
+  "error_runs": 0,
+  "transport_retries": 0,
+  "finish_reason_length_runs": 0,
+  "prompt_tokens": 266240,
+  "cached_tokens": 216320,
+  "completion_tokens": 3160,
+  "reasoning_tokens": 0,
+  "cost_usd_auto_path": 0.0679,
+  "prices_usd_per_1m": [
+   0.75,
+   0.075,
+   4.5
+  ],
+  "latency_ms": {
+   "auto": {
+    "n": 40,
+    "median": 3213,
+    "p90": 4714,
+    "max": 5730
+   },
+   "panel": null
+  },
+  "seconds": 777,
+  "by_check": {
+   "lang_kz": "28/40",
+   "mentions:15000": "8/20",
+   "no_marker_leak": "40/40",
+   "no_stock_guarantee": "20/20",
+   "no_tool:create_handoff": "40/40",
+   "numbers_grounded": "20/20"
+  }
+ },
+ "results": [
+  {
+   "id": "ks_kz_availability",
+   "vertical": "kaspi_seller",
+   "mode": "auto",
+   "lang": "kz",
+   "tags": [
+    "lang"
+   ],
+   "repeats": 20,
+   "pass_rate": 0.9,
+   "runs": [
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "no_stock_guarantee": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Иә, ақ түсі бар.\n\nНаушники JBL Tune 510BT белые — 18990 тг\nТапсырысты Kaspi-дегі дүкен беті арқылы рәсімдеуге болады: https://kaspi.kz/shop/techstore",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "JBL Tune 510BT white color availability black white product price catalog"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8256,
+      "completion_tokens": 89,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 5730,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 1,
+     "t": 0.0
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "no_stock_guarantee": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Иә, ақ түсі бар.\n\nНаушники JBL Tune 510BT белые — 18990 тг\nKaspi арқылы рәсімдеуге болады: https://kaspi.kz/shop/techstore",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "JBL Tune 510BT white color availability in price list"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8254,
+      "completion_tokens": 76,
+      "cached_tokens": 7424,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 4132,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 78,
+     "t": 55.3
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "no_stock_guarantee": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Иә, ақ түсі бар.\n\nНаушники JBL Tune 510BT белые — 18990 тг\nТапсырысты Kaspi-дегі дүкен беті арқылы рәсімдеуге болады: https://kaspi.kz/shop/techstore",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "JBL Tune 510BT white color availability black and white product"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8255,
+      "completion_tokens": 88,
+      "cached_tokens": 7424,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 4082,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 83,
+     "t": 60.1
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "no_stock_guarantee": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Иә, ақ түсі бар.\n\nНаушники JBL Tune 510BT белые — 18990 тг\nТапсырысты Kaspi арқылы рәсімдеуге болады: https://kaspi.kz/shop/techstore",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "JBL Tune 510BT white color availability in catalog or price list"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8256,
+      "completion_tokens": 83,
+      "cached_tokens": 7424,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 4222,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 261,
+     "t": 195.9
+    },
+    {
+     "verdicts": {
+      "lang_kz": false,
+      "no_stock_guarantee": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Иә, ақ түсі бар.\n\nНаушники JBL Tune 510BT белые — 18990 тг\nДолжен быть в наличии, точный остаток подтвердит владелец.\nОформить можно на странице магазина Kaspi: https://kaspi.kz/shop/techstore",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "JBL Tune 510BT white color availability white black product1"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8255,
+      "completion_tokens": 95,
+      "cached_tokens": 7424,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 4254,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 305,
+     "t": 218.1
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "no_stock_guarantee": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Иә, JBL Tune 510BT ақ түсте бар.\n\nБағасы: 18 990 тг\nТапсырысты Kaspi-дегі дүкен беті арқылы рәсімдей аласыз: https://kaspi.kz/shop/techstore",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "JBL Tune 510BT white availability color white in stock"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8254,
+      "completion_tokens": 85,
+      "cached_tokens": 7424,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 4153,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 343,
+     "t": 251.2
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "no_stock_guarantee": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Иә, ақ түсі бар.\n\nНаушники JBL Tune 510BT белые — 18990 тг\nKaspi арқылы рәсімдеуге болады: https://kaspi.kz/shop/techstore",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "JBL Tune 510BT white color availability white black product1"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8255,
+      "completion_tokens": 77,
+      "cached_tokens": 7424,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 4138,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 387,
+     "t": 274.7
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "no_stock_guarantee": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Иә, ақ түсі бар.\n\nНаушники JBL Tune 510BT белые — 18990 тг\nТапсырысты Kaspi-дегі дүкен беті арқылы рәсімдеуге болады: https://kaspi.kz/shop/techstore\n",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "JBL Tune 510BT white color availability white black product price catalog"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8256,
+      "completion_tokens": 90,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 4714,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 425,
+     "t": 305.4
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "no_stock_guarantee": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Иә, ақ түсі бар.\n\nНаушники JBL Tune 510BT белые — 18990 тг\nТапсырысты Kaspi-дегі дүкен беті арқылы рәсімдеуге болады: https://kaspi.kz/shop/techstore",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "JBL Tune 510BT white color availability black white product"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8254,
+      "completion_tokens": 87,
+      "cached_tokens": 7424,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 4860,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 430,
+     "t": 310.6
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "no_stock_guarantee": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Иә, ақ түсі бар.\n\nНаушники JBL Tune 510BT белые — 18990 тг\nТапсырысты Kaspi-дегі дүкен беті арқылы рәсімдей аласыз: https://kaspi.kz/shop/techstore",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "JBL Tune 510BT white color availability black and white product"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8255,
+      "completion_tokens": 87,
+      "cached_tokens": 7424,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3213,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 507,
+     "t": 363.5
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "no_stock_guarantee": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Иә, ақ түсі бар.\n\nНаушники JBL Tune 510BT белые — 18990 тг\nТапсырысты Kaspi-дегі дүкен беті арқылы рәсімдеуге болады: https://kaspi.kz/shop/techstore",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "JBL Tune 510BT white color availability in catalog/pricelist"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8256,
+      "completion_tokens": 89,
+      "cached_tokens": 7424,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3383,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 652,
+     "t": 458.2
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "no_stock_guarantee": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Иә, ақ түсі бар.\n\nНаушники JBL Tune 510BT белые — 18990 тг\nТапсырысты Kaspi арқылы рәсімдейсіз: https://kaspi.kz/shop/techstore\nНақты қалдығын менеджер растайды.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "JBL Tune 510BT white color availability white black product"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8254,
+      "completion_tokens": 91,
+      "cached_tokens": 7424,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3247,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 729,
+     "t": 503.0
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "no_stock_guarantee": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Иә, ақ түсі бар.\n\nНаушники JBL Tune 510BT — 18990 тг\nТүстері: ақ және қара\n\nKaspi-дегі дүкен сілтемесі:\nhttps://kaspi.kz/shop/techstore",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "JBL Tune 510BT white black availability color product"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8253,
+      "completion_tokens": 84,
+      "cached_tokens": 7424,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3141,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 734,
+     "t": 507.8
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "no_stock_guarantee": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Иә, ақ түсі бар.\n\nНаушники JBL Tune 510BT белые — 18990 тг\nТапсырысты Kaspi-дегі дүкен беті арқылы рәсімдей аласыз: https://kaspi.kz/shop/techstore",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "JBL Tune 510BT white color availability in catalog/pricelist"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8256,
+      "completion_tokens": 88,
+      "cached_tokens": 7424,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3026,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 772,
+     "t": 534.6
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "no_stock_guarantee": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Иә, ақ түсі бар.\n\nНаушники JBL Tune 510BT белые — 18990 тг\nТапсырысты Kaspi арқылы рәсімдей аласыз: https://kaspi.kz/shop/techstore",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "JBL Tune 510BT white color availability in catalog/pricelist"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8256,
+      "completion_tokens": 82,
+      "cached_tokens": 7424,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3461,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 816,
+     "t": 555.0
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "no_stock_guarantee": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Иә, ақ түсі бар.\n\nНаушники JBL Tune 510BT белые — 18990 тг\nТапсырысты Kaspi-дегі дүкен беті арқылы рәсімдей аласыз: https://kaspi.kz/shop/techstore",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "JBL Tune 510BT white color availability black and white price"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8255,
+      "completion_tokens": 87,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3513,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 854,
+     "t": 582.3
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "no_stock_guarantee": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Иә, ақ түсі бар.\n\nНаушники JBL Tune 510BT белые — 18990 тг\nТапсырысты Kaspi-дегі дүкен беті арқылы рәсімдей аласыз: https://kaspi.kz/shop/techstore",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "JBL Tune 510BT white color availability white black product"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8254,
+      "completion_tokens": 86,
+      "cached_tokens": 7424,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3664,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 898,
+     "t": 604.9
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "no_stock_guarantee": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Иә, ақ түсі бар.\n\nНаушники JBL Tune 510BT белые — 18990 тг\nТапсырысты Kaspi-дегі дүкен беті арқылы рәсімдей аласыз: https://kaspi.kz/shop/techstore",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "JBL Tune 510BT white availability color white"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8252,
+      "completion_tokens": 84,
+      "cached_tokens": 7424,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3518,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 1076,
+     "t": 721.8
+    },
+    {
+     "verdicts": {
+      "lang_kz": false,
+      "no_stock_guarantee": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Иә, ақ түсі бар.\n\nНаушники JBL Tune 510BT белые — 18990 тг\nОформить можно на странице магазина Kaspi: https://kaspi.kz/shop/techstore",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "JBL Tune 510BT white black availability color product1"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8254,
+      "completion_tokens": 77,
+      "cached_tokens": 7424,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3492,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 1081,
+     "t": 725.9
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "no_stock_guarantee": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Иә, ақ түсі бар.\n\nНаушники JBL Tune 510BT белые — 18990 тг\nТапсырысты Kaspi-дегі дүкен беті арқылы рәсімдеуге болады: https://kaspi.kz/shop/techstore",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "JBL Tune 510BT white color availability white black product1"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8255,
+      "completion_tokens": 88,
+      "cached_tokens": 7424,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3037,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 1158,
+     "t": 771.6
+    }
+   ]
+  },
+  {
+   "id": "pr_kz_battery",
+   "vertical": "phone_repair",
+   "mode": "auto",
+   "lang": "kz",
+   "tags": [
+    "lang"
+   ],
+   "repeats": 20,
+   "pass_rate": 0.1,
+   "runs": [
+    {
+     "verdicts": {
+      "lang_kz": false,
+      "mentions:15000": true,
+      "numbers_grounded": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "iPhone 12 батареясын ауыстыру — 15000 тг.\n\nТочная цена — после диагностики, мастер подтвердит её до начала работ.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "iPhone 12 батарея ауыстыру цена"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8495,
+      "completion_tokens": 65,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 5283,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 2,
+     "t": 0.0
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "mentions:15000": false,
+      "numbers_grounded": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "iPhone 12 үшін батарея ауыстырудың нақты бағасын айту үшін модель мен ақауды нақтылап аламын: сізде iPhone 12, батарея ауыстыру керек пе?\n\nЕгер иә болса, мастер тексеріп, нақты құнын диагностикадан кейін растайды. Диагностика тегін.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4198,
+      "completion_tokens": 72,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2386,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 81,
+     "t": 57.7
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "mentions:15000": false,
+      "numbers_grounded": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "iPhone 12 үшін батарея ауыстырудың нақты бағасын айту үшін алдымен мастерге модель мен ақауды нақтылап жіберемін.\n\nҚабылдау:\nТЦ Азия, 2 этаж\n10:00–19:00\n\nМастер құрылғыны қарап, нақты бағасы мен мерзімін растайды.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4198,
+      "completion_tokens": 73,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1883,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 84,
+     "t": 60.8
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "mentions:15000": true,
+      "numbers_grounded": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "iPhone 12 үшін батарея ауыстыру бағасы туралы нақты мәлімет жоқ.\n\nБізде көрсетілген қызметтер ішінде iPhone 11–13 үшін АКБ ауыстыру бар:\n15 000 тг\n40 минут\n\nТегін диагностика бар, нақты бағаны мастер тексерістен кейін растайды.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4198,
+      "completion_tokens": 72,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2174,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 264,
+     "t": 197.8
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "mentions:15000": true,
+      "numbers_grounded": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "iPhone 12 үшін батарея ауыстыру бағасы туралы нақты мәлімет жоқ.\n\nБізде көрсетілген қызметтер ішінде iPhone 11–13 үшін АКБ ауыстыру бар:\n15 000 тг\n40 минут\n\nТегін диагностика жасаймыз, нақты бағаны мастер құрылғыны көргеннен кейін растайды.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4198,
+      "completion_tokens": 76,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1985,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 306,
+     "t": 219.6
+    },
+    {
+     "verdicts": {
+      "lang_kz": false,
+      "mentions:15000": true,
+      "numbers_grounded": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "iPhone 12 үшін батарея ауыстыру — 15000 тг.\n\nТочная цена — после диагностики, мастер подтвердит её до начала работ.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "iPhone 12 battery replacement price"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8492,
+      "completion_tokens": 61,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3930,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 346,
+     "t": 252.9
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "mentions:15000": false,
+      "numbers_grounded": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "iPhone 12 үшін батарея ауыстырудың нақты бағасын қазір айта алмаймын — прайста бұл модель бойынша баға көрсетілмеген.\n\nМастер құрылғыны қарап, нақты құнын растайды.\nДиагностика тегін.\nТЦ Азия, 2 этаж\n10:00–19:00\n+7 705 444 55 66",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4198,
+      "completion_tokens": 83,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2194,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 388,
+     "t": 276.4
+    },
+    {
+     "verdicts": {
+      "lang_kz": false,
+      "mentions:15000": true,
+      "numbers_grounded": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "iPhone 12 батареясын ауыстыру — 15000 тг.\n\nТочная цена — после диагностики, мастер подтвердит её до начала работ.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "iPhone 12 батарея ауыстыру цена"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8495,
+      "completion_tokens": 65,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3565,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 428,
+     "t": 309.0
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "mentions:15000": false,
+      "numbers_grounded": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "iPhone 12 үшін батарея ауыстырудың нақты бағасын айту үшін алдымен құрылғының моделін және ақауын нақтылап аламын: сізде iPhone 12, батарея ауыстыру керек пе?\n\nЕгер иә болса, шебер тексергеннен кейін нақты бағаны растайды. Диагностика тегін.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4198,
+      "completion_tokens": 78,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2066,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 431,
+     "t": 310.7
+    },
+    {
+     "verdicts": {
+      "lang_kz": false,
+      "mentions:15000": false,
+      "numbers_grounded": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "iPhone 12 үшін батарея ауыстырудың нақты бағасын айту үшін алдымен модель мен ақауды нақтылап аламын: сізде iPhone 12, батареяны ауыстыру керек пе?\n\nТочная цена — после диагностики, мастер подтвердит её до начала работ.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4198,
+      "completion_tokens": 63,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1752,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 510,
+     "t": 365.0
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "mentions:15000": false,
+      "numbers_grounded": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "iPhone 12 батареясын ауыстыру құнын нақтылау үшін құрылғының моделін және ақауын жазып жіберіңіз.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4198,
+      "completion_tokens": 34,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1418,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 653,
+     "t": 459.5
+    },
+    {
+     "verdicts": {
+      "lang_kz": false,
+      "mentions:15000": false,
+      "numbers_grounded": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "iPhone 12 үшін батарея ауыстырудың нақты бағасын айту үшін алдымен модель мен ақауды нақтылап аламын: сізде iPhone 12, батарея ауыстыру керек пе?\n\nТочная цена — после диагностики, мастер подтвердит её до начала работ. Диагностика бесплатная.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4198,
+      "completion_tokens": 69,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1872,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 732,
+     "t": 505.9
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "mentions:15000": false,
+      "numbers_grounded": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "iPhone 12 батареясын ауыстыру бағасы туралы нақты мәлімет жоқ.\n\nДиагностика тегін\nМастер құрылғыны қарап, нақты бағасы мен мерзімін растайды\n\nМекенжай: ТЦ Азия, 2 этаж\nЖұмыс уақыты: 10:00–19:00\nТелефон: +7 705 444 55 66",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4198,
+      "completion_tokens": 88,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2219,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 735,
+     "t": 508.0
+    },
+    {
+     "verdicts": {
+      "lang_kz": false,
+      "mentions:15000": true,
+      "numbers_grounded": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "iPhone 12 батареясын ауыстыру — 15000 тг.\n\nТочная цена — после диагностики, мастер подтвердит её до начала работ.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "iPhone 12 батарея ауыстыру цена"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8495,
+      "completion_tokens": 65,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3097,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 775,
+     "t": 536.7
+    },
+    {
+     "verdicts": {
+      "lang_kz": false,
+      "mentions:15000": true,
+      "numbers_grounded": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "iPhone 12 үшін батарея ауыстырудың нақты бағасын модель мен жұмыс түрі бойынша тексеру керек.\n\nБізде прайста iPhone 11–13 үшін АКБ ауыстыру бар:\n15 000 тг\n40 минут\n\nТочная цена — после диагностики, мастер подтвердит её до начала работ.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4198,
+      "completion_tokens": 73,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1747,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 817,
+     "t": 556.0
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "mentions:15000": false,
+      "numbers_grounded": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "iPhone 12 үшін батарея ауыстырудың нақты бағасын қазір айта алмаймын — прайста бұл модель көрсетілмеген.\n\nМастер құрылғыны қарап, нақты құнын және мерзімін растайды.\nДиагностика тегін.\n\nТЦ Азия, 2 этаж\n10:00–19:00\n+7 705 444 55 66",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4198,
+      "completion_tokens": 84,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1956,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 857,
+     "t": 585.8
+    },
+    {
+     "verdicts": {
+      "lang_kz": false,
+      "mentions:15000": false,
+      "numbers_grounded": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "iPhone 12 үшін батарея ауыстырудың нақты бағасын айту үшін алдымен модель мен ақауды нақтылап аламын: сізде iPhone 12, батареяны ауыстыру керек пе?\n\nТочная цена — после диагностики, мастер подтвердит её до начала работ. Диагностика бесплатная.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4198,
+      "completion_tokens": 70,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1652,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 899,
+     "t": 605.9
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "mentions:15000": false,
+      "numbers_grounded": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "iPhone 12 үшін батарея ауыстырудың нақты бағасын айту үшін алдымен құрылғының моделін және істен не болғанын нақтылап алу керек. Сіз модельді жаздыңыз, бірақ жөндеу түрі бойынша бізде iPhone 12-ге арналған баға көрсетілмеген.\n\nМастер диагностикадан кейін нақты құнын растайды. Диагностика тегін.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4198,
+      "completion_tokens": 86,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1918,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 1079,
+     "t": 724.1
+    },
+    {
+     "verdicts": {
+      "lang_kz": false,
+      "mentions:15000": false,
+      "numbers_grounded": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "iPhone 12 батареясын ауыстыру бағасын нақтылау үшін құрылғының моделін және қандай жұмыс керек екенін жазып жіберіңіз.\n\nМодель: iPhone 12\nЖұмыс: батареяны ауыстыру\n\nТочная цена — после диагностики, мастер подтвердит её до начала работ. Диагностика бесплатная.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4198,
+      "completion_tokens": 77,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1932,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 1082,
+     "t": 726.0
+    },
+    {
+     "verdicts": {
+      "lang_kz": false,
+      "mentions:15000": true,
+      "numbers_grounded": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "iPhone 12 батареясын ауыстыру құнын нақтылау үшін құрылғының моделін және ақауын толық растау керек. Сізде iPhone 12, батарея ауыстыру екені түсінікті.\n\nБіздің прайста iPhone 11–13 үшін АКБ ауыстыру — 15000 тг.\nТочная цена — после диагностики, мастер подтвердит её до начала работ.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4198,
+      "completion_tokens": 93,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2097,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 1161,
+     "t": 774.4
+    }
+   ]
+  }
+ ]
+}

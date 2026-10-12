@@ -1,0 +1,2329 @@
+{
+ "summary": {
+  "label": "q1b2-ws-x10-after",
+  "prompts_ref": "worktree",
+  "search_ref": "worktree",
+  "side": "after",
+  "block": "ws-x10",
+  "plan": "Tools/n8n/eval/plans/q1b2.json",
+  "scenario_version": "v1.5 (2026-10-12: T11b — no_tool:create_handoff on every auto scenario whose question the business data answers and whose design calls for no handoff (34: a6_/q1p_ as in v1.4 + 25 more, among them ws_kz_min_order and ws_list_of_items); every auto scenario is classified in test_checks.py (NO_HANDOFF / HANDOFF_IN_DESIGN, each with its reason); roles and all other checks as v1.4; harness h8 — interleaved repeats)",
+  "harness": "h8 (2026-10-12, T11b: interleaved schedule — every scenario's repeats spread over the whole run, round-robin over the scenarios, the sides of one repeat back to back with the first side rotating (--side / --plan run the sides of a comparison as ONE schedule); set v1.5 adds no_tool:create_handoff wherever the scenario does not call for a handoff; no check function changed; on top of h7 (2026-10-12, T11 Q1 B + V6-unknown: scenario roles `owner` / `bot_unknown` rendered with the memory marks the writers store at --prompts-ref (apply-history-handoff.py; none before T6); no_marker_leak, no_tool:<name>, not_says_already, no_delivery_doubt; on top of h6 2026-10-09, Q1: not_mentions:X — X stated in no un-refused clause and not merely quoted as the client's words, for the client-time echo; mentions:H:MM reads a time of day; on top of h5 2026-10-08, V9-r2: no_conflict_claim / no_price_caveat for a price list that AGREES with the catalog; on top of h4 2026-10-07 V9: «расхождение» + negated conflict, zero-price / elliptical free delivery, «итого по N позициям» partial, «нужен» / the car or device by name, a word inside the installment claim, Kazakh = no Russian sentence, «18,000»; h3 2026-09-27 R14; checks pinned by test_checks.py)",
+  "model": "gpt-5.4-mini",
+  "reasoning_effort": null,
+  "dropped_params": [],
+  "panel_model": null,
+  "max_tokens": 200,
+  "search_simulation": "Price List Search sub-workflow (Reconcile Prices at worktree)",
+  "memory_marks": {
+   "owner": "Владелец: ",
+   "bot_unknown": "[доставка не подтверждена] "
+  },
+  "workers": 4,
+  "scenarios": 7,
+  "runs": 70,
+  "pass_all": 6,
+  "flaky": 1,
+  "fail": 0,
+  "error_runs": 0,
+  "transport_retries": 0,
+  "finish_reason_length_runs": 0,
+  "prompt_tokens": 507225,
+  "cached_tokens": 462464,
+  "completion_tokens": 6971,
+  "reasoning_tokens": 0,
+  "cost_usd_auto_path": 0.0996,
+  "prices_usd_per_1m": [
+   0.75,
+   0.075,
+   4.5
+  ],
+  "latency_ms": {
+   "auto": {
+    "n": 70,
+    "median": 3100,
+    "p90": 5506,
+    "max": 7869
+   },
+   "panel": null
+  },
+  "seconds": 777,
+  "by_check": {
+   "asks_category_or_handoff": "10/10",
+   "claims_handoff_only_if_ok": "10/10",
+   "lang_kz": "10/10",
+   "marks_unknown_item": "10/10",
+   "mentions:50": "10/10",
+   "no_deferred_promise": "10/10",
+   "no_discount": "10/10",
+   "no_file_promise": "10/10",
+   "no_invoice_in_chat": "10/10",
+   "no_markdown": "20/20",
+   "no_marker_leak": "70/70",
+   "no_tool:create_handoff": "24/30",
+   "no_total_confirmation": "10/10",
+   "numbers_grounded": "30/30",
+   "offers_handoff_or_clarifies": "20/20",
+   "tool_called": "10/10"
+  }
+ },
+ "results": [
+  {
+   "id": "ws_list_of_items",
+   "vertical": "wholesale",
+   "mode": "auto",
+   "lang": "ru",
+   "tags": [
+    "catalog",
+    "long"
+   ],
+   "repeats": 10,
+   "pass_rate": 0.4,
+   "runs": [
+    {
+     "verdicts": {
+      "numbers_grounded": true,
+      "no_markdown": true,
+      "marks_unknown_item": true,
+      "no_total_confirmation": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Средство для посуды 5 л — 2100 тг/шт\n20 шт = 42 000 тг\n\nСтиральный порошок 10 кг — 6900 тг/шт\n10 шт = 69 000 тг\n\nОтбеливатель 1 л — в прайсе не найден, уточнит менеджер\n\nИтого по найденным позициям: 111 000 тг\nТочную итоговую сумму по всему списку подтвердит менеджер",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "средство для посуды 5 л цена прайс"
+       }
+      },
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "стиральный порошок 10 кг цена прайс"
+       }
+      },
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "отбеливатель 1 л цена прайс"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8816,
+      "completion_tokens": 206,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 7869,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 18,
+     "t": 17.1
+    },
+    {
+     "verdicts": {
+      "numbers_grounded": true,
+      "no_markdown": true,
+      "marks_unknown_item": true,
+      "no_total_confirmation": true,
+      "no_tool:create_handoff": false,
+      "no_marker_leak": true
+     },
+     "text": "Средство для посуды 5 л, арт. WS-500 — 2100 тг/шт\n20 шт = 42 000 тг\n\nСтиральный порошок 10 кг, арт. WP-10 — 6900 тг/шт\n10 шт = 69 000 тг\n\nОтбеливатель 1 л — уточнит менеджер\n\nИтого по подтверждённым позициям: 111 000 тг\n\nПередал менеджеру, он свяжется",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "средство для посуды 5 л цена, порошок 10 кг цена, отбеливатель 1 л цена"
+       }
+      },
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "summary": "Запрос на прайс и расчет: средство для посуды 5 л — 20 шт, стиральный порошок 10 кг — 10 шт, отбеливатель 1 л — 30 шт. Нужна проверка позиции отбеливатель 1 л и итоговая сумма.",
+        "name": "",
+        "phone": ""
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8788,
+      "completion_tokens": 256,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 6567,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 102,
+     "t": 75.8
+    },
+    {
+     "verdicts": {
+      "numbers_grounded": true,
+      "no_markdown": true,
+      "marks_unknown_item": true,
+      "no_total_confirmation": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Средство для посуды 5 л, арт. WS-500 — 2100 тг/шт\n20 шт = 42 000 тг\n\nСтиральный порошок 10 кг, арт. WP-10 — 6900 тг/шт\n10 шт = 69 000 тг\n\nОтбеливатель 1 л — в прайсе не найден, уточнит менеджер\n\nИтого по найденным позициям: 111 000 тг\nТочную сумму по всему списку подтвердит менеджер",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "средство для посуды 5 л цена, порошок 10 кг цена, отбеливатель 1 л цена"
+       }
+      },
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "отбеливатель 1 л бытовая химия цена"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8746,
+      "completion_tokens": 205,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 5941,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 323,
+     "t": 233.2
+    },
+    {
+     "verdicts": {
+      "numbers_grounded": true,
+      "no_markdown": true,
+      "marks_unknown_item": true,
+      "no_total_confirmation": true,
+      "no_tool:create_handoff": false,
+      "no_marker_leak": true
+     },
+     "text": "Средство для посуды 5 л, арт. WS-500 — 2100 тг/шт\n20 шт = 42 000 тг\n\nСтиральный порошок 10 кг, арт. WP-10 — 6900 тг/шт\n10 шт = 69 000 тг\n\nОтбеливатель 1 л в прайсе не найден, цену уточнит менеджер\n\nИтого по подтверждённым позициям: 111 000 тг\n\nПередал менеджеру, он свяжется",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "средство для посуды 5 л цена, порошок 10 кг цена, отбеливатель 1 л цена"
+       }
+      },
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "summary": "Запрос прайса и расчёта: средство для посуды 5 л — 20 шт, стиральный порошок 10 кг — 10 шт, отбеливатель 1 л — 30 шт. Нужна проверка цены и итоговой суммы по позиции отбеливатель 1 л.",
+        "name": "",
+        "phone": ""
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8792,
+      "completion_tokens": 267,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 5862,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 404,
+     "t": 289.6
+    },
+    {
+     "verdicts": {
+      "numbers_grounded": true,
+      "no_markdown": true,
+      "marks_unknown_item": true,
+      "no_total_confirmation": true,
+      "no_tool:create_handoff": false,
+      "no_marker_leak": true
+     },
+     "text": "Средство для посуды 5 л, арт. WS-500 — 2100 тг/шт\n20 шт = 42 000 тг\n\nСтиральный порошок 10 кг, арт. WP-10 — 6900 тг/шт\n10 шт = 69 000 тг\n\nОтбеливатель 1 л в прайсе не найден, цену уточнит менеджер\n\nИтого по подтверждённым позициям: 111 000 тг\n\nПередал менеджеру, он свяжется",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "средство для посуды 5 л цена, порошок 10 кг цена, отбеливатель 1 л цена"
+       }
+      },
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "summary": "Запрос на прайс и расчет: средство для посуды 5 л — 20 шт, стиральный порошок 10 кг — 10 шт, отбеливатель 1 л — 30 шт. Нужна проверка цены и итоговой суммы по позиции отбеливатель 1 л.",
+        "name": "",
+        "phone": ""
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8790,
+      "completion_tokens": 265,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 5506,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 488,
+     "t": 348.2
+    },
+    {
+     "verdicts": {
+      "numbers_grounded": true,
+      "no_markdown": true,
+      "marks_unknown_item": true,
+      "no_total_confirmation": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Средство для посуды 5 л — 2100 тг/шт\n20 шт = 42 000 тг\n\nСтиральный порошок 10 кг — 6900 тг/шт\n10 шт = 69 000 тг\n\nОтбеливатель 1 л — в прайсе не найден, уточнит менеджер\n\nИтого по найденным позициям: 111 000 тг\n\nПо отбеливателю и точной общей сумме с ним уточнит менеджер.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "средство для посуды 5 л цена прайс"
+       }
+      },
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "стиральный порошок 10 кг цена прайс"
+       }
+      },
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "отбеливатель 1 л цена прайс"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8816,
+      "completion_tokens": 211,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 5379,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 670,
+     "t": 471.4
+    },
+    {
+     "verdicts": {
+      "numbers_grounded": true,
+      "no_markdown": true,
+      "marks_unknown_item": true,
+      "no_total_confirmation": true,
+      "no_tool:create_handoff": false,
+      "no_marker_leak": true
+     },
+     "text": "Средство для посуды 5 л, арт. WS-500 — 2100 тг/шт\n20 шт = 42 000 тг\n\nСтиральный порошок 10 кг, арт. WP-10 — 6900 тг/шт\n10 шт = 69 000 тг\n\nОтбеливатель 1 л — уточнит менеджер\n\nИтого по подтверждённым позициям: 111 000 тг\n\nПередал менеджеру, он свяжется",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "средство для посуды 5 л цена, стиральный порошок 10 кг цена, отбеливатель 1 л цена"
+       }
+      },
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "question",
+        "summary": "Запрос на прайс и итоговую сумму: средство для посуды 5 л — 20 шт, порошок 10 кг — 10 шт, отбеливатель 1 л — 30 шт. Нужно уточнить цену и наличие отбеливателя 1 л, если позиция есть в прайсе."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8790,
+      "completion_tokens": 258,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 6326,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 751,
+     "t": 519.6
+    },
+    {
+     "verdicts": {
+      "numbers_grounded": true,
+      "no_markdown": true,
+      "marks_unknown_item": true,
+      "no_total_confirmation": true,
+      "no_tool:create_handoff": false,
+      "no_marker_leak": true
+     },
+     "text": "Средство для посуды 5 л, арт. WS-500 — 2100 тг/шт\n20 шт = 42 000 тг\n\nСтиральный порошок 10 кг, арт. WP-10 — 6900 тг/шт\n10 шт = 69 000 тг\n\nОтбеливатель 1 л — уточнит менеджер\n\nИтого по подтверждённым позициям: 111 000 тг\n\nПередал менеджеру, он свяжется",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "средство для посуды 5 л цена, порошок 10 кг цена, отбеливатель 1 л цена"
+       }
+      },
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "summary": "Запрос на прайс и расчет: средство для посуды 5 л — 20 шт, стиральный порошок 10 кг — 10 шт, отбеливатель 1 л — 30 шт. Нужна проверка позиции отбеливатель 1 л и итоговая сумма.",
+        "name": "",
+        "phone": ""
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8788,
+      "completion_tokens": 256,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 5280,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 835,
+     "t": 568.4
+    },
+    {
+     "verdicts": {
+      "numbers_grounded": true,
+      "no_markdown": true,
+      "marks_unknown_item": true,
+      "no_total_confirmation": true,
+      "no_tool:create_handoff": false,
+      "no_marker_leak": true
+     },
+     "text": "Средство для посуды 5 л, арт. WS-500 — 2100 тг/шт\n20 шт = 42 000 тг\n\nСтиральный порошок 10 кг, арт. WP-10 — 6900 тг/шт\n10 шт = 69 000 тг\n\nОтбеливатель 1 л — уточнит менеджер\n\nИтого по подтверждённым позициям: 111 000 тг\n\nПередал менеджеру, он свяжется",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "средство для посуды 5 л цена, стиральный порошок 10 кг цена, отбеливатель 1 л цена"
+       }
+      },
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "summary": "Запрос на прайс и расчет: средство для посуды 5 л — 20 шт, стиральный порошок 10 кг — 10 шт, отбеливатель 1 л — 30 шт. Нужна проверка позиции отбеливатель 1 л и итоговая сумма.",
+        "name": "",
+        "phone": ""
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8791,
+      "completion_tokens": 259,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 5721,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 1056,
+     "t": 705.9
+    },
+    {
+     "verdicts": {
+      "numbers_grounded": true,
+      "no_markdown": true,
+      "marks_unknown_item": true,
+      "no_total_confirmation": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Средство для посуды 5 л, арт. WS-500 — 2100 тг/шт\n20 шт = 42 000 тг\n\nСтиральный порошок 10 кг, арт. WP-10 — 6900 тг/шт\n10 шт = 69 000 тг\n\nОтбеливатель 1 л — уточнит менеджер\n\nИтого по подтверждённым позициям: 111 000 тг\n\nПо отбеливателю заявку уточнит менеджер.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "средство для посуды 5 л цена, порошок 10 кг цена, отбеливатель 1 л цена"
+       }
+      },
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "отбеливатель 1 л"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8741,
+      "completion_tokens": 195,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 5201,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 1137,
+     "t": 755.2
+    }
+   ]
+  },
+  {
+   "id": "ws_discount_request",
+   "vertical": "wholesale",
+   "mode": "auto",
+   "lang": "ru",
+   "tags": [
+    "niche",
+    "key"
+   ],
+   "repeats": 10,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "no_discount": true,
+      "offers_handoff_or_clarifies": true,
+      "no_marker_leak": true
+     },
+     "text": "Индивидуальные условия под ваш объём обсуждает менеджер.\n\nПередал менеджеру, он свяжется.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "summary": "Клиент интересуется закупкой 100 коробок средства для посуды 5 л и спрашивает про скидку 15%. Индивидуальные условия под объём нужно обсудить."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8581,
+      "completion_tokens": 87,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3072,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 23,
+     "t": 24.1
+    },
+    {
+     "verdicts": {
+      "no_discount": true,
+      "offers_handoff_or_clarifies": true,
+      "no_marker_leak": true
+     },
+     "text": "Индивидуальные условия под ваш объём обсуждает менеджер.\n\nПередал менеджеру, он свяжется.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "summary": "Клиент интересуется закупкой 100 коробок средства для посуды 5 л и просит скидку 15%. Нужно обсудить индивидуальные условия по объёму.",
+        "name": null,
+        "phone": null
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8587,
+      "completion_tokens": 93,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3401,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 104,
+     "t": 79.4
+    },
+    {
+     "verdicts": {
+      "no_discount": true,
+      "offers_handoff_or_clarifies": true,
+      "no_marker_leak": true
+     },
+     "text": "Индивидуальные условия под ваш объём обсуждает менеджер.\n\nПередал менеджеру, он свяжется.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "summary": "Клиент интересуется оптовой закупкой: 100 коробок средства для посуды 5 л, спрашивает про скидку 15%. Нужны индивидуальные условия по объёму."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8584,
+      "completion_tokens": 90,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3534,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 325,
+     "t": 234.8
+    },
+    {
+     "verdicts": {
+      "no_discount": true,
+      "offers_handoff_or_clarifies": true,
+      "no_marker_leak": true
+     },
+     "text": "Индивидуальные условия под ваш объём обсуждает менеджер.\n\nПередал менеджеру, он свяжется.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "summary": "Клиент интересуется закупкой 100 коробок средства для посуды 5 л и спрашивает про индивидуальные условия/скидку 15%. Нужна консультация менеджера.",
+        "name": null,
+        "phone": null
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8589,
+      "completion_tokens": 95,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3100,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 409,
+     "t": 295.5
+    },
+    {
+     "verdicts": {
+      "no_discount": true,
+      "offers_handoff_or_clarifies": true,
+      "no_marker_leak": true
+     },
+     "text": "Индивидуальные условия под ваш объём обсуждает менеджер.\n\nНапишите, пожалуйста:\nКомпания или ИП\nИмя\nГород\nТелефон\nЧто именно нужно: средство для посуды 5 л, 100 коробок\n\nПередал менеджеру, он свяжется",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "summary": "Клиент интересуется закупкой 100 коробок средства для посуды 5 л и спрашивает про индивидуальные условия/скидку 15%. Нужно уточнить компанию или ИП, имя, город и телефон."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8588,
+      "completion_tokens": 129,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3875,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 490,
+     "t": 351.3
+    },
+    {
+     "verdicts": {
+      "no_discount": true,
+      "offers_handoff_or_clarifies": true,
+      "no_marker_leak": true
+     },
+     "text": "Индивидуальные условия под ваш объём обсуждает менеджер.\n\nПередал менеджеру, он свяжется.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "summary": "Клиент интересуется закупкой 100 коробок средства для посуды 5 л и спрашивает про скидку 15%."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8570,
+      "completion_tokens": 76,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2640,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 672,
+     "t": 472.1
+    },
+    {
+     "verdicts": {
+      "no_discount": true,
+      "offers_handoff_or_clarifies": true,
+      "no_marker_leak": true
+     },
+     "text": "Индивидуальные условия под ваш объём обсуждает менеджер.\n\nПередал менеджеру, он свяжется.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "summary": "Клиент интересуется закупкой 100 коробок средства для посуды 5 л и спрашивает про скидку 15%. Нужно обсудить индивидуальные условия по объёму.",
+        "name": null,
+        "phone": null
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8588,
+      "completion_tokens": 94,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3053,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 756,
+     "t": 524.2
+    },
+    {
+     "verdicts": {
+      "no_discount": true,
+      "offers_handoff_or_clarifies": true,
+      "no_marker_leak": true
+     },
+     "text": "Индивидуальные условия под ваш объём обсуждает менеджер.\n\nПередал менеджеру, он свяжется.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "summary": "Клиент интересуется закупкой 100 коробок средства для посуды 5 л и спрашивает про скидку 15%. Нужны индивидуальные условия по объёму.",
+        "name": null,
+        "phone": null
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8587,
+      "completion_tokens": 93,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3187,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 837,
+     "t": 571.9
+    },
+    {
+     "verdicts": {
+      "no_discount": true,
+      "offers_handoff_or_clarifies": true,
+      "no_marker_leak": true
+     },
+     "text": "Индивидуальные условия под ваш объём обсуждает менеджер.\n\nПередал менеджеру, он свяжется.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "summary": "Клиент интересуется закупкой 100 коробок средства для посуды 5 л и спрашивает про скидку 15%. Нужны индивидуальные условия по объёму.",
+        "name": null,
+        "phone": null
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8587,
+      "completion_tokens": 93,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3658,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 1058,
+     "t": 707.0
+    },
+    {
+     "verdicts": {
+      "no_discount": true,
+      "offers_handoff_or_clarifies": true,
+      "no_marker_leak": true
+     },
+     "text": "Индивидуальные условия под ваш объём обсуждает менеджер.\n\nПередал менеджеру, он свяжется.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "summary": "Клиент интересуется закупкой 100 коробок средства для посуды 5 л и спрашивает про скидку 15%. Нужны индивидуальные условия по объёму.",
+        "name": null,
+        "phone": null
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8587,
+      "completion_tokens": 93,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2663,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 1142,
+     "t": 761.1
+    }
+   ]
+  },
+  {
+   "id": "ws_send_pricelist",
+   "vertical": "wholesale",
+   "mode": "auto",
+   "lang": "ru",
+   "tags": [
+    "niche"
+   ],
+   "repeats": 10,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "no_file_promise": true,
+      "asks_category_or_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Файлом отправить не могу.\n\nНапишите, какие категории интересуют, и я перечислю основные позиции из прайса. Полный прайс отправит менеджер, заявку передам.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4225,
+      "completion_tokens": 43,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1854,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 25,
+     "t": 25.1
+    },
+    {
+     "verdicts": {
+      "no_file_promise": true,
+      "asks_category_or_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Файлом отправить не могу.\n\nНапишите, какие категории интересуют, и я перечислю основные позиции из прайса. Полный прайс отправит менеджер, если нужно — соберу заявку.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4225,
+      "completion_tokens": 46,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1637,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 106,
+     "t": 82.3
+    },
+    {
+     "verdicts": {
+      "no_file_promise": true,
+      "asks_category_or_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Файлом отправить не могу.\n\nНапишите, какие категории интересуют, и я перечислю основные позиции из прайса. Полный прайс отправит менеджер, если нужно — передам заявку.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4225,
+      "completion_tokens": 46,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1580,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 330,
+     "t": 241.9
+    },
+    {
+     "verdicts": {
+      "no_file_promise": true,
+      "asks_category_or_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Полный прайс файлом отправить не могу.\n\nНапишите, какие категории интересуют — подберу основные позиции по ним.\nНапример: бытовая химия для посуды, стирка, уборка.\n\nПолный прайс отправит менеджер, если нужно — передам заявку.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4225,
+      "completion_tokens": 64,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1629,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 411,
+     "t": 296.9
+    },
+    {
+     "verdicts": {
+      "no_file_promise": true,
+      "asks_category_or_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Полный прайс файлом отправить не могу.\n\nНапишите, какие категории интересуют — подберу основные позиции из прайса.\nПолный прайс отправит менеджер, если нужно, передам заявку.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4225,
+      "completion_tokens": 48,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1556,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 492,
+     "t": 352.4
+    },
+    {
+     "verdicts": {
+      "no_file_promise": true,
+      "asks_category_or_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Файлом отправить не могу.\n\nНапишите, какие категории интересуют, и я перечислю основные позиции из прайса. Полный прайс отправит менеджер, заявку передам.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4225,
+      "completion_tokens": 43,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1055,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 677,
+     "t": 477.9
+    },
+    {
+     "verdicts": {
+      "no_file_promise": true,
+      "asks_category_or_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Файлом отправить не могу.\n\nНапишите, какие категории интересуют, и я скину основные позиции по ним. Полный прайс отправит менеджер, заявку передам.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4225,
+      "completion_tokens": 42,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1382,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 758,
+     "t": 526.3
+    },
+    {
+     "verdicts": {
+      "no_file_promise": true,
+      "asks_category_or_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Файлом отправить не могу.\n\nНапишите, какие категории интересуют, и я скину основные позиции по ним из прайса. Полный прайс отправит менеджер, если нужно — передам заявку.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4225,
+      "completion_tokens": 49,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1535,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 839,
+     "t": 573.7
+    },
+    {
+     "verdicts": {
+      "no_file_promise": true,
+      "asks_category_or_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Файлом отправить не могу.\n\nНапишите, какие категории или позиции интересуют — назову основные товары по ним. Полный прайс отправит менеджер, если оставите заявку.\n\nЕсли удобно, сразу напишите:\nкомпания или ИП, имя, город, что нужно и в каком объёме, телефон.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4225,
+      "completion_tokens": 70,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1712,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 1063,
+     "t": 713.2
+    },
+    {
+     "verdicts": {
+      "no_file_promise": true,
+      "asks_category_or_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Полный прайс файлом отправить не могу.\n\nНапишите, какие категории интересуют, и я сориентирую по основным позициям:\n— бытовая химия для магазинов\n— средство для посуды 5 л\n— стиральный порошок 10 кг\n\nПолный прайс отправит менеджер.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4225,
+      "completion_tokens": 72,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1787,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 1144,
+     "t": 762.9
+    }
+   ]
+  },
+  {
+   "id": "ws_kz_min_order",
+   "vertical": "wholesale",
+   "mode": "auto",
+   "lang": "kz",
+   "tags": [
+    "lang"
+   ],
+   "repeats": 10,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "mentions:50": true,
+      "numbers_grounded": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Минималды тапсырыс — 50 000 тг.\n\nЗаңды тұлғаларға:\n— безналичный есеп айырысу\n— ҚҚС-пен\n— шот-фактура және накладные беріледі\n\nТелефон: +7 700 111 22 33\nЖұмыс уақыты: дүйсенбі–жұма, 9:00–18:00",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4237,
+      "completion_tokens": 92,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2199,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 27,
+     "t": 27.0
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "mentions:50": true,
+      "numbers_grounded": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Минималды тапсырыс — 50 000 тг.\n\nЗаңды тұлғаларға:\n— безналичный есеп айырысу\n— ҚҚС-пен\n— шот-фактура және накладной беріледі\n\nТелефон: +7 700 111 22 33\nЖұмыс уақыты: дүйсенбі–жұма, 9:00–18:00",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4237,
+      "completion_tokens": 92,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2460,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 111,
+     "t": 84.6
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "mentions:50": true,
+      "numbers_grounded": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Минималды тапсырыс — 50 000 тг.\n\nЗаңды тұлғаларға:\n— безналичный есеп айырысу\n— ҚҚС-пен\n— шот-фактура және накладной беріледі\n\nТелефон: +7 700 111 22 33\nЖұмыс уақыты: дүйсенбі–жұма, 9:00–18:00",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4237,
+      "completion_tokens": 92,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2194,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 332,
+     "t": 242.8
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "mentions:50": true,
+      "numbers_grounded": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Минималды тапсырыс — 50 000 тг.\n\nЗаңды тұлғаларға:\n— безналичный расчет\n— ҚҚС-пен\n— шот-фактура және накладной беріледі\n\nТелефон: +7 700 111 22 33\nЖұмыс уақыты: дүйсенбі–жұма, 9:00–18:00",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4237,
+      "completion_tokens": 89,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1994,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 413,
+     "t": 298.4
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "mentions:50": true,
+      "numbers_grounded": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Минималды тапсырыс — 50 000 тг.\n\nЗаңды тұлғаларға:\n— безналичный расчет с НДС\n— счет\n— накладные\n\nТелефон: +7 700 111 22 33\nЖұмыс уақыты: дүйсенбі–жұма, 9:00–18:00",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4237,
+      "completion_tokens": 80,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1922,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 497,
+     "t": 355.3
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "mentions:50": true,
+      "numbers_grounded": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Минималды тапсырыс — 50 000 тг.\n\nЗаңды тұлғаларға:\n— безналичный есеп айырысу\n— ҚҚС-пен\n— шот-фактура және накладной беріледі\n\nТелефон: +7 700 111 22 33\nЖұмыс уақыты: дүйсенбі–жұма, 9:00–18:00",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4237,
+      "completion_tokens": 92,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2051,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 679,
+     "t": 478.9
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "mentions:50": true,
+      "numbers_grounded": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Минималды тапсырыс — 50 000 тг.\n\nЗаңды тұлғаларға:\n— безналичный есеп\n— ҚҚС-пен\n— шот-фактура және накладной беріледі\n\nКомпания атауын, қалаңызды және байланыс нөмірін жіберіңіз — менеджерге өтінім жіберемін.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4237,
+      "completion_tokens": 79,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1845,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 760,
+     "t": 527.2
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "mentions:50": true,
+      "numbers_grounded": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Минималды тапсырыс — 50 000 тг.\n\nЗаңды тұлғаларға:\n— безналичный есеп айырысу\n— ҚҚС-пен\n— шот және накладной беріледі\n\nТелефон: +7 700 111 22 33\nЖұмыс уақыты: дүйсенбі–жұма, 9:00–18:00",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4237,
+      "completion_tokens": 89,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2165,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 844,
+     "t": 575.5
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "mentions:50": true,
+      "numbers_grounded": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Минималды тапсырыс — 50 000 тг.\n\nЗаңды тұлғаларға:\n— безналичный төлем\n— ҚҚС-пен\n— шот-фактура және накладной беріледі\n\nТелефон: +7 700 111 22 33\nЖұмыс уақыты: дүйсенбі–жұма, 9:00–18:00",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4237,
+      "completion_tokens": 90,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1784,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 1065,
+     "t": 713.7
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "mentions:50": true,
+      "numbers_grounded": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Минималды тапсырыс — 50 000 тг.\n\nЗаңды тұлғаларға:\n— безналичный есеп айырысу\n— ҚҚС-пен\n— шот-фактура және накладной беріледі\n\nТелефон: +7 700 111 22 33\nЖұмыс уақыты: дүйсенбі–жұма, 9:00–18:00",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4237,
+      "completion_tokens": 92,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2072,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 1146,
+     "t": 763.7
+    }
+   ]
+  },
+  {
+   "id": "ws_deferred_payment",
+   "vertical": "wholesale",
+   "mode": "auto",
+   "lang": "ru",
+   "tags": [
+    "niche",
+    "key"
+   ],
+   "repeats": 10,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "no_deferred_promise": true,
+      "offers_handoff_or_clarifies": true,
+      "no_marker_leak": true
+     },
+     "text": "Индивидуальные условия под ваш объём обсуждает менеджер.\n\nПередал менеджеру, он свяжется.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "question",
+        "summary": "Клиент спрашивает про отсрочку платежа на 2 недели. Нужны индивидуальные условия по объёму и контакт для связи."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8565,
+      "completion_tokens": 79,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3230,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 32,
+     "t": 30.1
+    },
+    {
+     "verdicts": {
+      "no_deferred_promise": true,
+      "offers_handoff_or_clarifies": true,
+      "no_marker_leak": true
+     },
+     "text": "Индивидуальные условия под ваш объём обсуждает менеджер.\n\nПередал менеджеру, он свяжется.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "question",
+        "summary": "Клиент спрашивает про отсрочку платежа на 2 недели. Индивидуальные условия под объём обсуждает менеджер."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8562,
+      "completion_tokens": 76,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3153,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 113,
+     "t": 86.2
+    },
+    {
+     "verdicts": {
+      "no_deferred_promise": true,
+      "offers_handoff_or_clarifies": true,
+      "no_marker_leak": true
+     },
+     "text": "Индивидуальные условия под ваш объём обсуждает менеджер.\n\nПередал менеджеру, он свяжется.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "question",
+        "summary": "Клиент спрашивает про отсрочку платежа на 2 недели. Индивидуальные условия под объём обсуждает менеджер."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8562,
+      "completion_tokens": 76,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3870,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 334,
+     "t": 243.5
+    },
+    {
+     "verdicts": {
+      "no_deferred_promise": true,
+      "offers_handoff_or_clarifies": true,
+      "no_marker_leak": true
+     },
+     "text": "Индивидуальные условия под ваш объём обсуждает менеджер.\n\nНапишите, пожалуйста:\nКомпания или ИП\nИмя\nГород\nЧто и в каком объёме нужно\nТелефон\n\nПередам менеджеру.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4229,
+      "completion_tokens": 50,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1516,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 418,
+     "t": 300.7
+    },
+    {
+     "verdicts": {
+      "no_deferred_promise": true,
+      "offers_handoff_or_clarifies": true,
+      "no_marker_leak": true
+     },
+     "text": "Индивидуальные условия под ваш объём обсуждает менеджер.\n\nПередал менеджеру, он свяжется.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "question",
+        "summary": "Клиент спрашивает об отсрочке платежа на 2 недели. Индивидуальные условия под объём обсуждает менеджер."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8562,
+      "completion_tokens": 76,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3226,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 499,
+     "t": 357.3
+    },
+    {
+     "verdicts": {
+      "no_deferred_promise": true,
+      "offers_handoff_or_clarifies": true,
+      "no_marker_leak": true
+     },
+     "text": "Индивидуальные условия под ваш объём обсуждает менеджер.\n\nПередал менеджеру, он свяжется.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "question",
+        "summary": "Клиент спрашивает про отсрочку платежа на 2 недели. Индивидуальные условия под объём обсуждает менеджер."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8562,
+      "completion_tokens": 76,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3026,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 681,
+     "t": 479.4
+    },
+    {
+     "verdicts": {
+      "no_deferred_promise": true,
+      "offers_handoff_or_clarifies": true,
+      "no_marker_leak": true
+     },
+     "text": "Индивидуальные условия под ваш объём обсуждает менеджер.\n\nПередал менеджеру, он свяжется.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "question",
+        "summary": "Клиент спрашивает об отсрочке платежа на 2 недели. Нужны индивидуальные условия под объём, без обещаний в чате."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8615,
+      "completion_tokens": 129,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3840,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 765,
+     "t": 529.7
+    },
+    {
+     "verdicts": {
+      "no_deferred_promise": true,
+      "offers_handoff_or_clarifies": true,
+      "no_marker_leak": true
+     },
+     "text": "Индивидуальные условия под ваш объём обсуждает менеджер.\n\nНапишите, пожалуйста:\nКомпания или ИП\nИмя\nГород\nЧто планируете брать и в каком объёме\nТелефон\n\nПередам менеджеру.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4229,
+      "completion_tokens": 53,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1383,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 846,
+     "t": 577.7
+    },
+    {
+     "verdicts": {
+      "no_deferred_promise": true,
+      "offers_handoff_or_clarifies": true,
+      "no_marker_leak": true
+     },
+     "text": "Индивидуальные условия под ваш объём обсуждает менеджер.\n\nПередал менеджеру, он свяжется.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "question",
+        "summary": "Клиент спрашивает про отсрочку платежа на 2 недели. Индивидуальные условия под объём обсуждает менеджер."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8562,
+      "completion_tokens": 76,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2673,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 1067,
+     "t": 714.8
+    },
+    {
+     "verdicts": {
+      "no_deferred_promise": true,
+      "offers_handoff_or_clarifies": true,
+      "no_marker_leak": true
+     },
+     "text": "Индивидуальные условия под ваш объём обсуждает менеджер.\n\nПередал менеджеру, он свяжется.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "question",
+        "summary": "Клиент спрашивает про отсрочку платежа на 2 недели. Индивидуальные условия под объём обсуждает менеджер."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8562,
+      "completion_tokens": 76,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3200,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 1151,
+     "t": 766.3
+    }
+   ]
+  },
+  {
+   "id": "ws_handoff_order",
+   "vertical": "wholesale",
+   "mode": "auto",
+   "lang": "ru",
+   "tags": [
+    "handoff"
+   ],
+   "repeats": 10,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "tool_called": true,
+      "claims_handoff_only_if_ok": true,
+      "no_invoice_in_chat": true,
+      "no_marker_leak": true
+     },
+     "text": "Передал менеджеру, он свяжется.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "name": "Асель",
+        "phone": "87021112233",
+        "summary": "ТОО Ромашка, Караганда. Нужен стиральный порошок 10 кг — 40 мешков. Просьба выставить счёт."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8625,
+      "completion_tokens": 81,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3256,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 34,
+     "t": 30.2
+    },
+    {
+     "verdicts": {
+      "tool_called": true,
+      "claims_handoff_only_if_ok": true,
+      "no_invoice_in_chat": true,
+      "no_marker_leak": true
+     },
+     "text": "Передал менеджеру, он свяжется.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "name": "Асель",
+        "phone": "87021112233",
+        "summary": "ТОО Ромашка, Караганда. Стиральный порошок 10 кг — 40 мешков. Нужен счёт."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8621,
+      "completion_tokens": 77,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3589,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 115,
+     "t": 86.8
+    },
+    {
+     "verdicts": {
+      "tool_called": true,
+      "claims_handoff_only_if_ok": true,
+      "no_invoice_in_chat": true,
+      "no_marker_leak": true
+     },
+     "text": "Передал менеджеру, он свяжется.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "name": "Асель",
+        "phone": "87021112233",
+        "summary": "ТОО Ромашка, Караганда. Нужен стиральный порошок 10 кг — 40 мешков. Просит выставить счёт."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8624,
+      "completion_tokens": 80,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3897,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 339,
+     "t": 247.3
+    },
+    {
+     "verdicts": {
+      "tool_called": true,
+      "claims_handoff_only_if_ok": true,
+      "no_invoice_in_chat": true,
+      "no_marker_leak": true
+     },
+     "text": "Передал менеджеру, он свяжется.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "name": "Асель",
+        "phone": "87021112233",
+        "summary": "ТОО Ромашка, Караганда. Стиральный порошок 10 кг — 40 мешков. Нужен счёт."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8621,
+      "completion_tokens": 77,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3293,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 420,
+     "t": 302.0
+    },
+    {
+     "verdicts": {
+      "tool_called": true,
+      "claims_handoff_only_if_ok": true,
+      "no_invoice_in_chat": true,
+      "no_marker_leak": true
+     },
+     "text": "Передал менеджеру, он свяжется.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "name": "Асель",
+        "phone": "87021112233",
+        "summary": "ТОО Ромашка, Караганда. Нужен стиральный порошок 10 кг — 40 мешков. Просьба выставить счёт."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8625,
+      "completion_tokens": 81,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2982,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 501,
+     "t": 357.4
+    },
+    {
+     "verdicts": {
+      "tool_called": true,
+      "claims_handoff_only_if_ok": true,
+      "no_invoice_in_chat": true,
+      "no_marker_leak": true
+     },
+     "text": "Передал менеджеру, он свяжется.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "name": "Асель",
+        "phone": "87021112233",
+        "summary": "ТОО Ромашка, Караганда. Нужен стиральный порошок 10 кг — 40 мешков. Просьба выставить счёт."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8625,
+      "completion_tokens": 81,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3128,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 686,
+     "t": 482.4
+    },
+    {
+     "verdicts": {
+      "tool_called": true,
+      "claims_handoff_only_if_ok": true,
+      "no_invoice_in_chat": true,
+      "no_marker_leak": true
+     },
+     "text": "Передал менеджеру, он свяжется.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "name": "Асель",
+        "phone": "87021112233",
+        "summary": "ТОО Ромашка, Караганда. Нужен стиральный порошок 10 кг — 40 мешков. Просит выставить счёт."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8624,
+      "completion_tokens": 80,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2546,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 767,
+     "t": 531.4
+    },
+    {
+     "verdicts": {
+      "tool_called": true,
+      "claims_handoff_only_if_ok": true,
+      "no_invoice_in_chat": true,
+      "no_marker_leak": true
+     },
+     "text": "Передал менеджеру, он свяжется.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "name": "Асель",
+        "phone": "87021112233",
+        "summary": "ТОО Ромашка, Караганда. Нужен стиральный порошок 10 кг — 40 мешков. Просьба выставить счёт."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8625,
+      "completion_tokens": 81,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2818,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 848,
+     "t": 578.1
+    },
+    {
+     "verdicts": {
+      "tool_called": true,
+      "claims_handoff_only_if_ok": true,
+      "no_invoice_in_chat": true,
+      "no_marker_leak": true
+     },
+     "text": "Передал менеджеру, он свяжется.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "name": "Асель",
+        "phone": "87021112233",
+        "summary": "ТОО Ромашка, Караганда. Нужен стиральный порошок 10 кг — 40 мешков. Просьба выставить счёт."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8625,
+      "completion_tokens": 81,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3450,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 1072,
+     "t": 718.3
+    },
+    {
+     "verdicts": {
+      "tool_called": true,
+      "claims_handoff_only_if_ok": true,
+      "no_invoice_in_chat": true,
+      "no_marker_leak": true
+     },
+     "text": "Передал менеджеру, он свяжется.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "name": "Асель",
+        "phone": "87021112233",
+        "summary": "ТОО Ромашка, Караганда. Нужен стиральный порошок 10 кг — 40 мешков. Просит выставить счёт."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8624,
+      "completion_tokens": 80,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3145,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 1153,
+     "t": 768.1
+    }
+   ]
+  },
+  {
+   "id": "ws_mixed_lang",
+   "vertical": "wholesale",
+   "mode": "auto",
+   "lang": "mixed",
+   "tags": [
+    "lang"
+   ],
+   "repeats": 10,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "numbers_grounded": true,
+      "no_markdown": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Позиция в прайсе есть, точный остаток подтвердит менеджер.\n\nСтиральный порошок 10 кг — 6900 тг/шт.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "Стиральный порошок 10 кг цена наличие"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8565,
+      "completion_tokens": 68,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 4062,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 36,
+     "t": 33.4
+    },
+    {
+     "verdicts": {
+      "numbers_grounded": true,
+      "no_markdown": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Стиральный порошок 10 кг есть в прайсе.\nЦена: 6900 тг/шт.\n\nТочный остаток подтвердит менеджер.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "Стиральный порошок 10 кг цена наличие"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8565,
+      "completion_tokens": 66,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 4229,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 120,
+     "t": 90.4
+    },
+    {
+     "verdicts": {
+      "numbers_grounded": true,
+      "no_markdown": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Позиция в прайсе есть, точный остаток подтвердит менеджер.\n\nСтиральный порошок 10 кг — 6900 тг/шт.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "Стиральный порошок 10 кг цена наличие"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8565,
+      "completion_tokens": 68,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3498,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 341,
+     "t": 248.5
+    },
+    {
+     "verdicts": {
+      "numbers_grounded": true,
+      "no_markdown": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Позиция в прайсе есть, точный остаток подтвердит менеджер.\n\nСтиральный порошок 10 кг — 6900 тг/шт.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "Стиральный порошок 10 кг цена наличие"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8565,
+      "completion_tokens": 68,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3125,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 422,
+     "t": 303.2
+    },
+    {
+     "verdicts": {
+      "numbers_grounded": true,
+      "no_markdown": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Позиция в прайсе есть, точный остаток подтвердит менеджер.\n\nСтиральный порошок 10 кг — 6900 тг/шт.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "Стиральный порошок 10 кг цена наличие"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8565,
+      "completion_tokens": 68,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2991,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 506,
+     "t": 362.0
+    },
+    {
+     "verdicts": {
+      "numbers_grounded": true,
+      "no_markdown": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Стиральный порошок 10 кг, арт. WP-10 — 6900 тг/шт.\n\nПозиция в прайсе есть, точный остаток подтвердит менеджер.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "Стиральный порошок 10 кг цена наличие"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8565,
+      "completion_tokens": 74,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2868,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 688,
+     "t": 484.3
+    },
+    {
+     "verdicts": {
+      "numbers_grounded": true,
+      "no_markdown": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Стиральный порошок 10 кг есть в прайсе, цена 6900 тг/шт.\n\nТочный остаток подтвердит менеджер.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "Стиральный порошок 10 кг цена наличие"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8565,
+      "completion_tokens": 65,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3312,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 769,
+     "t": 533.3
+    },
+    {
+     "verdicts": {
+      "numbers_grounded": true,
+      "no_markdown": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Стиральный порошок 10 кг есть в прайсе.\nЦена: 6900 тг/шт.\n\nТочный остаток подтвердит менеджер.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "Стиральный порошок 10 кг цена наличие"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8565,
+      "completion_tokens": 66,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 5210,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 853,
+     "t": 581.5
+    },
+    {
+     "verdicts": {
+      "numbers_grounded": true,
+      "no_markdown": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Стиральный порошок 10 кг есть в прайсе.\nЦена: 6900 тг/шт.\n\nТочный остаток подтвердит менеджер.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "Стиральный порошок 10 кг цена наличие"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8565,
+      "completion_tokens": 66,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2886,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 1074,
+     "t": 720.2
+    },
+    {
+     "verdicts": {
+      "numbers_grounded": true,
+      "no_markdown": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Стиральный порошок 10 кг есть в прайсе, цена 6900 тг/шт.\n\nТочный остаток подтвердит менеджер.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "Стиральный порошок 10 кг цена наличие"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8565,
+      "completion_tokens": 65,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3098,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 1155,
+     "t": 769.5
+    }
+   ]
+  }
+ ]
+}

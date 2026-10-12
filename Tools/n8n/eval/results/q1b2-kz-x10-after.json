@@ -1,0 +1,2262 @@
+{
+ "summary": {
+  "label": "q1b2-kz-x10-after",
+  "prompts_ref": "worktree",
+  "search_ref": "worktree",
+  "side": "after",
+  "block": "kz-x10",
+  "plan": "Tools/n8n/eval/plans/q1b2.json",
+  "scenario_version": "v1.5 (2026-10-12: T11b — no_tool:create_handoff on every auto scenario whose question the business data answers and whose design calls for no handoff (34: a6_/q1p_ as in v1.4 + 25 more, among them ws_kz_min_order and ws_list_of_items); every auto scenario is classified in test_checks.py (NO_HANDOFF / HANDOFF_IN_DESIGN, each with its reason); roles and all other checks as v1.4; harness h8 — interleaved repeats)",
+  "harness": "h8 (2026-10-12, T11b: interleaved schedule — every scenario's repeats spread over the whole run, round-robin over the scenarios, the sides of one repeat back to back with the first side rotating (--side / --plan run the sides of a comparison as ONE schedule); set v1.5 adds no_tool:create_handoff wherever the scenario does not call for a handoff; no check function changed; on top of h7 (2026-10-12, T11 Q1 B + V6-unknown: scenario roles `owner` / `bot_unknown` rendered with the memory marks the writers store at --prompts-ref (apply-history-handoff.py; none before T6); no_marker_leak, no_tool:<name>, not_says_already, no_delivery_doubt; on top of h6 2026-10-09, Q1: not_mentions:X — X stated in no un-refused clause and not merely quoted as the client's words, for the client-time echo; mentions:H:MM reads a time of day; on top of h5 2026-10-08, V9-r2: no_conflict_claim / no_price_caveat for a price list that AGREES with the catalog; on top of h4 2026-10-07 V9: «расхождение» + negated conflict, zero-price / elliptical free delivery, «итого по N позициям» partial, «нужен» / the car or device by name, a word inside the installment claim, Kazakh = no Russian sentence, «18,000»; h3 2026-09-27 R14; checks pinned by test_checks.py)",
+  "model": "gpt-5.4-mini",
+  "reasoning_effort": null,
+  "dropped_params": [],
+  "panel_model": null,
+  "max_tokens": 200,
+  "search_simulation": "Price List Search sub-workflow (Reconcile Prices at worktree)",
+  "memory_marks": {
+   "owner": "Владелец: ",
+   "bot_unknown": "[доставка не подтверждена] "
+  },
+  "workers": 4,
+  "scenarios": 7,
+  "runs": 70,
+  "pass_all": 3,
+  "flaky": 4,
+  "fail": 0,
+  "error_runs": 0,
+  "transport_retries": 0,
+  "finish_reason_length_runs": 0,
+  "prompt_tokens": 520733,
+  "cached_tokens": 466432,
+  "completion_tokens": 5899,
+  "reasoning_tokens": 0,
+  "cost_usd_auto_path": 0.1023,
+  "prices_usd_per_1m": [
+   0.75,
+   0.075,
+   4.5
+  ],
+  "latency_ms": {
+   "auto": {
+    "n": 70,
+    "median": 3275,
+    "p90": 4213,
+    "max": 7152
+   },
+   "panel": null
+  },
+  "seconds": 777,
+  "by_check": {
+   "lang_kz": "48/70",
+   "mentions:15000": "10/10",
+   "mentions:25000": "10/10",
+   "mentions:50": "10/10",
+   "mentions:55000": "10/10",
+   "no_invented_sku": "10/10",
+   "no_markdown": "10/10",
+   "no_marker_leak": "70/70",
+   "no_stock_guarantee": "10/10",
+   "no_tool:create_handoff": "70/70",
+   "numbers_grounded": "50/50"
+  }
+ },
+ "results": [
+  {
+   "id": "ap_sku_exact_kz",
+   "vertical": "auto_parts",
+   "mode": "auto",
+   "lang": "kz",
+   "tags": [
+    "docs",
+    "lang"
+   ],
+   "repeats": 10,
+   "pass_rate": 0.3,
+   "runs": [
+    {
+     "verdicts": {
+      "lang_kz": false,
+      "numbers_grounded": true,
+      "no_invented_sku": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Бар.\n\nФильтр масляный Toyota 90915-YZZE1 — 3200 тг\nОригинал\n\nАналог Sakura C-1139 — 1400 тг",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "90915-YZZE1 фильтр масляный Toyota цена наличие"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9038,
+      "completion_tokens": 76,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 4656,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 5,
+     "t": 5.2
+    },
+    {
+     "verdicts": {
+      "lang_kz": false,
+      "numbers_grounded": true,
+      "no_invented_sku": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Фильтр 90915-YZZE1 есть.\nЦена: 3200 тг\nАртикул: 90915-YZZE1\nОригинал\n\nАналог:\nSakura C-1139 — 1400 тг",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "90915-YZZE1 фильтр масляный Toyota цена наличие"
+       }
+      },
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "Toyota 90915-YZZE1"
+       }
+      },
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "фильтр масляный Toyota 90915-YZZE1"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9261,
+      "completion_tokens": 155,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 6238,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 86,
+     "t": 62.7
+    },
+    {
+     "verdicts": {
+      "lang_kz": false,
+      "numbers_grounded": true,
+      "no_invented_sku": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Бар.\n\nФильтр масляный Toyota 90915-YZZE1 — 3200 тг\nОригинал, цена без установки\n\nАналог:\nSakura C-1139 — 1400 тг",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "90915-YZZE1 фильтр масляный Toyota наличие цена"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9038,
+      "completion_tokens": 82,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3895,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 309,
+     "t": 221.6
+    },
+    {
+     "verdicts": {
+      "lang_kz": false,
+      "numbers_grounded": true,
+      "no_invented_sku": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Фильтр 90915-YZZE1 есть.\n3200 тг, оригинал.\n\nЕсть ещё аналог Sakura C-1139 — 1400 тг.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "90915-YZZE1 фильтр масляный Toyota цена наличие"
+       }
+      },
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "Toyota 90915-YZZE1"
+       }
+      },
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "фильтр масляный Toyota 90915-YZZE1"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9261,
+      "completion_tokens": 138,
+      "cached_tokens": 8960,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 7152,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 390,
+     "t": 277.8
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "numbers_grounded": true,
+      "no_invented_sku": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Бар.\n\nФильтр масляный Toyota 90915-YZZE1 — 3200 тг\nОригинал\n\nПо прайсу позиция есть, нақты қалдығын менеджер растайды.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "90915-YZZE1 фильтр масляный Toyota цена наличие"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9038,
+      "completion_tokens": 79,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 4021,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 473,
+     "t": 334.7
+    },
+    {
+     "verdicts": {
+      "lang_kz": false,
+      "numbers_grounded": true,
+      "no_invented_sku": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Бар.\n\nФильтр масляный Toyota 90915-YZZE1 — 3200 тг\nОригинал\n\nПо наличию точнее подтвердит менеджер.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "90915-YZZE1 фильтр масляный Toyota цена наличие"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9038,
+      "completion_tokens": 72,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3315,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 655,
+     "t": 460.9
+    },
+    {
+     "verdicts": {
+      "lang_kz": false,
+      "numbers_grounded": true,
+      "no_invented_sku": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Бар.\n\nФильтр масляный Toyota 90915-YZZE1 — 3200 тг\nОригинал\n\nАналог Sakura C-1139 — 1400 тг\nТочное наличие подтвердит менеджер",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "90915-YZZE1 фильтр масляный Toyota цена наличие"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9038,
+      "completion_tokens": 84,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3280,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 738,
+     "t": 510.2
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "numbers_grounded": true,
+      "no_invented_sku": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Бар.\n\nФильтр масляный Toyota 90915-YZZE1 — 3200 тг\nОригинал\n\nПо прайсу позиция есть, нақты қалдығын менеджер растайды.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "90915-YZZE1 фильтр масляный Toyota цена наличие"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9038,
+      "completion_tokens": 79,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3796,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 819,
+     "t": 556.5
+    },
+    {
+     "verdicts": {
+      "lang_kz": false,
+      "numbers_grounded": true,
+      "no_invented_sku": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Бар.\n\nФильтр масляный Toyota 90915-YZZE1 — 3200 тг\nОригинал, цена без установки\n\nАналог:\nSakura C-1139 — 1400 тг",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "90915-YZZE1 фильтр масляный Toyota цена наличие"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9038,
+      "completion_tokens": 82,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3159,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 1042,
+     "t": 696.3
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "numbers_grounded": true,
+      "no_invented_sku": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Фильтр масляный 90915-YZZE1 — 3200 тг\nОригинал\n\nВ прайсе позиция есть, нақты қалдығын менеджер растайды.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "90915-YZZE1 фильтр масляный Toyota цена наличие"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9038,
+      "completion_tokens": 76,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3539,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 1123,
+     "t": 744.7
+    }
+   ]
+  },
+  {
+   "id": "ws_kz_min_order",
+   "vertical": "wholesale",
+   "mode": "auto",
+   "lang": "kz",
+   "tags": [
+    "lang"
+   ],
+   "repeats": 10,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "mentions:50": true,
+      "numbers_grounded": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Минималды тапсырыс — 50 000 тг.\n\nЗаңды тұлғаларға:\n— безналичный есеп айырысу\n— ҚҚС-пен\n— шот және накладной беріледі\n\nТелефон: +7 700 111 22 33\nЖұмыс уақыты: дүйсенбі–жұма, 9:00–18:00",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4237,
+      "completion_tokens": 89,
+      "cached_tokens": 0,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2151,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 6,
+     "t": 5.3
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "mentions:50": true,
+      "numbers_grounded": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Минималды тапсырыс — 50 000 тг.\n\nЗаңды тұлғаларға:\n— безналичный есеп айырысу\n— ҚҚС-пен\n— шот және накладной беріледі\n\nТелефон: +7 700 111 22 33\nЖұмыс уақыты: дүйсенбі–жұма, 9:00–18:00",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4237,
+      "completion_tokens": 89,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2382,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 89,
+     "t": 65.0
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "mentions:50": true,
+      "numbers_grounded": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Минималды тапсырыс — 50 000 тг.\n\nЗаңды тұлғаларға:\n— безналичный есеп айырысу\n— ҚҚС-пен\n— шот-фактура және накладной беріледі\n\nТелефон: +7 700 111 22 33\nЖұмыс уақыты: дүйсенбі–жұма, 9:00–18:00",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4237,
+      "completion_tokens": 92,
+      "cached_tokens": 0,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2272,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 310,
+     "t": 222.4
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "mentions:50": true,
+      "numbers_grounded": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Минималды тапсырыс — 50 000 тг.\n\nЗаңды тұлғаларға:\n— безналичный есеп айырысу\n— ҚҚС-пен\n— шот-фактура және накладной беріледі\n\nТелефон: +7 700 111 22 33\nЖұмыс уақыты: дүйсенбі–жұма, 9:00–18:00",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4237,
+      "completion_tokens": 92,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1935,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 393,
+     "t": 280.8
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "mentions:50": true,
+      "numbers_grounded": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Минималды тапсырыс — 50 000 тг.\n\nЗаңды тұлғаларға:\n— безналичный есеп айырысу\n— ҚҚС-пен\n— шот-фактура және накладной беріледі\n\nТелефон: +7 700 111 22 33\nЖұмыс уақыты: дүйсенбі–жұма, 9:00–18:00",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4237,
+      "completion_tokens": 92,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2391,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 474,
+     "t": 335.4
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "mentions:50": true,
+      "numbers_grounded": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Минималды тапсырыс — 50 000 тг.\n\nЗаңды тұлғаларға:\n— қолма-қол емес төлем\n— ҚҚС-пен\n— шот және накладной береміз\n\nТелефон: +7 700 111 22 33\nЖұмыс уақыты: дүйсенбі–жұма, 9:00–18:00",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4237,
+      "completion_tokens": 89,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2123,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 658,
+     "t": 462.8
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "mentions:50": true,
+      "numbers_grounded": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Минималды тапсырыс — 50 000 тг.\n\nЗаңды тұлғаларға:\n— безналичный расчет\n— ҚҚС\n— шот-фактура\n— накладные\n\nТелефон: +7 700 111 22 33\nЖұмыс уақыты: дүйсенбі–жұма, 9:00–18:00",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4237,
+      "completion_tokens": 86,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1185,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 739,
+     "t": 510.9
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "mentions:50": true,
+      "numbers_grounded": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Минималды тапсырыс — 50 000 тг.\n\nЗаңды тұлғаларға:\n— безналичный есеп айырысу\n— ҚҚС-пен\n— шот-фактура және накладной беріледі\n\nТелефон: +7 700 111 22 33\nЖұмыс уақыты: дүйсенбі–жұма, 9:00–18:00",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4237,
+      "completion_tokens": 92,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2002,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 822,
+     "t": 559.7
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "mentions:50": true,
+      "numbers_grounded": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Минималды тапсырыс — 50 000 тг.\n\nЗаңды тұлғаларға:\nБезнал төлем\nҚҚС-пен\nШот және накладной береміз\n\nТелефон: +7 700 111 22 33\nЖұмыс уақыты: дүйсенбі–жұма, 9:00–18:00",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4237,
+      "completion_tokens": 83,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1738,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 1043,
+     "t": 697.0
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "mentions:50": true,
+      "numbers_grounded": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Минималды тапсырыс — 50 000 тг.\n\nЗаңды тұлғаларға:\n— қолма-қолсыз төлем\n— ҚҚС-пен\n— шот және накладной береміз\n\nТелефон: +7 700 111 22 33\nЖұмыс уақыты: дүйсенбі–жұма, 9:00–18:00",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4237,
+      "completion_tokens": 89,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1951,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 1126,
+     "t": 746.8
+    }
+   ]
+  },
+  {
+   "id": "fl_kz_price",
+   "vertical": "flowers",
+   "mode": "auto",
+   "lang": "kz",
+   "tags": [
+    "lang"
+   ],
+   "repeats": 10,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "mentions:25000": true,
+      "numbers_grounded": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "25 раушан гүлі — 25000 тг.\n\n50 см, Эквадор раушандары.\nНақты қалдығын флорист тапсырыс рәсімдегенде растайды.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "25 раушан гүлі цена букет 25 роз"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8581,
+      "completion_tokens": 76,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3932,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 9,
+     "t": 7.8
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "mentions:25000": true,
+      "numbers_grounded": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "25 раушан гүлі — 25000 тг.\n\n50 см, Эквадор раушандары. Нақты қалдығын флорист тапсырысты рәсімдегенде растайды.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "25 раушан гүлі price bouquet roses 25 roses"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8581,
+      "completion_tokens": 77,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3698,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 90,
+     "t": 66.1
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "mentions:25000": true,
+      "numbers_grounded": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "25 раушан гүлі — 25000 тг.\n50 см, Эквадор раушандары.\n\nҚаласаңыз, жеткізуге де рәсімдеп беремін.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "25 раушан гүлі price bouquet roses 25 roses"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8581,
+      "completion_tokens": 73,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3353,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 313,
+     "t": 225.5
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "mentions:25000": true,
+      "numbers_grounded": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "25 раушан гүлі — 25000 тг.\n50 см, Эквадор раушандары.\n\nҚаласаңыз, жеткізуге де рәсімдеп беремін.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "25 раушан гүлі price bouquet roses 25 roses"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8581,
+      "completion_tokens": 73,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3546,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 394,
+     "t": 280.9
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "mentions:25000": true,
+      "numbers_grounded": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "25 раушан гүлі — 25000 тг.\n\n50 см, Эквадор раушандары.\nНақты қолда барын флорист тапсырыс рәсімдегенде растайды.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "25 раушан гүлі price bouquet 25 roses"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8580,
+      "completion_tokens": 76,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 4797,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 477,
+     "t": 337.9
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "mentions:25000": true,
+      "numbers_grounded": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "25 раушан гүлі — 25000 тг.\n\nҚұрамын флорист нақтылап, қолда барын тапсырыс кезінде растайды.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "25 раушан гүлі price bouquet 25 roses"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8580,
+      "completion_tokens": 67,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3213,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 659,
+     "t": 462.8
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "mentions:25000": true,
+      "numbers_grounded": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "25 раушан гүлі — 25000 тг.\n\n50 см, Эквадор раушандары.\nНақты қалдығын флорист тапсырыс рәсімдегенде растайды.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "25 раушан гүлі цена букет 25 роз"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8581,
+      "completion_tokens": 76,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3104,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 742,
+     "t": 513.0
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "mentions:25000": true,
+      "numbers_grounded": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "25 раушан гүлі — 25000 тг.\n\nНақты қалдығын флорист тапсырыс рәсімдегенде растайды.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "25 раушан гүлі цена букет 25 роз"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8581,
+      "completion_tokens": 66,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2973,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 823,
+     "t": 560.3
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "mentions:25000": true,
+      "numbers_grounded": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "25 раушан гүлі — 25000 тг.\n\n50 см, Эквадор раушандары.\nНақты қалдығын флорист тапсырысты рәсімдегенде растайды.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "25 раушан гүлі цена букет 25 роз"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8581,
+      "completion_tokens": 77,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3073,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 1046,
+     "t": 699.3
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "mentions:25000": true,
+      "numbers_grounded": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "25 раушан гүлі — 25 000 тг.\n\n50 см, Эквадор раушандары.\nНақты қолда барын флорист тапсырысты рәсімдегенде растайды.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "25 раушан гүлі price bouquet 25 roses"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8580,
+      "completion_tokens": 78,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3111,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 1127,
+     "t": 748.3
+    }
+   ]
+  },
+  {
+   "id": "ks_kz_availability",
+   "vertical": "kaspi_seller",
+   "mode": "auto",
+   "lang": "kz",
+   "tags": [
+    "lang"
+   ],
+   "repeats": 10,
+   "pass_rate": 0.5,
+   "runs": [
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "no_stock_guarantee": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Иә, ақ түсі бар.\nНаушники JBL Tune 510BT белые — 18990 тг\n\nKaspi арқылы рәсімдеуге болады:\nhttps://kaspi.kz/shop/techstore",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "JBL Tune 510BT white color availability stock white black product1"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8614,
+      "completion_tokens": 78,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 4242,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 10,
+     "t": 8.7
+    },
+    {
+     "verdicts": {
+      "lang_kz": false,
+      "no_stock_guarantee": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Да, белый JBL Tune 510BT есть.\n\nЦена: 18990 тг\nВ наличии должен быть, точный остаток подтвердит владелец\nОформить можно на странице магазина Kaspi: https://kaspi.kz/shop/techstore",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "JBL Tune 510BT white black availability color price"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8611,
+      "completion_tokens": 85,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3471,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 93,
+     "t": 69.0
+    },
+    {
+     "verdicts": {
+      "lang_kz": false,
+      "no_stock_guarantee": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Да, белый цвет есть.\n\nНаушники JBL Tune 510BT белые — 18990 тг\nОформление и рассрочка — только на странице товара в Kaspi:\nhttps://kaspi.kz/shop/techstore",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "JBL Tune 510BT white black availability color price"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8611,
+      "completion_tokens": 81,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 4020,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 314,
+     "t": 225.5
+    },
+    {
+     "verdicts": {
+      "lang_kz": false,
+      "no_stock_guarantee": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Да, белые JBL Tune 510BT есть.\n\nЦена: 18990 тг\nОформление — только через Kaspi: https://kaspi.kz/shop/techstore",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "JBL Tune 510BT white color availability black white product"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8612,
+      "completion_tokens": 70,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3229,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 397,
+     "t": 284.5
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "no_stock_guarantee": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Иә, JBL Tune 510BT ақ түсте бар.\n\nБағасы: 18 990 тг\nKaspi арқылы рәсімдеуге болады: https://kaspi.kz/shop/techstore\nНақты қалдығын менеджер растайды.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "JBL Tune 510BT white color availability black white product"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8612,
+      "completion_tokens": 86,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3800,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 478,
+     "t": 338.7
+    },
+    {
+     "verdicts": {
+      "lang_kz": false,
+      "no_stock_guarantee": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Иә, ақ түсі бар.\n\nНаушники JBL Tune 510BT белые — 18990 тг\nДолжен быть в наличии, точный остаток подтвердит владелец.\nОформить можно на странице магазина Kaspi: https://kaspi.kz/shop/techstore",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "JBL Tune 510BT white color availability in catalog/pricelist"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8614,
+      "completion_tokens": 96,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2912,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 662,
+     "t": 464.9
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "no_stock_guarantee": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Иә, ақ түсі бар.\n\nНаушники JBL Tune 510BT белые — 18990 тг\nТапсырысты Kaspi арқылы рәсімдеуге болады: https://kaspi.kz/shop/techstore",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "JBL Tune 510BT white black availability color product"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8611,
+      "completion_tokens": 80,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3499,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 743,
+     "t": 513.1
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "no_stock_guarantee": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Иә, ақ түсі бар.\n\nНаушники JBL Tune 510BT белые — 18990 тг\nТапсырысты Kaspi-дегі дүкен беті арқылы рәсімдеуге болады: https://kaspi.kz/shop/techstore\nНақты қалдығын владелец растайды.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "JBL Tune 510BT white color availability in catalog/pricelist"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8614,
+      "completion_tokens": 101,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3851,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 826,
+     "t": 561.7
+    },
+    {
+     "verdicts": {
+      "lang_kz": false,
+      "no_stock_guarantee": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Иә, ақ түсі бар.\n\nНаушники JBL Tune 510BT белые — 18990 тг\nОформление только через Kaspi: https://kaspi.kz/shop/techstore",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "JBL 510 ақ түсі бар ма? наличие JBL Tune 510BT white black"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8618,
+      "completion_tokens": 81,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3309,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 1047,
+     "t": 699.5
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "no_stock_guarantee": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Иә, JBL Tune 510BT ақ түсте бар.\n\nБағасы — 18990 тг\nТапсырысты Kaspi арқылы рәсімдеуге болады: https://kaspi.kz/shop/techstore",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "JBL Tune 510BT white color availability black white product"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8612,
+      "completion_tokens": 79,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3463,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 1130,
+     "t": 750.7
+    }
+   ]
+  },
+  {
+   "id": "ed_kz_parent",
+   "vertical": "education",
+   "mode": "auto",
+   "lang": "kz",
+   "tags": [
+    "lang"
+   ],
+   "repeats": 10,
+   "pass_rate": 0.8,
+   "runs": [
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "mentions:55000": true,
+      "numbers_grounded": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "ЕНТ-ге дайындық — 55 000 тг/ай.\n\nМатематика және физика кіреді.\n\nПробный сабақ тегін.\n\nЕгер қаласаңыз, баланың аты-жөнін, жасын және телефон нөмірін жіберіңіз — администраторға жазып беремін.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "ЕНТ подготовка цена, длительность, условия пробного урока, для школьников и взрослых"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8502,
+      "completion_tokens": 107,
+      "cached_tokens": 7424,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 4392,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 13,
+     "t": 11.8
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "mentions:55000": true,
+      "numbers_grounded": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "ЕНТ-ге дайындық — 55 000 тг/ай.\n\nМатематика және физика кіреді.\n\nПробный сабақ тегін. Қаласаңыз, өтінім қалдырайын: баланың аты-жөні мен жасы, және телефон нөмірі керек.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "ЕНТ подготовка цена, стоимость, длительность, расписание, прайс-лист"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8500,
+      "completion_tokens": 102,
+      "cached_tokens": 7424,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3935,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 94,
+     "t": 69.8
+    },
+    {
+     "verdicts": {
+      "lang_kz": false,
+      "mentions:55000": true,
+      "numbers_grounded": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Подготовка к ЕНТ — 55 000 тг/мес.\n\nЗанятия по математике и физике.\n\nПробный урок бесплатный. Если хотите, могу передать заявку администратору — он свяжется и подберёт время.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "ЕНТ подготовка цена, длительность, условия пробного урока, расписание"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8499,
+      "completion_tokens": 96,
+      "cached_tokens": 7424,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3973,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 317,
+     "t": 228.9
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "mentions:55000": true,
+      "numbers_grounded": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "ЕНТ-ге дайындық — 55 000 тг/ай.\n\nМатематика және физика.\n\nПробный урок тегін. Қаласаңыз, өтінім қалдырайын: баланың аты-жөні, жасы және телефон нөмірін жазыңыз.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "ЕНТ подготовка цена, длительность, расписание, прайс-лист"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8498,
+      "completion_tokens": 99,
+      "cached_tokens": 7424,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3761,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 398,
+     "t": 284.9
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "mentions:55000": true,
+      "numbers_grounded": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "ЕНТ-ге дайындық — 55000 тг/ай.\n\nМатематика және физика.\n\nПробный урок тегін.\n\nЕгер жаздырғыңыз келсе, баланың аты-жөні, жасы және телефон нөмірін жіберіңіз — әкімші уақытын нақтылап, топты таңдап береді.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "ЕНТ подготовка цена, длительность, расписание, пробный урок, для школьников"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8501,
+      "completion_tokens": 110,
+      "cached_tokens": 7424,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 4195,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 481,
+     "t": 342.5
+    },
+    {
+     "verdicts": {
+      "lang_kz": false,
+      "mentions:55000": true,
+      "numbers_grounded": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Подготовка к ЕНТ — 55 000 тг/мес.\n\nЗанятия по математике и физике.\n\nПробный урок бесплатный. Если хотите, могу передать заявку администратору — он подберёт группу и подтвердит время.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "ЕНТ подготовка цена, длительность, условия пробного урока, расписание"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8499,
+      "completion_tokens": 96,
+      "cached_tokens": 7424,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2933,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 663,
+     "t": 466.0
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "mentions:55000": true,
+      "numbers_grounded": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "ЕНТ-ге дайындық — 55000 тг/ай.\n\nМатематика және физика кіреді.\n\nҚаласаңыз, балаңыздың аты-жөнін, жасын және телефон нөмірін жіберіңіз — әкімші тегін пробный сабаққа жазып береді.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "ЕНТ подготовка цена длительность курс для школьников и взрослых прайс-лист"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8499,
+      "completion_tokens": 99,
+      "cached_tokens": 7424,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3533,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 746,
+     "t": 516.1
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "mentions:55000": true,
+      "numbers_grounded": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "ЕНТ-ге дайындық — 55 000 тг/ай.\n\nМатематика және физика кіреді.\n\nПробный урок тегін. Қаласаңыз, өтінім қалдырайын: баланың аты-жөні мен жасы, және телефон нөмірі керек.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "ЕНТ подготовка цена, длительность, условия пробного урока, для школьников и взрослых, прайс-лист"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8507,
+      "completion_tokens": 109,
+      "cached_tokens": 7424,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2863,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 827,
+     "t": 563.3
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "mentions:55000": true,
+      "numbers_grounded": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "ЕНТ-ге дайындық — 55 000 тг/ай.\n\nМатематика және физика кіреді.\n\nПробный сабақ тегін.\n\nҚаласаңыз, өтінім қалдырайын: баланың аты-жөні, жасы және телефон нөмірін жазыңыз.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "ЕНТ подготовка цена, длительность, расписание, пробный урок, прайс-лист"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8502,
+      "completion_tokens": 105,
+      "cached_tokens": 7424,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3540,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 1050,
+     "t": 702.4
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "mentions:55000": true,
+      "numbers_grounded": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "ЕНТ-ге дайындық — 55 000 тг/ай.\n\nМатематика және физика кіреді.\n\nТегін пробный сабаққа да жазуға болады. Баланың аты-жөні мен жасын жіберіңіз, администратор уақытын нақтылап береді.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "ЕНТ подготовка цена, стоимость, длительность, прайс-лист"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8497,
+      "completion_tokens": 95,
+      "cached_tokens": 7424,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3275,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 1131,
+     "t": 751.4
+    }
+   ]
+  },
+  {
+   "id": "pr_kz_battery",
+   "vertical": "phone_repair",
+   "mode": "auto",
+   "lang": "kz",
+   "tags": [
+    "lang"
+   ],
+   "repeats": 10,
+   "pass_rate": 0.2,
+   "runs": [
+    {
+     "verdicts": {
+      "lang_kz": false,
+      "mentions:15000": true,
+      "numbers_grounded": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "iPhone 12 батареясын ауыстыру — 15000 тг.\n\nТочная цена — после диагностики, мастер подтвердит её до начала работ.\nДиагностика бесплатная.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "iPhone 12 battery replacement price"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8850,
+      "completion_tokens": 69,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 4213,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 14,
+     "t": 12.9
+    },
+    {
+     "verdicts": {
+      "lang_kz": false,
+      "mentions:15000": true,
+      "numbers_grounded": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "iPhone 12 батареясын ауыстыру — 15000 тг.\n\nТочная цена — после диагностики, мастер подтвердит её до начала работ. Диагностика бесплатная.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "iPhone 12 батарея ауыстыру цена"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8853,
+      "completion_tokens": 72,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3531,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 97,
+     "t": 72.4
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "mentions:15000": true,
+      "numbers_grounded": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "iPhone 12 батареясын ауыстыру — 15000 тг.\n\nНақты баға — диагностикадан кейін, мастер жұмысты бастамас бұрын растайды.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "iPhone 12 батарея ауыстыру цена"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8853,
+      "completion_tokens": 69,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3446,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 318,
+     "t": 229.6
+    },
+    {
+     "verdicts": {
+      "lang_kz": false,
+      "mentions:15000": true,
+      "numbers_grounded": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "iPhone 12 батареясын ауыстыру — 15000 тг.\n\nТочная цена — после диагностики, мастер подтвердит её до начала работ.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "iPhone 12 батарея ауыстыру цена"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8853,
+      "completion_tokens": 65,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3227,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 401,
+     "t": 287.7
+    },
+    {
+     "verdicts": {
+      "lang_kz": false,
+      "mentions:15000": true,
+      "numbers_grounded": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "iPhone 12 батареясын ауыстыру — 15000 тг.\n\nТочная цена — после диагностики, мастер подтвердит её до начала работ.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "iPhone 12 батарея ауыстыру цена"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8853,
+      "completion_tokens": 65,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3183,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 482,
+     "t": 342.7
+    },
+    {
+     "verdicts": {
+      "lang_kz": false,
+      "mentions:15000": true,
+      "numbers_grounded": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "iPhone 12 үшін батарея ауыстыру — 15000 тг.\n\nТочная цена — после диагностики, мастер подтвердит её до начала работ.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "iPhone 12 батарея ауыстыру цена"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8853,
+      "completion_tokens": 64,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3470,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 666,
+     "t": 467.9
+    },
+    {
+     "verdicts": {
+      "lang_kz": false,
+      "mentions:15000": true,
+      "numbers_grounded": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "iPhone 12 үшін батарея ауыстыру — 15000 тг.\n\nТочная цена — после диагностики, мастер подтвердит её до начала работ. Диагностика бесплатная.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "iPhone 12 батарея ауыстыру цена"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8853,
+      "completion_tokens": 71,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3012,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 747,
+     "t": 516.6
+    },
+    {
+     "verdicts": {
+      "lang_kz": false,
+      "mentions:15000": true,
+      "numbers_grounded": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "iPhone 12 батареясын ауыстыру — 15000 тг.\n\nТочная цена — после диагностики, мастер подтвердит её до начала работ.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "iPhone 12 батарея ауыстыру цена"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8853,
+      "completion_tokens": 65,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3319,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 830,
+     "t": 565.6
+    },
+    {
+     "verdicts": {
+      "lang_kz": false,
+      "mentions:15000": true,
+      "numbers_grounded": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "iPhone 12 батареясын ауыстыру — 15000 тг.\n\nТочная цена — после диагностики, мастер подтвердит её до начала работ.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "iPhone 12 батарея ауыстыру цена"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8853,
+      "completion_tokens": 65,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2865,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 1051,
+     "t": 702.6
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "mentions:15000": true,
+      "numbers_grounded": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "iPhone 12 батареясын ауыстыру — 15000 тг.\n\nНақты баға диагностикадан кейін белгілі болады, мастер жұмысты бастамай тұрып растайды.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "iPhone 12 батарея ауыстыру цена"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8853,
+      "completion_tokens": 71,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3260,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 1134,
+     "t": 754.1
+    }
+   ]
+  },
+  {
+   "id": "gen_kz_pure_greeting",
+   "vertical": "education",
+   "mode": "auto",
+   "lang": "kz",
+   "tags": [
+    "lang"
+   ],
+   "repeats": 10,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "no_markdown": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Сәлеметсіз бе!\n\nАғылшын тілі курсы бар:\n40 000 тг/ай\nАптасына 3 рет, әр сабақ 60 минут\n\nПробный сабақ тегін.\n\nЕгер жазылғыңыз келсе, оқушының аты-жөні мен жасын жазыңыз.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4207,
+      "completion_tokens": 71,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2050,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 17,
+     "t": 16.2
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "no_markdown": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Сәлеметсіз бе!\n\nАғылшын тілі курсы бар:\n40 000 тг/ай\nАптасына 3 рет, әр сабақ 60 минут\nТоптық формат, балаларға арналған\n\nПробный сабақ тегін.\n\nЕгер жазылғыңыз келсе, оқушының аты-жөні мен жасын жазыңыз.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4207,
+      "completion_tokens": 80,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2345,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 98,
+     "t": 73.3
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "no_markdown": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Сәлеметсіз бе!\n\nАғылшын тілі курсы бар:\n— балаларға арналған топтық сабақ\n— 3 рет аптасына, 60 минут\n— бағасы: 40 000 тг/ай\n\nТегін пробный сабақ бар.\n\nЕгер жазылғыңыз келсе, оқушының аты-жөні мен жасын жазыңыз.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4207,
+      "completion_tokens": 83,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1997,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 321,
+     "t": 232.8
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "no_markdown": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Сәлеметсіз бе!\n\nАғылшын тілі курсы бар:\nАнглийский для детей, группа — 40 000 тг/ай\n3 рет апта сайын, сабақ ұзақтығы 60 минут\n\nПробный сабақ тегін.\n\nЕгер жаздырғыңыз келсе, оқушының аты-жөні мен жасын жазыңыз.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4207,
+      "completion_tokens": 82,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1920,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 402,
+     "t": 288.2
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "no_markdown": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Сәлеметсіз бе!\n\nАғылшын тілі курсы бар:\n— Балаларға арналған топтық сабақ\n— 3 рет аптасына, 60 минут\n— Бағасы: 40 000 тг/ай\n\nТегін пробный сабақ бар.\n\nЕгер жазылғыңыз келсе, оқушының аты-жөні мен жасын жазыңыз.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4207,
+      "completion_tokens": 85,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1943,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 485,
+     "t": 346.2
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "no_markdown": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Сәлеметсіз бе!\n\nАғылшын тілі курсы бар:\n40 000 тг/ай\nАптасына 3 рет, әр сабақ 60 минут\nТоптық формат, балаларға арналған\n\nПробный сабақ тегін.\n\nЕгер жазылғыңыз келсе, оқушының аты-жөні мен жасын жазыңыз.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4207,
+      "completion_tokens": 80,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2062,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 667,
+     "t": 469.0
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "no_markdown": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Сәлеметсіз бе!\n\nАғылшын тілі курсы бар:\n40 000 тг/ай\nАптасына 3 рет, әр сабақ 60 минут\n\nПробный сабақ тегін.\n\nЕгер жазылғыңыз келсе, оқушының аты-жөні мен жасын жазыңыз.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4207,
+      "completion_tokens": 71,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1788,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 750,
+     "t": 519.1
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "no_markdown": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Сәлеметсіз бе!\n\nАғылшын тілі курсы бар:\n— Балаларға арналған топтық сабақ\n— 40 000 тг/ай\n— Аптасына 3 рет, 60 минуттан\n\nПробный сабақ тегін.\n\nЕгер қаласаңыз, өтінім қалдырайын:\n1) Оқушының аты-жөні және жасы\n2) Қай курс керек\n3) Телефон нөмірі",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4207,
+      "completion_tokens": 102,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2099,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 831,
+     "t": 566.1
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "no_markdown": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Сәлеметсіз бе!\n\nАғылшын тілі курсы бар:\n40 000 тг/ай\nТопта оқыту, аптасына 3 рет, сабақ ұзақтығы 60 минут\n\nПробный сабақ тегін.\n\nЕгер жазылғыңыз келсе, оқушының аты-жөні мен жасын жазыңыз.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4207,
+      "completion_tokens": 78,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1933,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 1054,
+     "t": 705.1
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "no_markdown": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Сәлеметсіз бе!\n\nАғылшын тілі курсы бар:\n— балаларға арналған топтық сабақ\n— 3 рет апта сайын, 60 минут\n— айына 40 000 тг\n\nТегін пробный сабақ бар.\n\nЕгер жазылғыңыз келсе, оқушының аты-жөні мен жасын жазыңыз.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4207,
+      "completion_tokens": 81,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2104,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 1135,
+     "t": 754.7
+    }
+   ]
+  }
+ ]
+}

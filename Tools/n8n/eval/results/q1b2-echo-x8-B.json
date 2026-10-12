@@ -1,0 +1,838 @@
+{
+ "summary": {
+  "label": "q1b2-echo-x8-B",
+  "prompts_ref": "fba44558",
+  "search_ref": "fba44558",
+  "side": "B",
+  "block": "echo-x8",
+  "plan": "Tools/n8n/eval/plans/q1b2.json",
+  "scenario_version": "v1.5 (2026-10-12: T11b — no_tool:create_handoff on every auto scenario whose question the business data answers and whose design calls for no handoff (34: a6_/q1p_ as in v1.4 + 25 more, among them ws_kz_min_order and ws_list_of_items); every auto scenario is classified in test_checks.py (NO_HANDOFF / HANDOFF_IN_DESIGN, each with its reason); roles and all other checks as v1.4; harness h8 — interleaved repeats)",
+  "harness": "h8 (2026-10-12, T11b: interleaved schedule — every scenario's repeats spread over the whole run, round-robin over the scenarios, the sides of one repeat back to back with the first side rotating (--side / --plan run the sides of a comparison as ONE schedule); set v1.5 adds no_tool:create_handoff wherever the scenario does not call for a handoff; no check function changed; on top of h7 (2026-10-12, T11 Q1 B + V6-unknown: scenario roles `owner` / `bot_unknown` rendered with the memory marks the writers store at --prompts-ref (apply-history-handoff.py; none before T6); no_marker_leak, no_tool:<name>, not_says_already, no_delivery_doubt; on top of h6 2026-10-09, Q1: not_mentions:X — X stated in no un-refused clause and not merely quoted as the client's words, for the client-time echo; mentions:H:MM reads a time of day; on top of h5 2026-10-08, V9-r2: no_conflict_claim / no_price_caveat for a price list that AGREES with the catalog; on top of h4 2026-10-07 V9: «расхождение» + negated conflict, zero-price / elliptical free delivery, «итого по N позициям» partial, «нужен» / the car or device by name, a word inside the installment claim, Kazakh = no Russian sentence, «18,000»; h3 2026-09-27 R14; checks pinned by test_checks.py)",
+  "model": "gpt-5.4-mini",
+  "reasoning_effort": null,
+  "dropped_params": [],
+  "panel_model": null,
+  "max_tokens": 200,
+  "search_simulation": "Price List Search sub-workflow (Reconcile Prices at fba44558)",
+  "memory_marks": {
+   "owner": "Владелец: ",
+   "bot_unknown": "[доставка не подтверждена] "
+  },
+  "workers": 4,
+  "scenarios": 3,
+  "runs": 24,
+  "pass_all": 2,
+  "flaky": 1,
+  "fail": 0,
+  "error_runs": 0,
+  "transport_retries": 0,
+  "finish_reason_length_runs": 0,
+  "prompt_tokens": 168239,
+  "cached_tokens": 136960,
+  "completion_tokens": 1867,
+  "reasoning_tokens": 0,
+  "cost_usd_auto_path": 0.0421,
+  "prices_usd_per_1m": [
+   0.75,
+   0.075,
+   4.5
+  ],
+  "latency_ms": {
+   "auto": {
+    "n": 24,
+    "median": 3026,
+    "p90": 3510,
+    "max": 4411
+   },
+   "panel": null
+  },
+  "seconds": 777,
+  "by_check": {
+   "no_exact_time_confirmation": "24/24",
+   "no_marker_leak": "24/24",
+   "no_time_assignment": "24/24",
+   "not_mentions:15:00": "21/24",
+   "offers_handoff_or_clarifies": "24/24"
+  }
+ },
+ "results": [
+  {
+   "id": "q1c_client_time_education",
+   "vertical": "education",
+   "mode": "auto",
+   "lang": "ru",
+   "tags": [
+    "control"
+   ],
+   "repeats": 8,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "no_time_assignment": true,
+      "no_exact_time_confirmation": true,
+      "offers_handoff_or_clarifies": true,
+      "not_mentions:15:00": true,
+      "no_marker_leak": true
+     },
+     "text": "Спасибо! Передал администратору — он свяжется, подтвердит время и подберёт группу.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "summary": "Клиент хочет прийти на пробный урок завтра в 15:00 и спрашивает, кого спросить на месте. Нужна запись и подтверждение встречи."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8425,
+      "completion_tokens": 82,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3336,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 75,
+     "t": 54.1
+    },
+    {
+     "verdicts": {
+      "no_time_assignment": true,
+      "no_exact_time_confirmation": true,
+      "offers_handoff_or_clarifies": true,
+      "not_mentions:15:00": true,
+      "no_marker_leak": true
+     },
+     "text": "Спасибо! Передал администратору — он свяжется, подтвердит время и подскажет, кого спросить на месте.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "summary": "Клиент хочет прийти на пробный урок завтра в 15:00 и спрашивает, кого спросить на месте. Нужна подтверждённая запись и ответ по встрече.",
+        "name": ""
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8433,
+      "completion_tokens": 95,
+      "cached_tokens": 7424,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3888,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 301,
+     "t": 215.8
+    },
+    {
+     "verdicts": {
+      "no_time_assignment": true,
+      "no_exact_time_confirmation": true,
+      "offers_handoff_or_clarifies": true,
+      "not_mentions:15:00": true,
+      "no_marker_leak": true
+     },
+     "text": "Здравствуйте! Пробный урок у нас бесплатный.\n\nНа месте вас встретит администратор, он подскажет всё по записи и группе. Адрес: пр. Республики 10.\n\nЕсли хотите, я могу передать заявку на пробный урок — напишите имя и возраст ученика.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4157,
+      "completion_tokens": 63,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2376,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 383,
+     "t": 272.3
+    },
+    {
+     "verdicts": {
+      "no_time_assignment": true,
+      "no_exact_time_confirmation": true,
+      "offers_handoff_or_clarifies": true,
+      "not_mentions:15:00": true,
+      "no_marker_leak": true
+     },
+     "text": "Спасибо! Передал администратору — он свяжется, подтвердит время и подберёт группу.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "summary": "Клиент хочет прийти на пробный урок завтра в 15:00 и спрашивает, кого спросить на месте. Нужна запись/подтверждение визита."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8428,
+      "completion_tokens": 85,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3368,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 469,
+     "t": 332.1
+    },
+    {
+     "verdicts": {
+      "no_time_assignment": true,
+      "no_exact_time_confirmation": true,
+      "offers_handoff_or_clarifies": true,
+      "not_mentions:15:00": true,
+      "no_marker_leak": true
+     },
+     "text": "Спасибо! Передал администратору — он свяжется, подтвердит время и подберёт группу.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "summary": "Клиент хочет прийти на пробный урок завтра в 15:00 и спрашивает, кого спросить на месте. Нужна запись и подтверждение деталей."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8425,
+      "completion_tokens": 82,
+      "cached_tokens": 7424,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3042,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 726,
+     "t": 502.1
+    },
+    {
+     "verdicts": {
+      "no_time_assignment": true,
+      "no_exact_time_confirmation": true,
+      "offers_handoff_or_clarifies": true,
+      "not_mentions:15:00": true,
+      "no_marker_leak": true
+     },
+     "text": "Спасибо! Передал администратору — он свяжется, подтвердит время и подскажет, кого спросить на месте.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "summary": "Клиент хочет прийти на пробный урок завтра в 15:00 и спрашивает, кого спросить на месте. Нужна подтверждённая запись и контактное лицо на месте."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8431,
+      "completion_tokens": 93,
+      "cached_tokens": 7424,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3026,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 812,
+     "t": 552.9
+    },
+    {
+     "verdicts": {
+      "no_time_assignment": true,
+      "no_exact_time_confirmation": true,
+      "offers_handoff_or_clarifies": true,
+      "not_mentions:15:00": true,
+      "no_marker_leak": true
+     },
+     "text": "На месте спросите администратора.\n\nСпасибо! Передал администратору — он свяжется, подтвердит время и подберёт группу.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "summary": "Клиент хочет прийти на пробный урок завтра в 15:00 и спрашивает, кого спросить на месте. Нужна запись/подтверждение визита.",
+        "name": ""
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8431,
+      "completion_tokens": 95,
+      "cached_tokens": 7424,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3447,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 894,
+     "t": 602.5
+    },
+    {
+     "verdicts": {
+      "no_time_assignment": true,
+      "no_exact_time_confirmation": true,
+      "offers_handoff_or_clarifies": true,
+      "not_mentions:15:00": true,
+      "no_marker_leak": true
+     },
+     "text": "Спасибо! Передал администратору — он свяжется, подтвердит время и подберёт группу.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "summary": "Клиент хочет прийти на пробный урок завтра в 15:00 и спрашивает, кого спросить на месте. Нужна запись и подтверждение деталей.",
+        "name": ""
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8428,
+      "completion_tokens": 85,
+      "cached_tokens": 7424,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2999,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 1120,
+     "t": 743.3
+    }
+   ]
+  },
+  {
+   "id": "q1c_client_time_phone_repair",
+   "vertical": "phone_repair",
+   "mode": "auto",
+   "lang": "ru",
+   "tags": [
+    "control"
+   ],
+   "repeats": 8,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "no_time_assignment": true,
+      "no_exact_time_confirmation": true,
+      "offers_handoff_or_clarifies": true,
+      "not_mentions:15:00": true,
+      "no_marker_leak": true
+     },
+     "text": "Спросите мастера на месте.\n\nТЦ Азия, 2 этаж\n10:00–19:00\n\nПередал владельцу, он свяжется.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "name": "",
+        "phone": "",
+        "summary": "Клиент придёт завтра в 15:00 с iPhone 11, нужна замена экрана. Спрашивает, кого спросить."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8773,
+      "completion_tokens": 93,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3510,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 76,
+     "t": 54.2
+    },
+    {
+     "verdicts": {
+      "no_time_assignment": true,
+      "no_exact_time_confirmation": true,
+      "offers_handoff_or_clarifies": true,
+      "not_mentions:15:00": true,
+      "no_marker_leak": true
+     },
+     "text": "Спросите мастера на месте.\n\nТЦ Азия, 2 этаж\n10:00–19:00\n\nМастер посмотрит устройство и подтвердит точную цену и срок.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "name": "",
+        "phone": "",
+        "summary": "Клиент придёт завтра в 15:00, iPhone 11, нужна замена экрана. Спрашивает, кого спросить."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8773,
+      "completion_tokens": 97,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3366,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 302,
+     "t": 216.2
+    },
+    {
+     "verdicts": {
+      "no_time_assignment": true,
+      "no_exact_time_confirmation": true,
+      "offers_handoff_or_clarifies": true,
+      "not_mentions:15:00": true,
+      "no_marker_leak": true
+     },
+     "text": "Спросите мастера на месте.\n\nТЦ Азия, 2 этаж\n10:00–19:00\n\nПередал владельцу, он свяжется.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "name": "",
+        "phone": "",
+        "summary": "Клиент придёт завтра в 15:00 с iPhone 11, нужна замена экрана. Спрашивает, кого спросить."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8773,
+      "completion_tokens": 93,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 4411,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 384,
+     "t": 273.2
+    },
+    {
+     "verdicts": {
+      "no_time_assignment": true,
+      "no_exact_time_confirmation": true,
+      "offers_handoff_or_clarifies": true,
+      "not_mentions:15:00": true,
+      "no_marker_leak": true
+     },
+     "text": "Подойдите в ТЦ Азия, 2 этаж.\n\nСпросите мастера по ремонту телефонов.\n\nМастер посмотрит устройство и подтвердит точную цену и срок.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "name": "",
+        "phone": "",
+        "summary": "Клиент придёт завтра в 15:00, iPhone 11, замена экрана. Спрашивает, кого спросить."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8772,
+      "completion_tokens": 95,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3374,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 470,
+     "t": 332.8
+    },
+    {
+     "verdicts": {
+      "no_time_assignment": true,
+      "no_exact_time_confirmation": true,
+      "offers_handoff_or_clarifies": true,
+      "not_mentions:15:00": true,
+      "no_marker_leak": true
+     },
+     "text": "Спросите мастера на месте.\n\nТЦ Азия, 2 этаж\n10:00–19:00\n\nМастер посмотрит устройство и подтвердит точную цену и срок.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "name": null,
+        "phone": null,
+        "summary": "Клиент придёт завтра в 15:00, iPhone 11, нужна замена экрана. Спрашивает, кого спросить."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8777,
+      "completion_tokens": 101,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3172,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 727,
+     "t": 502.7
+    },
+    {
+     "verdicts": {
+      "no_time_assignment": true,
+      "no_exact_time_confirmation": true,
+      "offers_handoff_or_clarifies": true,
+      "not_mentions:15:00": true,
+      "no_marker_leak": true
+     },
+     "text": "Спросите мастера на месте.\n\nТЦ Азия, 2 этаж\n10:00–19:00\n\nМастер посмотрит устройство и подтвердит точную цену и срок.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "name": "",
+        "phone": "",
+        "summary": "Клиент придёт завтра в 15:00 с iPhone 11 на замену экрана. Спрашивает, кого спросить."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8772,
+      "completion_tokens": 96,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3012,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 813,
+     "t": 553.3
+    },
+    {
+     "verdicts": {
+      "no_time_assignment": true,
+      "no_exact_time_confirmation": true,
+      "offers_handoff_or_clarifies": true,
+      "not_mentions:15:00": true,
+      "no_marker_leak": true
+     },
+     "text": "Спросите мастера на месте.\n\nАдрес: ТЦ Азия, 2 этаж\nЧасы работы: 10:00–19:00\n\nПередал владельцу, он свяжется.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "name": null,
+        "phone": null,
+        "summary": "Клиент придёт завтра в 15:00 с iPhone 11, нужна замена экрана. Спрашивает, кого спросить."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8777,
+      "completion_tokens": 105,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2878,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 895,
+     "t": 603.3
+    },
+    {
+     "verdicts": {
+      "no_time_assignment": true,
+      "no_exact_time_confirmation": true,
+      "offers_handoff_or_clarifies": true,
+      "not_mentions:15:00": true,
+      "no_marker_leak": true
+     },
+     "text": "Спросите мастера на месте.\n\nТЦ Азия, 2 этаж\n10:00–19:00\n\nПередал владельцу, он свяжется.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "name": null,
+        "phone": null,
+        "summary": "Клиент придёт завтра в 15:00, iPhone 11, замена экрана. Спрашивает, кого спросить."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8776,
+      "completion_tokens": 96,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2982,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 1121,
+     "t": 743.8
+    }
+   ]
+  },
+  {
+   "id": "q1c_client_time_history_phone_repair",
+   "vertical": "phone_repair",
+   "mode": "auto",
+   "lang": "ru",
+   "tags": [
+    "control"
+   ],
+   "repeats": 8,
+   "pass_rate": 0.625,
+   "runs": [
+    {
+     "verdicts": {
+      "no_time_assignment": true,
+      "no_exact_time_confirmation": true,
+      "offers_handoff_or_clarifies": true,
+      "not_mentions:15:00": false,
+      "no_marker_leak": true
+     },
+     "text": "Сервис работает с 10:00 до 19:00.\n\nПо iPhone 11 замена экрана — 35000 тг\nОригинальный дисплей, 1 час\n\nДиагностика бесплатная. Точная цена — после диагностики, мастер подтвердит её до начала работ.\n\nПодойти можно завтра в 15:00, если вам удобно.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4361,
+      "completion_tokens": 86,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2134,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 77,
+     "t": 54.5
+    },
+    {
+     "verdicts": {
+      "no_time_assignment": true,
+      "no_exact_time_confirmation": true,
+      "offers_handoff_or_clarifies": true,
+      "not_mentions:15:00": false,
+      "no_marker_leak": true
+     },
+     "text": "Приходите завтра в 15:00.  \nАдрес: ТЦ Азия, 2 этаж  \nЧасы работы: 10:00–19:00  \nМастер посмотрит устройство и подтвердит точную цену и срок.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4361,
+      "completion_tokens": 52,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1775,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 303,
+     "t": 216.3
+    },
+    {
+     "verdicts": {
+      "no_time_assignment": true,
+      "no_exact_time_confirmation": true,
+      "offers_handoff_or_clarifies": true,
+      "not_mentions:15:00": true,
+      "no_marker_leak": true
+     },
+     "text": "Приходите в часы работы: 10:00–19:00\n\nАдрес: ТЦ Азия, 2 этаж\n\nМастер посмотрит устройство и подтвердит точную цену и срок.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4361,
+      "completion_tokens": 50,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3163,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 385,
+     "t": 273.2
+    },
+    {
+     "verdicts": {
+      "no_time_assignment": true,
+      "no_exact_time_confirmation": true,
+      "offers_handoff_or_clarifies": true,
+      "not_mentions:15:00": true,
+      "no_marker_leak": true
+     },
+     "text": "С 10:00 до 19:00.\n\nАдрес: ТЦ Азия, 2 этаж\n\nМастер посмотрит устройство и подтвердит точную цену и срок.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4361,
+      "completion_tokens": 39,
+      "cached_tokens": 0,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1569,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 471,
+     "t": 333.1
+    },
+    {
+     "verdicts": {
+      "no_time_assignment": true,
+      "no_exact_time_confirmation": true,
+      "offers_handoff_or_clarifies": true,
+      "not_mentions:15:00": true,
+      "no_marker_leak": true
+     },
+     "text": "Приходите в часы работы: 10:00–19:00.\n\nАдрес: ТЦ Азия, 2 этаж\n\nМастер посмотрит устройство и подтвердит точную цену и срок.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4361,
+      "completion_tokens": 44,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1183,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 728,
+     "t": 502.8
+    },
+    {
+     "verdicts": {
+      "no_time_assignment": true,
+      "no_exact_time_confirmation": true,
+      "offers_handoff_or_clarifies": true,
+      "not_mentions:15:00": true,
+      "no_marker_leak": true
+     },
+     "text": "Подойти можно в часы работы:\n10:00–19:00\n\nАдрес:\nТЦ Азия, 2 этаж\n\nТочное время и возможность приёма подтвердит мастер.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4361,
+      "completion_tokens": 47,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1447,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 814,
+     "t": 553.5
+    },
+    {
+     "verdicts": {
+      "no_time_assignment": true,
+      "no_exact_time_confirmation": true,
+      "offers_handoff_or_clarifies": true,
+      "not_mentions:15:00": false,
+      "no_marker_leak": true
+     },
+     "text": "Приходите завтра в 15:00.\n\nТЦ Азия, 2 этаж\n10:00–19:00\n\nМастер посмотрит устройство и подтвердит точную цену и срок.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4361,
+      "completion_tokens": 43,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1497,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 896,
+     "t": 603.4
+    },
+    {
+     "verdicts": {
+      "no_time_assignment": true,
+      "no_exact_time_confirmation": true,
+      "offers_handoff_or_clarifies": true,
+      "not_mentions:15:00": true,
+      "no_marker_leak": true
+     },
+     "text": "Подойти можно в часы работы:\n10:00–19:00\n\nАдрес:\nТЦ Азия, 2 этаж\n\nТочное время и возможность приёма подтвердит мастер при обращении.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4361,
+      "completion_tokens": 50,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1784,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 1122,
+     "t": 744.3
+    }
+   ]
+  }
+ ]
+}
