@@ -1,0 +1,799 @@
+{
+ "summary": {
+  "label": "v6u-t11-x8-before",
+  "prompts_ref": "661431c9",
+  "scenario_version": "v1.4 (2026-10-12: T11 — Q1 B + V6-unknown: the business turn of a6_/q1p_/q1c_ is the OWNER's reply (role `owner`), except the bot's own reply in q1c_client_time_history_phone_repair; u1_–u4_ — the bot's earlier reply of UNKNOWN delivery (role `bot_unknown`); no_tool:create_handoff on a6_/q1p_ (the c1 lesson), no_marker_leak on every auto scenario; harness h7)",
+  "harness": "h7 (2026-10-12, T11 Q1 B + V6-unknown: scenario roles `owner` / `bot_unknown` rendered with the memory marks the writers store at --prompts-ref (apply-history-handoff.py; none before T6); no_marker_leak, no_tool:<name>, not_says_already, no_delivery_doubt; on top of h6 2026-10-09, Q1: not_mentions:X — X stated in no un-refused clause and not merely quoted as the client's words, for the client-time echo; mentions:H:MM reads a time of day; on top of h5 2026-10-08, V9-r2: no_conflict_claim / no_price_caveat for a price list that AGREES with the catalog; on top of h4 2026-10-07 V9: «расхождение» + negated conflict, zero-price / elliptical free delivery, «итого по N позициям» partial, «нужен» / the car or device by name, a word inside the installment claim, Kazakh = no Russian sentence, «18,000»; h3 2026-09-27 R14; checks pinned by test_checks.py)",
+  "model": "gpt-5.4-mini",
+  "reasoning_effort": null,
+  "dropped_params": [],
+  "panel_model": null,
+  "max_tokens": 200,
+  "search_simulation": "Price List Search sub-workflow (Reconcile Prices at 661431c9)",
+  "memory_marks": {
+   "owner": "",
+   "bot_unknown": ""
+  },
+  "scenarios": 4,
+  "runs": 32,
+  "pass_all": 4,
+  "flaky": 0,
+  "fail": 0,
+  "error_runs": 0,
+  "transport_retries": 0,
+  "finish_reason_length_runs": 0,
+  "prompt_tokens": 137680,
+  "cached_tokens": 128896,
+  "completion_tokens": 733,
+  "reasoning_tokens": 0,
+  "cost_usd_auto_path": 0.0196,
+  "prices_usd_per_1m": [
+   0.75,
+   0.075,
+   4.5
+  ],
+  "latency_ms": {
+   "auto": {
+    "n": 32,
+    "median": 1206,
+    "p90": 1483,
+    "max": 1994
+   },
+   "panel": null
+  },
+  "seconds": 39,
+  "by_check": {
+   "lang_kz": "8/8",
+   "mentions:1500": "8/8",
+   "mentions:3200": "24/24",
+   "no_delivery_doubt": "16/16",
+   "no_free_delivery_claim": "8/8",
+   "no_marker_leak": "32/32",
+   "not_says_already": "16/16"
+  }
+ },
+ "results": [
+  {
+   "id": "u1_unknown_reask",
+   "vertical": "auto_parts",
+   "mode": "auto",
+   "lang": "ru",
+   "tags": [
+    "delivery_unknown"
+   ],
+   "repeats": 8,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "mentions:3200": true,
+      "not_says_already": true,
+      "no_marker_leak": true
+     },
+     "text": "Фильтр масляный Toyota 90915-YZZE1 — 3200 тг.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4300,
+      "completion_tokens": 24,
+      "cached_tokens": 0,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1994,
+     "status": null,
+     "transport_retries": 0
+    },
+    {
+     "verdicts": {
+      "mentions:3200": true,
+      "not_says_already": true,
+      "no_marker_leak": true
+     },
+     "text": "Фильтр масляный Toyota 90915-YZZE1 — 3200 тг.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4300,
+      "completion_tokens": 24,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1321,
+     "status": null,
+     "transport_retries": 0
+    },
+    {
+     "verdicts": {
+      "mentions:3200": true,
+      "not_says_already": true,
+      "no_marker_leak": true
+     },
+     "text": "Фильтр масляный Toyota 90915-YZZE1 — 3200 тг.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4300,
+      "completion_tokens": 24,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1004,
+     "status": null,
+     "transport_retries": 0
+    },
+    {
+     "verdicts": {
+      "mentions:3200": true,
+      "not_says_already": true,
+      "no_marker_leak": true
+     },
+     "text": "Фильтр масляный Toyota 90915-YZZE1 — 3200 тг.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4300,
+      "completion_tokens": 24,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1033,
+     "status": null,
+     "transport_retries": 0
+    },
+    {
+     "verdicts": {
+      "mentions:3200": true,
+      "not_says_already": true,
+      "no_marker_leak": true
+     },
+     "text": "Фильтр масляный Toyota 90915-YZZE1 — 3200 тг.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4300,
+      "completion_tokens": 24,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1319,
+     "status": null,
+     "transport_retries": 0
+    },
+    {
+     "verdicts": {
+      "mentions:3200": true,
+      "not_says_already": true,
+      "no_marker_leak": true
+     },
+     "text": "Да, ответ был: фильтр 90915-YZZE1 — 3200 тг.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4300,
+      "completion_tokens": 24,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1206,
+     "status": null,
+     "transport_retries": 0
+    },
+    {
+     "verdicts": {
+      "mentions:3200": true,
+      "not_says_already": true,
+      "no_marker_leak": true
+     },
+     "text": "Да, ответ был: фильтр 90915-YZZE1 — 3200 тг.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4300,
+      "completion_tokens": 24,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1345,
+     "status": null,
+     "transport_retries": 0
+    },
+    {
+     "verdicts": {
+      "mentions:3200": true,
+      "not_says_already": true,
+      "no_marker_leak": true
+     },
+     "text": "Да, ответ отправил: фильтр 90915-YZZE1 — 3200 тг.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4300,
+      "completion_tokens": 25,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1370,
+     "status": null,
+     "transport_retries": 0
+    }
+   ]
+  },
+  {
+   "id": "u2_unknown_new_question",
+   "vertical": "auto_parts",
+   "mode": "auto",
+   "lang": "ru",
+   "tags": [
+    "delivery_unknown"
+   ],
+   "repeats": 8,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "no_delivery_doubt": true,
+      "no_marker_leak": true,
+      "mentions:1500": true,
+      "no_free_delivery_claim": true
+     },
+     "text": "Да, доставка по городу есть — от 1500 тг.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4303,
+      "completion_tokens": 18,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1051,
+     "status": null,
+     "transport_retries": 0
+    },
+    {
+     "verdicts": {
+      "no_delivery_doubt": true,
+      "no_marker_leak": true,
+      "mentions:1500": true,
+      "no_free_delivery_claim": true
+     },
+     "text": "Да, доставка по городу есть — от 1500 тг.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4303,
+      "completion_tokens": 18,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1046,
+     "status": null,
+     "transport_retries": 0
+    },
+    {
+     "verdicts": {
+      "no_delivery_doubt": true,
+      "no_marker_leak": true,
+      "mentions:1500": true,
+      "no_free_delivery_claim": true
+     },
+     "text": "Да, доставка по городу есть — от 1500 тг.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4303,
+      "completion_tokens": 18,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1320,
+     "status": null,
+     "transport_retries": 0
+    },
+    {
+     "verdicts": {
+      "no_delivery_doubt": true,
+      "no_marker_leak": true,
+      "mentions:1500": true,
+      "no_free_delivery_claim": true
+     },
+     "text": "Да, доставка по городу есть — от 1500 тг.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4303,
+      "completion_tokens": 18,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 977,
+     "status": null,
+     "transport_retries": 0
+    },
+    {
+     "verdicts": {
+      "no_delivery_doubt": true,
+      "no_marker_leak": true,
+      "mentions:1500": true,
+      "no_free_delivery_claim": true
+     },
+     "text": "Да, доставка по городу есть — от 1500 тг.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4303,
+      "completion_tokens": 18,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 958,
+     "status": null,
+     "transport_retries": 0
+    },
+    {
+     "verdicts": {
+      "no_delivery_doubt": true,
+      "no_marker_leak": true,
+      "mentions:1500": true,
+      "no_free_delivery_claim": true
+     },
+     "text": "Да, доставка по городу есть — от 1500 тг.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4303,
+      "completion_tokens": 18,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 952,
+     "status": null,
+     "transport_retries": 0
+    },
+    {
+     "verdicts": {
+      "no_delivery_doubt": true,
+      "no_marker_leak": true,
+      "mentions:1500": true,
+      "no_free_delivery_claim": true
+     },
+     "text": "Да, доставка по городу есть — от 1500 тг.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4303,
+      "completion_tokens": 18,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1150,
+     "status": null,
+     "transport_retries": 0
+    },
+    {
+     "verdicts": {
+      "no_delivery_doubt": true,
+      "no_marker_leak": true,
+      "mentions:1500": true,
+      "no_free_delivery_claim": true
+     },
+     "text": "Да, доставка по городу есть — от 1500 тг.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4303,
+      "completion_tokens": 18,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1030,
+     "status": null,
+     "transport_retries": 0
+    }
+   ]
+  },
+  {
+   "id": "u3_sent_control",
+   "vertical": "auto_parts",
+   "mode": "auto",
+   "lang": "ru",
+   "tags": [
+    "delivery_unknown",
+    "control"
+   ],
+   "repeats": 8,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "no_delivery_doubt": true,
+      "no_marker_leak": true,
+      "mentions:3200": true
+     },
+     "text": "Фильтр масляный Toyota 90915-YZZE1 — 3200 тг.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4300,
+      "completion_tokens": 24,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1149,
+     "status": null,
+     "transport_retries": 0
+    },
+    {
+     "verdicts": {
+      "no_delivery_doubt": true,
+      "no_marker_leak": true,
+      "mentions:3200": true
+     },
+     "text": "Фильтр 90915-YZZE1 — 3200 тг.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4300,
+      "completion_tokens": 20,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1038,
+     "status": null,
+     "transport_retries": 0
+    },
+    {
+     "verdicts": {
+      "no_delivery_doubt": true,
+      "no_marker_leak": true,
+      "mentions:3200": true
+     },
+     "text": "Фильтр масляный Toyota 90915-YZZE1 — 3200 тг.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4300,
+      "completion_tokens": 24,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1082,
+     "status": null,
+     "transport_retries": 0
+    },
+    {
+     "verdicts": {
+      "no_delivery_doubt": true,
+      "no_marker_leak": true,
+      "mentions:3200": true
+     },
+     "text": "Фильтр 90915-YZZE1 — 3200 тг.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4300,
+      "completion_tokens": 20,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1026,
+     "status": null,
+     "transport_retries": 0
+    },
+    {
+     "verdicts": {
+      "no_delivery_doubt": true,
+      "no_marker_leak": true,
+      "mentions:3200": true
+     },
+     "text": "Да, ответил: фильтр 90915-YZZE1 — 3200 тг.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4300,
+      "completion_tokens": 24,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1020,
+     "status": null,
+     "transport_retries": 0
+    },
+    {
+     "verdicts": {
+      "no_delivery_doubt": true,
+      "no_marker_leak": true,
+      "mentions:3200": true
+     },
+     "text": "Фильтр 90915-YZZE1 — 3200 тг.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4300,
+      "completion_tokens": 20,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1282,
+     "status": null,
+     "transport_retries": 0
+    },
+    {
+     "verdicts": {
+      "no_delivery_doubt": true,
+      "no_marker_leak": true,
+      "mentions:3200": true
+     },
+     "text": "Фильтр 90915-YZZE1 — 3200 тг.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4300,
+      "completion_tokens": 20,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1712,
+     "status": null,
+     "transport_retries": 0
+    },
+    {
+     "verdicts": {
+      "no_delivery_doubt": true,
+      "no_marker_leak": true,
+      "mentions:3200": true
+     },
+     "text": "Фильтр 90915-YZZE1 — 3200 тг.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4300,
+      "completion_tokens": 20,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1020,
+     "status": null,
+     "transport_retries": 0
+    }
+   ]
+  },
+  {
+   "id": "u4_kz_unknown",
+   "vertical": "auto_parts",
+   "mode": "auto",
+   "lang": "kz",
+   "tags": [
+    "delivery_unknown",
+    "lang"
+   ],
+   "repeats": 8,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "mentions:3200": true,
+      "not_says_already": true,
+      "no_marker_leak": true,
+      "lang_kz": true
+     },
+     "text": "Иә, жауап бердім: 90915-YZZE1 сүзгісі — 3200 тг.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4307,
+      "completion_tokens": 28,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1138,
+     "status": null,
+     "transport_retries": 0
+    },
+    {
+     "verdicts": {
+      "mentions:3200": true,
+      "not_says_already": true,
+      "no_marker_leak": true,
+      "lang_kz": true
+     },
+     "text": "Иә, жауап бердім: 90915-YZZE1 сүзгісі — 3200 тг.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4307,
+      "completion_tokens": 28,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1483,
+     "status": null,
+     "transport_retries": 0
+    },
+    {
+     "verdicts": {
+      "mentions:3200": true,
+      "not_says_already": true,
+      "no_marker_leak": true,
+      "lang_kz": true
+     },
+     "text": "Иә, жауап бердім: 90915-YZZE1 сүзгісі — 3200 тг.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4307,
+      "completion_tokens": 28,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1446,
+     "status": null,
+     "transport_retries": 0
+    },
+    {
+     "verdicts": {
+      "mentions:3200": true,
+      "not_says_already": true,
+      "no_marker_leak": true,
+      "lang_kz": true
+     },
+     "text": "Иә, жауап бердім: 90915-YZZE1 сүзгісі — 3200 тг.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4307,
+      "completion_tokens": 28,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1509,
+     "status": null,
+     "transport_retries": 0
+    },
+    {
+     "verdicts": {
+      "mentions:3200": true,
+      "not_says_already": true,
+      "no_marker_leak": true,
+      "lang_kz": true
+     },
+     "text": "Иә, жауап бердім: 90915-YZZE1 сүзгісі — 3200 тг.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4307,
+      "completion_tokens": 28,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1258,
+     "status": null,
+     "transport_retries": 0
+    },
+    {
+     "verdicts": {
+      "mentions:3200": true,
+      "not_says_already": true,
+      "no_marker_leak": true,
+      "lang_kz": true
+     },
+     "text": "Иә, жауап бердім: 90915-YZZE1 сүзгісі — 3200 тг.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4307,
+      "completion_tokens": 28,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1427,
+     "status": null,
+     "transport_retries": 0
+    },
+    {
+     "verdicts": {
+      "mentions:3200": true,
+      "not_says_already": true,
+      "no_marker_leak": true,
+      "lang_kz": true
+     },
+     "text": "Иә, жауап бердім: 90915-YZZE1 сүзгісі — 3200 тг.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4307,
+      "completion_tokens": 28,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1305,
+     "status": null,
+     "transport_retries": 0
+    },
+    {
+     "verdicts": {
+      "mentions:3200": true,
+      "not_says_already": true,
+      "no_marker_leak": true,
+      "lang_kz": true
+     },
+     "text": "Иә, жауап бердім: 90915-YZZE1 сүзгісі — 3200 тг.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4307,
+      "completion_tokens": 28,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1208,
+     "status": null,
+     "transport_retries": 0
+    }
+   ]
+  }
+ ]
+}
