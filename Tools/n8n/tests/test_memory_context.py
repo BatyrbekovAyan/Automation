@@ -14,6 +14,10 @@ read exactly like a delivered one (V6-unknown). Contract (plan §4.1–4.2):
     bot's own memory row is stored without it (Stamp Draft — tests/test_reply_memory.py);
   * the «Сводка» classifier labels rows by source and therefore reads the content WITHOUT the marks (no
     «Владелец: Владелец:», no «[доставка не подтверждена]» in a «Бот:» line).
+T11d (owner decision 2026-10-12, evidence/Q1B3-measure.txt §6): the rule that explains the marks to the model is B plus
+the re-ask guard («Клиент просто переспрашивает — это не новый заказ: …») right after «повтори её как есть», in every
+copy the model reads — _core.md → the Create/Edit WA/TG maps → a Create-composed clone, and the templates'
+##memory_marks## block → the system message the model receives.
 
 Rows are written by the REAL writers — the proxy's Record Owner Send, the templates' Record Outgoing (owner_phone),
 the chain Claim → Stamp Draft → Final Check → Acquire Send Lease → Settle → Record Send (reply_chain.Run) — on session
@@ -312,5 +316,94 @@ with Case('T6 tripwires: the verifiers accept the canonical exports and reject e
             c.check(not ok, f'verify-history-handoff accepted: {label}')
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
+
+
+# ---------------------------------------------------------------------------------------------------------- T11d
+# Owner decision 2026-10-12 (third, after T11c — evidence/Q1B3-measure.txt §6): ship the T11c candidate. The memory-marks
+# rule of B gains ONE sentence, the re-ask guard, right after «повтори её как есть» (the sentence it qualifies — lesson c1,
+# evidence/Q1c-measure.txt); T11b's anti-echo sentence stays OUT. The rule text is the contract (spelled out here, like
+# OWNER / UNDELIVERED above), and every copy the model can read must carry it exactly once:
+#   * the generator's constant (apply-history-handoff.MEMORY_MARKS_TEXT);
+#   * _core.md «Память» → every vertical of the Create/Edit WA/TG maps (inject-prompts.py) → the system message a
+#     Create-composed clone carries (staging/vertical-bots.py composes it the way Create's Set Fields does);
+#   * the templates' ##memory_marks## block (bots with an empty / legacy business type) → the system message the model
+#     receives, as the staging n8n's LangChain classes hand it over (the memory_context.js view of the T6 cases above).
+RULE_HEAD = ('Реплики, которые начинаются с «Владелец:», написал сам владелец: названные в них день, время, место или человек — '
+             'подтверждённая договорённость; клиент переспрашивает — повтори её как есть.')
+REASK_GUARD = 'Клиент просто переспрашивает — это не новый заказ: ничего заново не оформляй и владельцу не передавай.'
+RULE_V6 = ('Твой прежний ответ с пометкой «[доставка не подтверждена]» мог не дойти до клиента: не ссылайся на него как на уже '
+           'прочитанный, а если клиент переспрашивает или пишет, что ответа не было, ответь заново по существу. '
+           'Сами эти пометки в ответах не пиши.')
+RULE = RULE_HEAD + ' ' + REASK_GUARD + ' ' + RULE_V6
+RULE_B = RULE_HEAD + ' ' + RULE_V6                       # T6 canon until T11d: no guard
+ANTI_ECHO = 'Время, которое назвал сам клиент, договорённостью не становится, пока бизнес не написал это время сам.'  # T11b, not shipped
+
+
+def rule_findings(texts):
+    """{label: text the model reads} → what is wrong with the memory-marks rule in it (empty = the owner's decision)."""
+    bad = []
+    for label, text in texts.items():
+        if text.count(RULE) != 1:
+            bad.append(f'{label}: the rule with the re-ask guard occurs {text.count(RULE)}× (want exactly once)')
+        if RULE_B in text:
+            bad.append(f'{label}: carries the rule WITHOUT the re-ask guard (T6 text)')
+        if text.count(REASK_GUARD) != 1:
+            bad.append(f'{label}: the re-ask guard occurs {text.count(REASK_GUARD)}×')
+        if ANTI_ECHO in text:
+            bad.append(f'{label}: carries T11b\'s anti-echo sentence (not part of the decision)')
+    return bad
+
+
+IP = module('inject-prompts.py')
+MAPS = ('XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json', 'Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json',
+        '3qax5J9u2qsT9Vao-Edit_Whatsapp_Workflow.json', 'TwWPW3gIyjZS3foR-Edit_Telegram_Workflow.json')
+
+
+def map_texts(fname, w=None):
+    prompts = IP.prompts_of_workflow(w if w is not None else wf(fname)) or {}
+    return {f'{fname}/{v}': prompts.get(v, '') for v in IP.VERTICALS}
+
+
+with Case('T11d the rule is the owner\'s decision: B + the re-ask guard right after «повтори её как есть», no anti-echo') as c:
+    c.check(HH.MEMORY_MARKS_TEXT == RULE, f'MEMORY_MARKS_TEXT={HH.MEMORY_MARKS_TEXT!r}')
+    c.check(HH.MEMORY_MARKS_RULE == '\n\n##memory_marks##\n' + RULE, 'the ##memory_marks## block must carry the same text')
+    core = (N8N / 'prompts' / '_core.md').read_text(encoding='utf-8')
+    para = [line for line in core.splitlines() if line.startswith('Память.')]
+    c.check(len(para) == 1 and para[0].endswith(' ' + RULE), f'_core.md «Память» paragraph={para}')
+    c.check(not rule_findings({'_core.md': core}), rule_findings({'_core.md': core}))
+
+with Case('T11d every Create/Edit map (WA + TG, all 6 verticals) and every Create-composed clone carries the decided rule once') as c:
+    for fname in MAPS:
+        texts = map_texts(fname)
+        c.check(all(texts.values()), f'{fname}: verticals missing from the PROMPTS map: {[k for k, v in texts.items() if not v]}')
+        c.check(not rule_findings(texts), rule_findings(texts))
+    VB = module('staging/vertical-bots.py')
+    for v in IP.VERTICALS:
+        composed, _ = VB.compose_prompt(v, 'worktree')
+        c.check(not rule_findings({f'Create-composed {v}': composed}), rule_findings({f'Create-composed {v}': composed}))
+
+for ch, T in TEMPLATES.items():
+    with Case(f'T11d [{ch}] the template prompt ends with the decided rule, and that is the system message the model receives') as c:
+        sm = system_message(T)
+        c.check(sm.endswith('\n\n##memory_marks##\n' + RULE) and sm.count('##memory_marks##') == 1, f'template prompt tail={sm[-400:]!r}')
+        c.check(not rule_findings({f'{ch} template': sm}), rule_findings({f'{ch} template': sm}))
+        seen = (VIEWS.get(ch, {}).get('modelMessages') or [{}])[0]     # the converter sends it as the developer turn
+        c.check(seen.get('role') in ('system', 'developer') and str(seen.get('content', '')).rstrip().endswith(RULE)
+                and not rule_findings({f'{ch} model system message': str(seen.get('content', ''))}),
+                f'the model\'s system message: role={seen.get("role")!r} tail={str(seen.get("content", ""))[-300:]!r}')
+
+with Case('T11d negative: the check rejects the T6 rule, a missing guard, a doubled rule and T11b\'s anti-echo — and a mutated map') as c:
+    c.check(rule_findings({'T6 rule': 'Память. … ' + RULE_B}), 'the T6 rule (no guard) must be rejected')
+    c.check(rule_findings({'guard after V6': RULE_B + ' ' + REASK_GUARD}), 'the guard detached from «как есть» must be rejected')
+    c.check(rule_findings({'twice': RULE + ' ' + RULE}), 'a doubled rule must be rejected')
+    c.check(rule_findings({'T11b': RULE_HEAD + ' ' + ANTI_ECHO + ' ' + REASK_GUARD + ' ' + RULE_V6}), 'T11b\'s text must be rejected')
+    c.check(not rule_findings({'decided': 'Память. … ' + RULE}), 'the decided rule must be accepted')
+    w = wf(MAPS[1])
+    n = _node_of(w, 'Vertical Prompt')
+    js = n['parameters']['jsCode']
+    n['parameters']['jsCode'] = js.replace(json.dumps(REASK_GUARD + ' ', ensure_ascii=False)[1:-1], '', 1)
+    c.check(n['parameters']['jsCode'] != js, 'the mutation (strip the guard from one vertical) did not apply — the canon map has no guard')
+    bad = rule_findings(map_texts(MAPS[1], w))
+    c.check(len(bad) >= 1 and all('/' in b for b in bad), f'a Create TG map with one vertical stripped of the guard must be rejected: {bad}')
 
 report()

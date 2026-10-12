@@ -422,3 +422,76 @@ v1.5 — без изменений (§0.5). Прод не тронут.
       этому замеру); тот же план q1b3.json с рукой B.
   (4) §4.6 (а) — B1: писатели, стражи, V6 и бэкфилл без Q1-части фразы. Остаётся только предложение V6. Q1 тогда не
       решён. Не измерялся.
+
+==== 6. РЕШЕНИЕ ВЛАДЕЛЬЦА (2026-10-12, третье) И ПРОВЕРКИ ПОСЛЕ ПЕРЕНОСА В КАНОН (T11d)
+
+6.0 Решение владельца 2026-10-12 — дословно, как передано в постановке T11d:
+    «Выложить кандидат T11c» — вариант (2) из §5.
+  Вердикт §3 не меняется: по зафиксированным критериям кандидат НЕ принят (не выполнены К7, К8, К10). Владелец выкладывает его
+  вопреки вердикту и принимает задокументированную цену (§3, §4, §5 (2)):
+    - лишний create_handoff на НОВЫЙ вопрос после ответа с неизвестной доставкой: u2_unknown_new_question 0/11 → 10/11
+      («Доставка по городу есть, от 1500 тг. Передал владельцу, он свяжется.»). Ветка редкая — нужен send_unknown, но на живом
+      боте это заявка и пауза чата;
+    - эхо клиентского времени на q1c_client_time_history_phone_repair: 5/8 против 1/8 у прода (B — 0/8);
+    - одна утечка ведущей пометки «Владелец:» на 534 прогона («Владелец: склад на ул. Складская 5, спросить Бекзата.»). На живом
+      боте её срезают стражи T6: Final Check — с отправляемого текста, Stamp Draft — со строки памяти.
+  Что кандидат даёт (§3, §4, то же окно): опт без лишних передач (ws_kz_min_order 0/10 против 9/10 у B), q1p_pickup_auto_parts
+  8/8 → 0/8 передач, a6 11/24 → 24/24, перефразы 6/48 → 36/48, казахский в этом окне не хуже прода (сумма 7 KZ: 70 → 77 из 110).
+  Платных прогонов оценщика в T11d нет; новых чисел замера нет — всё выше в §1–§4. Модель вызывалась только в staging A6 (6.3):
+  9 прогонов, центы.
+
+6.1 Перенос в канон — только генераторами (полный вывод: evidence/T11d-after.txt §1–§2):
+  - prompts/_core.md, абзац «Память» → inject-prompts.py → карты PROMPTS в Create/Edit WA/TG (все 6 ниш);
+  - apply-history-handoff.py MEMORY_MARKS_TEXT → блок ##memory_marks## в хвосте собственного промпта шаблонов WA/TG;
+  - у обоих генераторов: --check до применения rc=2, применение rc=0, второй прогон без диффа, --check rc=0;
+  - inject-prompts.py — полный --check с assert_token_floor (tiktoken ~/.venvs/tiktoken): минимум 3733 ≥ 2300 (education; у B —
+    3705), как в T11c §1.
+  Сверка с измеренным патчем wip/Q1B3-candidate.patch (sha256 0bd09edbaf135…): _core.md и все 6 workflow JSON (Create/Edit WA/TG,
+  шаблоны WA/TG) совпадают с патчем байт в байт. В apply-history-handoff.py — те же строки плюс две строки комментария (T11d).
+  Значит, в каноне ровно тот текст, который мерили как «после» в §1–§3.
+
+6.2 Поведенческий тест — новый блок T11d в Tools/n8n/tests/test_memory_context.py. Правило = текст B + защита переспроса сразу
+  после «повтори её как есть», без анти-эха T11b. Проверяется в каждой копии, которую читает модель:
+    - в константе генератора и в абзаце «Память» _core.md;
+    - во всех 6 нишах четырёх карт Create/Edit WA/TG;
+    - в системном сообщении клона, собранного как Create (staging/vertical-bots.py compose_prompt, все 6 ниш);
+    - в хвосте промпта шаблонов WA и TG и в системном сообщении, которое получает модель (вид memory_context.js — классы
+      LangChain staging n8n, роль developer).
+  Негатив: проверка отклоняет правило T6 без защиты, защиту после предложения V6, двойное правило, текст T11b и карту Create TG,
+  у которой в одной нише снята защита.
+  До (HEAD 358a5115): 20 pass, 5 fail — все пять FAIL в блоке T11d (evidence/T11d-before.txt). После: 25 pass, 0 fail.
+
+6.3 Проверки после переноса (полный вывод — evidence/T11d-after.txt):
+  - генераторы --check: 15 генераторов rc=0 + inject-prompts.py полный rc=0;
+  - верификаторы history-handoff, reply-pipeline, telegram-parity, auth-gate, message-batching, reply-mode, clone-lifecycle,
+    sql-comments, panel-prompts, verify_rag all — rc=0;
+  - тесты: test_memory_context 25/0, test_verify_parity 52/0, test_reply_memory 56/0, test_reply_memory_concurrent 9/0;
+    eval: test_checks 53 OK, test_schedule 19 OK, test_search_ref 4 OK, Q1-eval/test_q1b3report 11 OK;
+  - tests/run_all.py: 31/31 OK, rc=0 (18:22–19:14; test_memory_context 25/0);
+  - staging (n8n 2.36.7, Wappi mock, staging Postgres):
+      bootstrap.py --bot wa:stgwa001 --bot tg:stgtg001 из нового канона → verify-deployed rc=0 (canonical 27, diff 0);
+      e2e-handoff bot_knows_owner_agreement_after_auto_resumes [llm] ×3 на штатных клонах (промпт шаблона, ##memory_marks##):
+        3/3 PASS — «Завтра в 15:00, спросите Марину.» (2), «Завтра в 15:00, спросить Марину.»;
+      model-free, один раз: outgoing_phone_recorded[wa|tg], proxy_send_records_owner_app_row[wa|tg] (строка памяти владельца
+        начинается с «Владелец: »), lost_send_settled_by_notifier (черновик умершего прогона → unknown + «[доставка не
+        подтверждена] », WA и TG) — 5/5 PASS;
+      vertical-bots.py --vertical education → verify-deployed rc=0, prompt=at_canonical/education (голова клона = новая
+        карта) → A6 ×3: 3/3 PASS, «Завтра в 15:00, спросите Марину.» (3);
+      vertical-bots.py --vertical phone_repair → verify-deployed rc=0, prompt=at_canonical/phone_repair → A6 ×3: 3/3 PASS,
+        «Завтра в 15:00, спросите Марину.» (2), «Завтра в 15:00, спросить Марину.»;
+      во всех 9 прогонах память содержит «ai/owner_phone: Владелец: Да, конечно. Завтра в 15:00 …», ответ не говорит о
+        передаче владельцу;
+      обратно: bootstrap.py --bot wa:stgwa001 --bot tg:stgtg001 → verify-deployed rc=0.
+  A6 — только WhatsApp: так устроен сценарий. Модельный вход на обоих каналах одинаков: карты Create WA/TG и блоки шаблонов
+  WA/TG несут одно правило (test_memory_context T11d, verify-telegram-parity). Писатели TG закреплены детерминированными тестами
+  T6/T10 и model-free e2e выше.
+
+6.4 Что остаётся:
+  - цена, принятая владельцем (6.0): она не исправлялась;
+  - остатки плана §4.4: относительные даты, цена владельца против каталога, дошедший unknown остаётся с пометкой, поздняя
+    запись owner_app.
+  Выкладка — только по отдельному «да» владельца, пакет — T12:
+    - Create/Edit WA/TG и шаблоны WA/TG через deploy-canonical.py;
+    - затем update-clones.py: головы клонов станут PROMPT-BEHIND и обновятся, хвосты владельцев сохранятся. Живые клоны
+      проверить инвентарём инструмента перед выкладкой.
+  Кандидат в каноне: коммит «feat(memory-marks): T11d — …».

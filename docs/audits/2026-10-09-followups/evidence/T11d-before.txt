@@ -1,0 +1,53 @@
+T11d — поведенческий тест ДО переноса кандидата в канон (2026-10-12). HEAD 358a5115 (канон = B), рабочее дерево по Tools/n8n = HEAD + новый блок T11d в tests/test_memory_context.py.
+Ожидание: пять случаев T11d FAIL (правила с защитой переспроса нет ни в одной копии), случаи T6 — PASS.
+
+=== python3 Tools/n8n/tests/test_memory_context.py ===
+PASS T6 the marks are ONE contract: apply-history-handoff's constants equal the plan's strings
+PASS T6 [WA] the memory class reads the rows with the statement the test ran (fidelity of the model view)
+PASS T6 [WA] Q1 B: the owner's replies reach the model as «Владелец: …» (from the app AND from the phone)
+PASS T6 [WA] V6-unknown: a reply with unknown delivery carries «[доставка не подтверждена]», a sent one is verbatim, a refused one is gone
+PASS T6 [WA] the whole conversation, in order: client rows unchanged, nothing else marked
+PASS T6 [WA] the one history (what the app shows) carries no marks: ai / owner bodies as sent
+PASS T6 [TG] the memory class reads the rows with the statement the test ran (fidelity of the model view)
+PASS T6 [TG] Q1 B: the owner's replies reach the model as «Владелец: …» (from the app AND from the phone)
+PASS T6 [TG] V6-unknown: a reply with unknown delivery carries «[доставка не подтверждена]», a sent one is verbatim, a refused one is gone
+PASS T6 [TG] the whole conversation, in order: client rows unchanged, nothing else marked
+PASS T6 [TG] the one history (what the app shows) carries no marks: ai / owner bodies as sent
+PASS T6 [WA] Final Check: a reply the model opens with a memory mark goes out WITHOUT it (send body, history, reconcile)
+PASS T6 [WA] Final Check: a mark that does not OPEN the reply, or the bare word, is the reply's own text — kept
+PASS T6 [WA] Final Check: a reply that is ONLY a mark is no reply (generation_failed, nothing sent)
+PASS T6 [TG] Final Check: a reply the model opens with a memory mark goes out WITHOUT it (send body, history, reconcile)
+PASS T6 [TG] Final Check: a mark that does not OPEN the reply, or the bare word, is the reply's own text — kept
+PASS T6 [TG] Final Check: a reply that is ONLY a mark is no reply (generation_failed, nothing sent)
+PASS T6 [WA] «Сводка» transcript: one «Владелец:» per owner row, the bot's lines without «[доставка не подтверждена]»
+PASS T6 [TG] «Сводка» transcript: one «Владелец:» per owner row, the bot's lines without «[доставка не подтверждена]»
+PASS T6 tripwires: the verifiers accept the canonical exports and reject every writer without its mark
+FAIL T11d the rule is the owner's decision: B + the re-ask guard right after «повтори её как есть», no anti-echo
+      - MEMORY_MARKS_TEXT='Реплики, которые начинаются с «Владелец:», написал сам владелец: названные в них день, время, место или человек — подтверждённая договорённость; клиент переспрашивает — повтори её как есть. Твой прежний ответ с пометкой «[доставка не подтверждена]» мог не дойти до клиента: не ссылайся на него как на уже прочитанный, а если клиент переспрашивает или пишет, что ответа не было, ответь заново по существу. Сами эти пометки в ответах не пиши.'
+      - the ##memory_marks## block must carry the same text
+      - _core.md «Память» paragraph=['Память. Chat Memory хранит переписку этого чата: сообщения клиента, твои ответы и ответы владельца, когда они прошли через приложение или телефон. Веди диалог с учётом контекста; чего в памяти нет — не утверждай, что этого не было, а уточни. Реплики, которые начинаются с «Владелец:», написал сам владелец: названные в них день, время, место или человек — подтверждённая договорённость; клиент переспрашивает — повтори её как есть. Твой прежний ответ с пометкой «[доставка не подтверждена]» мог не дойти до клиента: не ссылайся на него как на уже прочитанный, а если кли
+      - ['_core.md: the rule with the re-ask guard occurs 0× (want exactly once)', '_core.md: carries the rule WITHOUT the re-ask guard (T6 text)', '_core.md: the re-ask guard occurs 0×']
+FAIL T11d every Create/Edit map (WA + TG, all 6 verticals) and every Create-composed clone carries the decided rule once
+      - ['XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json/auto_parts: the rule with the re-ask guard occurs 0× (want exactly once)', 'XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json/auto_parts: carries the rule WITHOUT the re-ask guard (T6 text)', 'XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json/auto_parts: the re-ask guard occurs 0×', 'XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json/wholesale: the rule with the re-ask guard occurs 0× (want exactly once)', 'XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json/wholesale: carries the rule WITHOUT the re-ask guard (T6 text)', 'XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json/wh
+      - ['Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json/auto_parts: the rule with the re-ask guard occurs 0× (want exactly once)', 'Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json/auto_parts: carries the rule WITHOUT the re-ask guard (T6 text)', 'Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json/auto_parts: the re-ask guard occurs 0×', 'Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json/wholesale: the rule with the re-ask guard occurs 0× (want exactly once)', 'Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json/wholesale: carries the rule WITHOUT the re-ask guard (T6 text)', 'Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json/wh
+      - ['3qax5J9u2qsT9Vao-Edit_Whatsapp_Workflow.json/auto_parts: the rule with the re-ask guard occurs 0× (want exactly once)', '3qax5J9u2qsT9Vao-Edit_Whatsapp_Workflow.json/auto_parts: carries the rule WITHOUT the re-ask guard (T6 text)', '3qax5J9u2qsT9Vao-Edit_Whatsapp_Workflow.json/auto_parts: the re-ask guard occurs 0×', '3qax5J9u2qsT9Vao-Edit_Whatsapp_Workflow.json/wholesale: the rule with the re-ask guard occurs 0× (want exactly once)', '3qax5J9u2qsT9Vao-Edit_Whatsapp_Workflow.json/wholesale: carries the rule WITHOUT the re-ask guard (T6 text)', '3qax5J9u2qsT9Vao-Edit_Whatsapp_Workflow.json/wh
+      - ['TwWPW3gIyjZS3foR-Edit_Telegram_Workflow.json/auto_parts: the rule with the re-ask guard occurs 0× (want exactly once)', 'TwWPW3gIyjZS3foR-Edit_Telegram_Workflow.json/auto_parts: carries the rule WITHOUT the re-ask guard (T6 text)', 'TwWPW3gIyjZS3foR-Edit_Telegram_Workflow.json/auto_parts: the re-ask guard occurs 0×', 'TwWPW3gIyjZS3foR-Edit_Telegram_Workflow.json/wholesale: the rule with the re-ask guard occurs 0× (want exactly once)', 'TwWPW3gIyjZS3foR-Edit_Telegram_Workflow.json/wholesale: carries the rule WITHOUT the re-ask guard (T6 text)', 'TwWPW3gIyjZS3foR-Edit_Telegram_Workflow.json/wh
+      - ['Create-composed auto_parts: the rule with the re-ask guard occurs 0× (want exactly once)', 'Create-composed auto_parts: carries the rule WITHOUT the re-ask guard (T6 text)', 'Create-composed auto_parts: the re-ask guard occurs 0×']
+      - ['Create-composed wholesale: the rule with the re-ask guard occurs 0× (want exactly once)', 'Create-composed wholesale: carries the rule WITHOUT the re-ask guard (T6 text)', 'Create-composed wholesale: the re-ask guard occurs 0×']
+      - ['Create-composed flowers: the rule with the re-ask guard occurs 0× (want exactly once)', 'Create-composed flowers: carries the rule WITHOUT the re-ask guard (T6 text)', 'Create-composed flowers: the re-ask guard occurs 0×']
+      - ['Create-composed kaspi_seller: the rule with the re-ask guard occurs 0× (want exactly once)', 'Create-composed kaspi_seller: carries the rule WITHOUT the re-ask guard (T6 text)', 'Create-composed kaspi_seller: the re-ask guard occurs 0×']
+      - ['Create-composed education: the rule with the re-ask guard occurs 0× (want exactly once)', 'Create-composed education: carries the rule WITHOUT the re-ask guard (T6 text)', 'Create-composed education: the re-ask guard occurs 0×']
+      - ['Create-composed phone_repair: the rule with the re-ask guard occurs 0× (want exactly once)', 'Create-composed phone_repair: carries the rule WITHOUT the re-ask guard (T6 text)', 'Create-composed phone_repair: the re-ask guard occurs 0×']
+FAIL T11d [WA] the template prompt ends with the decided rule, and that is the system message the model receives
+      - template prompt tail='», написал сам владелец: названные в них день, время, место или человек — подтверждённая договорённость; клиент переспрашивает — повтори её как есть. Твой прежний ответ с пометкой «[доставка не подтверждена]» мог не дойти до клиента: не ссылайся на него как на уже прочитанный, а если клиент переспрашивает или пишет, что ответа не было, ответь заново по существу. Сами эти пометки в ответах не пиши.'
+      - ['WA template: the rule with the re-ask guard occurs 0× (want exactly once)', 'WA template: carries the rule WITHOUT the re-ask guard (T6 text)', 'WA template: the re-ask guard occurs 0×']
+      - the model's system message: role='developer' tail='сть; клиент переспрашивает — повтори её как есть. Твой прежний ответ с пометкой «[доставка не подтверждена]» мог не дойти до клиента: не ссылайся на него как на уже прочитанный, а если клиент переспрашивает или пишет, что ответа не было, ответь заново по существу. Сами эти пометки в ответах не пиши.'
+FAIL T11d [TG] the template prompt ends with the decided rule, and that is the system message the model receives
+      - template prompt tail='», написал сам владелец: названные в них день, время, место или человек — подтверждённая договорённость; клиент переспрашивает — повтори её как есть. Твой прежний ответ с пометкой «[доставка не подтверждена]» мог не дойти до клиента: не ссылайся на него как на уже прочитанный, а если клиент переспрашивает или пишет, что ответа не было, ответь заново по существу. Сами эти пометки в ответах не пиши.'
+      - ['TG template: the rule with the re-ask guard occurs 0× (want exactly once)', 'TG template: carries the rule WITHOUT the re-ask guard (T6 text)', 'TG template: the re-ask guard occurs 0×']
+      - the model's system message: role='developer' tail='сть; клиент переспрашивает — повтори её как есть. Твой прежний ответ с пометкой «[доставка не подтверждена]» мог не дойти до клиента: не ссылайся на него как на уже прочитанный, а если клиент переспрашивает или пишет, что ответа не было, ответь заново по существу. Сами эти пометки в ответах не пиши.'
+FAIL T11d negative: the check rejects the T6 rule, a missing guard, a doubled rule and T11b's anti-echo — and a mutated map
+      - the mutation (strip the guard from one vertical) did not apply — the canon map has no guard
+
+20 pass, 5 fail
+rc=1

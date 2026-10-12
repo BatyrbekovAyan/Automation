@@ -67,8 +67,11 @@ MEMORY_MARKS_LEAD_RE = r"^(\s*([Вв]ладелец\s*:|\[\s*[Дд]оставк�
 # The one rule the model gets for both marks (plan §4.3): appended to the «Память» paragraph of prompts/_core.md (the
 # Create/Edit vertical maps, inject-prompts.py) and, as the `##memory_marks##` block, to the templates' own prompt —
 # what a bot with an empty or legacy business type carries. verify-history-handoff.py pins both copies to this text.
+# T11d (owner decision 2026-10-12): B + the re-ask guard right after «повтори её как есть» — the T11c candidate, shipped
+# with its measured costs (evidence/Q1B3-measure.txt §6); tests/test_memory_context.py pins the text in every copy.
 MEMORY_MARKS_TEXT = ("Реплики, которые начинаются с «Владелец:», написал сам владелец: названные в них день, время, место или человек — "
-                     "подтверждённая договорённость; клиент переспрашивает — повтори её как есть. Твой прежний ответ с пометкой "
+                     "подтверждённая договорённость; клиент переспрашивает — повтори её как есть. Клиент просто переспрашивает — "
+                     "это не новый заказ: ничего заново не оформляй и владельцу не передавай. Твой прежний ответ с пометкой "
                      "«[доставка не подтверждена]» мог не дойти до клиента: не ссылайся на него как на уже прочитанный, а если клиент "
                      "переспрашивает или пишет, что ответа не было, ответь заново по существу. Сами эти пометки в ответах не пиши.")
 MEMORY_MARKS_RULE = "\n\n##memory_marks##\n" + MEMORY_MARKS_TEXT
