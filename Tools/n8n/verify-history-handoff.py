@@ -11,6 +11,7 @@ proxy recorder after the response).
 import copy
 import json
 import os
+import re
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -122,6 +123,43 @@ def check_notifier_gate(ntf):
     assert not around, f"notifier: {sorted(around)} reachable from the schedule without passing {NOTIFIER_GATE}[true] (F3)"
 NO_DOUBLE = "x.message->'additional_kwargs'->>'message_id' = $3"
 
+# R9 + T7: the notifier's one memory/ledger sweep (Settle Lost Sends). R9 settles a lost send_pending as send_unknown and
+# never makes an event re-claimable; T7 (follow-ups 2026-10-11) settles the dead run's memory DRAFT in the same statement
+# — only drafts (delivery 'draft', no writer's source, an ai row), only through the draft's OWN event row, marked unknown
+# only when that event is send_unknown under the SAME execution, dropped only on a dead claim of the SAME execution older
+# than 10 minutes or under a re-claimed event once the draft itself is older than 10 minutes.
+LOST_SWEEP_FRAGMENTS = (
+    "update reply_events\n     set state = 'send_unknown'",
+    "where state = 'send_pending' and updated_at < now() - interval '10 minutes'",
+    "run_lost",
+    "\n     and e.chat_id = substr(h.session_id, position(':' in h.session_id) + 1)\n     and e.message_id = h.message->'additional_kwargs'->>'event_id'",
+    "\n   where h.message->>'type' = 'ai'\n     and (h.message->'additional_kwargs'->>'source') is null\n"
+    "     and h.message->'additional_kwargs'->>'delivery' = 'draft'\n     and h.message->'additional_kwargs'->>'execution_id' is not null",
+    "where h.id = d.id and d.event_state = 'send_unknown' and d.event_run_id = d.run_id",
+    "     and ((d.event_run_id = d.run_id and d.event_state in ('claimed', 'generated') and d.event_at < now() - interval '10 minutes')\n"
+    "       or (d.event_run_id <> d.run_id and d.created_at < now() - interval '10 minutes'))",
+)
+
+
+def check_lost_send_sweep(q):
+    """R9 + T7 rules of Settle Lost Sends (see LOST_SWEEP_FRAGMENTS). Raises AssertionError; tests/test_reply_lost_send.py
+    holds the loosened variants and cross-checks them with the scenarios."""
+    code = "\n".join(re.sub(r"--.*$", "", line) for line in q.split("\n"))
+    for frag in LOST_SWEEP_FRAGMENTS:
+        assert frag in code, f"Settle Lost Sends lacks {frag!r}"
+    assert re.findall(r"\bset\s+state\s*=\s*'(\w+)'", code) == ["send_unknown"], \
+        "Settle Lost Sends may only set state = 'send_unknown' (never makes an event re-claimable)"
+    assert code.count("update reply_events") == 1 and "insert into reply_events" not in code and "delete from reply_events" not in code, \
+        "Settle Lost Sends must write the ledger only through its one send_unknown update"
+    assert "message/send" not in code and "lock_token" not in code, "Settle Lost Sends must not send or touch the lease"
+    mark = "|| jsonb_build_object('content', case when left(coalesce(h.message->>'content', ''), " + str(len(hh().UNDELIVERED_MEMORY_PREFIX)) \
+        + ") = " + hh().sql_text(hh().UNDELIVERED_MEMORY_PREFIX)
+    assert mark in code and "jsonb_build_object('delivery', 'unknown')" in code, "T7: a lost draft must become delivery unknown + the undelivered mark (once)"
+    assert code.count("delete from n8n_chat_histories") == 1 and "delete from n8n_chat_histories h\n   using drafts d\n   where h.id = d.id\n" in code, \
+        "T7: the only memory delete is of the drafts the drafts CTE selected"
+    assert code.count("update n8n_chat_histories") == 1 and "\n    from drafts d\n   where h.id = d.id and" in code, \
+        "T7: the only memory update is of the drafts the drafts CTE selected"
+
 
 def verify_bot(f):
     wf = load(f)
@@ -210,11 +248,18 @@ def verify_handoff_workflows():
         fail("F3 tripwire accepted the pre-fix notifier (Due Notifications → Owner Phone)")
     except AssertionError:
         pass
-    # R9: the same schedule settles lost sends (send_pending > 10 min → send_unknown), in a branch with no transport node
+    # R9: the same schedule settles lost sends (send_pending > 10 min → send_unknown), in a branch with no transport node;
+    # T7: and the dead run's memory draft (unknown + mark after the lease, removed before it) — check_lost_send_sweep
     q = node(ntf, "Settle Lost Sends")["parameters"]["query"]
-    for frag in ("update reply_events", "set state = 'send_unknown'", "where state = 'send_pending'", "interval '10 minutes'", "run_lost"):
-        check(frag in q, f"Settle Lost Sends lacks {frag!r}")
-    check("message/send" not in q and "lock_token" not in q and "'claimed'" not in q, "Settle Lost Sends must not send, touch the lease or make an event re-claimable")
+    try:
+        check_lost_send_sweep(q)
+    except AssertionError as e:
+        fail(str(e))
+    try:
+        check_lost_send_sweep(q.replace("set state = 'send_unknown'", "set state = 'claimed'"))
+        fail("R9 tripwire accepted a sweep that makes an event re-claimable")
+    except AssertionError:
+        pass
     trig = ntf["connections"]["Every 2 Minutes"]["main"][0]
     check({"node": "Settle Lost Sends", "type": "main", "index": 0} in trig, "Settle Lost Sends must run off the notifier's schedule")
     check(not ntf["connections"].get("Settle Lost Sends"), "Settle Lost Sends must lead nowhere (never to a transport node)")

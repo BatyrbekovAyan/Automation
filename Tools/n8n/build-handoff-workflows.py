@@ -12,6 +12,10 @@
                                           failed delivery never loses the request. Also settles LOST SENDS
                                           (R9): a bot reply left send_pending > 10 min (its run died between
                                           the lease and Record Send) becomes send_unknown — never a resend.
+                                          T7 (2026-10-11): in the same statement the dead run's memory
+                                          DRAFT is settled — reached the lease (send_unknown) → delivery
+                                          unknown + «[доставка не подтверждена] »; died before it → removed;
+                                          only on a positive fact from reply_events.
                                           F3 (2026-10-08): only a real due request passes `Due Request?` —
                                           a tick with nothing due (or a DB fault) calls no Wappi endpoint and
                                           writes nothing.
@@ -32,6 +36,10 @@ WF = os.path.join(HERE, "workflows")
 _spec = importlib.util.spec_from_file_location("build_auth", os.path.join(HERE, "build-auth-workflows.py"))
 auth = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(auth)
+# T7: the undelivered memory mark is apply-history-handoff.py's constant (ONE place for the memory marks, T6)
+_hh_spec = importlib.util.spec_from_file_location("apply_history_handoff", os.path.join(HERE, "apply-history-handoff.py"))
+HH = importlib.util.module_from_spec(_hh_spec)
+_hh_spec.loader.exec_module(HH)
 
 REQ_ID, REQ_NAME = "crHandoffReq0001", "Handoff Request"
 NTFY_ID, NTFY_NAME = "crHandoffNtfy001", "Handoff Notifier"
@@ -147,14 +155,60 @@ LOST_SEND_SQL = """-- R9 (iteration 2026-09-27): a bot reply whose run died betw
 -- it becomes send_unknown: the transport may or may not have taken it, so the owner sees «not confirmed».
 -- NEVER a resend: this branch has no transport node and a send_unknown is never re-claimed. The attempt's
 -- execution id and time (updated_at) are kept; a late real Record Send still overwrites the state.
+-- T7 (follow-ups 2026-10-11): the dead run's memory DRAFT (Stamp Draft's delivery 'draft', tied to its execution)
+-- must not stay in the bot's memory as an ordinary reply of its own. In the same statement, and only on a POSITIVE
+-- fact from the event ledger — the draft's own event (profile, chat, event id) with the SAME execution id and its
+-- state and age; no event row, nothing:
+--   * the run reached the lease and was lost (its event is send_unknown — settled by this tick or an earlier one) →
+--     the row becomes delivery unknown with the undelivered mark (the transport may have taken it; never resent);
+--   * the run died BEFORE the lease (its claim still claimed/generated after __MIN__ minutes) → the row goes: the
+--     client never saw it — Record Cancel's meaning;
+--   * the event names ANOTHER execution: a re-delivery re-claimed it, which Claim Event allows only after the
+--     draft's run held the claim __MIN__ minutes without reaching the lease → the row goes once the draft itself is
+--     older than __MIN__ minutes (a run still finishing keeps its fresh draft).
+-- A live run's draft, sent / unknown rows, owner and client rows (source-marked or human) are never touched here.
 with swept as (
   update reply_events
      set state = 'send_unknown',
          error = coalesce(nullif(error, ''), 'run_lost: no send result recorded within __MIN__ min (execution ' || coalesce(execution_id, '?') || ')')
    where state = 'send_pending' and updated_at < now() - interval '__MIN__ minutes'
+  returning profile_id, chat_id, message_id
+), drafts as (
+  select h.id, h.created_at,
+         h.message->'additional_kwargs'->>'execution_id' as run_id,
+         e.execution_id as event_run_id,
+         case when s.message_id is not null then 'send_unknown' else e.state end as event_state,
+         e.updated_at as event_at
+    from n8n_chat_histories h
+    join reply_events e
+      on e.profile_id = split_part(h.session_id, ':', 1)
+     and e.chat_id = substr(h.session_id, position(':' in h.session_id) + 1)
+     and e.message_id = h.message->'additional_kwargs'->>'event_id'
+    left join swept s on s.profile_id = e.profile_id and s.chat_id = e.chat_id and s.message_id = e.message_id
+   where h.message->>'type' = 'ai'
+     and (h.message->'additional_kwargs'->>'source') is null
+     and h.message->'additional_kwargs'->>'delivery' = 'draft'
+     and h.message->'additional_kwargs'->>'execution_id' is not null
+), lost_drafts as (
+  update n8n_chat_histories h
+     set message = jsonb_set(h.message, '{additional_kwargs}', (h.message->'additional_kwargs') || jsonb_build_object('delivery', 'unknown'))
+                   || jsonb_build_object('content', case when left(coalesce(h.message->>'content', ''), __ULEN__) = __UNDELIVERED__
+                                                         then h.message->>'content'
+                                                         else __UNDELIVERED__ || coalesce(h.message->>'content', '') end)
+    from drafts d
+   where h.id = d.id and d.event_state = 'send_unknown' and d.event_run_id = d.run_id
+  returning 1
+), dead_drafts as (
+  delete from n8n_chat_histories h
+   using drafts d
+   where h.id = d.id
+     and ((d.event_run_id = d.run_id and d.event_state in ('claimed', 'generated') and d.event_at < now() - interval '__MIN__ minutes')
+       or (d.event_run_id <> d.run_id and d.created_at < now() - interval '__MIN__ minutes'))
   returning 1
 )
-select count(*)::int as settled from swept;""".replace("__MIN__", str(LOST_SEND_MINUTES))
+select (select count(*) from swept)::int as settled, (select count(*) from lost_drafts)::int as marked_drafts,
+       (select count(*) from dead_drafts)::int as dropped_drafts;""".replace("__MIN__", str(LOST_SEND_MINUTES)).replace(
+    "__UNDELIVERED__", HH.sql_text(HH.UNDELIVERED_MEMORY_PREFIX)).replace("__ULEN__", str(len(HH.UNDELIVERED_MEMORY_PREFIX)))
 
 COMPOSE_NOTICE_JS = r"""// HANDOFF NOTIFIER / Compose Notice (runs PER ITEM — one notice per due request): a self-message
 // on the bot's own channel. No client text, no client number — the owner opens the app for the details.

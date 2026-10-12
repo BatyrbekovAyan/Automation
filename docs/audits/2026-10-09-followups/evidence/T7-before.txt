@@ -1,0 +1,85 @@
+T7 (dead-run drafts + M3 backfill) — BEFORE: canon of HEAD b86e6957 (T6 committed; tests written first, M3 file not yet present)
+date: 2026-10-12T00:27:53Z
+
+=== python3 Tools/n8n/tests/test_reply_lost_send.py ===
+PASS R9 graph: the notifier's schedule settles lost sends in a branch that reaches NO transport node and runs first
+PASS R9 [WA] send_pending older than 10 min → send_unknown (execution id kept); a live one, a stale claim and the live lease untouched
+PASS R9 [WA] after the sweep: a re-delivery of the lost event is a duplicate (never a second send), a late real result still wins
+PASS R9 [TG] send_pending older than 10 min → send_unknown (execution id kept); a live one, a stale claim and the live lease untouched
+PASS R9 [TG] after the sweep: a re-delivery of the lost event is a duplicate (never a second send), a late real result still wins
+FAIL T7 graph: the dead drafts are settled by the SAME R9 node (one node per tick, no new branch, no params)
+      - memory is touched by [], the R9 sweep is ['Settle Lost Sends']
+FAIL T7 [WA] the draft of a run R9 settles (lost after the lease) becomes delivery unknown + the mark, stamped by its run
+      - memory=[('human', None, 'Сколько стоит букет?', None, None), ('ai', None, 'Букет из 25 роз — 25 000 ₸.', 'exec-dead', 'draft')]
+FAIL T7 [WA] a draft whose event an EARLIER tick already settled send_unknown is marked on the next tick
+      - memory=[('human', None, 'сообщение OLD', None, None), ('ai', None, 'Букет из 25 роз — 25 000 ₸.', 'exec-old', 'draft')]
+FAIL T7 [WA] the draft of a run that died BEFORE the lease (claimed 11 min ago) is removed; the client row stays
+      - memory=[('human', None, 'А с доставкой?', None, None), ('ai', None, 'Букет из 25 роз — 25 000 ₸.', 'exec-dead', 'draft')]
+FAIL T7 [WA] the draft of a run whose event ANOTHER run re-claimed is removed once it is old; the re-claimer's live draft stays
+      - memory ai rows=[('ai', None, 'Букет из 25 роз — 25 000 ₸.', 'exec-x', 'draft'), ('ai', None, 'Букет из 25 роз — 25 000 ₸. Доставка — 1000 ₸.', 'exec-y', 'draft')]
+PASS T7 [WA] negatives: a live run's draft, a sent row, an unknown row, another execution's fresh draft, owner rows — untouched
+PASS T7 [WA] no event row → nothing: a draft whose event was deleted (or never recorded) stays as it is
+FAIL T7 [TG] the draft of a run R9 settles (lost after the lease) becomes delivery unknown + the mark, stamped by its run
+      - memory=[('human', None, 'Сколько стоит букет?', None, None), ('ai', None, 'Букет из 25 роз — 25 000 ₸.', 'exec-dead', 'draft')]
+FAIL T7 [TG] a draft whose event an EARLIER tick already settled send_unknown is marked on the next tick
+      - memory=[('human', None, 'сообщение OLD', None, None), ('ai', None, 'Букет из 25 роз — 25 000 ₸.', 'exec-old', 'draft')]
+FAIL T7 [TG] the draft of a run that died BEFORE the lease (claimed 11 min ago) is removed; the client row stays
+      - memory=[('human', None, 'А с доставкой?', None, None), ('ai', None, 'Букет из 25 роз — 25 000 ₸.', 'exec-dead', 'draft')]
+FAIL T7 [TG] the draft of a run whose event ANOTHER run re-claimed is removed once it is old; the re-claimer's live draft stays
+      - memory ai rows=[('ai', None, 'Букет из 25 роз — 25 000 ₸.', 'exec-x', 'draft'), ('ai', None, 'Букет из 25 роз — 25 000 ₸. Доставка — 1000 ₸.', 'exec-y', 'draft')]
+PASS T7 [TG] negatives: a live run's draft, a sent row, an unknown row, another execution's fresh draft, owner rows — untouched
+PASS T7 [TG] no event row → nothing: a draft whose event was deleted (or never recorded) stays as it is
+FAIL T7 M3: the backfill marks old owner / unknown rows once, is idempotent, touches nothing else; same strings as the writers
+      - 2026-10-12-memory-marks-backfill.sql is missing
+      - the backfill must use the writers' strings and their lengths
+FAIL T7 tripwire: verify-history-handoff accepts the canonical sweep and rejects every loosened variant
+      - verify-history-handoff.py has no check_lost_send_sweep (the T7 rules are not pinned)
+      - unknown mark without the same execution: the canonical sweep lacks " and d.event_state = 'send_unknown' and d.event_run_id = d.run_id" (update the mutation)
+      - a dead claim dropped without its age: the canonical sweep lacks " and d.event_state in ('claimed', 'generated') and d.event_at < now() - interval '10 minutes')" (update the mutation)
+      - a re-claimed draft dropped while fresh: the canonical sweep lacks " and d.created_at < now() - interval '10 minutes'" (update the mutation)
+      - drafts of any delivery: the canonical sweep lacks "\n     and h.message->'additional_kwargs'->>'delivery' = 'draft'" (update the mutation)
+      - owner rows included: the canonical sweep lacks "\n     and (h.message->'additional_kwargs'->>'source') is null" (update the mutation)
+FAIL T7 tripwire cross-check: the scenarios catch the loosened sweeps too (WA)
+      - a dead claim dropped without its age: the scenario did not catch it
+      - a re-claimed draft dropped while fresh: the scenario did not catch it
+      - unknown mark without the same execution: the scenario did not catch it
+
+9 pass, 12 fail
+exit=1
+
+=== python3 Tools/n8n/tests/test_handoff_notifier.py ===
+PASS F3 A [no_due]: a tick with nothing due calls no Wappi endpoint and writes no notice state
+PASS F3 A [db_query_error]: a tick with nothing due calls no Wappi endpoint and writes no notice state
+PASS F3 A [db_thrown]: a tick with nothing due calls no Wappi endpoint and writes no notice state
+PASS F3 A [no_due]: the R9 lost-send sweep off the same schedule is unchanged (once, first, leads nowhere)
+PASS F3 A [db_query_error]: the R9 lost-send sweep off the same schedule is unchanged (once, first, leads nowhere)
+PASS F3 A [db_thrown]: the R9 lost-send sweep off the same schedule is unchanged (once, first, leads nowhere)
+PASS F3 A [one_due]: the R9 lost-send sweep off the same schedule is unchanged (once, first, leads nowhere)
+PASS F3 A [two_due]: the R9 lost-send sweep off the same schedule is unchanged (once, first, leads nowhere)
+PASS F3 A [no_phone]: the R9 lost-send sweep off the same schedule is unchanged (once, first, leads nowhere)
+FAIL T7 [no_due]: the dead drafts are settled inside the R9 node — one memory statement per tick, no new branch
+      - nodes touching the bot memory: []
+      - memory statements this tick: []
+FAIL T7 [db_query_error]: the dead drafts are settled inside the R9 node — one memory statement per tick, no new branch
+      - nodes touching the bot memory: []
+      - memory statements this tick: []
+FAIL T7 [db_thrown]: the dead drafts are settled inside the R9 node — one memory statement per tick, no new branch
+      - nodes touching the bot memory: []
+      - memory statements this tick: []
+FAIL T7 [one_due]: the dead drafts are settled inside the R9 node — one memory statement per tick, no new branch
+      - nodes touching the bot memory: []
+      - memory statements this tick: []
+FAIL T7 [two_due]: the dead drafts are settled inside the R9 node — one memory statement per tick, no new branch
+      - nodes touching the bot memory: []
+      - memory statements this tick: []
+FAIL T7 [no_phone]: the dead drafts are settled inside the R9 node — one memory statement per tick, no new branch
+      - nodes touching the bot memory: []
+      - memory statements this tick: []
+PASS F3 A [one_due]: a real request still reaches Owner Phone → (Send Notice) → Record Notify, about its own row
+PASS F3 A [two_due]: a real request still reaches Owner Phone → (Send Notice) → Record Notify, about its own row
+PASS F3 A [no_phone]: a real request still reaches Owner Phone → (Send Notice) → Record Notify, about its own row
+PASS F3 B: Due Notifications feeds exactly one If gate, and its condition passes ONLY a real request row (n8n expression engine)
+PASS F3 C: verify-history-handoff accepts the canonical notifier and its tripwire rejects every bypass the driver also catches
+
+14 pass, 6 fail
+exit=1

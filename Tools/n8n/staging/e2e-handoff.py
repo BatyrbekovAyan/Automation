@@ -299,13 +299,27 @@ def notifier(ctx):
     return ok, f"states={states} send_calls={len(calls)} to_self={to_self} no_leak={no_leak} requests_intact={intact} body={bodies[-1][:80] if bodies else None!r}"
 
 
-@scenario("lost_send_settled_by_notifier", "R9: a reply left send_pending > 10 min (its run died between the lease and Record Send) becomes send_unknown on the notifier's schedule — no transport call; a live one is untouched")
+def _draft(pid, chat, run, event, text):
+    psql(f"insert into n8n_chat_histories (session_id, message) values ('{pid}:{chat}', jsonb_build_object('type', 'ai', 'content', '{text}', "
+         f"'additional_kwargs', jsonb_build_object('execution_id', '{run}', 'event_id', '{event}', 'delivery', 'draft'), 'response_metadata', '{{}}'::jsonb));")
+
+
+def _drafts(pid, chat):
+    return psql(f"select coalesce(string_agg((message->'additional_kwargs'->>'execution_id') || '/' || (message->'additional_kwargs'->>'delivery') || '/' "
+                f"|| (message->>'content'), ' | ' order by id), '') from n8n_chat_histories where session_id = '{pid}:{chat}';")
+
+
+@scenario("lost_send_settled_by_notifier", "R9: a reply left send_pending > 10 min (its run died between the lease and Record Send) becomes send_unknown on the notifier's schedule — no transport call; a live one is untouched; T7: the lost run's memory draft becomes unknown + «[доставка не подтверждена] », a dead claim's draft is removed, a live run's draft stays")
 def lost_send(ctx):
     b = Dedicated(ctx, "ls")
-    lost, live = f"ls-lost-{ctx.run_id}", f"ls-live-{ctx.run_id}"
+    lost, live, dead = f"ls-lost-{ctx.run_id}", f"ls-live-{ctx.run_id}", f"ls-dead-{ctx.run_id}"
     psql(f"insert into reply_events (profile_id, chat_id, message_id, execution_id, state, updated_at) values "
          f"('{b.pid}', '{b.chat}', '{lost}', 'dead-run', 'send_pending', now() - interval '11 minutes'), "
-         f"('{b.pid}', '{b.chat}', '{live}', 'live-run', 'send_pending', now() - interval '2 minutes');")
+         f"('{b.pid}', '{b.chat}', '{live}', 'live-run', 'send_pending', now() - interval '2 minutes'), "
+         f"('{b.pid}', '{b.chat}', '{dead}', 'dead-claim', 'claimed', now() - interval '11 minutes');")
+    _draft(b.pid, b.chat, "dead-run", lost, "Букет — 25 000 ₸.")          # T7: the drafts Stamp Draft would have tied to these runs
+    _draft(b.pid, b.chat, "live-run", live, "Доставка — 1000 ₸.")
+    _draft(b.pid, b.chat, "dead-claim", dead, "Черновик умершего прогона.")
     since = mock_total()
     deadline = time.time() + 170            # the schedule fires every 2 minutes
     row = ""
@@ -317,8 +331,10 @@ def lost_send(ctx):
     live_state = psql(f"select state from reply_events where profile_id = '{b.pid}' and message_id = '{live}';")
     st, d = mock("GET", f"/__mock/calls?since={since}&path=message/send")
     mine = [c for c in d["calls"] if (c.get("query") or {}).get("profile_id") == b.pid]
-    ok = row.startswith("send_unknown|dead-run|run_lost") and live_state == "send_pending" and not mine
-    return ok, f"lost={row} live={live_state} send_calls_for_profile={len(mine)}"
+    drafts = _drafts(b.pid, b.chat)
+    ok = row.startswith("send_unknown|dead-run|run_lost") and live_state == "send_pending" and not mine \
+        and drafts == "dead-run/unknown/[доставка не подтверждена] Букет — 25 000 ₸. | live-run/draft/Доставка — 1000 ₸."
+    return ok, f"lost={row} live={live_state} send_calls_for_profile={len(mine)} memory={drafts}"
 
 
 @scenario("handoffs_webhook_owner_scoped_list_take_done", "A5: the app's list/take/done are token-only and owner-scoped; done lifts the chat's pause")

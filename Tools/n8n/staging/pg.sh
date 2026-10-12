@@ -101,6 +101,8 @@ cmd_migrate() {
     "${N8N_DIR}/sql/2026-10-07-retired-clone-deactivate.sql"
     "${N8N_DIR}/sql/2026-10-11-billing-conflicts.sql"
     "${N8N_DIR}/sql/2026-10-11-bot-lineage.sql"
+    # M3 (T7): a data backfill of the memory marks, idempotent; on prod it runs AFTER the T6 workflows (F1F2-plan §6)
+    "${N8N_DIR}/sql/2026-10-12-memory-marks-backfill.sql"
   )
   for f in "${files[@]}"; do
     [ -s "$f" ] || { echo "skip (missing) $f"; continue; }

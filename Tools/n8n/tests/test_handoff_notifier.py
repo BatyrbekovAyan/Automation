@@ -157,6 +157,13 @@ for name in SCENARIOS:
         for x in r9_violations(R[name]):
             c.check(False, x)
 
+MEMORY_NODES = [n['name'] for n in W['nodes'] if n['type'] == 'n8n-nodes-base.postgres' and 'n8n_chat_histories' in n['parameters']['query']]
+for name in SCENARIOS:
+    with Case(f'T7 [{name}]: the dead drafts are settled inside the R9 node — one memory statement per tick, no new branch') as c:
+        c.check(MEMORY_NODES == ['Settle Lost Sends'], f'nodes touching the bot memory: {MEMORY_NODES}')
+        touched = [e for e in R[name]['effects'] if e['kind'] == 'db' and e['node'] in MEMORY_NODES]
+        c.check(len(touched) == 1, f'memory statements this tick: {touched}')
+
 for name, exp in EXPECT.items():
     with Case(f'F3 A [{name}]: a real request still reaches Owner Phone → (Send Notice) → Record Notify, about its own row') as c:
         for x in delivery_violations(R[name], exp):

@@ -1,0 +1,129 @@
+T7 (dead-run drafts + M3 backfill) — AFTER: build-handoff-workflows.py regenerated (second run: no diff), sql/2026-10-12-memory-marks-backfill.sql
+date: 2026-10-12T01:35:05Z, base b86e6957 + T7 working tree
+
+=== python3 Tools/n8n/tests/test_reply_lost_send.py ===
+PASS R9 graph: the notifier's schedule settles lost sends in a branch that reaches NO transport node and runs first
+PASS R9 [WA] send_pending older than 10 min → send_unknown (execution id kept); a live one, a stale claim and the live lease untouched
+PASS R9 [WA] after the sweep: a re-delivery of the lost event is a duplicate (never a second send), a late real result still wins
+PASS R9 [TG] send_pending older than 10 min → send_unknown (execution id kept); a live one, a stale claim and the live lease untouched
+PASS R9 [TG] after the sweep: a re-delivery of the lost event is a duplicate (never a second send), a late real result still wins
+PASS T7 graph: the dead drafts are settled by the SAME R9 node (one node per tick, no new branch, no params)
+PASS T7 [WA] the draft of a run R9 settles (lost after the lease) becomes delivery unknown + the mark, stamped by its run
+PASS T7 [WA] a draft whose event an EARLIER tick already settled send_unknown is marked on the next tick
+PASS T7 [WA] the draft of a run that died BEFORE the lease (claimed 11 min ago) is removed; the client row stays
+PASS T7 [WA] the draft of a run whose event ANOTHER run re-claimed is removed once it is old; the re-claimer's live draft stays
+PASS T7 [WA] negatives: a live run's draft, a sent row, an unknown row, another execution's fresh draft, owner rows — untouched
+PASS T7 [WA] no event row → nothing: a draft whose event was deleted (or never recorded) stays as it is
+PASS T7 [TG] the draft of a run R9 settles (lost after the lease) becomes delivery unknown + the mark, stamped by its run
+PASS T7 [TG] a draft whose event an EARLIER tick already settled send_unknown is marked on the next tick
+PASS T7 [TG] the draft of a run that died BEFORE the lease (claimed 11 min ago) is removed; the client row stays
+PASS T7 [TG] the draft of a run whose event ANOTHER run re-claimed is removed once it is old; the re-claimer's live draft stays
+PASS T7 [TG] negatives: a live run's draft, a sent row, an unknown row, another execution's fresh draft, owner rows — untouched
+PASS T7 [TG] no event row → nothing: a draft whose event was deleted (or never recorded) stays as it is
+PASS T7 M3: the backfill marks old owner / unknown rows once, is idempotent, touches nothing else; same strings as the writers
+PASS T7 tripwire: verify-history-handoff accepts the canonical sweep and rejects every loosened variant
+PASS T7 tripwire cross-check: the scenarios catch the loosened sweeps too (WA)
+
+21 pass, 0 fail
+exit=0
+
+=== python3 Tools/n8n/tests/test_handoff_notifier.py ===
+PASS F3 A [no_due]: a tick with nothing due calls no Wappi endpoint and writes no notice state
+PASS F3 A [db_query_error]: a tick with nothing due calls no Wappi endpoint and writes no notice state
+PASS F3 A [db_thrown]: a tick with nothing due calls no Wappi endpoint and writes no notice state
+PASS F3 A [no_due]: the R9 lost-send sweep off the same schedule is unchanged (once, first, leads nowhere)
+PASS F3 A [db_query_error]: the R9 lost-send sweep off the same schedule is unchanged (once, first, leads nowhere)
+PASS F3 A [db_thrown]: the R9 lost-send sweep off the same schedule is unchanged (once, first, leads nowhere)
+PASS F3 A [one_due]: the R9 lost-send sweep off the same schedule is unchanged (once, first, leads nowhere)
+PASS F3 A [two_due]: the R9 lost-send sweep off the same schedule is unchanged (once, first, leads nowhere)
+PASS F3 A [no_phone]: the R9 lost-send sweep off the same schedule is unchanged (once, first, leads nowhere)
+PASS T7 [no_due]: the dead drafts are settled inside the R9 node — one memory statement per tick, no new branch
+PASS T7 [db_query_error]: the dead drafts are settled inside the R9 node — one memory statement per tick, no new branch
+PASS T7 [db_thrown]: the dead drafts are settled inside the R9 node — one memory statement per tick, no new branch
+PASS T7 [one_due]: the dead drafts are settled inside the R9 node — one memory statement per tick, no new branch
+PASS T7 [two_due]: the dead drafts are settled inside the R9 node — one memory statement per tick, no new branch
+PASS T7 [no_phone]: the dead drafts are settled inside the R9 node — one memory statement per tick, no new branch
+PASS F3 A [one_due]: a real request still reaches Owner Phone → (Send Notice) → Record Notify, about its own row
+PASS F3 A [two_due]: a real request still reaches Owner Phone → (Send Notice) → Record Notify, about its own row
+PASS F3 A [no_phone]: a real request still reaches Owner Phone → (Send Notice) → Record Notify, about its own row
+PASS F3 B: Due Notifications feeds exactly one If gate, and its condition passes ONLY a real request row (n8n expression engine)
+PASS F3 C: verify-history-handoff accepts the canonical notifier and its tripwire rejects every bypass the driver also catches
+
+20 pass, 0 fail
+exit=0
+
+=== generators --check / verifiers ===
+apply-clone-lifecycle.py --check rc=0 | clone lifecycle: OK
+apply-auth-gate.py --check rc=0 | auth gate: OK
+apply-history-handoff.py --check rc=0 | history/handoff: OK
+apply-reply-pipeline-v2.py --check rc=0 | reply pipeline v2: OK
+apply-outcome-stamps.py --check rc=0 | outcome stamps: OK
+apply-sweep-clone-deactivate.py --check rc=0 | sweep clone deactivate: OK
+apply-reply-mode-v2.py --check rc=0 | reply-mode v2: OK
+apply-slot-count-fix.py --check rc=0 | OK  Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json
+apply-suggest-v2.py --check rc=0 | suggest v2: OK
+build-test-dialog.py --check rc=0 | test dialog: OK
+build-auth-workflows.py --check rc=0 | auth workflows: up to date
+build-handoff-workflows.py --check rc=0 | handoff workflows: OK
+build-price-search.py --check rc=0 | price search: OK
+clone_lineage.py --check rc=0 | clone_lineage: 11 statements, 0 findings
+inject-panel-prompts.py --check rc=0 | 9PTyYcelRQI7bGDb-Suggest_Replies.json: up-to-date
+inject-prompts.py --check rc=0 | token floor OK (>= 2300, o200k_base, minimal profile): {'auto_parts': 3903, 'wholesale': 3734, 'flowers': 3755, 'kaspi_seller': 3813, 'education': 3705, 'phone_repair': 3890}
+verify-history-handoff.py rc=0 | ALL HISTORY/HANDOFF ASSERTS PASSED
+verify-reply-pipeline.py rc=0 | ALL REPLY PIPELINE ASSERTS PASSED
+verify-telegram-parity.py rc=0 | ALL PARITY ASSERTS PASSED
+verify-auth-gate.py rc=0 | ALL AUTH GATE ASSERTS PASSED
+verify-message-batching.py rc=0 | ALL BATCHING ASSERTS PASSED
+verify-reply-mode.py rc=0 | ALL REPLY MODE ASSERTS PASSED
+verify-clone-lifecycle.py rc=0 | ALL CLONE LIFECYCLE ASSERTS PASSED
+verify-sql-comments.py rc=0 | OK  88 Postgres node(s) in 28 workflow file(s): no placeholder outside code, no {{ }}, no modifier, no leading =
+verify-panel-prompts.js rc=0 | PASS
+verify_rag.py all rc=0 | VERIFY OK: all
+
+=== python3 Tools/n8n/tests/run_all.py ===
+OK   test_auth_refresh.py: 12 pass, 0 fail
+OK   test_billing_identity.py: 24 pass, 0 fail
+OK   test_claim.py: 19 pass, 0 fail
+OK   test_clone_lineage_sql.py: 50 pass, 0 fail
+OK   test_clone_retirements.py: 21 pass, 0 fail
+OK   test_create_clone.py: 70 pass, 0 fail
+OK   test_create_seed.py: 53 pass, 0 fail
+OK   test_deploy_canonical.py: 20 pass, 0 fail
+OK   test_handoff_notifier.py: 20 pass, 0 fail
+OK   test_harness_selfcheck.py: 2 pass, 0 fail
+OK   test_legacy_generators.py: 5 pass, 0 fail
+OK   test_memory_context.py: 20 pass, 0 fail
+OK   test_price_search.py: 36 pass, 0 fail
+OK   test_reply_lost_send.py: 21 pass, 0 fail
+OK   test_reply_memory.py: 56 pass, 0 fail
+OK   test_reply_memory_concurrent.py: 9 pass, 0 fail
+OK   test_reply_mode.py: 43 pass, 0 fail
+OK   test_reply_order.py: 44 pass, 0 fail
+OK   test_reply_reconcile.py: 66 pass, 0 fail
+OK   test_retired_delete.py: 13 pass, 0 fail
+OK   test_sql_comment_injection.py: 36 pass, 0 fail
+OK   test_suggest_catalog.py: 24 pass, 0 fail
+OK   test_suggest_lang.py: 11 pass, 0 fail
+OK   test_suggest_price.py: 16 pass, 0 fail
+OK   test_suggest_query.py: 37 pass, 0 fail
+OK   test_test_dialog.py: 17 pass, 0 fail
+OK   test_upload.py: 45 pass, 0 fail
+OK   test_verify_clone_lifecycle.py: 44 pass, 0 fail
+OK   test_verify_deployed.py: 48 pass, 0 fail
+OK   test_verify_parity.py: 52 pass, 0 fail
+OK   test_verify_sql_comments.py: 53 pass, 0 fail
+python3 tests/run_all.py  2884.26s user 545.86s system 109% cpu 52:12.23 total
+exit=0
+
+=== staging: pg.sh migrate (M3 applied; post-checks: 0 unmarked owner rows, 0 unmarked unknown rows) → bootstrap.py --bot wa:stgwa001 --bot tg:stgtg001 → verify-deployed.py rc=0 ===
+  OK      crHandoffNtfy001 crHandoffNtfy001-Handoff_Notifier.json  active=True names=True graph=True published=True
+
+=== e2e-handoff --only lost_send_settled_by_notifier (the real 2-minute schedule; model-free) ===
+PASS  lost_send_settled_by_notifier (116s) — R9: a reply left send_pending > 10 min (its run died between the lease and Record Send) becomes send_unknown on the notifier's schedule — no transport call; a live one is untouched; T7: the lost run's memory draft becomes unknown + «[доставка не подтверждена] », a dead claim's draft is removed, a live run's draft stays
+      lost=send_unknown|dead-run|run_lost: no send result recorded within 10 min (execution dead-run) live=send_pending send_calls_for_profile=0 memory=dead-run/unknown/[доставка не подтверждена] Букет — 25 000 ₸. | live-run/draft/Доставка — 1000 ₸.
+1 pass, 0 fail
+
+=== e2e-handoff --only notifier_delivers (model-free) ===
+PASS  notifier_delivers_self_message_and_survives_failure (114s) — A5 acceptance: the owner notice is a self-message on the bot's channel (no client text); a failed delivery keeps the request and is retried
+      states=failed/1,sent/1 send_calls=2 to_self=True no_leak=True requests_intact=True body='Choose Reply: вопрос клиента (чат …6251). Автоответ в этом чате приостановлен — '
+1 pass, 0 fail
