@@ -1,0 +1,96 @@
+T11 — тест сначала: Tools/n8n/eval/test_checks.py с новыми проверками h7 / набора v1.4 на коде HEAD 4badcc2f (run-eval.py h6, scenarios v1.3, rescore.py без rescore_results).
+Дата: 2026-10-12 08:57 +05. Сеть, staging и модель не используются.
+
+$ python3 Tools/n8n/eval/test_checks.py -v
+test_rows (__main__.AsksCar) ... ok
+test_rows (__main__.AsksForWhomOrGoal) ... ok
+test_rows (__main__.AsksModel) ... ok
+test_rows (__main__.AsksOrderNumberOrPhone) ... ok
+test_no_scenario_names_an_unknown_check (__main__.EveryExpectedCheckExists) ... ok
+test_rows (__main__.LangKz) ... ok
+test_rows (__main__.MarksUnknownItem) ... ok
+test_business_turn_stays_unmarked_on_every_ref (__main__.MemoryMarkRoles) ... ERROR
+test_marks_are_read_from_the_writers_at_the_measured_ref (__main__.MemoryMarkRoles) ... ERROR
+test_marks_are_the_writers_own_constants (__main__.MemoryMarkRoles)
+test_owner_turn_on_a_ref_with_marks_carries_the_owner_mark (__main__.MemoryMarkRoles) ... ERROR
+test_owner_turn_on_a_ref_without_marks_renders_like_business (__main__.MemoryMarkRoles) ... ERROR
+test_the_runner_renders_through_render_messages (__main__.MemoryMarkRoles) ... /Users/ayan/Projects/Automation/Tools/n8n/eval/test_checks.py:568: ResourceWarning: unclosed file <_io.TextIOWrapper name='/Users/ayan/Projects/Automation/Tools/n8n/eval/run-eval.py' mode='r' encoding='utf-8'>
+test_unknown_delivery_turn_carries_the_undelivered_mark_only_on_a_ref_with_marks (__main__.MemoryMarkRoles) ... ERROR
+test_rows (__main__.Mentions) ... ok
+test_rows (__main__.MentionsClock) ... ok
+test_rows (__main__.NoConflictClaim) ... ok
+test_rows (__main__.NoDeliveryDoubt) ... test_free_delivery_that_is_really_in_the_business_data_passes (__main__.NoFreeDeliveryClaim) ... ok
+test_negated_free_delivery_in_the_data_does_not_license_the_claim (__main__.NoFreeDeliveryClaim) ... ok
+test_rows (__main__.NoFreeDeliveryClaim) ... ok
+test_the_owner_prompt_is_not_business_data (__main__.NoFreeDeliveryClaim) ... ok
+test_conflict_pair_is_derived_from_the_scenario_data (__main__.NoFreshPricePick) ... ok
+test_rows (__main__.NoFreshPricePick) ... ok
+test_rows (__main__.NoMarkerLeak) ... test_rows (__main__.NoPriceCaveat) ... ok
+test_the_scenario_reaches_the_model_unmarked (__main__.NoPriceCaveat)
+test_rows (__main__.NoStockGuarantee) ... ok
+test_rows (__main__.NoTool) ... test_rows (__main__.NoTotalConfirmation) ... ok
+test_rows (__main__.NotMentions) ... ok
+test_rows (__main__.NotSaysAlready) ... test_rows (__main__.PanelChecks) ... ok
+test_rows (__main__.PromisePhrases) ... ok
+test_no_saved_v13_verdict_changes (__main__.RescoreV13UnderH7) ... /Users/ayan/Projects/Automation/Tools/n8n/eval/test_checks.py:713: ResourceWarning: unclosed file <_io.TextIOWrapper name='/Users/ayan/Projects/Automation/Tools/n8n/eval/results/after-v1-mt320-ws.json' mode='r' encoding='utf-8'>
+test_a6_and_q1p_guard_against_a_spurious_handoff (__main__.ScenarioSetV14)
+test_earlier_bot_replies_keep_the_business_role (__main__.ScenarioSetV14) ... ok
+test_every_auto_scenario_checks_the_marker_leak (__main__.ScenarioSetV14)
+test_q1_business_turns_are_owner_turns (__main__.ScenarioSetV14) ... test_roles_are_known (__main__.ScenarioSetV14) ... ok
+test_v6_scenarios (__main__.ScenarioSetV14) ... ERROR
+test_version (__main__.ScenarioSetV14) ... FAIL
+Ran 42 tests in 0.389s
+FAILED (failures=23, errors=39)
+
+--- первые сообщения об ошибках по классам ---
+  15 KeyError: 'u1_unknown_reask'
+  11 AssertionError: Items in the first set but not the second:
+   7 KeyError: 'u2_unknown_new_question'
+   6 KeyError: 'u3_sent_control'
+   4 KeyError: 'u4_kz_unknown'
+   4 AttributeError: module 'run_eval' has no attribute 'render_messages'
+   1 IndexError: list index out of range
+   1 FAIL: test_version (__main__.ScenarioSetV14)
+   1 FAIL: test_the_runner_renders_through_render_messages (__main__.MemoryMarkRoles)
+   1 FAIL: test_rows (__main__.NoTool) (check='no_tool:create_handoff', why='the c1 answer: a request opened on a re-ask', text='Передал флористу — он подтвердит заказ.')
+   1 FAIL: test_rows (__main__.NoTool) (check='no_tool:create_handoff', why='no tool', text='Завтра в 15:00, спросите Марину.')
+   1 FAIL: test_rows (__main__.NoTool) (check='no_tool:create_handoff', why='another tool', text='Завтра в 15:00, спросите Марину.')
+   1 FAIL: test_rows (__main__.NoTool) (check='no_tool:create_handoff', why='a handoff among other calls', text='Завтра в 15:00, спросите Марину.')
+   1 FAIL: test_rows (__main__.NoMarkerLeak) (check='no_marker_leak', why='«Владелец подтвердил:» is a sentence, not the mark', text='Владелец подтвердил: завтра в 15:00.')
+   1 FAIL: test_rows (__main__.NoMarkerLeak) (check='no_marker_leak', why='the word without the colon is no mark', text='Завтра в 15:00, спросите Марину — так договорился владелец.')
+   1 FAIL: test_rows (__main__.NoMarkerLeak) (check='no_marker_leak', why='lower case, a space before the colon, a later line', text='Завтра в 15:00, спросите Марину.\nвладелец : Марина')
+   1 FAIL: test_rows (__main__.NoMarkerLeak) (check='no_marker_leak', why='copied the owner mark', text='Владелец: завтра в 15:00, спросите Марину.')
+   1 FAIL: test_q1_business_turns_are_owner_turns (__main__.ScenarioSetV14) (scenario='q1p_visit_phone_repair')
+   1 FAIL: test_q1_business_turns_are_owner_turns (__main__.ScenarioSetV14) (scenario='q1p_trial_education')
+   1 FAIL: test_q1_business_turns_are_owner_turns (__main__.ScenarioSetV14) (scenario='q1p_pickup_auto_parts')
+   1 FAIL: test_q1_business_turns_are_owner_turns (__main__.ScenarioSetV14) (scenario='q1p_meeting_wholesale')
+   1 FAIL: test_q1_business_turns_are_owner_turns (__main__.ScenarioSetV14) (scenario='q1p_early_phone_repair')
+   1 FAIL: test_q1_business_turns_are_owner_turns (__main__.ScenarioSetV14) (scenario='q1p_delivery_flowers')
+   1 FAIL: test_q1_business_turns_are_owner_turns (__main__.ScenarioSetV14) (scenario='q1c_no_agreement_phone_repair')
+   1 FAIL: test_q1_business_turns_are_owner_turns (__main__.ScenarioSetV14) (scenario='q1c_no_agreement_education')
+   1 FAIL: test_q1_business_turns_are_owner_turns (__main__.ScenarioSetV14) (scenario='a6_owner_agreement_phone_repair')
+   1 FAIL: test_q1_business_turns_are_owner_turns (__main__.ScenarioSetV14) (scenario='a6_owner_agreement_flowers')
+   1 FAIL: test_q1_business_turns_are_owner_turns (__main__.ScenarioSetV14) (scenario='a6_owner_agreement_education')
+   1 FAIL: test_every_auto_scenario_checks_the_marker_leak (__main__.ScenarioSetV14)
+   1 FAIL: test_a6_and_q1p_guard_against_a_spurious_handoff (__main__.ScenarioSetV14)
+   1 ERROR: test_v6_scenarios (__main__.ScenarioSetV14)
+   1 ERROR: test_unknown_delivery_turn_carries_the_undelivered_mark_only_on_a_ref_with_marks (__main__.MemoryMarkRoles)
+   1 ERROR: test_rows (__main__.NotSaysAlready) (check='not_says_already', why='«я уже ответил»', text='Я уже ответил: 3200 тг.')
+   1 ERROR: test_rows (__main__.NotSaysAlready) (check='not_says_already', why='«ранее я сообщил»', text='Ранее я сообщил: фильтр 3200 тг.')
+   1 ERROR: test_rows (__main__.NotSaysAlready) (check='not_says_already', why='«повторю» repeats, it does not refer', text='Повторю: фильтр 90915-YZZE1 — 3200 тг.')
+   1 ERROR: test_rows (__main__.NotSaysAlready) (check='not_says_already', why='«как я уже писал»', text='Как я уже писал, фильтр стоит 3200 тг.')
+   1 ERROR: test_rows (__main__.NotSaysAlready) (check='not_says_already', why='«как писал выше»', text='Как писал выше, 3200 тг.')
+   1 ERROR: test_rows (__main__.NotSaysAlready) (check='not_says_already', why='«в предыдущем сообщении»', text='В предыдущем сообщении я написал цену: 3200 тг.')
+   1 ERROR: test_rows (__main__.NotSaysAlready) (check='not_says_already', why='the answer is in this message', text='Да, ответил: фильтр 90915-YZZE1 — 3200 тг.')
+   1 ERROR: test_rows (__main__.NotSaysAlready) (check='not_says_already', why='sends the client to the earlier reply', text='Смотрите выше — там цена.')
+
+--- добавлено после первого прогона: TransportRetry (повтор при 429/5xx, остановка при insufficient_quota) против run-eval.py HEAD ---
+$ RUN_EVAL=<run-eval.py из HEAD 4badcc2f> python3 Tools/n8n/eval/test_checks.py TransportRetry
+ERROR: test_a_model_error_is_not_retried (__main__.TransportRetry)
+AttributeError: module 'run_eval' has no attribute 'post_completion'
+ERROR: test_insufficient_quota_stops_the_run (__main__.TransportRetry)
+AttributeError: module 'run_eval' has no attribute 'QuotaExhausted'
+ERROR: test_rate_limit_then_answer (__main__.TransportRetry)
+AttributeError: module 'run_eval' has no attribute 'post_completion'
+Ran 3 tests in 0.001s
+FAILED (errors=3)

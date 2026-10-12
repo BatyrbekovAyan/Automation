@@ -15,6 +15,11 @@ spread and cost — never a single «100 %» run.
                     pipeline). finish_reason / usage are recorded.
   panel scenarios — POSTed to the staging /webhook/SuggestReplies with the v1.5 knowledge object.
 
+Scenario roles (h7, set v1.4): `client` → user; `business` → the bot's own earlier (delivered) reply, an unmarked assistant
+turn; `owner` → the owner's reply and `bot_unknown` → the bot's reply of unknown delivery, both assistant turns opening with
+the mark the memory WRITERS store at --prompts-ref (OWNER_MEMORY_PREFIX / UNDELIVERED_MEMORY_PREFIX of
+apply-history-handoff.py, parsed at that ref — none before T6, so a «before» on the prod ref sees prod's unmarked memory).
+
     python3 Tools/n8n/eval/run-eval.py --label after                  # working-tree prompts
     python3 Tools/n8n/eval/run-eval.py --label before --prompts-ref 805311ee
     python3 Tools/n8n/eval/run-eval.py --only ap_ --repeat 3 --max-tokens 320
@@ -32,6 +37,7 @@ after touching a check, and bump HARNESS_VERSION. rescore.py re-scores saved run
 (writes <label>.<harness>.json/.md, never overwrites); numbers from different harness versions never mix.
 """
 import argparse
+import ast
 import json
 import os
 import re
@@ -49,6 +55,9 @@ CREATE_WA = "Tools/n8n/workflows/XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json"
 BOT_WA = "Tools/n8n/workflows/4wYitz5ek30SVNlT-WhatsApp_Bot.json"
 STAGING_SUGGEST = "Tools/n8n/workflows-staging/9PTyYcelRQI7bGDb-Suggest_Replies.json"
 PRICE_SEARCH = "Tools/n8n/workflows/crPriceSearch001-Price_List_Search.json"
+# T6 (Q1 B + V6-unknown): the memory writers put the marks into the content the model reads; their strings live here
+MARKS_SRC = "Tools/n8n/apply-history-handoff.py"
+MARK_NAMES = {"owner": "OWNER_MEMORY_PREFIX", "bot_unknown": "UNDELIVERED_MEMORY_PREFIX"}
 KZ = set("әіңғүұқөһӘІҢҒҮҰҚӨҺ")
 # USD per 1M tokens (input, cached input, output) — OpenAI Standard tier as published on
 # developers.openai.com/api/docs/pricing, read 2026-09-25. Reasoning tokens are billed as output.
@@ -75,6 +84,8 @@ def http(method, url, body=None, timeout=120):
             return e.code, json.loads(raw)
         except Exception:
             return e.code, raw
+    except (urllib.error.URLError, TimeoutError, ConnectionError) as e:   # the proxy unreachable / timed out: status 0
+        return 0, str(e)
 
 
 def file_at(ref, rel):
@@ -104,6 +115,43 @@ def set_fields_template(ref):
 def compose(vertical_prompt, business_type, owner_prompt, business, products, services):
     return (f"Business Type: {business_type}\n\n{vertical_prompt}\n\nAdditional Instructions: {owner_prompt}  \n\n"
             f"About Business: {business}\n\nProducts:\n{products}\n\nServices:\n{services}")
+
+
+def memory_marks(ref):
+    """h7 (T11): the memory marks the WRITERS store at `ref` — the module-level string literals of apply-history-handoff.py,
+    parsed (never executed) at that ref, the way --search-ref reads the tool. A ref before T6 has no such constants: its
+    owner reply and its reply of unknown delivery reach the model unmarked, exactly like the bot's own delivered reply."""
+    marks = {role: "" for role in MARK_NAMES}
+    try:
+        tree = ast.parse(file_at(ref, MARKS_SRC))
+    except (subprocess.CalledProcessError, OSError, SyntaxError):
+        return marks
+    found = {}
+    for node in tree.body:
+        if isinstance(node, ast.Assign) and isinstance(node.value, ast.Constant) and isinstance(node.value.value, str):
+            for t in node.targets:
+                if isinstance(t, ast.Name):
+                    found[t.id] = node.value.value
+    for role, name in MARK_NAMES.items():
+        marks[role] = found.get(name, "")
+    return marks
+
+
+# scenario role -> (chat role, mark key): `business` is the bot's own earlier reply as memory stores it (delivered, unmarked);
+# `owner` is the owner's reply (owner_app / owner_phone rows), `bot_unknown` the bot's reply whose delivery is unknown
+ROLES = {"client": ("user", None), "business": ("assistant", None), "owner": ("assistant", "owner"), "bot_unknown": ("assistant", "bot_unknown")}
+
+
+def render_messages(sc, marks):
+    """The scenario's turns as the agent's memory hands them to the model: role + content, the writers' mark (if the measured
+    ref has one) at the start of the content."""
+    out = []
+    for role, text in sc["messages"]:
+        if role not in ROLES:
+            raise ValueError(f"{sc['id']}: unknown role {role!r}")
+        chat_role, mark = ROLES[role]
+        out.append({"role": chat_role, "content": (marks.get(mark, "") if mark else "") + text})
+    return out
 
 
 def search_code(ref, bot_wf):
@@ -157,17 +205,39 @@ TOOLS = lambda mp: [
 ]
 
 
-def run_auto(sc, know, mp, prompts, max_tokens, effort=None, drop=()):
+class QuotaExhausted(RuntimeError):
+    """OpenAI answered insufficient_quota — the run stops at once instead of scoring empty answers (the owner tops up)."""
+
+
+def post_completion(req, attempts=4):
+    """One completion through the staging proxy. A TRANSPORT failure (OpenAI 429 rate limit, a 5xx, the proxy itself
+    unreachable) is retried with backoff — it says nothing about the model and would otherwise be scored as an empty
+    answer; an exhausted quota stops the run. Returns (http status, body, retries used)."""
+    for i in range(attempts + 1):
+        st, d = http("POST", f"{BASE}/webhook/EvalRun", {"request": req})
+        body = (d or {}).get("body") if isinstance(d, dict) else None
+        err = ((body or {}).get("error") or {}) if isinstance(body, dict) else {}
+        if isinstance(err, dict) and (err.get("code") == "insufficient_quota" or err.get("type") == "insufficient_quota"):
+            raise QuotaExhausted(str(err.get("message", err))[:200])
+        upstream = d.get("status") if isinstance(d, dict) else None
+        transient = st == 0 or st >= 500 or upstream == 429 or (isinstance(upstream, int) and upstream >= 500)
+        if not transient or i == attempts:
+            return st, d, i
+        time.sleep(min(30, 2 ** (i + 1)))
+    return st, d, attempts
+
+
+def run_auto(sc, know, mp, prompts, max_tokens, effort=None, drop=(), marks=None):
     vertical = prompts.get(sc["vertical"], "")
     business = sc.get("business_override", know["business"])
     system = compose(vertical, know["businessType"], sc.get("owner_prompt", ""), business, know["products"], know["services"])
     docs = sc.get("docs_override", know["docs"])
-    messages = [{"role": "system", "content": system}]
-    for role, text in sc["messages"]:
-        messages.append({"role": "user" if role == "client" else "assistant", "content": text})
+    marks = marks if marks is not None else {role: "" for role in MARK_NAMES}
+    messages = [{"role": "system", "content": system}] + render_messages(sc, marks)
     tool_calls, finish, text = [], None, ""
     usage = {"prompt_tokens": 0, "completion_tokens": 0, "cached_tokens": 0, "reasoning_tokens": 0}
     dropped = set(drop)
+    retries = 0
     for _round in range(4):
         # gpt-5.x takes max_completion_tokens; a parameter the model rejects is dropped and the call retried (recorded)
         req = {"model": mp["model"], "temperature": mp["temperature"], "frequency_penalty": mp["frequency_penalty"],
@@ -176,14 +246,16 @@ def run_auto(sc, know, mp, prompts, max_tokens, effort=None, drop=()):
             req["reasoning_effort"] = effort
         for k in dropped:
             req.pop(k, None)
-        st, d = http("POST", f"{BASE}/webhook/EvalRun", {"request": req})
+        st, d, n_retry = post_completion(req)
+        retries += n_retry
         body = (d or {}).get("body") if isinstance(d, dict) else None
         err = ((body or {}).get("error") or {}) if isinstance(body, dict) else {}
         if isinstance(err, dict) and err.get("code") == "unsupported_parameter" and err.get("param") and err["param"] not in dropped:
             dropped.add(err["param"])
             continue
         if st != 200 or not body or "choices" not in body:
-            return {"error": f"proxy {st}: {str(d)[:200]}", "text": "", "tool_calls": tool_calls, "usage": usage, "finish_reason": None, "system_chars": len(system), "dropped_params": sorted(dropped)}
+            return {"error": f"proxy {st}: {str(d)[:200]}", "text": "", "tool_calls": tool_calls, "usage": usage, "finish_reason": None, "system_chars": len(system),
+                    "dropped_params": sorted(dropped), "transport_retries": retries}
         u = body.get("usage") or {}
         usage["prompt_tokens"] += u.get("prompt_tokens", 0); usage["completion_tokens"] += u.get("completion_tokens", 0)
         usage["cached_tokens"] += (u.get("prompt_tokens_details") or {}).get("cached_tokens") or 0
@@ -206,7 +278,8 @@ def run_auto(sc, know, mp, prompts, max_tokens, effort=None, drop=()):
             continue
         text = msg.get("content") or ""
         break
-    return {"text": text, "tool_calls": tool_calls, "usage": usage, "finish_reason": finish, "system_chars": len(system), "dropped_params": sorted(dropped)}
+    return {"text": text, "tool_calls": tool_calls, "usage": usage, "finish_reason": finish, "system_chars": len(system), "dropped_params": sorted(dropped),
+            "transport_retries": retries}
 
 
 def run_panel(sc, know, app_user_id):
@@ -264,7 +337,8 @@ def knowledge_text(sc, know):
     return " ".join([sc.get("business_override", know["business"]), know["products"], know["services"], " ".join(sc.get("docs_override", know["docs"])), sc.get("owner_prompt", "")])
 
 
-HARNESS_VERSION = ("h6 (2026-10-09, Q1: not_mentions:X — X stated in no un-refused clause and not merely quoted as the client's words, for the client-time echo; mentions:H:MM "
+HARNESS_VERSION = ("h7 (2026-10-12, T11 Q1 B + V6-unknown: scenario roles `owner` / `bot_unknown` rendered with the memory marks the writers store at --prompts-ref (apply-history-handoff.py; none before T6); no_marker_leak, no_tool:<name>, not_says_already, no_delivery_doubt; on top of "
+                   "h6 2026-10-09, Q1: not_mentions:X — X stated in no un-refused clause and not merely quoted as the client's words, for the client-time echo; mentions:H:MM "
                    "reads a time of day; on top of "
                    "h5 2026-10-08, V9-r2: no_conflict_claim / no_price_caveat for a price list that AGREES with the catalog; on top of "
                    "h4 2026-10-07 V9: «расхождение» + negated conflict, zero-price / elliptical free delivery, «итого по N позициям» partial, "
@@ -618,6 +692,40 @@ def kazakh(text):
     return sum(c in KZ for c in text or "") >= 2 and not any(russian_sentence(x) for x in sentences(text))
 
 
+# ---- h7 (T11, 2026-10-12): the memory marks (Q1 B + V6-unknown) -------------------------------------------------------
+# The model must not write a mark itself (the rule's last sentence). Scored on the RAW answer — prod's Final Check also cuts a
+# LEADING run of marks, the eval does not, so a leak anywhere counts. «Владелец подтвердил:» / «владельца:» are words, not the mark.
+_MARK_OWNER = re.compile(r"\bвладелец\s*:", re.I)
+_MARK_UNDELIVERED = re.compile(r"доставка\s+не\s+подтверждена", re.I)
+
+
+def marker_leak(text):
+    return bool(_MARK_OWNER.search(text or "") or _MARK_UNDELIVERED.search(text or ""))
+
+
+# u1/u4: the earlier reply may never have arrived — sending the client to «what I already wrote» is the error. A first-person
+# past form only («как вы писали» is the client's words); «Да, ответил: <the answer>» repeats the essence and passes.
+_PAST_1 = r"(?:писал|написал|ответил|отвечал|сообщал|сообщил|указывал|указал|говорил|сказал|называл|назвал|отправлял|отправил)а?\b"
+SAYS_ALREADY = (rf"\bкак\s+(?:я\s+)?(?:уже\s+)?(?:и\s+)?{_PAST_1}"
+                rf"|(?:\bя\s+)?\bуже\s+{_PAST_1}"
+                rf"|\bранее\s+(?:я\s+)?{_PAST_1}"
+                rf"|\bя\s+(?:же\s+)?{_PAST_1}\s+(?:выше|ранее)"
+                r"|\b(?:см\.?|смотрите|посмотрите)\s+выше|\bвыше\s+(?:я\s+)?(?:писал|написал|ответил|указал|отправил|прив[её]л)"
+                r"|\bв\s+(?:моём|моем|предыдущем|прошлом)\s+(?:сообщении|ответе)"
+                # Kazakh: «жоғарыда» (above), «жазғанымдай / айтқанымдай» (as I wrote / said), «бұрын жаздым» (I wrote before),
+                # «алдыңғы хабарлама / жауап» (the previous message / answer)
+                r"|жоғарыда|жазғанымдай|айтқанымдай|бұрын\s+(?:да\s+)?(?:жаздым|айттым|жауап\s+бердім)|алдыңғы\s+(?:хабарлама|жауап)")
+
+# u2/u3: talk about the bot's OWN message not having arrived. The goods' delivery («доставка по городу», «не доставляем») is not it.
+_DOUBT_BARE = re.compile(r"не\s+дош(?:ло|ёл|ел|ла|ли)\b|мо(?:г|гл\w*|жет)\s+не\s+(?:дойти|прийти)|не\s+доставлен\w*|доставка\s+не\s+подтвержден\w*|\bсбо(?:й|я|е|ем|и)\b")
+_DOUBT_MSG = re.compile(r"сообщени|\bответ|\bсмс")
+_DOUBT_VERB = re.compile(r"не\s+(?:пришл\w*|приш[её]л|отправил\w*|отправлен\w*|ушл\w*|уш[её]л|отобраз\w*|отображ\w*|получил\w*|доход\w*)")
+
+
+def delivery_doubt(low):
+    return any(_DOUBT_BARE.search(s) or (_DOUBT_MSG.search(s) and _DOUBT_VERB.search(s)) for s in sentences(low))
+
+
 def check(name, sc, know, out):
     t = out.get("text", "") or ""
     low = t.lower()
@@ -637,6 +745,8 @@ def check(name, sc, know, out):
         return mentions(t, name.split(":", 1)[1])
     if name.startswith("max_questions:"):
         return t.count("?") <= int(name.split(":")[1])
+    if name.startswith("no_tool:"):
+        return name.split(":", 1)[1] not in [c.get("name") for c in calls]
     if name.startswith("no_price_for:"):
         word = name.split(":", 1)[1].lower()
         return not any(word in line and AMOUNT.search(line) for line in low.split("\n"))
@@ -701,6 +811,10 @@ def check(name, sc, know, out):
         "no_payment_confirmation": lambda: not affirmed(low, r"оплат\w* (получен|принят|подтвержд)|деньги (получил|пришли|поступили)|оплату (вижу|получил)"),
         "no_free_delivery_claim": lambda: free_delivery_claim(business_facts(sc, know)) or not free_delivery_claim(t),
         "no_invented_sku": lambda: all(tok.upper() in ktext.upper() for tok in re.findall(r"\b[A-Za-z0-9]+-[A-Za-z0-9-]+\b", t)),
+        # h7 (T11, Q1 B + V6-unknown)
+        "no_marker_leak": lambda: not marker_leak(t),
+        "not_says_already": lambda: not affirmed(low, SAYS_ALREADY),
+        "no_delivery_doubt": lambda: not delivery_doubt(low),
     }
     fn = table.get(name)
     if fn is None:
@@ -760,6 +874,8 @@ def main():
     d = json.load(open(a.scenarios, encoding="utf-8"))
     prompts = prompts_map(a.prompts_ref)
     set_fields_template(a.prompts_ref)
+    # h7: the owner / unknown-delivery turns carry the marks the writers store at the measured ref (none before T6)
+    marks = memory_marks(a.prompts_ref)
     mp = model_params("worktree")
     # The tool the model calls is part of the measured ref (V9 changed the TOOL, not the prompts): before 2026-10-08 the
     # search was always taken from the worktree, so a «before» run quietly measured today's reconciliation.
@@ -786,7 +902,7 @@ def main():
             runs = []
             for i in range(reps):
                 t_call = time.time()
-                out = run_panel(sc, know, app_user_id) if sc["mode"] == "panel" else run_auto(sc, know, mp, prompts, max_tokens, a.reasoning_effort, a.drop_param)
+                out = run_panel(sc, know, app_user_id) if sc["mode"] == "panel" else run_auto(sc, know, mp, prompts, max_tokens, a.reasoning_effort, a.drop_param, marks)
                 latency_ms = round((time.time() - t_call) * 1000)
                 verdicts = {}
                 for name in sc["expect"]:
@@ -795,7 +911,8 @@ def main():
                 # whole answer / whole body: rescore.py re-scores saved runs offline, and a cut text cannot be re-scored exactly
                 runs.append({"verdicts": verdicts, "text": (out.get("text") or "") if sc["mode"] == "auto" else json.dumps(out.get("body"), ensure_ascii=False),
                              "tool_calls": out.get("tool_calls"), "usage": out.get("usage"), "finish_reason": out.get("finish_reason"), "error": out.get("error"),
-                             "dropped_params": out.get("dropped_params"), "latency_ms": latency_ms, "status": out.get("status")})
+                             "dropped_params": out.get("dropped_params"), "latency_ms": latency_ms, "status": out.get("status"),
+                             "transport_retries": out.get("transport_retries", 0)})
             passes = [all(v is not False for v in r["verdicts"].values()) for r in runs]
             rec = {"id": sc["id"], "vertical": sc["vertical"], "mode": sc["mode"], "lang": sc["lang"], "tags": sc.get("tags", []), "repeats": reps,
                    "pass_rate": sum(passes) / len(passes), "runs": runs}
@@ -833,9 +950,11 @@ def main():
                "reasoning_effort": a.reasoning_effort, "dropped_params": a.drop_param, "panel_model": panel_model, "max_tokens": max_tokens,
                "search_simulation": (f"Price List Search sub-workflow (Reconcile Prices at {a.search_ref})" if mp.get("search_code")
                                      else f"raw documents (retrieve-as-tool at {a.search_ref})"),
+               "memory_marks": marks,
                "scenarios": len(results), "runs": total_runs, "pass_all": sum(1 for x in results if x["pass_rate"] == 1),
                "flaky": sum(1 for x in results if 0 < x["pass_rate"] < 1), "fail": sum(1 for x in results if x["pass_rate"] == 0),
-               "error_runs": error_runs, "finish_reason_length_runs": length_cut, "prompt_tokens": usage_in, "cached_tokens": usage_cached,
+               "error_runs": error_runs, "transport_retries": sum(r.get("transport_retries") or 0 for x in results for r in x["runs"]),
+               "finish_reason_length_runs": length_cut, "prompt_tokens": usage_in, "cached_tokens": usage_cached,
                "completion_tokens": usage_out, "reasoning_tokens": usage_reason,
                "cost_usd_auto_path": cost, "prices_usd_per_1m": [p_in, p_cached, p_out], "latency_ms": latency, "seconds": round(time.time() - t0),
                "by_check": {k: f"{v[0]}/{v[1]}" for k, v in sorted(by_check.items())}}
@@ -850,7 +969,8 @@ def main():
           f"pass {summary['pass_all']} · flaky {summary['flaky']} · fail {summary['fail']} · error runs {error_runs} · finish_reason=length in {length_cut} runs",
           f"auto-path tokens {usage_in} in (cached {usage_cached}) + {usage_out} out (reasoning {usage_reason}) ≈ ${cost} at ${p_in}/${p_cached}/${p_out} per 1M in/cached/out (panel usage is not returned by the webhook)",
           f"latency (wall clock through staging): {lat_txt}",
-          f"simulated price-list search: {summary['search_simulation']}", "",
+          f"simulated price-list search: {summary['search_simulation']}",
+          f"memory marks (apply-history-handoff.py at `{a.prompts_ref}`): owner {marks['owner']!r} · unknown delivery {marks['bot_unknown']!r}", "",
           "| scenario | vertical | mode | pass rate | failed checks |", "|---|---|---|---|---|"]
     for x in results:
         failed = sorted({k for r in x["runs"] for k, v in r["verdicts"].items() if v is False})

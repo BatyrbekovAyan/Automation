@@ -394,6 +394,10 @@ All READ-ONLY against prod unless the flag says otherwise; every mutating path w
   no model, deleted after use).
 - Handoffs `op: "status"` (`build-handoff-workflows.py`) — the last 12 `reply_events` rows for the owner's profiles (state, time,
   execution id, chat masked to its last 4 digits — never the client's text); the app's `ReplyOutcomeCopy` names each state.
-- `eval/run-eval.py` (stage 6, harness h2) — before/after prompt measurement through the STAGING-ONLY completions proxy
-  `stgEvalRunner001`; compare only runs of one scenario version + one harness version. Results in `eval/results/`.
+- `eval/run-eval.py` (stage 6; harness h7, set v1.4 since T11 2026-10-12) — before/after prompt measurement through the
+  STAGING-ONLY completions proxy `stgEvalRunner001`; compare only runs of one scenario version + one harness version. Results
+  in `eval/results/`. The scenario roles `owner` / `bot_unknown` reach the model with the memory marks the writers store at
+  `--prompts-ref` (apply-history-handoff.py's constants, parsed at that ref; none before T6) — pass the same ref as
+  `--search-ref` for a «before». `eval/test_checks.py` pins the checks and the rendering; `eval/rescore.py` re-scores saved
+  runs offline (a new harness must move no saved verdict — pinned for the v1.3 runs).
 

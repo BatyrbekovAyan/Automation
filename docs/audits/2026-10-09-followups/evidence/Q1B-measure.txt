@@ -1,0 +1,58 @@
+Q1 B + V6-unknown (T11) — замер «до/после» в один день на staging. План: F1F2-plan.md §4.5 (протокол и критерии),
+§4.6 (если не выполнен К6). Оценщик h7, набор v1.4 (Tools/n8n/eval, коммит этого файла). Прод не тронут.
+
+==== 0. ЗАФИКСИРОВАНО ДО ПРОГОНОВ (2026-10-12, этот раздел закоммичен вместе с оценщиком h7 до первого платного прогона) ====
+
+Проба кредитов OpenAI до всего: один сценарий (gen_kz_pure_greeting ×1, рабочее дерево) — ответ 200, $0.0035, 429/insufficient_quota нет.
+
+Стенд: staging n8n http://localhost:5678 (2.36.7), stgEvalRunner001 (/webhook/EvalRun → api.openai.com), модель и параметры
+шаблона из рабочего дерева: gpt-5.4-mini, temperature 0.2, frequency_penalty 0, max_completion_tokens 200; инструменты
+(supabase_vector_store, create_handoff) — описания из шаблона рабочего дерева; узлы OpenAI / Supabase Vector Store /
+Create Handoff между сторонами не менялись (диф шаблона 661431c9..70518dd0: AI Agent, Final Check, Record Outgoing,
+Record Send, Stamp Draft). Симуляция поиска одинакова на обеих сторонах (Reconcile Prices 661431c9 == 70518dd0).
+
+Стороны (обе запускаются ПАРАЛЛЕЛЬНО, блок за блоком, в один день):
+  до    = --prompts-ref 661431c9 --search-ref 661431c9   (T5, последний коммит до T6; карты Create = прод-пакет d08c345d;
+          пометок нет: роли owner / bot_unknown рендерятся как на проде — обычная реплика assistant без префикса)
+  после = --prompts-ref 70518dd0 --search-ref 70518dd0   (T7; фраза «Память» в карте Create; owner → «Владелец: …»,
+          bot_unknown → «[доставка не подтверждена] …» — строки читаются из apply-history-handoff.py на этом ref)
+
+Блоки (на сторону; метки результатов Tools/n8n/eval/results/<метка>-{before,after}):
+  q1b-t11-q1-x8     --only a6_,q1p_,q1c_ --repeat 8 --repeat-all --skip-panel                         14 сц. × 8 = 112
+  q1b-t11-kz-x10    --only ap_sku_exact_kz,ws_kz_min_order,fl_kz_price,ks_kz_availability,ed_kz_parent,
+                           pr_kz_battery,gen_kz_pure_greeting --repeat 10 --repeat-all --skip-panel   7 × 10 = 70
+  q1b-t11-kz2-x20   --only pr_kz_battery,ks_kz_availability --repeat 20 --repeat-all --skip-panel     2 × 20 = 40 (добор до ×30)
+  v6u-t11-x8        --only u1_,u2_,u3_,u4_ --repeat 8 --repeat-all --skip-panel                       4 × 8 = 32
+  q1b-t11-auto-x3   --repeat 3 --repeat-all --skip-panel (весь автоответ v1.4)                         70 × 3 = 210
+  итого 464 прогона на сторону, 928 всего.
+
+Критерии (все обязательны; Fisher точный односторонний, порог p < 0,05). «Все проверки» = все проверки сценария v1.4
+(в a6/q1p входит no_tool:create_handoff, во все автосценарии — no_marker_leak). Источник чисел — блоки выше.
+  К1  a6 (3 сц. × 8, блок q1): «после» все проверки ≥ 23/24.
+  К2  q1p (6 сц. × 8 = 48): «после» все проверки ≥ 30/48 И значимо лучше «до» (H1: после > до, p < 0,05); ни один q1p-сценарий
+      не хуже «до» на ≥ 3/8.
+  К3  эхо клиентского времени = провалы not_mentions:15:00 на трёх q1c_client_time_* (24 прогона): «после» 0/24 и не больше «до».
+  К4  контроли q1c (5 сц. × 8 = 40): «после» все проверки ≥ 39/40.
+  К5  лишний create_handoff = прогоны a6/q1p с вызовом create_handoff (72 на сторону): «после» ≤ «до» (ожидается 0).
+  К6  казахский: прогон «на языке» = все проверки lang* истинны (lang_kz). Нет значимого ухудшения «после» против «до»
+      (H1: до > после, p < 0,05 — провал) ни в одном из четырёх срезов: (а) сумма 7 KZ-сценариев (блоки kz + kz2:
+      5 × 10 + 2 × 30 = 110), (б) pr_kz_battery ×30, (в) ks_kz_availability ×30, (г) сумма пяти остальных ×10 (50).
+  К7  V6 (блок v6u, ×8): u1 и u4 ≥ 7/8 по (mentions:3200 ∧ not_says_already ∧ no_marker_leak) — суть повторена, нет «как я
+      уже писал»; u2 и u3 ≥ 7/8 по (no_delivery_doubt ∧ no_marker_leak) — без разговоров о недоставке; утечка пометок
+      (no_marker_leak = FAIL) 0 во ВСЕХ прогонах стороны «после» (все 464). Прочие проверки u-сценариев (mentions:1500 и
+      no_free_delivery_claim в u2, mentions:3200 в u3, lang_kz в u4) — в отчёт, в К7 не входят.
+  К8  регрессия ×3 (блок auto): ни один сценарий, чистый или нестабильный «до» (доля > 0), не стал 0/3 «после»; проверки
+      обещаний и передачи 100 % «после» — список Q1-design §5.2: no_time_assignment, no_exact_time_confirmation,
+      no_reservation_confirmation, no_schedule_invention, no_time_promise_without_hours, claims_handoff_only_if_ok,
+      tool_called, no_payment_confirmation, no_stock_guarantee, no_fresh_price_pick, no_free_delivery_claim, no_prompt_leak;
+      нестабильных «после» не больше, чем «до» + 2.
+  Плюс staging A6: e2e-handoff bot_knows_owner_agreement_after_auto_resumes ×3 на клонах с промптом Create
+  (staging/vertical-bots.py, ниши education и phone_repair — слабейшие в Q1) и ×3 на штатных клонах с промптом шаблона
+  (bootstrap.py --bot wa:stgwa001 --bot tg:stgtg001; ##memory_marks## в промпте шаблона) — стабильный PASS (3/3 в каждой).
+
+Если К6 не выполнен — §4.6: кандидат B2-lang («…повтори её как есть, на языке клиента…»), скрининг ×4 по Q1 и 7 KZ, затем
+полный протокол заново в один день; при повторном провале — отчёт владельцу с двумя путями (а) B1 без фразы Q1, (б) B с ценой
+для казахского. Решение — владельца.
+
+Ошибки транспорта (429/5xx прокси) повторяются раннером (post_completion, до 4 раз) и в оценку не попадают; insufficient_quota
+останавливает прогон (тогда статус «blocked»).

@@ -49,8 +49,9 @@ def by_check(results):
     return {k: f"{v[0]}/{v[1]}" for k, v in sorted(agg.items())}
 
 
-def rescore(src, scenarios, suffix):
-    J = json.load(open(src, encoding="utf-8"))
+def rescore_results(J, scenarios, src="<results>"):
+    """Pure: the saved runs of `J` re-scored with the current checks against `scenarios` (the set they were scored with).
+    Returns (results, changes, counters) and writes nothing — test_checks.py pins «a new harness moves no saved verdict» on it."""
     old_summary = J["summary"]
     if old_summary.get("scenario_version") != scenarios["version"]:
         sys.exit(f"{src}: scored against scenarios {old_summary.get('scenario_version')!r}, the file on disk is {scenarios['version']!r}")
@@ -89,6 +90,14 @@ def rescore(src, scenarios, suffix):
             runs.append(dict(run, verdicts=new, verdicts_before=old))
         passes = [all(v is not False for v in r["verdicts"].values()) for r in runs]
         results.append(dict(x, runs=runs, pass_rate=sum(passes) / len(passes), pass_rate_before=x["pass_rate"]))
+    return results, changes, {"carried": carried, "recomputed_panel": recomputed_panel, "truncated": truncated}
+
+
+def rescore(src, scenarios, suffix):
+    J = json.load(open(src, encoding="utf-8"))
+    old_summary = J["summary"]
+    results, changes, n = rescore_results(J, scenarios, src)
+    carried, recomputed_panel, truncated = n["carried"], n["recomputed_panel"], n["truncated"]
     new_counts, old_counts = counts(results), counts(J["results"])
     label = old_summary.get("label", os.path.splitext(os.path.basename(src))[0]) + suffix
     summary = dict(old_summary)

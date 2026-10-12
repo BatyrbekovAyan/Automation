@@ -13,6 +13,7 @@ Rule for extending: a new failure mode found in a saved answer goes in here as a
 text), then the check is changed until the table is green.
 """
 import copy
+import glob
 import importlib.util
 import json
 import os
@@ -506,6 +507,250 @@ class PanelChecks(unittest.TestCase):
                 sc = SC[sid]
                 out = {"status": 200, "body": {"suggestions": [{"text": t, "label": "x", "move": "Ответ"} for t in texts]}}
                 self.assertIs(M.check_panel(name, sc, DATA["knowledge"][sc["vertical"]], out), want, f"{name} [{sid}] {why}")
+
+
+# ---- h7 (T11, Q1 B + V6-unknown, 2026-10-12): the memory marks reach the measured model as the WRITERS store them ----
+# The memory node hands the model role + content only, so an owner's reply and a bot reply of unknown delivery differ from
+# the bot's own delivered reply ONLY by the mark the writer put into the content (apply-history-handoff.py). The eval must
+# render a scenario turn exactly so — and only on a ref whose writers put the mark: a «before» on the prod ref (no marks)
+# must see the owner's reply the way prod stores it today, as a plain assistant turn.
+PRE_T6 = "661431c9"     # T5 — the canon before the marks (prompts = the prod package d08c345d)
+T7 = "70518dd0"         # T6 + T7 — the marks in the writers and the rule in «Память»
+OWNER, UNDELIVERED = "Владелец: ", "[доставка не подтверждена] "
+U1, U2, U3, U4 = "u1_unknown_reask", "u2_unknown_new_question", "u3_sent_control", "u4_kz_unknown"
+A6 = "a6_owner_agreement_flowers"
+
+
+class MemoryMarkRoles(unittest.TestCase):
+    def test_marks_are_read_from_the_writers_at_the_measured_ref(self):
+        self.assertEqual(M.memory_marks(PRE_T6), {"owner": "", "bot_unknown": ""}, "no constants before T6 — prod renders no mark")
+        self.assertEqual(M.memory_marks(T7), {"owner": OWNER, "bot_unknown": UNDELIVERED})
+        self.assertEqual(M.memory_marks("worktree"), {"owner": OWNER, "bot_unknown": UNDELIVERED})
+
+    def test_marks_are_the_writers_own_constants(self):
+        """One source: the runner parses the generator's literals, it never keeps a copy (a changed mark must move both)."""
+        src = open(os.path.join(os.path.dirname(HERE), "apply-history-handoff.py"), encoding="utf-8").read()
+        self.assertIn(f'OWNER_MEMORY_PREFIX = "{OWNER}"', src)
+        self.assertIn(f'UNDELIVERED_MEMORY_PREFIX = "{UNDELIVERED}"', src)
+        run_eval = open(os.path.join(HERE, "run-eval.py"), encoding="utf-8").read()
+        self.assertNotIn(OWNER.strip(), run_eval.split("def memory_marks", 1)[1].split("\ndef ", 1)[0],
+                         "memory_marks() must read the mark at the ref, not spell it")
+
+    def test_owner_turn_on_a_ref_without_marks_renders_like_business(self):
+        sc = SC[A6]
+        before = M.render_messages(sc, M.memory_marks(PRE_T6))
+        self.assertEqual([m["role"] for m in before], ["user", "assistant", "user"])
+        self.assertEqual(before[1]["content"], "Да, конечно. Завтра в 15:00 вас ждём, спросите Марину.")
+        as_business = M.render_messages(dict(sc, messages=[["business" if r == "owner" else r, t] for r, t in sc["messages"]]),
+                                        M.memory_marks(T7))
+        self.assertEqual(before, as_business, "an owner turn without the writers' mark is exactly the old business turn")
+
+    def test_owner_turn_on_a_ref_with_marks_carries_the_owner_mark(self):
+        after = M.render_messages(SC[A6], M.memory_marks(T7))
+        self.assertEqual(after[1], {"role": "assistant", "content": OWNER + "Да, конечно. Завтра в 15:00 вас ждём, спросите Марину."})
+        self.assertEqual(after[0]["content"], SC[A6]["messages"][0][1], "a client turn is never marked")
+
+    def test_unknown_delivery_turn_carries_the_undelivered_mark_only_on_a_ref_with_marks(self):
+        sc = SC[U1]
+        self.assertEqual(M.render_messages(sc, M.memory_marks(T7))[1],
+                         {"role": "assistant", "content": UNDELIVERED + "Фильтр 90915-YZZE1 — 3200 тг."})
+        self.assertEqual(M.render_messages(sc, M.memory_marks(PRE_T6))[1], {"role": "assistant", "content": "Фильтр 90915-YZZE1 — 3200 тг."})
+
+    def test_business_turn_stays_unmarked_on_every_ref(self):
+        for sid in ("fl_thanks_in_dialog", U3):
+            sc = SC[sid]
+            i = [r for r, _ in sc["messages"]].index("business")
+            for ref in (PRE_T6, T7):
+                with self.subTest(scenario=sid, ref=ref):
+                    self.assertEqual(M.render_messages(sc, M.memory_marks(ref))[i], {"role": "assistant", "content": sc["messages"][i][1]})
+
+    def test_the_runner_renders_through_render_messages(self):
+        src = open(os.path.join(HERE, "run-eval.py"), encoding="utf-8").read()
+        body = src.split("def run_auto", 1)[1].split("\ndef ", 1)[0]
+        self.assertIn("render_messages(sc, marks)", body)
+        self.assertIn("marks = memory_marks(a.prompts_ref)", src)
+
+
+class ScenarioSetV14(unittest.TestCase):
+    """Set v1.4 (plan §4.5): the business turns of a6/q1p/q1c are the OWNER's replies — except the bot's own reply in
+    q1c_client_time_history_phone_repair; the remaining business turns are earlier bot replies and keep their role."""
+
+    def test_version(self):
+        self.assertTrue(DATA["version"].startswith("v1.4"), DATA["version"])
+
+    def test_q1_business_turns_are_owner_turns(self):
+        for sc in DATA["scenarios"]:
+            if not sc["id"].startswith(("a6_", "q1p_", "q1c_")):
+                continue
+            roles = {r for r, _ in sc["messages"]} - {"client"}
+            with self.subTest(scenario=sc["id"]):
+                if sc["id"] == "q1c_client_time_history_phone_repair":
+                    self.assertEqual(roles, {"business"}, "«Принял заявку, мастер свяжется…» is the BOT's reply")
+                elif len(sc["messages"]) > 1:
+                    self.assertEqual(roles, {"owner"})
+
+    def test_earlier_bot_replies_keep_the_business_role(self):
+        for sid in ("fl_absent_item", "fl_thanks_in_dialog"):
+            self.assertIn("business", [r for r, _ in SC[sid]["messages"]], sid)
+
+    def test_roles_are_known(self):
+        for sc in DATA["scenarios"]:
+            allowed = {"client", "business", "owner", "bot_unknown"} if sc["mode"] == "auto" else {"client", "business"}
+            with self.subTest(scenario=sc["id"]):
+                self.assertLessEqual({r for r, _ in sc["messages"]}, allowed)
+
+    def test_v6_scenarios(self):
+        for sid, role, kz in ((U1, "bot_unknown", False), (U2, "bot_unknown", False), (U3, "business", False), (U4, "bot_unknown", True)):
+            sc = SC[sid]
+            with self.subTest(scenario=sid):
+                self.assertEqual(sc["mode"], "auto")
+                self.assertEqual(sc["vertical"], "auto_parts")
+                self.assertEqual([r for r, _ in sc["messages"]], ["client", role, "client"])
+                self.assertEqual(sc["lang"], "kz" if kz else "ru")
+                self.assertIn("no_marker_leak", sc["expect"])
+        self.assertEqual(SC[U1]["messages"][1][1], SC[U3]["messages"][1][1], "u3 is u1 delivered")
+        self.assertEqual(SC[U1]["messages"][2][1], SC[U3]["messages"][2][1], "u3 is u1 delivered")
+        self.assertIn("not_says_already", SC[U1]["expect"])
+        self.assertIn("not_says_already", SC[U4]["expect"])
+        self.assertIn("lang_kz", SC[U4]["expect"])
+        self.assertIn("no_delivery_doubt", SC[U2]["expect"])
+        self.assertIn("no_delivery_doubt", SC[U3]["expect"])
+
+    def test_a6_and_q1p_guard_against_a_spurious_handoff(self):
+        """The c1 lesson (evidence/Q1c-measure.txt): a pass-all score cannot see a create_handoff on a scenario that already
+        fails another check — the tool call is a check of its own."""
+        for sc in DATA["scenarios"]:
+            if sc["id"].startswith(("a6_", "q1p_")):
+                self.assertIn("no_tool:create_handoff", sc["expect"], sc["id"])
+
+    def test_every_auto_scenario_checks_the_marker_leak(self):
+        """K7: «утечка пометок 0 во ВСЕХ прогонах» — every auto run is scored for it."""
+        for sc in DATA["scenarios"]:
+            if sc["mode"] == "auto":
+                self.assertIn("no_marker_leak", sc["expect"], sc["id"])
+
+
+class NoMarkerLeak(Table, unittest.TestCase):
+    """The bot writes neither mark itself (the rule's last sentence; prod also strips a LEADING run in Final Check — the eval
+    scores the model's raw answer, so a leak anywhere fails)."""
+    check_name = "no_marker_leak"
+    rows = [
+        (U1, "Фильтр 90915-YZZE1 — 3200 тг.", NO_TOOLS, PASS, "the plain answer"),
+        (U1, "[доставка не подтверждена] Фильтр 90915-YZZE1 — 3200 тг.", NO_TOOLS, FAIL, "copied the undelivered mark"),
+        (U1, "Фильтр 90915-YZZE1 — 3200 тг. [Доставка не подтверждена]", NO_TOOLS, FAIL, "the mark at the end, capitalised"),
+        (U1, "Доставка не подтверждена. Фильтр — 3200 тг.", NO_TOOLS, FAIL, "the mark's words without the brackets"),
+        (A6, "Владелец: завтра в 15:00, спросите Марину.", NO_TOOLS, FAIL, "copied the owner mark"),
+        (A6, "Завтра в 15:00, спросите Марину.\nвладелец : Марина", NO_TOOLS, FAIL, "lower case, a space before the colon, a later line"),
+        (A6, "Завтра в 15:00, спросите Марину — так договорился владелец.", NO_TOOLS, PASS, "the word without the colon is no mark"),
+        (A6, "Владелец подтвердил: завтра в 15:00.", NO_TOOLS, PASS, "«Владелец подтвердил:» is a sentence, not the mark"),
+        (U2, "Да, доставка по городу от 1500 тг.", NO_TOOLS, PASS, "the GOODS' delivery"),
+        (U2, "Контакт владельца: +7 777 000 11 22.", NO_TOOLS, PASS, "«владельца:» is not «Владелец:»"),
+    ]
+
+
+class NoTool(Table, unittest.TestCase):
+    """no_tool:<name> — the model did not call that tool (c1 opened a request + paused the chat on a plain re-ask)."""
+    check_name = "no_tool:create_handoff"
+    rows = [
+        (A6, "Завтра в 15:00, спросите Марину.", NO_TOOLS, PASS, "no tool"),
+        (A6, "Завтра в 15:00, спросите Марину.", SEARCH, PASS, "another tool"),
+        (A6, "Передал флористу — он подтвердит заказ.", HANDOFF, FAIL, "the c1 answer: a request opened on a re-ask"),
+        (A6, "Завтра в 15:00, спросите Марину.", SEARCH + HANDOFF, FAIL, "a handoff among other calls"),
+    ]
+
+
+class NotSaysAlready(Table, unittest.TestCase):
+    """u1/u4 (V6-unknown): the earlier reply may never have arrived — the bot answers again and does not send the client
+    to «what I already wrote». «Да, ответил: …» followed by the answer itself repeats the essence and passes."""
+    check_name = "not_says_already"
+    rows = [
+        (U1, "Фильтр 90915-YZZE1 — 3200 тг.", NO_TOOLS, PASS, "answered again"),
+        (U1, "Повторю: фильтр 90915-YZZE1 — 3200 тг.", NO_TOOLS, PASS, "«повторю» repeats, it does not refer"),
+        (U1, "Да, ответил: фильтр 90915-YZZE1 — 3200 тг.", NO_TOOLS, PASS, "the answer is in this message"),
+        (U1, "Как я уже писал, фильтр стоит 3200 тг.", NO_TOOLS, FAIL, "«как я уже писал»"),
+        (U1, "Как писал выше, 3200 тг.", NO_TOOLS, FAIL, "«как писал выше»"),
+        (U1, "Я уже ответил: 3200 тг.", NO_TOOLS, FAIL, "«я уже ответил»"),
+        (U1, "Смотрите выше — там цена.", NO_TOOLS, FAIL, "sends the client to the earlier reply"),
+        (U1, "В предыдущем сообщении я написал цену: 3200 тг.", NO_TOOLS, FAIL, "«в предыдущем сообщении»"),
+        (U1, "Ранее я сообщил: фильтр 3200 тг.", NO_TOOLS, FAIL, "«ранее я сообщил»"),
+        (U4, "90915-YZZE1 сүзгісі — 3200 тг.", NO_TOOLS, PASS, "Kazakh, answered again"),
+        (U4, "Жоғарыда жаздым: сүзгі 3200 тг.", NO_TOOLS, FAIL, "Kazakh «жоғарыда жаздым» — «I wrote above»"),
+        (U4, "Жазғанымдай, сүзгі 3200 тг.", NO_TOOLS, FAIL, "Kazakh «жазғанымдай» — «as I wrote»"),
+        (U4, "Алдыңғы хабарламада айттым: 3200 тг.", NO_TOOLS, FAIL, "Kazakh «алдыңғы хабарламада» — «in the previous message»"),
+    ]
+
+
+class NoDeliveryDoubt(Table, unittest.TestCase):
+    """u2/u3: no talk about the bot's own message not having arrived — not on a NEW question about the goods' delivery (u2),
+    and not about a reply whose delivery was confirmed (u3). The goods' delivery («доставка по городу») is no such talk."""
+    check_name = "no_delivery_doubt"
+    rows = [
+        (U2, "Да, доставка по городу от 1500 тг.", NO_TOOLS, PASS, "the goods' delivery"),
+        (U2, "Доставка по городу — от 1500 тг. Фильтр 90915-YZZE1 — 3200 тг.", NO_TOOLS, PASS, "the goods' delivery + the price again"),
+        (U3, "Дублирую: фильтр 90915-YZZE1 — 3200 тг.", NO_TOOLS, PASS, "repeats without a word about delivery"),
+        (U3, "Похоже, моё сообщение не дошло. Фильтр 90915-YZZE1 — 3200 тг.", NO_TOOLS, FAIL, "«сообщение не дошло»"),
+        (U3, "Видимо, не дошло — повторяю: 3200 тг.", NO_TOOLS, FAIL, "a bare «не дошло»"),
+        (U2, "Возможно, предыдущий ответ не доставлен. Доставка по городу от 1500 тг.", NO_TOOLS, FAIL, "«ответ не доставлен»"),
+        (U2, "Мой прошлый ответ мог не дойти: фильтр 3200 тг. Доставка от 1500 тг.", NO_TOOLS, FAIL, "«мог не дойти»"),
+        (U3, "Извините, был технический сбой — фильтр 3200 тг.", NO_TOOLS, FAIL, "«сбой»"),
+        (U3, "Если сообщение не пришло, вот ещё раз: 3200 тг.", NO_TOOLS, FAIL, "a conditional doubt is still the talk"),
+        (U2, "Доставка не подтверждена, но по городу от 1500 тг.", NO_TOOLS, FAIL, "the mark's own words"),
+    ]
+
+
+class TransportRetry(unittest.TestCase):
+    """A rate limit / 5xx says nothing about the model: retried, never scored as an empty answer; an exhausted quota stops."""
+
+    def run_with(self, answers):
+        calls = []
+        real_http, real_sleep = M.http, M.time.sleep
+        M.http = lambda *a, **k: (calls.append(1), answers[len(calls) - 1])[1]
+        M.time.sleep = lambda s: None
+        try:
+            return M.post_completion({"model": "x"}), len(calls)
+        finally:
+            M.http, M.time.sleep = real_http, real_sleep
+
+    def test_rate_limit_then_answer(self):
+        ok = (200, {"status": 200, "body": {"choices": [{"message": {"content": "ok"}}]}})
+        limited = (200, {"status": 429, "body": {"error": {"code": "rate_limit_exceeded"}}})
+        (st, d, retries), n = self.run_with([limited, (0, "timed out"), (500, "x"), ok])
+        self.assertEqual((st, retries, n), (200, 3, 4))
+        self.assertIn("choices", d["body"])
+
+    def test_insufficient_quota_stops_the_run(self):
+        quota = (200, {"status": 429, "body": {"error": {"code": "insufficient_quota", "message": "You exceeded your current quota"}}})
+        with self.assertRaises(M.QuotaExhausted):
+            self.run_with([quota])
+
+    def test_a_model_error_is_not_retried(self):
+        bad = (200, {"status": 400, "body": {"error": {"code": "invalid_request_error"}}})
+        (st, d, retries), n = self.run_with([bad])
+        self.assertEqual((retries, n), (0, 1))
+
+
+class RescoreV13UnderH7(unittest.TestCase):
+    """h7 adds checks and roles; it must not move a single verdict of the runs saved under h6 (set v1.3)."""
+    V13_REF = "4badcc2f"   # the last commit that carries scenarios v1.3
+
+    def test_no_saved_v13_verdict_changes(self):
+        spec = importlib.util.spec_from_file_location("rescore", os.path.join(HERE, "rescore.py"))
+        R = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(R)
+        v13 = json.loads(M.file_at(self.V13_REF, "Tools/n8n/eval/scenarios.v1.json"))
+        self.assertTrue(v13["version"].startswith("v1.3"))
+        files = 0
+        for f in sorted(glob.glob(os.path.join(HERE, "results", "*.json"))):
+            J = json.load(open(f, encoding="utf-8"))
+            s = J.get("summary") or {}
+            if not str(s.get("scenario_version", "")).startswith("v1.3") or not str(s.get("harness", "")).startswith("h6") or s.get("rescored_from"):
+                continue
+            files += 1
+            results, changes, _ = R.rescore_results(J, v13)
+            with self.subTest(file=os.path.basename(f)):
+                self.assertEqual(changes, [], f"{os.path.basename(f)}: h7 moved {len(changes)} verdicts")
+                self.assertEqual([x["pass_rate"] for x in results], [x["pass_rate"] for x in J["results"]])
+        self.assertGreaterEqual(files, 40, "the saved v1.3 runs (q1a-/q1b-/q1c-/v9r3-) are the material")
 
 
 class EveryExpectedCheckExists(unittest.TestCase):

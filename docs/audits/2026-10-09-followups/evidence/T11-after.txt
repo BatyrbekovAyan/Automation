@@ -1,0 +1,72 @@
+T11 — после: оценщик h7 + набор v1.4 (офлайн-часть, без сети и модели).
+Дата: 2026-10-12 09:02 +05.
+
+$ python3 Tools/n8n/eval/test_checks.py -v
+test_rows (__main__.AsksCar) ... ok
+test_rows (__main__.AsksForWhomOrGoal) ... ok
+test_rows (__main__.AsksModel) ... ok
+test_rows (__main__.AsksOrderNumberOrPhone) ... ok
+test_no_scenario_names_an_unknown_check (__main__.EveryExpectedCheckExists) ... ok
+test_rows (__main__.LangKz) ... ok
+test_rows (__main__.MarksUnknownItem) ... ok
+test_business_turn_stays_unmarked_on_every_ref (__main__.MemoryMarkRoles) ... ok
+test_marks_are_read_from_the_writers_at_the_measured_ref (__main__.MemoryMarkRoles) ... /Users/ayan/Projects/Automation/Tools/n8n/eval/run-eval.py:93: ResourceWarning: unclosed file <_io.TextIOWrapper name='/Users/ayan/Projects/Automation/Tools/n8n/apply-history-handoff.py' mode='r' encoding='utf-8'>
+One source: the runner parses the generator's literals, it never keeps a copy (a changed mark must move both). ... /Users/ayan/Projects/Automation/Tools/n8n/eval/test_checks.py:532: ResourceWarning: unclosed file <_io.TextIOWrapper name='/Users/ayan/Projects/Automation/Tools/n8n/apply-history-handoff.py' mode='r' encoding='utf-8'>
+test_owner_turn_on_a_ref_with_marks_carries_the_owner_mark (__main__.MemoryMarkRoles) ... ok
+test_owner_turn_on_a_ref_without_marks_renders_like_business (__main__.MemoryMarkRoles) ... ok
+test_the_runner_renders_through_render_messages (__main__.MemoryMarkRoles) ... /Users/ayan/Projects/Automation/Tools/n8n/eval/test_checks.py:568: ResourceWarning: unclosed file <_io.TextIOWrapper name='/Users/ayan/Projects/Automation/Tools/n8n/eval/run-eval.py' mode='r' encoding='utf-8'>
+test_unknown_delivery_turn_carries_the_undelivered_mark_only_on_a_ref_with_marks (__main__.MemoryMarkRoles) ... ok
+test_rows (__main__.Mentions) ... ok
+test_rows (__main__.MentionsClock) ... ok
+test_rows (__main__.NoConflictClaim) ... ok
+test_rows (__main__.NoDeliveryDoubt) ... ok
+test_free_delivery_that_is_really_in_the_business_data_passes (__main__.NoFreeDeliveryClaim) ... ok
+test_negated_free_delivery_in_the_data_does_not_license_the_claim (__main__.NoFreeDeliveryClaim) ... ok
+test_rows (__main__.NoFreeDeliveryClaim) ... ok
+test_the_owner_prompt_is_not_business_data (__main__.NoFreeDeliveryClaim) ... ok
+test_conflict_pair_is_derived_from_the_scenario_data (__main__.NoFreshPricePick) ... ok
+test_rows (__main__.NoFreshPricePick) ... ok
+test_rows (__main__.NoMarkerLeak) ... ok
+test_rows (__main__.NoPriceCaveat) ... ok
+The data carries no conflict, and the measured search (the canonical Reconcile Prices) hands the chunk over as is. ... /Users/ayan/Projects/Automation/Tools/n8n/eval/run-eval.py:93: ResourceWarning: unclosed file <_io.TextIOWrapper name='/Users/ayan/Projects/Automation/Tools/n8n/workflows/4wYitz5ek30SVNlT-WhatsApp_Bot.json' mode='r' encoding='utf-8'>
+test_rows (__main__.NoStockGuarantee) ... ok
+test_rows (__main__.NoTool) ... ok
+test_rows (__main__.NoTotalConfirmation) ... ok
+test_rows (__main__.NotMentions) ... ok
+test_rows (__main__.NotSaysAlready) ... ok
+test_rows (__main__.PanelChecks) ... ok
+test_rows (__main__.PromisePhrases) ... ok
+test_no_saved_v13_verdict_changes (__main__.RescoreV13UnderH7) ... /Users/ayan/Projects/Automation/Tools/n8n/eval/test_checks.py:744: ResourceWarning: unclosed file <_io.TextIOWrapper name='/Users/ayan/Projects/Automation/Tools/n8n/eval/results/after-v1-mt320-ws.json' mode='r' encoding='utf-8'>
+The c1 lesson (evidence/Q1c-measure.txt): a pass-all score cannot see a create_handoff on a scenario that already ... ok
+test_earlier_bot_replies_keep_the_business_role (__main__.ScenarioSetV14) ... ok
+K7: «утечка пометок 0 во ВСЕХ прогонах» — every auto run is scored for it. ... ok
+test_q1_business_turns_are_owner_turns (__main__.ScenarioSetV14) ... ok
+test_roles_are_known (__main__.ScenarioSetV14) ... ok
+test_v6_scenarios (__main__.ScenarioSetV14) ... ok
+test_version (__main__.ScenarioSetV14) ... ok
+test_a_model_error_is_not_retried (__main__.TransportRetry) ... ok
+test_insufficient_quota_stops_the_run (__main__.TransportRetry) ... ok
+test_rate_limit_then_answer (__main__.TransportRetry) ... ok
+Ran 45 tests in 1.366s
+OK
+
+$ python3 Tools/n8n/eval/test_search_ref.py
+Ran 3 tests in 0.094s
+
+OK
+
+--- рендер ролей (render_messages) на двух ref ---
+ref 661431c9: marks {'owner': '', 'bot_unknown': ''}
+   a6_owner_agreement_flowers [{"role": "user", "content": "Здравствуйте, можно к вам завтра подъехать?"}, {"role": "assistant", "content": "Да, конечно. Завтра в 15:00 вас ждём, спросите Марину."}, {"role": "user", "content": "Напомните, во сколько мне подойти и кого спросить?"}]
+   u1_unknown_reask [{"role": "user", "content": "Сколько стоит масляный фильтр 90915-YZZE1?"}, {"role": "assistant", "content": "Фильтр 90915-YZZE1 — 3200 тг."}, {"role": "user", "content": "Вы ответили? Не вижу сообщения"}]
+   u3_sent_control [{"role": "user", "content": "Сколько стоит масляный фильтр 90915-YZZE1?"}, {"role": "assistant", "content": "Фильтр 90915-YZZE1 — 3200 тг."}, {"role": "user", "content": "Вы ответили? Не вижу сообщения"}]
+ref 70518dd0: marks {'owner': 'Владелец: ', 'bot_unknown': '[доставка не подтверждена] '}
+   a6_owner_agreement_flowers [{"role": "user", "content": "Здравствуйте, можно к вам завтра подъехать?"}, {"role": "assistant", "content": "Владелец: Да, конечно. Завтра в 15:00 вас ждём, спросите Марину."}, {"role": "user", "content": "Напомните, во сколько мне подойти и кого спросить?"}]
+   u1_unknown_reask [{"role": "user", "content": "Сколько стоит масляный фильтр 90915-YZZE1?"}, {"role": "assistant", "content": "[доставка не подтверждена] Фильтр 90915-YZZE1 — 3200 тг."}, {"role": "user", "content": "Вы ответили? Не вижу сообщения"}]
+   u3_sent_control [{"role": "user", "content": "Сколько стоит масляный фильтр 90915-YZZE1?"}, {"role": "assistant", "content": "Фильтр 90915-YZZE1 — 3200 тг."}, {"role": "user", "content": "Вы ответили? Не вижу сообщения"}]
+
+--- ложные срабатывания новых проверок на всех сохранённых ответах автоответа (results/*.json, вкл. неотслеживаемые cmp-0925-*) ---
+ответов 4127: no_marker_leak FAIL 0, no_delivery_doubt FAIL 0, not_says_already FAIL 0
+
+--- пересчёт сохранённого прогона v1.3 под h7 (копия, rescore.py CLI; набор v1.3 из 4badcc2f) ---
+q1c-A-pc-x8.h7: 6/3/2 -> 6/3/2 (pass/flaky/fail), 0 verdict changes, panel carried 0
