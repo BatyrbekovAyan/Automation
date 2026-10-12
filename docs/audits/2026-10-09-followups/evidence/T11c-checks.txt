@@ -1,0 +1,152 @@
+T11c — проверки кандидата и канона (2026-10-12). Прод не тронут; модель вызывалась только через staging stgEvalRunner001 (проба + план q1b3).
+
+## 1. Кандидат «B + только переспрос» в рабочем дереве (HEAD 6aa8a675 + wip/Q1B3-candidate.patch), ДО платного прогона
+Текст MEMORY_MARKS_TEXT кандидата == текст кандидата T11b (Q1B2-candidate.patch) без предложения анти-эха: True (сверка программой).
+## apply-history-handoff.py
+history/handoff: MISSING/STALE in ['4wYitz5ek30SVNlT-WhatsApp_Bot.json', '4VN3gsFaC2HUYmcc-Telegram_Bot.json']
+--check (до применения) rc=2
+up to date  Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json
+up to date  2htWSV5IHO8E2CgB-Dashboard_Outcomes.json
+up to date  lmjYsdNcQA2IE5rl-Delete_Bot_Files.json
+up to date  0DP79STI3pafXO9B-Set_Workflow_State.json
+применение rc=0
+up to date  Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json
+up to date  2htWSV5IHO8E2CgB-Dashboard_Outcomes.json
+up to date  lmjYsdNcQA2IE5rl-Delete_Bot_Files.json
+up to date  0DP79STI3pafXO9B-Set_Workflow_State.json
+второй прогон rc=0
+history/handoff: OK
+--check rc=0
+## inject-prompts.py (tiktoken ~/.venvs/tiktoken)
+token floor OK (>= 2300, o200k_base, minimal profile): {'auto_parts': 3931, 'wholesale': 3762, 'flowers': 3783, 'kaspi_seller': 3841, 'education': 3733, 'phone_repair': 3918}
+XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json: kind=create CHANGED
+Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json: kind=create CHANGED
+3qax5J9u2qsT9Vao-Edit_Whatsapp_Workflow.json: kind=edit CHANGED
+TwWPW3gIyjZS3foR-Edit_Telegram_Workflow.json: kind=edit CHANGED
+--check (до применения) rc=2
+token floor OK (>= 2300, o200k_base, minimal profile): {'auto_parts': 3931, 'wholesale': 3762, 'flowers': 3783, 'kaspi_seller': 3841, 'education': 3733, 'phone_repair': 3918}
+XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json: kind=create CHANGED
+Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json: kind=create CHANGED
+3qax5J9u2qsT9Vao-Edit_Whatsapp_Workflow.json: kind=edit CHANGED
+TwWPW3gIyjZS3foR-Edit_Telegram_Workflow.json: kind=edit CHANGED
+применение rc=0
+token floor OK (>= 2300, o200k_base, minimal profile): {'auto_parts': 3931, 'wholesale': 3762, 'flowers': 3783, 'kaspi_seller': 3841, 'education': 3733, 'phone_repair': 3918}
+XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json: kind=create up-to-date
+Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json: kind=create up-to-date
+3qax5J9u2qsT9Vao-Edit_Whatsapp_Workflow.json: kind=edit up-to-date
+TwWPW3gIyjZS3foR-Edit_Telegram_Workflow.json: kind=edit up-to-date
+второй прогон rc=0
+token floor OK (>= 2300, o200k_base, minimal profile): {'auto_parts': 3931, 'wholesale': 3762, 'flowers': 3783, 'kaspi_seller': 3841, 'education': 3733, 'phone_repair': 3918}
+XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json: kind=create up-to-date
+Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json: kind=create up-to-date
+3qax5J9u2qsT9Vao-Edit_Whatsapp_Workflow.json: kind=edit up-to-date
+TwWPW3gIyjZS3foR-Edit_Telegram_Workflow.json: kind=edit up-to-date
+--check полный rc=0
+  ## генераторы --check
+  apply-clone-lifecycle.py --check rc=0 | clone lifecycle: OK
+  apply-auth-gate.py --check rc=0 | auth gate: OK
+  apply-history-handoff.py --check rc=0 | history/handoff: OK
+  apply-reply-pipeline-v2.py --check rc=0 | reply pipeline v2: OK
+  apply-outcome-stamps.py --check rc=0 | outcome stamps: OK
+  apply-sweep-clone-deactivate.py --check rc=0 | sweep clone deactivate: OK
+  apply-reply-mode-v2.py --check rc=0 | reply-mode v2: OK
+  apply-slot-count-fix.py --check rc=0 | OK  Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json
+  apply-suggest-v2.py --check rc=0 | suggest v2: OK
+  build-test-dialog.py --check rc=0 | test dialog: OK
+  build-auth-workflows.py --check rc=0 | auth workflows: up to date
+  build-handoff-workflows.py --check rc=0 | handoff workflows: OK
+  build-price-search.py --check rc=0 | price search: OK
+  clone_lineage.py --check rc=0 | clone_lineage: 11 statements, 0 findings
+  inject-panel-prompts.py --check rc=0 | 9PTyYcelRQI7bGDb-Suggest_Replies.json: up-to-date
+  inject-prompts.py --check (полный, с assert_token_floor) rc=0
+    token floor OK (>= 2300, o200k_base, minimal profile): {'auto_parts': 3931, 'wholesale': 3762, 'flowers': 3783, 'kaspi_seller': 3841, 'education': 3733, 'phone_repair': 3918}
+    XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json: kind=create up-to-date
+    Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json: kind=create up-to-date
+    3qax5J9u2qsT9Vao-Edit_Whatsapp_Workflow.json: kind=edit up-to-date
+    TwWPW3gIyjZS3foR-Edit_Telegram_Workflow.json: kind=edit up-to-date
+  ## верификаторы
+  verify-history-handoff.py rc=0 | ALL HISTORY/HANDOFF ASSERTS PASSED
+  verify-reply-pipeline.py rc=0 | ALL REPLY PIPELINE ASSERTS PASSED
+  verify-telegram-parity.py rc=0 | ALL PARITY ASSERTS PASSED
+  verify-auth-gate.py rc=0 | ALL AUTH GATE ASSERTS PASSED
+  verify-message-batching.py rc=0 | ALL BATCHING ASSERTS PASSED
+  verify-reply-mode.py rc=0 | ALL REPLY MODE ASSERTS PASSED
+  verify-clone-lifecycle.py rc=0 | ALL CLONE LIFECYCLE ASSERTS PASSED
+  verify-sql-comments.py rc=0 | OK  88 Postgres node(s) in 28 workflow file(s): no placeholder outside code, no {{ }}, no modifier, no leading =
+  verify-panel-prompts.js rc=0 | PASS
+  verify_rag.py all rc=0 | VERIFY OK: all
+tests на кандидате: test_memory_context.py 20 pass, 0 fail · test_verify_parity.py 52 pass, 0 fail · test_reply_memory.py — запущен, остановлен после вердикта (SQL Record Send / Stamp Draft кандидат не меняет; на каноне — §3)
+Патч в изолированном git worktree (HEAD 6aa8a675 + git apply wip/Q1B3-candidate.patch): apply-history-handoff.py --check rc=0, inject-prompts.py --check (полный) rc=0, verify-history-handoff.py — ALL HISTORY/HANDOFF ASSERTS PASSED
+
+## 2. Канон после вердикта (кандидат снят: git checkout 8 файлов; рабочее дерево по Tools/n8n = HEAD 6aa8a675)
+q1b3report.py на каноне — вывод байт в байт тот же, что на кандидате (cmp).
+  ## генераторы --check
+  apply-clone-lifecycle.py --check rc=0 | clone lifecycle: OK
+  apply-auth-gate.py --check rc=0 | auth gate: OK
+  apply-history-handoff.py --check rc=0 | history/handoff: OK
+  apply-reply-pipeline-v2.py --check rc=0 | reply pipeline v2: OK
+  apply-outcome-stamps.py --check rc=0 | outcome stamps: OK
+  apply-sweep-clone-deactivate.py --check rc=0 | sweep clone deactivate: OK
+  apply-reply-mode-v2.py --check rc=0 | reply-mode v2: OK
+  apply-slot-count-fix.py --check rc=0 | OK  Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json
+  apply-suggest-v2.py --check rc=0 | suggest v2: OK
+  build-test-dialog.py --check rc=0 | test dialog: OK
+  build-auth-workflows.py --check rc=0 | auth workflows: up to date
+  build-handoff-workflows.py --check rc=0 | handoff workflows: OK
+  build-price-search.py --check rc=0 | price search: OK
+  clone_lineage.py --check rc=0 | clone_lineage: 11 statements, 0 findings
+  inject-panel-prompts.py --check rc=0 | 9PTyYcelRQI7bGDb-Suggest_Replies.json: up-to-date
+  inject-prompts.py --check (полный, с assert_token_floor) rc=0
+    token floor OK (>= 2300, o200k_base, minimal profile): {'auto_parts': 3903, 'wholesale': 3734, 'flowers': 3755, 'kaspi_seller': 3813, 'education': 3705, 'phone_repair': 3890}
+    XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json: kind=create up-to-date
+    Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json: kind=create up-to-date
+    3qax5J9u2qsT9Vao-Edit_Whatsapp_Workflow.json: kind=edit up-to-date
+    TwWPW3gIyjZS3foR-Edit_Telegram_Workflow.json: kind=edit up-to-date
+  ## верификаторы
+  verify-history-handoff.py rc=0 | ALL HISTORY/HANDOFF ASSERTS PASSED
+  verify-reply-pipeline.py rc=0 | ALL REPLY PIPELINE ASSERTS PASSED
+  verify-telegram-parity.py rc=0 | ALL PARITY ASSERTS PASSED
+  verify-auth-gate.py rc=0 | ALL AUTH GATE ASSERTS PASSED
+  verify-message-batching.py rc=0 | ALL BATCHING ASSERTS PASSED
+  verify-reply-mode.py rc=0 | ALL REPLY MODE ASSERTS PASSED
+  verify-clone-lifecycle.py rc=0 | ALL CLONE LIFECYCLE ASSERTS PASSED
+  verify-sql-comments.py rc=0 | OK  88 Postgres node(s) in 28 workflow file(s): no placeholder outside code, no {{ }}, no modifier, no leading =
+  verify-panel-prompts.js rc=0 | PASS
+  verify_rag.py all rc=0 | VERIFY OK: all
+eval: test_checks.py: Ran 53 tests in 5.246s OK  test_schedule.py: Ran 19 tests in 2.517s OK  test_search_ref.py: Ran 4 tests in 0.432s OK  test_q1b3report.py: Ran 11 tests in 0.436s OK  
+
+## 3. python3 Tools/n8n/tests/run_all.py (канон HEAD 6aa8a675, 14:14–15:24)
+OK   test_auth_refresh.py: 12 pass, 0 fail
+OK   test_billing_identity.py: 24 pass, 0 fail
+OK   test_claim.py: 19 pass, 0 fail
+OK   test_clone_lineage_sql.py: 50 pass, 0 fail
+OK   test_clone_retirements.py: 21 pass, 0 fail
+OK   test_create_clone.py: 70 pass, 0 fail
+OK   test_create_seed.py: 53 pass, 0 fail
+OK   test_deploy_canonical.py: 20 pass, 0 fail
+OK   test_handoff_notifier.py: 20 pass, 0 fail
+OK   test_harness_selfcheck.py: 2 pass, 0 fail
+OK   test_legacy_generators.py: 5 pass, 0 fail
+OK   test_memory_context.py: 20 pass, 0 fail
+OK   test_price_search.py: 36 pass, 0 fail
+OK   test_reply_lost_send.py: 21 pass, 0 fail
+OK   test_reply_memory.py: 56 pass, 0 fail
+OK   test_reply_memory_concurrent.py: 9 pass, 0 fail
+OK   test_reply_mode.py: 43 pass, 0 fail
+OK   test_reply_order.py: 44 pass, 0 fail
+OK   test_reply_reconcile.py: 66 pass, 0 fail
+OK   test_retired_delete.py: 13 pass, 0 fail
+OK   test_sql_comment_injection.py: 36 pass, 0 fail
+OK   test_suggest_catalog.py: 24 pass, 0 fail
+OK   test_suggest_lang.py: 11 pass, 0 fail
+OK   test_suggest_price.py: 16 pass, 0 fail
+OK   test_suggest_query.py: 37 pass, 0 fail
+OK   test_test_dialog.py: 17 pass, 0 fail
+OK   test_upload.py: 45 pass, 0 fail
+OK   test_verify_clone_lifecycle.py: 44 pass, 0 fail
+OK   test_verify_deployed.py: 48 pass, 0 fail
+OK   test_verify_parity.py: 52 pass, 0 fail
+OK   test_verify_sql_comments.py: 53 pass, 0 fail
+run_all rc=0 end 15:23:58
+
+## 4. staging после run_all: verify-deployed --base http://localhost:5678 rc=0 — base http://localhost:5678: canonical 27 (diff 0), clones 2 (behind template 0, of them prompt head behind 0; custom prompts 2, not counted), archived clones 0 (not counted), other 2
