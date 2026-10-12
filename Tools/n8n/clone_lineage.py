@@ -478,8 +478,9 @@ LINE_RETIRE_SQL = ("""-- App-delete slot release (2026-08-27) by the bot's line 
 --            kept. The line's clones are booked in clone_retirements (bot_deleted) for the sweep's branch A — never one
 --            a live row outside the line drives, never a protected id; a clone already booked keeps its booking.
 --   legacy:  the named rows still alive only (the pre-T5 behaviour), nothing booked.
--- Always one row: retiredProfiles (rows changed now) and bookedClones (bookings added now) — both numbers on success,
--- which is what Deletion Settled? reads.
+-- Always one row: retiredProfiles (rows changed now) and bookedClones (bookings added now). Deletion Settled? reads
+-- retiredProfiles only: the bookings are made by this same statement, so they cannot fail apart from it; bookedClones
+-- is not part of the webhook's answer.
 """ + _LINE_PARAMS_WORDS + DBF_LINE_HEAD + _LINE_CLONES + """, retired as (
   update bot_profiles bp set deleted_at = coalesce(bp.deleted_at, now()), deleted_reason = 'app_delete'
   where bp.profile_id in (select profile_id from lineage_profiles)

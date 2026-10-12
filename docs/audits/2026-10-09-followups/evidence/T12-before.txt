@@ -1,0 +1,88 @@
+T12 «до» — deploy-canonical.py против staging (HEAD 196158b7 + правка комментария LINE_RETIRE_SQL в рабочем дереве)
+Дата: 2026-10-12. Только staging (http://localhost:5678) и офлайн-модель n8n; прод не трогался.
+
+Почему: шаг 5 репетиции T12 («deploy-canonical.py dry-run против staging показывает ровно ожидаемый список») на
+инструменте HEAD невыполним — staging держит ПРОИЗВОДНЫЕ копии (derive-staging.py), а инструмент сравнивает и выкладывает
+сырой канон: dry-run видит «would update» почти везде, а --apply выложил бы на стенд прод-адреса и настоящий Wappi.
+
+=== §1. Реальный staging: verify-deployed.py (эталон) — 1 DIFF (Delete Bot Files: правка комментария) ===
+base http://localhost:5678: canonical 27 (diff 1), clones 2 (behind template 0, of them prompt head behind 0; custom prompts 2, not counted), archived clones 0 (not counted), other 2
+  DIFF    lmjYsdNcQA2IE5rl lmjYsdNcQA2IE5rl-Delete_Bot_Files.json  active=True names=True graph=False published=False  (stored graph differs; PUBLISHED graph differs)
+
+=== §2. Реальный staging: deploy-canonical.py --base http://localhost:5678 (dry-run, инструмент HEAD) — 15 would_update ===
+~ 2islisFH7jjLoPQM 'Delete Orphan Profiles' active=True nodes 13 → 13 (+0 -0)
+~ 3qax5J9u2qsT9Vao 'Edit Whatsapp Workflow' active=True nodes 9 → 9 (+0 -0)
+~ 4VN3gsFaC2HUYmcc 'Telegram Bot' active=False nodes 60 → 60 (+0 -0)
+~ 4wYitz5ek30SVNlT 'WhatsApp Bot' active=False nodes 60 → 60 (+0 -0)
+~ KoTuIlk4LMrlvnWI 'Upload File' active=True nodes 31 → 34 (+3 -0)
+~ TwWPW3gIyjZS3foR 'Edit Telegram Workflow' active=True nodes 9 → 9 (+0 -0)
+~ Uz6HBBUpAiUqVysB 'CreateTelegramWorkflow' active=True nodes 52 → 52 (+0 -0)
+~ XuvOp7TxOImOAmlj 'CreateWhatsappWorkflow' active=True nodes 52 → 52 (+0 -0)
+~ ZTqpumOpL1rNDOp6 'Delete File' active=True nodes 9 → 9 (+0 -0)
+~ crAuthSession001 'Auth Session' active=True nodes 26 → 26 (+0 -0)
+~ crHandoffNtfy001 'Handoff Notifier' active=True nodes 10 → 10 (+0 -0)
+~ crPriceSearch001 'Price List Search' active=True nodes 5 → 6 (+1 -0)
+~ crWappiProxy0001 'Wappi Proxy' active=True nodes 24 → 24 (+0 -0)
+~ fXYpCXPKw92EzRz8 'Profile Lifecycle Sweep' active=True nodes 40 → 40 (+0 -0)
+~ lmjYsdNcQA2IE5rl 'Delete Bot Files' active=True nodes 19 → 19 (+0 -0)
+{"considered": 25, "missing": 0, "up_to_date": 10, "would_update": 15, "updated": 0, "would_publish": 0, "republished": 0, "inactive_must_run": 0, "failed": 0}
+
+=== §3. tests/test_deploy_canonical.py на инструменте HEAD (новые случаи STG) — 22 pass, 4 fail ===
+PASS D1 stored canonical, PUBLISHED version older: --apply publishes the stored version in place, read-back confirms (exit 0, republished=1)
+PASS D1 dry-run: the same state is «would publish» with the rollback pointer, nothing is written (exit 0)
+PASS D1 origin: a PUT whose own publish was refused (400, version saved) fails the run; the RE-RUN repairs it and confirms
+PASS D1 an instance that reports version ids only (no activeVersion graph): activeVersionId != versionId is republished, then confirmed by the ids
+PASS D1 an active workflow whose stored version still carries an unbound placeholder is NOT published (refused, exit 1)
+PASS D1 NEG publish refused (400, n8n validated before switching): exit 1, failed=1, republished=0, the old served version is named
+PASS D1 NEG publish answered 200 but the served version did not change: the read-back fails the run (exit 1)
+PASS D1 NEG publish rolled back by n8n (trigger registration failed → INACTIVE): exit 1, the read-back names the outage
+PASS D1b ordinary DIFF, the PUT published (n8n 2.36): neither deactivate nor activate — PUT only, read-back ok, updated=1, exit 0
+PASS D1b ordinary DIFF, the PUT saved but did NOT publish: only POST /activate {versionId: the saved version}, no deactivate; read-back ok, updated=1
+PASS D1b ids-only instance (no activeVersion graph): a PUT that published (activeVersionId == versionId) needs no publish
+PASS D1b NEG the PUT did not publish and the in-place publish is REFUSED: failed=1, exit 1, the workflow stays ACTIVE on its old version (never deactivated)
+PASS D1b NEG the in-place publish answered 200 but nothing changed: the read-back fails the run (exit 1)
+PASS D1b NEG the in-place publish was rolled back by n8n (trigger registration failed → INACTIVE): exit 1, the output names the outage
+PASS NEG ordinary DIFF dry-run: would_update=1, would_publish=0, nothing written
+PASS NEG fully matching (stored = published = canonical): up_to_date=1, only GETs, exit 0
+PASS NEG inactive bot template with a canonical stored graph: up_to_date, never published or activated
+PASS NEG inactive bot template whose stored graph differs: PUT only, it stays inactive (no publish)
+PASS NEG a workflow that must run but is INACTIVE (canonical stored): reported, never activated, not counted up to date, exit 0
+PASS NEG whole healthy canonical set (placeholders bound, templates inactive): --apply writes NOTHING, every workflow up to date
+PASS STG premise: the derivation of the parsed canon equals the derivation of the file text bootstrap.py reads
+FAIL STG a healthy staging (exactly what bootstrap.py imports): the dry-run is «up to date» for every workflow, nothing would be PUT
+      - exit 0 {'considered': 25, 'missing': 0, 'up_to_date': 10, 'would_update': 15, 'updated': 0, 'would_publish': 0, 'republished': 0, 'inactive_must_run': 0, 'failed': 0}
+ollback pointer: versionId ZTqpum-v14 (activeVersionId ZTqpum-v14)
+~ crAuthSession001 'Auth Session' active=True nodes 26 → 26 (+0 -0)
+    rollback pointer: versionId crAuth-v15 (activeVersionId crAuth-v15)
+= crHandoffDry0001 'Handoff Request (dry)' up to date (stored and published)
+~ crHandoffNtfy001 'Handoff Notifier' active=True nodes 10 → 10 (+0 -0)
+    rollback pointer: versionId crHand-v17 (activeVersionId crHand-v17)
+= crH
+FAIL STG --apply on staging PUTs the DERIVED canon: no production host, staging credentials bound, isolation kept, read-back ok
+      - /workflows/KoTuIlk4LMrlvnWI: a PUT to staging would write to the real Supabase
+      - /workflows/KoTuIlk4LMrlvnWI: Postgres must be bound to «Postgres Staging» only: {'vvRrFiEXzLVqKjOx'}
+      - /workflows/XuvOp7TxOImOAmlj: a PUT to staging carries a production host
+      - /workflows/XuvOp7TxOImOAmlj: Postgres must be bound to «Postgres Staging» only: {'vvRrFiEXzLVqKjOx'}
+      - Create's n8n API calls must use staging's `n8n Admin API`: {'HdrAdminCred0001'}
+      - XuvOp7TxOImOAmlj: staging must SERVE the derived canonical graph
+      - KoTuIlk4LMrlvnWI: staging must SERVE the derived canonical graph
+      - crPriceSearch001: staging must SERVE the derived canonical graph
+FAIL STG NEG a staging without «Postgres Staging» is refused before any request (a set bound to the shared DB is the failure mode)
+      - exit 0, writes [('PUT', '/workflows/XuvOp7TxOImOAmlj')]
+~ XuvOp7TxOImOAmlj 'CreateWhatsappWorkflow' active=True nodes 52 → 52 (+0 -0)
+    rollback pointer: versionId XuvOp7-v1 (activeVersionId XuvOp7-v1)
+    published by the PUT (served version = the update) — no publish call, no deactivate window
+    read-back: ok
+{"considered": 1, "missing": 0, "up_to_date": 0, "would_update": 0, "updated": 1, "would_publish": 0, "republished": 0, "inactive_must_run": 0, "failed": 0}
+
+FAIL STG NEG a credential the canon names is missing on staging: refused, nothing written
+      - exit 0, writes [('PUT', '/workflows/XuvOp7TxOImOAmlj')]
+~ XuvOp7TxOImOAmlj 'CreateWhatsappWorkflow' active=True nodes 52 → 52 (+0 -0)
+    rollback pointer: versionId XuvOp7-v1 (activeVersionId XuvOp7-v1)
+    published by the PUT (served version = the update) — no publish call, no deactivate window
+    read-back: ok
+{"considered": 1, "missing": 0, "up_to_date": 0, "would_update": 0, "updated": 1, "would_publish": 0, "republished": 0, "inactive_must_run": 0, "failed": 0}
+
+PASS STG NEG a production base never derives and never reads staging state: the raw (bound) canon is up to date there
+
+22 pass, 4 fail

@@ -404,4 +404,122 @@ with Case('NEG whole healthy canonical set (placeholders bound, templates inacti
     c.check(fake.writes() == [], f'no writes on a healthy instance: {fake.writes()[:5]}')
     c.check(not any(p.endswith((SUPPORT, SWS)) for _, p, _ in fake.calls), 'the two placeholder workflows stay out of scope (build-client-webhooks.py --update)')
 
+# ---------------------------------------------------------------------------------------------- staging (T12, 2026-10-12)
+# The rehearsal of a deploy on staging (F1F2-plan T12) runs THIS tool against the staging n8n. Staging holds the DERIVED
+# copies bootstrap.py imports (derive-staging.py: n8n self-calls → localhost, Wappi → the mock, Supabase writers
+# neutralised, the price search on the staging stub, credentials re-bound BY NAME to staging's own). A local base must be
+# compared with — and PUT — that same derivation: compared with the raw canon every derived workflow read as «would
+# update» (15 of 25 on the real staging, while verify-deployed.py reported one DIFF), and --apply would have PUT the
+# production URLs and the real Wappi host into the isolated stand. A production base never reads staging state.
+STG_BASE = 'http://localhost:5678'
+CREATE_WA, UPLOAD, PRICE = 'XuvOp7TxOImOAmlj', 'KoTuIlk4LMrlvnWI', 'crPriceSearch001'
+DERIVE = module('update-clones.py')._derive_module()
+STG_CREDS = {}
+for _w in CANON.values():
+    for _n in _w.get('nodes') or []:
+        for _ctype, _ref in (_n.get('credentials') or {}).items():
+            if isinstance(_ref, dict) and _ref.get('name'):
+                STG_CREDS.setdefault(_ref['name'], (f'stg{len(STG_CREDS):04d}cred', _ctype))
+STG_CREDS[DERIVE.PG_STAGING_NAME] = ('stgPgStaging0001', 'postgres')
+STG_CREDS.pop('Support Bot', None)                      # left dangling on purpose by derive-staging.py (ALLOWED_MISSING)
+STG_ADMIN = STG_CREDS['n8n Admin API'][0]
+
+
+def staged(w):
+    """What bootstrap.py imports for canonical `w`: derive-staging.py's own steps, in its order."""
+    x = json.loads(DERIVE.derive_file(json.dumps(w, ensure_ascii=False)))
+    DERIVE.isolate_supabase_writers(x)
+    DERIVE.isolate_supabase_readers(x)
+    missing = set()
+    for n in x.get('nodes') or []:
+        DERIVE.remap(n, STG_CREDS, missing)
+    return x
+
+
+def stg_deploy(fake, *args, only=(CREATE_WA,), creds=None):
+    DERIVE.staging_credentials = lambda: dict(STG_CREDS if creds is None else creds)
+    dc = module('deploy-canonical.py')
+    dc.uc.call = fake.call
+    dc.uc._derive_module = lambda: DERIVE
+    dc.canonical_files = lambda: copy.deepcopy(CANON_FILES)
+    argv = ['deploy-canonical.py', '--base', STG_BASE, *[x for o in only for x in ('--only', o)], *args]
+    code, out = run_main(dc, argv)
+    lines = [l for l in out.strip().splitlines() if l.startswith('{')]
+    return code, out, (json.loads(lines[-1]) if lines else {})
+
+
+PROD_HOSTS = ('n8n.choosereply.com', 'wappi.pro')
+
+
+def puts(fake):
+    return [(p, b) for m, p, b in fake.calls if m == 'PUT']
+
+
+with Case('STG premise: the derivation of the parsed canon equals the derivation of the file text bootstrap.py reads') as c:
+    for wid, (path, w) in CANON_FILES.items():
+        a = json.loads(DERIVE.derive_file(open(path, encoding='utf-8').read()))
+        b = json.loads(DERIVE.derive_file(json.dumps(w, ensure_ascii=False)))
+        c.check(a == b, f'{wid}: derive_file(file text) != derive_file(json.dumps)')
+    c.check(any(h(staged(w)) != h(w) for w in CANON.values()), 'premise: the derivation changes the graph of some workflow')
+
+with Case('STG a healthy staging (exactly what bootstrap.py imports): the dry-run is «up to date» for every workflow, nothing would be PUT') as c:
+    fake = FakeN8n()
+    for wid, w in CANON.items():
+        fake.add(staged(w), active=wid not in (TEMPLATE_WA, '4VN3gsFaC2HUYmcc'))
+    code, out, s = stg_deploy(fake, only=())
+    c.check(code == 0 and s.get('considered', 0) > 20 and s.get('up_to_date') == s.get('considered')
+            and s.get('would_update', 0) == 0 and s.get('would_publish', 0) == 0, f'exit {code} {s}\n{out[-1500:]}')
+    c.check(fake.writes() == [], f'a dry-run never writes: {fake.writes()}')
+
+with Case('STG --apply on staging PUTs the DERIVED canon: no production host, staging credentials bound, isolation kept, read-back ok') as c:
+    fake = FakeN8n()
+    for wid in (CREATE_WA, UPLOAD, PRICE):
+        fake.add(stale(staged(CANON[wid])), active=True)
+    for wid in (SWS, SUPPORT):
+        fake.add(bound(CANON[wid]), active=True)
+    code, out, s = stg_deploy(fake, *APPLY, only=(CREATE_WA, UPLOAD, PRICE))
+    c.check(code == 0 and counts(s, 'updated', 'failed') == {'updated': 3, 'failed': 0}, f'exit {code} {s}\n{out[-1500:]}')
+    sent = puts(fake)
+    c.check(len(sent) == 3, f'one PUT per workflow: {[p for p, _ in sent]}')
+    for p, body in sent:
+        t = json.dumps(body, ensure_ascii=False)
+        c.check(not any(x in t for x in PROD_HOSTS), f'{p}: a PUT to staging carries a production host')
+        c.check('__HDR_CRED__' not in t, f'{p}: the admin placeholder must be bound to staging\'s credential')
+        c.check(DERIVE.supabase_writers_left(body) == [], f'{p}: a PUT to staging would write to the real Supabase')
+        pg = {(n.get('credentials') or {}).get('postgres', {}).get('id') for n in body['nodes'] if (n.get('credentials') or {}).get('postgres')}
+        c.check(pg <= {'stgPgStaging0001'}, f'{p}: Postgres must be bound to «Postgres Staging» only: {pg}')
+    create = next(b for p, b in sent if p.endswith(CREATE_WA))
+    admin = {(n.get('credentials') or {}).get('httpHeaderAuth', {}).get('id') for n in create['nodes']
+             if ((n.get('credentials') or {}).get('httpHeaderAuth') or {}).get('name') == 'n8n Admin API'}
+    c.check(admin == {STG_ADMIN}, f'Create\'s n8n API calls must use staging\'s `n8n Admin API`: {admin}')
+    for wid in (CREATE_WA, UPLOAD, PRICE):
+        active, graph = fake.served(wid)
+        c.check(active and h(graph) == h(staged(CANON[wid])), f'{wid}: staging must SERVE the derived canonical graph')
+
+with Case('STG NEG a staging without «Postgres Staging» is refused before any request (a set bound to the shared DB is the failure mode)') as c:
+    fake = FakeN8n()
+    fake.add(stale(staged(CANON[CREATE_WA])), active=True)
+    fake.add(bound(CANON[SWS]), active=True)          # the admin credential is readable: only the derivation may refuse
+    no_pg = {k: v for k, v in STG_CREDS.items() if k != DERIVE.PG_STAGING_NAME}
+    code, out, s = stg_deploy(fake, *APPLY, creds=no_pg)
+    c.check(code not in (0, None) and fake.writes() == [], f'exit {code}, writes {fake.writes()}\n{out[-600:]}')
+
+with Case('STG NEG a credential the canon names is missing on staging: refused, nothing written') as c:
+    fake = FakeN8n()
+    fake.add(stale(staged(CANON[CREATE_WA])), active=True)
+    fake.add(bound(CANON[SWS]), active=True)
+    no_admin = {k: v for k, v in STG_CREDS.items() if k != 'n8n Admin API'}
+    code, out, s = stg_deploy(fake, *APPLY, creds=no_admin)
+    c.check(code not in (0, None) and fake.writes() == [], f'exit {code}, writes {fake.writes()}\n{out[-600:]}')
+
+with Case('STG NEG a production base never derives and never reads staging state: the raw (bound) canon is up to date there') as c:
+    def boom():
+        raise AssertionError('a production deploy read the staging credentials')
+    DERIVE.staging_credentials = boom
+    fake = FakeN8n()
+    fake.add(bound(CANON[CREATE_WA]), active=True)
+    code, out, s = deploy(fake, *APPLY, only=(CREATE_WA,))
+    c.check(code == 0 and s.get('up_to_date') == 1 and fake.writes() == [], f'exit {code} {s}\n{out[-600:]}')
+
+
 report()

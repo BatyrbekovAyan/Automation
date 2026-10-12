@@ -29,7 +29,14 @@ webhook offline exactly then) — and confirmed by a read-back (served = stored 
 workflows are never published or activated: a bot template stays as it is, and a workflow that must run (everything but
 the templates, verify-deployed.py) but is inactive is only reported (`inactive_must_run`) — switching it on is an
 operator's decision.
+STAGING (T12, 2026-10-12): a local base (localhost / 127.0.0.1) holds the DERIVED copies bootstrap.py imports, so the
+tool compares with — and PUTs — the same derivation (staging_canon: derive-staging.py's steps, credentials re-bound by name
+to the staging instance's own, refused when «Postgres Staging» or any named credential is missing or a production host
+survives). That is what lets the deploy package be rehearsed on staging with the very tool that will run on prod; the raw
+canon would read as «would update» everywhere there and --apply would have pointed the stand at prod. A production base
+never derives and never reads staging state.
     python3 Tools/n8n/deploy-canonical.py                       # dry-run on prod: what differs, what would be PUT
+    python3 Tools/n8n/deploy-canonical.py --base http://localhost:5678   # the same against staging (rehearsal)
     python3 Tools/n8n/deploy-canonical.py --only <id> --apply --yes
     python3 Tools/n8n/deploy-canonical.py --apply --yes         # every DIFF canonical workflow, in file order
 """
@@ -88,6 +95,42 @@ def canonical_files():
         wf = json.load(open(path, encoding="utf-8"))
         wid = wf.get("id") or os.path.basename(path).split("-", 1)[0]
         out[wid] = (path, wf)
+    return out
+
+
+def is_staging(base):
+    """The rule verify-deployed.py and update-clones.py use: a local n8n is the isolated staging stand."""
+    return "localhost" in base or "127.0.0.1" in base
+
+
+def staging_canon(files):
+    """T12 (2026-10-12): the canon as STAGING holds it — derive-staging.py's own steps in its order (n8n self-calls →
+    localhost, Wappi → the mock, Supabase writers neutralised, the price search on the staging stub, credentials
+    re-bound BY NAME to the staging instance's own, «Postgres Staging» for every Postgres node). Refuses — before any
+    request — when «Postgres Staging» or a credential the canon names is missing, when a production host survives or
+    when a Supabase writer is left: the PUT body to staging is exactly what bootstrap.py would import."""
+    d = uc._derive_module()
+    creds = d.staging_credentials()
+    if d.PG_STAGING_NAME not in creds:
+        sys.exit(f"REFUSED: staging has no credential named {d.PG_STAGING_NAME!r} — a derived set would bind the shared "
+                 f"production Postgres (derive-staging.py)")
+    out, missing = {}, set()
+    for wid, (path, wf) in files.items():
+        x = json.loads(d.derive_file(json.dumps(wf, ensure_ascii=False)))
+        d.isolate_supabase_writers(x)
+        d.isolate_supabase_readers(x)
+        for n in x.get("nodes") or []:
+            d.remap(n, creds, missing)
+        text = json.dumps(x, ensure_ascii=False)
+        for forbidden in (d.CANON_HOST, d.WAPPI, "wappi.pro"):
+            if forbidden in text:
+                sys.exit(f"REFUSED: {os.path.basename(path)} still references {forbidden} after the staging derivation")
+        if d.supabase_writers_left(x):
+            sys.exit(f"REFUSED: {os.path.basename(path)} would still WRITE to the real Supabase: {d.supabase_writers_left(x)}")
+        out[wid] = (path, x)
+    missing -= d.ALLOWED_MISSING
+    if missing:
+        sys.exit(f"REFUSED: credentials the canon names are missing on staging: {sorted(missing)} (bootstrap.py creates them)")
     return out
 
 
@@ -236,6 +279,8 @@ def main():
         for f, node, rule, line, token, excerpt in refused:
             print(f"SQL GUARD: {f} :: {node} :: line {line} :: {rule} {token}: {excerpt}")
         sys.exit("refusing to deploy: a Postgres node fails verify-sql-comments.py (V1) — fix its generator / the canon first")
+    if is_staging(base):
+        files = staging_canon(files)   # what staging holds and must be given: the derived set (T12)
     summary = {"considered": 0, "missing": 0, "up_to_date": 0, "would_update": 0, "updated": 0,
                "would_publish": 0, "republished": 0, "inactive_must_run": 0, "failed": 0}
     for wid, (path, canon) in files.items():

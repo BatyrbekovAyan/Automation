@@ -1,0 +1,46 @@
+T12 «после» — deploy-canonical.py с производным каноном для staging (staging_canon) + правка комментария LINE_RETIRE_SQL
+Дата: 2026-10-12. Только staging и офлайн-модель n8n; прод не трогался.
+
+=== §1. tests/test_deploy_canonical.py — 26 pass, 0 fail (было 22/4) ===
+PASS D1 stored canonical, PUBLISHED version older: --apply publishes the stored version in place, read-back confirms (exit 0, republished=1)
+PASS D1 dry-run: the same state is «would publish» with the rollback pointer, nothing is written (exit 0)
+PASS D1 origin: a PUT whose own publish was refused (400, version saved) fails the run; the RE-RUN repairs it and confirms
+PASS D1 an instance that reports version ids only (no activeVersion graph): activeVersionId != versionId is republished, then confirmed by the ids
+PASS D1 an active workflow whose stored version still carries an unbound placeholder is NOT published (refused, exit 1)
+PASS D1 NEG publish refused (400, n8n validated before switching): exit 1, failed=1, republished=0, the old served version is named
+PASS D1 NEG publish answered 200 but the served version did not change: the read-back fails the run (exit 1)
+PASS D1 NEG publish rolled back by n8n (trigger registration failed → INACTIVE): exit 1, the read-back names the outage
+PASS D1b ordinary DIFF, the PUT published (n8n 2.36): neither deactivate nor activate — PUT only, read-back ok, updated=1, exit 0
+PASS D1b ordinary DIFF, the PUT saved but did NOT publish: only POST /activate {versionId: the saved version}, no deactivate; read-back ok, updated=1
+PASS D1b ids-only instance (no activeVersion graph): a PUT that published (activeVersionId == versionId) needs no publish
+PASS D1b NEG the PUT did not publish and the in-place publish is REFUSED: failed=1, exit 1, the workflow stays ACTIVE on its old version (never deactivated)
+PASS D1b NEG the in-place publish answered 200 but nothing changed: the read-back fails the run (exit 1)
+PASS D1b NEG the in-place publish was rolled back by n8n (trigger registration failed → INACTIVE): exit 1, the output names the outage
+PASS NEG ordinary DIFF dry-run: would_update=1, would_publish=0, nothing written
+PASS NEG fully matching (stored = published = canonical): up_to_date=1, only GETs, exit 0
+PASS NEG inactive bot template with a canonical stored graph: up_to_date, never published or activated
+PASS NEG inactive bot template whose stored graph differs: PUT only, it stays inactive (no publish)
+PASS NEG a workflow that must run but is INACTIVE (canonical stored): reported, never activated, not counted up to date, exit 0
+PASS NEG whole healthy canonical set (placeholders bound, templates inactive): --apply writes NOTHING, every workflow up to date
+PASS STG premise: the derivation of the parsed canon equals the derivation of the file text bootstrap.py reads
+PASS STG a healthy staging (exactly what bootstrap.py imports): the dry-run is «up to date» for every workflow, nothing would be PUT
+PASS STG --apply on staging PUTs the DERIVED canon: no production host, staging credentials bound, isolation kept, read-back ok
+PASS STG NEG a staging without «Postgres Staging» is refused before any request (a set bound to the shared DB is the failure mode)
+PASS STG NEG a credential the canon names is missing on staging: refused, nothing written
+PASS STG NEG a production base never derives and never reads staging state: the raw (bound) canon is up to date there
+
+26 pass, 0 fail
+
+=== §2. Реальный staging (канон рабочего дерева + правка комментария), dry-run исправленного инструмента: 1 would_update = ровно DIFF verify-deployed (Delete Bot Files) ===
+~ lmjYsdNcQA2IE5rl 'Delete Bot Files' active=True nodes 19 → 19 (+0 -0)
+{"considered": 25, "missing": 0, "up_to_date": 24, "would_update": 1, "updated": 0, "would_publish": 0, "republished": 0, "inactive_must_run": 0, "failed": 0}
+
+=== §3. После репетиции и возврата стенда (bootstrap рабочего канона): dry-run — 25/25 up to date ===
+{"considered": 25, "missing": 0, "up_to_date": 25, "would_update": 0, "updated": 0, "would_publish": 0, "republished": 0, "inactive_must_run": 0, "failed": 0}
+
+=== §4. Правка комментария (T10, остаток 2): генератор, второй прогон без диффа, --check, стражи ===
+apply-auth-gate.py --check до: rc=2 (Delete Bot Files stale); после apply: rc=0; второй прогон — без диффа
+auth gate: OK
+ALL AUTH GATE ASSERTS PASSED
+OK  88 Postgres node(s) in 28 workflow file(s): no placeholder outside code, no {{ }}, no modifier, no leading =
+21 pass, 0 fail
