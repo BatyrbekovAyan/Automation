@@ -1,0 +1,104 @@
+T11b — тесты оценщика h8 / набора v1.5 ДО реализации (HEAD fba44558; run-eval.py, scenarios.v1.json и plans/ не тронуты; новые тесты — test_checks.py ScenarioSetV15 / RescoreV14UnderH8 / изменённый ScenarioSetV14.test_version, новый test_schedule.py). 2026-10-12 12:06:56
+
+$ python3 Tools/n8n/eval/test_checks.py   (статус каждого теста; провалы подтестов — ниже)
+rc=1
+  test_rows (__main__.AsksCar) ... ok
+  test_rows (__main__.AsksForWhomOrGoal) ... ok
+  test_rows (__main__.AsksModel) ... ok
+  test_rows (__main__.AsksOrderNumberOrPhone) ... ok
+  test_no_scenario_names_an_unknown_check (__main__.EveryExpectedCheckExists) ... ok
+  test_rows (__main__.LangKz) ... ok
+  test_rows (__main__.MarksUnknownItem) ... ok
+  test_business_turn_stays_unmarked_on_every_ref (__main__.MemoryMarkRoles) ... ok
+  test_marks_are_read_from_the_writers_at_the_measured_ref (__main__.MemoryMarkRoles) ... ok
+  One source: the runner parses the generator's literals, it never keeps a copy (a changed mark must move both). ... ok
+  test_owner_turn_on_a_ref_with_marks_carries_the_owner_mark (__main__.MemoryMarkRoles) ... ok
+  test_owner_turn_on_a_ref_without_marks_renders_like_business (__main__.MemoryMarkRoles) ... ok
+  test_the_runner_renders_through_render_messages (__main__.MemoryMarkRoles) ... ok
+  test_unknown_delivery_turn_carries_the_undelivered_mark_only_on_a_ref_with_marks (__main__.MemoryMarkRoles) ... ok
+  test_rows (__main__.Mentions) ... ok
+  test_rows (__main__.MentionsClock) ... ok
+  test_rows (__main__.NoConflictClaim) ... ok
+  test_rows (__main__.NoDeliveryDoubt) ... ok
+  test_free_delivery_that_is_really_in_the_business_data_passes (__main__.NoFreeDeliveryClaim) ... ok
+  test_negated_free_delivery_in_the_data_does_not_license_the_claim (__main__.NoFreeDeliveryClaim) ... ok
+  test_rows (__main__.NoFreeDeliveryClaim) ... ok
+  test_the_owner_prompt_is_not_business_data (__main__.NoFreeDeliveryClaim) ... ok
+  test_conflict_pair_is_derived_from_the_scenario_data (__main__.NoFreshPricePick) ... ok
+  test_rows (__main__.NoFreshPricePick) ... ok
+  test_rows (__main__.NoMarkerLeak) ... ok
+  test_rows (__main__.NoPriceCaveat) ... ok
+  The data carries no conflict, and the measured search (the canonical Reconcile Prices) hands the chunk over as is. ... ok
+  test_rows (__main__.NoStockGuarantee) ... ok
+  test_rows (__main__.NoTool) ... ok
+  test_rows (__main__.NoTotalConfirmation) ... ok
+  test_rows (__main__.NotMentions) ... ok
+  test_rows (__main__.NotSaysAlready) ... ok
+  test_rows (__main__.PanelChecks) ... ok
+  test_rows (__main__.PromisePhrases) ... ok
+  test_no_saved_v13_verdict_changes (__main__.RescoreV13UnderH7) ... ok
+  test_no_saved_v14_verdict_changes (__main__.RescoreV14UnderH8) ... ok
+  The c1 lesson (evidence/Q1c-measure.txt): a pass-all score cannot see a create_handoff on a scenario that already ... ok
+  test_earlier_bot_replies_keep_the_business_role (__main__.ScenarioSetV14) ... ok
+  K7: «утечка пометок 0 во ВСЕХ прогонах» — every auto run is scored for it. ... ok
+  test_q1_business_turns_are_owner_turns (__main__.ScenarioSetV14) ... ok
+  test_roles_are_known (__main__.ScenarioSetV14) ... ok
+  test_v6_scenarios (__main__.ScenarioSetV14) ... ok
+  test_version (__main__.ScenarioSetV14) ... FAIL
+  test_checked_scenarios_carry_no_tool (__main__.ScenarioSetV15) ... test_every_auto_scenario_is_classified_once (__main__.ScenarioSetV15) ... ok
+  test_handoff_in_design_scenarios_do_not (__main__.ScenarioSetV15) ... ok
+  test_no_scenario_requires_and_forbids_the_handoff (__main__.ScenarioSetV15) ... ok
+  K8 of T11 (ws_kz_min_order) and the wholesale list it dragged along, the a6/q1p of K5. ... ok
+  test_a_model_error_is_not_retried (__main__.TransportRetry) ... ok
+  test_insufficient_quota_stops_the_run (__main__.TransportRetry) ... ok
+  test_rate_limit_then_answer (__main__.TransportRetry) ... ok
+Ran 51 tests in 2.140s
+FAILED (failures=26)
+  провалившиеся подтесты:
+    FAIL: test_version (__main__.ScenarioSetV14)
+    FAIL: test_checked_scenarios_carry_no_tool (__main__.ScenarioSetV15) (scenario='ap_price_without_car')
+    FAIL: test_checked_scenarios_carry_no_tool (__main__.ScenarioSetV15) (scenario='ap_price_with_car')
+    FAIL: test_checked_scenarios_carry_no_tool (__main__.ScenarioSetV15) (scenario='ap_sku_exact_kz')
+    FAIL: test_checked_scenarios_carry_no_tool (__main__.ScenarioSetV15) (scenario='ap_price_agrees_analogues')
+    FAIL: test_checked_scenarios_carry_no_tool (__main__.ScenarioSetV15) (scenario='gen_owner_pref_vs_fact')
+    FAIL: test_checked_scenarios_carry_no_tool (__main__.ScenarioSetV15) (scenario='ws_list_of_items')
+    FAIL: test_checked_scenarios_carry_no_tool (__main__.ScenarioSetV15) (scenario='ws_kz_min_order')
+    FAIL: test_checked_scenarios_carry_no_tool (__main__.ScenarioSetV15) (scenario='ws_mixed_lang')
+    FAIL: test_checked_scenarios_carry_no_tool (__main__.ScenarioSetV15) (scenario='gen_markdown_bait')
+    FAIL: test_checked_scenarios_carry_no_tool (__main__.ScenarioSetV15) (scenario='fl_recommend')
+    FAIL: test_checked_scenarios_carry_no_tool (__main__.ScenarioSetV15) (scenario='fl_kz_price')
+    FAIL: test_checked_scenarios_carry_no_tool (__main__.ScenarioSetV15) (scenario='fl_thanks_in_dialog')
+    FAIL: test_checked_scenarios_carry_no_tool (__main__.ScenarioSetV15) (scenario='ks_installment_terms')
+    FAIL: test_checked_scenarios_carry_no_tool (__main__.ScenarioSetV15) (scenario='ks_variant_clarify')
+    FAIL: test_checked_scenarios_carry_no_tool (__main__.ScenarioSetV15) (scenario='ks_kz_availability')
+    FAIL: test_checked_scenarios_carry_no_tool (__main__.ScenarioSetV15) (scenario='ed_price_no_details')
+    FAIL: test_checked_scenarios_carry_no_tool (__main__.ScenarioSetV15) (scenario='ed_kz_parent')
+    FAIL: test_checked_scenarios_carry_no_tool (__main__.ScenarioSetV15) (scenario='gen_kz_pure_greeting')
+    FAIL: test_checked_scenarios_carry_no_tool (__main__.ScenarioSetV15) (scenario='pr_price_no_model')
+    FAIL: test_checked_scenarios_carry_no_tool (__main__.ScenarioSetV15) (scenario='pr_price_with_model')
+    FAIL: test_checked_scenarios_carry_no_tool (__main__.ScenarioSetV15) (scenario='pr_kz_battery')
+    FAIL: test_checked_scenarios_carry_no_tool (__main__.ScenarioSetV15) (scenario='u1_unknown_reask')
+    FAIL: test_checked_scenarios_carry_no_tool (__main__.ScenarioSetV15) (scenario='u2_unknown_new_question')
+    FAIL: test_checked_scenarios_carry_no_tool (__main__.ScenarioSetV15) (scenario='u3_sent_control')
+    FAIL: test_checked_scenarios_carry_no_tool (__main__.ScenarioSetV15) (scenario='u4_kz_unknown')
+
+$ python3 Tools/n8n/eval/test_schedule.py
+rc=1
+  test_a_plan_writes_one_file_per_block_and_side (__main__.MainRunsTheSchedule) ... ERROR
+  test_an_exhausted_quota_stops_the_plan_and_writes_nothing (__main__.MainRunsTheSchedule) ... ERROR
+  test_sides_run_together_interleaved (__main__.MainRunsTheSchedule) ... ERROR
+  test_single_side_repeats_go_round_robin (__main__.MainRunsTheSchedule) ... ERROR
+  test_blocks (__main__.Plan) ... ERROR
+  test_run_counts (__main__.Plan) ... ERROR
+  test_sides (__main__.Plan) ... ERROR
+  test_equal_repeats_are_plain_round_robin (__main__.Schedule) ... ERROR
+  test_every_side_gets_every_repeat_once (__main__.Schedule) ... ERROR
+  test_sides_of_one_slot_run_back_to_back_and_take_turns_first (__main__.Schedule) ... ERROR
+  Negative case: T11's order (a scenario's repeats one after another) breaks the property the tests below pin. ... ERROR
+  test_the_t11b_plan_never_sends_one_request_twice_in_a_row (__main__.Schedule) ... ERROR
+  A ×20 job beside ×10 ones does not leave its extra repeats for a tail of its own (T11's kz2 block was exactly ... ERROR
+Ran 13 tests in 0.008s
+FAILED (errors=13)
+     5 AttributeError: module 'run_eval' has no attribute 'schedule'
+     4 FileNotFoundError: [Errno 2] No such file or directory: '/Users/ayan/Projects/Automation/Tools/n8n/eval/plans/q1b2.json'
+     4 TypeError: main() takes 0 positional arguments but 1 was given

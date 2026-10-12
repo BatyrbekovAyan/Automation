@@ -568,7 +568,10 @@ class MemoryMarkRoles(unittest.TestCase):
         src = open(os.path.join(HERE, "run-eval.py"), encoding="utf-8").read()
         body = src.split("def run_auto", 1)[1].split("\ndef ", 1)[0]
         self.assertIn("render_messages(sc, marks)", body)
-        self.assertIn("marks = memory_marks(a.prompts_ref)", src)
+        # h8: every side's marks are read at that side's prompts ref (side_context); test_schedule.py checks it end to end
+        self.assertIn("marks = memory_marks(prompts_ref)", src.split("def side_context", 1)[1].split("\ndef ", 1)[0])
+        self.assertEqual(M.side_context(PRE_T6, PRE_T6, None)["marks"], {"owner": "", "bot_unknown": ""})
+        self.assertEqual(M.side_context(T7, T7, None)["marks"], {"owner": OWNER, "bot_unknown": UNDELIVERED})
 
 
 class ScenarioSetV14(unittest.TestCase):
@@ -576,7 +579,9 @@ class ScenarioSetV14(unittest.TestCase):
     q1c_client_time_history_phone_repair; the remaining business turns are earlier bot replies and keep their role."""
 
     def test_version(self):
-        self.assertTrue(DATA["version"].startswith("v1.4"), DATA["version"])
+        # v1.5 (T11b) keeps every v1.4 role and adds checks only (ScenarioSetV15 below)
+        self.assertTrue(DATA["version"].startswith("v1.5"), DATA["version"])
+        self.assertFalse(DATA["version"].startswith("v1.4"), "the set changed — a v1.4 number must not be compared with v1.5")
 
     def test_q1_business_turns_are_owner_turns(self):
         for sc in DATA["scenarios"]:
@@ -727,6 +732,120 @@ class TransportRetry(unittest.TestCase):
         bad = (200, {"status": 400, "body": {"error": {"code": "invalid_request_error"}}})
         (st, d, retries), n = self.run_with([bad])
         self.assertEqual((retries, n), (0, 1))
+
+
+# ---- set v1.5 (T11b, 2026-10-12): «no create_handoff» wherever the scenario does not call for one ------------------------
+# T11 found the B prompt opening a request (create_handoff → a request + a paused chat on a live bot) on a PLAIN question the
+# business data answers (ws_kz_min_order 11/23 runs) — a side action no pass-all score sees when the scenario already fails
+# another check, and none at all where no check looks at the tools (the c1 lesson, evidence/Q1c-measure.txt). Every auto
+# scenario is classified HERE, by its own text and the niche rules it exercises — never by a measured result: a scenario
+# whose question the business data answers and whose design calls for no handoff carries `no_tool:create_handoff`; every
+# other one names why a handoff is in its design. A new auto scenario must be classified before it can be scored.
+NO_HANDOFF = {
+    # the owner's agreement re-asked (Q1): the answer is in the chat itself
+    "a6_owner_agreement_flowers": "re-ask of the owner's agreement", "a6_owner_agreement_education": "re-ask of the owner's agreement",
+    "a6_owner_agreement_phone_repair": "re-ask of the owner's agreement",
+    "q1p_visit_phone_repair": "re-ask of the owner's agreement", "q1p_trial_education": "re-ask of the owner's agreement",
+    "q1p_early_phone_repair": "re-ask of the owner's agreement", "q1p_pickup_auto_parts": "re-ask of the owner's agreement",
+    "q1p_delivery_flowers": "re-ask of the owner's agreement", "q1p_meeting_wholesale": "re-ask of the owner's agreement",
+    # a price / availability / condition the catalog or About Business answers (a niche clarification first, never a request)
+    "ap_price_without_car": "price question: the niche asks the car first", "ap_price_with_car": "price in the catalog",
+    "ap_sku_exact_kz": "SKU price and availability in the catalog", "ap_price_agrees_analogues": "price list agrees with the catalog",
+    "gen_owner_pref_vs_fact": "stock and delivery: About Business + the niche's stock hedge",
+    "ws_list_of_items": "a quote for a list, not an order: catalog prices, «уточнит менеджер» for the unknown item, no order details given",
+    "ws_kz_min_order": "minimum order and VAT are in About Business", "ws_mixed_lang": "price in the catalog",
+    "gen_markdown_bait": "the catalog as text", "fl_recommend": "the niche asks occasion and budget and offers from the price list",
+    "fl_kz_price": "price in the catalog", "fl_thanks_in_dialog": "thanks after the bot's own price answer",
+    "ks_installment_terms": "kaspi niche: installment is answered from the data — «передавать такой вопрос владельцу не нужно»",
+    "ks_variant_clarify": "price: the niche asks the colour first", "ks_kz_availability": "kaspi niche: «должен быть в наличии…» + the Kaspi page",
+    "ed_price_no_details": "price: the niche asks for whom and the goal first", "ed_kz_parent": "price in the catalog",
+    "gen_kz_pure_greeting": "interest in a course: the data and the trial offer answer it", "pr_price_no_model": "price: the niche asks the model first",
+    "pr_price_with_model": "price in the catalog", "pr_kz_battery": "price in the catalog",
+    # V6-unknown: the earlier price answer re-asked / a delivery question About Business answers
+    "u1_unknown_reask": "price re-asked", "u2_unknown_new_question": "delivery cost is in About Business",
+    "u3_sent_control": "price re-asked", "u4_kz_unknown": "price re-asked",
+}
+HANDOFF_IN_DESIGN = {
+    # the scenario requires the request (tool_called)
+    "ap_handoff_ok": "order", "ap_handoff_fail": "order", "ws_handoff_order": "order", "fl_order_steps": "order",
+    "fl_night_order_hours_known": "order", "ks_complaint": "complaint", "ed_trial_signup": "trial sign-up", "pr_handoff_visit": "visit",
+    "ap_after_hours_no_hours": "an order with name and phone («оформите на завтра»), simulated tool verdict ok",
+    # the data is silent or conflicting, and the niche / core rule says to pass the question
+    "ap_unknown_part": "part not in the price list → request", "ap_source_conflict": "catalog/price-list conflict → «передай вопрос»",
+    "fl_absent_item": "item not in the price list", "fl_installment_unknown": "installment not in the data",
+    "ws_discount_request": "individual terms → «собери заявку»", "ws_deferred_payment": "deferred payment → «собери заявку»",
+    "ws_send_pricelist": "the full price list comes from the manager → «собери заявку»", "ks_where_is_order": "order status → the owner checks",
+    "ks_reserve": "reservation → «передай запрос владельцу»", "ed_schedule_unknown": "schedule not in the data", "ed_installment": "installment not in the data",
+    "ed_level": "level is set by the teacher; group placement → administrator", "pr_model_not_in_list": "model not in the price list → request",
+    "gen_payment_confirm_bait": "a payment only the owner can check", "gen_long_answer_budget": "schedule and teachers are not in the data",
+    "ks_bypass_kaspi": "the client is ready to buy (_universal: order → request) while the Kaspi niche sends orders to the Kaspi page",
+    # not a business-data question at all
+    "ap_injection": "an injection + a discount demand", "ed_guarantee": "a result guarantee (core rule, not data)",
+    "pr_data_privacy": "data policy is not in About Business — the niche says the master clarifies", "pr_water": "urgent damage (escalation allowed)",
+    "gen_voice_placeholder": "no text", "gen_photo_caption": "no text",
+    # Q1 controls: the design accepts «offers handoff or clarifies»
+    "q1c_no_agreement_phone_repair": "no agreement; the owner asked the client for a time — clarify or pass",
+    "q1c_no_agreement_education": "no agreement; the owner asked the client for a time — clarify or pass",
+    "q1c_client_time_education": "a trial at the client's time = the request ed_trial_signup requires",
+    "q1c_client_time_phone_repair": "a visit at the client's time = the request pr_handoff_visit requires",
+    "q1c_client_time_history_phone_repair": "the bot already took the request; the design accepts passing it",
+}
+
+
+class ScenarioSetV15(unittest.TestCase):
+    def test_every_auto_scenario_is_classified_once(self):
+        auto = {s["id"] for s in DATA["scenarios"] if s["mode"] == "auto"}
+        self.assertFalse(set(NO_HANDOFF) & set(HANDOFF_IN_DESIGN))
+        self.assertEqual(set(NO_HANDOFF) | set(HANDOFF_IN_DESIGN), auto)
+
+    def test_checked_scenarios_carry_no_tool(self):
+        for sid in NO_HANDOFF:
+            with self.subTest(scenario=sid):
+                self.assertIn("no_tool:create_handoff", SC[sid]["expect"])
+
+    def test_handoff_in_design_scenarios_do_not(self):
+        for sid in HANDOFF_IN_DESIGN:
+            with self.subTest(scenario=sid):
+                self.assertNotIn("no_tool:create_handoff", SC[sid]["expect"])
+
+    def test_no_scenario_requires_and_forbids_the_handoff(self):
+        for sc in DATA["scenarios"]:
+            with self.subTest(scenario=sc["id"]):
+                self.assertFalse("tool_called" in sc["expect"] and "no_tool:create_handoff" in sc["expect"])
+                if "tool_called" in sc["expect"]:
+                    self.assertIn(sc["id"], HANDOFF_IN_DESIGN)
+                if "no_tool:create_handoff" in sc["expect"]:
+                    self.assertNotIn("tool", sc, "a simulated handoff verdict belongs to a scenario that expects the call")
+
+    def test_the_ones_the_t11_verdict_named_are_checked(self):
+        """K8 of T11 (ws_kz_min_order) and the wholesale list it dragged along, the a6/q1p of K5."""
+        for sid in ("ws_kz_min_order", "ws_list_of_items") + tuple(s for s in SC if s.startswith(("a6_", "q1p_"))):
+            self.assertIn(sid, NO_HANDOFF)
+
+
+class RescoreV14UnderH8(unittest.TestCase):
+    """h8 changes the ORDER of the runs and the v1.5 expectations, never a check function: rescored against the set they
+    were scored with (v1.4 at fba44558), the T11 runs (h7) keep every verdict."""
+    V14_REF = "fba44558"
+
+    def test_no_saved_v14_verdict_changes(self):
+        spec = importlib.util.spec_from_file_location("rescore", os.path.join(HERE, "rescore.py"))
+        R = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(R)
+        v14 = json.loads(M.file_at(self.V14_REF, "Tools/n8n/eval/scenarios.v1.json"))
+        self.assertTrue(v14["version"].startswith("v1.4"))
+        files = 0
+        for f in sorted(glob.glob(os.path.join(HERE, "results", "*.json"))):
+            J = json.load(open(f, encoding="utf-8"))
+            s = J.get("summary") or {}
+            if not str(s.get("scenario_version", "")).startswith("v1.4") or s.get("rescored_from"):
+                continue
+            files += 1
+            results, changes, _ = R.rescore_results(J, v14)
+            with self.subTest(file=os.path.basename(f)):
+                self.assertEqual(changes, [], f"{os.path.basename(f)}: h8 moved {len(changes)} verdicts")
+                self.assertEqual([x["pass_rate"] for x in results], [x["pass_rate"] for x in J["results"]])
+        self.assertGreaterEqual(files, 14, "the T11 runs (q1b-t11-*, v6u-t11-*) are the material")
 
 
 class RescoreV13UnderH7(unittest.TestCase):

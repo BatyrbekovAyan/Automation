@@ -1,0 +1,88 @@
+T11b — тесты оценщика h8 / набора v1.5 ПОСЛЕ реализации (до первого платного прогона; кандидат к рабочему дереву ещё не применён). 2026-10-12 12:12:35
+
+## 1. $ python3 Tools/n8n/eval/test_checks.py
+rc=0
+  test_rows (__main__.AsksCar) ... ok
+  test_rows (__main__.AsksForWhomOrGoal) ... ok
+  test_rows (__main__.AsksModel) ... ok
+  test_rows (__main__.AsksOrderNumberOrPhone) ... ok
+  test_no_scenario_names_an_unknown_check (__main__.EveryExpectedCheckExists) ... ok
+  test_rows (__main__.LangKz) ... ok
+  test_rows (__main__.MarksUnknownItem) ... ok
+  test_business_turn_stays_unmarked_on_every_ref (__main__.MemoryMarkRoles) ... ok
+  test_marks_are_read_from_the_writers_at_the_measured_ref (__main__.MemoryMarkRoles) ... ok
+  One source: the runner parses the generator's literals, it never keeps a copy (a changed mark must move both). ... ok
+  test_owner_turn_on_a_ref_with_marks_carries_the_owner_mark (__main__.MemoryMarkRoles) ... ok
+  test_owner_turn_on_a_ref_without_marks_renders_like_business (__main__.MemoryMarkRoles) ... ok
+  test_the_runner_renders_through_render_messages (__main__.MemoryMarkRoles) ... ok
+  test_unknown_delivery_turn_carries_the_undelivered_mark_only_on_a_ref_with_marks (__main__.MemoryMarkRoles) ... ok
+  test_rows (__main__.Mentions) ... ok
+  test_rows (__main__.MentionsClock) ... ok
+  test_rows (__main__.NoConflictClaim) ... ok
+  test_rows (__main__.NoDeliveryDoubt) ... ok
+  test_free_delivery_that_is_really_in_the_business_data_passes (__main__.NoFreeDeliveryClaim) ... ok
+  test_negated_free_delivery_in_the_data_does_not_license_the_claim (__main__.NoFreeDeliveryClaim) ... ok
+  test_rows (__main__.NoFreeDeliveryClaim) ... ok
+  test_the_owner_prompt_is_not_business_data (__main__.NoFreeDeliveryClaim) ... ok
+  test_conflict_pair_is_derived_from_the_scenario_data (__main__.NoFreshPricePick) ... ok
+  test_rows (__main__.NoFreshPricePick) ... ok
+  test_rows (__main__.NoMarkerLeak) ... ok
+  test_rows (__main__.NoPriceCaveat) ... ok
+  The data carries no conflict, and the measured search (the canonical Reconcile Prices) hands the chunk over as is. ... ok
+  test_rows (__main__.NoStockGuarantee) ... ok
+  test_rows (__main__.NoTool) ... ok
+  test_rows (__main__.NoTotalConfirmation) ... ok
+  test_rows (__main__.NotMentions) ... ok
+  test_rows (__main__.NotSaysAlready) ... ok
+  test_rows (__main__.PanelChecks) ... ok
+  test_rows (__main__.PromisePhrases) ... ok
+  test_no_saved_v13_verdict_changes (__main__.RescoreV13UnderH7) ... ok
+  test_no_saved_v14_verdict_changes (__main__.RescoreV14UnderH8) ... ok
+  The c1 lesson (evidence/Q1c-measure.txt): a pass-all score cannot see a create_handoff on a scenario that already ... ok
+  test_earlier_bot_replies_keep_the_business_role (__main__.ScenarioSetV14) ... ok
+  K7: «утечка пометок 0 во ВСЕХ прогонах» — every auto run is scored for it. ... ok
+  test_q1_business_turns_are_owner_turns (__main__.ScenarioSetV14) ... ok
+  test_roles_are_known (__main__.ScenarioSetV14) ... ok
+  test_v6_scenarios (__main__.ScenarioSetV14) ... ok
+  test_version (__main__.ScenarioSetV14) ... ok
+  test_checked_scenarios_carry_no_tool (__main__.ScenarioSetV15) ... ok
+  test_every_auto_scenario_is_classified_once (__main__.ScenarioSetV15) ... ok
+  test_handoff_in_design_scenarios_do_not (__main__.ScenarioSetV15) ... ok
+  test_no_scenario_requires_and_forbids_the_handoff (__main__.ScenarioSetV15) ... ok
+  K8 of T11 (ws_kz_min_order) and the wholesale list it dragged along, the a6/q1p of K5. ... ok
+  test_a_model_error_is_not_retried (__main__.TransportRetry) ... ok
+  test_insufficient_quota_stops_the_run (__main__.TransportRetry) ... ok
+  test_rate_limit_then_answer (__main__.TransportRetry) ... ok
+Ran 51 tests in 2.474s
+OK
+
+## 2. $ python3 Tools/n8n/eval/test_schedule.py
+rc=0
+  test_a_plan_writes_one_file_per_block_and_side (__main__.MainRunsTheSchedule) ... ok
+  test_an_exhausted_quota_stops_the_plan_and_writes_nothing (__main__.MainRunsTheSchedule) ... ok
+  test_sides_run_together_interleaved (__main__.MainRunsTheSchedule) ... ok
+  test_single_side_repeats_go_round_robin (__main__.MainRunsTheSchedule) ... ok
+  test_blocks (__main__.Plan) ... ok
+  test_run_counts (__main__.Plan) ... ok
+  test_sides (__main__.Plan) ... ok
+  test_equal_repeats_are_plain_round_robin (__main__.Schedule) ... ok
+  test_every_side_gets_every_repeat_once (__main__.Schedule) ... ok
+  test_sides_of_one_slot_run_back_to_back_and_take_turns_first (__main__.Schedule) ... ok
+  Negative case: T11's order (a scenario's repeats one after another) breaks the property the tests below pin. ... ok
+  test_the_t11b_plan_never_sends_one_request_twice_in_a_row (__main__.Schedule) ... ok
+  A ×20 job beside ×10 ones does not leave its extra repeats for a tail of its own (T11's kz2 block was exactly ... ok
+Ran 13 tests in 0.570s
+OK
+
+## 3. $ python3 Tools/n8n/eval/test_search_ref.py
+rc=0
+Ran 4 tests in 0.151s
+OK
+
+## 4. сухой прогон всего плана с подставным прокси (без сети; ответы случайны) → q1b2report.py
+run-eval --plan plans/q1b2.json --workers 4 (fake): rc=0, файлов результатов 14
+  прогонов по сторонам: {'after': 534, 'before': 534, 'B': 94} · seq уникальны и покрывают 0..N-1: True
+  q1b2report.py rc=0 (строк 141; числа подставного прогона смысла не имеют)
+
+## 5. t11report.py (T11, h7) на наборе v1.5 — вывод не изменился
+rc=0; diff с сохранённым выводом T11 (= Q1B-measure.txt §2): пустой — IDENTICAL

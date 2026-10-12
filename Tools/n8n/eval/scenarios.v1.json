@@ -1,6 +1,6 @@
 {
-  "version": "v1.4 (2026-10-12: T11 — Q1 B + V6-unknown: the business turn of a6_/q1p_/q1c_ is the OWNER's reply (role `owner`), except the bot's own reply in q1c_client_time_history_phone_repair; u1_–u4_ — the bot's earlier reply of UNKNOWN delivery (role `bot_unknown`); no_tool:create_handoff on a6_/q1p_ (the c1 lesson), no_marker_leak on every auto scenario; harness h7)",
-  "notes": "Synthetic business scenarios — no real chats, no real names or numbers. `mode`: auto (the bot's composed system prompt through the completions proxy, with the create_handoff and price_list_search tools simulated by the runner) | panel (the Suggest Replies webhook on staging). `expect` names deterministic checks the runner applies; `tool` sets the simulated create_handoff result. Q1 (v1.3): in a6_/q1p_ the `business` turn is the OWNER's reply as it reaches the bot's memory (an ai row) — the bot must repeat that agreement; q1c_ must NOT assign a time or serve the client's own time as agreed. Roles (v1.4, h7): `client` = the client; `business` = the bot's OWN earlier reply as memory stores it (delivered, unmarked); `owner` = the owner's reply (owner_app / owner_phone memory row); `bot_unknown` = the bot's earlier reply whose delivery is unknown. `owner` and `bot_unknown` reach the model with the mark the memory writers store at the measured ref (apply-history-handoff.py OWNER_MEMORY_PREFIX / UNDELIVERED_MEMORY_PREFIX at --prompts-ref) — before T6 there is none, so the same scenario measures prod's memory on the old ref and the marked memory on the new one.",
+  "version": "v1.5 (2026-10-12: T11b — no_tool:create_handoff on every auto scenario whose question the business data answers and whose design calls for no handoff (34: a6_/q1p_ as in v1.4 + 25 more, among them ws_kz_min_order and ws_list_of_items); every auto scenario is classified in test_checks.py (NO_HANDOFF / HANDOFF_IN_DESIGN, each with its reason); roles and all other checks as v1.4; harness h8 — interleaved repeats)",
+  "notes": "Synthetic business scenarios — no real chats, no real names or numbers. `mode`: auto (the bot's composed system prompt through the completions proxy, with the create_handoff and price_list_search tools simulated by the runner) | panel (the Suggest Replies webhook on staging). `expect` names deterministic checks the runner applies; `tool` sets the simulated create_handoff result. Q1 (v1.3): in a6_/q1p_ the `business` turn is the OWNER's reply as it reaches the bot's memory (an ai row) — the bot must repeat that agreement; q1c_ must NOT assign a time or serve the client's own time as agreed. Roles (v1.4, h7): `client` = the client; `business` = the bot's OWN earlier reply as memory stores it (delivered, unmarked); `owner` = the owner's reply (owner_app / owner_phone memory row); `bot_unknown` = the bot's earlier reply whose delivery is unknown. `owner` and `bot_unknown` reach the model with the mark the memory writers store at the measured ref (apply-history-handoff.py OWNER_MEMORY_PREFIX / UNDELIVERED_MEMORY_PREFIX at --prompts-ref) — before T6 there is none, so the same scenario measures prod's memory on the old ref and the marked memory on the new one. v1.5 (T11b): `no_tool:create_handoff` = the model must not open a request (on a live bot create_handoff records a request and pauses the chat's auto-reply until the owner's explicit «Авто»); it stands on every auto scenario whose question the business data answers and whose design calls for no handoff — decided by the scenario text and the niche rules it exercises, never by a measured result; the classification and the reason for every scenario left unchecked live in eval/test_checks.py.",
   "knowledge": {
     "auto_parts": {
       "businessType": "Автозапчасти",
@@ -87,6 +87,7 @@
         "lang_ru",
         "no_markdown",
         "no_closing_offer",
+        "no_tool:create_handoff",
         "no_marker_leak"
       ]
     },
@@ -108,6 +109,7 @@
         "numbers_grounded",
         "mentions:3200",
         "no_markdown",
+        "no_tool:create_handoff",
         "no_marker_leak"
       ]
     },
@@ -130,6 +132,7 @@
         "lang_kz",
         "numbers_grounded",
         "no_invented_sku",
+        "no_tool:create_handoff",
         "no_marker_leak"
       ]
     },
@@ -251,6 +254,7 @@
         "no_conflict_claim",
         "no_price_caveat",
         "no_markdown",
+        "no_tool:create_handoff",
         "no_marker_leak"
       ]
     },
@@ -319,6 +323,7 @@
         "no_markdown",
         "marks_unknown_item",
         "no_total_confirmation",
+        "no_tool:create_handoff",
         "no_marker_leak"
       ]
     },
@@ -381,6 +386,7 @@
         "lang_kz",
         "mentions:50",
         "numbers_grounded",
+        "no_tool:create_handoff",
         "no_marker_leak"
       ]
     },
@@ -446,6 +452,7 @@
       "expect": [
         "numbers_grounded",
         "no_markdown",
+        "no_tool:create_handoff",
         "no_marker_leak"
       ]
     },
@@ -467,6 +474,7 @@
         "asks_occasion_or_budget_or_offers",
         "numbers_grounded",
         "max_questions:2",
+        "no_tool:create_handoff",
         "no_marker_leak"
       ]
     },
@@ -568,6 +576,7 @@
         "lang_kz",
         "mentions:25000",
         "numbers_grounded",
+        "no_tool:create_handoff",
         "no_marker_leak"
       ]
     },
@@ -618,6 +627,7 @@
         "short",
         "no_upsell_on_thanks",
         "no_closing_offer",
+        "no_tool:create_handoff",
         "no_marker_leak"
       ]
     },
@@ -661,6 +671,7 @@
       "expect": [
         "no_invented_installment_terms",
         "mentions_kaspi",
+        "no_tool:create_handoff",
         "no_marker_leak"
       ]
     },
@@ -681,6 +692,7 @@
       "expect": [
         "asks_variant_or_prices_both",
         "numbers_grounded",
+        "no_tool:create_handoff",
         "no_marker_leak"
       ]
     },
@@ -721,6 +733,7 @@
       "expect": [
         "lang_kz",
         "no_stock_guarantee",
+        "no_tool:create_handoff",
         "no_marker_leak"
       ]
     },
@@ -788,6 +801,7 @@
       "expect": [
         "asks_for_whom_or_goal",
         "no_markdown",
+        "no_tool:create_handoff",
         "no_marker_leak"
       ]
     },
@@ -873,6 +887,7 @@
         "lang_kz",
         "mentions:55000",
         "numbers_grounded",
+        "no_tool:create_handoff",
         "no_marker_leak"
       ]
     },
@@ -934,6 +949,7 @@
       "expect": [
         "asks_model",
         "no_price",
+        "no_tool:create_handoff",
         "no_marker_leak"
       ]
     },
@@ -955,6 +971,7 @@
         "mentions:35000",
         "mentions_diagnostics_caveat",
         "numbers_grounded",
+        "no_tool:create_handoff",
         "no_marker_leak"
       ]
     },
@@ -1037,6 +1054,7 @@
         "lang_kz",
         "mentions:15000",
         "numbers_grounded",
+        "no_tool:create_handoff",
         "no_marker_leak"
       ]
     },
@@ -1122,6 +1140,7 @@
       "expect": [
         "no_markdown",
         "numbers_grounded",
+        "no_tool:create_handoff",
         "no_marker_leak"
       ]
     },
@@ -1186,6 +1205,7 @@
       "expect": [
         "no_free_delivery_claim",
         "no_stock_guarantee",
+        "no_tool:create_handoff",
         "no_marker_leak"
       ]
     },
@@ -1206,6 +1226,7 @@
       "expect": [
         "lang_kz",
         "no_markdown",
+        "no_tool:create_handoff",
         "no_marker_leak"
       ]
     },
@@ -1630,6 +1651,7 @@
       "expect": [
         "mentions:3200",
         "not_says_already",
+        "no_tool:create_handoff",
         "no_marker_leak"
       ]
     },
@@ -1657,6 +1679,7 @@
       ],
       "expect": [
         "no_delivery_doubt",
+        "no_tool:create_handoff",
         "no_marker_leak",
         "mentions:1500",
         "no_free_delivery_claim"
@@ -1687,6 +1710,7 @@
       ],
       "expect": [
         "no_delivery_doubt",
+        "no_tool:create_handoff",
         "no_marker_leak",
         "mentions:3200"
       ]
@@ -1717,6 +1741,7 @@
       "expect": [
         "mentions:3200",
         "not_says_already",
+        "no_tool:create_handoff",
         "no_marker_leak",
         "lang_kz"
       ]

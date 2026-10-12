@@ -30,7 +30,18 @@ carries — see panel-model.py). GPT-6 defaults to reasoning «medium», and Cha
 templates' lmChatOpenAi v1.2 node calls) serves function calling ONLY at reasoning_effort=none, so a
 GPT-6 run without --reasoning-effort none measures a configuration the bot cannot use.
 
-Results: Tools/n8n/eval/results/<label>.json + .md (synthetic data only).
+h8 (T11b): the runs go out INTERLEAVED — a scenario's repeats are spread over the whole run (round-robin over the scenarios)
+instead of N identical requests back to back, whose answers T11 found strongly correlated in time. A comparison runs its sides
+in ONE schedule, the sides of one repeat back to back:
+
+    python3 Tools/n8n/eval/run-eval.py --label cmp --side before=661431c9 --side after=worktree --only a6_ --repeat 8 --repeat-all --skip-panel
+    python3 Tools/n8n/eval/run-eval.py --plan Tools/n8n/eval/plans/q1b2.json --workers 4     # blocks × sides, one schedule
+
+(--side NAME=REF: prompts AND search at REF. --plan: {label, sides {name: ref}, blocks [{name, only, repeat, repeat_all, sides}],
+skip_panel}; --workers N keeps the schedule's order within a window of N parallel requests.)
+
+Results: Tools/n8n/eval/results/<label>.json + .md (synthetic data only); with --side <label>-<side>, with --plan
+<label>-<block>-<side>. Every run records its place in the schedule (`seq`) and its start (`t`, seconds into the run).
 
 The deterministic checks are measured themselves by test_checks.py (right/wrong phrase table, no network) — run it
 after touching a check, and bump HARNESS_VERSION. rescore.py re-scores saved runs with the current checks offline
@@ -43,9 +54,12 @@ import os
 import re
 import subprocess
 import sys
+import threading
 import time
 import urllib.error
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor
+from fractions import Fraction
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 N8N = os.path.dirname(HERE)
@@ -176,6 +190,7 @@ def model_params(ref):
 
 
 _HARNESS = None
+_HARNESS_LOCK = threading.Lock()   # h8: --workers runs searches in parallel threads; the harness module is loaded once
 
 
 def simulate_search(docs, system, mp):
@@ -185,11 +200,13 @@ def simulate_search(docs, system, mp):
     if not mp.get("search_code"):
         return {"documents": hits}
     global _HARNESS
-    if _HARNESS is None:
-        import importlib.util
-        spec = importlib.util.spec_from_file_location("harness", os.path.join(N8N, "tests", "harness.py"))
-        _HARNESS = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(_HARNESS)
+    with _HARNESS_LOCK:
+        if _HARNESS is None:
+            import importlib.util
+            spec = importlib.util.spec_from_file_location("harness", os.path.join(N8N, "tests", "harness.py"))
+            mod = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(mod)
+            _HARNESS = mod
     named = {"Guard": {"ok": True, "query": "", "filterKey": "botWaId", "botId": "evalScenario0001", "prompt": system},
              "Search Price Lists": [{"document": {"pageContent": d, "metadata": {}}, "score": 0.8} for d in hits] or [{}]}
     return _HARNESS.run_js(mp["search_code"], {"json": {}}, named)[0]["json"]
@@ -337,7 +354,11 @@ def knowledge_text(sc, know):
     return " ".join([sc.get("business_override", know["business"]), know["products"], know["services"], " ".join(sc.get("docs_override", know["docs"])), sc.get("owner_prompt", "")])
 
 
-HARNESS_VERSION = ("h7 (2026-10-12, T11 Q1 B + V6-unknown: scenario roles `owner` / `bot_unknown` rendered with the memory marks the writers store at --prompts-ref (apply-history-handoff.py; none before T6); no_marker_leak, no_tool:<name>, not_says_already, no_delivery_doubt; on top of "
+HARNESS_VERSION = ("h8 (2026-10-12, T11b: interleaved schedule — every scenario's repeats spread over the whole run, round-robin over the "
+                   "scenarios, the sides of one repeat back to back with the first side rotating (--side / --plan run the sides of a "
+                   "comparison as ONE schedule); set v1.5 adds no_tool:create_handoff wherever the scenario does not call for a handoff; "
+                   "no check function changed; on top of "
+                   "h7 (2026-10-12, T11 Q1 B + V6-unknown: scenario roles `owner` / `bot_unknown` rendered with the memory marks the writers store at --prompts-ref (apply-history-handoff.py; none before T6); no_marker_leak, no_tool:<name>, not_says_already, no_delivery_doubt; on top of "
                    "h6 2026-10-09, Q1: not_mentions:X — X stated in no un-refused clause and not merely quoted as the client's words, for the client-time echo; mentions:H:MM "
                    "reads a time of day; on top of "
                    "h5 2026-10-08, V9-r2: no_conflict_claim / no_price_caveat for a price list that AGREES with the catalog; on top of "
@@ -848,82 +869,67 @@ def check_panel(name, sc, know, out):
     return None if fn is None else bool(fn())
 
 
-def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--scenarios", default=os.path.join(HERE, "scenarios.v1.json"))
-    ap.add_argument("--label", default="run")
-    ap.add_argument("--prompts-ref", default="worktree", help="git ref for the Create WA workflow's prompt map (before/after)")
-    ap.add_argument("--search-ref", default="worktree",
-                    help="git ref whose bot template decides the simulated price-list search (V9: raw documents before the "
-                         "Price List Search sub-workflow, that ref's own Reconcile Prices after). The model and its parameters "
-                         "always come from the worktree — pass the same ref as --prompts-ref for a before run")
-    ap.add_argument("--only")
-    ap.add_argument("--repeat", type=int, default=1, help="repeats for scenarios tagged key")
-    ap.add_argument("--repeat-all", action="store_true")
-    ap.add_argument("--max-tokens", type=int, default=0, help="override the template's maxTokens")
-    ap.add_argument("--model", help="override the template's model for the AUTO path (the panel is set by panel-model.py)")
-    ap.add_argument("--reasoning-effort", choices=["none", "minimal", "low", "medium", "high"], help="sent as reasoning_effort on the auto path")
-    ap.add_argument("--drop-param", action="append", default=[],
-                    help="remove a template parameter from every auto request (repeatable) — e.g. frequency_penalty, which makes "
-                         "gpt-6-luna hang ~61 s and return a 500 (probed 2026-09-25)")
-    ap.add_argument("--price-in", type=float, help="USD per 1M prompt tokens — overrides PRICES (cached input billed the same)")
-    ap.add_argument("--price-out", type=float, help="USD per 1M completion tokens — overrides PRICES")
-    ap.add_argument("--skip-panel", action="store_true")
-    ap.add_argument("--skip-auto", action="store_true")
-    a = ap.parse_args()
-    d = json.load(open(a.scenarios, encoding="utf-8"))
-    prompts = prompts_map(a.prompts_ref)
-    set_fields_template(a.prompts_ref)
+# ---- h8 (T11b, 2026-10-12): the order the runs go out in ---------------------------------------------------------------
+def schedule(jobs):
+    """The order the runs go out in — never N identical requests back to back.
+
+    `jobs` = [(key, repeats, sides)] in plan order. The k-th of a job's n repeats sits at (2k + 1) / 2n of the run, so every
+    job's repeats are spread evenly over the whole window — equal repeats are plain round-robin over the jobs — and jobs at the
+    same position keep plan order. Each slot sends all of the job's sides back to back (the before and the after of one
+    scenario are seconds apart, never blocks apart); which side goes first rotates with the job and the repeat.
+    Returns [(key, rep, side)].
+    Why: T11 (h7) sent a scenario's repeats one after another, one block per process, and they were strongly correlated in
+    time (ws_kz_min_order on one input 8/10 → 3/3 → 0/10 within 15 minutes; «до» often 8/10 identical texts) — a Fisher test
+    over such repeats overstates significance in both directions (evidence/Q1B-measure.txt §5). test_schedule.py pins it."""
+    slots = sorted((Fraction(2 * k + 1, 2 * n), j, k) for j, (_key, n, _sides) in enumerate(jobs) for k in range(n))
+    out = []
+    for _pos, j, k in slots:
+        key, _n, sides = jobs[j]
+        sides = list(sides)
+        r = (j + k) % len(sides)
+        out.extend((key, k, side) for side in sides[r:] + sides[:r])
+    return out
+
+
+def selected(sc, only, skip_panel, skip_auto):
+    if only and not any(o and o in sc["id"] for o in only.split(",")):
+        return False
+    return not ((skip_panel and sc["mode"] == "panel") or (skip_auto and sc["mode"] == "auto"))
+
+
+def plan_jobs(plan, d, skip_panel, skip_auto):
+    """[((block, scenario id), repeats, sides)] — blocks in plan order, each block's scenarios in scenario-file order. A block:
+    {name, only (comma-separated id substrings, null = all), repeat, repeat_all (default true; false = only `key`-tagged
+    scenarios repeat), sides (default: every side of the plan)}."""
+    jobs = []
+    for b in plan["blocks"]:
+        sides = list(b.get("sides") or plan["sides"])
+        for sc in d["scenarios"]:
+            if not selected(sc, b.get("only"), skip_panel, skip_auto):
+                continue
+            reps = b.get("repeat", 1) if (b.get("repeat_all", True) or "key" in sc.get("tags", [])) else 1
+            jobs.append(((b.get("name"), sc["id"]), reps, sides))
+    return jobs
+
+
+def side_context(prompts_ref, search_ref, model):
+    """What one side of a comparison measures: the prompt map and the memory marks at its prompts ref, the price-list search
+    at its search ref. The model and its parameters always come from the worktree (the template's OpenAI node)."""
+    prompts = prompts_map(prompts_ref)
+    set_fields_template(prompts_ref)
     # h7: the owner / unknown-delivery turns carry the marks the writers store at the measured ref (none before T6)
-    marks = memory_marks(a.prompts_ref)
+    marks = memory_marks(prompts_ref)
     mp = model_params("worktree")
     # The tool the model calls is part of the measured ref (V9 changed the TOOL, not the prompts): before 2026-10-08 the
     # search was always taken from the worktree, so a «before» run quietly measured today's reconciliation.
-    mp["search_code"] = search_code(a.search_ref, json.loads(file_at(a.search_ref, BOT_WA)))
-    if a.model:
-        mp["model"] = a.model
-    max_tokens = a.max_tokens or mp["max_tokens"]
-    panel_model = staging_panel_model() if not a.skip_panel else None
-    app_user_id = None
-    if not a.skip_panel:
-        app_user_id = subprocess.run([sys.executable, os.path.join(N8N, "staging", "fixtures.py"), "create-subscriber", "--run-id", f"eval{int(time.time())}"],
-                                     capture_output=True, text=True, check=True).stdout.strip()
-    results, t0 = [], time.time()
-    try:
-        for sc in d["scenarios"]:
-            if a.only and not any(o and o in sc["id"] for o in a.only.split(",")):
-                continue
-            if a.skip_panel and sc["mode"] == "panel":
-                continue
-            if a.skip_auto and sc["mode"] == "auto":
-                continue
-            know = d["knowledge"][sc["vertical"]]
-            reps = a.repeat if (a.repeat_all or "key" in sc.get("tags", [])) else 1
-            runs = []
-            for i in range(reps):
-                t_call = time.time()
-                out = run_panel(sc, know, app_user_id) if sc["mode"] == "panel" else run_auto(sc, know, mp, prompts, max_tokens, a.reasoning_effort, a.drop_param, marks)
-                latency_ms = round((time.time() - t_call) * 1000)
-                verdicts = {}
-                for name in sc["expect"]:
-                    v = check_panel(name, sc, know, out) if sc["mode"] == "panel" else check(name, sc, know, out)
-                    verdicts[name] = v
-                # whole answer / whole body: rescore.py re-scores saved runs offline, and a cut text cannot be re-scored exactly
-                runs.append({"verdicts": verdicts, "text": (out.get("text") or "") if sc["mode"] == "auto" else json.dumps(out.get("body"), ensure_ascii=False),
-                             "tool_calls": out.get("tool_calls"), "usage": out.get("usage"), "finish_reason": out.get("finish_reason"), "error": out.get("error"),
-                             "dropped_params": out.get("dropped_params"), "latency_ms": latency_ms, "status": out.get("status"),
-                             "transport_retries": out.get("transport_retries", 0)})
-            passes = [all(v is not False for v in r["verdicts"].values()) for r in runs]
-            rec = {"id": sc["id"], "vertical": sc["vertical"], "mode": sc["mode"], "lang": sc["lang"], "tags": sc.get("tags", []), "repeats": reps,
-                   "pass_rate": sum(passes) / len(passes), "runs": runs}
-            results.append(rec)
-            flag = "PASS" if rec["pass_rate"] == 1 else ("FLAKY" if rec["pass_rate"] > 0 else "FAIL")
-            failed = sorted({k for r in runs for k, v in r["verdicts"].items() if v is False})
-            print(f"{flag:5} {sc['id']:36} {rec['pass_rate']:.2f}  {('failed: ' + ', '.join(failed)) if failed else ''}", flush=True)
-    finally:
-        if app_user_id:
-            subprocess.run([sys.executable, os.path.join(N8N, "staging", "fixtures.py"), "delete", "--app-user-id", app_user_id], capture_output=True)
-    # summary
+    mp["search_code"] = search_code(search_ref, json.loads(file_at(search_ref, BOT_WA)))
+    if model:
+        mp["model"] = model
+    return {"prompts_ref": prompts_ref, "search_ref": search_ref, "prompts": prompts, "marks": marks, "mp": mp}
+
+
+def summarize(a, d, results, ctx, label, block, side, plan_path, panel_model, max_tokens, seconds):
+    mp, marks = ctx["mp"], ctx["marks"]
     usage_in = sum(r["usage"]["prompt_tokens"] for x in results for r in x["runs"] if r.get("usage"))
     usage_out = sum(r["usage"]["completion_tokens"] for x in results for r in x["runs"] if r.get("usage"))
     usage_cached = sum(r["usage"].get("cached_tokens", 0) for x in results for r in x["runs"] if r.get("usage"))
@@ -946,39 +952,170 @@ def main():
             for k, v in r["verdicts"].items():
                 if v is None: continue
                 c = by_check.setdefault(k, [0, 0]); c[1] += 1; c[0] += (1 if v else 0)
-    summary = {"label": a.label, "prompts_ref": a.prompts_ref, "scenario_version": d["version"], "harness": HARNESS_VERSION, "model": mp["model"],
+    summary = {"label": label, "prompts_ref": ctx["prompts_ref"], "search_ref": ctx["search_ref"], "side": side, "block": block,
+               "plan": plan_path, "scenario_version": d["version"], "harness": HARNESS_VERSION, "model": mp["model"],
                "reasoning_effort": a.reasoning_effort, "dropped_params": a.drop_param, "panel_model": panel_model, "max_tokens": max_tokens,
-               "search_simulation": (f"Price List Search sub-workflow (Reconcile Prices at {a.search_ref})" if mp.get("search_code")
-                                     else f"raw documents (retrieve-as-tool at {a.search_ref})"),
-               "memory_marks": marks,
+               "search_simulation": (f"Price List Search sub-workflow (Reconcile Prices at {ctx['search_ref']})" if mp.get("search_code")
+                                     else f"raw documents (retrieve-as-tool at {ctx['search_ref']})"),
+               "memory_marks": marks, "workers": a.workers,
                "scenarios": len(results), "runs": total_runs, "pass_all": sum(1 for x in results if x["pass_rate"] == 1),
                "flaky": sum(1 for x in results if 0 < x["pass_rate"] < 1), "fail": sum(1 for x in results if x["pass_rate"] == 0),
                "error_runs": error_runs, "transport_retries": sum(r.get("transport_retries") or 0 for x in results for r in x["runs"]),
                "finish_reason_length_runs": length_cut, "prompt_tokens": usage_in, "cached_tokens": usage_cached,
                "completion_tokens": usage_out, "reasoning_tokens": usage_reason,
-               "cost_usd_auto_path": cost, "prices_usd_per_1m": [p_in, p_cached, p_out], "latency_ms": latency, "seconds": round(time.time() - t0),
+               "cost_usd_auto_path": cost, "prices_usd_per_1m": [p_in, p_cached, p_out], "latency_ms": latency, "seconds": seconds,
                "by_check": {k: f"{v[0]}/{v[1]}" for k, v in sorted(by_check.items())}}
-    os.makedirs(os.path.join(HERE, "results"), exist_ok=True)
-    stem = os.path.join(HERE, "results", re.sub(r"[^A-Za-z0-9_.-]", "_", a.label))
-    json.dump({"summary": summary, "results": results}, open(stem + ".json", "w", encoding="utf-8"), ensure_ascii=False, indent=1)
     effort_txt = (f" · reasoning_effort `{a.reasoning_effort}`" if a.reasoning_effort else " · reasoning_effort (model default)") + \
                  (f" · dropped {', '.join(a.drop_param)}" if a.drop_param else "")
     lat_txt = " · ".join(f"{m} median {v['median']} ms, p90 {v['p90']} ms, max {v['max']} ms" for m, v in latency.items() if v)
-    md = [f"# Eval {a.label} — {d['version']}", "",
-          f"prompts: `{a.prompts_ref}` · auto model `{mp['model']}`{effort_txt} · panel model `{panel_model}` · max_tokens {max_tokens} · {summary['scenarios']} scenarios / {total_runs} runs · {summary['seconds']} s",
+    where = (f" · side `{side}`" if side else "") + (f" · block `{block}` of plan `{plan_path}`" if block else "")
+    md = [f"# Eval {label} — {d['version']}", "",
+          f"prompts: `{ctx['prompts_ref']}`{where} · auto model `{mp['model']}`{effort_txt} · panel model `{panel_model}` · max_tokens {max_tokens} · {summary['scenarios']} scenarios / {total_runs} runs · {seconds} s (whole schedule, {a.workers} worker(s))",
           f"pass {summary['pass_all']} · flaky {summary['flaky']} · fail {summary['fail']} · error runs {error_runs} · finish_reason=length in {length_cut} runs",
           f"auto-path tokens {usage_in} in (cached {usage_cached}) + {usage_out} out (reasoning {usage_reason}) ≈ ${cost} at ${p_in}/${p_cached}/${p_out} per 1M in/cached/out (panel usage is not returned by the webhook)",
           f"latency (wall clock through staging): {lat_txt}",
           f"simulated price-list search: {summary['search_simulation']}",
-          f"memory marks (apply-history-handoff.py at `{a.prompts_ref}`): owner {marks['owner']!r} · unknown delivery {marks['bot_unknown']!r}", "",
+          f"memory marks (apply-history-handoff.py at `{ctx['prompts_ref']}`): owner {marks['owner']!r} · unknown delivery {marks['bot_unknown']!r}",
+          "order: h8 interleaved — every scenario's repeats spread over the whole schedule, the sides of one repeat back to back (run `seq` in the JSON)", "",
           "| scenario | vertical | mode | pass rate | failed checks |", "|---|---|---|---|---|"]
     for x in results:
         failed = sorted({k for r in x["runs"] for k, v in r["verdicts"].items() if v is False})
         md.append(f"| {x['id']} | {x['vertical']} | {x['mode']} | {x['pass_rate']:.2f} ({x['repeats']}×) | {', '.join(failed)} |")
     md += ["", "## By check", "", "| check | pass/total |", "|---|---|"] + [f"| {k} | {v} |" for k, v in summary["by_check"].items()]
-    open(stem + ".md", "w", encoding="utf-8").write("\n".join(md) + "\n")
-    print("\n" + json.dumps(summary, ensure_ascii=False, indent=1))
-    print("wrote", os.path.relpath(stem + ".md", REPO))
+    return summary, md
+
+
+def main(argv=None):
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--scenarios", default=os.path.join(HERE, "scenarios.v1.json"))
+    ap.add_argument("--label", default="run")
+    ap.add_argument("--prompts-ref", default="worktree", help="git ref for the Create WA workflow's prompt map (before/after)")
+    ap.add_argument("--search-ref", default="worktree",
+                    help="git ref whose bot template decides the simulated price-list search (V9: raw documents before the "
+                         "Price List Search sub-workflow, that ref's own Reconcile Prices after). The model and its parameters "
+                         "always come from the worktree — pass the same ref as --prompts-ref for a before run")
+    ap.add_argument("--side", action="append", default=[], metavar="NAME=REF",
+                    help="h8: measure several refs in ONE interleaved run (repeatable; prompts AND search at REF, 'worktree' allowed); "
+                         "writes <label>-<NAME>.json per side. Replaces --prompts-ref/--search-ref")
+    ap.add_argument("--plan", help="h8: a JSON plan {label, sides {name: ref}, blocks [{name, only, repeat, repeat_all, sides}], "
+                                   "skip_panel} run as ONE interleaved schedule; writes <label>-<block>-<side>.json")
+    ap.add_argument("--workers", type=int, default=1, help="parallel requests (the schedule's order is kept within this window)")
+    ap.add_argument("--results-dir", default=os.path.join(HERE, "results"))
+    ap.add_argument("--only")
+    ap.add_argument("--repeat", type=int, default=1, help="repeats for scenarios tagged key")
+    ap.add_argument("--repeat-all", action="store_true")
+    ap.add_argument("--max-tokens", type=int, default=0, help="override the template's maxTokens")
+    ap.add_argument("--model", help="override the template's model for the AUTO path (the panel is set by panel-model.py)")
+    ap.add_argument("--reasoning-effort", choices=["none", "minimal", "low", "medium", "high"], help="sent as reasoning_effort on the auto path")
+    ap.add_argument("--drop-param", action="append", default=[],
+                    help="remove a template parameter from every auto request (repeatable) — e.g. frequency_penalty, which makes "
+                         "gpt-6-luna hang ~61 s and return a 500 (probed 2026-09-25)")
+    ap.add_argument("--price-in", type=float, help="USD per 1M prompt tokens — overrides PRICES (cached input billed the same)")
+    ap.add_argument("--price-out", type=float, help="USD per 1M completion tokens — overrides PRICES")
+    ap.add_argument("--skip-panel", action="store_true")
+    ap.add_argument("--skip-auto", action="store_true")
+    a = ap.parse_args(argv)
+    d = json.load(open(a.scenarios, encoding="utf-8"))
+    plan_path = None
+    if a.plan:
+        plan = json.load(open(a.plan, encoding="utf-8"))
+        plan_path = os.path.relpath(os.path.abspath(a.plan), REPO)
+        skip_panel = bool(plan.get("skip_panel", a.skip_panel))
+        label = plan.get("label", a.label)
+        refs = {name: (ref, ref) for name, ref in plan["sides"].items()}
+        stem_of = lambda block, side: f"{label}-{block}-{side}"
+    else:
+        skip_panel = a.skip_panel
+        label = a.label
+        if a.side:
+            refs = {}
+            for spec in a.side:
+                name, sep, ref = spec.partition("=")
+                if not sep or not name or not ref:
+                    ap.error(f"--side wants NAME=REF, got {spec!r}")
+                refs[name] = (ref, ref)
+            stem_of = lambda block, side: f"{label}-{side}"
+        else:
+            refs = {None: (a.prompts_ref, a.search_ref)}
+            stem_of = lambda block, side: label
+        plan = {"sides": list(refs), "blocks": [{"name": None, "only": a.only, "repeat": a.repeat, "repeat_all": a.repeat_all}]}
+    ctxs = {name: side_context(p_ref, s_ref, a.model) for name, (p_ref, s_ref) in refs.items()}
+    jobs = plan_jobs(plan, d, skip_panel, a.skip_auto)
+    order = schedule(jobs)
+    sc_by_id = {sc["id"]: sc for sc in d["scenarios"]}
+    max_tokens = a.max_tokens or next(iter(ctxs.values()))["mp"]["max_tokens"]
+    any_panel = any(sc_by_id[key[1]]["mode"] == "panel" for key, _n, _s in jobs)
+    panel_model = staging_panel_model() if (not skip_panel and any_panel) else None
+    store = {(key, side): [None] * n for key, n, sides in jobs for side in sides}
+    lock = threading.Lock()
+    app_user_id = None
+    t0 = time.time()
+
+    def run_one(seq, key, rep, side):
+        sc = sc_by_id[key[1]]
+        know = d["knowledge"][sc["vertical"]]
+        ctx = ctxs[side]
+        t_call = time.time()
+        out = run_panel(sc, know, app_user_id) if sc["mode"] == "panel" else \
+            run_auto(sc, know, ctx["mp"], ctx["prompts"], max_tokens, a.reasoning_effort, a.drop_param, ctx["marks"])
+        latency_ms = round((time.time() - t_call) * 1000)
+        verdicts = {name: (check_panel(name, sc, know, out) if sc["mode"] == "panel" else check(name, sc, know, out)) for name in sc["expect"]}
+        # whole answer / whole body: rescore.py re-scores saved runs offline, and a cut text cannot be re-scored exactly
+        run = {"verdicts": verdicts, "text": (out.get("text") or "") if sc["mode"] == "auto" else json.dumps(out.get("body"), ensure_ascii=False),
+               "tool_calls": out.get("tool_calls"), "usage": out.get("usage"), "finish_reason": out.get("finish_reason"), "error": out.get("error"),
+               "dropped_params": out.get("dropped_params"), "latency_ms": latency_ms, "status": out.get("status"),
+               "transport_retries": out.get("transport_retries", 0), "seq": seq, "t": round(t_call - t0, 1)}
+        with lock:
+            runs = store[(key, side)]
+            runs[rep] = run
+            if all(r is not None for r in runs):
+                passes = [all(v is not False for v in r["verdicts"].values()) for r in runs]
+                rate = sum(passes) / len(passes)
+                flag = "PASS" if rate == 1 else ("FLAKY" if rate > 0 else "FAIL")
+                failed = sorted({k for r in runs for k, v in r["verdicts"].items() if v is False})
+                where = "/".join(x for x in (key[0], side) if x)
+                print(f"{flag:5} {key[1]:36} {rate:.2f}  {(where + '  ') if where else ''}{('failed: ' + ', '.join(failed)) if failed else ''}", flush=True)
+
+    if not skip_panel and any_panel:
+        app_user_id = subprocess.run([sys.executable, os.path.join(N8N, "staging", "fixtures.py"), "create-subscriber", "--run-id", f"eval{int(time.time())}"],
+                                     capture_output=True, text=True, check=True).stdout.strip()
+    ex = ThreadPoolExecutor(max_workers=max(1, a.workers))
+    futures = [ex.submit(run_one, seq, key, rep, side) for seq, (key, rep, side) in enumerate(order)]
+    try:
+        for f in futures:   # in schedule order: the first failure (an exhausted quota) stops the run, nothing is written
+            f.result()
+    except BaseException:
+        for f in futures:
+            f.cancel()
+        raise
+    finally:
+        ex.shutdown(wait=True)
+        if app_user_id:
+            subprocess.run([sys.executable, os.path.join(N8N, "staging", "fixtures.py"), "delete", "--app-user-id", app_user_id], capture_output=True)
+    seconds = round(time.time() - t0)
+    os.makedirs(a.results_dir, exist_ok=True)
+    outputs = {}
+    for key, n, sides in jobs:
+        for side in sides:
+            outputs.setdefault((key[0], side), []).append(key)
+    for (block, side), keys in outputs.items():
+        results = []
+        for key in keys:
+            sc = sc_by_id[key[1]]
+            runs = store[(key, side)]
+            passes = [all(v is not False for v in r["verdicts"].values()) for r in runs]
+            results.append({"id": sc["id"], "vertical": sc["vertical"], "mode": sc["mode"], "lang": sc["lang"], "tags": sc.get("tags", []),
+                            "repeats": len(runs), "pass_rate": sum(passes) / len(passes), "runs": runs})
+        file_label = stem_of(block, side)
+        summary, md = summarize(a, d, results, ctxs[side], file_label, block, side, plan_path, panel_model, max_tokens, seconds)
+        stem = os.path.join(a.results_dir, re.sub(r"[^A-Za-z0-9_.-]", "_", file_label))
+        with open(stem + ".json", "w", encoding="utf-8") as fh:
+            json.dump({"summary": summary, "results": results}, fh, ensure_ascii=False, indent=1)
+        with open(stem + ".md", "w", encoding="utf-8") as fh:
+            fh.write("\n".join(md) + "\n")
+        print(f"\n{file_label}: pass {summary['pass_all']} · flaky {summary['flaky']} · fail {summary['fail']} · runs {summary['runs']} · "
+              f"errors {summary['error_runs']} · retries {summary['transport_retries']} · ${summary['cost_usd_auto_path']}")
+        print("wrote", os.path.relpath(stem + ".md", REPO))
 
 
 if __name__ == "__main__":

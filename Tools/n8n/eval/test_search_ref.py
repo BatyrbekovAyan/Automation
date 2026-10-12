@@ -40,7 +40,14 @@ class SearchRef(unittest.TestCase):
     def test_the_flag_reaches_the_simulation(self):
         src = open(os.path.join(HERE, "run-eval.py"), encoding="utf-8").read()
         self.assertIn('ap.add_argument("--search-ref"', src)
-        self.assertIn('mp["search_code"] = search_code(a.search_ref, json.loads(file_at(a.search_ref, BOT_WA)))', src)
+        # h8: every side of a run is built by side_context(); the legacy single side takes --prompts-ref / --search-ref
+        self.assertIn('mp["search_code"] = search_code(search_ref, json.loads(file_at(search_ref, BOT_WA)))', src)
+        self.assertIn('refs = {None: (a.prompts_ref, a.search_ref)}', src)
+
+    def test_each_side_measures_its_own_search(self):
+        """h8: a --side / --plan side reads the search at ITS ref — a pre-V9 side never borrows today's reconciliation."""
+        self.assertIsNone(run_eval.side_context("worktree", "5b0a222d", None)["mp"]["search_code"])
+        self.assertIn("Сверка с каталогом", run_eval.side_context("worktree", "worktree", None)["mp"]["search_code"])
 
 
 if __name__ == "__main__":

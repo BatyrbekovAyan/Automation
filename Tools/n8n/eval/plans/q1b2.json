@@ -1,0 +1,19 @@
+{
+  "label": "q1b2",
+  "note": "T11b (2026-10-12, owner decision: option (2) of evidence/Q1B-measure.txt §6) — the F1F2-plan §4.5 protocol as T11 ran it (q1 ×8, kz ×10 + the two weakest ×20 more, V6 ×8, the whole auto set ×3) for before (prod prompts, no memory marks) and after (the candidate «B + анти-эхо» in the worktree), plus all ws_* ×10 for both and the B arm (HEAD canon = 70518dd0 prompts) on the decisive blocks only: q1c_client_time_* ×8 (its before/after numbers come from q1-x8) and ws_* ×10. ONE interleaved schedule (harness h8): every scenario's repeats spread over the whole run, the sides of one repeat back to back. Criteria: docs/audits/2026-10-09-followups/evidence/Q1B2-measure.txt §0, fixed before the first run.",
+  "sides": {
+    "before": "661431c9",
+    "after": "worktree",
+    "B": "fba44558"
+  },
+  "skip_panel": true,
+  "blocks": [
+    {"name": "q1-x8", "only": "a6_,q1p_,q1c_", "repeat": 8, "sides": ["before", "after"]},
+    {"name": "kz-x10", "only": "ap_sku_exact_kz,ws_kz_min_order,fl_kz_price,ks_kz_availability,ed_kz_parent,pr_kz_battery,gen_kz_pure_greeting", "repeat": 10, "sides": ["before", "after"]},
+    {"name": "kz2-x20", "only": "pr_kz_battery,ks_kz_availability", "repeat": 20, "sides": ["before", "after"]},
+    {"name": "v6u-x8", "only": "u1_,u2_,u3_,u4_", "repeat": 8, "sides": ["before", "after"]},
+    {"name": "auto-x3", "only": null, "repeat": 3, "sides": ["before", "after"]},
+    {"name": "ws-x10", "only": "ws_", "repeat": 10, "sides": ["before", "after", "B"]},
+    {"name": "echo-x8", "only": "q1c_client_time_", "repeat": 8, "sides": ["B"]}
+  ]
+}
