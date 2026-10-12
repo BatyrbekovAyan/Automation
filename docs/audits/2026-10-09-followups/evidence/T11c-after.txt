@@ -1,0 +1,115 @@
+T11c — тесты замера «B + только переспрос» ПОСЛЕ реализации части (A) (до первого платного прогона; кандидат к рабочему дереву ещё не применён; HEAD 6799b512 + plans/q1b3.json, Q1-eval/q1b3report.py, тесты, evidence/Q1B3-measure.txt §0). 2026-10-12 13:50:19
+
+$ python3 Tools/n8n/eval/test_checks.py
+rc=0
+  test_rows (__main__.AsksCar) ... ok
+  test_rows (__main__.AsksForWhomOrGoal) ... ok
+  test_rows (__main__.AsksModel) ... ok
+  test_rows (__main__.AsksOrderNumberOrPhone) ... ok
+  test_no_scenario_names_an_unknown_check (__main__.EveryExpectedCheckExists) ... ok
+  test_rows (__main__.LangKz) ... ok
+  test_rows (__main__.MarksUnknownItem) ... ok
+  test_business_turn_stays_unmarked_on_every_ref (__main__.MemoryMarkRoles) ... ok
+  test_owner_turn_on_a_ref_with_marks_carries_the_owner_mark (__main__.MemoryMarkRoles) ... ok
+  test_owner_turn_on_a_ref_without_marks_renders_like_business (__main__.MemoryMarkRoles) ... ok
+  test_unknown_delivery_turn_carries_the_undelivered_mark_only_on_a_ref_with_marks (__main__.MemoryMarkRoles) ... ok
+  test_rows (__main__.Mentions) ... ok
+  test_rows (__main__.MentionsClock) ... ok
+  test_rows (__main__.NoConflictClaim) ... ok
+  test_rows (__main__.NoDeliveryDoubt) ... ok
+  test_free_delivery_that_is_really_in_the_business_data_passes (__main__.NoFreeDeliveryClaim) ... ok
+  test_negated_free_delivery_in_the_data_does_not_license_the_claim (__main__.NoFreeDeliveryClaim) ... ok
+  test_rows (__main__.NoFreeDeliveryClaim) ... ok
+  test_the_owner_prompt_is_not_business_data (__main__.NoFreeDeliveryClaim) ... ok
+  test_conflict_pair_is_derived_from_the_scenario_data (__main__.NoFreshPricePick) ... ok
+  test_rows (__main__.NoFreshPricePick) ... ok
+  test_rows (__main__.NoMarkerLeak) ... ok
+  test_rows (__main__.NoPriceCaveat) ... ok
+  test_rows (__main__.NoStockGuarantee) ... ok
+  test_rows (__main__.NoTool) ... ok
+  test_rows (__main__.NoTotalConfirmation) ... ok
+  test_rows (__main__.NotMentions) ... ok
+  test_rows (__main__.NotSaysAlready) ... ok
+  test_rows (__main__.PanelChecks) ... ok
+  test_rows (__main__.PromisePhrases) ... ok
+  The c1 lesson (evidence/Q1c-measure.txt): a pass-all score cannot see a create_handoff on a scenario that already ... ok
+  test_earlier_bot_replies_keep_the_business_role (__main__.ScenarioSetV14) ... ok
+  K7: «утечка пометок 0 во ВСЕХ прогонах» — every auto run is scored for it. ... ok
+  test_q1_business_turns_are_owner_turns (__main__.ScenarioSetV14) ... ok
+  test_roles_are_known (__main__.ScenarioSetV14) ... ok
+  test_v6_scenarios (__main__.ScenarioSetV14) ... ok
+  test_version (__main__.ScenarioSetV14) ... ok
+  test_checked_scenarios_carry_no_tool (__main__.ScenarioSetV15) ... ok
+  test_every_auto_scenario_is_classified_once (__main__.ScenarioSetV15) ... ok
+  test_handoff_in_design_scenarios_do_not (__main__.ScenarioSetV15) ... ok
+  test_no_scenario_requires_and_forbids_the_handoff (__main__.ScenarioSetV15) ... ok
+  K8 of T11 (ws_kz_min_order) and the wholesale list it dragged along, the a6/q1p of K5. ... ok
+  test_a_model_error_is_not_retried (__main__.TransportRetry) ... ok
+  test_insufficient_quota_stops_the_run (__main__.TransportRetry) ... ok
+  test_rate_limit_then_answer (__main__.TransportRetry) ... ok
+  test_every_v6_scenario_carries_the_check (__main__.V6HandoffCheckK10) ... ok
+  Ran 53 tests in 4.180s
+  OK
+
+$ python3 Tools/n8n/eval/test_schedule.py
+rc=0
+  test_run_counts (__main__.Plan) ... ok
+  test_sides (__main__.Plan) ... ok
+  test_run_counts (__main__.PlanQ1B3) ... ok
+  test_sides (__main__.PlanQ1B3) ... ok
+  test_the_b_arm_covers_the_decisive_blocks (__main__.PlanQ1B3) ... ok
+  B = HEAD before T11c; its measured files equal T11b's B arm (fba44558) — the two B numbers are one arm. ... ok
+  test_equal_repeats_are_plain_round_robin (__main__.Schedule) ... ok
+  test_every_side_gets_every_repeat_once (__main__.Schedule) ... ok
+  test_sides_of_one_slot_run_back_to_back_and_take_turns_first (__main__.Schedule) ... ok
+  Negative case: T11's order (a scenario's repeats one after another) breaks the property the tests below pin. ... ok
+  A ×20 job beside ×10 ones does not leave its extra repeats for a tail of its own (T11's kz2 block was exactly ... ok
+  Ran 19 tests in 1.482s
+  OK
+
+$ python3 Tools/n8n/eval/test_search_ref.py
+rc=0
+  Ran 4 tests in 0.236s
+  OK
+
+$ python3 docs/audits/2026-10-09-followups/Q1-eval/test_q1b3report.py
+rc=0
+  test_incomplete_side_fails (__main__.K10SpuriousHandoffOnU) ... ok
+  test_rows (__main__.K10SpuriousHandoffOnU) ... ok
+  test_t11b_numbers_fail (__main__.K10SpuriousHandoffOnU) ... ok
+  test_rows (__main__.K3EchoNotWorseThanProd) ... ok
+  Negative case for the change itself: T11b's К3 («после» 0/24 and ≤ «до») refuses an echo at a level prod has ... ok
+  test_rows (__main__.K4ControlsNotWorseThanProd) ... ok
+  test_the_old_rule_refused_what_the_owner_now_accepts (__main__.K4ControlsNotWorseThanProd) ... ok
+  T11b ran B on ws/echo only; the T11c B arm on kz/v6 is diagnostics and its absence must not break the criteria. ... ok
+  test_new_and_changed_criteria (__main__.ReplayT11b) ... ok
+  test_printed_verdicts_are_the_returned_ones (__main__.ReplayT11b) ... ok
+  test_unchanged_criteria_match_q1b2report (__main__.ReplayT11b) ... ok
+  Ran 11 tests in 0.240s
+  OK
+
+## повтор T11b через критерии T11c: python3 docs/audits/2026-10-09-followups/Q1-eval/q1b3report.py --label q1b2 (итог)
+К3 эхо клиентского времени (провалы not_mentions:15:00, q1c_client_time_*; меньше — лучше) — «не хуже прода»
+  эхо                                                        до   0/24   после   0/24  Fisher после>до p=1
+    q1c_client_time_education                                до   0/8    после   0/8   
+    q1c_client_time_phone_repair                             до   0/8    после   0/8   
+    q1c_client_time_history_phone_repair                     до   0/8    после   0/8   
+К4 контроли q1c — все проверки — «не хуже прода»
+К10 лишний create_handoff на u-сценариях (прогонов с вызовом; v6u-x8 + auto-x3 = 11 на сценарий; меньше — лучше)
+    u1_unknown_reask                                         до   0/11   после   0/11  
+    u2_unknown_new_question                                  до   0/11   после   5/11  ← u2 отдельно
+    u3_sent_control                                          до   0/11   после   0/11  
+    u4_kz_unknown                                            до   0/11   после   0/11  
+  сумма u1–u4                                                до   0/44   после   5/44  
+
+Итог по критериям (A6 на staging — отдельно):
+  К1: выполнен
+  К2: выполнен
+  К3: выполнен
+  К4: выполнен
+  К5: выполнен
+  К6: НЕ выполнен
+  К7: выполнен
+  К8: выполнен
+  К9: выполнен
+  К10: НЕ выполнен

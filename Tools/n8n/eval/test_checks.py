@@ -661,6 +661,10 @@ class NoTool(Table, unittest.TestCase):
         (A6, "Завтра в 15:00, спросите Марину.", SEARCH, PASS, "another tool"),
         (A6, "Передал флористу — он подтвердит заказ.", HANDOFF, FAIL, "the c1 answer: a request opened on a re-ask"),
         (A6, "Завтра в 15:00, спросите Марину.", SEARCH + HANDOFF, FAIL, "a handoff among other calls"),
+        # T11c К10: T11b's candidate opened a request on the plain delivery question of u2 (5/11 runs)
+        (U2, "Доставка по городу есть, от 1500 тг. Передал владельцу, он свяжется.", HANDOFF, FAIL,
+         "the T11b u2 answer: a request + a paused chat on a question About Business answers"),
+        (U2, "Доставка по городу есть, от 1500 тг.", NO_TOOLS, PASS, "u2 answered from About Business"),
     ]
 
 
@@ -821,6 +825,39 @@ class ScenarioSetV15(unittest.TestCase):
         """K8 of T11 (ws_kz_min_order) and the wholesale list it dragged along, the a6/q1p of K5."""
         for sid in ("ws_kz_min_order", "ws_list_of_items") + tuple(s for s in SC if s.startswith(("a6_", "q1p_"))):
             self.assertIn(sid, NO_HANDOFF)
+
+
+class V6HandoffCheckK10(unittest.TestCase):
+    """T11c (evidence/Q1B3-measure.txt §0.5): К10 counts the create_handoff calls on the V6 scenarios. The owner asked to add
+    no_tool:create_handoff to u2 and every other u*/V6 scenario whose design calls for no handoff — v1.5 (T11b) already
+    carries it on all four, which is how T11b saw u2 0/11 → 5/11. Pinned here so a new V6 scenario cannot slip past К10."""
+
+    def test_every_v6_scenario_carries_the_check(self):
+        v6 = {s["id"] for s in DATA["scenarios"]
+              if "bot_unknown" in {r for r, _ in s["messages"]} or "delivery_unknown" in s.get("tags", [])}
+        self.assertEqual(v6, {U1, U2, U3, U4})
+        for sid in sorted(v6):
+            with self.subTest(scenario=sid):
+                self.assertIn(sid, NO_HANDOFF)
+                self.assertIn("no_tool:create_handoff", SC[sid]["expect"])
+
+    def test_the_saved_t11b_u2_handoffs_are_failed_by_the_check(self):
+        """Replay of T11b's «после» runs of u2 (v6u-x8 + auto-x3): every run with a create_handoff call fails the check,
+        every run without one passes — the 5/11 К10 is built on."""
+        calls = runs = 0
+        for f in ("q1b2-v6u-x8-after.json", "q1b2-auto-x3-after.json"):
+            J = json.load(open(os.path.join(HERE, "results", f), encoding="utf-8"))
+            for x in J["results"]:
+                if x["id"] != U2:
+                    continue
+                for r in x["runs"]:
+                    runs += 1
+                    called = any(c.get("name") == "create_handoff" for c in r.get("tool_calls") or [])
+                    calls += called
+                    with self.subTest(file=f, seq=r["seq"]):
+                        self.assertIs(r["verdicts"]["no_tool:create_handoff"], not called)
+                        self.assertIs(verdict("no_tool:create_handoff", U2, r["text"], r.get("tool_calls") or []), not called)
+        self.assertEqual((calls, runs), (5, 11))
 
 
 class RescoreV14UnderH8(unittest.TestCase):

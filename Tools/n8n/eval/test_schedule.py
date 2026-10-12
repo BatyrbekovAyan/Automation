@@ -130,6 +130,73 @@ class Plan(unittest.TestCase):
         self.assertEqual(per_side["B"], ws * 10 + 3 * 8)
 
 
+PLAN_Q1B3 = os.path.join(HERE, "plans", "q1b3.json")
+B_CANON = "6799b512"   # HEAD before T11c = canon B (prompts/, workflows/, apply-history-handoff.py equal to fba44558, T11b's B)
+KZ7 = {"ap_sku_exact_kz", "ws_kz_min_order", "fl_kz_price", "ks_kz_availability", "ed_kz_parent", "pr_kz_battery", "gen_kz_pure_greeting"}
+
+
+class PlanQ1B3(unittest.TestCase):
+    """T11c (owner decision 2026-10-12, the second): the T11b protocol unchanged for before/after, the B arm (HEAD canon) on
+    every decisive block — all Kazakh blocks, all ws_* ×10, q1c_client_time_* ×8 and the u-scenarios. Fixed before the runs
+    (evidence/Q1B3-measure.txt §0.4)."""
+
+    def setUp(self):
+        self.plan = json.load(open(PLAN_Q1B3, encoding="utf-8"))
+        self.b = {x["name"]: x for x in self.plan["blocks"]}
+
+    def test_sides(self):
+        self.assertEqual(self.plan["label"], "q1b3")
+        self.assertEqual(self.plan["sides"], {"before": PRE_T6, "after": "worktree", "B": B_CANON})
+        self.assertTrue(self.plan.get("skip_panel"))
+
+    def test_before_and_after_run_the_t11b_protocol_unchanged(self):
+        t11b = {x["name"]: x for x in json.load(open(PLAN, encoding="utf-8"))["blocks"]}
+        self.assertEqual(set(self.b), set(t11b))
+        for name, blk in self.b.items():
+            with self.subTest(block=name):
+                self.assertEqual((blk.get("only"), blk["repeat"], blk.get("repeat_all", True)),
+                                 (t11b[name].get("only"), t11b[name]["repeat"], t11b[name].get("repeat_all", True)))
+                self.assertEqual("before" in blk["sides"], "before" in t11b[name]["sides"])
+                self.assertEqual("after" in blk["sides"], "after" in t11b[name]["sides"])
+
+    def test_the_b_arm_covers_the_decisive_blocks(self):
+        three = ["before", "after", "B"]
+        for name in ("kz-x10", "kz2-x20", "v6u-x8", "ws-x10"):
+            self.assertEqual(self.b[name]["sides"], three, name)
+        self.assertEqual((self.b["echo-x8"]["only"], self.b["echo-x8"]["repeat"], self.b["echo-x8"]["sides"]), ("q1c_client_time_", 8, ["B"]))
+        self.assertEqual(self.b["q1-x8"]["sides"], ["before", "after"])
+        self.assertEqual(self.b["auto-x3"]["sides"], ["before", "after"])
+        # the B arm reaches every Kazakh scenario of K6, every u-scenario of K7/K10, every ws_* and every echo scenario
+        b_ids = {sid for (blk, sid), _n, sides in plan_jobs(self.plan) if "B" in sides}
+        ids = {s["id"] for s in DATA["scenarios"]}
+        self.assertTrue(KZ7 <= b_ids)
+        self.assertTrue({i for i in ids if i.startswith(("u1_", "u2_", "u3_", "u4_", "ws_", "q1c_client_time_"))} <= b_ids)
+
+    def test_run_counts(self):
+        per_side = {}
+        for _key, n, sides in plan_jobs(self.plan):
+            for s in sides:
+                per_side[s] = per_side.get(s, 0) + n
+        auto = sum(1 for s in DATA["scenarios"] if s["mode"] == "auto")
+        ws = sum(1 for s in DATA["scenarios"] if s["id"].startswith("ws_"))
+        protocol = 14 * 8 + 7 * 10 + 2 * 20 + 4 * 8 + auto * 3
+        self.assertEqual((per_side["before"], per_side["after"]), (protocol + ws * 10, protocol + ws * 10))
+        self.assertEqual(per_side["B"], 7 * 10 + 2 * 20 + 4 * 8 + ws * 10 + 3 * 8)
+        self.assertEqual(sum(per_side.values()), 1304)
+
+    def test_the_plan_never_sends_one_request_twice_in_a_row(self):
+        order = M.schedule(plan_jobs(self.plan))
+        reqs = [(key[1], side) for key, _r, side in order]
+        self.assertFalse([i for i in range(len(reqs) - 1) if reqs[i] == reqs[i + 1]])
+
+    def test_the_b_ref_is_the_canon_b_measured_in_t11b(self):
+        """B = HEAD before T11c; its measured files equal T11b's B arm (fba44558) — the two B numbers are one arm."""
+        for rel in ("Tools/n8n/prompts/_core.md", M.MARKS_SRC, M.CREATE_WA, M.BOT_WA, M.PRICE_SEARCH):
+            with self.subTest(file=rel):
+                self.assertEqual(M.file_at(B_CANON, rel), M.file_at("fba44558", rel))
+        self.assertEqual(M.memory_marks(B_CANON), M.memory_marks("fba44558"))
+
+
 FAKE_ANSWER = "Завтра в 15:00, спросите Марину."
 
 
