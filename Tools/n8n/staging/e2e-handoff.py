@@ -309,32 +309,37 @@ def _drafts(pid, chat):
                 f"|| (message->>'content'), ' | ' order by id), '') from n8n_chat_histories where session_id = '{pid}:{chat}';")
 
 
-@scenario("lost_send_settled_by_notifier", "R9: a reply left send_pending > 10 min (its run died between the lease and Record Send) becomes send_unknown on the notifier's schedule — no transport call; a live one is untouched; T7: the lost run's memory draft becomes unknown + «[доставка не подтверждена] », a dead claim's draft is removed, a live run's draft stays")
+@scenario("lost_send_settled_by_notifier", "R9: a reply left send_pending > 10 min (its run died between the lease and Record Send) becomes send_unknown on the notifier's schedule — no transport call; a live one is untouched; T7: the lost run's memory draft becomes unknown + «[доставка не подтверждена] », a dead claim's draft is removed, a live run's draft stays — WhatsApp and Telegram, one schedule tick")
 def lost_send(ctx):
-    b = Dedicated(ctx, "ls")
-    lost, live, dead = f"ls-lost-{ctx.run_id}", f"ls-live-{ctx.run_id}", f"ls-dead-{ctx.run_id}"
-    psql(f"insert into reply_events (profile_id, chat_id, message_id, execution_id, state, updated_at) values "
-         f"('{b.pid}', '{b.chat}', '{lost}', 'dead-run', 'send_pending', now() - interval '11 minutes'), "
-         f"('{b.pid}', '{b.chat}', '{live}', 'live-run', 'send_pending', now() - interval '2 minutes'), "
-         f"('{b.pid}', '{b.chat}', '{dead}', 'dead-claim', 'claimed', now() - interval '11 minutes');")
-    _draft(b.pid, b.chat, "dead-run", lost, "Букет — 25 000 ₸.")          # T7: the drafts Stamp Draft would have tied to these runs
-    _draft(b.pid, b.chat, "live-run", live, "Доставка — 1000 ₸.")
-    _draft(b.pid, b.chat, "dead-claim", dead, "Черновик умершего прогона.")
+    bots = {"wa": Dedicated(ctx, "ls"), "tg": Dedicated(ctx, "lt", channel="telegram", suffix="")}
+    for ch, b in bots.items():
+        lost, live, dead = f"ls-lost-{ctx.run_id}-{ch}", f"ls-live-{ctx.run_id}-{ch}", f"ls-dead-{ctx.run_id}-{ch}"
+        psql(f"insert into reply_events (profile_id, chat_id, message_id, execution_id, state, updated_at) values "
+             f"('{b.pid}', '{b.chat}', '{lost}', 'dead-run-{ch}', 'send_pending', now() - interval '11 minutes'), "
+             f"('{b.pid}', '{b.chat}', '{live}', 'live-run-{ch}', 'send_pending', now() - interval '2 minutes'), "
+             f"('{b.pid}', '{b.chat}', '{dead}', 'dead-claim-{ch}', 'claimed', now() - interval '11 minutes');")
+        _draft(b.pid, b.chat, f"dead-run-{ch}", lost, "Букет — 25 000 ₸.")          # T7: the drafts Stamp Draft would have tied to these runs
+        _draft(b.pid, b.chat, f"live-run-{ch}", live, "Доставка — 1000 ₸.")
+        _draft(b.pid, b.chat, f"dead-claim-{ch}", dead, "Черновик умершего прогона.")
     since = mock_total()
     deadline = time.time() + 170            # the schedule fires every 2 minutes
-    row = ""
+    rows = {}
     while time.time() < deadline:
-        row = psql(f"select state || '|' || coalesce(execution_id, '-') || '|' || coalesce(error, '-') from reply_events where profile_id = '{b.pid}' and message_id = '{lost}';")
-        if not row.startswith("send_pending"):
+        rows = {ch: psql(f"select state || '|' || coalesce(execution_id, '-') || '|' || coalesce(error, '-') from reply_events "
+                         f"where profile_id = '{b.pid}' and message_id = 'ls-lost-{ctx.run_id}-{ch}';") for ch, b in bots.items()}
+        if not any(r.startswith("send_pending") for r in rows.values()):
             break
         time.sleep(5)
-    live_state = psql(f"select state from reply_events where profile_id = '{b.pid}' and message_id = '{live}';")
     st, d = mock("GET", f"/__mock/calls?since={since}&path=message/send")
-    mine = [c for c in d["calls"] if (c.get("query") or {}).get("profile_id") == b.pid]
-    drafts = _drafts(b.pid, b.chat)
-    ok = row.startswith("send_unknown|dead-run|run_lost") and live_state == "send_pending" and not mine \
-        and drafts == "dead-run/unknown/[доставка не подтверждена] Букет — 25 000 ₸. | live-run/draft/Доставка — 1000 ₸."
-    return ok, f"lost={row} live={live_state} send_calls_for_profile={len(mine)} memory={drafts}"
+    res, ok = {}, True
+    for ch, b in bots.items():
+        live_state = psql(f"select state from reply_events where profile_id = '{b.pid}' and message_id = 'ls-live-{ctx.run_id}-{ch}';")
+        mine = [c for c in d["calls"] if (c.get("query") or {}).get("profile_id") == b.pid]
+        drafts = _drafts(b.pid, b.chat)
+        res[ch] = {"lost": rows.get(ch), "live": live_state, "send_calls_for_profile": len(mine), "memory": drafts}
+        ok &= rows.get(ch, "").startswith(f"send_unknown|dead-run-{ch}|run_lost") and live_state == "send_pending" and not mine \
+            and drafts == f"dead-run-{ch}/unknown/[доставка не подтверждена] Букет — 25 000 ₸. | live-run-{ch}/draft/Доставка — 1000 ₸."
+    return ok, json.dumps(res, ensure_ascii=False)
 
 
 @scenario("handoffs_webhook_owner_scoped_list_take_done", "A5: the app's list/take/done are token-only and owner-scoped; done lifts the chat's pause")
@@ -416,11 +421,11 @@ def dashboard(ctx):
     return ok, f"http={st} row={rows[0] if rows else None}"
 
 
-@scenario("proxy_send_records_owner_app_row", "A6: a message the owner sends from the APP (proxy) lands as owner_app in history and as a marked memory row, after the response; T6: the memory row opens with «Владелец: »")
-def proxy_send(ctx):
-    b = Bot(ctx, "wa", "px")
+@for_channels("proxy_send_records_owner_app_row", "A6: a message the owner sends from the APP (proxy) lands as owner_app in history and as a marked memory row, after the response; T6: the memory row opens with «Владелец: »")
+def proxy_send(ctx, ch):
+    b = Bot(ctx, ch, "px")
     owner = owner_for(ctx, b)
-    st, d = e2e_auth.proxy(owner.token, {"op": "message.send", "channel": "whatsapp", "profile_id": b.pid, "recipient": b.chat.replace("@c.us", ""), "body": "Спасибо, ждём вас"})
+    st, d = e2e_auth.proxy(owner.token, {"op": "message.send", "channel": b.channel, "profile_id": b.pid, "recipient": b.chat.replace("@c.us", ""), "body": "Спасибо, ждём вас"})
     time.sleep(4)
     # T6 (Q1 B): the history keeps the text as sent, the memory row opens with the owner mark
     ok = st == 200 and d.get("status") == "done" and history(b.pid, b.chat) == "owner_app:Спасибо, ждём вас" and memory(b.pid, b.chat) == "ai/owner_app:Владелец: Спасибо, ждём вас"

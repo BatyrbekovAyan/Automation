@@ -1,0 +1,124 @@
+# T10 — staging e2e блока: прогон «до» на каноне ДО блока (HEAD-канон плана, git 92a7caa2)
+# 2026-10-12 06:59 +0500; staging: python3 Tools/n8n/staging/bootstrap.py --bot wa:stgwa001 --bot tg:stgtg001 --canon-ref 92a7caa2
+# verify-deployed против этого стенда: ровно 12 workflow блока отличаются от рабочего канона (Create WA/TG, Auth Session, Sweep, Delete Bot Files, Wappi Proxy, шаблоны WA/TG, Handoff Notifier, Dashboard, Edit WA/TG)
+# сценарии — из рабочего дерева (они формулируют правильное поведение); ожидание: каждый FAIL
+# ИТОГ: 29 FAIL, 0 PASS (строки ниже; два раздела e2e-auth перезапущены после правки, не дававшей отсутствию ветки A скрывать проверки данных; WA-сценарий e2e-reply повторён один раз из-за 503 OpenAI)
+# после прогона стенд возвращён на рабочий канон: bootstrap.py --bot wa:stgwa001 --bot tg:stgtg001 → verify-deployed rc=0
+
+## e2e-auth.py (линия бота F1+F2, ветка A, журнал V3)
+### --only reauth_same_profile_reuses_bound_clone
+FAIL  reauth_same_profile_reuses_bound_clone[wa] (4.4s) — F1 (a1): the channel saved off (SetWorkflowState deactivate), then a Create for the SAME profile → the SAME clone id (created:false), activated again, no template read, no second clone
+      first=etN1iBZVyn7TlUTQ deactivate=200 state_before=(200, False, 'profile-000003') second=200 {'id': 'Df5aIQWel79peWKk'} ran_template=True ran_create=True ran_activate=True state_after=(200, False, 'profile-000003') clones=[('Df5aIQWel79peWKk', True), ('etN1iBZVyn7TlUTQ', False)] row=Df5aIQWel79peWKk|true|-|-
+FAIL  reauth_same_profile_reuses_bound_clone[tg] (2.4s) — F1 (a1): the channel saved off (SetWorkflowState deactivate), then a Create for the SAME profile → the SAME clone id (created:false), activated again, no template read, no second clone
+      first=cSIoh9c2INH4xu0V deactivate=200 state_before=(200, False, 'profile-000004') second=200 {'id': '8P5LeKReVxz5Oldq'} ran_template=True ran_create=True ran_activate=True state_after=(200, False, 'profile-000004') clones=[('8P5LeKReVxz5Oldq', True), ('cSIoh9c2INH4xu0V', False)] row=8P5LeKReVxz5Oldq|true|-|-
+
+0 pass, 2 fail
+### --only reuse_active_clone_skips_reactivation
+FAIL  reuse_active_clone_skips_reactivation[wa] (15.5s) — F1 (a1) + platform: on n8n 2.36.7 activating an ACTIVE workflow is NOT a no-op (200, but its webhook is unregistered for a moment); so a Create for the same profile whose clone is ACTIVE reuses it WITHOUT activating it — the webhook answers throughout, same id, no second clone
+      platform: re-activate=200 ×1 webhook gaps during it=3/188 | create#2=500 {'message': 'Error in workflow'} ran_activate=False webhook answered 2224/2224 probes during Create#2 clones=[('bqrWUTzMyqPrNGSQ', False), ('fVHjGyGjV6IBizoP', True)]
+FAIL  reuse_active_clone_skips_reactivation[tg] (15.6s) — F1 (a1) + platform: on n8n 2.36.7 activating an ACTIVE workflow is NOT a no-op (200, but its webhook is unregistered for a moment); so a Create for the same profile whose clone is ACTIVE reuses it WITHOUT activating it — the webhook answers throughout, same id, no second clone
+      platform: re-activate=200 ×1 webhook gaps during it=3/190 | create#2=500 {'message': 'Error in workflow'} ran_activate=False webhook answered 2513/2513 probes during Create#2 clones=[('ToBxn3XDlYALQplm', False), ('mv1kw7TKGlfb2d1C', True)]
+
+0 pass, 2 fail
+### --only reauth_new_profile_replaces_prior_and_moves_data   (re-run after the scenario stopped letting a missing branch A hide its data checks)
+FAIL  reauth_new_profile_replaces_prior_and_moves_data[wa] (14.4s) — F1 (a2/a3) + F2: a NEW profile of the same bot (re-pairing: same bot key) → a new clone; the predecessor's memory, history, «Сводка», handoffs, ledger, chat state, chat flags, price-list chunks and file registry move to it; the prior clone is booked and deleted (GET 404), the sweep's branch A stamps it; a repeat Create is idempotent
+      w1=07WXBadT3LSB7i3V create#2=200 {'id': 'yfgmJ2VgP4MLtvJs'} rows p1|p2|file=('2|1|1|1|1|1|1', '0|0|0|0|0|0|0', '07WXBadT3LSB7i3V|07WXBadT3LSB7i3V') old clone GET|row|booking=(200, '07WXBadT3LSB7i3V|false|-|-', '') new clone=(200, True, 'profile-000067') repeat=500 {'message': 'Error in workflow'} rows|clones after repeat=('0|0|0|0|0|0|0', [('6S6XmVHihqSE8stP', False), ('yfgmJ2VgP4MLtvJs', True)]) branch A=branch A: fXYpCXPKw92EzRz8-Profile_Lifecycle_Sweep.json: no ['Clone Retirements', 'Delete Retired Clone', 'Has Retired Clone?', 'Log Would Remove', 'Retired Clone Gone?', 'Retirements Dry Run?', 'Stamp Retirement Kept', 'Stamp Retirement Removed'] in this canon
+FAIL  reauth_new_profile_replaces_prior_and_moves_data[tg] (14.2s) — F1 (a2/a3) + F2: a NEW profile of the same bot (re-pairing: same bot key) → a new clone; the predecessor's memory, history, «Сводка», handoffs, ledger, chat state, chat flags, price-list chunks and file registry move to it; the prior clone is booked and deleted (GET 404), the sweep's branch A stamps it; a repeat Create is idempotent
+      w1=DulJ5FWxEfdU7Vdj create#2=200 {'id': 'X23A3nbykWyHXfbZ'} rows p1|p2|file=('2|1|1|1|1|1|1', '0|0|0|0|0|0|0', 'DulJ5FWxEfdU7Vdj|DulJ5FWxEfdU7Vdj') old clone GET|row|booking=(200, 'DulJ5FWxEfdU7Vdj|false|-|-', '') new clone=(200, True, 'profile-000069') repeat=500 {'message': 'Error in workflow'} rows|clones after repeat=('0|0|0|0|0|0|0', [('NdWPHT1WgjjVlMQz', False), ('X23A3nbykWyHXfbZ', True)]) branch A=branch A: fXYpCXPKw92EzRz8-Profile_Lifecycle_Sweep.json: no ['Clone Retirements', 'Delete Retired Clone', 'Has Retired Clone?', 'Log Would Remove', 'Retired Clone Gone?', 'Retirements Dry Run?', 'Stamp Retirement Kept', 'Stamp Retirement Removed'] in this canon
+
+0 pass, 2 fail
+### --only retired_bot_reconnects_after_purchase
+FAIL  retired_bot_reconnects_after_purchase[wa] (6.7s) — F2: a bot the sweep retired (trial over: row trial_expiry, clone switched off by the V12 branch, trialing → expired) is bought back (RevenueCat INITIAL_PURCHASE through the real mapping + upsert), reconnected on a NEW profile (profile.add) and Created with PreviousProfileId → a new active clone on the new path takes over its chats, memory and price list, the old clone is deleted, the new webhook reaches the new clone, the V12 branch leaves it on; [llm] then, in «Авто», the bot answers with the price from the moved price list and the time agreed in the moved dialog
+      {"retired": [false, []], "purchase": [200, "business|active"], "create": [200, {"id": "7Glcc1D4EnklcIqv"}], "new_clone": [200, true, "profile-000018"], "old": [200, "hRDM0EikgilOZYN9|false|trial_expiry|-", ""], "moved": ["2|1|1|1|1|1|1", "0|0|0|0|0|0|0", "hRDM0EikgilOZYN9|hRDM0EikgilOZYN9"], "webhook": [1, "suppressed", "1"], "after_sweep": [200, true, "profile-000018"], "llm": "skipped (deterministic part failed)"}
+FAIL  retired_bot_reconnects_after_purchase[tg] (6.0s) — F2: a bot the sweep retired (trial over: row trial_expiry, clone switched off by the V12 branch, trialing → expired) is bought back (RevenueCat INITIAL_PURCHASE through the real mapping + upsert), reconnected on a NEW profile (profile.add) and Created with PreviousProfileId → a new active clone on the new path takes over its chats, memory and price list, the old clone is deleted, the new webhook reaches the new clone, the V12 branch leaves it on; [llm] then, in «Авто», the bot answers with the price from the moved price list and the time agreed in the moved dialog
+      {"retired": [false, []], "purchase": [200, "business|active"], "create": [200, {"id": "AKf4Ewd2gYZBtptO"}], "new_clone": [200, true, "profile-000020"], "old": [200, "R8TF0T1vtr5YeyZl|false|trial_expiry|-", ""], "moved": ["2|1|1|1|1|1|1", "0|0|0|0|0|0|0", "R8TF0T1vtr5YeyZl|R8TF0T1vtr5YeyZl"], "webhook": [1, "suppressed", "1"], "after_sweep": [200, true, "profile-000020"], "llm": "skipped (deterministic part failed)"}
+
+0 pass, 2 fail
+### --only activation_conflict_discards_new_clone
+FAIL  activation_conflict_discards_new_clone[wa] (12.2s) — F1 (б): an orphan workflow already serves the profile's webhook path → the new clone's activation is refused; Create answers create_failed WITHOUT an id and deletes the clone it made (no second workflow on the path, nothing bound)
+      create=500 {'message': 'Error in workflow'} ran_discard=False workflows on the path=[('JwRObEGpjG1lZhIV', False), ('MnF11KIwJXWyNmy6', True)] (orphan MnF11KIwJXWyNmy6) row=-|true|-|-
+FAIL  activation_conflict_discards_new_clone[tg] (12.1s) — F1 (б): an orphan workflow already serves the profile's webhook path → the new clone's activation is refused; Create answers create_failed WITHOUT an id and deletes the clone it made (no second workflow on the path, nothing bound)
+      create=500 {'message': 'Error in workflow'} ran_discard=False workflows on the path=[('iLpfG512dL7UcKji', False), ('uwOb20J8pD1tEAfJ', True)] (orphan uwOb20J8pD1tEAfJ) row=-|true|-|-
+
+0 pass, 2 fail
+### --only bind_failure_answers_no_id
+FAIL  bind_failure_answers_no_id[wa] (12.7s) — F1 (б) / R8 trick: Bind Workflow Id fails on the real Postgres (a CHECK scoped to this profile) → create_failed WITHOUT an id, the new clone deleted, nothing bound; the retry once the DB is back creates exactly ONE live clone
+      failed create=200 {'id': 'ORZEsKHNAHNzENKp'} ran_bind=True ran_discard=False clones=[('ORZEsKHNAHNzENKp', True)] row=-|true|-|- | retry=500 None clones=[('K6qGTUzJESNsirgr', False), ('ORZEsKHNAHNzENKp', True)]
+FAIL  bind_failure_answers_no_id[tg] (12.7s) — F1 (б) / R8 trick: Bind Workflow Id fails on the real Postgres (a CHECK scoped to this profile) → create_failed WITHOUT an id, the new clone deleted, nothing bound; the retry once the DB is back creates exactly ONE live clone
+      failed create=200 {'id': '23uZi1IdSwZzVKuN'} ran_bind=True ran_discard=False clones=[('23uZi1IdSwZzVKuN', True)] row=-|true|-|- | retry=500 None clones=[('23uZi1IdSwZzVKuN', True), ('XakpnpvunMMlx80x', False)]
+
+0 pass, 2 fail
+### --only legacy_create_on_owned_profile_refused
+FAIL  legacy_create_on_owned_profile_refused[wa] (12.6s) — F1 Q3: a token-less (legacy, compat window) Create naming a profile an install OWNS → profile_owned WITHOUT an id; no clone created, the owner's clone and binding untouched
+      owner's clone=PUgbUm2BxWSVUROK legacy create=500 {'message': 'Error in workflow'} ran_template=False clones=[('MWQvySAjE64LuNQ7', False), ('PUgbUm2BxWSVUROK', True)] row=PUgbUm2BxWSVUROK|true|-|- owner_kept=True | observed (compat-window residual, not this block's): the owner's '*' reply mode true/1791770528676 -> false/1791770529340
+FAIL  legacy_create_on_owned_profile_refused[tg] (12.7s) — F1 Q3: a token-less (legacy, compat window) Create naming a profile an install OWNS → profile_owned WITHOUT an id; no clone created, the owner's clone and binding untouched
+      owner's clone=PdZ8iar26fwM0Cu4 legacy create=500 {'message': 'Error in workflow'} ran_template=False clones=[('PdZ8iar26fwM0Cu4', True), ('jiJzufo3DF1w4ojC', False)] row=PdZ8iar26fwM0Cu4|true|-|- owner_kept=True | observed (compat-window residual, not this block's): the owner's '*' reply mode true/1791770541335 -> false/1791770542001
+
+0 pass, 2 fail
+### --only foreign_install_same_bot_key_untouched
+FAIL  foreign_install_same_bot_key_untouched[wa] (4.9s) — F1 §1.3: install B names its own profile with the SAME bot key as A's bot (and even A's profile as PreviousProfileId) → B gets its own clone, adopts nothing; A's clone, rows, memory and price list stay A's. Control: A's own re-pairing adopts A's line and leaves B's bot alone
+      B create=200 {'id': '9mOHYSkDiS30fKSr'} A seen after B (A rows|A file|A clone|A row|B rows)=('2|1|1|1|1|1|1', 'kNLMqgIwAJ9qQ6uJ|kNLMqgIwAJ9qQ6uJ', (200, True, 'profile-000035'), 'kNLMqgIwAJ9qQ6uJ|true|-|-', '0|0|0|0|0|0|0') | A control=200 {'id': 'XNUFCBfRFbCfdwED'} (A new rows|A file|old A clone GET|B rows|B file|B clone|B row)=('0|0|0|0|0|0|0', 'kNLMqgIwAJ9qQ6uJ|kNLMqgIwAJ9qQ6uJ', 200, '2|1|1|1|1|1|1', '9mOHYSkDiS30fKSr|9mOHYSkDiS30fKSr', (200, True, 'profile-000036'), '9mOHYSkDiS30fKSr|true|-|-')
+FAIL  foreign_install_same_bot_key_untouched[tg] (4.8s) — F1 §1.3: install B names its own profile with the SAME bot key as A's bot (and even A's profile as PreviousProfileId) → B gets its own clone, adopts nothing; A's clone, rows, memory and price list stay A's. Control: A's own re-pairing adopts A's line and leaves B's bot alone
+      B create=200 {'id': 'SOUuHrFJpqfGDkTH'} A seen after B (A rows|A file|A clone|A row|B rows)=('2|1|1|1|1|1|1', 'qiUnr2vFimU1dtpw|qiUnr2vFimU1dtpw', (200, True, 'profile-000038'), 'qiUnr2vFimU1dtpw|true|-|-', '0|0|0|0|0|0|0') | A control=200 {'id': 'uEgrUycycAfMYzoH'} (A new rows|A file|old A clone GET|B rows|B file|B clone|B row)=('0|0|0|0|0|0|0', 'qiUnr2vFimU1dtpw|qiUnr2vFimU1dtpw', 200, '2|1|1|1|1|1|1', 'SOUuHrFJpqfGDkTH|SOUuHrFJpqfGDkTH', (200, True, 'profile-000039'), 'SOUuHrFJpqfGDkTH|true|-|-')
+
+0 pass, 2 fail
+### --only wizard_create_never_adopts
+FAIL  wizard_create_never_adopts[wa] (6.1s) — F1 + F2 §1.3: a wizard Create (CreateOrigin=start: a NEW bot in a reused slot) never adopts — not by the same bot key, not even with the old profile named as PreviousProfileId; the old bot's data and clone stay where they were. Control: the same shape from settings (CreateOrigin=edit) adopts
+      wizard create=200 {'id': 'UUBpRRxN9bW2SDnl'} (old rows|old file|old clone|booking|new rows)=('2|1|1|1|1|1|1', 'bFUyAhNKdSd31YaP|bFUyAhNKdSd31YaP', (200, True, 'profile-000043'), '', '0|0|0|0|0|0|0') | control=200 {'id': '8u7ZEB40o5GZR4CP'} (rows|file)=('0|0|0|0|0|0|0', 'qhbw6EIXVjMVAwA7|qhbw6EIXVjMVAwA7')
+FAIL  wizard_create_never_adopts[tg] (9.7s) — F1 + F2 §1.3: a wizard Create (CreateOrigin=start: a NEW bot in a reused slot) never adopts — not by the same bot key, not even with the old profile named as PreviousProfileId; the old bot's data and clone stay where they were. Control: the same shape from settings (CreateOrigin=edit) adopts
+      wizard create=200 {'id': 'bpg6KKtXLWZQ2EOv'} (old rows|old file|old clone|booking|new rows)=('2|1|1|1|1|1|1', 'fviySPKGpSNrRjAt|fviySPKGpSNrRjAt', (200, True, 'profile-000047'), '', '0|0|0|0|0|0|0') | control=200 {'id': 'X03O3D0HZEfNnTN4'} (rows|file)=('0|0|0|0|0|0|0', 'KCjpjiW7pKHW8aUr|KCjpjiW7pKHW8aUr')
+
+0 pass, 2 fail
+### --only bot_delete_wipes_lineage   (re-run after the scenario stopped letting a missing branch A hide its data checks)
+FAIL  bot_delete_wipes_lineage (8.6s) — F1 + F2 §1.6 (T5): a two-channel bot whose earlier profiles were left behind by a pre-fix re-pairing (WA and TG) is deleted from the app naming only its CURRENT ids → Delete Bot Files wipes the whole line (memory, history, ledger, chunks of every profile and clone), retires every row as app_delete and books the left-behind clones; the sweep's branch A deletes them. Another install's bot with the same key is untouched
+      {"setup": ["4eRlyHCgTQiXHw25", "dP69BNLUEPt37qA2", "H1e7n5zCjsBz8uNu", "3TVRKhObAZ6hczX9", "Dy8OmRhgUa6BZVSq"], "dbf": [200, {"success": true, "deletedChunks": 2, "retiredProfiles": 2}], "left": {"profile-000072": "2|1|1|1|1|1|1", "profile-000074": "0|0|0|0|0|0|0", "profile-000075": "2|1|1|1|1|1|1", "profile-000076": "0|0|0|0|0|0|0"}, "chunks_left": "2", "rows": {"profile-000072": "4eRlyHCgTQiXHw25|false|-|-", "profile-000074": "dP69BNLUEPt37qA2|false|app_delete|-", "profile-000075": "H1e7n5zCjsBz8uNu|false|-|-", "profile-000076": "3TVRKhObAZ6hczX9|false|app_delete|-"}, "bookings": {"4eRlyHCgTQiXHw25": "", "dP69BNLUEPt37qA2": "", "H1e7n5zCjsBz8uNu": "", "3TVRKhObAZ6hczX9": ""}, "foreign": ["2|1|1|1|1|1|1", "Dy8OmRhgUa6BZVSq|Dy8OmRhgUa6BZVSq", [200, true, "profile-000073"], "Dy8OmRhgUa6BZVSq|true|-|-", ""], "client_deletes": [200, 200], "after_branch_a": "branch A: fXYpCXPKw92EzRz8-Profile_Lifecycle_Sweep.json: no ['Clone Retirements', 'Delete Retired Clone', 'Has Retired Clone?', 'Log Would Remove', 'Retired Clone Gone?', 'Retirements Dry Run?', 'Stamp Retirement Kept', 'Stamp Retirement Removed'] in this canon"}
+
+0 pass, 1 fail
+### --only sweep_removes_booked_clone
+FAIL  sweep_removes_booked_clone (1.5s) — F1 §2.6 A (T5): the sweep's branch A on the real n8n — in canon's dry run (retirementsDryRun true) it only logs; flipped, it DELETEs a booked clone older than 10 minutes (200 → removed_at), stamps an already-gone one (404), never touches a clone a LIVE row drives or a booking younger than 10 minutes, and never calls again what it stamped
+      EXCEPTION RuntimeError("fXYpCXPKw92EzRz8-Profile_Lifecycle_Sweep.json: no ['Clone Retirements', 'Delete Retired Clone', 'Has Retired Clone?', 'Log Would Remove', 'Retired Clone Gone?', 'Retirements Dry Run?', 'Stamp Retirement Kept', 'Stamp Retirement Removed'] in this canon")
+
+0 pass, 1 fail
+### --only billing_conflict_is_logged
+FAIL  billing_conflict_is_logged (32.9s) — V3 (T1): a refresh that answers billingConflict (a second install naming a billing id another install holds) writes ONE billing_conflicts row — claimant, the CURRENT holder, attempts — a repeat bumps attempts, a refresh without a conflict writes nothing, the answer itself is unchanged; once support revokes the holder the id moves on the claimant's next refresh
+      journal after bootstrap+refresh='' conflict answer=True/None after repeat='' holder's refresh logged=0 after revoke: id=True conflict=False journal=''
+
+0 pass, 1 fail
+
+## e2e-handoff.py (пометка «Владелец: » — owner_send_marked_in_memory; черновики умерших прогонов — lost_run_draft_settled)
+### --only outgoing_phone_recorded
+FAIL  outgoing_phone_recorded[wa] (6s) — A6: a message the owner sent from the PHONE lands in the one history (owner_phone) and in the agent's memory once, even when re-delivered; T6: the memory row opens with «Владелец: »
+      first=('recorded_owner_phone', 'owner_phone:Да, завтра в 15:00 ждём вас', 'ai/owner_phone:Да, завтра в 15:00 ждём вас') redelivery=outgoing_known memory_rows=1
+FAIL  outgoing_phone_recorded[tg] (6s) — A6: a message the owner sent from the PHONE lands in the one history (owner_phone) and in the agent's memory once, even when re-delivered; T6: the memory row opens with «Владелец: »
+      first=('recorded_owner_phone', 'owner_phone:Да, завтра в 15:00 ждём вас', 'ai/owner_phone:Да, завтра в 15:00 ждём вас') redelivery=outgoing_known memory_rows=1
+
+0 pass, 2 fail
+### --only proxy_send_records_owner_app_row
+FAIL  proxy_send_records_owner_app_row[wa] (7s) — A6: a message the owner sends from the APP (proxy) lands as owner_app in history and as a marked memory row, after the response; T6: the memory row opens with «Владелец: »
+      http=200 body={'status': 'done', 'message_id': 'sent-000001', 'time': 1791770792} history=owner_app:Спасибо, ждём вас memory=ai/owner_app:Спасибо, ждём вас
+FAIL  proxy_send_records_owner_app_row[tg] (6s) — A6: a message the owner sends from the APP (proxy) lands as owner_app in history and as a marked memory row, after the response; T6: the memory row opens with «Владелец: »
+      http=200 body={'status': 'done', 'message_id': 'sent-000001', 'time': 1791770798} history=owner_app:Спасибо, ждём вас memory=ai/owner_app:Спасибо, ждём вас
+
+0 pass, 2 fail
+### --only lost_send_settled_by_notifier
+FAIL  lost_send_settled_by_notifier (97s) — R9: a reply left send_pending > 10 min (its run died between the lease and Record Send) becomes send_unknown on the notifier's schedule — no transport call; a live one is untouched; T7: the lost run's memory draft becomes unknown + «[доставка не подтверждена] », a dead claim's draft is removed, a live run's draft stays — WhatsApp and Telegram, one schedule tick
+      {"wa": {"lost": "send_unknown|dead-run-wa|run_lost: no send result recorded within 10 min (execution dead-run-wa)", "live": "send_pending", "send_calls_for_profile": 0, "memory": "dead-run-wa/draft/Букет — 25 000 ₸. | live-run-wa/draft/Доставка — 1000 ₸. | dead-claim-wa/draft/Черновик умершего прогона."}, "tg": {"lost": "send_unknown|dead-run-tg|run_lost: no send result recorded within 10 min (execution dead-run-tg)", "live": "send_pending", "send_calls_for_profile": 0, "memory": "dead-run-tg/draft/Букет — 25 000 ₸. | live-run-tg/draft/Доставка — 1000 ₸. | dead-claim-tg/draft/Черновик умершего прогона."}}
+
+0 pass, 1 fail
+
+## e2e-reply.py (пометка неизвестной доставки — unknown_delivery_marked_in_memory) [модель: 1 прогон на канал]
+### --only dropped_without_echo_stays_send_unknown
+FAIL  dropped_without_echo_stays_send_unknown[wa] (12s) — A7: the connection dies before the transport processed anything → no echo → the state STAYS send_unknown (visible in the ledger), no resend; T6: the memory row carries «[доставка не подтверждена] »
+      send_calls=0 outcome=generation_failed ledger=generation_failed|-|- reconciled=None ai_memory_rows=0 ai_marks=[] ai_contents=[]
+FAIL  dropped_without_echo_stays_send_unknown[tg] (32s) — A7: the connection dies before the transport processed anything → no echo → the state STAYS send_unknown (visible in the ledger), no resend; T6: the memory row carries «[доставка не подтверждена] »
+      send_calls=1 outcome=send_unknown ledger=send_unknown|-|socket hang up reconciled=False ai_memory_rows=1 ai_marks=[('true', 'unknown', '-')] ai_contents=['Не знаю: в данных нет прайса на букеты.']
+   cleanup: deleted rows: 5
+
+0 pass, 2 fail
+
+### --only dropped_without_echo_stays_send_unknown --channel wa   (повтор: в прогоне выше OpenAI ответил 503 «upstream connect error» — exec 22926, generation_failed, модель не ответила; повтор один)
+FAIL  dropped_without_echo_stays_send_unknown[wa] (32s) — A7: the connection dies before the transport processed anything → no echo → the state STAYS send_unknown (visible in the ledger), no resend; T6: the memory row carries «[доставка не подтверждена] »
+      send_calls=1 outcome=send_unknown ledger=send_unknown|-|socket hang up reconciled=False ai_memory_rows=1 ai_marks=[('true', 'unknown', '-')] ai_contents=['Не знаю: в данных бизнеса нет цен на букеты.']
+   cleanup: deleted rows: 3
+
+0 pass, 1 fail

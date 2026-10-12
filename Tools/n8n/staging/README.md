@@ -39,5 +39,15 @@ python3 Tools/n8n/staging/vertical-bots.py --vertical education  # клоны с
 #   назад к промпту шаблона — обычный bootstrap.py --bot …
 python3 Tools/n8n/staging/bootstrap.py --stop                 # остановить сервер
 ```
+## Прогон «до»: канон на другом git-ref (F1F2-plan T10)
+```bash
+python3 Tools/n8n/staging/bootstrap.py --bot wa:stgwa001 --bot tg:stgtg001 --canon-ref 92a7caa2   # канон, каким он был на ref
+python3 Tools/n8n/staging/e2e-auth.py --only reauth_new_profile          # сценарии — из рабочего дерева: ждём FAIL
+python3 Tools/n8n/staging/bootstrap.py --bot wa:stgwa001 --bot tg:stgtg001                       # вернуть рабочий канон
+python3 Tools/n8n/verify-deployed.py --base http://localhost:5678                                # exit 0
+```
+`--canon-ref` берёт ТОЛЬКО `Tools/n8n/workflows/*.json` на этом ref (`git archive` во временный каталог); правила
+вывода, изоляция и STAGING-ONLY workflows — из рабочего дерева; `_manifest.json` записывает `canonRef`. Новые
+миграции на стенде остаются (они аддитивны, старый канон их не читает).
 Проверка изоляции: `grep -c 'wappi.pro\|n8n.choosereply.com' Tools/n8n/workflows-staging/*.json` → везде 0
 (derive-staging.py сам отказывает при любом остатке).

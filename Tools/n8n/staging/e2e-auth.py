@@ -9,10 +9,14 @@ endpoint; unknown/expired/forged sessions are rejected before any side effect; l
 """
 import argparse
 import base64
+import copy
+import hashlib
 import json
 import os
+import re
 import subprocess
 import sys
+import threading
 import time
 import urllib.error
 import urllib.request
@@ -1074,8 +1078,698 @@ def s_sweep_clone(ctx):
     return ok, f"active before={pre} after run 1 (wa, tg, stamp)={mid} run 2 called deactivate={'Deactivate Clone' in ran2} still exist={exists}"
 
 
+# ------------------------------------------------------------------ F1 + F2 «the bot's line» + V3 journal (F1F2-plan T10)
+# The real Create WA/TG graphs (apply-clone-lifecycle.py), Delete Bot Files by the line, the sweep's branch A and the
+# Auth Session journal on n8n 2.36.7 + the Wappi mock. Every scenario was first run against the canon BEFORE the block
+# (bootstrap.py --canon-ref 92a7caa2) and failed there (docs/audits/2026-10-09-followups/evidence/T10-before.txt).
+# A scenario cleans up its clones (the staging API), price-list rows and bookings; the Owner cleanup deletes the rest.
+
+NO_LLM = "--no-llm" in sys.argv     # skip the model step of retired_bot_reconnects_after_purchase (deterministic part only)
+
+LINE_CH = {
+    "wa": {"channel": "whatsapp", "form": "CreateWhatsappWorkflow", "field": "WhatsappProfileId", "other": "TelegramWorkflowId",
+           "key": "botWaId", "other_key": "botTgId", "fcol": "bot_wa_id", "suffix": "@c.us"},
+    "tg": {"channel": "telegram", "form": "CreateTelegramWorkflow", "field": "TelegramProfileId", "other": "WhatsappWorkflowId",
+           "key": "botTgId", "other_key": "botWaId", "fcol": "bot_tg_id", "suffix": ""},
+}
+
+
+def for_channels(id_, title):
+    """Register a scenario once per channel: `<id>[wa]` and `<id>[tg]`."""
+    def deco(fn):
+        for ch in ("wa", "tg"):
+            SCENARIOS.append((f"{id_}[{ch}]", title, (lambda c, ch=ch: fn(c, ch))))
+        return fn
+    return deco
+
+
+def line_owner(ctx, tag, ch):
+    """A fresh install whose FIRST profile is on the scenario's channel (fresh_owner always starts on WhatsApp)."""
+    o = Owner(tag, ctx["run_id"])
+    pid = o.add_profile(LINE_CH[ch]["channel"])
+    return o, pid
+
+
+def line_chat(ch, ctx, tag):
+    n = int(hashlib.sha1((tag + ctx["run_id"] + ch).encode()).hexdigest(), 16) % 10_000_000
+    return f"7701{n:07d}@c.us" if ch == "wa" else f"55{n:07d}"
+
+
+def line_create(owner, ch, pid, key, origin="edit", prev=None, other="-1", mode="semi", token=None, app_user_id=None, refresh=True):
+    """One Create WA/TG through the real gate, as the client sends it (§1.7: CreateOrigin, PreviousProfileId). Returns
+    (http, body, the answered id, the nodes the execution ran)."""
+    c = LINE_CH[ch]
+    fields = {"Name": f"e2e-line-{key}", "BusinessType": "Цветы", "BusinessTypeId": "flowers", "Business": "", "Prompt": "",
+              "ProductsList": "", "ServicesList": "", "AppUserID": owner.app_user_id if app_user_id is None else app_user_id,
+              "BotKey": key, "ReplyMode": mode, "ReplyModeVersion": str(int(time.time() * 1000)), c["field"]: pid, c["other"]: other}
+    if origin is not None:
+        fields["CreateOrigin"] = origin
+    if prev:
+        fields["PreviousProfileId"] = prev
+    wf = CREATE_WORKFLOW_IDS[c["form"]]
+    since = newest_execution_id(wf)
+    st, d = hook_form(c["form"], owner.token if token is None else token, fields)
+    ran = ran_nodes(newest_execution(wf, since))
+    wid = d.get("id") if isinstance(d, dict) else None
+    if refresh and token is None:
+        owner.refresh()
+    return st, d, wid, ran
+
+
+def wf_state(wid):
+    """(GET status, active, webhook path) of a staging workflow."""
+    st, d = admin_api("GET", f"/workflows/{wid}")
+    if st != 200 or not isinstance(d, dict):
+        return st, None, None
+    path = next(((n.get("parameters") or {}).get("path") for n in d.get("nodes", []) if n.get("type") == "n8n-nodes-base.webhook"), None)
+    return st, d.get("active"), path
+
+
+def registered(path):
+    """Whether n8n serves a POST webhook on `path` right now — asked with a GET, which never starts an execution: a
+    registered POST webhook answers «not registered for GET … Did you mean to make a POST request?»."""
+    st, d = http("GET", f"{BASE}/webhook/{path}", timeout=10)
+    return st == 404 and "Did you mean" in str((d or {}).get("message", "") if isinstance(d, dict) else d)
+
+
+def drop_clones(*pids, keep=()):
+    """Staging API cleanup: every workflow whose webhook path is one of `pids` (clones and orphans of this scenario)."""
+    for pid in pids:
+        for wid, _ in clones_for(pid):
+            if wid not in keep:
+                admin_api("DELETE", f"/workflows/{wid}")
+
+
+def seed_line(pid, wid, ch, chat, install, tag, price_row="Букет «Нежность» — 18 500 ₸ (15 роз)",
+              dialog=(("human", "Здравствуйте! Можно букет «Нежность» с доставкой в пятницу к 18:00?"),
+                      ("ai", "Да, доставим букет «Нежность» в пятницу к 18:00 по адресу Абая 10."))):
+    """Everything a bot holds on the server for one chat, as its writers leave it: memory, the one history, «Сводка»,
+    a handoff, the reply ledger, chat state, a chat-scoped reply-mode flag — under the profile — and a price-list chunk +
+    its registry row under the clone. Returns the file id."""
+    c = LINE_CH[ch]
+    fid = str(uuid.uuid4())
+    for kind, text in dialog:
+        pg(f"insert into n8n_chat_histories (session_id, message) values ('{pid}:{chat}', jsonb_build_object('type', '{kind}', "
+           f"'content', '{text}', 'additional_kwargs', '{{}}'::jsonb, 'response_metadata', '{{}}'::jsonb));")
+    pg(f"insert into chat_history_events (profile_id, chat_id, message_id, source, body, msg_type, sent_at) values "
+       f"('{pid}', '{chat}', '{tag}-m1', 'client', '{dialog[0][1]}', 'chat', now() - interval '1 day');"
+       f"insert into conversation_outcomes (session_id, profile_id, chat_id, outcome, summary, last_history_id, last_message_at, outcome_at) "
+       f"values ('{pid}:{chat}', '{pid}', '{chat}', 'order_collected', 'Нежность, пятница 18:00', 0, now() - interval '1 day', now() - interval '1 day');"
+       f"insert into handoff_requests (profile_id, chat_id, source_message_id, reason, summary) values ('{pid}', '{chat}', '{tag}-m1', 'order', 'Нежность');"
+       f"insert into reply_events (profile_id, chat_id, message_id, state) values ('{pid}', '{chat}', '{tag}-m1', 'sent');"
+       f"insert into chat_reply_state (profile_id, chat_id, incoming_generation) values ('{pid}', '{chat}', 3);"
+       f"insert into reply_mode_flags (profile_id, chat_id, suppressed, version) values ('{pid}', '{chat}', false, 5);"
+       f"insert into documents (content, metadata) values ('{price_row}', jsonb_build_object('{c['key']}', '{wid}', '{c['other_key']}', '-1', 'fileId', '{fid}'));"
+       f"insert into uploaded_files (file_id, owner_id, {c['fcol']}, content_type, file_name) values ('{fid}', '{install}', '{wid}', 'products', 'price.txt');")
+    return fid
+
+
+def line_rows(pid, chat):
+    """memory|history|outcomes|handoffs|events|state|chat flags of one profile's chat."""
+    return pg(f"select (select count(*) from n8n_chat_histories where session_id = '{pid}:{chat}') || '|' || "
+              f"(select count(*) from chat_history_events where profile_id = '{pid}' and chat_id = '{chat}') || '|' || "
+              f"(select count(*) from conversation_outcomes where profile_id = '{pid}' and chat_id = '{chat}' and session_id = '{pid}:{chat}') || '|' || "
+              f"(select count(*) from handoff_requests where profile_id = '{pid}' and chat_id = '{chat}') || '|' || "
+              f"(select count(*) from reply_events where profile_id = '{pid}' and chat_id = '{chat}') || '|' || "
+              f"(select count(*) from chat_reply_state where profile_id = '{pid}' and chat_id = '{chat}') || '|' || "
+              f"(select count(*) from reply_mode_flags where profile_id = '{pid}' and chat_id = '{chat}');")
+
+
+def file_home(fid, ch):
+    """chunks key|registry column of one price-list file."""
+    c = LINE_CH[ch]
+    return pg(f"select coalesce((select string_agg(distinct metadata->>'{c['key']}', ',') from documents where metadata->>'fileId' = '{fid}'), '-') "
+              f"|| '|' || coalesce((select {c['fcol']} from uploaded_files where file_id = '{fid}'), '-');")
+
+
+def drop_files(*fids):
+    if fids:
+        ids = ", ".join(f"'{f}'" for f in fids)
+        pg(f"delete from documents where metadata->>'fileId' in ({ids}); delete from uploaded_files where file_id in ({ids});")
+
+
+def row_of(pid):
+    return pg(f"select coalesce(workflow_id, '-') || '|' || (deleted_at is null) || '|' || coalesce(deleted_reason, '-') || '|' "
+              f"|| coalesce(superseded_by, '-') from bot_profiles where profile_id = '{pid}';")
+
+
+def booking(wid):
+    return pg(f"select reason || '|' || coalesce(replaced_by, '-') || '|' || coalesce(profile_id, '-') || '|' || (removed_at is not null) "
+              f"|| '|' || coalesce(last_status, '-') || '|' || attempts from clone_retirements where workflow_id = '{wid}';")
+
+
+def probe_workflow(run_id, src_file, keep, entry, tag, edit=None, response_node=False):
+    """A TEMPORARY staging-only workflow: a webhook → the DERIVED canonical nodes `keep` of `src_file` (credentials already
+    remapped by derive-staging), entered at `entry`. Runs exactly those nodes on the real n8n; the caller deletes it.
+    A node `keep` names that the canon does not have fails the probe — the canon before the block lacks branch A."""
+    src = json.load(open(os.path.join(N8N_DIR, "workflows-staging", src_file), encoding="utf-8"))
+    nodes = [copy.deepcopy(n) for n in src["nodes"] if n["name"] in keep]
+    missing = sorted(set(keep) - {n["name"] for n in nodes})
+    if missing:
+        raise RuntimeError(f"{src_file}: no {missing} in this canon")
+    if edit:
+        edit({n["name"]: n for n in nodes})
+    conns = {k: {kind: [[e for e in out or [] if e["node"] in keep] for out in lists] for kind, lists in v.items()}
+             for k, v in src["connections"].items() if k in keep}      # edges into nodes outside the probe are cut
+    path = f"t10-{tag}-{run_id}"
+    nodes.append({"parameters": {"httpMethod": "POST", "path": path, "responseMode": "responseNode" if response_node else "onReceived",
+                                 "options": {}},
+                  "id": f"probe-{tag}", "name": "Probe Webhook", "type": "n8n-nodes-base.webhook", "typeVersion": 2,
+                  "position": [-900, 900], "webhookId": path})
+    conns["Probe Webhook"] = {"main": [[{"node": entry, "type": "main", "index": 0}]]}
+    st, created = admin_api("POST", "/workflows", {"name": f"STAGING probe {tag} {run_id}", "settings": {"executionOrder": "v1"},
+                                                   "nodes": nodes, "connections": conns})
+    if st != 200:
+        raise RuntimeError(f"probe create {st}: {str(created)[:300]}")
+    wid = created["id"]
+    if admin_api("POST", f"/workflows/{wid}/activate")[0] != 200:
+        admin_api("DELETE", f"/workflows/{wid}")
+        raise RuntimeError("probe activate failed")
+    return wid, f"{BASE}/webhook/{path}"
+
+
+def drop_probe(wid):
+    if wid:
+        admin_api("POST", f"/workflows/{wid}/deactivate")
+        admin_api("DELETE", f"/workflows/{wid}")
+
+
+SWEEP_FILE = "fXYpCXPKw92EzRz8-Profile_Lifecycle_Sweep.json"
+BRANCH_A = ("Sweep Config", "Clone Retirements", "Retirements Dry Run?", "Log Would Remove", "Has Retired Clone?",
+            "Delete Retired Clone", "Retired Clone Gone?", "Stamp Retirement Removed", "Stamp Retirement Kept")
+
+
+def run_branch_a(run_id, dry_run=None):
+    """One run of the sweep's branch A (Clone Retirements → … → Stamp) as canon has it; dry_run=False flips Sweep Config's
+    retirementsDryRun exactly as the generator's flip will on prod (plan §6 step 12). Returns the execution."""
+    def flip(nodes):
+        for a in nodes["Sweep Config"]["parameters"]["assignments"]["assignments"]:
+            if a["name"] == "retirementsDryRun" and dry_run is not None:
+                a["value"] = dry_run
+    wid = None
+    try:
+        wid, url = probe_workflow(run_id, SWEEP_FILE, BRANCH_A, "Sweep Config", f"ba{int(time.time())}", edit=flip)
+        return run_probe(wid, url)
+    finally:
+        drop_probe(wid)
+
+
+def age_bookings(*wids):
+    if wids:
+        pg(f"update clone_retirements set created_at = now() - interval '11 minutes' where workflow_id in ({', '.join(repr(w) for w in wids)});")
+
+
+def throwaway_workflow(tag, path=None, active=False):
+    """A plain staging workflow standing in for a clone (a webhook node on `path`)."""
+    path = path or f"t10-thr-{tag}-{uuid.uuid4().hex[:6]}"
+    st, d = admin_api("POST", "/workflows", {"name": f"STAGING t10 {tag}", "settings": {"executionOrder": "v1"}, "connections": {},
+                                             "nodes": [{"parameters": {"httpMethod": "POST", "path": path, "responseMode": "onReceived", "options": {}},
+                                                        "id": "w", "name": "Webhook", "type": "n8n-nodes-base.webhook", "typeVersion": 2,
+                                                        "position": [0, 0], "webhookId": path}]})
+    if st != 200:
+        raise RuntimeError(f"throwaway workflow: {st} {d}")
+    if active and admin_api("POST", f"/workflows/{d['id']}/activate")[0] != 200:
+        raise RuntimeError("throwaway activate failed")
+    return d["id"]
+
+
+def rc_purchase(run_id, app_user_id, entitlement="tier_business", product="sub.business.month"):
+    """A store purchase as RevenueCat reports it: the DERIVED RevenueCat Events workflow (Map Event → … → Upsert Subscriber)
+    behind a temporary auth-free webhook — the real mapping and upsert, without the RevenueCat header secret."""
+    keep = ("Map Event", "If Is Transfer?", "Transfer Subscriber", "If Needs Consolidation?", "Consolidate Aliases", "If Has Payload?",
+            "Upsert Subscriber", "Respond 200", "Respond No-Op", "Respond Error", "Respond Error Transfer", "Respond Error Consolidate")
+    wid = None
+    try:
+        wid, url = probe_workflow(run_id, "ZGYr6srzS3rSSXHp-RevenueCat_Events.json", keep, "Map Event", f"rc{int(time.time())}", response_node=True)
+        return http("POST", url, {"event": {"type": "INITIAL_PURCHASE", "app_user_id": app_user_id, "entitlement_ids": [entitlement],
+                                            "product_id": product, "expiration_at_ms": int(time.time() * 1000) + 30 * 86400_000}})
+    finally:
+        drop_probe(wid)
+
+
+def clone_executions(wid, since_id, n=1, wait_s=60):
+    deadline = time.time() + wait_s
+    while time.time() < deadline:
+        st, page = http("GET", f"{BASE}/api/v1/executions?workflowId={wid}&limit=20&includeData=false", headers={"X-N8N-API-KEY": SEC.get("apiKey", "")})
+        rows = [e for e in (page or {}).get("data", []) if int(e["id"]) > since_id]
+        if len(rows) >= n and all(r.get("finished") or r.get("status") in ("success", "error", "canceled", "crashed") for r in rows):
+            return [http("GET", f"{BASE}/api/v1/executions/{r['id']}?includeData=true", headers={"X-N8N-API-KEY": SEC.get("apiKey", "")})[1]
+                    for r in sorted(rows, key=lambda e: int(e["id"]))]
+        time.sleep(1)
+    return []
+
+
+def node_items(ex, node):
+    """Every main-output item (json) a node produced in one execution."""
+    return [it.get("json") or {} for run in (((ex or {}).get("data") or {}).get("resultData", {}).get("runData", {}).get(node, []) or [])
+            for br in (run.get("data") or {}).get("main") or [] for it in br or []]
+
+
+def exec_outcome(ex):
+    return next((it.get("outcome") for it in node_items(ex, "Outcome")), None)
+
+
+def bot_event(pid, chat, mid, body, t):
+    return {"messages": [{"id": mid, "chatId": chat, "from": chat, "to": "770100000000", "profile_id": pid, "body": body, "type": "chat",
+                          "time": t, "fromMe": False, "senderName": "client", "wh_type": "incoming_message"}]}
+
+
+@for_channels("reauth_same_profile_reuses_bound_clone", "F1 (a1): the channel saved off (SetWorkflowState deactivate), then a Create for the SAME profile → the SAME clone id (created:false), activated again, no template read, no second clone")
+def s_line_reauth_same(ctx, ch):
+    o, pid = line_owner(ctx, f"rs{ch}", ch)
+    key = f"Bot-rs{ch}-{ctx['run_id']}"
+    try:
+        st1, d1, w1, _ = line_create(o, ch, pid, key)
+        if not w1:
+            return False, f"setup create: {st1} {d1}"
+        off = hook("SetWorkflowState", o.token, {"workflowId": w1, "action": "deactivate"})[0]
+        before = wf_state(w1)
+        st2, d2, w2, ran = line_create(o, ch, pid, key)
+        after = wf_state(w1)
+        clones = clones_for(pid)
+        row = row_of(pid)
+    finally:
+        drop_clones(pid)
+    ok = (off == 200 and before == (200, False, pid) and st2 == 200 and w2 == w1 and isinstance(d2, dict) and d2.get("created") is False
+          and d2.get("adoptedProfiles") == [] and "Probe Bound Clone" in ran and "Activate Created Workflow" in ran
+          and "Get Sample Workflow" not in ran and "Create Workflow" not in ran
+          and after == (200, True, pid) and clones == [(w1, True)] and row.startswith(f"{w1}|true|"))
+    return ok, (f"first={w1} deactivate={off} state_before={before} second={st2} {d2} ran_template={'Get Sample Workflow' in ran} "
+                f"ran_create={'Create Workflow' in ran} ran_activate={'Activate Created Workflow' in ran} state_after={after} clones={clones} row={row}")
+
+
+@for_channels("reuse_active_clone_skips_reactivation", "F1 (a1) + platform: on n8n 2.36.7 activating an ACTIVE workflow is NOT a no-op (200, but its webhook is unregistered for a moment); so a Create for the same profile whose clone is ACTIVE reuses it WITHOUT activating it — the webhook answers throughout, same id, no second clone")
+def s_line_reuse_active(ctx, ch):
+    # the platform fact the reuse branch is built on (T3 «Already Active?»): a throwaway webhook, activated twice
+    thr = throwaway_workflow(f"act{ch}", active=True)
+    path = wf_state(thr)[2]
+    gaps, stop = [], [False]
+
+    def watch(target, out):
+        while not stop[0]:
+            out.append(registered(target))
+    again, tries = [], 0
+    try:
+        while tries < 5 and gaps.count(False) == 0:     # the gap lasts milliseconds: a few re-activations, until one is seen
+            tries += 1
+            stop[0] = False
+            t = threading.Thread(target=watch, args=(path, gaps)); t.start(); time.sleep(0.3)
+            again.append(admin_api("POST", f"/workflows/{thr}/activate")[0])
+            time.sleep(0.5); stop[0] = True; t.join()
+    finally:
+        stop[0] = True
+        admin_api("DELETE", f"/workflows/{thr}")
+    platform_gap = gaps.count(False)
+    again = again[-1] if again and all(x == again[0] for x in again) else again
+    o, pid = line_owner(ctx, f"ra{ch}", ch)
+    key = f"Bot-ra{ch}-{ctx['run_id']}"
+    try:
+        st1, d1, w1, _ = line_create(o, ch, pid, key)
+        if not w1:
+            return False, f"setup create: {st1} {d1}"
+        seen, stop[0] = [], False
+        t = threading.Thread(target=watch, args=(pid, seen)); t.start(); time.sleep(0.3)
+        st2, d2, w2, ran = line_create(o, ch, pid, key)
+        time.sleep(0.3); stop[0] = True; t.join()
+        clones = clones_for(pid)
+    finally:
+        stop[0] = True
+        drop_clones(pid)
+    ok = (again == 200 and platform_gap > 0 and st2 == 200 and w2 == w1 and isinstance(d2, dict) and d2.get("created") is False
+          and "Probe Bound Clone" in ran and "Activate Created Workflow" not in ran and "Create Workflow" not in ran
+          and seen and all(seen) and clones == [(w1, True)])
+    return ok, (f"platform: re-activate={again} ×{tries} webhook gaps during it={platform_gap}/{len(gaps)} | create#2={st2} {d2} "
+                f"ran_activate={'Activate Created Workflow' in ran} webhook answered {seen.count(True)}/{len(seen)} probes during Create#2 clones={clones}")
+
+
+@for_channels("reauth_new_profile_replaces_prior_and_moves_data", "F1 (a2/a3) + F2: a NEW profile of the same bot (re-pairing: same bot key) → a new clone; the predecessor's memory, history, «Сводка», handoffs, ledger, chat state, chat flags, price-list chunks and file registry move to it; the prior clone is booked and deleted (GET 404), the sweep's branch A stamps it; a repeat Create is idempotent")
+def s_line_repair(ctx, ch):
+    o, p1 = line_owner(ctx, f"rp{ch}", ch)
+    key = f"Bot-rp{ch}-{ctx['run_id']}"
+    chat = line_chat(ch, ctx, "rp")
+    fid = None
+    try:
+        st1, d1, w1, _ = line_create(o, ch, p1, key)
+        if not w1:
+            return False, f"setup create: {st1} {d1}"
+        fid = seed_line(p1, w1, ch, chat, o.install_id, f"rp{ch}{ctx['run_id']}")
+        p2 = o.add_profile(LINE_CH[ch]["channel"])
+        st2, d2, w2, ran = line_create(o, ch, p2, key)
+        moved = (line_rows(p1, chat), line_rows(p2, chat), file_home(fid, ch))
+        old = (wf_state(w1)[0], row_of(p1), booking(w1))
+        new = wf_state(w2) if w2 else None
+        st3, d3, w3, ran3 = line_create(o, ch, p2, key)                  # the answer was lost: the client repeats
+        repeat = (line_rows(p2, chat), clones_for(p2))
+        age_bookings(w1)
+        try:
+            run_branch_a(ctx["run_id"], dry_run=False)
+            stamped = booking(w1)
+        except RuntimeError as e:          # a canon without branch A: the rest of the evidence still stands
+            stamped = f"branch A: {e}"
+    finally:
+        drop_clones(*o.profiles)
+        drop_files(*([fid] if fid else []))
+    ok = (st2 == 200 and w2 and w2 != w1 and isinstance(d2, dict) and d2.get("created") is True and d2.get("adoptedProfiles") == [p1]
+          and moved == ("0|0|0|0|0|0|0", "2|1|1|1|1|1|1", f"{w2}|{w2}")
+          and old == (404, f"{w1}|false|replaced|{p2}", f"replaced|{w2}|{p1}|false|-|0") and new == (200, True, p2)
+          and st3 == 200 and w3 == w2 and isinstance(d3, dict) and d3.get("created") is False and d3.get("adoptedProfiles") == [p1]
+          and repeat == ("2|1|1|1|1|1|1", [(w2, True)]) and stamped == f"replaced|{w2}|{p1}|true|404|0")
+    return ok, (f"w1={w1} create#2={st2} {d2} rows p1|p2|file={moved} old clone GET|row|booking={old} new clone={new} "
+                f"repeat={st3} {d3} rows|clones after repeat={repeat} branch A={stamped}")
+
+
+@for_channels("retired_bot_reconnects_after_purchase", "F2: a bot the sweep retired (trial over: row trial_expiry, clone switched off by the V12 branch, trialing → expired) is bought back (RevenueCat INITIAL_PURCHASE through the real mapping + upsert), reconnected on a NEW profile (profile.add) and Created with PreviousProfileId → a new active clone on the new path takes over its chats, memory and price list, the old clone is deleted, the new webhook reaches the new clone, the V12 branch leaves it on; [llm] then, in «Авто», the bot answers with the price from the moved price list and the time agreed in the moved dialog")
+def s_line_reconnect(ctx, ch):
+    o, p1 = line_owner(ctx, f"rc{ch}", ch)
+    key = f"Bot-rc{ch}-{ctx['run_id']}"
+    chat, chat2 = line_chat(ch, ctx, "rc"), line_chat(ch, ctx, "rc2")
+    fid, res = None, {}
+    try:
+        st1, d1, w1, _ = line_create(o, ch, p1, key)
+        if not w1:
+            return False, f"setup create: {st1} {d1}"
+        fid = seed_line(p1, w1, ch, chat, o.install_id, f"rc{ch}{ctx['run_id']}")
+        # the trial ends: the sweep's Mark Deleted + Demote Trialing, then its V12 branch switches the clone off
+        pg(f"update bot_profiles set deleted_at = now(), deleted_reason = 'trial_expiry' where profile_id = '{p1}';"
+           f"update subscribers set status = 'expired' where app_user_id = '{o.app_user_id}' and status = 'trialing';")
+        wid = None
+        try:
+            wid, url = sweep_clone_probe(ctx["run_id"] + ch)
+            run_probe(wid, url)
+        finally:
+            drop_probe(wid)
+        res["retired"] = (wf_state(w1)[1], o.refresh().get("profiles"))
+        st, _ = rc_purchase(ctx["run_id"], o.app_user_id)
+        res["purchase"] = (st, pg(f"select plan || '|' || status from subscribers where app_user_id = '{o.app_user_id}';"))
+        o.refresh()
+        p2 = o.add_profile(LINE_CH[ch]["channel"])
+        st2, d2, w2, ran = line_create(o, ch, p2, key, prev=p1)
+        res["create"] = (st2, d2)
+        res["new_clone"] = wf_state(w2) if w2 else None
+        res["old"] = (wf_state(w1)[0], row_of(p1), booking(w1))
+        res["moved"] = (line_rows(p1, chat), line_rows(p2, chat), file_home(fid, ch))
+        # the new profile's webhook reaches the new clone («Вместе»: recorded, nothing generated)
+        since = newest_execution_id(w2) if w2 else 0
+        t = int(time.time())
+        http("POST", f"{BASE}/webhook/{p2}", bot_event(p2, chat2, f"rc2-{ctx['run_id']}{ch}", "Здравствуйте, вы работаете?", t), timeout=30)
+        exs = clone_executions(w2, since) if w2 else []
+        res["webhook"] = (len(exs), exec_outcome(exs[0]) if exs else None,
+                          pg(f"select count(*) from chat_history_events where profile_id = '{p2}' and chat_id = '{chat2}';"))
+        wid = None
+        try:                                   # F2 R7: the V12 branch never picks the reconnected bot's clone
+            wid, url = sweep_clone_probe(ctx["run_id"] + ch + "b")
+            run_probe(wid, url)
+        finally:
+            drop_probe(wid)
+        res["after_sweep"] = wf_state(w2) if w2 else None
+        det = (res["retired"][0] is False and p1 not in (res["retired"][1] or []) and res["purchase"] == (200, "business|active")
+               and st2 == 200 and w2 and w2 != w1 and isinstance(d2, dict) and d2.get("created") is True and d2.get("adoptedProfiles") == [p1]
+               and res["new_clone"] == (200, True, p2) and res["old"] == (404, f"{w1}|false|trial_expiry|{p2}", f"replaced|{w2}|{p1}|false|-|0")
+               and res["moved"] == ("0|0|0|0|0|0|0", "2|1|1|1|1|1|1", f"{w2}|{w2}")
+               and res["webhook"] == (1, "suppressed", "1") and res["after_sweep"] == (200, True, p2))
+        if not det or NO_LLM:
+            res["llm"] = "skipped" + (" (--no-llm)" if NO_LLM else " (deterministic part failed)")
+            return det, json.dumps(res, ensure_ascii=False)
+        # [llm] the owner returns the chat to «Авто»; the client asks about the earlier agreement and the price
+        hook("SetReplyMode", o.token, {"profileIds": [p2], "chatId": "*", "suppressed": False, "version": int(time.time() * 1000)})
+        q = "Напомните, во сколько в пятницу вы привезёте букет «Нежность» и сколько он стоит?"
+        t = int(time.time())
+        mid = f"rcq-{ctx['run_id']}{ch}"
+        http("POST", f"{MOCK}/__mock/messages", {"profile_id": p2, "chat_id": chat, "messages": [
+            {"id": mid, "chatId": chat, "from": chat, "body": q, "time": t, "fromMe": False, "type": "chat"}]})
+        since = newest_execution_id(w2)
+        since_calls = mock_total()
+        http("POST", f"{BASE}/webhook/{p2}", bot_event(p2, chat, mid, q, t), timeout=30)
+        exs = clone_executions(w2, since, wait_s=180)
+        ex = exs[0] if exs else {}
+        tools = []
+        for run in ((ex.get("data") or {}).get("resultData", {}).get("runData", {}).get("Supabase Vector Store", []) or []):
+            for br in (run.get("data") or {}).get("ai_tool") or []:
+                tools += [str(it.get("json")) for it in br or []]
+        sends = [c for c in mock_calls(since_calls, "message/send")[0] if (c.get("query") or {}).get("profile_id") == p2 and not c.get("dropped")]
+        reply = ((sends[0].get("body") or {}).get("body", "") if sends else "")
+        flat = reply.replace(" ", "").replace(" ", "")
+        res["llm"] = {"outcome": exec_outcome(ex), "price_tool_saw_row": any("18 500" in x for x in tools), "reply": reply[:240]}
+        ok = det and exec_outcome(ex) == "sent" and "18500" in flat and re.search(r"18[:.]00", reply) is not None
+        return ok, json.dumps(res, ensure_ascii=False)
+    finally:
+        drop_clones(*o.profiles)
+        drop_files(*([fid] if fid else []))
+
+
+@for_channels("activation_conflict_discards_new_clone", "F1 (б): an orphan workflow already serves the profile's webhook path → the new clone's activation is refused; Create answers create_failed WITHOUT an id and deletes the clone it made (no second workflow on the path, nothing bound)")
+def s_line_activation_conflict(ctx, ch):
+    o, pid = line_owner(ctx, f"ac{ch}", ch)
+    orphan = throwaway_workflow(f"orph{ch}", path=pid, active=True)
+    try:
+        st, d, wid, ran = line_create(o, ch, pid, f"Bot-ac{ch}-{ctx['run_id']}")
+        clones = clones_for(pid)
+        row = row_of(pid)
+    finally:
+        drop_clones(pid)
+    ok = (st == 200 and d == {"success": False, "error": "create_failed"} and wid is None and "Activate Created Workflow" in ran
+          and "Discard New Clone" in ran and "Record Discard Failure" not in ran and clones == [(orphan, True)] and row.startswith("-|"))
+    return ok, f"create={st} {d} ran_discard={'Discard New Clone' in ran} workflows on the path={clones} (orphan {orphan}) row={row}"
+
+
+@for_channels("bind_failure_answers_no_id", "F1 (б) / R8 trick: Bind Workflow Id fails on the real Postgres (a CHECK scoped to this profile) → create_failed WITHOUT an id, the new clone deleted, nothing bound; the retry once the DB is back creates exactly ONE live clone")
+def s_line_bind_failure(ctx, ch):
+    o, pid = line_owner(ctx, f"bf{ch}", ch)
+    con = f"t10bf_{ctx['run_id']}_{ch}"
+    key = f"Bot-bf{ch}-{ctx['run_id']}"
+    try:
+        pg(f"alter table bot_profiles add constraint {con} check (profile_id <> '{pid}' or workflow_id is null) not valid;")
+        try:
+            st, d, wid, ran = line_create(o, ch, pid, key)
+            clones1 = clones_for(pid)
+            row1 = row_of(pid)
+        finally:
+            pg(f"alter table bot_profiles drop constraint if exists {con};")
+        st2, d2, w2, _ = line_create(o, ch, pid, key)
+        clones2 = clones_for(pid)
+    finally:
+        drop_clones(pid)
+    ok = (st == 200 and d == {"success": False, "error": "create_failed"} and wid is None and "Bind Workflow Id" in ran
+          and "Discard New Clone" in ran and clones1 == [] and row1.startswith("-|")
+          and st2 == 200 and w2 and clones2 == [(w2, True)])
+    return ok, f"failed create={st} {d} ran_bind={'Bind Workflow Id' in ran} ran_discard={'Discard New Clone' in ran} clones={clones1} row={row1} | retry={st2} {w2} clones={clones2}"
+
+
+@for_channels("legacy_create_on_owned_profile_refused", "F1 Q3: a token-less (legacy, compat window) Create naming a profile an install OWNS → profile_owned WITHOUT an id; no clone created, the owner's clone and binding untouched")
+def s_line_legacy_owned(ctx, ch):
+    o, pid = line_owner(ctx, f"lg{ch}", ch)
+    key = f"Bot-lg{ch}-{ctx['run_id']}"
+    try:
+        st1, d1, w1, _ = line_create(o, ch, pid, key)
+        if not w1:
+            return False, f"setup create: {st1} {d1}"
+        flag = lambda: pg(f"select suppressed || '/' || version from reply_mode_flags where profile_id = '{pid}' and chat_id = '*';")
+        flag_before = flag()
+        st, d, wid, ran = line_create(o, ch, pid, key, origin=None, token="", refresh=False, mode="auto")
+        flag_after = flag()                    # observed, not asserted: the pre-A1 compat path seeds BEFORE the plan refuses
+        clones = clones_for(pid)
+        row = row_of(pid)
+        owner = pg(f"select owner_id from bot_profiles where profile_id = '{pid}';")
+    finally:
+        drop_clones(pid)
+    if COMPAT_CLOSED:
+        ok = st == 401 and clones == [(w1, True)]
+    else:
+        ok = (st == 200 and d == {"success": False, "error": "profile_owned"} and wid is None and "Get Sample Workflow" not in ran
+              and clones == [(w1, True)] and row == f"{w1}|true|-|-" and owner == o.install_id)
+    return ok, (f"owner's clone={w1} legacy create={st} {d} ran_template={'Get Sample Workflow' in ran} clones={clones} row={row} "
+                f"owner_kept={owner == o.install_id} | observed (compat-window residual, not this block's): the owner's '*' reply mode "
+                f"{flag_before} -> {flag_after}")
+
+
+@for_channels("foreign_install_same_bot_key_untouched", "F1 §1.3: install B names its own profile with the SAME bot key as A's bot (and even A's profile as PreviousProfileId) → B gets its own clone, adopts nothing; A's clone, rows, memory and price list stay A's. Control: A's own re-pairing adopts A's line and leaves B's bot alone")
+def s_line_foreign(ctx, ch):
+    a, pa = line_owner(ctx, f"fa{ch}", ch)
+    b, pb = line_owner(ctx, f"fb{ch}", ch)
+    key = f"Bot-fx{ch}-{ctx['run_id']}"
+    chat = line_chat(ch, ctx, "fx")
+    fa = fb = None
+    try:
+        _, _, wa_, _ = line_create(a, ch, pa, key)
+        if not wa_:
+            return False, "setup create A failed"
+        fa = seed_line(pa, wa_, ch, chat, a.install_id, f"fxa{ch}{ctx['run_id']}")
+        stb, db, wb, _ = line_create(b, ch, pb, key, prev=pa)
+        b_view = (line_rows(pa, chat), file_home(fa, ch), wf_state(wa_), row_of(pa), line_rows(pb, chat))
+        fb = seed_line(pb, wb, ch, chat, b.install_id, f"fxb{ch}{ctx['run_id']}") if wb else None
+        pa2 = a.add_profile(LINE_CH[ch]["channel"])                   # control: A's own re-pairing
+        sta, da, wa2, _ = line_create(a, ch, pa2, key)
+        a_view = (line_rows(pa2, chat), file_home(fa, ch), wf_state(wa_)[0], line_rows(pb, chat), file_home(fb, ch) if fb else None,
+                  wf_state(wb) if wb else None, row_of(pb))
+    finally:
+        drop_clones(*a.profiles, *b.profiles)
+        drop_files(*[f for f in (fa, fb) if f])
+    ok = (stb == 200 and wb and wb != wa_ and isinstance(db, dict) and db.get("created") is True and db.get("adoptedProfiles") == []
+          and b_view == ("2|1|1|1|1|1|1", f"{wa_}|{wa_}", (200, True, pa), f"{wa_}|true|-|-", "0|0|0|0|0|0|0")
+          and sta == 200 and isinstance(da, dict) and da.get("adoptedProfiles") == [pa]
+          and a_view == ("2|1|1|1|1|1|1", f"{wa2}|{wa2}", 404, "2|1|1|1|1|1|1", f"{wb}|{wb}", (200, True, pb), f"{wb}|true|-|-"))
+    return ok, (f"B create={stb} {db} A seen after B (A rows|A file|A clone|A row|B rows)={b_view} | A control={sta} {da} "
+                f"(A new rows|A file|old A clone GET|B rows|B file|B clone|B row)={a_view}")
+
+
+@for_channels("wizard_create_never_adopts", "F1 + F2 §1.3: a wizard Create (CreateOrigin=start: a NEW bot in a reused slot) never adopts — not by the same bot key, not even with the old profile named as PreviousProfileId; the old bot's data and clone stay where they were. Control: the same shape from settings (CreateOrigin=edit) adopts")
+def s_line_wizard(ctx, ch):
+    o, p1 = line_owner(ctx, f"wz{ch}", ch)
+    run = ctx["run_id"]
+    key, key2 = f"Bot-wz{ch}-{run}", f"Bot-wy{ch}-{run}"
+    chat = line_chat(ch, ctx, "wz")
+    f1 = f3 = None
+    try:
+        _, _, w1, _ = line_create(o, ch, p1, key)
+        if not w1:
+            return False, "setup create failed"
+        f1 = seed_line(p1, w1, ch, chat, o.install_id, f"wz{ch}{run}")
+        p2 = o.add_profile(LINE_CH[ch]["channel"])
+        st, d, w2, _ = line_create(o, ch, p2, key, origin="start", prev=p1)
+        wiz = (line_rows(p1, chat), file_home(f1, ch), wf_state(w1), booking(w1), line_rows(p2, chat))
+        p3 = o.add_profile(LINE_CH[ch]["channel"])                     # control: another bot, from settings
+        _, _, w3, _ = line_create(o, ch, p3, key2)
+        f3 = seed_line(p3, w3, ch, chat, o.install_id, f"wy{ch}{run}") if w3 else None
+        p4 = o.add_profile(LINE_CH[ch]["channel"])
+        stc, dc, w4, _ = line_create(o, ch, p4, key2, origin="edit")
+        ctl = (line_rows(p4, chat), file_home(f3, ch) if f3 else None)
+    finally:
+        drop_clones(*o.profiles)
+        drop_files(*[f for f in (f1, f3) if f])
+    ok = (st == 200 and w2 and w2 != w1 and isinstance(d, dict) and d.get("created") is True and d.get("adoptedProfiles") == []
+          and wiz == ("2|1|1|1|1|1|1", f"{w1}|{w1}", (200, True, p1), "", "0|0|0|0|0|0|0")
+          and stc == 200 and isinstance(dc, dict) and dc.get("adoptedProfiles") == [p3] and ctl == ("2|1|1|1|1|1|1", f"{w4}|{w4}"))
+    return ok, f"wizard create={st} {d} (old rows|old file|old clone|booking|new rows)={wiz} | control={stc} {dc} (rows|file)={ctl}"
+
+
+@scenario("bot_delete_wipes_lineage", "F1 + F2 §1.6 (T5): a two-channel bot whose earlier profiles were left behind by a pre-fix re-pairing (WA and TG) is deleted from the app naming only its CURRENT ids → Delete Bot Files wipes the whole line (memory, history, ledger, chunks of every profile and clone), retires every row as app_delete and books the left-behind clones; the sweep's branch A deletes them. Another install's bot with the same key is untouched")
+def s_line_delete(ctx):
+    o, p1 = line_owner(ctx, "dlw", "wa")
+    x, px = line_owner(ctx, "dlx", "wa")
+    run = ctx["run_id"]
+    key = f"Bot-dl-{run}"
+    chat = line_chat("wa", ctx, "dl")
+    tchat = line_chat("tg", ctx, "dl")
+    files, res = [], {}
+    try:
+        _, _, w1, _ = line_create(o, "wa", p1, key)
+        files.append(seed_line(p1, w1, "wa", chat, o.install_id, f"dl1{run}"))
+        p2 = o.add_profile("whatsapp")                    # pre-fix re-pairing: the earlier profile is left with its data
+        _, _, w2, _ = line_create(o, "wa", p2, key, origin="start")
+        files.append(seed_line(p2, w2, "wa", chat, o.install_id, f"dl2{run}"))
+        t1 = o.add_profile("telegram")
+        _, _, wt1, _ = line_create(o, "tg", t1, key, other=w2)
+        files.append(seed_line(t1, wt1, "tg", tchat, o.install_id, f"dlt1{run}"))
+        t2 = o.add_profile("telegram")
+        _, _, wt2, _ = line_create(o, "tg", t2, key, origin="start", other=w2)
+        files.append(seed_line(t2, wt2, "tg", tchat, o.install_id, f"dlt2{run}"))
+        _, _, wx, _ = line_create(x, "wa", px, key)                    # another install, the same bot key
+        files.append(seed_line(px, wx, "wa", chat, x.install_id, f"dlx{run}"))
+        res["setup"] = [w1, w2, wt1, wt2, wx]
+        if not all(res["setup"]):
+            return False, json.dumps(res)
+        st, d = hook("DeleteBotFiles", o.token, {"botWaId": w2, "botTgId": wt2, "waProfileId": p2, "tgProfileId": t2, "appUserId": o.app_user_id})
+        res["dbf"] = (st, {k: v for k, v in (d or {}).items() if k in ("success", "retiredProfiles", "bookedClones", "deletedChunks")})
+        res["left"] = {p: line_rows(p, chat if p in (p1, p2) else tchat) for p in (p1, p2, t1, t2)}
+        res["chunks_left"] = pg(f"select count(*) from documents where metadata->>'fileId' in ({', '.join(repr(f) for f in files[:4])});")
+        res["rows"] = {p: row_of(p) for p in (p1, p2, t1, t2)}
+        res["bookings"] = {w: booking(w) for w in (w1, w2, wt1, wt2)}
+        res["foreign"] = (line_rows(px, chat), file_home(files[4], "wa"), wf_state(wx), row_of(px), booking(wx))
+        res["client_deletes"] = [hook("SetWorkflowState", o.token, {"workflowId": w, "action": "delete"})[0] for w in (w2, wt2)]
+        age_bookings(w1, w2, wt1, wt2)
+        try:
+            run_branch_a(run, dry_run=False)
+            res["after_branch_a"] = {w: (wf_state(w)[0], booking(w).split("|")[3:5]) for w in (w1, w2, wt1, wt2)}
+        except RuntimeError as e:          # a canon without branch A: the rest of the evidence still stands
+            res["after_branch_a"] = f"branch A: {e}"
+    finally:
+        drop_clones(*o.profiles, *x.profiles)
+        drop_files(*files)
+    gone = "0|0|0|0|0|0|0"
+    ok = (res.get("dbf", (0,))[0] == 200 and res["dbf"][1].get("success") is True
+          and all(v == gone for v in res["left"].values()) and res["chunks_left"] == "0"
+          and all(v.split("|")[1:3] == ["false", "app_delete"] for v in res["rows"].values())
+          and all(v.startswith("bot_deleted|-|") for v in res["bookings"].values())
+          and res["foreign"] == ("2|1|1|1|1|1|1", f"{wx}|{wx}", (200, True, px), f"{wx}|true|-|-", "")
+          and res["client_deletes"] == [200, 200]
+          and res["after_branch_a"] == {w1: (404, ["true", "200"]), w2: (404, ["true", "404"]), wt1: (404, ["true", "200"]), wt2: (404, ["true", "404"])})
+    return ok, json.dumps(res, ensure_ascii=False)
+
+
+@scenario("sweep_removes_booked_clone", "F1 §2.6 A (T5): the sweep's branch A on the real n8n — in canon's dry run (retirementsDryRun true) it only logs; flipped, it DELETEs a booked clone older than 10 minutes (200 → removed_at), stamps an already-gone one (404), never touches a clone a LIVE row drives or a booking younger than 10 minutes, and never calls again what it stamped")
+def s_line_branch_a(ctx):
+    o, pid = line_owner(ctx, "ba", "wa")
+    run = ctx["run_id"]
+    old = throwaway_workflow("baold")                                    # a replaced clone the Create could not delete
+    young = throwaway_workflow("bayoung")                                # booked a minute ago (a Create still in flight)
+    ghost = ("gone" + run + "000000")[:16]                               # already deleted by someone else
+    res = {}
+    try:
+        _, _, live, _ = line_create(o, "wa", pid, f"Bot-ba-{run}")       # bound to a LIVE row: never deleted
+        pg(f"insert into clone_retirements (workflow_id, profile_id, owner_id, reason, created_at) values "
+           f"('{old}', '{pid}', '{o.install_id}', 'replaced', now() - interval '11 minutes'), "
+           f"('{young}', '{pid}', '{o.install_id}', 'replaced', now() - interval '1 minute'), "
+           f"('{ghost}', '{pid}', '{o.install_id}', 'discard_failed', now() - interval '11 minutes'), "
+           f"('{live}', '{pid}', '{o.install_id}', 'replaced', now() - interval '11 minutes');")
+        e0 = run_branch_a(run)                                            # canon as committed: the first day's dry run
+        res["dry"] = ({w: wf_state(w)[0] for w in (old, young, live)}, {w: booking(w).split("|")[3] for w in (old, ghost)},
+                      "Log Would Remove" in ran_nodes(e0), "Delete Retired Clone" in ran_nodes(e0))
+        run_branch_a(run, dry_run=False)
+        res["live"] = {w: (wf_state(w)[0], booking(w)) for w in (old, young, ghost, live)}
+        e2 = run_branch_a(run, dry_run=False)                             # what it stamped is never picked again
+        res["second_run_picks"] = sorted(w for w in (it.get("workflow_id") for it in node_items(e2, "Clone Retirements"))
+                                         if w in {old, young, ghost, live})
+    finally:
+        for w in (old, young):
+            admin_api("DELETE", f"/workflows/{w}")
+        drop_clones(pid)
+    ok = (res["dry"] == ({old: 200, young: 200, live: 200}, {old: "false", ghost: "false"}, True, False)
+          and res["live"][old] == (404, f"replaced|-|{pid}|true|200|0") and res["live"][ghost] == (404, f"discard_failed|-|{pid}|true|404|0")
+          and res["live"][young] == (200, f"replaced|-|{pid}|false|-|0") and res["live"][live] == (200, f"replaced|-|{pid}|false|-|0")
+          and res["second_run_picks"] == [])
+    return ok, json.dumps(res, ensure_ascii=False)
+
+
+@scenario("billing_conflict_is_logged", "V3 (T1): a refresh that answers billingConflict (a second install naming a billing id another install holds) writes ONE billing_conflicts row — claimant, the CURRENT holder, attempts — a repeat bumps attempts, a refresh without a conflict writes nothing, the answer itself is unchanged; once support revokes the holder the id moves on the claimant's next refresh")
+def s_billing_conflict_log(ctx):
+    a = fresh_owner(ctx, "v3j")
+    b = Owner("v3k", ctx["run_id"], app_user_id=a.app_user_id)       # bootstrap + refresh: the first conflict
+    q = (f"select claimant_install_id || '|' || holder_install_id || '|' || attempts from billing_conflicts "
+         f"where app_user_id = '{a.app_user_id}' order by claimant_install_id;")
+
+    def settled(want):
+        for _ in range(20):                                           # the journal is written AFTER the answer
+            got = pg(q)
+            if got == want:
+                return got
+            time.sleep(0.5)
+        return pg(q)
+    first = settled(f"{b.install_id}|{a.install_id}|1")
+    d_b = b.refresh()
+    second = settled(f"{b.install_id}|{a.install_id}|2")
+    d_a = a.refresh()
+    time.sleep(2)
+    holder_logged = pg(f"select count(*) from billing_conflicts where claimant_install_id = '{a.install_id}';")
+    pg(f"update installs set revoked_at = now() where install_id = '{a.install_id}';")
+    d_b2 = b.refresh()
+    time.sleep(2)
+    after = pg(q)
+    ok = (first == f"{b.install_id}|{a.install_id}|1" and d_b.get("billingConflict") is True and d_b.get("appUserId") is None
+          and second == f"{b.install_id}|{a.install_id}|2" and not d_a.get("billingConflict") and holder_logged == "0"
+          and d_b2.get("appUserId") == a.app_user_id and not d_b2.get("billingConflict") and after == second)
+    return ok, (f"journal after bootstrap+refresh={first!r} conflict answer={d_b.get('billingConflict')}/{d_b.get('appUserId')} "
+                f"after repeat={second!r} holder's refresh logged={holder_logged} after revoke: id={d_b2.get('appUserId') == a.app_user_id} "
+                f"conflict={d_b2.get('billingConflict')} journal={after!r}")
+
+
 def main():
-    ap = argparse.ArgumentParser(); ap.add_argument("--only"); ap.add_argument("--compat-closed", action="store_true"); a = ap.parse_args()
+    ap = argparse.ArgumentParser(); ap.add_argument("--only"); ap.add_argument("--compat-closed", action="store_true")
+    ap.add_argument("--no-llm", action="store_true", help="skip the model step of retired_bot_reconnects_after_purchase")
+    ap.add_argument("--list", action="store_true"); a = ap.parse_args()
+    if a.list:
+        for id_, title, _ in SCENARIOS:
+            print(f"{id_:56} {title[:110]}")
+        return
     if not AUTH_SECRET:
         sys.exit("no authSecret in staging secrets — restart staging via bootstrap.py")
     run_id = uuid.uuid4().hex[:10]

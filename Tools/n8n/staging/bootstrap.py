@@ -15,6 +15,7 @@ Steps (each skipped when already done):
 
     python3 Tools/n8n/staging/bootstrap.py --creds-file <encrypted-export.json> --bot wa:stgwa001 --bot tg:stgtg001
     python3 Tools/n8n/staging/bootstrap.py --restart          # just (re)start the server
+    python3 Tools/n8n/staging/bootstrap.py --bot wa:stgwa001 --bot tg:stgtg001 --canon-ref 92a7caa2   # the canon at a ref
 """
 import argparse
 import http.cookiejar
@@ -193,6 +194,8 @@ def main():
     ap.add_argument("--restart", action="store_true")
     ap.add_argument("--stop", action="store_true")
     ap.add_argument("--skip-workflows", action="store_true")
+    ap.add_argument("--canon-ref", help="passed to derive-staging.py: import the canon committed at this git ref (a scenario's "
+                                        "«before» run, F1F2-plan T10); restore with a plain bootstrap afterwards")
     a = ap.parse_args()
     if a.stop:
         stop_server(); print("stopped"); return
@@ -245,7 +248,7 @@ def main():
     if not a.skip_workflows:
         stop_server()
         r = sh(sys.executable, os.path.join(HERE, "derive-staging.py"), *[x for b in a.bot for x in ("--bot", b)],
-               *(("--prompt-file", a.prompt_file) if a.prompt_file else ()))
+               *(("--prompt-file", a.prompt_file) if a.prompt_file else ()), *(("--canon-ref", a.canon_ref) if a.canon_ref else ()))
         n8n("import:workflow", "--separate", f"--input={os.path.join(N8N_DIR, 'workflows-staging')}")
         manifest = json.load(open(os.path.join(N8N_DIR, "workflows-staging", "_manifest.json")))
         for wid in ACTIVE_CANONICAL + [b["workflowId"] for b in manifest["bots"]]:

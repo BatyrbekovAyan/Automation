@@ -1,0 +1,354 @@
+# T10 — staging e2e блока: прогон «после» на каноне блока (рабочее дерево, HEAD 70518dd0 + сценарии T10)
+# 2026-10-12 07:55 +0500; n8n 2.36.7 (task runners) + Wappi-мок + staging Postgres (M1/M2/M3 применены); стенд: bootstrap.py --bot wa:stgwa001 --bot tg:stgtg001
+# канон и генераторы T10 не меняет (git status Tools/n8n/workflows, *.py генераторы, sql — чисто); меняются только staging-сценарии и инструмент --canon-ref
+# «до» (каждый новый/расширенный сценарий FAIL на каноне 92a7caa2): evidence/T10-before.txt
+#
+# Сценарии плана §3 T10 → сценарии стенда (×WA/TG, где канал имеет смысл):
+#   reauth_same_profile_reuses_bound_clone            → e2e-auth reauth_same_profile_reuses_bound_clone[wa|tg]
+#   reauth_new_profile_replaces_prior_and_moves_data  → e2e-auth reauth_new_profile_replaces_prior_and_moves_data[wa|tg] (+ повтор Create идемпотентен, ветка A ставит removed_at)
+#   retired_bot_reconnects_after_purchase             → e2e-auth retired_bot_reconnects_after_purchase[wa|tg] (покупка = RevenueCat INITIAL_PURCHASE через настоящие Map Event + Upsert Subscriber; [llm]-шаг — п.2)
+#   activation_conflict_discards_new_clone            → e2e-auth activation_conflict_discards_new_clone[wa|tg]
+#   bind_failure_answers_no_id                        → e2e-auth bind_failure_answers_no_id[wa|tg]
+#   legacy_create_on_owned_profile_refused            → e2e-auth legacy_create_on_owned_profile_refused[wa|tg]
+#   foreign_install_same_bot_key_untouched            → e2e-auth foreign_install_same_bot_key_untouched[wa|tg] (+ контроль: свой re-pair A перенимает)
+#   wizard_create_never_adopts                        → e2e-auth wizard_create_never_adopts[wa|tg] (+ контроль: CreateOrigin=edit перенимает)
+#   bot_delete_wipes_lineage                          → e2e-auth bot_delete_wipes_lineage (двухканальный бот, остатки на WA и TG)
+#   sweep_removes_booked_clone                        → e2e-auth sweep_removes_booked_clone
+#   activate_on_active_is_noop                        → e2e-auth reuse_active_clone_skips_reactivation[wa|tg] — ПЛАТФОРМА НЕ no-op: повторная
+#                                                       активация активного workflow отвечает 200, но вебхук на миллисекунды снимается
+#                                                       (GET-пробы 404); поэтому сценарий закрепляет обратное: Create переиспользует
+#                                                       активный клон БЕЗ активации и вебхук отвечает всё время (T3 «Already Active?»)
+#   billing_conflict_is_logged                        → e2e-auth billing_conflict_is_logged
+#   owner_send_marked_in_memory                       → e2e-handoff outgoing_phone_recorded[wa|tg] (owner_phone) + proxy_send_records_owner_app_row[wa|tg] (owner_app)
+#   unknown_delivery_marked_in_memory                 → e2e-reply dropped_without_echo_stays_send_unknown[wa|tg]
+#   lost_run_draft_settled                            → e2e-handoff lost_send_settled_by_notifier (WA + TG одним тиком расписания)
+
+## 1. e2e-auth.py --no-llm — ПОЛНЫЙ набор (31 прежних + 21 новых: линия бота F1+F2 ×WA/TG, ветка A, журнал V3)
+PASS  session_bootstrap_and_refresh (0.2s) — bootstrap mints an install; refresh with the secret returns a token; a wrong secret is 401
+      refresh ok=True wrong-secret=401/install_revoked unknown-install=401/install_revoked
+PASS  session_bad_request_is_400 (0.1s) — a malformed AuthSession body answers 400, never a token
+      400 {'success': False, 'error': 'bad_request'} / 400
+PASS  proxy_requires_token (0.4s) — WappiProxy without / with a forged / with an expired token → 401 and NO transport call
+      none=401 forged=401 garbage=401 transport_calls=0
+PASS  proxy_profile_add_binds_owner (0.7s) — profile.add creates the Wappi profile, binds it to the install and returns a token carrying it
+      profile=profile-000004 token_profiles=['profile-000003', 'profile-000004'] owner_bound=True
+PASS  proxy_owner_isolation (0.8s) — owner B cannot read/act on owner A's profile through ANY proxy op (403, no transport call)
+      {'chats.filter': 403, 'messages.get': 403, 'message.send': 403, 'profile.delete': 403, 'profile.logout': 403, 'status': 403, 'qr': 403, 'media.download': 403, 'chat.delete': 403, 'message.mark_read': 403} transport_calls=0
+PASS  proxy_legit_ops_pass_through (0.3s) — the owner's own ops reach the transport with the server credential and get Wappi's body back
+      status=200 send=200 get=200 bad_param=400 calls=3 all_authed=True
+PASS  proxy_unknown_op_rejected (0.2s) — an op outside the allow-list is refused without a transport call
+      unknown=400 channel_mismatch=400 calls=0
+PASS  hooks_reject_foreign_ids (0.7s) — gated webhooks refuse owner B's ids on owner A's token (and refuse no token) before any side effect
+      {"setreplymode_foreign": 403, "setreplymode_own": 200, "setreplymode_notoken": 200, "dashboard_foreign": 403, "getusage_foreign": 403, "getusage_own": 200, "setworkflowstate_foreign": 403, "deletebotfiles_foreign": 403, "support_notoken": 200}  (token-less expected 200: compat open)
+PASS  claim_by_code_transfers_ownership (0.5s) — a legacy/other-install profile: claim.start sends a code to the bot's OWN chat; claim.verify binds it to the claiming install
+      recipient_is_own_phone=True second_start_reuses_code=True wrong_code=403 verify=200 now_owned_by_A=True B_lost_it=True
+PASS  claim_reauth_then_code_binds (1.8s) — V2: an UNAUTHORISED legacy profile: claim.start → reauth; a pairing alone binds NOTHING (claim.status); claim.start then sends ONE code into the paired account's own chat and claim.verify binds it
+      qr_allowed=200 chats_refused=403 pairing_alone_owned=False/pending start=200/code sends=1 to=77009998877 verify=200 owned=True
+PASS  claim_reauth_independent_reconnect_not_transferred (4.6s) — V2: the claimant requests a QR, the OWNER reconnects the owner-less profile independently → the claimant gets nothing (claim.status), its claim.start sends the code into the OWNER's chat, a wrong code is 403 and the row stays owner-less — WhatsApp and Telegram
+      {"whatsapp": {"start": [200, "reauth"], "qr": 200, "status_owned": false, "start2": [200, "code"], "sends": [["/api/sync/message/send", "77001119900"]], "wrong_code": [403, "claim_code_rejected"], "owner": "-"}, "telegram": {"start": [200, "reauth"], "qr": 200, "status_owned": false, "start2": [200, "code"], "sends": [["/tapi/sync/message/send", "77001119911"]], "wrong_code": [403, "claim_code_rejected"], "owner": "-"}}
+PASS  claim_code_send_failure_is_reported (1.6s) — V2: a code the transport refuses is reported (502 code_send_failed) and cleared — the retry sends a NEW code (never «reused») and that code binds; a Telegram code goes to the authorised account (account.phone), not the top-level phone
+      {"whatsapp": {"failed": [502, "code_send_failed"], "retry": [200, "code", false], "sends": ["77002220000"], "verify": 200, "owned": true}, "telegram": {"failed": [502, "code_send_failed"], "retry": [200, "code", false], "sends": ["77002220001"], "verify": 200, "owned": true}}
+PASS  claim_reauth_owned_profile_not_transferred (2.5s) — R1: a stranger's pending claim on an OWNED profile + the owner's own later re-pairing → the stranger gets nothing, claim.status sends no code, the owner keeps the profile
+      stranger start=200/code owner_qr=200 stranger status=200 got_it=False codes_sent_by_status=0 owner_keeps=True (codes in chat total 1)
+PASS  claim_stale_capability_cannot_pair (1.2s) — R1: once another install takes over a pending claim, the first claimant's token capability no longer starts a pairing (403 claim_not_pending, no transport call)
+      L start=200 takeover=200 L qr=403 {'success': False, 'error': 'claim_not_pending'} transport_calls=0
+PASS  claim_unauthenticated_writes_nothing (1.0s) — R1: a claim.* call with a wrong secret is refused (401) before Claim Start — no row inserted, a pending claim untouched
+      wrong-secret=401/install_revoked ghost=401 rows_for_new_id=0 pending_unchanged=True
+PASS  replymode_reordered_versions_keep_newest (0.7s) — SetReplyMode v2: a later request with an OLDER version is not applied; the reply reports the server's newer value
+      first=200/True stale=200/False report=[{'profileId': 'profile-000024', 'applied': False, 'suppressed': True, 'version': 200}] row='true|200'
+PASS  replymode_bot_default_covers_both_channels_atomically (0.7s) — SetReplyMode v2: a bot-default write for WA+TG travels as ONE request and both rows land (all-or-nothing); a stale follow-up for one of them is refused per profile
+      both=200/True rows=2 stale=200/False report=[False, False]
+PASS  replymode_legacy_body_still_writes (0.2s) — SetReplyMode v2: a legacy body (no version) is applied with a server-assigned version and reads success + written
+      http=200 legacy=True allApplied=True written=1 row='f'
+PASS  replymode_invalid_is_400 (0.0s) — SetReplyMode v2: a malformed body answers 400 (was 200 + success:false)
+      http=400 body={'success': False, 'error': 'bad_request'}
+PASS  create_seeds_reply_mode_before_activation (1.4s) — CreateWhatsappWorkflow with ReplyMode=semi: the '*' row exists after create, the clone id is bound to the profile, the token learns it, and SetWorkflowState can delete it
+      create=200 id=0QS2ZaPCI16eHxZw row='true|150' bound=True token_has_wf=True delete=200 {'success': True}
+PASS  create_slot_count_excludes_own_profile_and_retires_refused (1.7s) — 2026-09-24 hotfix: on a 1-channel plan the FIRST channel is accepted (the A1-registered row of the profile being created is not counted) and a refused second profile is deleted at Wappi AND retired in bot_profiles
+      first=200 id=U9872ppPW5q8mSum second=200 refused=True wappi_deletes=1 row2='channel_limit|true' row1_alive_bound=True
+PASS  refresh_db_outage_keeps_install (0.4s) — R11: a refresh while the database fails answers 503 db_unavailable (never the 401 that makes the client discard its install); the SAME credentials refresh fine once it is back
+      outage=503 {'success': False, 'error': 'db_unavailable'} after=200 same_install=True profiles_kept=True
+PASS  billing_id_first_bind (2.9s) — R2/V3: a second install naming a billing id another install holds — WITH a live bot or WITHOUT one (a paying owner before the first bot) — gets NO billing identity + billingConflict on bootstrap AND refresh; its GetUsage/profile.add on that id are refused; the bootstrap itself binds nothing; the id follows only once the holder is revoked
+      WITH bot: second appUserId=None conflict=True usage_own=200 usage_second=403 profile.add_second=409 {'success': False, 'error': 'no_billing_identity', 'detail': None} holders=True after_revoke=True/False | NO bot (V3): bootstrap_binds=None/None second=None/True usage_second=403 profile.add_second=409/tg 409 holder_refresh=True/False usage_holder=200 holders=True after_revoke=True/False
+PASS  create_rejects_empty_appuserid_in_session (0.8s) — R2: CreateWhatsappWorkflow/CreateTelegramWorkflow with an EMPTY AppUserID in session mode are refused before any write (the empty id skipped Count Channels and let the quota fail open)
+      wa=200 {'success': False, 'error': 'unauthorized', 'reason': 'forbidden:AppUserID'} tg=200 {'success': False, 'error': 'unauthorized', 'reason': 'forbidden:AppUserID'} clones_bound=0
+PASS  create_seed_failure_keeps_clone_inactive (8.5s) — R8 + R8-deletefail: a «Вместе» create whose reply-mode seed fails (a real Postgres failure on staging, scoped to this profile) answers reply_mode_not_saved and never CREATES a clone (the execution reads no template and runs no Create Workflow, so nothing is active, bound, hooked or left to delete); the retry once the DB is back creates exactly ONE live clone with the '*' row — WhatsApp and Telegram
+      {"wa": {"failed_create": [200, {"success": false, "error": "reply_mode_not_saved"}], "wappi_webhook_calls": 0, "bound": "-", "clones_after_failure": [], "failed_execution": {"Seed Reply Mode": true, "Get Sample Workflow": false, "Create Workflow": false, "Respond Reply Mode Not Saved": true}, "retry": [200, "Z6iCJaZWFDqt4zfM"], "clones_after_retry": [["Z6iCJaZWFDqt4zfM", true]], "row": "true|151", "cleanup_delete": 200}, "tg": {"failed_create": [200, {"success": false, "error": "reply_mode_not_saved"}], "wappi_webhook_calls": 0, "bound": "-", "clones_after_failure": [], "failed_execution": {"Seed Reply Mode": true, "Get Sample Workflow": false, "Create Workflow": false, "Respond Reply Mode Not Saved": true}, "retry": [200, "AWPyBSTU7soU2VAw"], "clones_after_retry": [["AWPyBSTU7soU2VAw", true]], "row": "true|151", "cleanup_delete": 200}}
+PASS  sql_comment_values_run_nothing (3.3s) — V1: a value whose newline would end an SQL comment stays a literal on the real n8n Postgres node — Delete File (session token and token-less), Suggest Replies, AuthSession bootstrap, Create WhatsApp and Create Telegram each run their statement WITH the value (row proof) and no extra statement (no marker table)
+      {"delete_session": {"http": 200, "deletedChunks": 1, "marker": false}, "delete_tokenless": {"http": 200, "deletedChunks": 1, "marker": false}, "suggest_tokenless": {"http": 200, "body": {"v": 1, "requestSeq": 1, "suggestions": [], "error": "generation_failed"}, "count_after": "101", "marker": false}, "bootstrap": {"http": 200, "install": true, "app_user_id": "-", "marker": false}, "create_wa_tokenless": {"http": 200, "id": null, "bot_key_written": true, "marker": false}, "create_tg_tokenless": {"http": 200, "id": null, "bot_key_written": true, "marker": false}}
+PASS  upload_price_list_multipart (3.3s) — R3: a real .txt price list sent the way WWWForm sends it passes the gate with its file, is registered FIRST, reaches extraction (a staging `documents` row with the text + the bot's ids); a foreign workflow id, a non-GUID fileId or another install's fileId is 403 before any write; an unreadable PDF is 422, an empty file writes nothing, an own repeat keeps one registry row. V4: another bot's owner-less file (WhatsApp) and another bot's unregistered chunks (Telegram) are neither taken nor deleted by a session (403, row and chunk untouched); the caller's own compat-window file and its own upload are deleted (200)
+      own=200 {'success': True, 'fileId': '576da4f8-b3f8-448b-976e-bfb632622947'} registry='ee53965b-ad78-4362-9728-55fa4d4f4e0a|wfup9fd2c6dae6|-|products|price.txt|1' extracted_doc='true|wfup9fd2c6dae6|-1|576da4f8-b3f8-448b-976e-bfb632622947' foreign_wf=403 pathlike_fileid=403 foreign_fileid=403 refused_rows=0 foreign_row_kept=True corrupt_pdf=422 {'success': False, 'error': 'unreadable_file'} empty_file=500 own_repeat=200 legacy=200 legacy_registry='-' | V4 owner-less foreign: upload=403 delete=403 {'success': False, 'error': 'forbidden', 'fileId': '25f22918-0506-41fc-85e5-5759e7dba534'} owner|chunks|live='-|1|true'; unregistered foreign tg: upload=403 delete=403 rows|chunks='0|1'; own compat delete=200 {'success': True, 'fileId': '453043b5-080a-42fd-ba95-613f510a135c', 'deletedChunks': 1}; own upload delete=200 {'success': True, 'fileId': '576da4f8-b3f8-448b-976e-bfb632622947', 'deletedChunks': 2}; own chunks left|rows marked='0|2'
+PASS  retired_bot_owner_can_delete (3.5s) — V12: the owner of a bot the sweep retired (trial over: its rows deleted, its token lists nothing) deletes its memory, history and files (200, real counters) and both clones (200; a repeat is 200 — idempotent); activating the retired clone and another install naming the same ids are 403 (reason owned_elsewhere) — WhatsApp and Telegram
+      token after retire=[]/[] foreign dbf=403 {'success': False, 'error': 'forbidden', 'reason': 'owned_elsewhere'} foreign sws=403 activate retired=403 rows before=('1|1|1|1', '1|1|1|1') own dbf=200 {'success': True, 'deletedChunks': 2, 'deletedFiles': 1, 'retiredProfiles': 2, 'deletedMemoryRows': 2, 'deletedOutcomes': 0, 'deletedReplyFlags': 2, 'deletedHistoryEvents': 2, 'deletedHandoffs': 0, 'deletedReplyEvents': 0, 'deletedChatStates': 0} rows after=('0|0|0|0', '0|0|0|0') deletes=[200, 200, 200] GET=[404, 404]
+PASS  claim_on_retired_profile_is_refused (3.8s) — M4: claim.start / claim.status / claim.verify on a bot profile the sweep retired (trial over) → 410 profile_retired, retiredReason for its owner only (another install: the same 410 without it), Wappi is never asked, no pending claim, no token; the owner's V12 delete of that same bot then goes through (profile.delete answers a FINAL code the client steps over — not in the token, 403; DeleteBotFiles and SetWorkflowState delete = 200, the clones gone) — WhatsApp and Telegram
+      token after retire=[] answers={"own whatsapp claim.start": [410, "profile_retired", "trial_expiry", false], "own whatsapp claim.status": [410, "profile_retired", "trial_expiry", false], "own whatsapp claim.verify": [410, "profile_retired", "trial_expiry", false], "foreign whatsapp claim.start": [410, "profile_retired", null, false], "own telegram claim.start": [410, "profile_retired", "trial_expiry", false], "own telegram claim.status": [410, "profile_retired", "trial_expiry", false], "own telegram claim.verify": [410, "profile_retired", "trial_expiry", false], "foreign telegram claim.start": [410, "profile_retired", null, false]} wappi calls for the retired ids=[] claims written=0 | V12 delete: unlink=[403, 403] dbf=200 {'success': True, 'deletedChunks': 0, 'deletedFiles': 0, 'retiredProfiles': 2, 'deletedMemoryRows': 0, 'deletedOutcomes': 0, 'deletedReplyFlags': 2, 'deletedHistoryEvents': 0, 'deletedHandoffs': 0, 'deletedReplyEvents': 0, 'deletedChatStates': 0} sws=[200, 200] GET=[404, 404]
+PASS  stale_token_cannot_unlink_a_claimed_profile (3.1s) — V12 / M5: a token issued while install A owned a profile still lists it after install B took the profile over — A's profile.delete / profile.logout (proxy), DeleteBotFiles and SetWorkflowState(delete) are all refused (403) and the transport is never called; B's own profile.delete passes — WhatsApp and Telegram
+      {'whatsapp delete': 403, 'whatsapp logout': 403, 'telegram delete': 403, 'telegram logout': 403, 'dbf': 403, 'sws': 403, 'b delete': 200} transport calls for A's stale token: 0
+PASS  sweep_deactivates_retired_clone (3.2s) — V12: the sweep's clone branch (the derived canonical nodes, run on the real n8n) deactivates the clone of a bot IT retired (trial_expiry), stamps it and never calls it again; a liveness-retired bot's clone stays ACTIVE; nothing is deleted — WhatsApp and Telegram
+      active before=(True, True) after run 1 (wa, tg, stamp)=(False, True, 'ED2c3JeDboQO3xxW') run 2 called deactivate=False still exist=[200, 200]
+PASS  reauth_same_profile_reuses_bound_clone[wa] (2.1s) — F1 (a1): the channel saved off (SetWorkflowState deactivate), then a Create for the SAME profile → the SAME clone id (created:false), activated again, no template read, no second clone
+      first=dE8U7zKNnhJPKPZ8 deactivate=200 state_before=(200, False, 'profile-000047') second=200 {'id': 'dE8U7zKNnhJPKPZ8', 'created': False, 'adoptedProfiles': []} ran_template=False ran_create=False ran_activate=True state_after=(200, True, 'profile-000047') clones=[('dE8U7zKNnhJPKPZ8', True)] row=dE8U7zKNnhJPKPZ8|true|-|-
+PASS  reauth_same_profile_reuses_bound_clone[tg] (2.2s) — F1 (a1): the channel saved off (SetWorkflowState deactivate), then a Create for the SAME profile → the SAME clone id (created:false), activated again, no template read, no second clone
+      first=4m27GeZwqRcjrJuK deactivate=200 state_before=(200, False, 'profile-000048') second=200 {'id': '4m27GeZwqRcjrJuK', 'created': False, 'adoptedProfiles': []} ran_template=False ran_create=False ran_activate=True state_after=(200, True, 'profile-000048') clones=[('4m27GeZwqRcjrJuK', True)] row=4m27GeZwqRcjrJuK|true|-|-
+PASS  reuse_active_clone_skips_reactivation[wa] (3.5s) — F1 (a1) + platform: on n8n 2.36.7 activating an ACTIVE workflow is NOT a no-op (200, but its webhook is unregistered for a moment); so a Create for the same profile whose clone is ACTIVE reuses it WITHOUT activating it — the webhook answers throughout, same id, no second clone
+      platform: re-activate=200 ×1 webhook gaps during it=3/298 | create#2=200 {'id': 'YsFAX4bNp7usrrna', 'created': False, 'adoptedProfiles': []} ran_activate=False webhook answered 251/251 probes during Create#2 clones=[('YsFAX4bNp7usrrna', True)]
+PASS  reuse_active_clone_skips_reactivation[tg] (3.6s) — F1 (a1) + platform: on n8n 2.36.7 activating an ACTIVE workflow is NOT a no-op (200, but its webhook is unregistered for a moment); so a Create for the same profile whose clone is ACTIVE reuses it WITHOUT activating it — the webhook answers throughout, same id, no second clone
+      platform: re-activate=200 ×1 webhook gaps during it=3/304 | create#2=200 {'id': 'GJ5nQIs663ZGDXBS', 'created': False, 'adoptedProfiles': []} ran_activate=False webhook answered 205/205 probes during Create#2 clones=[('GJ5nQIs663ZGDXBS', True)]
+PASS  reauth_new_profile_replaces_prior_and_moves_data[wa] (4.8s) — F1 (a2/a3) + F2: a NEW profile of the same bot (re-pairing: same bot key) → a new clone; the predecessor's memory, history, «Сводка», handoffs, ledger, chat state, chat flags, price-list chunks and file registry move to it; the prior clone is booked and deleted (GET 404), the sweep's branch A stamps it; a repeat Create is idempotent
+      w1=2vdRXvf8Y31iZLcF create#2=200 {'id': '62ijJb2Fv6QQFCAt', 'created': True, 'adoptedProfiles': ['profile-000051']} rows p1|p2|file=('0|0|0|0|0|0|0', '2|1|1|1|1|1|1', '62ijJb2Fv6QQFCAt|62ijJb2Fv6QQFCAt') old clone GET|row|booking=(404, '2vdRXvf8Y31iZLcF|false|replaced|profile-000052', 'replaced|62ijJb2Fv6QQFCAt|profile-000051|false|-|0') new clone=(200, True, 'profile-000052') repeat=200 {'id': '62ijJb2Fv6QQFCAt', 'created': False, 'adoptedProfiles': ['profile-000051']} rows|clones after repeat=('2|1|1|1|1|1|1', [('62ijJb2Fv6QQFCAt', True)]) branch A=replaced|62ijJb2Fv6QQFCAt|profile-000051|true|404|0
+PASS  reauth_new_profile_replaces_prior_and_moves_data[tg] (4.7s) — F1 (a2/a3) + F2: a NEW profile of the same bot (re-pairing: same bot key) → a new clone; the predecessor's memory, history, «Сводка», handoffs, ledger, chat state, chat flags, price-list chunks and file registry move to it; the prior clone is booked and deleted (GET 404), the sweep's branch A stamps it; a repeat Create is idempotent
+      w1=zqZkH4zAjmHG7K6L create#2=200 {'id': 'xknc5fWn6Uwa0sUv', 'created': True, 'adoptedProfiles': ['profile-000053']} rows p1|p2|file=('0|0|0|0|0|0|0', '2|1|1|1|1|1|1', 'xknc5fWn6Uwa0sUv|xknc5fWn6Uwa0sUv') old clone GET|row|booking=(404, 'zqZkH4zAjmHG7K6L|false|replaced|profile-000054', 'replaced|xknc5fWn6Uwa0sUv|profile-000053|false|-|0') new clone=(200, True, 'profile-000054') repeat=200 {'id': 'xknc5fWn6Uwa0sUv', 'created': False, 'adoptedProfiles': ['profile-000053']} rows|clones after repeat=('2|1|1|1|1|1|1', [('xknc5fWn6Uwa0sUv', True)]) branch A=replaced|xknc5fWn6Uwa0sUv|profile-000053|true|404|0
+PASS  retired_bot_reconnects_after_purchase[wa] (6.7s) — F2: a bot the sweep retired (trial over: row trial_expiry, clone switched off by the V12 branch, trialing → expired) is bought back (RevenueCat INITIAL_PURCHASE through the real mapping + upsert), reconnected on a NEW profile (profile.add) and Created with PreviousProfileId → a new active clone on the new path takes over its chats, memory and price list, the old clone is deleted, the new webhook reaches the new clone, the V12 branch leaves it on; [llm] then, in «Авто», the bot answers with the price from the moved price list and the time agreed in the moved dialog
+      {"retired": [false, []], "purchase": [200, "business|active"], "create": [200, {"id": "Dafh0xAQmexiq3Ky", "created": true, "adoptedProfiles": ["profile-000055"]}], "new_clone": [200, true, "profile-000056"], "old": [404, "wp1eSwI0qMUKwZKL|false|trial_expiry|profile-000056", "replaced|Dafh0xAQmexiq3Ky|profile-000055|false|-|0"], "moved": ["0|0|0|0|0|0|0", "2|1|1|1|1|1|1", "Dafh0xAQmexiq3Ky|Dafh0xAQmexiq3Ky"], "webhook": [1, "suppressed", "1"], "after_sweep": [200, true, "profile-000056"], "llm": "skipped (--no-llm)"}
+PASS  retired_bot_reconnects_after_purchase[tg] (6.8s) — F2: a bot the sweep retired (trial over: row trial_expiry, clone switched off by the V12 branch, trialing → expired) is bought back (RevenueCat INITIAL_PURCHASE through the real mapping + upsert), reconnected on a NEW profile (profile.add) and Created with PreviousProfileId → a new active clone on the new path takes over its chats, memory and price list, the old clone is deleted, the new webhook reaches the new clone, the V12 branch leaves it on; [llm] then, in «Авто», the bot answers with the price from the moved price list and the time agreed in the moved dialog
+      {"retired": [false, []], "purchase": [200, "business|active"], "create": [200, {"id": "J8rmfE6dJU0veWXi", "created": true, "adoptedProfiles": ["profile-000057"]}], "new_clone": [200, true, "profile-000058"], "old": [404, "CC9cet40HRGlAnlj|false|trial_expiry|profile-000058", "replaced|J8rmfE6dJU0veWXi|profile-000057|false|-|0"], "moved": ["0|0|0|0|0|0|0", "2|1|1|1|1|1|1", "J8rmfE6dJU0veWXi|J8rmfE6dJU0veWXi"], "webhook": [1, "suppressed", "1"], "after_sweep": [200, true, "profile-000058"], "llm": "skipped (--no-llm)"}
+PASS  activation_conflict_discards_new_clone[wa] (1.4s) — F1 (б): an orphan workflow already serves the profile's webhook path → the new clone's activation is refused; Create answers create_failed WITHOUT an id and deletes the clone it made (no second workflow on the path, nothing bound)
+      create=200 {'success': False, 'error': 'create_failed'} ran_discard=True workflows on the path=[('BBmHKCAqQBFidpHa', True)] (orphan BBmHKCAqQBFidpHa) row=-|true|-|-
+PASS  activation_conflict_discards_new_clone[tg] (1.4s) — F1 (б): an orphan workflow already serves the profile's webhook path → the new clone's activation is refused; Create answers create_failed WITHOUT an id and deletes the clone it made (no second workflow on the path, nothing bound)
+      create=200 {'success': False, 'error': 'create_failed'} ran_discard=True workflows on the path=[('ghCOFGUSqrBgbHl1', True)] (orphan ghCOFGUSqrBgbHl1) row=-|true|-|-
+PASS  bind_failure_answers_no_id[wa] (4.5s) — F1 (б) / R8 trick: Bind Workflow Id fails on the real Postgres (a CHECK scoped to this profile) → create_failed WITHOUT an id, the new clone deleted, nothing bound; the retry once the DB is back creates exactly ONE live clone
+      failed create=200 {'success': False, 'error': 'create_failed'} ran_bind=True ran_discard=True clones=[] row=-|true|-|- | retry=200 QbbEecHZpwK1D8Lq clones=[('QbbEecHZpwK1D8Lq', True)]
+PASS  bind_failure_answers_no_id[tg] (4.4s) — F1 (б) / R8 trick: Bind Workflow Id fails on the real Postgres (a CHECK scoped to this profile) → create_failed WITHOUT an id, the new clone deleted, nothing bound; the retry once the DB is back creates exactly ONE live clone
+      failed create=200 {'success': False, 'error': 'create_failed'} ran_bind=True ran_discard=True clones=[] row=-|true|-|- | retry=200 xaRyRhP3Pze7znDg clones=[('xaRyRhP3Pze7znDg', True)]
+PASS  legacy_create_on_owned_profile_refused[wa] (2.0s) — F1 Q3: a token-less (legacy, compat window) Create naming a profile an install OWNS → profile_owned WITHOUT an id; no clone created, the owner's clone and binding untouched
+      owner's clone=MSwa2qDvytObAQlg legacy create=200 {'success': False, 'error': 'profile_owned'} ran_template=False clones=[('MSwa2qDvytObAQlg', True)] row=MSwa2qDvytObAQlg|true|-|- owner_kept=True | observed (compat-window residual, not this block's): the owner's '*' reply mode true/1791773398426 -> false/1791773399174
+PASS  legacy_create_on_owned_profile_refused[tg] (2.0s) — F1 Q3: a token-less (legacy, compat window) Create naming a profile an install OWNS → profile_owned WITHOUT an id; no clone created, the owner's clone and binding untouched
+      owner's clone=tLdO4rF7ENzGAQXR legacy create=200 {'success': False, 'error': 'profile_owned'} ran_template=False clones=[('tLdO4rF7ENzGAQXR', True)] row=tLdO4rF7ENzGAQXR|true|-|- owner_kept=True | observed (compat-window residual, not this block's): the owner's '*' reply mode true/1791773400425 -> false/1791773401132
+PASS  foreign_install_same_bot_key_untouched[wa] (5.0s) — F1 §1.3: install B names its own profile with the SAME bot key as A's bot (and even A's profile as PreviousProfileId) → B gets its own clone, adopts nothing; A's clone, rows, memory and price list stay A's. Control: A's own re-pairing adopts A's line and leaves B's bot alone
+      B create=200 {'id': '4pq6m4oXjJZT2ML5', 'created': True, 'adoptedProfiles': []} A seen after B (A rows|A file|A clone|A row|B rows)=('2|1|1|1|1|1|1', 'eyuhT6kpJlBQwZpx|eyuhT6kpJlBQwZpx', (200, True, 'profile-000065'), 'eyuhT6kpJlBQwZpx|true|-|-', '0|0|0|0|0|0|0') | A control=200 {'id': 'UDTGScMh5F3JaUy8', 'created': True, 'adoptedProfiles': ['profile-000065']} (A new rows|A file|old A clone GET|B rows|B file|B clone|B row)=('2|1|1|1|1|1|1', 'UDTGScMh5F3JaUy8|UDTGScMh5F3JaUy8', 404, '2|1|1|1|1|1|1', '4pq6m4oXjJZT2ML5|4pq6m4oXjJZT2ML5', (200, True, 'profile-000066'), '4pq6m4oXjJZT2ML5|true|-|-')
+PASS  foreign_install_same_bot_key_untouched[tg] (5.3s) — F1 §1.3: install B names its own profile with the SAME bot key as A's bot (and even A's profile as PreviousProfileId) → B gets its own clone, adopts nothing; A's clone, rows, memory and price list stay A's. Control: A's own re-pairing adopts A's line and leaves B's bot alone
+      B create=200 {'id': 'I3geKdESJTU0haOm', 'created': True, 'adoptedProfiles': []} A seen after B (A rows|A file|A clone|A row|B rows)=('2|1|1|1|1|1|1', 'uWBoHPbTYzynt23x|uWBoHPbTYzynt23x', (200, True, 'profile-000068'), 'uWBoHPbTYzynt23x|true|-|-', '0|0|0|0|0|0|0') | A control=200 {'id': 'PkF7jueMKzuHCwmR', 'created': True, 'adoptedProfiles': ['profile-000068']} (A new rows|A file|old A clone GET|B rows|B file|B clone|B row)=('2|1|1|1|1|1|1', 'PkF7jueMKzuHCwmR|PkF7jueMKzuHCwmR', 404, '2|1|1|1|1|1|1', 'I3geKdESJTU0haOm|I3geKdESJTU0haOm', (200, True, 'profile-000069'), 'I3geKdESJTU0haOm|true|-|-')
+PASS  wizard_create_never_adopts[wa] (5.5s) — F1 + F2 §1.3: a wizard Create (CreateOrigin=start: a NEW bot in a reused slot) never adopts — not by the same bot key, not even with the old profile named as PreviousProfileId; the old bot's data and clone stay where they were. Control: the same shape from settings (CreateOrigin=edit) adopts
+      wizard create=200 {'id': 'iYAa5LqtOEjUNRlD', 'created': True, 'adoptedProfiles': []} (old rows|old file|old clone|booking|new rows)=('2|1|1|1|1|1|1', 'UIFvtxHV6k9ZISMh|UIFvtxHV6k9ZISMh', (200, True, 'profile-000071'), '', '0|0|0|0|0|0|0') | control=200 {'id': 'YtHQu68InuhNjNnQ', 'created': True, 'adoptedProfiles': ['profile-000073']} (rows|file)=('2|1|1|1|1|1|1', 'YtHQu68InuhNjNnQ|YtHQu68InuhNjNnQ')
+PASS  wizard_create_never_adopts[tg] (5.2s) — F1 + F2 §1.3: a wizard Create (CreateOrigin=start: a NEW bot in a reused slot) never adopts — not by the same bot key, not even with the old profile named as PreviousProfileId; the old bot's data and clone stay where they were. Control: the same shape from settings (CreateOrigin=edit) adopts
+      wizard create=200 {'id': '40SILQI5umMVvrbJ', 'created': True, 'adoptedProfiles': []} (old rows|old file|old clone|booking|new rows)=('2|1|1|1|1|1|1', 'l9Pkkt60H6aSD7vi|l9Pkkt60H6aSD7vi', (200, True, 'profile-000075'), '', '0|0|0|0|0|0|0') | control=200 {'id': 'vYabuNPHM0cy4zUq', 'created': True, 'adoptedProfiles': ['profile-000077']} (rows|file)=('2|1|1|1|1|1|1', 'vYabuNPHM0cy4zUq|vYabuNPHM0cy4zUq')
+PASS  bot_delete_wipes_lineage (10.0s) — F1 + F2 §1.6 (T5): a two-channel bot whose earlier profiles were left behind by a pre-fix re-pairing (WA and TG) is deleted from the app naming only its CURRENT ids → Delete Bot Files wipes the whole line (memory, history, ledger, chunks of every profile and clone), retires every row as app_delete and books the left-behind clones; the sweep's branch A deletes them. Another install's bot with the same key is untouched
+      {"setup": ["5ssvc1Ge3nzokOQn", "X1Ite8CYfy0zrpMs", "nqKIy3quYKxSUHjd", "fVtq4RMOM9G7jWS7", "qlEB5JLeokzATe9U"], "dbf": [200, {"success": true, "deletedChunks": 4, "retiredProfiles": 4}], "left": {"profile-000079": "0|0|0|0|0|0|0", "profile-000081": "0|0|0|0|0|0|0", "profile-000082": "0|0|0|0|0|0|0", "profile-000083": "0|0|0|0|0|0|0"}, "chunks_left": "0", "rows": {"profile-000079": "5ssvc1Ge3nzokOQn|false|app_delete|-", "profile-000081": "X1Ite8CYfy0zrpMs|false|app_delete|-", "profile-000082": "nqKIy3quYKxSUHjd|false|app_delete|-", "profile-000083": "fVtq4RMOM9G7jWS7|false|app_delete|-"}, "bookings": {"5ssvc1Ge3nzokOQn": "bot_deleted|-|profile-000079|false|-|0", "X1Ite8CYfy0zrpMs": "bot_deleted|-|profile-000081|false|-|0", "nqKIy3quYKxSUHjd": "bot_deleted|-|profile-000082|false|-|0", "fVtq4RMOM9G7jWS7": "bot_deleted|-|profile-000083|false|-|0"}, "foreign": ["2|1|1|1|1|1|1", "qlEB5JLeokzATe9U|qlEB5JLeokzATe9U", [200, true, "profile-000080"], "qlEB5JLeokzATe9U|true|-|-", ""], "client_deletes": [200, 200], "after_branch_a": {"5ssvc1Ge3nzokOQn": [404, ["true", "200"]], "X1Ite8CYfy0zrpMs": [404, ["true", "404"]], "nqKIy3quYKxSUHjd": [404, ["true", "200"]], "fVtq4RMOM9G7jWS7": [404, ["true", "404"]]}}
+PASS  sweep_removes_booked_clone (4.5s) — F1 §2.6 A (T5): the sweep's branch A on the real n8n — in canon's dry run (retirementsDryRun true) it only logs; flipped, it DELETEs a booked clone older than 10 minutes (200 → removed_at), stamps an already-gone one (404), never touches a clone a LIVE row drives or a booking younger than 10 minutes, and never calls again what it stamped
+      {"dry": [{"7xLjmEVGgkxHcbcW": 200, "bOnd5aB5ZSl7hEnJ": 200, "kLqndfeHxMyiumuz": 200}, {"7xLjmEVGgkxHcbcW": "false", "gone9fd2c6dae600": "false"}, true, false], "live": {"7xLjmEVGgkxHcbcW": [404, "replaced|-|profile-000084|true|200|0"], "bOnd5aB5ZSl7hEnJ": [200, "replaced|-|profile-000084|false|-|0"], "gone9fd2c6dae600": [404, "discard_failed|-|profile-000084|true|404|0"], "kLqndfeHxMyiumuz": [200, "replaced|-|profile-000084|false|-|0"]}, "second_run_picks": []}
+PASS  billing_conflict_is_logged (5.5s) — V3 (T1): a refresh that answers billingConflict (a second install naming a billing id another install holds) writes ONE billing_conflicts row — claimant, the CURRENT holder, attempts — a repeat bumps attempts, a refresh without a conflict writes nothing, the answer itself is unchanged; once support revokes the holder the id moves on the claimant's next refresh
+      journal after bootstrap+refresh='c75d9b33-ee79-4ca0-9f49-24dd46a303c5|6c14f9bb-27c7-48de-95ee-c97848856e93|1' conflict answer=True/None after repeat='c75d9b33-ee79-4ca0-9f49-24dd46a303c5|6c14f9bb-27c7-48de-95ee-c97848856e93|2' holder's refresh logged=0 after revoke: id=True conflict=False journal='c75d9b33-ee79-4ca0-9f49-24dd46a303c5|6c14f9bb-27c7-48de-95ee-c97848856e93|2'
+
+52 pass, 0 fail
+exit=0
+
+## 2. e2e-auth.py --only retired_bot_reconnects_after_purchase — модельный шаг (ровно один прогон на канал; сделан до правки
+##    exec_outcome → node_items, поведение то же: детерминированная часть этого сценария прошла и в п.1)
+PASS  retired_bot_reconnects_after_purchase[wa] (41.4s) — F2: a bot the sweep retired (trial over: row trial_expiry, clone switched off by the V12 branch, trialing → expired) is bought back (RevenueCat INITIAL_PURCHASE through the real mapping + upsert), reconnected on a NEW profile (profile.add) and Created with PreviousProfileId → a new active clone on the new path takes over its chats, memory and price list, the old clone is deleted, the new webhook reaches the new clone, the V12 branch leaves it on; [llm] then, in «Авто», the bot answers with the price from the moved price list and the time agreed in the moved dialog
+      {"retired": [false, []], "purchase": [200, "business|active"], "create": [200, {"id": "MjPFwVCyiSTOx3I4", "created": true, "adoptedProfiles": ["profile-000087"]}], "new_clone": [200, true, "profile-000088"], "old": [404, "2G2xYkSQuOvjuBcX|false|trial_expiry|profile-000088", "replaced|MjPFwVCyiSTOx3I4|profile-000087|false|-|0"], "moved": ["0|0|0|0|0|0|0", "2|1|1|1|1|1|1", "MjPFwVCyiSTOx3I4|MjPFwVCyiSTOx3I4"], "webhook": [1, "suppressed", "1"], "after_sweep": [200, true, "profile-000088"], "llm": {"outcome": "sent", "price_tool_saw_row": true, "reply": "Букет «Нежность» — 18 500 ₸\n\nПо времени в пятницу: вы просили к 18:00, точное время доставки флорист подтвердит."}}
+PASS  retired_bot_reconnects_after_purchase[tg] (43.2s) — F2: a bot the sweep retired (trial over: row trial_expiry, clone switched off by the V12 branch, trialing → expired) is bought back (RevenueCat INITIAL_PURCHASE through the real mapping + upsert), reconnected on a NEW profile (profile.add) and Created with PreviousProfileId → a new active clone on the new path takes over its chats, memory and price list, the old clone is deleted, the new webhook reaches the new clone, the V12 branch leaves it on; [llm] then, in «Авто», the bot answers with the price from the moved price list and the time agreed in the moved dialog
+      {"retired": [false, []], "purchase": [200, "business|active"], "create": [200, {"id": "PrOkoH1gprJuVVXj", "created": true, "adoptedProfiles": ["profile-000090"]}], "new_clone": [200, true, "profile-000091"], "old": [404, "5vHuCb9Lh6SulQrC|false|trial_expiry|profile-000091", "replaced|PrOkoH1gprJuVVXj|profile-000090|false|-|0"], "moved": ["0|0|0|0|0|0|0", "2|1|1|1|1|1|1", "PrOkoH1gprJuVVXj|PrOkoH1gprJuVVXj"], "webhook": [1, "suppressed", "1"], "after_sweep": [200, true, "profile-000091"], "llm": {"outcome": "sent", "price_tool_saw_row": true, "reply": "Букет «Нежность» — 18 500 ₸.\n\nПо времени: вы просили к 18:00 в пятницу, точное время доставки флорист подтвердит при оформлении."}}
+
+2 pass, 0 fail
+
+## 3. e2e-handoff.py — ПОЛНЫЙ набор (proxy_send_records_owner_app_row теперь ×WA/TG; lost_send_settled_by_notifier — WA+TG одним тиком)
+PASS  outgoing_phone_recorded[wa] (6s) — A6: a message the owner sent from the PHONE lands in the one history (owner_phone) and in the agent's memory once, even when re-delivered; T6: the memory row opens with «Владелец: »
+      first=('recorded_owner_phone', 'owner_phone:Да, завтра в 15:00 ждём вас', 'ai/owner_phone:Владелец: Да, завтра в 15:00 ждём вас') redelivery=outgoing_known memory_rows=1
+PASS  outgoing_phone_recorded[tg] (5s) — A6: a message the owner sent from the PHONE lands in the one history (owner_phone) and in the agent's memory once, even when re-delivered; T6: the memory row opens with «Владелец: »
+      first=('recorded_owner_phone', 'owner_phone:Да, завтра в 15:00 ждём вас', 'ai/owner_phone:Владелец: Да, завтра в 15:00 ждём вас') redelivery=outgoing_known memory_rows=1
+PASS  outgoing_api_history_only (3s) — A6: an API-sent message (unknown writer) is a history row only — never a memory row (the AI's / the app's own writers own memory)
+      outcome=recorded_outgoing_api history=outgoing_api:Текст через API memory_rows=0
+PASS  outgoing_foreign_profile_filtered (3s) — A1/A6: an outgoing event naming ANOTHER profile is filtered before any write
+      outcome=filtered history=''
+PASS  suppressed_incoming_recorded[wa] (4s) — A6: in «Вместе» the client's message is still recorded (history + memory human row), once, with no generation
+      outcomes=['suppressed', 'suppressed'] history=client:Можно завтра к 15? memory=human/client:Можно завтра к 15? sends=0
+PASS  suppressed_incoming_recorded[tg] (3s) — A6: in «Вместе» the client's message is still recorded (history + memory human row), once, with no generation
+      outcomes=['suppressed', 'suppressed'] history=client:Можно завтра к 15? memory=human/client:Можно завтра к 15? sends=0
+PASS  auto_reply_records_client_and_ai_rows (28s) — A6: a normal auto-reply leaves exactly client + ai history rows and the memory node's own human + ai rows (no doubles)
+      outcome=sent history_sources=client,ai memory=human/agent,ai/agent sends=1
+PASS  bot_knows_owner_agreement_after_auto_resumes [llm] (32s) — A6 acceptance: owner agreed by phone during «Вместе»; after the explicit return to «Авто» the bot answers with that agreement
+      outcome=sent reply='Завтра в 15:00, спросите Марину.' memory=human/client:Здравствуйте, можно к вам завтра подъеха | ai/owner_phone:Владелец: Да, конечно. Завтра в 15:00 ва | human/agent:Напомните, во сколько мне подойти и кого | ai/agent:Завтра в 15:00, спросите Марину.
+PASS  handoff_tool_creates_request_once_and_pauses [llm] (59s) — A5 acceptance: the agent CREATES the request through the tool (once, even on re-delivery), the chat is paused, and only the owner's explicit «Авто» resumes it
+      request=6689:open:order:pending:87011234567 reply='Передал владельцу, он свяжется.' paused=t once=True paused_incoming=suppressed setmode=200 unpaused=True closed=6689:done:order:pending:87011234567 resumed=sent
+PASS  notifier_delivers_self_message_and_survives_failure (57s) — A5 acceptance: the owner notice is a self-message on the bot's channel (no client text); a failed delivery keeps the request and is retried
+      states=failed/1,sent/1 send_calls=2 to_self=True no_leak=True requests_intact=True body='Choose Reply: вопрос клиента (чат …8041). Автоответ в этом чате приостановлен — '
+PASS  lost_send_settled_by_notifier (117s) — R9: a reply left send_pending > 10 min (its run died between the lease and Record Send) becomes send_unknown on the notifier's schedule — no transport call; a live one is untouched; T7: the lost run's memory draft becomes unknown + «[доставка не подтверждена] », a dead claim's draft is removed, a live run's draft stays — WhatsApp and Telegram, one schedule tick
+      {"wa": {"lost": "send_unknown|dead-run-wa|run_lost: no send result recorded within 10 min (execution dead-run-wa)", "live": "send_pending", "send_calls_for_profile": 0, "memory": "dead-run-wa/unknown/[доставка не подтверждена] Букет — 25 000 ₸. | live-run-wa/draft/Доставка — 1000 ₸."}, "tg": {"lost": "send_unknown|dead-run-tg|run_lost: no send result recorded within 10 min (execution dead-run-tg)", "live": "send_pending", "send_calls_for_profile": 0, "memory": "dead-run-tg/unknown/[доставка не подтверждена] Букет — 25 000 ₸. | live-run-tg/draft/Доставка — 1000 ₸."}}
+PASS  handoffs_webhook_owner_scoped_list_take_done (2s) — A5: the app's list/take/done are token-only and owner-scoped; done lifts the chat's pause
+      {"notoken": 401, "foreign": 403, "list": [200, 1, "open", true], "take": [200, ["taken"]], "done": [200, [], "f", "done"]}
+PASS  stale_or_replayed_auto_keeps_newer_handoff[wa] (2s) — R4: through the real SetReplyMode webhook, a replay of the owner's applied «Авто» and an older «Авто» leave a NEWER request open and the chat paused; a new explicit «Авто» resumes it
+      {"first": [200, [true]], "replay": [200, [false]], "after_replay": ["t", "6693:open:question:pending:-"], "older": [200, [false]], "after_older": ["t", "6693:open:question:pending:-"], "new": [200, [true]], "after_new": ["f", "6693:done:question:pending:-"]}
+PASS  stale_or_replayed_auto_keeps_newer_handoff[tg] (2s) — R4: through the real SetReplyMode webhook, a replay of the owner's applied «Авто» and an older «Авто» leave a NEWER request open and the chat paused; a new explicit «Авто» resumes it
+      {"first": [200, [true]], "replay": [200, [false]], "after_replay": ["t", "6694:open:question:pending:-"], "older": [200, [false]], "after_older": ["t", "6694:open:question:pending:-"], "new": [200, [true]], "after_new": ["f", "6694:done:question:pending:-"]}
+PASS  fast_clock_queued_auto_keeps_newer_handoff[wa] (2s) — R4-clock: through the real SetReplyMode webhook, an «Авто» decided 4 min BEFORE a request on a phone 5 min fast (queued, delivered after it) leaves the request open and the chat paused; an immediate «Авто» from the same phone resumes it
+      {"queued": [200, [true]], "after_queued": ["t", "6695:open:question:pending:-"], "immediate": [200, [true]], "after_immediate": ["f", "6695:done:question:pending:-"]}
+PASS  fast_clock_queued_auto_keeps_newer_handoff[tg] (2s) — R4-clock: through the real SetReplyMode webhook, an «Авто» decided 4 min BEFORE a request on a phone 5 min fast (queued, delivered after it) leaves the request open and the chat paused; an immediate «Авто» from the same phone resumes it
+      {"queued": [200, [true]], "after_queued": ["t", "6696:open:question:pending:-"], "immediate": [200, [true]], "after_immediate": ["f", "6696:done:question:pending:-"]}
+PASS  dashboard_shows_open_handoff_as_event (3s) — A5/A6: «Сводка» reports an open request as a REAL event (source=event) that outranks the classifier
+      http=200 row={'profileId': 'stgwa001', 'chatId': '770171989@c.us', 'outcome': 'order_collected', 'summary': 'Заказ: 25 роз', 'outcomeAt': 1791771990519, 'lastMessageAt': 1791771990519, 'source': 'event', 'handoffId': 6697, 'handoffStatus': 'open', 'handoffReason': 'order'}
+PASS  proxy_send_records_owner_app_row[wa] (6s) — A6: a message the owner sends from the APP (proxy) lands as owner_app in history and as a marked memory row, after the response; T6: the memory row opens with «Владелец: »
+      http=200 body={'status': 'done', 'message_id': 'sent-000001', 'time': 1791771993} history=owner_app:Спасибо, ждём вас memory=ai/owner_app:Владелец: Спасибо, ждём вас
+PASS  proxy_send_records_owner_app_row[tg] (6s) — A6: a message the owner sends from the APP (proxy) lands as owner_app in history and as a marked memory row, after the response; T6: the memory row opens with «Владелец: »
+      http=200 body={'status': 'done', 'message_id': 'sent-000001', 'time': 1791771999} history=owner_app:Спасибо, ждём вас memory=ai/owner_app:Владелец: Спасибо, ждём вас
+PASS  delete_bot_wipes_history_and_requests (2s) — stage 4.7: deleting the bot wipes its history, requests, event ledger and chat state (billing counters untouched)
+      http=200 left=0/0/0/0 resp_counts={'deletedChunks': 0, 'deletedFiles': 0, 'deletedMemoryRows': 14, 'deletedOutcomes': 5, 'deletedReplyFlags': 4, 'deletedHistoryEvents': 16, 'deletedHandoffs': 5, 'deletedReplyEvents': 5, 'deletedChatStates': 6}
+   cleanup: deleted rows: 10
+   cleanup: 11 owner fixture(s)
+
+20 pass, 0 fail
+exit=0
+
+## 4. e2e-reply.py — ПОЛНЫЙ набор (модель: один прогон каждого сценария)
+PASS  dup_parallel_once[wa] (28s) — A4: the same event delivered twice IN PARALLEL → one send, one 'duplicate' stamp, ledger = sent
+      sends=1 outcomes=['duplicate', 'sent'] ledger=sent|sent-000001|-
+PASS  dup_parallel_once[tg] (27s) — A4: the same event delivered twice IN PARALLEL → one send, one 'duplicate' stamp, ledger = sent
+      sends=1 outcomes=['duplicate', 'sent'] ledger=sent|sent-000001|-
+PASS  dup_sequential_once[wa] (27s) — A4: the same event re-delivered 1 s later (first run still in flight) → one send, second refused before any side effect
+      sends=1 outcomes=['sent', 'duplicate'] dup_side_effects=False ledger=sent|sent-000001|-
+PASS  dup_sequential_once[tg] (27s) — A4: the same event re-delivered 1 s later (first run still in flight) → one send, second refused before any side effect
+      sends=1 outcomes=['sent', 'duplicate'] dup_side_effects=False ledger=sent|sent-000001|-
+PASS  restart_stale_claim_reclaims[wa] (30s) — A4: a claim older than 10 min (n8n died mid-flight) is re-claimed on re-delivery and replied; a 1-min-old claim is a duplicate
+      stale: sends=1 outcome=sent ledger=sent|sent-000001|-; recent: outcome=duplicate total_sends=1
+PASS  restart_stale_claim_reclaims[tg] (30s) — A4: a claim older than 10 min (n8n died mid-flight) is re-claimed on re-delivery and replied; a 1-min-old claim is a duplicate
+      stale: sends=1 outcome=sent ledger=sent|sent-000001|-; recent: outcome=duplicate total_sends=1
+PASS  two_chats_parallel_independent[wa] (28s) — A4: two DIFFERENT chats at the same moment → two sends (the lease is per chat, never per bot)
+      sends=2 recipients=['chat-c1-3d678dc7765e@c.us', 'chat-c2-3d678dc7765e@c.us'] outcomes=['sent', 'sent']
+PASS  two_chats_parallel_independent[tg] (28s) — A4: two DIFFERENT chats at the same moment → two sends (the lease is per chat, never per bot)
+      sends=2 recipients=['chat-c1-3d678dc7765e', 'chat-c2-3d678dc7765e'] outcomes=['sent', 'sent']
+PASS  newer_incoming_during_llm_supersedes[wa] (28s) — A3: a NEWER client message while the answer is being generated → the stale text is cancelled before the send, its AI memory dropped
+      sends=0 outcome=superseded ledger=superseded|-|- ai_memory_rows=0 last=Outcome
+PASS  newer_incoming_during_llm_supersedes[tg] (28s) — A3: a NEWER client message while the answer is being generated → the stale text is cancelled before the send, its AI memory dropped
+      sends=0 outcome=superseded ledger=superseded|-|- ai_memory_rows=0 last=Outcome
+PASS  owner_reply_before_send_cancels[wa] (28s) — A3: the OWNER answers while the bot is composing → no auto-send, cancelled_owner, memory dropped
+      sends=0 outcome=cancelled_owner ledger=cancelled_owner|-|- ai_memory_rows=0 last=Outcome
+PASS  owner_reply_before_send_cancels[tg] (28s) — A3: the OWNER answers while the bot is composing → no auto-send, cancelled_owner, memory dropped
+      sends=0 outcome=cancelled_owner ledger=cancelled_owner|-|- ai_memory_rows=0 last=Outcome
+PASS  auto_off_mid_flight_cancels[wa] (28s) — A3: «Вместе» switched on while the answer is being generated → the lease re-reads the mode, no send, cancelled_mode
+      sends=0 outcome=cancelled_mode ledger=cancelled_mode|-|- ai_memory_rows=0 last=Outcome
+PASS  auto_off_mid_flight_cancels[tg] (28s) — A3: «Вместе» switched on while the answer is being generated → the lease re-reads the mode, no send, cancelled_mode
+      sends=0 outcome=cancelled_mode ledger=cancelled_mode|-|- ai_memory_rows=0 last=Outcome
+PASS  typing_failure_still_sends[wa] (27s) — A7: the typing indicator fails (HTTP 500) → the reply is still sent
+      sends=1 outcome=sent typing_statuses=[500] ai_marks=[('true', 'sent', 'sent-000001')]
+PASS  typing_failure_still_sends[tg] (27s) — A7: the typing indicator fails (HTTP 500) → the reply is still sent
+      sends=1 outcome=sent typing_statuses=[500] ai_marks=[('true', 'sent', 'sent-000001')]
+PASS  expired_lock_does_not_block[wa] (27s) — A4: a lease left behind by a dead run (expired) does not block the next reply; the lock is released after the send
+      sends=1 outcome=sent chat_state(gen|lock)=1|-
+PASS  expired_lock_does_not_block[tg] (27s) — A4: a lease left behind by a dead run (expired) does not block the next reply; the lock is released after the send
+      sends=1 outcome=sent chat_state(gen|lock)=1|-
+PASS  live_lock_blocks_send[wa] (28s) — A4: a LIVE lease held by another run of the same chat → this run does not send (cancelled_busy), nothing is resent later
+      sends=0 outcome=cancelled_busy ledger=cancelled_busy|-|-
+PASS  live_lock_blocks_send[tg] (28s) — A4: a LIVE lease held by another run of the same chat → this run does not send (cancelled_busy), nothing is resent later
+      sends=0 outcome=cancelled_busy ledger=cancelled_busy|-|-
+PASS  accept_then_drop_reconciles_sent[wa] (31s) — A7: the transport accepts the message but the HTTP answer is lost → reconciled as sent from the echo, NO resend
+      send_calls=1 outcome=sent ledger=sent|sent-000001|- reconciled=True ai_marks=[('true', 'sent', 'sent-000001')]
+PASS  accept_then_drop_reconciles_sent[tg] (32s) — A7: the transport accepts the message but the HTTP answer is lost → reconciled as sent from the echo, NO resend
+      send_calls=1 outcome=sent ledger=sent|sent-000001|- reconciled=True ai_marks=[('true', 'sent', 'sent-000001')]
+PASS  send_500_is_send_failed[wa] (28s) — A7: the transport answers HTTP 500 → send_failed recorded with the error, exactly one attempt
+      send_calls=1 outcome=send_failed ledger=send_failed|-|http 500 {"status":"error","detail":"injected"} memory ai/human=0/1
+PASS  send_500_is_send_failed[tg] (28s) — A7: the transport answers HTTP 500 → send_failed recorded with the error, exactly one attempt
+      send_calls=1 outcome=send_failed ledger=send_failed|-|http 500 {"status":"error","detail":"injected"} memory ai/human=0/1
+PASS  send_timeout_reconciles_from_echo[wa] (60s) — A7: the transport answers after our 30-s timeout (message really went out) → send_unknown → echo found → sent, no resend
+      send_calls=1 settle=send_unknown outcome=sent ledger=sent|sent-000001|-
+PASS  send_timeout_reconciles_from_echo[tg] (60s) — A7: the transport answers after our 30-s timeout (message really went out) → send_unknown → echo found → sent, no resend
+      send_calls=1 settle=send_unknown outcome=sent ledger=sent|sent-000001|-
+PASS  dropped_without_echo_stays_send_unknown[wa] (32s) — A7: the connection dies before the transport processed anything → no echo → the state STAYS send_unknown (visible in the ledger), no resend; T6: the memory row carries «[доставка не подтверждена] »
+      send_calls=1 outcome=send_unknown ledger=send_unknown|-|socket hang up reconciled=False ai_memory_rows=1 ai_marks=[('true', 'unknown', '-')] ai_contents=['[доставка не подтверждена] Не знаю: в доступных данных нет ц']
+PASS  dropped_without_echo_stays_send_unknown[tg] (32s) — A7: the connection dies before the transport processed anything → no echo → the state STAYS send_unknown (visible in the ledger), no resend; T6: the memory row carries «[доставка не подтверждена] »
+      send_calls=1 outcome=send_unknown ledger=send_unknown|-|socket hang up reconciled=False ai_memory_rows=1 ai_marks=[('true', 'unknown', '-')] ai_contents=['[доставка не подтверждена] Не знаю: в доступных данных нет ц']
+PASS  reordered_webhooks_one_reply[wa] (31s) — R6: two client messages whose webhooks arrive in REVERSE order (the older one claimed last, inside the newer one's debounce) → exactly one reply, by the newer message's run
+      sends=1 ledger A=superseded|-|- B=sent|sent-000001|- outcomes=['sent', 'superseded']
+PASS  reordered_webhooks_one_reply[tg] (29s) — R6: two client messages whose webhooks arrive in REVERSE order (the older one claimed last, inside the newer one's debounce) → exactly one reply, by the newer message's run
+      sends=1 ledger A=superseded|-|- B=sent|sent-000001|- outcomes=['sent', 'superseded']
+PASS  crossed_reconcile_stays_send_unknown[wa] (13s) — R10: the send's answer is lost and the reconcile fetch comes back CROSSED (the neighbour chat's window, with the same canned text) → send_unknown, never the neighbour's id
+      send_calls=1 outcome=send_unknown ledger=send_unknown|-|socket hang up | reconcile: window without the trigger reconciled=False foreignFetched=2 ai_history_rows=0
+PASS  crossed_reconcile_stays_send_unknown[tg] (13s) — R10: the send's answer is lost and the reconcile fetch comes back CROSSED (the neighbour chat's window, with the same canned text) → send_unknown, never the neighbour's id
+      send_calls=1 outcome=send_unknown ledger=send_unknown|-|socket hang up | reconcile: window without the trigger reconciled=False foreignFetched=2 ai_history_rows=0
+PASS  same_second_peer_after_final_fetch[wa] (50s) — V5: a SAME-second message claimed after A's Final Fetch → A's lease refuses, A re-reads once; Wappi lists B first → exactly one reply, by B; A's draft leaves memory
+      {'sends': 1, 'ledger_A': 'superseded|-|-', 'ledger_B': 'sent|sent-000001|-', 'A_final_checks': 2, 'A_rechecked': True, 'outcomes': ['superseded', 'sent'], 'ai_memory_rows': 1}
+PASS  same_second_peer_after_final_fetch[tg] (51s) — V5: a SAME-second message claimed after A's Final Fetch → A's lease refuses, A re-reads once; Wappi lists B first → exactly one reply, by B; A's draft leaves memory
+      {'sends': 1, 'ledger_A': 'superseded|-|-', 'ledger_B': 'sent|sent-000001|-', 'A_final_checks': 2, 'A_rechecked': True, 'outcomes': ['superseded', 'sent'], 'ai_memory_rows': 1}
+PASS  same_second_peer_wappi_lists_older[wa] (39s) — V5: the same race, but the re-read lists A first → exactly one reply, by A after its re-read (the send after the loop reaches the right chat and profile)
+      {'sends': 1, 'ledger_A': 'sent|sent-000001|-', 'ledger_B': 'superseded|-|-', 'A_final_checks': 2, 'A_rechecked': True, 'outcomes': ['sent', 'superseded'], 'recipient': 'chat-ssq-3d678dc7765e@c.us', 'profile_id': 'stgwa001'}
+PASS  same_second_peer_wappi_lists_older[tg] (39s) — V5: the same race, but the re-read lists A first → exactly one reply, by A after its re-read (the send after the loop reaches the right chat and profile)
+      {'sends': 1, 'ledger_A': 'sent|sent-000001|-', 'ledger_B': 'superseded|-|-', 'A_final_checks': 2, 'A_rechecked': True, 'outcomes': ['sent', 'superseded'], 'recipient': 'chat-ssq-3d678dc7765e', 'profile_id': 'stgtg001'}
+PASS  unmarked_echo_stays_send_unknown[wa] (13s) — V7: the answer is lost and the only row with our text carries NO API mark (no from_where, no task id — isFromAPI alone proves nothing) → send_unknown, never adopted
+      send_calls=1 outcome=send_unknown ledger=send_unknown|-|socket hang up | reconcile: unattributed outgoing row sent-000001 (no api mark) reconcile_error=socket hang up | reconcile: unattributed outgoing row sent-000001 (no api mark)
+PASS  unmarked_echo_stays_send_unknown[tg] (13s) — V7: the answer is lost and the only row with our text carries NO API mark (no from_where, no task id — isFromAPI alone proves nothing) → send_unknown, never adopted
+      send_calls=1 outcome=send_unknown ledger=send_unknown|-|socket hang up | reconcile: unattributed outgoing row sent-000001 (no api mark) reconcile_error=socket hang up | reconcile: unattributed outgoing row sent-000001 (no api mark)
+PASS  owner_app_same_text_stays_send_unknown[wa] (13s) — V7: the answer is lost and the only same-text row is the OWNER's app send (owner_app in the one history, API-marked like ours) → send_unknown; the owner row keeps its source, last_sent stays empty
+      outcome=send_unknown ledger=send_unknown|-|socket hang up | reconcile: row oapown-3d678dc7765e is recorded as owner_app owner_row_source=owner_app last_sent=- reconcile_error=socket hang up | reconcile: row oapown-3d678dc7765e is recorded as owner_app
+PASS  owner_app_same_text_stays_send_unknown[tg] (13s) — V7: the answer is lost and the only same-text row is the OWNER's app send (owner_app in the one history, API-marked like ours) → send_unknown; the owner row keeps its source, last_sent stays empty
+      outcome=send_unknown ledger=send_unknown|-|socket hang up | reconcile: row oapown-3d678dc7765e is recorded as owner_app owner_row_source=owner_app last_sent=- reconcile_error=socket hang up | reconcile: row oapown-3d678dc7765e is recorded as owner_app
+PASS  media_message_gets_the_ru_ask_for_text[wa] (9s) — a photo/document/sticker never reaches the model: the canned ask is Russian (+ Kazakh line), sent once, through the same send chain (stage 6, 2026-09-22)
+      {'executions': [('23643', 'success', 'sent', 'Outcome')], 'sends': 1, 'body': 'Напишите, пожалуйста, текстом, что вас интересует — фото, файлы и стикеры я не в', 'ledger': 'sent|sent-000001|-'}
+PASS  media_message_gets_the_ru_ask_for_text[tg] (11s) — a photo/document/sticker never reaches the model: the canned ask is Russian (+ Kazakh line), sent once, through the same send chain (stage 6, 2026-09-22)
+      {'executions': [('23644', 'success', 'sent', 'Outcome')], 'sends': 1, 'body': 'Напишите, пожалуйста, текстом, что вас интересует — фото, файлы и стикеры я не в', 'ledger': 'sent|sent-000001|-'}
+   restore: OK (active=True, versionId==activeVersionId: True)
+PASS  price_conflict_reaches_the_agent_marked [llm][wa] (32s) — V9: the clone's price-list tool runs the Price List Search sub-workflow with the clone's PUBLISHED prompt — a price-list row at 3900 against its catalog's 3200 reaches the agent with «[Сверка с каталогом: … Цены расходятся.]», and the reply does not pick 3900 alone
+      {'premise_published_catalog': True, 'tool_calls': 1, 'marked': True, 'documents': ['Фильтр масляный 90915-YZZE1 — 3900 тг, оригинал\n[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1» — 3200 тг, в прайсе — 3900 тг. Ц'], 'sends': 1, 'reply': 'Фильтр масляный Toyota 90915-YZZE1 — 3\u202f900 тг, оригинал.  \nВ каталоге есть расхождение: указано 3\u202f200 тг.', 'picked_3900_alone': False}
+   restore: OK (active=True, versionId==activeVersionId: True)
+PASS  price_conflict_reaches_the_agent_marked [llm][tg] (32s) — V9: the clone's price-list tool runs the Price List Search sub-workflow with the clone's PUBLISHED prompt — a price-list row at 3900 against its catalog's 3200 reaches the agent with «[Сверка с каталогом: … Цены расходятся.]», and the reply does not pick 3900 alone
+      {'premise_published_catalog': True, 'tool_calls': 1, 'marked': True, 'documents': ['Фильтр масляный 90915-YZZE1 — 3900 тг, оригинал\n[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1» — 3200 тг, в прайсе — 3900 тг. Ц'], 'sends': 1, 'reply': 'Фильтр масляный Toyota 90915-YZZE1 — 3900 тг, оригинал.  \nВ каталоге есть расхождение: 3200 тг и 3900 тг.', 'picked_3900_alone': False}
+   cleanup: deleted rows: 49
+
+44 pass, 0 fail
+exit=0
+
+## 5. стенд возвращён: bootstrap.py --bot wa:stgwa001 --bot tg:stgtg001 (manifest canonRef=worktree) → verify-deployed.py --base http://localhost:5678 rc=0
+base http://localhost:5678: canonical 27 (diff 0), clones 2 (behind template 0, of them prompt head behind 0; custom prompts 2, not counted), archived clones 0 (not counted), other 2
+  prompt map = Create/Edit Vertical Prompt as introduced in b86e6957 (sha256 05d138bf5413)
+  clone   stgtg40da979c774 'STAGING TG stgtg001' [telegram] active=True nodes=60 graph=1381faffd630 published=1381faffd630 sticky=None AT-CANONICAL  prompt=custom (custom prompt — kept verbatim by update-clones, not counted: no Create/Edit grammar (Business Type line + Additional Instructions marker))
+  clone   stgwab77f282533c 'STAGING WA stgwa001' [whatsapp] active=True nodes=60 graph=b1a6f7240ad6 published=b1a6f7240ad6 sticky=None AT-CANONICAL  prompt=custom (custom prompt — kept verbatim by update-clones, not counted: no Create/Edit grammar (Business Type line + Additional Instructions marker))
+
+## 6. генераторы --check / верификаторы
+apply-clone-lifecycle.py --check rc=0 | clone lifecycle: OK
+apply-auth-gate.py --check rc=0 | auth gate: OK
+apply-history-handoff.py --check rc=0 | history/handoff: OK
+apply-reply-pipeline-v2.py --check rc=0 | reply pipeline v2: OK
+apply-outcome-stamps.py --check rc=0 | outcome stamps: OK
+apply-sweep-clone-deactivate.py --check rc=0 | sweep clone deactivate: OK
+apply-reply-mode-v2.py --check rc=0 | reply-mode v2: OK
+apply-slot-count-fix.py --check rc=0 | OK  Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json
+apply-suggest-v2.py --check rc=0 | suggest v2: OK
+build-test-dialog.py --check rc=0 | test dialog: OK
+build-auth-workflows.py --check rc=0 | auth workflows: up to date
+build-handoff-workflows.py --check rc=0 | handoff workflows: OK
+build-price-search.py --check rc=0 | price search: OK
+clone_lineage.py --check rc=0 | clone_lineage: 11 statements, 0 findings
+inject-panel-prompts.py --check rc=0 | 9PTyYcelRQI7bGDb-Suggest_Replies.json: up-to-date
+verify-history-handoff.py rc=0 | ALL HISTORY/HANDOFF ASSERTS PASSED
+verify-reply-pipeline.py rc=0 | ALL REPLY PIPELINE ASSERTS PASSED
+verify-telegram-parity.py rc=0 | ALL PARITY ASSERTS PASSED
+verify-auth-gate.py rc=0 | ALL AUTH GATE ASSERTS PASSED
+verify-message-batching.py rc=0 | ALL BATCHING ASSERTS PASSED
+verify-reply-mode.py rc=0 | ALL REPLY MODE ASSERTS PASSED
+verify-clone-lifecycle.py rc=0 | ALL CLONE LIFECYCLE ASSERTS PASSED
+verify-sql-comments.py rc=0 | OK  88 Postgres node(s) in 28 workflow file(s): no placeholder outside code, no {{ }}, no modifier, no leading =
+verify-panel-prompts.js rc=0 | PASS
+inject-prompts.py --check (tiktoken venv) rc=0 | TwWPW3gIyjZS3foR-Edit_Telegram_Workflow.json: kind=edit up-to-date
+verify_rag.py all rc=0 | VERIFY OK: all
+
+## 7. python3 Tools/n8n/tests/run_all.py
+OK   test_auth_refresh.py: 12 pass, 0 fail
+OK   test_billing_identity.py: 24 pass, 0 fail
+OK   test_claim.py: 19 pass, 0 fail
+OK   test_clone_lineage_sql.py: 50 pass, 0 fail
+OK   test_clone_retirements.py: 21 pass, 0 fail
+OK   test_create_clone.py: 70 pass, 0 fail
+OK   test_create_seed.py: 53 pass, 0 fail
+OK   test_deploy_canonical.py: 20 pass, 0 fail
+OK   test_handoff_notifier.py: 20 pass, 0 fail
+OK   test_harness_selfcheck.py: 2 pass, 0 fail
+OK   test_legacy_generators.py: 5 pass, 0 fail
+OK   test_memory_context.py: 20 pass, 0 fail
+OK   test_price_search.py: 36 pass, 0 fail
+OK   test_reply_lost_send.py: 21 pass, 0 fail
+OK   test_reply_memory.py: 56 pass, 0 fail
+OK   test_reply_memory_concurrent.py: 9 pass, 0 fail
+OK   test_reply_mode.py: 43 pass, 0 fail
+OK   test_reply_order.py: 44 pass, 0 fail
+OK   test_reply_reconcile.py: 66 pass, 0 fail
+OK   test_retired_delete.py: 13 pass, 0 fail
+OK   test_sql_comment_injection.py: 36 pass, 0 fail
+OK   test_suggest_catalog.py: 24 pass, 0 fail
+OK   test_suggest_lang.py: 11 pass, 0 fail
+OK   test_suggest_price.py: 16 pass, 0 fail
+OK   test_suggest_query.py: 37 pass, 0 fail
+OK   test_test_dialog.py: 17 pass, 0 fail
+OK   test_upload.py: 45 pass, 0 fail
+OK   test_verify_clone_lifecycle.py: 44 pass, 0 fail
+OK   test_verify_deployed.py: 48 pass, 0 fail
+OK   test_verify_parity.py: 52 pass, 0 fail
+OK   test_verify_sql_comments.py: 53 pass, 0 fail
+python3 tests/run_all.py  3015.68s user 563.04s system 109% cpu 54:31.52 total
+exit=0

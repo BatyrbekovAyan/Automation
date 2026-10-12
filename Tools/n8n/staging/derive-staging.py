@@ -18,6 +18,10 @@ could reach production or a real customer:
   * --bot wa:<profileId>[:<name>] / --bot tg:<profileId>[:<name>] additionally emits a STAGING
     BOT CLONE the way the Create handlers do (template + webhook path = profile id + name),
     with a deterministic id so re-runs upsert instead of multiplying workflows.
+  * --canon-ref <git ref> derives from the canon AT THAT REF (Tools/n8n/workflows/*.json read with `git archive`
+    into a temporary directory) instead of the working tree — how a staging scenario is first run against the canon
+    BEFORE a change («fails on HEAD», F1F2-plan T10). The derivation rules, isolation guards and STAGING-ONLY workflows
+    stay the working tree's; restore with a plain re-run (no --canon-ref).
 
     python3 Tools/n8n/staging/derive-staging.py --bot wa:stgwa001 --bot tg:stgtg001
     N8N_STAGING_HOME=~/.n8n-staging N8N_STAGING_PORT=5678 WAPPI_MOCK_BASE=http://127.0.0.1:8765 ...
@@ -27,8 +31,11 @@ import argparse
 import hashlib
 import json
 import os
+import shutil
 import sqlite3
+import subprocess
 import sys
+import tempfile
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 SRC = os.path.join(REPO, "Tools/n8n/workflows")
@@ -196,6 +203,22 @@ def supabase_writers_left(wf):
                 and str((n.get("parameters") or {}).get("method", "GET")).upper() != "GET")]
 
 
+def canon_at_ref(ref):
+    """Tools/n8n/workflows/*.json exactly as committed at `ref`, extracted into a fresh temporary directory (the caller
+    removes it). Fails loudly on an unknown ref or a ref without the canon — never falls back to the working tree."""
+    tmp = tempfile.mkdtemp(prefix="canon-ref-")
+    arch = subprocess.run(["git", "-C", REPO, "archive", "--format=tar", ref, "Tools/n8n/workflows"], capture_output=True)
+    if arch.returncode != 0:
+        shutil.rmtree(tmp, ignore_errors=True)
+        sys.exit(f"REFUSED: git archive {ref} Tools/n8n/workflows failed: {arch.stderr.decode(errors='replace').strip()}")
+    untar = subprocess.run(["tar", "-x", "-C", tmp], input=arch.stdout, capture_output=True)
+    src = os.path.join(tmp, "Tools/n8n/workflows")
+    if untar.returncode != 0 or not os.path.isdir(src) or not any(f.endswith(".json") for f in os.listdir(src)):
+        shutil.rmtree(tmp, ignore_errors=True)
+        sys.exit(f"REFUSED: no canonical workflows at {ref}")
+    return tmp, src
+
+
 def derive_file(text):
     text = text.replace(CANON_HOST + "/api/v1", LOCAL_HOST + "/api/v1")
     text = text.replace(CANON_HOST + "/webhook/", LOCAL_HOST + "/webhook/")
@@ -208,8 +231,23 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--bot", action="append", default=[], help="wa:<profileId>[:<name>] or tg:<profileId>[:<name>]")
     ap.add_argument("--prompt-file", help="optional systemMessage text file for the staging bot clones")
+    ap.add_argument("--canon-ref", help="derive from the canonical workflows committed at this git ref (default: the working tree)")
     args = ap.parse_args()
+    tmp = None
+    try:
+        if args.canon_ref:
+            tmp, src = canon_at_ref(args.canon_ref)
+            print(f"canon: {args.canon_ref} (git archive -> {src})")
+        else:
+            src = SRC
+        derive(args, src)
+    finally:
+        if tmp:
+            shutil.rmtree(tmp, ignore_errors=True)
 
+
+def derive(args, src):
+    """Write the derived staging set from the canonical workflows in `src` (the working tree or a --canon-ref extract)."""
     creds = staging_credentials()
     if PG_STAGING_NAME not in creds:
         sys.exit(f"REFUSED: staging n8n has no credential named {PG_STAGING_NAME!r} — a derived set would bind the "
@@ -219,11 +257,11 @@ def main():
         if stale.endswith(".json"):
             os.remove(os.path.join(OUT, stale))
     missing = set()
-    manifest = {"n8nHome": HOME, "n8nBase": LOCAL_HOST, "wappiMock": MOCK, "files": [], "bots": []}
+    manifest = {"n8nHome": HOME, "n8nBase": LOCAL_HOST, "wappiMock": MOCK, "canonRef": args.canon_ref or "worktree", "files": [], "bots": []}
     # Canonical workflows + the STAGING-ONLY ones (Tools/n8n/staging/workflows/, e.g. the stage-6 eval
     # runner) — the latter never reach prod because every deploy tool reads Tools/n8n/workflows/ only.
     STAGING_ONLY = os.path.join(os.path.dirname(os.path.abspath(__file__)), "workflows")
-    sources = [(SRC, f) for f in sorted(x for x in os.listdir(SRC) if x.endswith(".json"))]
+    sources = [(src, f) for f in sorted(x for x in os.listdir(src) if x.endswith(".json"))]
     if os.path.isdir(STAGING_ONLY):
         sources += [(STAGING_ONLY, f) for f in sorted(x for x in os.listdir(STAGING_ONLY) if x.endswith(".json"))]
     for src_dir, f in sources:
@@ -251,7 +289,7 @@ def main():
         parts = spec.split(":", 2)
         channel, profile_id = parts[0], parts[1]
         name = parts[2] if len(parts) > 2 else f"STAGING {channel.upper()} {profile_id}"
-        tpl = json.loads(derive_file(open(os.path.join(SRC, TEMPLATES[channel]), encoding="utf-8").read()))
+        tpl = json.loads(derive_file(open(os.path.join(src, TEMPLATES[channel]), encoding="utf-8").read()))
         for node in tpl.get("nodes", []):
             remap(node, creds, missing)
         tpl["id"] = staging_bot_id(channel, profile_id)
