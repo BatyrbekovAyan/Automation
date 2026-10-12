@@ -19,6 +19,21 @@
 legacy-Create при занятом профиле, порядок выкладки «сервер раньше клиента») — по рекомендациям проектов; тексты владелец видит
 до выкладки. Чтение прода (инвентаризация сирот F1, счёт `claim.start` по «23» для M4) — только по отдельному «да».
 
+## Решения владельца (2026-10-11)
+
+1. Q1: вариант A убрать из канона (казахский); Q1 — вариантом B вместе с F1/F2, с замером казахского.
+2. V3-first-bind — принять как ограничение и вести журнал конфликтов привязки, чтобы поддержка видела `billingConflict` (T1).
+
+Сводный план блока F1 + F2 + Q1 B + V6-unknown + V3 — `F1F2-plan.md` (задачи T1–T12, выполнены 2026-10-11/12; ход — ниже).
+
+## Решения владельца (2026-10-12) — Q1
+
+1. После T11 (B не прошёл К3/К4/К8) — мерить «B + анти-эхо» заново, тем же протоколом (T11b).
+2. После T11b (провал К6, казахский) — мерить «B + только переспрос». Эхо клиентского времени принимается на уровне прода,
+   К3/К4 = «не хуже прода», новый К10 (T11c).
+3. После T11c (провал К7, К8, К10) — «Выложить кандидат T11c» с задокументированной ценой (T11d): лишняя передача на u2,
+   эхо на `q1c_client_time_history_phone_repair` выше прода, одна утечка «Владелец:» на 534.
+
 ## Ход работ
 
 | Пункт | Статус | Коммит(ы) |
@@ -33,7 +48,20 @@ legacy-Create при занятом профиле, порядок выклад�
 | Изоляция `test_create_seed.py` | **исправлено** 2026-10-11: граф для `create_seed_chain.js` — во временный файл на каждый вызов (`tempfile.mkstemp`, вне репо, удаляется), а не в постоянный `tests/.r8-wf.json`; новый случай F (3 раунда × 6 одновременных прогонов WA/TG — каждый видит свой граф). До 52/53 (F: `FileNotFoundError` / чужой граф), после 53/53; два параллельных процесса — 53/53 оба | `0adac3f4` |
 | V6-concurrent | **исправлено в каноне** 2026-10-11, НЕ выложено: `Stamp Draft` (оба шаблона) выбирает кандидата `order by id limit 1 for update skip locked` (строку, которую держит штамп другого выполнения, пропускает — проигравший берёт следующую свою или ничего и тогда ничего в памяти не трогает), UPDATE перепроверяет все условия (не помечена, без `source`, свой текст, выше watermark) на записываемой строке; `Record Send`/`Record Cancel` без изменений (действуют по своему `execution_id`, который больше не переезжает). Тест `tests/test_reply_memory_concurrent.py` (два настоящих соединения staging Postgres, схема-фикстура, WA+TG: порядок ревью, обратный порядок, единственный кандидат; исходный `min(id)` и «min → max» проваливают ту же гонку; `verify-reply-pipeline.py` отвергает их, выбор без блокировки и UPDATE без перепроверки) 0/8 → 9/9; `test_reply_memory` 44/44, `test_reply_order` 44/44; генератор — второй прогон без диффа, `--check` 0; стражи reply-pipeline / history-handoff / sql-comments / parity / batching зелёные. Staging: bootstrap, `verify-deployed` exit 0, e2e-reply полный 44/0; `tests/run_all.py` 26/26 (на итоговом каноне, вместе с D1b). Остаток (закреплён, как раньше): между строками ОДИНАКОВОГО текста штампы идут в порядке прихода в базу, а не по авторству — у каждой строки ровно одно выполнение, но выжившая отправленная может стоять на позицию ниже; сосед того же текста без штампа забирает штамп. `evidence/V6c-{before,after}.txt` | `4e5f63af` |
 | D1b (остаток D1) | **исправлено** 2026-10-11 (только инструмент): обычный путь `deploy-canonical.py` после PUT активного workflow читает, опубликовал ли PUT сохранённую версию (как `update-clones.serves()`); да → ни deactivate, ни activate; нет → публикация на месте `POST /activate {versionId}`; затем read-back; отказ / пусто / откат → `failed`, exit 1, workflow не выключается. Тесты `test_deploy_canonical.py` 14/6 → 20/0; `evidence/D1b-{before,after}.txt`. Не тронуто: `update-clones.py` при неопубликовавшем PUT всё ещё делает deactivate → activate | `aa6082ca` |
-| F1 + F2 + Q1 B (+ V6-unknown) | следующие (V6-concurrent и D1 закрыты) | — |
+| V3-журнал (T1) | **в каноне** 2026-10-11, НЕ выложено: каждый refresh, ответивший `billingConflict`, пишет/наращивает строку `billing_conflicts` (запрошенный id, просившая установка, ТЕКУЩИЙ держатель из `billing_bindings`, первый/последний раз, попытки) — узлы `Conflict?` → `Log Billing Conflict` ПОСЛЕ `Respond` в `crAuthSession001` (генератор `build-auth-workflows.py`; путь ответа байт-в-байт как на HEAD; `continueRegularOutput`, без retry); миграция M1 `Tools/n8n/sql/2026-10-11-billing-conflicts.sql`; запрос и порядок решения поддержки — `a1-deploy-runbook.md` §5. Тесты: `test_billing_identity.py` 19/5 → 24/0 (B12–B15 + негатив верификатора), `run_all` 26/26, e2e-auth 31/0, staging-проба на n8n 2.36.7 5/5 (повтор → attempts 2; без таблицы — тот же ответ, исполнение success), `verify-deployed` 0; `evidence/T1-{before,after,staging}.txt`. Остаток: ответы claim.* флага `billingConflict` не несут — журналируется предшествующий им refresh | `e9a2f3ad` |
+| T2 SQL-ядро линии бота + M2 | **в каноне** 2026-10-11, НЕ выложено: `Tools/n8n/clone_lineage.py` — Clone Plan, Bind Workflow Id WA/TG (привязка + перенос памяти, истории, сводки, заявок, журнала ответов, состояния и флагов чатов, чанков и реестра файлов + бронь заменённых клонов — ОДНИМ оператором), Record Discard Failure, Clone Retirements + отметки, `lineage_cte`; миграция M2 `sql/2026-10-11-bot-lineage.sql`. Тест `tests/test_clone_lineage_sql.py` 50/50 (на каноне HEAD 6/36); `evidence/T2-{before,after}.txt`. Отклонения: (1) реестр файлов переносится и для строк без владельца — иначе compat-файл владельца неудаляем по V4; (2) план не предлагает переиспользовать клон, стоящий в `clone_retirements`; (3) Bind проверяет, что строка ещё называет привязку из его снимка (одновременный Create того же профиля: проигравший отвечает `bound=false`), строки истории/заявок и пометка `superseded` перепроверяются на зафиксированной версии, `adopted_profiles` — только реально помеченные; (4) чанки сравниваются по `metadata->>ключ` — индексы прод-хранилища | `5ac9b2f9` |
+| T3 + T4 (F1+F2: граф Create + стражи) | **в каноне** 2026-10-12, НЕ выложено: генератор `apply-clone-lifecycle.py` — Create WA/TG = цепочка §1.4 (Clone Plan → переиспользование по пробе / шаблон → Clone Id → Already Active? → Activate → Wappi → Bind по маркеру `bound` → удаление заменённых; любое «нет» после клона удаляет НОВЫЙ клон, сбой — в `clone_retirements`; отказы без id; n8n API — localhost + `__HDR_CRED__`; Restamp удалён). Отклонение: `Already Active?` (n8n 2.36.7 повторно регистрирует вебхук при активации активного). Тесты: `test_create_clone.py` 0/70 → 70/70 (книги клонов, контракт, F2 R1/R4/R9), `test_create_seed` 53/53, `verify-clone-lifecycle.py` + 21 мутация × WA/TG (прежние стражи пропускали 26/42, теперь 44/44), `test_verify_parity` 38 → 52; staging verify-deployed 0, e2e-auth 31/0; run_all 29/29. `evidence/T3-*`, `evidence/T4-*` | `7126ef70`, `358ab7ec` |
+| T5 (чистка и удаление по линии) | **в каноне** 2026-10-12, НЕ выложено: удаление бота по линии (все удаляющие узлы Delete Bot Files → `clone_lineage` DBF_LINE_*; линия = строки установки с тем же bot_key, оба канала, + цепочка superseded; всё в `app_delete`, клоны линии → `clone_retirements` bot_deleted; чанки по индексам выражений, удаление по PK); ветка A чистки (`Clone Retirements` → DELETE localhost → 200/404 отметка, иначе attempts+1; `retirementsDryRun=true` на первые сутки); фильтр V12 `superseded_by is null`. Тесты `test_clone_retirements.py` 2/18 → 21/21, `test_retired_delete` 13/13, run_all 30/30; staging bootstrap + verify-deployed 0 + e2e-auth 31/0; `evidence/T5-{before,after}.txt`. Опциональная отвязка удалённого профиля через прокси — не сделана (остаток V12 (ii)) | `661431c9` |
+| T6 Q1 B + V6-unknown | **в каноне** 2026-10-12, НЕ выложено. Пометки памяти «Владелец: » (owner_app — прокси, owner_phone — шаблоны) и «[доставка не подтверждена] » (Record Send — один раз; поздний sent снимает). Final Check и Stamp Draft срезают ведущие пометки, «Сводка» читает текст без них. Фраза — в «Память» `_core.md` (карты Create/Edit, порог кэша ≥ 3705) и блоком `##memory_marks##` в промпте шаблонов. Тесты: test_memory_context 8/11 → 20/0, test_reply_memory 40/16 → 56/0, V6c 9/9, run_all 31/31. Staging: owner_phone / owner_app / send_unknown / Сводка PASS. Замер — T11. `evidence/T6-{before,after}.txt` | `b86e6957` |
+| T7 черновики + M3 | **в каноне** 2026-10-12, НЕ выложено. Settle Lost Sends (тот же узел) закрывает черновик умершего прогона: событие send_unknown при том же execution_id → unknown + пометка; claim старше 10 мин при том же execution_id → удалить; перехвачено другим прогоном и черновик старше 10 мин → удалить. M3 `sql/2026-10-12-memory-marks-backfill.sql` — после выкладки T6. Тесты: test_reply_lost_send 9/12 → 21/0, test_handoff_notifier 14/6 → 20/0, run_all 31/31. Staging: M3 0/0, e2e lost_send_settled_by_notifier (черновики) PASS. `evidence/T7-{before,after}.txt` | `70518dd0` |
+| T8 (клиент F1+F2) | **сделано** 2026-10-11 (клиент, войдёт в новую сборку; сервер блока выкладывается раньше): перенос id удалённого канала в retired-набор (кроме app_delete; маркеры M4 переносятся при запуске), удаление V12 по текущим и retired-id (второй Delete Bot Files только при двух наборах, прежний клон удаляется, отвязка только текущих профилей), контракт Create §1.7 (CreateOrigin/PreviousProfileId, 45 с, `CreateWorkflowResponse`), повтор Create из настроек (`CreatePending`), «Сменить номер» — только logout. Тесты: до 88/14 (поведенческая V12 `ABotWithOnlyRetiredIds_IsStillDeletedOnTheServer` — NothingOnServer на HEAD), после 208/208 и полный EditMode 2933/2933; `evidence/T8-{before,after}.txt`. Каталог ключей `bot-persistence` обновлён (RetiredWorkflowId, CreatePending, правило переноса) | `50309e18` |
+| F2 клиент — экраны (T9) | **готово** 2026-10-11, НЕ выпущено (новая сборка): капсула «Подключить» (нет живых каналов, нет app_delete); баннер «Бот отключён» + подсказки строк каналов в настройках (во время выполнения, сцена и префабы не тронуты); пустое состояние чатов «Бот отключён»; ожидание сервера перед profile.add (GetUsage по расписанию 0/2/5/10/20 с); после покупки — refresh, повторный claim, лист «Подключите ботов снова»; channel_limit из настроек → лист лимита каналов. Тесты: до 13/19 (6 FAIL) и 13/14, после — полный EditMode 2994/2994; `evidence/T9-{before,after}.txt`, `evidence/T9b-{before,after}.txt`. Тексты — в разделе «Тексты для владельца» пакета ниже | `c80ada08`, `5b4bb62a` |
+| T10 staging e2e | **сделано** 2026-10-12, канон не менялся. На n8n 2.36.7 + мок, WA и TG. e2e-auth +21 сценарий: линия бота (то же устройство, активный клон, новый профиль с переносом, переподключение после покупки, конфликт активации, сбой Bind, legacy, чужая установка, мастер), удаление по линии, ветка A, журнал V3. e2e-handoff: owner_app и черновики теперь проверяются и на TG. Новый ключ `bootstrap.py --canon-ref`. «До» на каноне 92a7caa2 — 29 FAIL. «После»: e2e-auth 52/0 + модельный шаг reconnect 2/2; e2e-handoff 20/0; e2e-reply 44/0; verify-deployed 0, run_all 31/31, все `--check` 0. Отклонение: `activate_on_active_is_noop` опровергнут платформой (вебхук на мгновение снимается) — заменён на `reuse_active_clone_skips_reactivation`. `evidence/T10-{before,after}.txt` | `4badcc2f` |
+| T11 замер Q1 B / V6-unknown | **замер выполнен** 2026-10-12, канон не менялся. Оценщик h7, набор v1.4, стороны 661431c9 → 70518dd0 параллельно в один день, 558 прогонов на сторону (≈ $1,40). Выполнены: К1 a6 10/24 → 24/24; К2 q1p 8/48 → 42/48 (p≈8e-13); К5 лишний create_handoff 13/72 → 1/72; К6 казахский не хуже (80/110 → 83/110, поэтому §4.6 B2-lang не запускался); К7 V6 8/8 по всем u, утечек пометок 0/558. НЕ выполнены: К3 эхо клиентского времени 4/24 → 3/24 (порог 0/24); К4 q1c 36/40 → 37/40 (порог 39/40); К8 ws_kz_min_order 3/3 → 0/3 (лишний create_handoff и русская фраза ниши). Staging A6 9/9. Вердикт: B по критериям НЕ принят, решение за владельцем — варианты в `evidence/Q1B-measure.txt` §6. Доведение без сети: сводка воспроизведена, run_all 31/31. Файлы: `evidence/T11-{before,after,checks}.txt`, `evidence/Q1B-measure.txt` | `ea881b0e`, `fba44558` |
+| T11b (Q1 «B + анти-эхо») | **НЕ принят** 2026-10-12, канон = B без изменений. Решение владельца: вариант (2) из `evidence/Q1B-measure.txt` §6.<br>**До прогонов:** оценщик h8 — чередование повторов, `--side`/`--plan`/`--workers`, `eval/test_schedule.py` 13/13; набор v1.5 — `no_tool:create_handoff` на 34 сценариях, 70 классифицированы с причиной в `test_checks.py`, q1c_* сознательно без проверки; критерии К1–К8 + К9 — в `evidence/Q1B2-measure.txt` §0.<br>**Прогон:** один чередующийся, `plans/q1b2.json`; до 661431c9 / после = кандидат / рука B; 1162 прогона, $1.44.<br>**Итог:** К1–К5 и К7–К9 выполнены (a6 24/24, q1p 40/48, эхо 0/24, контроли 40/40, ws_kz_min_order 0/23 передач). К6 НЕ выполнен: казахский 84/110 → 66/110 (p≈0.007), pr_kz_battery 17/30 → 8/30. Новая лишняя передача u2 0/11 → 5/11.<br>**Рука B в том же окне:** ws_kz_min_order 5/10 передач, эхо 3/24.<br>**Проверки:** run_all 31/31, генераторы `--check` и стражи rc=0, verify-deployed 0.<br>Кандидат — `wip/Q1B2-candidate.patch`. Варианты — `Q1B2-measure.txt` §5. `evidence/T11b-{before,after,checks}.txt` | `c0b12f20`, `6799b512` |
+| T11c «B + только переспрос» | **не принят** 2026-10-12, канон = B. Решение владельца (второе): только защита переспроса, без анти-эха; эхо клиентского времени принимается на уровне прода (К3/К4 = «не хуже прода», Fisher как К6); новый К10 — лишний create_handoff на u2 и в сумме u1–u4. Один чередующийся прогон (h8, v1.5, plans/q1b3.json, рука B 6799b512 на казахском, u-сценариях, ws_* и эхе): 1304 прогона, $1.66. Выполнены К1–К6 и К9: a6 24/24, q1p 36/48, казахский 70 → 77/110. НЕ выполнены: К10 (u2 0/11 → 10/11, у B 1/8 — передачу несёт сама защита), К8 (u2, эхо q1c_client_time_history_phone_repair, ap_sku_exact_kz стали 0/3), К7 (одна утечка «Владелец:» на 534). Кандидат — wip/Q1B3-candidate.patch; варианты — evidence/Q1B3-measure.txt §5; run_all 31/31 | `6aa8a675`, `358a5115` |
+| T11d — Q1: кандидат T11c в канон | **в каноне** 2026-10-12, НЕ выложено. Решение владельца (третье за день): «Выложить кандидат T11c» — вопреки вердикту T11c (К7, К8, К10 не выполнены). Принятая цена: лишний create_handoff на u2 после ответа с неизвестной доставкой (0/11 → 10/11), эхо клиентского времени на q1c_client_time_history_phone_repair (5/8 против 1/8 у прода), одна утечка «Владелец:» на 534 (срезает Final Check). Перенос — только генераторами: `_core.md` «Память» → `inject-prompts.py`; `MEMORY_MARKS_TEXT` → `apply-history-handoff.py`. Канон = измеренный `wip/Q1B3-candidate.patch` байт в байт (в генераторе +2 строки комментария); порог кэша — минимум 3733 ≥ 2300. Тест: `test_memory_context.py` T11d 20/5 → 25/0 (текст правила во всех копиях, которые читает модель, + негатив). Генераторы `--check` 0, стражи зелёные, test_reply_memory 56/0, run_all 31/31. Staging: A6 9/9 (шаблон, education, phone_repair — по 3/3), model-free пометки 5/5, verify-deployed 0. Платных прогонов оценщика нет. `evidence/Q1B3-measure.txt` §6, `evidence/T11d-{before,after}.txt` | `f0cfc6d6`, `196158b7` |
+| T12 документы, пакет, репетиция | **сделано** 2026-10-12, НЕ выложено. CLAUDE.md и этот README сведены по заметкам T1–T11d; пакет выкладки — раздел «Пакет выкладки блока» ниже; `a1-deploy-runbook.md` §2/§4, `Tools/n8n/README.md`, `staging/README.md`. Инструмент: `deploy-canonical.py` для local-базы сравнивает и выкладывает ПРОИЗВОДНЫЙ канон staging (`staging_canon`) — без этого шаг «dry-run против staging = ровно ожидаемый список» был невыполним (15 из 25 «would update» при 1 DIFF у verify-deployed), а `--apply` залил бы на стенд прод-адреса; `test_deploy_canonical.py` 22/4 → 26/0. Попутно исправлен неточный комментарий `LINE_RETIRE_SQL` (остаток 2 T10; меняет только текст SQL-комментария Delete Bot Files). Репетиция на staging из прод-состояния (`--canon-ref 92a7caa2`, графы = прод-снимок 2026-10-11 27/27): dry-run = ровно 12 workflow блока, шаги 3–8 по одному с read-back ok (активные опубликованы самим PUT), update-clones обновил граф и головы PROMPT-BEHIND (хвосты сохранены), verify-deployed 0, M1/M2/M3 на свежем кластере дважды + M3 на строках старых писателей + обратный оператор байт-в-байт, smoke, e2e-auth 52/52 без модели + модельный шаг reconnect 2/2, писатели пометок 5/5; стенд возвращён (verify-deployed 0). Итоговые проверки на дереве T12: `tests/run_all.py` 31/31, полный EditMode 2994/2994, 16 генераторов `--check` 0 (inject-prompts — полный, с порогом кэша), 10 верификаторов канона 0, staging verify-deployed 0. `evidence/T12-{before,after,rehearsal,checks}.txt` | `3a1667d6` (инструмент), docs-коммит T12 |
 
 Замечание по ходу M4 (не исправлялось, вне объёма): `M4-design.md` §2.4 считает, что первый шаг удаления по V12 —
 `profile.delete` через прокси — проходит `Profile Owner` для своей удалённой строки. На деле его раньше отказывает
@@ -67,10 +95,14 @@ unlink 403, `DeleteBotFiles` и `SetWorkflowState delete` 200, клоны уда
 
 ## Пакет доработок (выкладка — только по новому явному «да» владельца)
 
+Строки M4, V6-concurrent и D1b выложены 2026-10-11 (раздел «Выкладка 2026-10-11» ниже). Строки V3-журнал, Q1 B и блок F1 + F2 — **НЕ выложены**; их общий пакет — раздел «Пакет выкладки блока» ниже.
+
 | Пункт | Что меняется на сервере | Миграции / env | Порядок и откат |
 |---|---|---|---|
 | M4 | ОДИН workflow — `crAuthSession001` (Auth Session): обновление существующего через `Tools/n8n/deploy-canonical.py` (PUT по id + read-back), сверка `verify-auth-gate.py` / `verify-deployed.py`; прокси и Create не меняются | нет / нет | **Сервер раньше клиента**: строго безопасен для любых сборок (A1-сборки получают 410 вместо бесконечного цикла, клиент 1.0 (4) `AuthSession` не вызывает); клиент — в новой сборке с HEAD, device-pass: бот с истёкшим триалом → один запрос → подстрока «Отключён · …» → удаление бота работает. Откат — прежний JSON `crAuthSession001` (из `d08c345d`), состояние не мигрирует |
-| Q1 (A) | **снят с пакета** (убран из канона 2026-10-11) — Create/Edit совпадают с продом | — | — |
+| Q1 B + защита переспроса (T6 + T11d) | Карты PROMPTS в Create/Edit WA/TG и блок `##memory_marks##` шаблонов WA/TG — через `deploy-canonical.py`, вместе с остальным серверным блоком (T6 меняет те же шаблоны). Затем `update-clones.py`: головы клонов станут PROMPT-BEHIND и обновятся, хвосты владельцев сохранятся; живые клоны — по инвентарю инструмента. Read-back — `verify-deployed.py` 0 | нет / нет (бэкфилл пометок M3 — шаг T7, после шаблонов) | Сервер раньше новой клиентской сборки; от клиента не зависит. Откат: только защиты — JSON Create/Edit и шаблонов из `358a5115` (канон B); всего Q1 — JSON прода `92a7caa2`. В обоих случаях снова `deploy-canonical.py` + `update-clones.py` |
+| V3-журнал (T1) | ОДИН workflow `crAuthSession001` (Auth Session) через `deploy-canonical.py` + read-back (`verify-auth-gate.py` / `verify-deployed.py`) | M1 `2026-10-11-billing-conflicts.sql` ДО workflow (пост-проверки в файле) / env нет | Независим от клиента и остального блока — можно раньше по отдельному «да»; без таблицы журнал молча не пишет (ответ не страдает). Откат — прежний JSON `crAuthSession001` (`92a7caa2`); таблица остаётся (её читает только поддержка) |
+| Блок F1 + F2 + Q1 B + V6-unknown + V3 (T1–T12) | 12 существующих workflow (Auth Session, Dashboard Outcomes, Profile Lifecycle Sweep, Handoff Notifier, Delete Bot Files, Create WA/TG, Edit WA/TG, Wappi Proxy, шаблоны WA/TG); новых нет, env нет, `PROTECTED_IDS` без изменений | M1 → M2 → workflow → M3 | Порядок, откат, проверки, тексты — раздел «Пакет выкладки блока». Сервер РАНЬШЕ новой клиентской сборки (T8/T9 — клиент) |
 | V6-concurrent | ДВА шаблона ботов — `4wYitz5ek30SVNlT` (WhatsApp Bot) и `4VN3gsFaC2HUYmcc` (Telegram Bot), меняется только SQL узла `Stamp Draft`: `deploy-canonical.py` (шаблоны неактивны по контракту → только PUT + read-back), затем **`update-clones.py`** для живых клонов (на проде их сейчас нет — проверить инвентарём инструмента перед выкладкой; бот, созданный после выкладки шаблонов, получает новый SQL сразу), `verify-deployed.py` exit 0 | нет / нет | Сервер-только, от клиента не зависит. Откат — прежние JSON шаблонов (из `0adac3f4`), снова `deploy-canonical.py` + `update-clones.py`; данные не мигрируют (пометки строк памяти совместимы) |
 | D1b | на сервере ничего — меняется только инструмент выкладки `deploy-canonical.py` (обычный путь больше не делает deactivate → activate) | — | Применяется уже в этой выкладке: активные workflow обновляются без окна без вебхука |
 
@@ -82,3 +114,134 @@ smoke ок, логи чистые; журнал — `docs/audits/implementation-
 `docs/audits/2026-10-11-prod-{before,after}.json`, точки отката `docs/audits/2026-10-11-deploy-rollback-pointers.txt`. Клиентские части (M4, C1/C1b)
 — в новой сборке. Q1 A не выкладывался (снят с канона).
 
+## Пакет выкладки блока F1 + F2 + Q1 B + V6-unknown + V3 (готов 2026-10-12, НЕ выложен)
+
+**Статус.** Всё в каноне на HEAD после T12; на проде — пакет 2026-10-11 (канон `92a7caa2`: его графы совпадают с прод-снимком
+`docs/audits/2026-10-11-prod-after.json` 27/27, офлайн-сверка — `evidence/T12-rehearsal.txt` §A). Выкладка — **только по явному
+«да» владельца**. Отдельные «да» нужны:
+
+1. на выкладку блока (или на V3-журнал отдельно и раньше — он независим);
+2. на read-only инвентаризацию прода перед выкладкой (F1 Q5: клоны, которые не называет ни одна строка `bot_profiles`; pre-A1
+   клоны). Ожидаемо пусто: на 2026-10-11 на проде 0 неархивных клонов и архивный «13»;
+3. на флип `retirementsDryRun = false` через сутки (шаг 12).
+
+**Сервер раньше клиента.** T8/T9 — клиентская часть (новая сборка с HEAD после блока). Новая сборка опирается на новый Create
+(`CreateOrigin`, `PreviousProfileId`, ответ без `id` при отказе, переиспользование клона) и на удаление по линии: со старым Create
+«Сменить номер» и повтор Create из настроек дали бы второй клон, а переподключение — новый клон без переноса данных. Поэтому порядок
+строго: сервер (шаги 1–12) → новая сборка → device-pass `F1F2-plan.md` §5.4 → живой canary → сторы. Сборку 1.0 (4) не выпускать
+(решение 2026-10-09).
+
+**Что меняется на сервере** (графы — `verify-deployed.graph_hash`; «до» = прод-снимок 2026-10-11, «после» = канон T12):
+
+| Workflow | Id | Что | Генератор | Граф до → после |
+|---|---|---|---|---|
+| Auth Session | `crAuthSession001` | журнал конфликтов V3 (T1) | `build-auth-workflows.py` | `d9a4cb587384` → `32ddd28b0ec6` |
+| Dashboard Outcomes | `2htWSV5IHO8E2CgB` | транскрипт «Сводки» без пометок (T6) | `apply-history-handoff.py` | `421dbd3636d3` → `b806209a2090` |
+| Profile Lifecycle Sweep | `fXYpCXPKw92EzRz8` | ветка A `clone_retirements` (`retirementsDryRun = true`), фильтр V12 `superseded_by is null` (T5) | `apply-sweep-clone-deactivate.py` | `a2f65ef06e58` → `40608f7baab5` |
+| Handoff Notifier | `crHandoffNtfy001` | черновики умерших прогонов в `Settle Lost Sends` (T7); должен остаться **активным** (R9) | `build-handoff-workflows.py` / `apply-history-handoff.py` | `d1b693e6c4e2` → `80eebf0b71f8` |
+| Delete Bot Files | `lmjYsdNcQA2IE5rl` | удаление по линии бота (T5) | `apply-auth-gate.py` + `apply-history-handoff.py` | `487da5a4894c` → `80d4b7a7e31e` |
+| Create WA / TG | `XuvOp7TxOImOAmlj` / `Uz6HBBUpAiUqVysB` | цепочка «линия бота» (T3), карта промптов с правилом пометок (T6 + T11d) | `apply-clone-lifecycle.py`, `inject-prompts.py` | `8fcd3e53ebee` → `7668910d8a58` / `8d830aa3f96b` → `dc998bb20675` |
+| Edit WA / TG | `3qax5J9u2qsT9Vao` / `TwWPW3gIyjZS3foR` | только карта промптов | `inject-prompts.py` | `b83dace5f01d` → `8ab351d929dc` / `904ec239eae1` → `8b303813c409` |
+| Wappi Proxy | `crWappiProxy0001` | «Владелец: » в `Record Owner Send` (T6) | `build-auth-workflows.py` | `4deee00842af` → `4d33d4562193` |
+| Шаблоны WA / TG | `4wYitz5ek30SVNlT` / `4VN3gsFaC2HUYmcc` | `Record Outgoing`, `Record Send`, `Stamp Draft`, `Final Check`, блок `##memory_marks##` (T6 + T11d) | `apply-history-handoff.py`, `apply-reply-pipeline-v2.py` | `669930389c9d` → `013bce231127` / `0f5ba39dbf3f` → `f22a7b12c69f` |
+
+Новых workflow нет, env не меняется, `PROTECTED_IDS` не меняется, Set Workflow State не меняется (`Delete Ownership` тот же).
+Миграции (все аддитивные и идемпотентные, пост-проверки — в самих файлах; применяет исполнитель средствами раннбука):
+
+| # | Файл | Когда |
+|---|---|---|
+| M1 | `Tools/n8n/sql/2026-10-11-billing-conflicts.sql` | до Auth Session |
+| M2 | `Tools/n8n/sql/2026-10-11-bot-lineage.sql` | до Sweep, Delete Bot Files и Create (без неё Create отвечает `clone_plan_unavailable`, Delete Bot Files — 503 → Retry клиента) |
+| M3 | `Tools/n8n/sql/2026-10-12-memory-marks-backfill.sql` | ПОСЛЕ прокси, шаблонов и Dashboard (обратный оператор — в файле, закомментирован) |
+
+**Порядок (сервер).** Все команды — с явным `--base`; инструменты по умолчанию смотрят на прод.
+
+1. Снимок «до»: `verify-deployed.py --base https://n8n.choosereply.com --json docs/audits/<дата>-prod-before.json` — ожидаемо канон 27,
+   DIFF ровно 12 из таблицы выше, клонов 0 (если не так — стоп и разбор); бэкап n8n (`~/choosereply/backup.sh` = `Tools/n8n/server-backup.sh`); снимок
+   затрагиваемых таблиц средствами раннбука. `deploy-canonical.py` dry-run: ровно эти 12 → строки `rollback pointer` (versionId до
+   выкладки) записать в `docs/audits/<дата>-deploy-rollback-pointers.txt` (как 2026-10-11).
+   Проверить, что ключ учётки `n8n Admin API` — полный ключ API (Create теперь делает им GET, POST create, activate и DELETE; до блока
+   им пользовались только Sweep (deactivate) и Test Dialog (GET)).
+2. M1, M2 + пост-проверки.
+3. Auth Session: `deploy-canonical.py --only crAuthSession001 --apply --yes`. Шаг независим, его можно выложить и раньше всего блока —
+   только по отдельному «да».
+4. Dashboard Outcomes (`--only 2htWSV5IHO8E2CgB`): снятие пометок должно стоять раньше, чем писатели начнут их ставить.
+5. Profile Lifecycle Sweep (`retirementsDryRun = true`, как в каноне) и Handoff Notifier (`--only fXYpCXPKw92EzRz8 --only crHandoffNtfy001`).
+6. Delete Bot Files (`--only lmjYsdNcQA2IE5rl`).
+7. Create WA/TG + Edit WA/TG (`--only XuvOp7TxOImOAmlj --only Uz6HBBUpAiUqVysB --only 3qax5J9u2qsT9Vao --only TwWPW3gIyjZS3foR`):
+   инструмент привязывает `__HDR_CRED__` к учётке `n8n Admin API` живого Set Workflow State и отказывается выкладывать непривязанное.
+8. Wappi Proxy + шаблоны WA/TG (`--only crWappiProxy0001 --only 4wYitz5ek30SVNlT --only 4VN3gsFaC2HUYmcc`).
+9. `update-clones.py` (V10): инвентарь инструмента → dry-run → `--apply --yes` → повтор (no-op). Все клоны станут BEHIND, головы
+   промптов — PROMPT-BEHIND, хвосты владельцев не трогаются. На 2026-10-11 клонов на проде 0. Остаток D1b: при неопубликовавшем PUT
+   `update-clones` делает deactivate → activate.
+10. M3 + пост-проверки (ожидаемо 0 и 0).
+11. `verify-deployed.py` exit 0 (`--json …-prod-after.json`). Smoke без изменения данных, ожидаемые ответы (сняты на staging):
+    WappiProxy без токена → 401; AuthSession nonsense и claim.start без токена → 400; SetWorkflowState на `crPriceSearch001` → 400
+    `protected_workflow`; SupportMessage пустой → 400; DeleteBotFiles с поддельным токеном → 401; Create WA/TG с поддельным токеном →
+    **HTTP 200** `{success:false, error:"unauthorized"}` (Create работает в режиме `lastNode` — так и было до блока; это не 401).
+    Логи 15 мин. Handoff Notifier активен.
+12. Через сутки: журнал ветки A (`Log Would Remove`) чист → в генераторе `RETIREMENTS_DRY_RUN = False`
+    (`apply-sweep-clone-deactivate.py`), `--check`, коммит, `deploy-canonical.py --only fXYpCXPKw92EzRz8` — по отдельному «да».
+13. Новая клиентская сборка с HEAD после блока (M4 клиент, C1/C1b, F1/F2 клиент) → `Tools/store/inspect-artifact.sh` → device-pass
+    `F1F2-plan.md` §5.4 (iOS + Android, Android дополнительно на ширине 720) → живой canary-бот (пакет 10-09 §4 + этот блок:
+    переподключение после истёкшего триала, «Сменить номер», «Получить код ещё раз», удаление, Q1 на живом боте) → сторы.
+
+**Обратная совместимость (почему сервер можно раньше).** Ответ Create для старых клиентов содержит `id` при успехе и не содержит его
+при отказе. Старые A1-dev-клиенты без новых полей получают поиск предшественника по `bot_key` (как F1). Сборка 1.0 (4) — legacy:
+переиспользование только привязки без владельца, отказ `profile_owned` по профилю установки, ничего не переносится (публично её не
+выпускаем). Пометки памяти и журнал конфликтов от клиента не зависят.
+
+**Откат.**
+
+- Прежние JSON — канон на `92a7caa2` (`git show 92a7caa2:Tools/n8n/workflows/<файл>`; на время отката положить его в
+  `Tools/n8n/workflows/`, `deploy-canonical.py --only <id> --apply --yes`, затем вернуть канон); версии на самом n8n — по `rollback
+  pointer` из шага 1. Для шаблонов затем `update-clones.py`.
+- Частичный откат Q1: только защита переспроса — JSON Create/Edit и шаблонов из `358a5115` (канон B); весь Q1 — из `92a7caa2`.
+- M1 и M2 остаются: старый код их не читает. M3 — обратный оператор из файла, по желанию (помеченные строки при старом промпте —
+  состояние B1, не хуже прода); на staging обратный оператор вернул содержимое байт в байт.
+- Перенесённые данные назад не переносятся (принадлежат живому боту; старый Create замещённые строки не видит). Удалённые
+  заменённые клоны не восстанавливаются — решение владельца по F1.
+- Клиентская сборка с откатанным сервером работает: новые поля Create старый сервер игнорирует; после переноса id канал идёт «свежим»
+  путём и получает новый клон без переноса данных; данные остаются под retired-id, удаление их видит.
+
+**Репетиция на staging (2026-10-12, T12; полный журнал — `evidence/T12-rehearsal.txt`).** Стенд поднят в прод-состоянии:
+`bootstrap.py --canon-ref 92a7caa2` с клонами, промпт которых собран Create по карте `92a7caa2` (education).
+
+| Шаг | Результат |
+|---|---|
+| Снимок «до» | verify-deployed: канон 27, DIFF 12 — ровно блок; клоны BEHIND + PROMPT-BEHIND |
+| Dry-run | `deploy-canonical.py --base http://localhost:5678`: would_update 12 — ровно список выше, по каждому `rollback pointer` |
+| Шаги 3–8 | по одному, `--only … --apply --yes`: updated 12, failed 0, read-back ok у каждого; все активные опубликованы самим PUT (путь D1b, без окна deactivate); шаблоны неактивны |
+| Шаг 9 | update-clones: dry-run 2 клона (граф + голова education, хвост 484 символа сохранён) → `--apply` updated 2 → повтор no-op |
+| Шаг 10 | M3 на строках старых писателей (синтетика): «Владелец: » ×2, «[доставка не подтверждена] » ×1, остальное не тронуто; пост-проверки 0/0 |
+| Шаг 11 | verify-deployed exit 0; smoke — ответы, как в шаге 11 выше; ничего не создано |
+| Миграции | на свежем кластере (все миграции прода → M1 → M2 → M3): пост-проверки M1 (`t`, 6, 2 индекса), M2 (2, `t`, 9, 2 индекса); повтор `migrate` без ошибок и без двойных пометок; обратный оператор M3 — байт в байт |
+| e2e на развёрнутом стенде | e2e-auth `--no-llm` 52/52 (4 сценария сначала упали только на пробе ветки A: она читает производные узлы с диска, а там после `--canon-ref` лежал старый набор; после `derive-staging.py` без импорта — PASS); модельный шаг `retired_bot_reconnects_after_purchase` 2/2 («Букет «Нежность» — 18 500 ₸ … вы просили к 18:00»); e2e-handoff писатели пометок 5/5 |
+| Возврат | `bootstrap.py --bot wa:stgwa001 --bot tg:stgtg001` → verify-deployed 0; dry-run 25/25 up to date; тестовых строк не осталось |
+
+**Не проверено (остатки).**
+
+- Device-pass клиента (§5.4) и живой canary — только после выкладки сервера и с новой сборкой.
+- Прод-снимок — от 2026-10-11; если прод менялся, шаг 1 это покажет (DIFF ≠ 12) — тогда стоп.
+- Права ключа учётки `n8n Admin API` на проде (GET, POST create, activate, DELETE) на staging не проверить — там свой ключ; см. шаг 1.
+- F1 Tier 2 (T13, бродячие клоны: умершее исполнение между Create и Bind/Discard; двойной сбой Discard и журнала) — не делался.
+- Отвязка своей удалённой строки через прокси (`OWNER_OPS` → `Profile Owner`) — не делалась: остаток V12 (ii) (ложный liveness не
+  отвязывает живой профиль Wappi при удалении из приложения).
+- Остаток compat-окна (до блока, виден в T10): legacy-Create без токена по чужому профилю получает `profile_owned` только в Clone Plan,
+  а `Seed Reply Mode` / `Register Profile` / `Retire Same Bot Slot` успевают записать — закроется с `CR_AUTH_COMPAT_UNTIL`.
+- Q1 — принятая цена (T11d): лишняя передача на новый вопрос после ответа с неизвестной доставкой (u2 10/11), эхо клиентского
+  времени на `q1c_client_time_history_phone_repair` (5/8 против 1/8), одна утечка «Владелец:» на 534; остатки §4.4 плана
+  (относительные даты, цена владельца против каталога, дошедший unknown остаётся с пометкой, поздняя запись owner_app).
+
+**Тексты для владельца** (решение 2026-10-09: владелец видит тексты до выкладки; источник — `Assets/Scripts/Main/RetiredChannelCopy.cs`):
+
+- баннер в настройках — заголовок «Бот отключён»; тело: триал — «Пробный период закончился, и канал отключили. Настройки, прайс-листы и
+  переписка сохранены — после оплаты подключите канал снова.»; подписка — «Подписка закончилась, и канал отключили. …»; прочие
+  причины (НОВЫЙ текст) — «Канал отключили. Настройки, прайс-листы и переписка сохранены — после оплаты подключите канал снова.»;
+  кнопка «Выбрать тариф»;
+- строка канала — «Отключён · нажмите, чтобы подключить снова» + «Ранее: +7 …»;
+- капсула на карточке — «Подключить»;
+- пустое состояние чатов — «Бот отключён» / «Подключите канал снова в настройках бота»; кнопка «Открыть настройки» (НОВЫЙ текст);
+- ожидание сервера — «Подтверждаем оплату…» / «Оплата ещё не дошла до сервера. Попробуйте через минуту.»;
+- лист после покупки — заголовок «Подключите ботов снова»; текст «Тариф активен. Настройки, прайс-листы и переписка на месте — осталось
+  заново подключить WhatsApp или Telegram.»; строки «{бот} · WhatsApp» / «{бот} · Telegram» с кнопкой «Подключить», внизу «Позже».

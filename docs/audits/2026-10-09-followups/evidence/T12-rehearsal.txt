@@ -1,0 +1,444 @@
+T12 — репетиция пакета выкладки блока F1 + F2 + Q1 B + V6-unknown + V3 на staging (2026-10-12)
+
+Только staging: n8n 2.36.7 http://localhost:5678, Postgres pg.sh (5433), Wappi-мок 127.0.0.1:8765; миграции — ещё и на
+отдельном одноразовом кластере (порт 5434, scratchpad). Прод не трогался: ни одного запроса к n8n.choosereply.com, ssh нет.
+Инструменты те же, что пойдут на прод: deploy-canonical.py (с производным каноном для local-базы, T12), update-clones.py,
+verify-deployed.py; SQL — файлы M1/M2/M3 как есть.
+
+Канон «после» = рабочее дерево на HEAD 196158b7 + правка комментария LINE_RETIRE_SQL (T12) — тот, что коммитит T12.
+Канон «до» = 92a7caa2: офлайн-сверка ниже (§A) показывает, что его графы совпадают с прод-снимком 2026-10-11 27/27.
+
+=== §A. Офлайн: канон 92a7caa2 против прод-снимка docs/audits/2026-10-11-prod-after.json; ожидаемый список выкладки ===
+prod snapshot https://n8n.choosereply.com 2026-10-11 (after): 27 canonical rows, statuses ['OK']
+canon at 92a7caa2 vs prod snapshot (graph_hash_live): 27 equal, 0 differ
+expected deploy list (worktree graph != 92a7caa2 graph): 12
+  2htWSV5IHO8E2CgB-Dashboard_Outcomes.json  421dbd3636d3 -> b806209a2090
+  3qax5J9u2qsT9Vao-Edit_Whatsapp_Workflow.json  b83dace5f01d -> 8ab351d929dc
+  4VN3gsFaC2HUYmcc-Telegram_Bot.json  0f5ba39dbf3f -> f22a7b12c69f
+  4wYitz5ek30SVNlT-WhatsApp_Bot.json  669930389c9d -> 013bce231127
+  TwWPW3gIyjZS3foR-Edit_Telegram_Workflow.json  904ec239eae1 -> 8b303813c409
+  Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json  8d830aa3f96b -> dc998bb20675
+  XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json  8fcd3e53ebee -> 7668910d8a58
+  crAuthSession001-Auth_Session.json  d9a4cb587384 -> 32ddd28b0ec6
+  crHandoffNtfy001-Handoff_Notifier.json  d1b693e6c4e2 -> 80eebf0b71f8
+  crWappiProxy0001-Wappi_Proxy.json  4deee00842af -> 4d33d4562193
+  fXYpCXPKw92EzRz8-Profile_Lifecycle_Sweep.json  a2f65ef06e58 -> 40608f7baab5
+  lmjYsdNcQA2IE5rl-Delete_Bot_Files.json  487da5a4894c -> 80d4b7a7e31e
+
+=== §B. Миграции M1 → M2 → M3 на СВЕЖЕМ кластере (pg.sh init: сначала все миграции прода, затем M1, M2, M3), пост-проверки, M3 на строках старых писателей, повтор (идемпотентность), обратный оператор M3 ===
+### pg.sh init on a FRESH throwaway cluster (port 5434): every migration in order — prod's set, then M1, M2, M3
+initdb done -> /private/tmp/claude-501/-Users-ayan-Projects-Automation/63dfeb94-c402-4db4-8e4d-4a4c6a378652/scratchpad/pgdata-t12
+waiting for server to start.... done
+server started
+database choosereply_staging created (owner n8n_staging — the n8n credential user, table owner like prod)
+apply 2026-08-21-billing-schema.sql
+apply 2026-08-21-billing-rls.sql
+apply 2026-08-21-bot-key.sql
+apply 2026-08-21-deleted-reason.sql
+apply 2026-08-22-product-id.sql
+apply 2026-08-26-suggestion-counts.sql
+apply 2026-08-27-landing-leads.sql
+apply 2026-07-19-reply-mode-flags.sql
+apply 2026-07-07-conversation-outcomes.sql
+apply 2026-09-17-auth-installs.sql
+apply 2026-09-17-reply-mode-version.sql
+apply 2026-09-17-reply-events.sql
+psql:/Users/ayan/Projects/Automation/Tools/n8n/sql/2026-09-17-reply-events.sql:12: NOTICE:  relation "n8n_chat_histories" already exists, skipping
+apply 2026-09-17-history-handoff.sql
+apply 2026-09-17-suggestion-request-keys.sql
+apply 2026-09-22-test-dialog.sql
+apply 2026-09-27-claim-pairing.sql
+apply 2026-09-27-billing-bindings.sql
+apply 2026-09-27-reply-order.sql
+apply 2026-10-07-claim-code-attempts.sql
+apply 2026-10-07-retired-clone-deactivate.sql
+apply 2026-10-11-billing-conflicts.sql
+apply 2026-10-11-bot-lineage.sql
+apply 2026-10-12-memory-marks-backfill.sql
+apply staging 2026-09-17-documents-stub.sql
+migrations applied to choosereply_staging@127.0.0.1:5434
+init rc=0
+
+### post-checks M1 (expect t | 6 | billing_conflicts_last_seen_idx,billing_conflicts_pkey)
+t
+6
+billing_conflicts_last_seen_idx,billing_conflicts_pkey
+### post-checks M2 (expect 2 | t | 9 | bot_profiles_lineage_idx,clone_retirements_open)
+2
+t
+9
+bot_profiles_lineage_idx,clone_retirements_open
+
+### M3 on rows written by the PRE-T6 writers (synthetic rows in the shape the old Record Owner Send / Record Outgoing / Record Send left)
+before M3 (id | type | source/delivery | content):
+1 | human | - | Во сколько завтра?
+2 | ai | owner_app | Завтра в 15:00, спросите Марину.
+3 | ai | owner_phone | Да, в 15:00.
+4 | ai | unknown | Фильтр 90915-YZZE1 — 3200 тг.
+5 | ai | sent | Обычный ответ бота.
+6 | ai | - | Ответ узла памяти без пометок.
+M3 rc=0
+after M3:
+1 | human | - | Во сколько завтра?
+2 | ai | owner_app | Владелец: Завтра в 15:00, спросите Марину.
+3 | ai | owner_phone | Владелец: Да, в 15:00.
+4 | ai | unknown | [доставка не подтверждена] Фильтр 90915-YZZE1 — 3200 тг.
+5 | ai | sent | Обычный ответ бота.
+6 | ai | - | Ответ узла памяти без пометок.
+M3 post-checks (expect 0 and 0):
+0
+0
+
+### second pass: pg.sh migrate again (M1, M2, M3 idempotent: no error, no double mark)
+apply staging 2026-09-17-documents-stub.sql
+psql:/Users/ayan/Projects/Automation/Tools/n8n/staging/sql/2026-09-17-documents-stub.sql:12: NOTICE:  relation "documents" already exists, skipping
+psql:/Users/ayan/Projects/Automation/Tools/n8n/staging/sql/2026-09-17-documents-stub.sql:13: NOTICE:  relation "documents_metadata_idx" already exists, skipping
+migrations applied to choosereply_staging@127.0.0.1:5434
+migrate rc=0
+1 | human | - | Во сколько завтра?
+2 | ai | owner_app | Владелец: Завтра в 15:00, спросите Марину.
+3 | ai | owner_phone | Владелец: Да, в 15:00.
+4 | ai | unknown | [доставка не подтверждена] Фильтр 90915-YZZE1 — 3200 тг.
+5 | ai | sent | Обычный ответ бота.
+6 | ai | - | Ответ узла памяти без пометок.
+
+### rollback rehearsal: M3's commented reverse operator restores the pre-M3 content byte for byte
+reverse rc=0
+1 | human | - | Во сколько завтра?
+2 | ai | owner_app | Завтра в 15:00, спросите Марину.
+3 | ai | owner_phone | Да, в 15:00.
+4 | ai | unknown | Фильтр 90915-YZZE1 — 3200 тг.
+5 | ai | sent | Обычный ответ бота.
+6 | ai | - | Ответ узла памяти без пометок.
+reverse == before M3: IDENTICAL
+
+=== §C. Выкладка workflow на staging из прод-состояния, шаги пакета 3–11, e2e на развёрнутом стенде, возврат ===
+### W0. staging = the PROD state: bootstrap from the canon at 92a7caa2 (= prod 2026-10-11, graph hashes 27/27) with bot clones Create-composed (education) at the same ref
+2026-10-12T14:27:38Z
+   Deactivating workflow "Price List Search".
+   Deactivating workflow "Test Dialog".
+   Deactivating workflow "Wappi Proxy".
+   Deactivating workflow "Profile Lifecycle Sweep".
+   Deactivating workflow "Landing Lead".
+   Deactivating workflow "Get Usage".
+   Deactivating workflow "Delete Bot Files".
+   Deactivating workflow "Support Message".
+   Deactivating workflow "STAGING Eval Runner".
+   Deactivating workflow "STAGING TG stgtg001".
+   Deactivating workflow "STAGING WA stgwa001".
+   Successfully imported 30 workflows.
+5. imported 28 workflows + 2 staging bots; published 28
+2. server up at http://localhost:5678 (pid 1534, log /Users/ayan/.n8n-staging/n8n.log)
+staging ready: http://localhost:5678
+bootstrap rc=0
+
+### W1. snapshot «до» (verify-deployed против рабочего канона): ждём 12 DIFF блока, клоны BEHIND, головы PROMPT-BEHIND
+base http://localhost:5678: canonical 27 (diff 12), clones 2 (behind template 2, of them prompt head behind 2; custom prompts 0, not counted), archived clones 0 (not counted), other 2
+  prompt map = Create/Edit Vertical Prompt as introduced in f0cfc6d6 (sha256 19da68c07367)
+  DIFF    2htWSV5IHO8E2CgB 2htWSV5IHO8E2CgB-Dashboard_Outcomes.json  active=True names=True graph=False published=False  (stored graph differs; PUBLISHED graph differs)
+  DIFF    3qax5J9u2qsT9Vao 3qax5J9u2qsT9Vao-Edit_Whatsapp_Workflow.json  active=True names=True graph=False published=False  (stored graph differs; PUBLISHED graph differs)
+  DIFF    4VN3gsFaC2HUYmcc 4VN3gsFaC2HUYmcc-Telegram_Bot.json  active=False names=True graph=False published=None  (stored graph differs)
+  DIFF    4wYitz5ek30SVNlT 4wYitz5ek30SVNlT-WhatsApp_Bot.json  active=False names=True graph=False published=None  (stored graph differs)
+  DIFF    TwWPW3gIyjZS3foR TwWPW3gIyjZS3foR-Edit_Telegram_Workflow.json  active=True names=True graph=False published=False  (stored graph differs; PUBLISHED graph differs)
+  DIFF    Uz6HBBUpAiUqVysB Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json  active=True names=False graph=False published=False  (node set differs; stored graph differs; PUBLISHED graph differs)
+  DIFF    XuvOp7TxOImOAmlj XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json  active=True names=False graph=False published=False  (node set differs; stored graph differs; PUBLISHED graph differs)
+  DIFF    crAuthSession001 crAuthSession001-Auth_Session.json  active=True names=False graph=False published=False  (node set differs; stored graph differs; PUBLISHED graph differs)
+  DIFF    crHandoffNtfy001 crHandoffNtfy001-Handoff_Notifier.json  active=True names=True graph=False published=False  (stored graph differs; PUBLISHED graph differs)
+  DIFF    crWappiProxy0001 crWappiProxy0001-Wappi_Proxy.json  active=True names=True graph=False published=False  (stored graph differs; PUBLISHED graph differs)
+  DIFF    fXYpCXPKw92EzRz8 fXYpCXPKw92EzRz8-Profile_Lifecycle_Sweep.json  active=True names=False graph=False published=False  (node set differs; stored graph differs; PUBLISHED graph differs)
+  DIFF    lmjYsdNcQA2IE5rl lmjYsdNcQA2IE5rl-Delete_Bot_Files.json  active=True names=True graph=False published=False  (stored graph differs; PUBLISHED graph differs)
+  clone   stgtg40da979c774 'STAGING TG stgtg001' [telegram] active=True nodes=60 graph=898aeda200bb published=898aeda200bb sticky=None BEHIND PROMPT-BEHIND (education, head of d7796c32)  prompt=behind/education (label 'Образование', the app labels education 'Учебный центр' — informational, the head decides)
+  clone   stgwab77f282533c 'STAGING WA stgwa001' [whatsapp] active=True nodes=60 graph=d850bc30efb0 published=d850bc30efb0 sticky=None BEHIND PROMPT-BEHIND (education, head of d7796c32)  prompt=behind/education (label 'Образование', the app labels education 'Учебный центр' — informational, the head decides)
+wrote /private/tmp/claude-501/-Users-ayan-Projects-Automation/63dfeb94-c402-4db4-8e4d-4a4c6a378652/scratchpad/stg-before.json
+verify-deployed rc=2
+
+### W2. deploy-canonical.py dry-run против staging (инструмент с производным каноном T12): ждём ровно 12 workflow блока
+~ 2htWSV5IHO8E2CgB 'Dashboard Outcomes' active=True nodes 16 → 16 (+0 -0)
+    rollback pointer: versionId cbdbf45b-0370-405a-9a6e-3ad30065cf29 (activeVersionId cbdbf45b-0370-405a-9a6e-3ad30065cf29)
+~ 3qax5J9u2qsT9Vao 'Edit Whatsapp Workflow' active=True nodes 9 → 9 (+0 -0)
+    rollback pointer: versionId 32330d8f-d4ec-4f08-9d0b-6ef9ae8d10d3 (activeVersionId 32330d8f-d4ec-4f08-9d0b-6ef9ae8d10d3)
+~ 4VN3gsFaC2HUYmcc 'Telegram Bot' active=False nodes 60 → 60 (+0 -0)
+    rollback pointer: versionId e072ec63-d541-4dfc-bbb5-6f63adbd4c80 (activeVersionId None)
+~ 4wYitz5ek30SVNlT 'WhatsApp Bot' active=False nodes 60 → 60 (+0 -0)
+    rollback pointer: versionId d4f91559-d9cd-45b5-b521-963994e087e6 (activeVersionId None)
+~ TwWPW3gIyjZS3foR 'Edit Telegram Workflow' active=True nodes 9 → 9 (+0 -0)
+    rollback pointer: versionId b484ead7-7a17-406f-aab8-a11aa3b1ccef (activeVersionId b484ead7-7a17-406f-aab8-a11aa3b1ccef)
+~ Uz6HBBUpAiUqVysB 'CreateTelegramWorkflow' active=True nodes 28 → 52 (+25 -1)
+    rollback pointer: versionId b3a3682a-4574-4b76-a6ce-94dee2df0adc (activeVersionId b3a3682a-4574-4b76-a6ce-94dee2df0adc)
+~ XuvOp7TxOImOAmlj 'CreateWhatsappWorkflow' active=True nodes 28 → 52 (+25 -1)
+    rollback pointer: versionId 849ed56b-11c6-412c-92db-e464f5364d0a (activeVersionId 849ed56b-11c6-412c-92db-e464f5364d0a)
+~ crAuthSession001 'Auth Session' active=True nodes 24 → 26 (+2 -0)
+    rollback pointer: versionId 547ffe48-f0a8-44dd-9c01-789ea5a9cafb (activeVersionId 547ffe48-f0a8-44dd-9c01-789ea5a9cafb)
+~ crHandoffNtfy001 'Handoff Notifier' active=True nodes 10 → 10 (+0 -0)
+    rollback pointer: versionId 90a62691-375d-4709-a781-75d47427e2d1 (activeVersionId 90a62691-375d-4709-a781-75d47427e2d1)
+~ crWappiProxy0001 'Wappi Proxy' active=True nodes 24 → 24 (+0 -0)
+    rollback pointer: versionId 1a4dcf79-9edf-4dc8-94ed-61275a09b8ae (activeVersionId 1a4dcf79-9edf-4dc8-94ed-61275a09b8ae)
+~ fXYpCXPKw92EzRz8 'Profile Lifecycle Sweep' active=True nodes 32 → 40 (+8 -0)
+    rollback pointer: versionId 57700a62-979d-4c78-8f4f-57c9fef92667 (activeVersionId 57700a62-979d-4c78-8f4f-57c9fef92667)
+~ lmjYsdNcQA2IE5rl 'Delete Bot Files' active=True nodes 19 → 19 (+0 -0)
+    rollback pointer: versionId 51c86c2d-d1d2-43f5-b38a-6201f3812087 (activeVersionId 51c86c2d-d1d2-43f5-b38a-6201f3812087)
+{"considered": 25, "missing": 0, "up_to_date": 13, "would_update": 12, "updated": 0, "would_publish": 0, "republished": 0, "inactive_must_run": 0, "failed": 0}
+dry-run rc=0
+
+### W2b. до выкладки: в памяти staging — строки старых писателей (синтетика, сессия t12r-stg:chat1; для шага M3)
+ai | owner_app | Завтра в 15:00, спросите Марину.
+ai | owner_phone | Да, в 15:00.
+ai | unknown | Фильтр 90915-YZZE1 — 3200 тг.
+ai | sent | Обычный ответ бота.
+
+### W3. выкладка в порядке пакета (§6 шаги 3–8), каждый шаг — deploy-canonical.py --only … --apply --yes с read-back
+
+### шаг 3: Auth Session (V3)
+14:31:06
+~ crAuthSession001 'Auth Session' active=True nodes 24 → 26 (+2 -0)
+    rollback pointer: versionId 547ffe48-f0a8-44dd-9c01-789ea5a9cafb (activeVersionId 547ffe48-f0a8-44dd-9c01-789ea5a9cafb)
+    published by the PUT (served version = the update) — no publish call, no deactivate window
+    read-back: ok
+{"considered": 1, "missing": 0, "up_to_date": 0, "would_update": 0, "updated": 1, "would_publish": 0, "republished": 0, "inactive_must_run": 0, "failed": 0}
+rc=0
+
+### шаг 4: Dashboard Outcomes (снятие пометок раньше писателей)
+14:31:08
+~ 2htWSV5IHO8E2CgB 'Dashboard Outcomes' active=True nodes 16 → 16 (+0 -0)
+    rollback pointer: versionId cbdbf45b-0370-405a-9a6e-3ad30065cf29 (activeVersionId cbdbf45b-0370-405a-9a6e-3ad30065cf29)
+    published by the PUT (served version = the update) — no publish call, no deactivate window
+    read-back: ok
+{"considered": 1, "missing": 0, "up_to_date": 0, "would_update": 0, "updated": 1, "would_publish": 0, "republished": 0, "inactive_must_run": 0, "failed": 0}
+rc=0
+
+### шаг 5: Profile Lifecycle Sweep (ветка A, retirementsDryRun=true) + Handoff Notifier (T7)
+14:31:09
+~ crHandoffNtfy001 'Handoff Notifier' active=True nodes 10 → 10 (+0 -0)
+    rollback pointer: versionId 90a62691-375d-4709-a781-75d47427e2d1 (activeVersionId 90a62691-375d-4709-a781-75d47427e2d1)
+    published by the PUT (served version = the update) — no publish call, no deactivate window
+    read-back: ok
+~ fXYpCXPKw92EzRz8 'Profile Lifecycle Sweep' active=True nodes 32 → 40 (+8 -0)
+    rollback pointer: versionId 57700a62-979d-4c78-8f4f-57c9fef92667 (activeVersionId 57700a62-979d-4c78-8f4f-57c9fef92667)
+    published by the PUT (served version = the update) — no publish call, no deactivate window
+    read-back: ok
+{"considered": 2, "missing": 0, "up_to_date": 0, "would_update": 0, "updated": 2, "would_publish": 0, "republished": 0, "inactive_must_run": 0, "failed": 0}
+rc=0
+
+### шаг 6: Delete Bot Files (удаление по линии)
+14:31:09
+~ lmjYsdNcQA2IE5rl 'Delete Bot Files' active=True nodes 19 → 19 (+0 -0)
+    rollback pointer: versionId 51c86c2d-d1d2-43f5-b38a-6201f3812087 (activeVersionId 51c86c2d-d1d2-43f5-b38a-6201f3812087)
+    published by the PUT (served version = the update) — no publish call, no deactivate window
+    read-back: ok
+{"considered": 1, "missing": 0, "up_to_date": 0, "would_update": 0, "updated": 1, "would_publish": 0, "republished": 0, "inactive_must_run": 0, "failed": 0}
+rc=0
+
+### шаг 7: Create WA/TG + Edit WA/TG (__HDR_CRED__ привязывается)
+14:31:10
+~ 3qax5J9u2qsT9Vao 'Edit Whatsapp Workflow' active=True nodes 9 → 9 (+0 -0)
+    rollback pointer: versionId 32330d8f-d4ec-4f08-9d0b-6ef9ae8d10d3 (activeVersionId 32330d8f-d4ec-4f08-9d0b-6ef9ae8d10d3)
+    published by the PUT (served version = the update) — no publish call, no deactivate window
+    read-back: ok
+~ TwWPW3gIyjZS3foR 'Edit Telegram Workflow' active=True nodes 9 → 9 (+0 -0)
+    rollback pointer: versionId b484ead7-7a17-406f-aab8-a11aa3b1ccef (activeVersionId b484ead7-7a17-406f-aab8-a11aa3b1ccef)
+    published by the PUT (served version = the update) — no publish call, no deactivate window
+    read-back: ok
+~ Uz6HBBUpAiUqVysB 'CreateTelegramWorkflow' active=True nodes 28 → 52 (+25 -1)
+    rollback pointer: versionId b3a3682a-4574-4b76-a6ce-94dee2df0adc (activeVersionId b3a3682a-4574-4b76-a6ce-94dee2df0adc)
+    published by the PUT (served version = the update) — no publish call, no deactivate window
+    read-back: ok
+~ XuvOp7TxOImOAmlj 'CreateWhatsappWorkflow' active=True nodes 28 → 52 (+25 -1)
+    rollback pointer: versionId 849ed56b-11c6-412c-92db-e464f5364d0a (activeVersionId 849ed56b-11c6-412c-92db-e464f5364d0a)
+    published by the PUT (served version = the update) — no publish call, no deactivate window
+    read-back: ok
+{"considered": 4, "missing": 0, "up_to_date": 0, "would_update": 0, "updated": 4, "would_publish": 0, "republished": 0, "inactive_must_run": 0, "failed": 0}
+rc=0
+
+### шаг 8: Wappi Proxy + шаблоны WA/TG
+14:31:11
+~ 4VN3gsFaC2HUYmcc 'Telegram Bot' active=False nodes 60 → 60 (+0 -0)
+    rollback pointer: versionId e072ec63-d541-4dfc-bbb5-6f63adbd4c80 (activeVersionId None)
+    read-back: ok
+~ 4wYitz5ek30SVNlT 'WhatsApp Bot' active=False nodes 60 → 60 (+0 -0)
+    rollback pointer: versionId d4f91559-d9cd-45b5-b521-963994e087e6 (activeVersionId None)
+    read-back: ok
+~ crWappiProxy0001 'Wappi Proxy' active=True nodes 24 → 24 (+0 -0)
+    rollback pointer: versionId 1a4dcf79-9edf-4dc8-94ed-61275a09b8ae (activeVersionId 1a4dcf79-9edf-4dc8-94ed-61275a09b8ae)
+    published by the PUT (served version = the update) — no publish call, no deactivate window
+    read-back: ok
+{"considered": 3, "missing": 0, "up_to_date": 0, "would_update": 0, "updated": 3, "would_publish": 0, "republished": 0, "inactive_must_run": 0, "failed": 0}
+rc=0
+
+### W4. после шагов 3–8: verify-deployed — канон 27 без отличий, клоны BEHIND + PROMPT-BEHIND (ждут update-clones)
+base http://localhost:5678: canonical 27 (diff 0), clones 2 (behind template 2, of them prompt head behind 2; custom prompts 0, not counted), archived clones 0 (not counted), other 2
+  prompt map = Create/Edit Vertical Prompt as introduced in f0cfc6d6 (sha256 19da68c07367)
+  clone   stgtg40da979c774 'STAGING TG stgtg001' [telegram] active=True nodes=60 graph=898aeda200bb published=898aeda200bb sticky=None BEHIND PROMPT-BEHIND (education, head of d7796c32)  prompt=behind/education (label 'Образование', the app labels education 'Учебный центр' — informational, the head decides)
+  clone   stgwab77f282533c 'STAGING WA stgwa001' [whatsapp] active=True nodes=60 graph=d850bc30efb0 published=d850bc30efb0 sticky=None BEHIND PROMPT-BEHIND (education, head of d7796c32)  prompt=behind/education (label 'Образование', the app labels education 'Учебный центр' — informational, the head decides)
+verify-deployed rc=2
+
+### W5. шаг 9: update-clones.py — инвентарь инструмента и dry-run
+base http://localhost:5678 · mode dry-run · template stamps {'whatsapp': 'b1a6f7240ad6', 'telegram': '1381faffd630'}
+prompt map applied: Create/Edit Vertical Prompt as introduced in f0cfc6d6 (sha256 19da68c07367) — deploy the matching Create/Edit BEFORE this run, or the next owner save would put an older head back
+~ stgtg40da979c774 'STAGING TG stgtg001' [telegram] active=True → +0 -0 ~5 conn=same
+    add: []
+    remove: []
+    change: ['AI Agent', 'Final Check', 'Record Outgoing', 'Record Send', 'Stamp Draft']
+    prompt: education head behind (head of d7796c32) → refreshed to today's map (12859→13403 chars), owner tail 484 chars kept
+    label 'Образование' is not the app's label for education ('Учебный центр') — informational, the head's content decides
+    keep: path='stgtg001' label line + owner tail, creds=['httpHeaderAuth', 'openAiApi', 'postgres']
+~ stgwab77f282533c 'STAGING WA stgwa001' [whatsapp] active=True → +0 -0 ~5 conn=same
+    add: []
+    remove: []
+    change: ['AI Agent', 'Final Check', 'Record Outgoing', 'Record Send', 'Stamp Draft']
+    prompt: education head behind (head of d7796c32) → refreshed to today's map (12859→13403 chars), owner tail 484 chars kept
+    label 'Образование' is not the app's label for education ('Учебный центр') — informational, the head's content decides
+    keep: path='stgwa001' label line + owner tail, creds=['httpHeaderAuth', 'openAiApi', 'postgres']
+{"clones": 2, "up_to_date": 0, "would_update": 2, "updated": 0, "failed": 0}
+dry-run rc=0
+
+### W5b. update-clones.py --apply --yes
+    rollback pointer: versionId f78fff0f-be76-4fbd-a118-659442ee609e (activeVersionId f78fff0f-be76-4fbd-a118-659442ee609e) before the update
+    published by the PUT (served version = the update) — no deactivate/activate window
+    read-back: ok
+~ stgwab77f282533c 'STAGING WA stgwa001' [whatsapp] active=True → +0 -0 ~5 conn=same
+    add: []
+    remove: []
+    change: ['AI Agent', 'Final Check', 'Record Outgoing', 'Record Send', 'Stamp Draft']
+    prompt: education head behind (head of d7796c32) → refreshed to today's map (12859→13403 chars), owner tail 484 chars kept
+    label 'Образование' is not the app's label for education ('Учебный центр') — informational, the head's content decides
+    keep: path='stgwa001' label line + owner tail, creds=['httpHeaderAuth', 'openAiApi', 'postgres']
+    rollback pointer: versionId bfeea3b8-e578-4293-b7c3-a43bc8160f57 (activeVersionId bfeea3b8-e578-4293-b7c3-a43bc8160f57) before the update
+    published by the PUT (served version = the update) — no deactivate/activate window
+    read-back: ok
+{"clones": 2, "up_to_date": 0, "would_update": 0, "updated": 2, "failed": 0}
+apply rc=0
+
+### W5c. повтор update-clones.py (dry-run): ждём no-op
+prompt map applied: Create/Edit Vertical Prompt as introduced in f0cfc6d6 (sha256 19da68c07367) — deploy the matching Create/Edit BEFORE this run, or the next owner save would put an older head back
+= stgtg40da979c774 'STAGING TG stgtg001' [telegram] up to date (1381faffd630, graph-verified, prompt at_canonical/education)
+= stgwab77f282533c 'STAGING WA stgwa001' [whatsapp] up to date (b1a6f7240ad6, graph-verified, prompt at_canonical/education)
+{"clones": 2, "up_to_date": 2, "would_update": 0, "updated": 0, "failed": 0}
+rerun rc=0
+
+### W6. шаг 11 (read-back): verify-deployed — ждём exit 0
+base http://localhost:5678: canonical 27 (diff 0), clones 2 (behind template 0, of them prompt head behind 0; custom prompts 0, not counted), archived clones 0 (not counted), other 2
+  prompt map = Create/Edit Vertical Prompt as introduced in f0cfc6d6 (sha256 19da68c07367)
+  clone   stgtg40da979c774 'STAGING TG stgtg001' [telegram] active=True nodes=60 graph=1381faffd630 published=1381faffd630 sticky=1381faffd630 AT-CANONICAL  prompt=at_canonical/education (label 'Образование', the app labels education 'Учебный центр' — informational, the head decides)
+  clone   stgwab77f282533c 'STAGING WA stgwa001' [whatsapp] active=True nodes=60 graph=b1a6f7240ad6 published=b1a6f7240ad6 sticky=b1a6f7240ad6 AT-CANONICAL  prompt=at_canonical/education (label 'Образование', the app labels education 'Учебный центр' — informational, the head decides)
+wrote /private/tmp/claude-501/-Users-ayan-Projects-Automation/63dfeb94-c402-4db4-8e4d-4a4c6a378652/scratchpad/stg-after.json
+verify-deployed rc=0
+
+### W7. шаг 10: M3 после шаблонов, прокси и Dashboard (на staging, где M3 уже применялась — второй прогон обязан пометить только новые старые строки)
+M3 rc=0
+post-checks (expect 0 and 0):
+0
+0
+ai | owner_app | Владелец: Завтра в 15:00, спросите Марину.
+ai | owner_phone | Владелец: Да, в 15:00.
+ai | unknown | [доставка не подтверждена] Фильтр 90915-YZZE1 — 3200 тг.
+ai | sent | Обычный ответ бота.
+
+### W8. шаг 11, smoke без изменения данных (тот же набор, что 2026-10-11, + новые входы блока)
+WappiProxy без токена ->  HTTP 401 body {"success":false,"error":"unauthorized"} HTTP 401
+AuthSession nonsense ->  HTTP 400 body {"success":false,"error":"bad_request"} HTTP 400
+AuthSession claim.start без токена ->  HTTP 400 body {"success":false,"error":"bad_request"} HTTP 400
+SetWorkflowState на crPriceSearch001 ->  HTTP 400 body {"success":false,"error":"protected_workflow"} HTTP 400
+SupportMessage пустой ->  HTTP 400 body {"success":false,"error":"bad_request"} HTTP 400
+CreateWhatsappWorkflow с поддельным токеном ->  HTTP 200 body {"success":false,"error":"unauthorized","reason":"unauthorized:bad_signature"} HTTP 200
+CreateTelegramWorkflow с поддельным токеном ->  HTTP 200 body {"success":false,"error":"unauthorized","reason":"unauthorized:bad_signature"} HTTP 200
+DeleteBotFiles с поддельным токеном ->  HTTP 401 body {"success":false,"error":"unauthorized","reason":"unauthorized:bad_signature"} HTTP 401
+проверка: smoke ничего не создал —
+0
+{"status":"ok"}
+
+### W9. smoke e2e на РАЗВЁРНУТОМ (не импортированном) стенде: e2e-auth --no-llm полностью
+PASS  session_bootstrap_and_refresh (0.2s) — bootstrap mints an install; refresh with the secret returns a t
+PASS  session_bad_request_is_400 (0.2s) — a malformed AuthSession body answers 400, never a token
+PASS  proxy_requires_token (0.2s) — WappiProxy without / with a forged / with an expired token → 401 and N
+PASS  proxy_profile_add_binds_owner (0.8s) — profile.add creates the Wappi profile, binds it to the install 
+PASS  proxy_owner_isolation (0.8s) — owner B cannot read/act on owner A's profile through ANY proxy op (403,
+PASS  proxy_legit_ops_pass_through (0.4s) — the owner's own ops reach the transport with the server credenti
+PASS  proxy_unknown_op_rejected (0.1s) — an op outside the allow-list is refused without a transport call
+PASS  hooks_reject_foreign_ids (0.7s) — gated webhooks refuse owner B's ids on owner A's token (and refuse n
+PASS  claim_by_code_transfers_ownership (0.6s) — a legacy/other-install profile: claim.start sends a code to
+PASS  claim_reauth_then_code_binds (1.8s) — V2: an UNAUTHORISED legacy profile: claim.start → reauth; a pa
+PASS  claim_reauth_independent_reconnect_not_transferred (4.5s) — V2: the claimant requests a QR, the OWNER 
+PASS  claim_code_send_failure_is_reported (1.5s) — V2: a code the transport refuses is reported (502 code_se
+PASS  claim_reauth_owned_profile_not_transferred (2.5s) — R1: a stranger's pending claim on an OWNED profile
+PASS  claim_stale_capability_cannot_pair (1.2s) — R1: once another install takes over a pending claim, the f
+PASS  claim_unauthenticated_writes_nothing (1.0s) — R1: a claim.* call with a wrong secret is refused (401) 
+PASS  replymode_reordered_versions_keep_newest (0.7s) — SetReplyMode v2: a later request with an OLDER versi
+PASS  replymode_bot_default_covers_both_channels_atomically (0.7s) — SetReplyMode v2: a bot-default write fo
+PASS  replymode_legacy_body_still_writes (0.2s) — SetReplyMode v2: a legacy body (no version) is applied wit
+PASS  replymode_invalid_is_400 (0.0s) — SetReplyMode v2: a malformed body answers 400 (was 200 + success:fal
+PASS  create_seeds_reply_mode_before_activation (1.8s) — CreateWhatsappWorkflow with ReplyMode=semi: the '*'
+PASS  create_slot_count_excludes_own_profile_and_retires_refused (1.8s) — 2026-09-24 hotfix: on a 1-channel 
+PASS  refresh_db_outage_keeps_install (0.4s) — R11: a refresh while the database fails answers 503 db_unavai
+PASS  billing_id_first_bind (2.9s) — R2/V3: a second install naming a billing id another install holds — W
+PASS  create_rejects_empty_appuserid_in_session (0.9s) — R2: CreateWhatsappWorkflow/CreateTelegramWorkflow w
+PASS  create_seed_failure_keeps_clone_inactive (10.9s) — R8 + R8-deletefail: a «Вместе» create whose
+PASS  sql_comment_values_run_nothing (7.8s) — V1: a value whose newline would end an SQL comment stays a lit
+PASS  upload_price_list_multipart (13.9s) — R3: a real .txt price list sent the way WWWForm sends it passes 
+PASS  retired_bot_owner_can_delete (7.6s) — V12: the owner of a bot the sweep retired (trial over: its rows 
+PASS  claim_on_retired_profile_is_refused (5.5s) — M4: claim.start / claim.status / claim.verify on a bot pr
+PASS  stale_token_cannot_unlink_a_claimed_profile (3.8s) — V12 / M5: a token issued while install A owned a 
+PASS  sweep_deactivates_retired_clone (3.5s) — V12: the sweep's clone branch (the derived canonical nodes, r
+PASS  reauth_same_profile_reuses_bound_clone[wa] (2.3s) — F1 (a1): the channel saved off (SetWorkflowState d
+PASS  reauth_same_profile_reuses_bound_clone[tg] (2.3s) — F1 (a1): the channel saved off (SetWorkflowState d
+PASS  reuse_active_clone_skips_reactivation[wa] (3.6s) — F1 (a1) + platform: on n8n 2.36.7 activating an ACT
+PASS  reuse_active_clone_skips_reactivation[tg] (3.7s) — F1 (a1) + platform: on n8n 2.36.7 activating an ACT
+FAIL  reauth_new_profile_replaces_prior_and_moves_data[wa] (5.1s) — F1 (a2/a3) + F2: a NEW profile of the sa
+FAIL  reauth_new_profile_replaces_prior_and_moves_data[tg] (6.0s) — F1 (a2/a3) + F2: a NEW profile of the sa
+PASS  retired_bot_reconnects_after_purchase[wa] (10.9s) — F2: a bot the sweep retired (trial over: row trial
+PASS  retired_bot_reconnects_after_purchase[tg] (11.4s) — F2: a bot the sweep retired (trial over: row trial
+PASS  activation_conflict_discards_new_clone[wa] (3.0s) — F1 (б): an orphan workflow already serves the pro
+PASS  activation_conflict_discards_new_clone[tg] (3.0s) — F1 (б): an orphan workflow already serves the pro
+PASS  bind_failure_answers_no_id[wa] (6.2s) — F1 (б) / R8 trick: Bind Workflow Id fails on the real Postgre
+PASS  bind_failure_answers_no_id[tg] (6.1s) — F1 (б) / R8 trick: Bind Workflow Id fails on the real Postgre
+PASS  legacy_create_on_owned_profile_refused[wa] (2.7s) — F1 Q3: a token-less (legacy, compat window) Create
+PASS  legacy_create_on_owned_profile_refused[tg] (2.7s) — F1 Q3: a token-less (legacy, compat window) Create
+PASS  foreign_install_same_bot_key_untouched[wa] (6.3s) — F1 §1.3: install B names its own profile with the
+PASS  foreign_install_same_bot_key_untouched[tg] (6.3s) — F1 §1.3: install B names its own profile with the
+PASS  wizard_create_never_adopts[wa] (7.8s) — F1 + F2 §1.3: a wizard Create (CreateOrigin=start: a NEW bot 
+PASS  wizard_create_never_adopts[tg] (9.2s) — F1 + F2 §1.3: a wizard Create (CreateOrigin=start: a NEW bot 
+FAIL  bot_delete_wipes_lineage (19.7s) — F1 + F2 §1.6 (T5): a two-channel bot whose earlier profiles were l
+FAIL  sweep_removes_booked_clone (3.3s) — F1 §2.6 A (T5): the sweep's branch A on the real n8n — in canon
+PASS  billing_conflict_is_logged (7.2s) — V3 (T1): a refresh that answers billingConflict (a second install 
+48 pass, 4 fail
+rc=1
+4 FAIL — один и тот же шаг: проба ветки A читает производные узлы Sweep с ДИСКА (Tools/n8n/workflows-staging/), а там после bootstrap --canon-ref 92a7caa2 лежал старый набор (выкладка шла через API, диск не менялся). Функциональные проверки этих сценариев (перенос, бронь, 404 прежнего клона, удаление линии) прошли — см. полный вывод.
+
+### W9b. производный набор на диске пересобран из рабочего канона (derive-staging.py, БЕЗ импорта), 3 группы сценариев повторены
+n8n base http://localhost:5678; Wappi -> http://127.0.0.1:8765; postgres -> 'Postgres Staging' (stgPostgres000001)
+note: left dangling on purpose (isolation): ['Support Bot']
+PASS  reauth_new_profile_replaces_prior_and_moves_data[wa] (5.2s) — F1 (a2/a3) + F2: a NEW profile of the same bot (re
+PASS  reauth_new_profile_replaces_prior_and_moves_data[tg] (4.9s) — F1 (a2/a3) + F2: a NEW profile of the same bot (re
+2 pass, 0 fail
+PASS  bot_delete_wipes_lineage (15.5s) — F1 + F2 §1.6 (T5): a two-channel bot whose earlier profiles were left behind
+1 pass, 0 fail
+PASS  sweep_removes_booked_clone (5.5s) — F1 §2.6 A (T5): the sweep's branch A on the real n8n — in canon's dry run
+1 pass, 0 fail
+итог e2e-auth на развёрнутом стенде: 48 + 4 = 52/52 (без модели)
+
+### W10. модельный шаг retired_bot_reconnects_after_purchase (один прогон, WA + TG = 2 вызова модели; пункт пакета T10 «перед canary»)
+PASS  retired_bot_reconnects_after_purchase[wa] (43.7s) — F2: a bot the sweep retired (trial over: row trial_expiry, c
+PASS  retired_bot_reconnects_after_purchase[tg] (41.8s) — F2: a bot the sweep retired (trial over: row trial_expiry, c
+2 pass, 0 fail
+"llm": {"outcome": "sent", "price_tool_saw_row": true, "reply": "Букет «Нежность» — 18 500 ₸.\n\nПо времени в пятницу к 18:00 — пожелание зафиксировано, точное время доставки флорист подтвердит отдельно."}
+"llm": {"outcome": "sent", "price_tool_saw_row": true, "reply": "Букет «Нежность» — 18 500 ₸.\n\nПо времени в пятницу: вы просили к 18:00, точное время доставки флорист подтвердит при оформлении."}
+
+### W11. писатели пометок памяти на развёрнутом стенде (e2e-handoff, без модели)
+PASS  outgoing_phone_recorded[wa] (6s) — A6: a message the owner sent from the PHONE lands in the one history (owner_p
+PASS  outgoing_phone_recorded[tg] (5s) — A6: a message the owner sent from the PHONE lands in the one history (owner_p
+2 pass, 0 fail
+PASS  proxy_send_records_owner_app_row[wa] (6s) — A6: a message the owner sends from the APP (proxy) lands as owner_ap
+PASS  proxy_send_records_owner_app_row[tg] (6s) — A6: a message the owner sends from the APP (proxy) lands as owner_ap
+2 pass, 0 fail
+PASS  lost_send_settled_by_notifier (65s) — R9: a reply left send_pending > 10 min (its run died between the lease and
+1 pass, 0 fail
+
+### W12. возврат стенда в штатное состояние: bootstrap.py --bot wa:stgwa001 --bot tg:stgtg001 (рабочий канон, промпт шаблона)
+2026-10-12T14:44:34Z
+5. imported 28 workflows + 2 staging bots; published 28
+2. server up at http://localhost:5678 (pid 19805, log /Users/ayan/.n8n-staging/n8n.log)
+staging ready: http://localhost:5678
+base http://localhost:5678: canonical 27 (diff 0), clones 2 (behind template 0, of them prompt head behind 0; custom prompts 2, not counted), archived clones 0 (not counted), other 2
+  prompt map = Create/Edit Vertical Prompt as introduced in f0cfc6d6 (sha256 19da68c07367)
+  clone   stgtg40da979c774 'STAGING TG stgtg001' [telegram] active=True nodes=60 graph=1381faffd630 published=1381faffd630 sticky=None AT-CANONICAL  prompt=custom (custom prompt — kept verbatim by update-clones, not counted: no Create/Edit grammar (Business Type line + Additional Instructions marker))
+  clone   stgwab77f282533c 'STAGING WA stgwa001' [whatsapp] active=True nodes=60 graph=b1a6f7240ad6 published=b1a6f7240ad6 sticky=None AT-CANONICAL  prompt=custom (custom prompt — kept verbatim by update-clones, not counted: no Create/Edit grammar (Business Type line + Additional Instructions marker))
+verify-deployed rc=0

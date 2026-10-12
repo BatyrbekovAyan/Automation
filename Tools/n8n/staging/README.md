@@ -51,3 +51,19 @@ python3 Tools/n8n/verify-deployed.py --base http://localhost:5678               
 миграции на стенде остаются (они аддитивны, старый канон их не читает).
 Проверка изоляции: `grep -c 'wappi.pro\|n8n.choosereply.com' Tools/n8n/workflows-staging/*.json` → везде 0
 (derive-staging.py сам отказывает при любом остатке).
+
+## Репетиция выкладки из прод-состояния (F1F2-plan T12)
+```bash
+python3 Tools/n8n/staging/bootstrap.py --bot wa:stgwa001 --bot tg:stgtg001 --canon-ref <ref прода>   # стенд = прод
+#   (клоны с промптом Create по старой карте: vertical-bots.py --vertical <id> --prompts-ref <ref> --dry-run → bootstrap … --prompt-file)
+python3 Tools/n8n/verify-deployed.py --base http://localhost:5678            # DIFF = ровно пакет, клоны BEHIND
+python3 Tools/n8n/deploy-canonical.py --base http://localhost:5678           # dry-run: ровно пакет (производный канон, T12)
+python3 Tools/n8n/deploy-canonical.py --base http://localhost:5678 --only <id> --apply --yes   # по шагам пакета
+python3 Tools/n8n/update-clones.py --base http://localhost:5678 [--apply --yes]
+python3 Tools/n8n/staging/derive-staging.py --bot wa:stgwa001 --bot tg:stgtg001   # БЕЗ импорта: e2e читают производные узлы с диска
+python3 Tools/n8n/staging/bootstrap.py --bot wa:stgwa001 --bot tg:stgtg001        # вернуть рабочий канон → verify-deployed 0
+```
+`deploy-canonical.py` для local-базы выкладывает ПРОИЗВОДНЫЙ канон (адреса → localhost/мок, учётки по имени, писатели Supabase
+выключены) и отказывает до первого запроса, если нет «Postgres Staging» или любой названной учётки. Всегда указывайте `--base`:
+по умолчанию инструмент смотрит на прод. Миграции — на отдельном одноразовом кластере: `STAGING_PGDATA=<scratch> STAGING_PGPORT=5434
+pg.sh init` (все миграции по порядку, затем `pg.sh migrate` ещё раз — идемпотентность), затем `pg.sh stop`.

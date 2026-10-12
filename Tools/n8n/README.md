@@ -376,6 +376,18 @@ All READ-ONLY against prod unless the flag says otherwise; every mutating path w
   active clone, and READS BACK (node set == canonical, path/prompt kept, `crTemplateVersion` stamp in a sticky note because
   `meta` is read-only on PUT, `activeVersionId == versionId`). Idempotent by stamp. Acceptance: `staging/e2e-clone-update.py`
   (an old 33-node clone → 57 nodes, replies once, ledger `sent`).
+- `deploy-canonical.py [--base …] [--only <id>]… [--apply --yes]` — PUT of EXISTING canonical workflows (new ones are imported
+  with `n8n import:workflow`; Set Workflow State / Support Message belong to `build-client-webhooks.py --update`). Dry-run by
+  default with the pre-update `versionId` as the rollback pointer; an active workflow is never switched off (D1/D1b: it reads
+  back whether its own PUT published, else publishes the saved version in place) and every PUT is read back (stored = served =
+  canon). Binds `__HDR_CRED__` to the live `n8n Admin API` credential and refuses unbound; refuses SQL that fails
+  `verify-sql-comments.py`. **The default base is PROD — always pass `--base`.** A local base (staging) is compared with and
+  given the DERIVED canon bootstrap.py imports (T12, 2026-10-12: `staging_canon` = derive-staging.py's own steps, refused when
+  «Postgres Staging» or a named credential is missing or a production host survives) — so a deploy package is rehearsed on
+  staging with this very tool: `staging/bootstrap.py --canon-ref <prod ref>` → dry-run (= exactly the package) → `--only …
+  --apply --yes` step by step → `update-clones.py` → `verify-deployed.py` 0 (then re-run `staging/derive-staging.py` before
+  e2e scenarios that read derived nodes from disk). Tests: `tests/test_deploy_canonical.py` (in-memory n8n 2.36.7 model; D1,
+  D1b and the STG cases). Rehearsal of the F1/F2 block: `docs/audits/2026-10-09-followups/evidence/T12-rehearsal.txt`.
 - `verify-deployed.py [--base …] [--json out]` — read-back of an instance vs the canonical exports: per canonical workflow
   OK/DIFF/MISSING (graph hash with identity blanked), `published_is_stored`, clone stamps, unknown workflows. Prod snapshot of
   2026-09-22: `docs/audits/2026-09-22-prod-readback.json` (20 DIFF, 5 MISSING, clones «13»/«15» behind — the deploy scope).
@@ -403,7 +415,9 @@ All READ-ONLY against prod unless the flag says otherwise; every mutating path w
   INTERLEAVED — every scenario's repeats spread over the whole run, round-robin over the scenarios, never N identical requests
   back to back (T11 found such repeats strongly correlated in time); the sides of a comparison run as ONE schedule
   (`--side NAME=REF`, or `--plan eval/plans/<name>.json` = blocks × sides → `<label>-<block>-<side>.json`), the sides of one
-  repeat back to back; `--workers N` parallel requests in that order; pinned by `eval/test_schedule.py`. Set v1.5:
+  repeat back to back; `--workers N` parallel requests in that order; pinned by `eval/test_schedule.py`. Plans:
+  `eval/plans/q1b2.json` (T11b), `eval/plans/q1b3.json` (T11c — the B arm on all Kazakh blocks, the u-scenarios, ws_* and the
+  echo scenarios); summaries `docs/audits/2026-10-09-followups/Q1-eval/t11report.py`, `q1b2report.py`, `q1b3report.py`. Set v1.5:
   `no_tool:create_handoff` on every auto scenario whose question the business data answers and whose design calls for no
   handoff — the classification (and the reason for every unchecked one) is pinned in `eval/test_checks.py`.
 
