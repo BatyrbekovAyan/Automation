@@ -63,6 +63,13 @@ def ai_marks(profile_id, chat):
     return [tuple(x.split(',')) for x in out.split(';') if x]
 
 
+def ai_contents(profile_id, chat):
+    """T6: the bot's own memory rows' CONTENT (what the model reads), in id order."""
+    out = psql(f"select coalesce(string_agg(message->>'content', E'\\x1f' order by id), '') from n8n_chat_histories "
+               f"where session_id = '{profile_id}:{chat}' and message->>'type' = 'ai' and (message->'additional_kwargs'->>'source') is null;")
+    return [x for x in out.split("\x1f") if x]
+
+
 def human_rows(profile_id, chat):
     return int(psql(f"select count(*) from n8n_chat_histories where session_id = '{profile_id}:{chat}' and message->>'type' = 'human';") or 0)
 
@@ -323,7 +330,7 @@ def send_timeout(ctx, ch):
     return ok, f"send_calls={len(b.all_send_calls())} settle={settle and settle.get('state')} outcome={ex[0]['outcome'] if ex else None} ledger={led}"
 
 
-@for_channels("dropped_without_echo_stays_send_unknown", "A7: the connection dies before the transport processed anything → no echo → the state STAYS send_unknown (visible in the ledger), no resend")
+@for_channels("dropped_without_echo_stays_send_unknown", "A7: the connection dies before the transport processed anything → no echo → the state STAYS send_unknown (visible in the ledger), no resend; T6: the memory row carries «[доставка не подтверждена] »")
 def dropped_no_echo(ctx, ch):
     b, mid, t = simple_trigger(ctx, ch, "nul")
     mock("POST", "/__mock/fault", {"match": "message/send", "mode": "drop"})
@@ -333,9 +340,11 @@ def dropped_no_echo(ctx, ch):
     rc = node_output(ex[0]["data"], "Reconcile Check") if ex else None
     ai = ai_rows(b.pid, b.chat)            # R7 decision: send_unknown KEEPS the reply in memory (usually it was delivered)
     marks = ai_marks(b.pid, b.chat)        # V6: … and the row SAYS so — stamped by this run, delivery unknown
+    texts = ai_contents(b.pid, b.chat)     # T6 (V6-unknown): … in the content the MODEL reads too — the undelivered mark, once
     ok = len(b.all_send_calls()) == 1 and ex and ex[0]["outcome"] == "send_unknown" and led.startswith("send_unknown|-|") and rc and rc.get("reconciled") is False \
-        and ai == 1 and marks == [("true", "unknown", "-")]
-    return ok, f"send_calls={len(b.all_send_calls())} outcome={ex[0]['outcome'] if ex else None} ledger={led} reconciled={rc and rc.get('reconciled')} ai_memory_rows={ai} ai_marks={marks}"
+        and ai == 1 and marks == [("true", "unknown", "-")] \
+        and len(texts) == 1 and texts[0].startswith("[доставка не подтверждена] ") and not texts[0][len("[доставка не подтверждена] "):].startswith("[доставка")
+    return ok, f"send_calls={len(b.all_send_calls())} outcome={ex[0]['outcome'] if ex else None} ledger={led} reconciled={rc and rc.get('reconciled')} ai_memory_rows={ai} ai_marks={marks} ai_contents={[t[:60] for t in texts]}"
 
 
 @for_channels("reordered_webhooks_one_reply", "R6: two client messages whose webhooks arrive in REVERSE order (the older one claimed last, inside the newer one's debounce) → exactly one reply, by the newer message's run")

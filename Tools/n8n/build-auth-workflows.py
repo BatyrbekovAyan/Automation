@@ -22,6 +22,18 @@ AUTH = os.path.join(HERE, "auth")
 PG_CRED = {"id": "vvRrFiEXzLVqKjOx", "name": "Postgres"}            # canonical executeQuery cred (parity verifier constant)
 WAPPI_CRED = {"id": "EuhhqAaV56DpoqAN", "name": "WappiAuthToken"}  # canonical, remapped by deployers / derive-staging
 
+# T6 (Q1 B, follow-ups 2026-10-11): the owner's app send enters the bot's memory as «Владелец: <text>» — the mark is
+# apply-history-handoff.py's constant (ONE place for the memory marks; verify-history-handoff.py pins the parity).
+def _history_handoff():
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("apply_history_handoff", os.path.join(HERE, "apply-history-handoff.py"))
+    m = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    return m
+
+
+OWNER_CONTENT_SQL = _history_handoff().OWNER_CONTENT_SQL
+
 SESSION_ID, SESSION_NAME = "crAuthSession001", "Auth Session"
 PROXY_ID, PROXY_NAME = "crWappiProxy0001", "Wappi Proxy"
 TOKEN_TTL_SEC = 12 * 3600
@@ -620,6 +632,8 @@ return [{ json: { ...body, token, expiresAt: exp, profiles: row.p || g.profiles 
 RECORD_OWNER_SEND_SQL = """-- A6 (stage 4): a message the OWNER sent from the app («Вместе» pick or a typed reply) is an
 -- owner_app row in the one history and an assistant-side turn in the agent's memory (marked by
 -- source, so a cancelled generation's cleanup never touches it). Runs AFTER the response.
+-- T6 (Q1 B): the memory content opens with the owner mark — the model sees role + content only, and without the
+-- mark the owner's agreement read as the bot's own earlier answer. The history keeps the text as sent.
 with ev as (
   insert into chat_history_events (profile_id, chat_id, message_id, source, body, msg_type, sent_at, execution_id)
   values ($1, $2, $3, 'owner_app', $4, $5, now(), $6)
@@ -627,11 +641,11 @@ with ev as (
   returning 1
 ), mem as (
   insert into n8n_chat_histories (session_id, message)
-  select $1 || ':' || $2, jsonb_build_object('type', 'ai', 'content', $4, 'additional_kwargs', jsonb_build_object('source', 'owner_app', 'message_id', $3), 'response_metadata', '{}'::jsonb)
+  select $1 || ':' || $2, jsonb_build_object('type', 'ai', 'content', __OWNER_CONTENT__, 'additional_kwargs', jsonb_build_object('source', 'owner_app', 'message_id', $3), 'response_metadata', '{}'::jsonb)
   where not exists (select 1 from n8n_chat_histories x where x.session_id = $1 || ':' || $2 and x.message->'additional_kwargs'->>'message_id' = $3)
   returning 1
 )
-select exists(select 1 from ev) as recorded, exists(select 1 from mem) as remembered;"""
+select exists(select 1 from ev) as recorded, exists(select 1 from mem) as remembered;""".replace("__OWNER_CONTENT__", OWNER_CONTENT_SQL % "$4")
 
 OWNER_SEND_PARAMS = """={{ (r => { const b = r.jsonBody || {}; const rec = String(b.recipient || ''); const chat = (r.channel === 'whatsapp' && rec && !rec.includes('@')) ? rec + '@c.us' : rec;
   const text = r.op === 'media.send' ? ('[' + String(r.kind || 'file') + ']' + (b.caption ? ' ' + String(b.caption) : '')) : String(b.body || '');

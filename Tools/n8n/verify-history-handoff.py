@@ -40,6 +40,25 @@ def _clone_lineage():
     return m
 
 
+def _tool(fname, modname):
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(modname, os.path.join(HERE, fname))
+    m = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    return m
+
+
+_HH = None
+
+
+def hh():
+    """apply-history-handoff.py — the ONE place of the memory marks (T6): every writer is pinned to its constants."""
+    global _HH
+    if _HH is None:
+        _HH = _tool("apply-history-handoff.py", "apply_history_handoff")
+    return _HH
+
+
 def node(wf, name):
     n = next((n for n in wf["nodes"] if n["name"] == name), None)
     check(n is not None, f"missing node {name!r}")
@@ -115,8 +134,19 @@ def verify_bot(f):
     q = node(wf, "Record Outgoing")["parameters"]["query"]
     for frag in ("'owner_phone'", "'outgoing_api'", "do nothing", "where exists (select 1 from ev where source = 'owner_phone')", NO_DOUBLE, "$2 not like '%@g.us'"):
         check(frag in q, f"{f}: Record Outgoing lacks {frag!r}")
+    # T6 (Q1 B): the owner's phone reply enters memory as «Владелец: <text>» — the model reads role + content only
+    check(hh().MEMORY_ROW % ("'ai'", hh().OWNER_CONTENT_SQL % "$4", "'owner_phone'", "$3") in q,
+          f"{f}: Record Outgoing must write the owner_phone memory row with the owner mark (T6 / Q1 B)")
+    check("'content', $4, 'additional_kwargs', jsonb_build_object('source', 'owner_phone'" not in q,
+          f"{f}: Record Outgoing writes the owner's text WITHOUT the mark (the model reads it as its own earlier answer, Q1)")
     q = node(wf, "Record Send")["parameters"]["query"]
     check("'ai'" in q and "do update set source = 'ai'" in q and "$4 = 'sent'" in q, f"{f}: Record Send must record the sent reply as an ai row (upgrading a webhook-first row)")
+    # T6 (V6-unknown): the row it marks unknown carries the undelivered mark (once); a late sent takes it off
+    check("      || jsonb_build_object('content', " + hh().RECORD_SEND_CONTENT_SQL + ")\n  where (message->'additional_kwargs'->>'execution_id') = $7" in q,
+          f"{f}: Record Send must put the undelivered mark on an unknown reply's memory row (once) and take it off on sent (T6)")
+    sd = node(wf, "Stamp Draft")["parameters"]["query"]
+    check("'{content}', to_jsonb(regexp_replace(message->>'content', " + hh().MARKS_LEAD_SQL + ", '')))" in sd,
+          f"{f}: Stamp Draft must cut a leading run of memory marks from the row it stamps (T6: the bot never stores a mark of its own)")
     q = node(wf, "Record Cancel")["parameters"]["query"]
     check("(message->'additional_kwargs'->>'source') is null" in q, f"{f}: Record Cancel must never drop owner rows")
     check("(message->'additional_kwargs'->>'source') is null" in node(wf, "Stamp Draft")["parameters"]["query"],
@@ -142,6 +172,9 @@ def verify_bot(f):
     check(wf["connections"]["Create Handoff"]["ai_tool"] == [[{"node": "AI Agent", "type": "ai_tool", "index": 0}]], f"{f}: tool not wired")
     sm = node(wf, "AI Agent")["parameters"]["options"]["systemMessage"]
     check("##create_handoff##" in sm and "ok:true" in sm, f"{f}: system prompt lacks the tool rule")
+    # T6: a bot with an empty / legacy business type carries THIS prompt (no _core.md) — the marks rule is its last block
+    check(sm.endswith(hh().MEMORY_MARKS_RULE) and sm.count("##memory_marks##") == 1,
+          f"{f}: the template prompt must end with exactly one ##memory_marks## block of the current text (T6)")
     print("OK ", f)
 
 
@@ -226,6 +259,9 @@ def verify_integrations():
         check(all(t in jb for t in ("incoming_message", "outgoing_message_phone", "outgoing_message_api")) and "delivery_status" not in jb, f"{f}: webhook types")
     d = load("2htWSV5IHO8E2CgB-Dashboard_Outcomes.json")
     check("'Владелец: '" in node(d, "Find Changed Sessions")["parameters"]["query"], "classifier transcript must label owner rows")
+    # T6: it labels by source, so it reads the content WITHOUT the memory marks (no «Владелец: Владелец:»)
+    fq = node(d, "Find Changed Sessions")["parameters"]["query"]
+    check(hh().CONTENT_NEW in fq and fq.count(hh().CONTENT_OLD) == 1, "classifier transcript must read the content without the memory marks (T6)")
     q = node(d, "Fetch Outcomes")["parameters"]["query"]
     for frag in ("FULL OUTER JOIN h", "'event' ELSE 'classifier' END AS source", "h.reason = 'order' THEN 'order_collected' ELSE 'owner_needed'", "r.status <> 'done'"):
         check(frag in q, f"Fetch Outcomes lacks {frag!r}")
@@ -249,6 +285,19 @@ def verify_integrations():
     check(px["connections"]["Respond"]["main"][0] == [{"node": "Owner Send?", "type": "main", "index": 0}], "proxy: the recorder must run AFTER the response")
     q = node(px, "Record Owner Send")["parameters"]["query"]
     check("'owner_app'" in q and MEM_MARK in q and NO_DOUBLE in q, "proxy: Record Owner Send must write an owner_app row + a marked memory row, no doubles")
+    # T6 (Q1 B): the SAME owner mark as the templates' Record Outgoing (parity: one constant in apply-history-handoff.py)
+    check("'content', " + hh().OWNER_CONTENT_SQL % "$4" + ", 'additional_kwargs', jsonb_build_object('source', 'owner_app'" in q,
+          "proxy: Record Owner Send must write the owner_app memory row with the owner mark of apply-history-handoff.py (T6)")
+    # T6: the one rule for both marks — the «Память» paragraph of _core.md (and so every vertical of the Create/Edit maps)
+    core = open(os.path.join(HERE, "prompts", "_core.md"), encoding="utf-8").read()
+    para = [l for l in core.splitlines() if l.startswith("Память.")]
+    check(len(para) == 1 and para[0].endswith(" " + hh().MEMORY_MARKS_TEXT), "prompts/_core.md: the «Память» paragraph must end with the memory-marks rule (T6)")
+    ip = _tool("inject-prompts.py", "inject_prompts")
+    for fname in ("XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json", "Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json",
+                  "3qax5J9u2qsT9Vao-Edit_Whatsapp_Workflow.json", "TwWPW3gIyjZS3foR-Edit_Telegram_Workflow.json"):
+        prompts = ip.prompts_of_workflow(load(fname)) or {}
+        check(set(prompts) == set(ip.VERTICALS) and all(p.count(hh().MEMORY_MARKS_TEXT) == 1 for p in prompts.values()),
+              f"{fname}: every vertical of the PROMPTS map must carry the memory-marks rule once (inject-prompts.py, T6)")
     print("OK  integrations (Create types / Dashboard / Delete / Set State / proxy)")
 
 

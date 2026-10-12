@@ -144,7 +144,7 @@ def for_channels(id_, title):
     return deco
 
 
-@for_channels("outgoing_phone_recorded", "A6: a message the owner sent from the PHONE lands in the one history (owner_phone) and in the agent's memory once, even when re-delivered")
+@for_channels("outgoing_phone_recorded", "A6: a message the owner sent from the PHONE lands in the one history (owner_phone) and in the agent's memory once, even when re-delivered; T6: the memory row opens with «Владелец: »")
 def outgoing_phone(ctx, ch):
     b = Bot(ctx, ch, "op")
     t = int(time.time())
@@ -155,7 +155,8 @@ def outgoing_phone(ctx, ch):
     b.mark()
     b.post(ev)
     ex2 = b.settle(1, 40)
-    ok = first[0] == "recorded_owner_phone" and first[1] == "owner_phone:Да, завтра в 15:00 ждём вас" and first[2] == "ai/owner_phone:Да, завтра в 15:00 ждём вас" \
+    # T6 (Q1 B): the history keeps the text as sent, the memory row opens with the owner mark (the model reads content only)
+    ok = first[0] == "recorded_owner_phone" and first[1] == "owner_phone:Да, завтра в 15:00 ждём вас" and first[2] == "ai/owner_phone:Владелец: Да, завтра в 15:00 ждём вас" \
         and ex2 and ex2[0]["outcome"] == "outgoing_known" and memory_count(b.pid, b.chat) == 1 and len(b.sends()) == 0
     return ok, f"first={first} redelivery={ex2[0]['outcome'] if ex2 else None} memory_rows={memory_count(b.pid, b.chat)}"
 
@@ -399,13 +400,14 @@ def dashboard(ctx):
     return ok, f"http={st} row={rows[0] if rows else None}"
 
 
-@scenario("proxy_send_records_owner_app_row", "A6: a message the owner sends from the APP (proxy) lands as owner_app in history and as a marked memory row, after the response")
+@scenario("proxy_send_records_owner_app_row", "A6: a message the owner sends from the APP (proxy) lands as owner_app in history and as a marked memory row, after the response; T6: the memory row opens with «Владелец: »")
 def proxy_send(ctx):
     b = Bot(ctx, "wa", "px")
     owner = owner_for(ctx, b)
     st, d = e2e_auth.proxy(owner.token, {"op": "message.send", "channel": "whatsapp", "profile_id": b.pid, "recipient": b.chat.replace("@c.us", ""), "body": "Спасибо, ждём вас"})
     time.sleep(4)
-    ok = st == 200 and d.get("status") == "done" and history(b.pid, b.chat) == "owner_app:Спасибо, ждём вас" and memory(b.pid, b.chat) == "ai/owner_app:Спасибо, ждём вас"
+    # T6 (Q1 B): the history keeps the text as sent, the memory row opens with the owner mark
+    ok = st == 200 and d.get("status") == "done" and history(b.pid, b.chat) == "owner_app:Спасибо, ждём вас" and memory(b.pid, b.chat) == "ai/owner_app:Владелец: Спасибо, ждём вас"
     return ok, f"http={st} body={d} history={history(b.pid, b.chat)} memory={memory(b.pid, b.chat)}"
 
 

@@ -16,6 +16,10 @@ Dashboard Outcomes: owner rows labelled «Владелец:» for the classifier
   events (source='event') that outrank the classifier (order → order_collected, else owner_needed).
 Delete Bot Files: wipes chat_history_events / handoff_requests / reply_events / chat_reply_state.
 Set Workflow State: the three handoff workflow ids are protected.
+T6 (Q1 B + V6-unknown, follow-ups 2026-10-11): the memory marks — owner rows open with «Владелец: » (Record Outgoing
+here, Record Owner Send in the Wappi Proxy), the bot's reply of unknown delivery with «[доставка не подтверждена] »
+(Record Send); Stamp Draft cuts a leading run of marks the model itself wrote; the «Сводка» transcript reads the
+content without them; the templates' own prompt ends with the ##memory_marks## rule (_core.md carries the same text).
 
     python3 Tools/n8n/apply-history-handoff.py          # patch in place (re-runnable)
     python3 Tools/n8n/apply-history-handoff.py --check
@@ -41,6 +45,53 @@ M = "$('Webhook').first().json.body.messages[0]"
 BODY_TEXT = "(['chat','text'].includes(String(m.type)) ? String(m.body || '').slice(0, 4000) : ('[' + String(m.type || 'media') + ']' + (m.caption ? ' ' + String(m.caption).slice(0, 1000) : '')))"
 
 MEMORY_ROW = "jsonb_build_object('type', %s, 'content', %s, 'additional_kwargs', jsonb_build_object('source', %s, 'message_id', %s), 'response_metadata', '{}'::jsonb)"
+
+# ---------------------------------------------------------------------------------------------- memory marks (T6)
+# Q1 B + V6-unknown (follow-ups 2026-10-11, F1F2-plan §4): the memory node hands the model ONLY role + content — the
+# rows' additional_kwargs (source, delivery) never reach it (independent review 2026-10-11, pipeline-delivery-context).
+# An owner's reply therefore read as the bot's OWN earlier answer, and a reply of unknown delivery as a delivered one.
+# The writers now put the fact INTO the content the model reads: «Владелец: » on owner rows (owner_app — the Wappi
+# Proxy's Record Owner Send, build-auth-workflows.py takes this very constant — and owner_phone — Record Outgoing),
+# «[доставка не подтверждена] » on the bot's reply whose delivery is unknown (Record Send; a lost run — the Handoff
+# Notifier, T7). The history (chat_history_events.body), source and delivery are unchanged: the marks live only in the
+# memory content. ONE place for the strings: the eval harness (run-eval.py) reads them from this file at a git ref.
+OWNER_MEMORY_PREFIX = "Владелец: "
+UNDELIVERED_MEMORY_PREFIX = "[доставка не подтверждена] "
+# A LEADING run of marks the model itself wrote (it copies what it sees in memory): Final Check strips it from the text
+# that goes to the client, Stamp Draft from the bot's own memory row — a made-up «Владелец: завтра в 15:00» must never
+# become a confirmed agreement on the next turn. One pattern for JavaScript (Final Check) and Postgres ARE (Stamp Draft,
+# the «Сводка» transcript): no `$` (pg-promise), no flags (the staging/prod collation cannot fold Cyrillic case), so the
+# capitalised and lower-case first letters are spelled out. Only the OPENING of the text: the word anywhere else, or a
+# mark on a later line, is the reply's own text.
+MEMORY_MARKS_LEAD_RE = r"^(\s*([Вв]ладелец\s*:|\[\s*[Дд]оставка не подтверждена\s*\]))+\s*"
+# The one rule the model gets for both marks (plan §4.3): appended to the «Память» paragraph of prompts/_core.md (the
+# Create/Edit vertical maps, inject-prompts.py) and, as the `##memory_marks##` block, to the templates' own prompt —
+# what a bot with an empty or legacy business type carries. verify-history-handoff.py pins both copies to this text.
+MEMORY_MARKS_TEXT = ("Реплики, которые начинаются с «Владелец:», написал сам владелец: названные в них день, время, место или человек — "
+                     "подтверждённая договорённость; клиент переспрашивает — повтори её как есть. Твой прежний ответ с пометкой "
+                     "«[доставка не подтверждена]» мог не дойти до клиента: не ссылайся на него как на уже прочитанный, а если клиент "
+                     "переспрашивает или пишет, что ответа не было, ответь заново по существу. Сами эти пометки в ответах не пиши.")
+MEMORY_MARKS_RULE = "\n\n##memory_marks##\n" + MEMORY_MARKS_TEXT
+
+
+def sql_text(s):
+    """A Python string as a standard SQL literal (standard_conforming_strings: a backslash is a plain character)."""
+    assert "$" not in s, "never a dollar sign in a Postgres node's literal (pg-promise formats the whole query text)"
+    return "'" + s.replace("'", "''") + "'"
+
+
+OWNER_CONTENT_SQL = sql_text(OWNER_MEMORY_PREFIX) + " || %s"          # owner rows: the mark + the text as sent
+MARKS_LEAD_SQL = sql_text(MEMORY_MARKS_LEAD_RE)
+_UNDELIVERED = sql_text(UNDELIVERED_MEMORY_PREFIX)
+_UNDELIVERED_LEN = len(UNDELIVERED_MEMORY_PREFIX)
+# Record Send's content for the row it marks: unknown → the mark, once (a repeated Record Send never doubles it);
+# sent → without it (a late real result after the R9 sweep marked the row unknown).
+RECORD_SEND_CONTENT_SQL = (
+    "case when $4 = 'sent'\n"
+    "             then case when left(coalesce(message->>'content', ''), " + str(_UNDELIVERED_LEN) + ") = " + _UNDELIVERED + "\n"
+    "                       then substr(message->>'content', " + str(_UNDELIVERED_LEN + 1) + ") else coalesce(message->>'content', '') end\n"
+    "             when left(coalesce(message->>'content', ''), " + str(_UNDELIVERED_LEN) + ") = " + _UNDELIVERED + " then message->>'content'\n"
+    "             else " + _UNDELIVERED + " || coalesce(message->>'content', '') end")
 
 # NEVER write a positional placeholder (dollar sign + digit) inside a SQL `--` comment of these statements: n8n's Postgres node
 # formats the query with pg-promise, which substitutes the placeholder THERE TOO — a multi-line reply text inlined into a
@@ -108,6 +159,8 @@ RECORD_OUTGOING_SQL = """-- A6: what the business side sent. outgoing_message_ph
 -- memory, so the bot knows the agreement); outgoing_message_api = fallback history row only — the
 -- AI's own sends (Record Send) and the app's sends (Wappi Proxy) upgrade it to their real source, and
 -- their memory rows are written by those writers, never here. Group chats are not recorded.
+-- T6 (Q1 B): the owner's memory row opens with the owner mark (the model sees role + content only); the history keeps
+-- the text as sent.
 with ev as (
   insert into chat_history_events (profile_id, chat_id, message_id, source, body, msg_type, sent_at, execution_id)
   select $1, $2, $3, case when $7 = 'outgoing_message_phone' then 'owner_phone' else 'outgoing_api' end, $4, $5, to_timestamp($6::bigint), $8
@@ -123,7 +176,7 @@ with ev as (
 )
 select case when exists (select 1 from ev) then 'recorded_' || (select source from ev limit 1)
             when $2 like '%@g.us' then 'ignored_group' else 'outgoing_known' end as outcome,
-       exists(select 1 from mem) as remembered;""".replace("__ROW__", MEMORY_ROW % ("'ai'", "$4", "'owner_phone'", "$3"))
+       exists(select 1 from mem) as remembered;""".replace("__ROW__", MEMORY_ROW % ("'ai'", OWNER_CONTENT_SQL % "$4", "'owner_phone'", "$3"))
 RECORD_OUTGOING_PARAMS = "={{ (m => [ m.profile_id, String(m.chatId || m.to || ''), String(m.id || ''), " + BODY_TEXT + ", String(m.type || ''), Number(m.time) || Math.floor(Date.now() / 1000), String(m.wh_type || ''), $execution.id ])(" + M + ") }}"
 
 RECORD_SEND_SQL = """-- A7: the event's final transport state and the lease release. send_unknown stays send_unknown —
@@ -133,6 +186,9 @@ RECORD_SEND_SQL = """-- A7: the event's final transport state and the lease rele
 -- «unknown» usually means «delivered, the answer got lost» (iteration decision 2026-09-27). Only the row Stamp
 -- Draft tied to THIS execution, never a row chosen by its text: another run's identical reply is not ours (V6,
 -- 2026-09-28). A run whose stamp did not happen touches nothing in memory. Nothing else is ever touched here.
+-- T6 (V6-unknown): delivery never reaches the model (it reads role + content), so a reply of unknown delivery also
+-- carries the undelivered mark at the start of its content — put once (a repeated Record Send never doubles it), taken
+-- off again when a late real result says sent. The history row (what the app shows) never carries it.
 with ev as (
   update reply_events set state = $4, transport_message_id = nullif($5, ''), error = nullif($6, ''), updated_at = now()
   where profile_id = $1 and chat_id = $2 and message_id = $3 returning 1
@@ -156,13 +212,15 @@ with ev as (
   update n8n_chat_histories
   set message = jsonb_set(message, '{additional_kwargs}', (message->'additional_kwargs')
         || jsonb_build_object('delivery', case when $4 = 'sent' then 'sent' else 'unknown' end, 'transport_message_id', nullif($5, '')))
+      || jsonb_build_object('content', __CONTENT__)
   where (message->'additional_kwargs'->>'execution_id') = $7
     and $4 <> 'send_failed' and session_id = $1 || ':' || $2 and id > $9::bigint and message->>'type' = 'ai'
     and (message->'additional_kwargs'->>'source') is null and jsonb_typeof(message->'additional_kwargs') = 'object'
   returning 1
 )
 select $4::text as outcome, nullif($5, '')::text as transport_message_id, exists(select 1 from ev) as recorded, exists(select 1 from rel) as released,
-       (select count(*) from mem)::int as dropped_ai_rows, (select count(*) from mark)::int as marked_ai_rows;"""
+       (select count(*) from mem)::int as dropped_ai_rows, (select count(*) from mark)::int as marked_ai_rows;""".replace(
+    "__CONTENT__", RECORD_SEND_CONTENT_SQL)
 RECORD_SEND_PARAMS_TAIL = (", $json.state, $json.transportMessageId, $json.error, $execution.id, $('Final Check').first().json.text, "
                            "$('Final Check').first().json.historyWatermark ] }}")
 
@@ -208,11 +266,16 @@ STAMP_DRAFT_SQL = """-- V6: tie the agent's memory row to THIS execution, right 
 -- holds right now is skipped (skip locked): the loser of a race takes the next matching row or none, never waits
 -- to overwrite. The update re-checks every condition on the row it writes, so a row stamped meanwhile is never
 -- stamped again.
+-- T6 (Q1 B + V6-unknown): the bot never keeps a memory mark of its own — a leading run of «Владелец:» /
+-- «[доставка не подтверждена]» the model wrote is cut from the row it stamps (Final Check cuts it from what is sent),
+-- or a made-up «Владелец: завтра в 15:00» would read as the owner's confirmed agreement on the next turn. The text is
+-- matched BEFORE the cut (the agent's output as written); everything later acts by the execution id.
 with draft as (
   update n8n_chat_histories
-  set message = jsonb_set(message, '{additional_kwargs}',
+  set message = jsonb_set(jsonb_set(message, '{additional_kwargs}',
         (case when jsonb_typeof(message->'additional_kwargs') = 'object' then message->'additional_kwargs' else '{}'::jsonb end)
-        || jsonb_build_object('execution_id', $4::text, 'event_id', $3::text, 'delivery', 'draft'))
+        || jsonb_build_object('execution_id', $4::text, 'event_id', $3::text, 'delivery', 'draft')),
+        '{content}', to_jsonb(regexp_replace(message->>'content', __MARKS__, '')))
   where id = (select id from n8n_chat_histories
               where session_id = $1 || ':' || $2 and id > $5::bigint and message->>'type' = 'ai'
                 and (message->'additional_kwargs'->>'source') is null
@@ -227,7 +290,7 @@ with draft as (
     and message->>'content' = $6
   returning id
 )
-select (select id from draft) as draft_row_id;"""
+select (select id from draft) as draft_row_id;""".replace("__MARKS__", MARKS_LEAD_SQL)
 STAMP_DRAFT_PARAMS = ("={{ (m => [ m.profile_id, m.from, m.id, $execution.id, Number($('Claim Event').first().json.history_watermark) || 0, "
                       "String($('AI Agent').first().json.output || '') ])(" + M + ") }}")
 
@@ -298,6 +361,16 @@ TOOL_DESCRIPTION = ("Передать заявку владельцу бизне
 
 def nid(*parts):
     return str(uuid.uuid5(uuid.NAMESPACE_URL, "history-handoff:" + ":".join(parts)))
+
+
+def with_memory_marks(sm):
+    """The template prompt with exactly one `##memory_marks##` block, the current text, at the very end."""
+    head = "\n\n##memory_marks##\n"
+    i = sm.find(head)
+    if i >= 0:
+        j = sm.find("\n\n##", i + len(head))
+        sm = sm[:i] + (sm[j:] if j >= 0 else "")
+    return sm.rstrip() + MEMORY_MARKS_RULE
 
 
 def node(wf, name):
@@ -405,6 +478,13 @@ def patch_bot(fname):
     if "##create_handoff##" not in sm:
         ai["parameters"]["options"]["systemMessage"] = sm.rstrip() + TOOL_RULE
         ch = True
+    # T6: the memory-marks rule for a bot that carries the TEMPLATE's own prompt (an empty or legacy business type —
+    # no _core.md there); always the LAST block, replaced in place when the text changes
+    sm = ai["parameters"]["options"]["systemMessage"]
+    want = with_memory_marks(sm)
+    if sm != want:
+        ai["parameters"]["options"]["systemMessage"] = want
+        ch = True
     if ch:
         with open(path, "w", encoding="utf-8") as fh:
             json.dump(wf, fh, indent=2, ensure_ascii=False)
@@ -430,6 +510,10 @@ def patch_create(fname):
 
 TRANSCRIPT_OLD = "(CASE WHEN m.message->>'type' = 'ai' THEN 'Бот: ' ELSE 'Клиент: ' END)"
 TRANSCRIPT_NEW = "(CASE WHEN m.message->>'type' = 'ai' THEN (CASE WHEN m.message->'additional_kwargs'->>'source' LIKE 'owner%' THEN 'Владелец: ' ELSE 'Бот: ' END) ELSE 'Клиент: ' END)"
+# T6: the transcript labels a row by its source, so the memory marks come off the content (no «Владелец: Владелец:», no
+# «[доставка не подтверждена]» in a «Бот:» line).
+CONTENT_OLD = "coalesce(m.message->>'content', m.message->'data'->>'content', '')"
+CONTENT_NEW = "regexp_replace(" + CONTENT_OLD + ", " + MARKS_LEAD_SQL + ", '')"
 FETCH_OUTCOMES_SQL = """-- «Сводка» reads ONE source: the classifier's verdict per session, outranked by a REAL event — an
 -- open/taken handoff (order → order_collected, question/escalation → owner_needed), marked
 -- source='event' so the app can tell a fact from a classification.
@@ -465,6 +549,10 @@ def patch_dashboard():
     fc = node(wf, "Find Changed Sessions")
     if TRANSCRIPT_OLD in fc["parameters"]["query"]:
         fc["parameters"]["query"] = fc["parameters"]["query"].replace(TRANSCRIPT_OLD, TRANSCRIPT_NEW)
+        ch = True
+    if CONTENT_NEW not in fc["parameters"]["query"]:
+        assert fc["parameters"]["query"].count(CONTENT_OLD) == 1, "Find Changed Sessions has an unexpected transcript shape"
+        fc["parameters"]["query"] = fc["parameters"]["query"].replace(CONTENT_OLD, CONTENT_NEW)
         ch = True
     fo = node(wf, "Fetch Outcomes")
     if fo["parameters"]["query"] != FETCH_OUTCOMES_SQL:
@@ -600,8 +688,12 @@ def check():
             and node(wf, "Stamp Draft")["parameters"]["options"]["queryReplacement"] == STAMP_DRAFT_PARAMS \
             and wf["connections"].get("Generated?", {}).get("main", [[]])[0] == [{"node": "Stamp Draft", "type": "main", "index": 0}] \
             and node(wf, "Claim Event")["parameters"]["query"] == CLAIM_SQL and node(wf, "Record Send")["parameters"]["query"] == RECORD_SEND_SQL \
+            and node(wf, "Record Outgoing")["parameters"]["query"] == RECORD_OUTGOING_SQL \
+            and node(wf, "Record Suppressed")["parameters"]["query"] == RECORD_SUPPRESSED_SQL \
             and node(wf, "Record Cancel")["parameters"]["query"] == RECORD_CANCEL_SQL and node(wf, "Read Reply Mode")["parameters"]["query"] == READ_MODE_SQL \
             and "##create_handoff##" in node(wf, "AI Agent")["parameters"]["options"]["systemMessage"] \
+            and node(wf, "AI Agent")["parameters"]["options"]["systemMessage"].endswith(MEMORY_MARKS_RULE) \
+            and with_memory_marks(node(wf, "AI Agent")["parameters"]["options"]["systemMessage"]) == node(wf, "AI Agent")["parameters"]["options"]["systemMessage"] \
             and wf["connections"].get("Create Handoff", {}).get("ai_tool") == [[{"node": "AI Agent", "type": "ai_tool", "index": 0}]]
         if not ok:
             bad.append(f)
@@ -610,7 +702,8 @@ def check():
         if node(wf, "Set Wappi Webhook Types")["parameters"].get("jsonBody") != WEBHOOK_TYPES:
             bad.append(f)
     wf = json.load(open(os.path.join(WF, DASHBOARD), encoding="utf-8"))
-    if node(wf, "Fetch Outcomes")["parameters"]["query"] != FETCH_OUTCOMES_SQL or TRANSCRIPT_NEW not in node(wf, "Find Changed Sessions")["parameters"]["query"]:
+    if node(wf, "Fetch Outcomes")["parameters"]["query"] != FETCH_OUTCOMES_SQL or TRANSCRIPT_NEW not in node(wf, "Find Changed Sessions")["parameters"]["query"] \
+            or CONTENT_NEW not in node(wf, "Find Changed Sessions")["parameters"]["query"]:
         bad.append(DASHBOARD)
     wf = json.load(open(os.path.join(WF, DELETE_BOT), encoding="utf-8"))
     dcm = node(wf, "Delete Chat Memory")["parameters"]

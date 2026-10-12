@@ -1,0 +1,171 @@
+T6 (Q1 B + V6-unknown) — BEFORE: canon of HEAD 661431c9 (generators and workflows of HEAD; tests written first)
+date: 2026-10-11T23:08:44Z
+
+=== python3 Tools/n8n/tests/test_memory_context.py (new) ===
+FAIL T6 the marks are ONE contract: apply-history-handoff's constants equal the plan's strings
+      - OWNER_MEMORY_PREFIX=None
+      - UNDELIVERED_MEMORY_PREFIX=None
+PASS T6 [WA] the memory class reads the rows with the statement the test ran (fidelity of the model view)
+FAIL T6 [WA] Q1 B: the owner's replies reach the model as «Владелец: …» (from the app AND from the phone)
+      - owner_app turn missing or unmarked: assistant turns=['Да, заказ готов.', 'Ждём вас завтра в 15:00, спросите Асхата.', 'Вход со двора, второй этаж.', 'Фильтр 90915-YZZE1 — 3200 тг.']
+      - owner_phone turn missing or unmarked: assistant turns=['Да, заказ готов.', 'Ждём вас завтра в 15:00, спросите Асхата.', 'Вход со двора, второй этаж.', 'Фильтр 90915-YZZE1 — 3200 тг.']
+      - an owner reply reaches the model as the bot's own turn (no mark): ['Да, заказ готов.', 'Ждём вас завтра в 15:00, спросите Асхата.', 'Вход со двора, второй этаж.', 'Фильтр 90915-YZZE1 — 3200 тг.']
+FAIL T6 [WA] V6-unknown: a reply with unknown delivery carries «[доставка не подтверждена]», a sent one is verbatim, a refused one is gone
+      - the unknown reply must be marked: assistant turns=['Да, заказ готов.', 'Ждём вас завтра в 15:00, спросите Асхата.', 'Вход со двора, второй этаж.', 'Фильтр 90915-YZZE1 — 3200 тг.']
+FAIL T6 [WA] the whole conversation, in order: client rows unchanged, nothing else marked
+      - model turns=[('user', 'Можно сегодня забрать заказ?'), ('assistant', 'Да, заказ готов.'), ('assistant', 'Ждём вас завтра в 15:00, спросите Асхата.'), ('assistant', 'Вход со двора, второй этаж.'), ('user', 'Сколько стоит фильтр 90915-YZZE1?'), ('assistant', 'Фильтр 90915-YZZE1 — 3200 тг.'), ('user', 'А с доставкой?')]
+PASS T6 [WA] the one history (what the app shows) carries no marks: ai / owner bodies as sent
+PASS T6 [TG] the memory class reads the rows with the statement the test ran (fidelity of the model view)
+FAIL T6 [TG] Q1 B: the owner's replies reach the model as «Владелец: …» (from the app AND from the phone)
+      - owner_app turn missing or unmarked: assistant turns=['Да, заказ готов.', 'Ждём вас завтра в 15:00, спросите Асхата.', 'Вход со двора, второй этаж.', 'Фильтр 90915-YZZE1 — 3200 тг.']
+      - owner_phone turn missing or unmarked: assistant turns=['Да, заказ готов.', 'Ждём вас завтра в 15:00, спросите Асхата.', 'Вход со двора, второй этаж.', 'Фильтр 90915-YZZE1 — 3200 тг.']
+      - an owner reply reaches the model as the bot's own turn (no mark): ['Да, заказ готов.', 'Ждём вас завтра в 15:00, спросите Асхата.', 'Вход со двора, второй этаж.', 'Фильтр 90915-YZZE1 — 3200 тг.']
+FAIL T6 [TG] V6-unknown: a reply with unknown delivery carries «[доставка не подтверждена]», a sent one is verbatim, a refused one is gone
+      - the unknown reply must be marked: assistant turns=['Да, заказ готов.', 'Ждём вас завтра в 15:00, спросите Асхата.', 'Вход со двора, второй этаж.', 'Фильтр 90915-YZZE1 — 3200 тг.']
+FAIL T6 [TG] the whole conversation, in order: client rows unchanged, nothing else marked
+      - model turns=[('user', 'Можно сегодня забрать заказ?'), ('assistant', 'Да, заказ готов.'), ('assistant', 'Ждём вас завтра в 15:00, спросите Асхата.'), ('assistant', 'Вход со двора, второй этаж.'), ('user', 'Сколько стоит фильтр 90915-YZZE1?'), ('assistant', 'Фильтр 90915-YZZE1 — 3200 тг.'), ('user', 'А с доставкой?')]
+PASS T6 [TG] the one history (what the app shows) carries no marks: ai / owner bodies as sent
+FAIL T6 [WA] Final Check: a reply the model opens with a memory mark goes out WITHOUT it (send body, history, reconcile)
+      - 'Владелец: Ждём вас завтра в 15:00.': Final Check text='Владелец: Ждём вас завтра в 15:00.' ok=True
+      - 'Владелец: Ждём вас завтра в 15:00.': history=[('F', 'client', 'Во сколько подойти?'), ('sent-F', 'ai', 'Владелец: Ждём вас завтра в 15:00.')]
+      - 'Владелец: Ждём вас завтра в 15:00.': the client would receive 'Владелец: Ждём вас завтра в 15:00.'
+      - '[доставка не подтверждена] Фильтр — 3200 тг.': Final Check text='[доставка не подтверждена] Фильтр — 3200 тг.' ok=True
+      - '[доставка не подтверждена] Фильтр — 3200 тг.': history=[('F', 'client', 'Во сколько подойти?'), ('sent-F', 'ai', '[доставка не подтверждена] Фильтр — 3200 тг.')]
+      - '[доставка не подтверждена] Фильтр — 3200 тг.': the client would receive '[доставка не подтверждена] Фильтр — 3200 тг.'
+      - '  Владелец: [доставка не подтверждена] Фильтр — 3200 тг.': Final Check text='  Владелец: [доставка не подтверждена] Фильтр — 3200 тг.' ok=True
+      - '  Владелец: [доставка не подтверждена] Фильтр — 3200 тг.': history=[('F', 'client', 'Во сколько подойти?'), ('sent-F', 'ai', '  Владелец: [доставка не подтверждена] Фильтр — 3200 тг.')]
+      - '  Владелец: [доставка не подтверждена] Фильтр — 3200 тг.': the client would receive '  Владелец: [доставка не подтверждена] Фильтр — 3200 тг.'
+      - 'владелец:Ждём вас.': Final Check text='владелец:Ждём вас.' ok=True
+      - 'владелец:Ждём вас.': history=[('F', 'client', 'Во сколько подойти?'), ('sent-F', 'ai', 'владелец:Ждём вас.')]
+      - 'владелец:Ждём вас.': the client would receive 'владелец:Ждём вас.'
+      - 'Владелец : Ждём вас.': Final Check text='Владелец : Ждём вас.' ok=True
+      - 'Владелец : Ждём вас.': history=[('F', 'client', 'Во сколько подойти?'), ('sent-F', 'ai', 'Владелец : Ждём вас.')]
+      - 'Владелец : Ждём вас.': the client would receive 'Владелец : Ждём вас.'
+      - '[Доставка не подтверждена]\nФильтр — 3200 тг.': Final Check text='[Доставка не подтверждена]\nФильтр — 3200 тг.' ok=True
+      - '[Доставка не подтверждена]\nФильтр — 3200 тг.': history=[('F', 'client', 'Во сколько подойти?'), ('sent-F', 'ai', '[Доставка не подтверждена]\nФильтр — 3200 тг.')]
+      - '[Доставка не подтверждена]\nФильтр — 3200 тг.': the client would receive '[Доставка не подтверждена]\nФильтр — 3200 тг.'
+PASS T6 [WA] Final Check: a mark that does not OPEN the reply, or the bare word, is the reply's own text — kept
+FAIL T6 [WA] Final Check: a reply that is ONLY a mark is no reply (generation_failed, nothing sent)
+      - final={'ok': True, 'outcome': None, 'text': 'Владелец:', 'generation': 1, 'historyWatermark': 0, 'sendStartedAt': 1791759511, 'seenIds': ['E'], 'seenComplete': True, 'recheck': False} outcome=None
+FAIL T6 [TG] Final Check: a reply the model opens with a memory mark goes out WITHOUT it (send body, history, reconcile)
+      - 'Владелец: Ждём вас завтра в 15:00.': Final Check text='Владелец: Ждём вас завтра в 15:00.' ok=True
+      - 'Владелец: Ждём вас завтра в 15:00.': history=[('F', 'client', 'Во сколько подойти?'), ('sent-F', 'ai', 'Владелец: Ждём вас завтра в 15:00.')]
+      - 'Владелец: Ждём вас завтра в 15:00.': the client would receive 'Владелец: Ждём вас завтра в 15:00.'
+      - '[доставка не подтверждена] Фильтр — 3200 тг.': Final Check text='[доставка не подтверждена] Фильтр — 3200 тг.' ok=True
+      - '[доставка не подтверждена] Фильтр — 3200 тг.': history=[('F', 'client', 'Во сколько подойти?'), ('sent-F', 'ai', '[доставка не подтверждена] Фильтр — 3200 тг.')]
+      - '[доставка не подтверждена] Фильтр — 3200 тг.': the client would receive '[доставка не подтверждена] Фильтр — 3200 тг.'
+      - '  Владелец: [доставка не подтверждена] Фильтр — 3200 тг.': Final Check text='  Владелец: [доставка не подтверждена] Фильтр — 3200 тг.' ok=True
+      - '  Владелец: [доставка не подтверждена] Фильтр — 3200 тг.': history=[('F', 'client', 'Во сколько подойти?'), ('sent-F', 'ai', '  Владелец: [доставка не подтверждена] Фильтр — 3200 тг.')]
+      - '  Владелец: [доставка не подтверждена] Фильтр — 3200 тг.': the client would receive '  Владелец: [доставка не подтверждена] Фильтр — 3200 тг.'
+      - 'владелец:Ждём вас.': Final Check text='владелец:Ждём вас.' ok=True
+      - 'владелец:Ждём вас.': history=[('F', 'client', 'Во сколько подойти?'), ('sent-F', 'ai', 'владелец:Ждём вас.')]
+      - 'владелец:Ждём вас.': the client would receive 'владелец:Ждём вас.'
+      - 'Владелец : Ждём вас.': Final Check text='Владелец : Ждём вас.' ok=True
+      - 'Владелец : Ждём вас.': history=[('F', 'client', 'Во сколько подойти?'), ('sent-F', 'ai', 'Владелец : Ждём вас.')]
+      - 'Владелец : Ждём вас.': the client would receive 'Владелец : Ждём вас.'
+      - '[Доставка не подтверждена]\nФильтр — 3200 тг.': Final Check text='[Доставка не подтверждена]\nФильтр — 3200 тг.' ok=True
+      - '[Доставка не подтверждена]\nФильтр — 3200 тг.': history=[('F', 'client', 'Во сколько подойти?'), ('sent-F', 'ai', '[Доставка не подтверждена]\nФильтр — 3200 тг.')]
+      - '[Доставка не подтверждена]\nФильтр — 3200 тг.': the client would receive '[Доставка не подтверждена]\nФильтр — 3200 тг.'
+PASS T6 [TG] Final Check: a mark that does not OPEN the reply, or the bare word, is the reply's own text — kept
+FAIL T6 [TG] Final Check: a reply that is ONLY a mark is no reply (generation_failed, nothing sent)
+      - final={'ok': True, 'outcome': None, 'text': 'Владелец:', 'generation': 1, 'historyWatermark': 0, 'sendStartedAt': 1791759553, 'seenIds': ['E'], 'seenComplete': True, 'recheck': False} outcome=None
+PASS T6 [WA] «Сводка» transcript: one «Владелец:» per owner row, the bot's lines without «[доставка не подтверждена]»
+PASS T6 [TG] «Сводка» transcript: one «Владелец:» per owner row, the bot's lines without «[доставка не подтверждена]»
+
+8 pass, 11 fail
+exit=1
+
+=== python3 Tools/n8n/tests/test_reply_memory.py (old checks of the memory content updated to the T6 contract + new T6 cases) ===
+PASS R7 [WA] old draft → new reply SENT → old cancelled: the new reply stays in memory (review scenario)
+PASS R7 [WA] new reply WRITTEN but not yet sent when the old run cancels → it survives, then goes out
+PASS R7 [WA] the newer message arrives during the OLD run's LLM call (claimed before its draft) → only the new reply stays
+PASS R7 [WA] the old run is refused at the LEASE (Send Allowed?) after the new reply went out → only its own draft goes
+PASS R7 [WA] two runs produced the SAME text: exactly one ai row survives (one per reply the client saw)
+FAIL R7 [WA] the owner already answered (cancelled_owner): the draft goes, the owner's marked row — same text — stays
+      - memory=[('human', None, 'Сколько стоит букет?'), ('ai', 'owner_phone', 'Букет из 25 роз стоит 25 000 ₸.')]
+PASS R7 [WA] send_failed: the reply the client never got leaves memory; the client's own row stays
+PASS R7 [WA] send_failed of the NEWER run after an older reply was sent: only the failed text leaves
+FAIL R7 [WA] send_unknown (no echo found) KEEPS the reply in memory (decision: «unknown» usually means delivered) — marked for the model (T6)
+      - outcome=send_unknown ai=['Букет из 25 роз стоит 25 000 ₸.']
+PASS R7 [WA] a media message (Ask to Send Text, the agent never ran) cancelled after a newer reply → nothing removed
+PASS R7 [WA] the transport echo of a sent reply (after Record Send) adds no second row
+PASS R7 [WA] the transport echo of a sent reply (before Record Send) adds no second row
+PASS R7 [WA] a MULTI-LINE reply goes through Record Send (sent → ledger sent, one ai history row)
+PASS R7 [WA] a MULTI-LINE reply refused by the transport (send_failed) leaves memory; the ledger says send_failed
+PASS R7 [WA] a MULTI-LINE draft of a cancelled run is removed; the newer reply stays
+PASS R7 [WA] the media branch's MULTI-LINE canned ask goes through Record Send
+FAIL V6 [WA] reversed completion with the SAME text: the newer run's SENT row survives (its id, delivery sent); the old run drops only its own draft
+      - memory order=[('human', None, 'Сколько стоит букет?\nА с доставкой?'), ('ai', None, 'Букет из 25 роз стоит 25 000 ₸, доставка по городу бесплатно.'), ('ai', 'owner_phone', 'Да, доставка бесплатно.'), ('human', None, 'Сколько стоит букет?')]
+FAIL V6 [WA] the row says what happened: draft after the agent, sent + transport id after a send, unknown after send_unknown
+      - send_unknown keeps the row and says so: outcome=send_unknown marks=[('Букет из 25 роз стоит 25 000 ₸.', 'exec-U', 'U', 'unknown', None)]
+PASS V6 [WA] Record Send(send_failed) removes ONLY its execution's row while another run's identical SENT row sits lower above its watermark
+PASS V6 [WA] a run whose stamp did not happen drops NOTHING on cancel — no text fallback
+PASS V6 [WA] residual (pinned): two same-text rows stamped in REVERSE order (within one PG round trip) → one row survives, sent by N, but it sits after the owner row written between them
+PASS V6 [WA] residual (pinned): an UNSTAMPED same-text neighbour row above the watermark takes this run's stamp; no row is removed and exactly one is marked sent
+PASS R7 [TG] old draft → new reply SENT → old cancelled: the new reply stays in memory (review scenario)
+PASS R7 [TG] new reply WRITTEN but not yet sent when the old run cancels → it survives, then goes out
+PASS R7 [TG] the newer message arrives during the OLD run's LLM call (claimed before its draft) → only the new reply stays
+PASS R7 [TG] the old run is refused at the LEASE (Send Allowed?) after the new reply went out → only its own draft goes
+PASS R7 [TG] two runs produced the SAME text: exactly one ai row survives (one per reply the client saw)
+FAIL R7 [TG] the owner already answered (cancelled_owner): the draft goes, the owner's marked row — same text — stays
+      - memory=[('human', None, 'Сколько стоит букет?'), ('ai', 'owner_phone', 'Букет из 25 роз стоит 25 000 ₸.')]
+PASS R7 [TG] send_failed: the reply the client never got leaves memory; the client's own row stays
+PASS R7 [TG] send_failed of the NEWER run after an older reply was sent: only the failed text leaves
+FAIL R7 [TG] send_unknown (no echo found) KEEPS the reply in memory (decision: «unknown» usually means delivered) — marked for the model (T6)
+      - outcome=send_unknown ai=['Букет из 25 роз стоит 25 000 ₸.']
+PASS R7 [TG] a media message (Ask to Send Text, the agent never ran) cancelled after a newer reply → nothing removed
+PASS R7 [TG] the transport echo of a sent reply (after Record Send) adds no second row
+PASS R7 [TG] the transport echo of a sent reply (before Record Send) adds no second row
+PASS R7 [TG] a MULTI-LINE reply goes through Record Send (sent → ledger sent, one ai history row)
+PASS R7 [TG] a MULTI-LINE reply refused by the transport (send_failed) leaves memory; the ledger says send_failed
+PASS R7 [TG] a MULTI-LINE draft of a cancelled run is removed; the newer reply stays
+PASS R7 [TG] the media branch's MULTI-LINE canned ask goes through Record Send
+FAIL V6 [TG] reversed completion with the SAME text: the newer run's SENT row survives (its id, delivery sent); the old run drops only its own draft
+      - memory order=[('human', None, 'Сколько стоит букет?\nА с доставкой?'), ('ai', None, 'Букет из 25 роз стоит 25 000 ₸, доставка по городу бесплатно.'), ('ai', 'owner_phone', 'Да, доставка бесплатно.'), ('human', None, 'Сколько стоит букет?')]
+FAIL V6 [TG] the row says what happened: draft after the agent, sent + transport id after a send, unknown after send_unknown
+      - send_unknown keeps the row and says so: outcome=send_unknown marks=[('Букет из 25 роз стоит 25 000 ₸.', 'exec-U', 'U', 'unknown', None)]
+PASS V6 [TG] Record Send(send_failed) removes ONLY its execution's row while another run's identical SENT row sits lower above its watermark
+PASS V6 [TG] a run whose stamp did not happen drops NOTHING on cancel — no text fallback
+PASS V6 [TG] residual (pinned): two same-text rows stamped in REVERSE order (within one PG round trip) → one row survives, sent by N, but it sits after the owner row written between them
+PASS V6 [TG] residual (pinned): an UNSTAMPED same-text neighbour row above the watermark takes this run's stamp; no row is removed and exactly one is marked sent
+FAIL T6 [WA] Stamp Draft: the agent's reply opening with «Владелец:» is stored WITHOUT the mark (and sent without it)
+      - 'Владелец: Ждём вас завтра в 15:00, спросите Асхата.': after Stamp Draft [('Владелец: Ждём вас завтра в 15:00, спросите Асхата.', 'exec-S', 'draft')] stamp={'draft_row_id': 1824014}
+      - 'Владелец: Ждём вас завтра в 15:00, спросите Асхата.': after the send [('Владелец: Ждём вас завтра в 15:00, спросите Асхата.', 'exec-S', 'sent')]
+      - '[доставка не подтверждена] Ждём вас завтра в 15:00, спросите Асхата.': after Stamp Draft [('[доставка не подтверждена] Ждём вас завтра в 15:00, спросите Асхата.', 'exec-S', 'draft')] stamp={'draft_row_id': 1824016}
+      - '[доставка не подтверждена] Ждём вас завтра в 15:00, спросите Асхата.': after the send [('[доставка не подтверждена] Ждём вас завтра в 15:00, спросите Асхата.', 'exec-S', 'sent')]
+      - '  Владелец: [доставка не подтверждена] Ждём вас завтра в 15:00, спросите Асхата.': after Stamp Draft [('  Владелец: [доставка не подтверждена] Ждём вас завтра в 15:00, спросите Асхата.', 'exec-S', 'draft')] stamp={'draft_row_id': 1824018}
+      - '  Владелец: [доставка не подтверждена] Ждём вас завтра в 15:00, спросите Асхата.': after the send [('  Владелец: [доставка не подтверждена] Ждём вас завтра в 15:00, спросите Асхата.', 'exec-S', 'sent')]
+      - 'владелец : Ждём вас завтра в 15:00, спросите Асхата.': after Stamp Draft [('владелец : Ждём вас завтра в 15:00, спросите Асхата.', 'exec-S', 'draft')] stamp={'draft_row_id': 1824020}
+      - 'владелец : Ждём вас завтра в 15:00, спросите Асхата.': after the send [('владелец : Ждём вас завтра в 15:00, спросите Асхата.', 'exec-S', 'sent')]
+PASS T6 [WA] Stamp Draft keeps the reply's own text: the word inside it, a mark that does not open it
+FAIL T6 [WA] the owner's marked row is never rewritten by the bot's stamp, even when the bot echoes it verbatim
+      - memory=[('ai', 'owner_phone', 'Ждём вас завтра в 15:00, спросите Асхата.', None), ('human', None, 'Во сколько подойти?', None), ('ai', None, 'Владелец: Ждём вас завтра в 15:00, спросите Асхата.', 'exec-O')]
+FAIL T6 [WA] V6 after the strip: a cancelled run drops ONLY its own (rewritten) row; a refused send drops its own too
+      - each run stamps its own row: [('Владелец: Ждём вас завтра в 15:00, спросите Асхата.', 'exec-O', 'draft'), ('Владелец: Ждём вас завтра в 15:00, спросите Асхата.', 'exec-N', 'draft')]
+      - o=superseded cancel={'outcome': 'superseded', 'dropped_ai_rows': 1, 'recorded': True, 'remembered': False} rows=[('Владелец: Ждём вас завтра в 15:00, спросите Асхата.', 'exec-N', 'sent')]
+FAIL T6 [WA] send_unknown marks the row ONCE (a repeated Record Send, a model-written mark) and a late «sent» takes the mark off
+      - late sent: [('[доставка не подтверждена] Букет из 25 роз стоит 25 000 ₸.', 'exec-U', 'sent')]
+      - history=[('U', 'client', 'Сколько стоит букет?'), ('sent-U', 'ai', '[доставка не подтверждена] Букет из 25 роз стоит 25 000 ₸.')]
+PASS T6 [WA] a «sent» reply that merely STARTS like the mark text (no brackets) is never cut by Record Send
+FAIL T6 [TG] Stamp Draft: the agent's reply opening with «Владелец:» is stored WITHOUT the mark (and sent without it)
+      - 'Владелец: Ждём вас завтра в 15:00, спросите Асхата.': after Stamp Draft [('Владелец: Ждём вас завтра в 15:00, спросите Асхата.', 'exec-S', 'draft')] stamp={'draft_row_id': 1824041}
+      - 'Владелец: Ждём вас завтра в 15:00, спросите Асхата.': after the send [('Владелец: Ждём вас завтра в 15:00, спросите Асхата.', 'exec-S', 'sent')]
+      - '[доставка не подтверждена] Ждём вас завтра в 15:00, спросите Асхата.': after Stamp Draft [('[доставка не подтверждена] Ждём вас завтра в 15:00, спросите Асхата.', 'exec-S', 'draft')] stamp={'draft_row_id': 1824043}
+      - '[доставка не подтверждена] Ждём вас завтра в 15:00, спросите Асхата.': after the send [('[доставка не подтверждена] Ждём вас завтра в 15:00, спросите Асхата.', 'exec-S', 'sent')]
+      - '  Владелец: [доставка не подтверждена] Ждём вас завтра в 15:00, спросите Асхата.': after Stamp Draft [('  Владелец: [доставка не подтверждена] Ждём вас завтра в 15:00, спросите Асхата.', 'exec-S', 'draft')] stamp={'draft_row_id': 1824045}
+      - '  Владелец: [доставка не подтверждена] Ждём вас завтра в 15:00, спросите Асхата.': after the send [('  Владелец: [доставка не подтверждена] Ждём вас завтра в 15:00, спросите Асхата.', 'exec-S', 'sent')]
+      - 'владелец : Ждём вас завтра в 15:00, спросите Асхата.': after Stamp Draft [('владелец : Ждём вас завтра в 15:00, спросите Асхата.', 'exec-S', 'draft')] stamp={'draft_row_id': 1824047}
+      - 'владелец : Ждём вас завтра в 15:00, спросите Асхата.': after the send [('владелец : Ждём вас завтра в 15:00, спросите Асхата.', 'exec-S', 'sent')]
+PASS T6 [TG] Stamp Draft keeps the reply's own text: the word inside it, a mark that does not open it
+FAIL T6 [TG] the owner's marked row is never rewritten by the bot's stamp, even when the bot echoes it verbatim
+      - memory=[('ai', 'owner_phone', 'Ждём вас завтра в 15:00, спросите Асхата.', None), ('human', None, 'Во сколько подойти?', None), ('ai', None, 'Владелец: Ждём вас завтра в 15:00, спросите Асхата.', 'exec-O')]
+FAIL T6 [TG] V6 after the strip: a cancelled run drops ONLY its own (rewritten) row; a refused send drops its own too
+      - each run stamps its own row: [('Владелец: Ждём вас завтра в 15:00, спросите Асхата.', 'exec-O', 'draft'), ('Владелец: Ждём вас завтра в 15:00, спросите Асхата.', 'exec-N', 'draft')]
+      - o=superseded cancel={'outcome': 'superseded', 'dropped_ai_rows': 1, 'recorded': True, 'remembered': False} rows=[('Владелец: Ждём вас завтра в 15:00, спросите Асхата.', 'exec-N', 'sent')]
+FAIL T6 [TG] send_unknown marks the row ONCE (a repeated Record Send, a model-written mark) and a late «sent» takes the mark off
+      - late sent: [('[доставка не подтверждена] Букет из 25 роз стоит 25 000 ₸.', 'exec-U', 'sent')]
+      - history=[('U', 'client', 'Сколько стоит букет?'), ('sent-U', 'ai', '[доставка не подтверждена] Букет из 25 роз стоит 25 000 ₸.')]
+PASS T6 [TG] a «sent» reply that merely STARTS like the mark text (no brackets) is never cut by Record Send
+
+40 pass, 16 fail
+exit=1

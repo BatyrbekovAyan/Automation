@@ -37,6 +37,15 @@ def node(wf, name):
     return n
 
 
+def _history_handoff():
+    """apply-history-handoff.py — the ONE place of the memory marks (T6)."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("apply_history_handoff", os.path.join(HERE, "apply-history-handoff.py"))
+    m = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    return m
+
+
 def verify(fname):
     wf = json.load(open(os.path.join(WF, fname), encoding="utf-8"))
     f = fname
@@ -177,6 +186,11 @@ def verify(fname):
                  "$('Acquire Send Lease').first().json.peer_unseen === true", "seenIds, seenComplete, recheck"):
         check(frag in js, f"{f}: Final Check lacks {frag!r}")
     check("message/send" not in js, f"{f}: Final Check must not send")
+    # T6 (Q1 B + V6-unknown): the memory marks are for the model only — a leading run of them is cut from the text
+    # BEFORE anything reads it (the empty check, the send body, the reconcile, the history row)
+    cut = "text = text.replace(new RegExp(" + json.dumps(_history_handoff().MEMORY_MARKS_LEAD_RE, ensure_ascii=False) + "), '');"
+    check(cut in js and js.index(cut) < js.index("if (!text.trim())"),
+          f"{f}: Final Check must cut a leading run of memory marks (apply-history-handoff.MEMORY_MARKS_LEAD_RE) from the text before the empty check (T6)")
     # (6) Settle: three states, no assumption of delivery on a missing answer.
     js = node(wf, "Settle Send")["parameters"]["jsCode"]
     for frag in ("state = 'sent'", "state = 'send_failed'", "state = 'send_unknown'", "body.status === 'done' || body.message_id"):

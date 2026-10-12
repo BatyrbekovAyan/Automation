@@ -50,6 +50,9 @@ FETCH_LIMIT = 15        # rows messages/get returns (Fetch Recent / Final Fetch 
 # whether it will answer (alive ⇒ A refuses) or stopped without a reply (A sends). The re-read is ONE short fetch
 # without retries (an error ⇒ cancelled_fetch): the execution timeout (120 s on prod) must survive a slow Wappi.
 DEBOUNCE_SECONDS = _module("apply-message-batching.py").DEBOUNCE_SECONDS
+# T6 (Q1 B + V6-unknown, follow-ups 2026-10-11): the memory marks («Владелец: », «[доставка не подтверждена] ») and the
+# pattern of a leading run of them live in ONE place — apply-history-handoff.py (stage 4 owns the memory writers).
+MEMORY_MARKS_LEAD_RE = _module("apply-history-handoff.py").MEMORY_MARKS_LEAD_RE
 FETCH_RECENT_BUDGET_SECONDS = 2
 PG_NODE_BUDGET_SECONDS = 2
 PEER_RECHECK_SECONDS = DEBOUNCE_SECONDS + FETCH_RECENT_BUDGET_SECONDS + PG_NODE_BUDGET_SECONDS
@@ -175,6 +178,10 @@ let text = '';
 try { text = String($('Retrieve Answer').first().json.text || ''); } catch (e) {
   try { text = String($('Ask to Send Text').first().json.text || ''); } catch (e2) { text = ''; }
 }
+// T6 (Q1 B + V6-unknown): the memory marks («Владелец:», «[доставка не подтверждена]») are for the model's eyes only.
+// A reply the model OPENS with one (it copies what it sees in its memory) goes out without it — the send body, the
+// reconcile and the history row all read this text; a reply that is nothing but marks is no reply (generation_failed).
+text = text.replace(new RegExp(__MARKS_RE__), '');
 const fetchedAll = ($json.messages || []).slice();
 const fetched = fetchedAll.filter(m => !(m && m.chatId && trig.chatId && m.chatId !== trig.chatId));
 fetched.forEach((m, i) => { if (m) m.__i = i; });
@@ -195,7 +202,7 @@ let recheck = false;
 try { recheck = $('Acquire Send Lease').first().json.peer_unseen === true; } catch (e) { recheck = false; }
 return [{ json: { ok, outcome, text, generation: Number(claim.generation) || 0, historyWatermark: Number(claim.history_watermark) || 0,
                   sendStartedAt: Math.floor(Date.now() / 1000), seenIds, seenComplete, recheck }, pairedItem: { item: 0 } }];
-""".replace("__LIMIT__", str(FETCH_LIMIT))
+""".replace("__LIMIT__", str(FETCH_LIMIT)).replace("__MARKS_RE__", json.dumps(MEMORY_MARKS_LEAD_RE, ensure_ascii=False))
 
 SETTLE_JS = r"""// SETTLE SEND (A7): classify the transport call — never assume delivery from a missing answer.
 const r = $input.first().json || {};

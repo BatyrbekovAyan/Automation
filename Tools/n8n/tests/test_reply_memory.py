@@ -18,6 +18,11 @@ V6 (iteration 2026-09-28): «its own» is decided by the EXECUTION, never by the
 agent) marks the row with execution_id / event_id / delivery=draft; Record Cancel and Record Send(send_failed)
 delete only that row, sent / send_unknown mark it delivery=sent (+ transport id) / unknown, and a run without a
 stamp touches nothing. Two residuals are pinned as documented (crossed stamps, an unstamped same-text neighbour).
+T6 (Q1 B + V6-unknown, follow-ups 2026-10-11): the memory CONTENT carries what the model must know — owner rows open
+with «Владелец: », the bot's reply of unknown delivery with «[доставка не подтверждена] » (Record Send: once; a late
+«sent» takes it off) — and the bot never stores a mark of its own: Stamp Draft strips a leading run of marks from the
+row it stamps (a made-up «Владелец: завтра в 15:00» must not become a confirmed agreement next turn). V6 still holds:
+the strip changes the content AFTER the stamp, every later step acts by the execution id.
 
 The REAL chain of BOTH templates (reply_chain.Run): Claim Event, Latest+Combine, Final Check, Acquire Send Lease,
 Settle Send, Record Send, Cancel Label ($prevNode = the refusing gate), Record Cancel, Record Outgoing — on session
@@ -30,6 +35,8 @@ from reply_chain import CHATS, SETUP, TEMPLATES, Run, _sql, history, memory, msg
 
 OLD_TEXT = 'Букет из 25 роз стоит 25 000 ₸.'
 NEW_TEXT = 'Букет из 25 роз стоит 25 000 ₸, доставка по городу бесплатно.'
+OWNER = 'Владелец: '                          # T6 contract (F1F2-plan §4.1), the same strings as test_memory_context.py
+UNDELIVERED = '[доставка не подтверждена] '
 
 
 def ai_rows(pg, ch):
@@ -102,7 +109,7 @@ for ch, T in TEMPLATES.items():
             o.final([msg(ch, 'own-1', 120, OLD_TEXT, from_me=True), mo])
             mem = [(r['type'], r['source'], r['content']) for r in memory(pg, ch)]
             c.check(o.outcome == 'cancelled_owner', f'o={o.outcome}')
-            c.check(ai_rows(pg, ch) == [] and ('ai', 'owner_phone', OLD_TEXT) in mem and len(human_rows(pg, ch)) == 1, f'memory={mem}')
+            c.check(ai_rows(pg, ch) == [] and ('ai', 'owner_phone', OWNER + OLD_TEXT) in mem and len(human_rows(pg, ch)) == 1, f'memory={mem}')
 
     with Case(f'R7 [{ch}] send_failed: the reply the client never got leaves memory; the client\'s own row stays') as c:
         with PgSession(SETUP) as pg:
@@ -122,13 +129,13 @@ for ch, T in TEMPLATES.items():
             n.send({'statusCode': 502, 'body': {'status': 'error'}})
             c.check(o.outcome == 'sent' and n.outcome == 'send_failed' and ai_rows(pg, ch) == [OLD_TEXT], f'o={o.outcome} n={n.outcome} ai={ai_rows(pg, ch)}')
 
-    with Case(f'R7 [{ch}] send_unknown (no echo found) KEEPS the reply in memory (decision: «unknown» usually means delivered)') as c:
+    with Case(f'R7 [{ch}] send_unknown (no echo found) KEEPS the reply in memory (decision: «unknown» usually means delivered) — marked for the model (T6)') as c:
         with PgSession(SETUP) as pg:
             m = msg(ch, 'U', 100, 'Сколько стоит букет?')
             r = Run(T, pg, m, 'exec-U')
             r.claim(); r.latest([m]); r.generate(OLD_TEXT); r.final([m]); r.lease()
             r.send({'error': {'message': 'socket hang up'}}, reconcile_snapshot=[m])
-            c.check(r.outcome == 'send_unknown' and ai_rows(pg, ch) == [OLD_TEXT], f'outcome={r.outcome} ai={ai_rows(pg, ch)}')
+            c.check(r.outcome == 'send_unknown' and ai_rows(pg, ch) == [UNDELIVERED + OLD_TEXT], f'outcome={r.outcome} ai={ai_rows(pg, ch)}')
 
     with Case(f'R7 [{ch}] a media message (Ask to Send Text, the agent never ran) cancelled after a newer reply → nothing removed') as c:
         with PgSession(SETUP) as pg:
@@ -217,7 +224,7 @@ for ch, T in TEMPLATES.items():
                     f'the sent row must survive, stamped: {row} memory={[(r["id"], r["type"], r["source"], r["execution_id"]) for r in mem]}')
             c.check(o.cancel and o.cancel.get('dropped_ai_rows') == 1, f'o.cancel={o.cancel}')
             order = [(r['type'], r['source'], r['content']) for r in mem]
-            c.check(order == [('human', None, n.combined), ('ai', None, NEW_TEXT), ('ai', 'owner_phone', 'Да, доставка бесплатно.'),
+            c.check(order == [('human', None, n.combined), ('ai', None, NEW_TEXT), ('ai', 'owner_phone', OWNER + 'Да, доставка бесплатно.'),
                               ('human', None, o.combined)], f'memory order={order}')
 
     with Case(f'V6 [{ch}] the row says what happened: draft after the agent, sent + transport id after a send, unknown after send_unknown') as c:
@@ -235,7 +242,7 @@ for ch, T in TEMPLATES.items():
             r = Run(T, pg, m, 'exec-U')
             r.claim(); r.latest([m]); r.generate(OLD_TEXT); r.final([m]); r.lease()
             r.send({'error': {'message': 'socket hang up'}}, reconcile_snapshot=[m])
-            c.check(r.outcome == 'send_unknown' and marks(pg) == [(OLD_TEXT, 'exec-U', 'U', 'unknown', None)],
+            c.check(r.outcome == 'send_unknown' and marks(pg) == [(UNDELIVERED + OLD_TEXT, 'exec-U', 'U', 'unknown', None)],
                     f'send_unknown keeps the row and says so: outcome={r.outcome} marks={marks(pg)}')
 
     with Case(f'V6 [{ch}] Record Send(send_failed) removes ONLY its execution\'s row while another run\'s identical SENT row sits lower above its watermark') as c:
@@ -289,5 +296,85 @@ for ch, T in TEMPLATES.items():
             mk = marks(pg)
             c.check(len(mk) == 2 and mk[0][1:] == ('exec-M', 'M', 'sent', 'sent-M') and mk[1][1:] == (None, None, None, None),
                     f'the neighbour row carries the stamp, the own row stays a phantom: {mk}')
+
+# T6 (Q1 B + V6-unknown, follow-ups 2026-10-11): the bot never stores a mark of its own, the unknown mark is put once and
+# taken off by a late «sent», and V6's ownership survives the content rewrite.
+AGREED = 'Ждём вас завтра в 15:00, спросите Асхата.'
+for ch, T in TEMPLATES.items():
+    def bot_rows(pg):
+        return [(r['content'], r['execution_id'], r['delivery']) for r in memory(pg, ch) if r['type'] == 'ai' and r['source'] is None]
+
+    with Case(f'T6 [{ch}] Stamp Draft: the agent\'s reply opening with «Владелец:» is stored WITHOUT the mark (and sent without it)') as c:
+        for raw in (OWNER + AGREED, UNDELIVERED + AGREED, '  ' + OWNER + UNDELIVERED + AGREED, 'владелец : ' + AGREED):
+            with PgSession(SETUP) as pg:
+                m = msg(ch, 'S', 100, 'Во сколько подойти?')
+                r = Run(T, pg, m, 'exec-S')
+                r.claim(); r.latest([m]); r.generate(raw)
+                after_stamp = bot_rows(pg)
+                c.check(after_stamp == [(AGREED, 'exec-S', 'draft')] and r.stamp_row.get('draft_row_id') is not None,
+                        f'{raw!r}: after Stamp Draft {after_stamp} stamp={r.stamp_row}')
+                r.final([m]); r.lease(); r.send_ok('sent-S')
+                c.check(r.outcome == 'sent' and bot_rows(pg) == [(AGREED, 'exec-S', 'sent')], f'{raw!r}: after the send {bot_rows(pg)}')
+
+    with Case(f'T6 [{ch}] Stamp Draft keeps the reply\'s own text: the word inside it, a mark that does not open it') as c:
+        for raw in ('Владелец магазина — Асхат.', 'Фильтр — 3200 тг. Владелец: Асхат.', 'Здравствуйте!\nВладелец: Асхат.'):
+            with PgSession(SETUP) as pg:
+                m = msg(ch, 'W', 100, 'Кто владелец?')
+                r = Run(T, pg, m, 'exec-W')
+                r.claim(); r.latest([m]); r.generate(raw)
+                c.check(bot_rows(pg) == [(raw, 'exec-W', 'draft')], f'{raw!r}: {bot_rows(pg)}')
+
+    with Case(f'T6 [{ch}] the owner\'s marked row is never rewritten by the bot\'s stamp, even when the bot echoes it verbatim') as c:
+        with PgSession(SETUP) as pg:
+            m = msg(ch, 'O', 100, 'Во сколько подойти?')
+            r = Run(T, pg, m, 'exec-O')
+            r.claim(); r.latest([m])
+            record_outgoing(T, pg, ch, 'own-1', AGREED, 101, wh_type='outgoing_message_phone')
+            r.generate(OWNER + AGREED)                               # the model copies the owner's turn, mark included
+            mem = [(r_['type'], r_['source'], r_['content'], r_['execution_id']) for r_ in memory(pg, ch)]
+            c.check(('ai', 'owner_phone', OWNER + AGREED, None) in mem and ('ai', None, AGREED, 'exec-O') in mem, f'memory={mem}')
+
+    with Case(f'T6 [{ch}] V6 after the strip: a cancelled run drops ONLY its own (rewritten) row; a refused send drops its own too') as c:
+        with PgSession(SETUP) as pg:
+            mo = msg(ch, 'O', 100, 'Сколько стоит букет?')
+            mn = msg(ch, 'N', 130, 'А с доставкой?')
+            o, n = Run(T, pg, mo, 'exec-O'), Run(T, pg, mn, 'exec-N')
+            o.claim(); o.latest([mo]); o.generate(OWNER + AGREED)
+            n.claim(); n.latest([mn, mo]); n.generate(OWNER + AGREED)       # the SAME marked text — two rows, two owners
+            stamps = bot_rows(pg)
+            n.final([mn, mo]); n.lease(); n.send_ok('sent-N')
+            o.final([mn, mo])
+            c.check(sorted(stamps) == sorted([(AGREED, 'exec-O', 'draft'), (AGREED, 'exec-N', 'draft')]), f'each run stamps its own row: {stamps}')
+            c.check(o.outcome == 'superseded' and o.cancel.get('dropped_ai_rows') == 1 and bot_rows(pg) == [(AGREED, 'exec-N', 'sent')],
+                    f'o={o.outcome} cancel={o.cancel} rows={bot_rows(pg)}')
+        with PgSession(SETUP) as pg:
+            m = msg(ch, 'F', 100, 'Во сколько подойти?')
+            r = Run(T, pg, m, 'exec-F')
+            r.claim(); r.latest([m]); r.generate(OWNER + AGREED); r.final([m]); r.lease()
+            r.send({'statusCode': 500, 'body': {'status': 'error'}})
+            c.check(r.outcome == 'send_failed' and bot_rows(pg) == [] and r.record.get('dropped_ai_rows') == 1, f'outcome={r.outcome} rows={bot_rows(pg)} record={r.record}')
+
+    with Case(f'T6 [{ch}] send_unknown marks the row ONCE (a repeated Record Send, a model-written mark) and a late «sent» takes the mark off') as c:
+        with PgSession(SETUP) as pg:
+            m = msg(ch, 'U', 100, 'Сколько стоит букет?')
+            r = Run(T, pg, m, 'exec-U')
+            r.claim(); r.latest([m]); r.generate(UNDELIVERED + OLD_TEXT); r.final([m]); r.lease()
+            r.send({'error': {'message': 'socket hang up'}}, reconcile_snapshot=[m])
+            first = bot_rows(pg)
+            r.send({'error': {'message': 'socket hang up'}}, reconcile_snapshot=[m])     # Record Send again (retry of the node)
+            again = bot_rows(pg)
+            c.check(first == [(UNDELIVERED + OLD_TEXT, 'exec-U', 'unknown')] and again == first, f'first={first} again={again}')
+            r.send_ok('sent-U')                                                           # the real result after all
+            c.check(r.outcome == 'sent' and bot_rows(pg) == [(OLD_TEXT, 'exec-U', 'sent')], f'late sent: {bot_rows(pg)}')
+            h = [(x['message_id'], x['source'], x['body']) for x in history(pg, ch)]
+            c.check(('sent-U', 'ai', OLD_TEXT) in h, f'history={h}')
+
+    with Case(f'T6 [{ch}] a «sent» reply that merely STARTS like the mark text (no brackets) is never cut by Record Send') as c:
+        with PgSession(SETUP) as pg:
+            m = msg(ch, 'D', 100, 'Доставка подтверждена?')
+            r = Run(T, pg, m, 'exec-D')
+            text = 'доставка не подтверждена — уточню у флориста.'
+            r.claim(); r.latest([m]); r.generate(text); r.final([m]); r.lease(); r.send_ok('sent-D')
+            c.check(bot_rows(pg) == [(text, 'exec-D', 'sent')], f'rows={bot_rows(pg)}')
 
 report()
