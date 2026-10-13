@@ -249,7 +249,7 @@ class MainRunsTheSchedule(unittest.TestCase):
         self.main(["--label", "t", "--only", f"{A6},{U1}", "--repeat", "2", "--repeat-all", "--skip-panel", "--results-dir", self.tmp])
         self.assertEqual([s for s, _ in self.seen()], [A6, U1, A6, U1])
         J = json.load(open(os.path.join(self.tmp, "t.json"), encoding="utf-8"))
-        self.assertTrue(J["summary"]["harness"].startswith("h9"))   # h9 (2026-10-13) adds panel checks; the schedule is h8's
+        self.assertTrue(J["summary"]["harness"].startswith("h10"))   # h10 (2026-10-13, learning A) adds the off-topic checks; the schedule is h8's
         self.assertEqual([x["id"] for x in J["results"]], [A6, U1], "result files keep the scenario-file order")
         self.assertEqual([r["seq"] for r in J["results"][0]["runs"]], [0, 2])
 

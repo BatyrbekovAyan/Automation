@@ -25,8 +25,11 @@ public static class SendOriginResolver
         o.setSize = snap.pickSetSize > 0 ? snap.pickSetSize : snap.shownSize;
         o.index = snap.pickIndex;
         o.pickedMove = snap.pickMove;
-        o.editPercent = (int)Math.Round((1.0 - Similarity(sentText, snap.pickText)) * 100.0);
-        o.kind = o.editPercent == 0 ? SendOriginKind.Card : SendOriginKind.Edited;
+        // spec §3.2: card = the NORMALIZED texts are EQUAL; edited = anything else — never the rounded percent, which hides
+        // a one-character change in a long card (210 chars → 0.48 % → 0). An edit reports at least 1 %.
+        bool sameText = Normalize(sentText) == Normalize(snap.pickText);
+        o.kind = sameText ? SendOriginKind.Card : SendOriginKind.Edited;
+        o.editPercent = sameText ? 0 : Math.Max(1, (int)Math.Round((1.0 - Similarity(sentText, snap.pickText)) * 100.0));
         return o;
     }
 

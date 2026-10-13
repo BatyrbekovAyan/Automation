@@ -86,4 +86,21 @@ public class SendOriginResolverTests
         Assert.AreEqual(1.0 - 1.0 / 4.0, SendOriginResolver.Similarity("kitn", "kite"), 1e-9);
         Assert.AreEqual(3, SendOriginResolver.Levenshtein("kitten", "sitting"));
     }
+
+    [Test]
+    public void LongCardWithOneChangedCharacter_IsEdited_NeverRoundedToCard()
+    {
+        // review 2026-10-14 (Important #2): a 210-char card (STYLE allows ≤ 220) with one digit of the price changed —
+        // spec §3.2 says card = the NORMALIZED texts are EQUAL; a percent that rounds to 0 must not record a changed
+        // price as «sent as is». An edited send reports edit ≥ 1 so the share never hides behind the rounding.
+        string card = new string('а', 100) + " цена 1500 тг " + new string('б', 96);   // 210 chars
+        string sent = card.Replace("1500", "1600");
+        var o = SendOriginResolver.Resolve(sent, Picked(1, card));
+        Assert.AreEqual(SendOriginKind.Edited, o.kind, "one changed digit is an edit, whatever the rounded percent says");
+        Assert.GreaterOrEqual(o.editPercent, 1);
+
+        var same = SendOriginResolver.Resolve(card.ToUpperInvariant() + " ", Picked(1, card));
+        Assert.AreEqual(SendOriginKind.Card, same.kind, "case and edge whitespace are not an edit (normalized equality)");
+        Assert.AreEqual(0, same.editPercent);
+    }
 }
