@@ -197,4 +197,22 @@ public class SuggestRepliesMapTests
         Assert.AreEqual(SuggestionErrorCopy.DailyCapText, SuggestionErrorCopy.Text(SuggestionErrorKind.DailyCap));
         Assert.AreEqual(SuggestionErrorCopy.Default, SuggestionErrorCopy.Text(SuggestionErrorKind.Generation));
     }
+
+    // --- learning A: the set's request key rides the result so a send can name the set it came from ---
+
+    [Test]
+    public void WithRequestKey_StampsOkResultsOnly_AndIsNullSafe()
+    {
+        var ok = N8nSuggestionsProvider.MapResponse(
+            "{\"v\":1,\"requestSeq\":1,\"suggestions\":[{\"text\":\"ок\",\"label\":\"Ответ\",\"move\":\"Ответ\"}]}", 5);
+        Assert.IsNull(ok.requestKey, "MapResponse itself never knows the key");
+        Assert.AreSame(ok, N8nSuggestionsProvider.WithRequestKey(ok, "0123456789abcdef"));
+        Assert.AreEqual("0123456789abcdef", ok.requestKey);
+
+        var empty = N8nSuggestionsProvider.MapResponse("{\"v\":1,\"requestSeq\":1,\"suggestions\":[],\"abstain\":true}", 5);
+        N8nSuggestionsProvider.WithRequestKey(empty, "0123456789abcdef");
+        Assert.IsNull(empty.requestKey, "an abstain/empty result has no set to name");
+
+        Assert.IsNull(N8nSuggestionsProvider.WithRequestKey(null, "x"));
+    }
 }

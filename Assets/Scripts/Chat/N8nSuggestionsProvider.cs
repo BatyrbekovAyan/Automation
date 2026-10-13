@@ -78,6 +78,7 @@ public class N8nSuggestionsProvider : ISuggestionsProvider
         // The open chat IS the active channel's chat (the seam guarantees it) — resolve the
         // profile/workflow ids by the active channel; the pure builder does the selection.
         ChatChannel channel = cm.ActiveChannel;
+        string requestKey = RequestKey(req, msgs);   // learning A: computed once — rides the payload AND the result
         string json = BuildPayloadJson(
             req,
             channel,
@@ -100,7 +101,7 @@ public class N8nSuggestionsProvider : ISuggestionsProvider
             // S1/S6/S7 (stage 5): the one knowledge contract (descriptions, contacts as fields, zone, version)
             // and the idempotent request key the daily counter dedupes on (a timeout retry is not a second request).
             knowledge:         BuildKnowledge(botName),
-            requestKey:        RequestKey(req, msgs));
+            requestKey:        requestKey);
 
         UnityWebRequest www = null;
         // S3 (stage 5): ONE deadline. The server stops the run at 20 s (workflow executionTimeout) and
@@ -115,7 +116,7 @@ public class N8nSuggestionsProvider : ISuggestionsProvider
             yield break;
         }
 
-        cb?.Invoke(MapResponse(www.downloadHandler.text, req.requestSeq));   // requestSeq stamped from the REQUEST
+        cb?.Invoke(WithRequestKey(MapResponse(www.downloadHandler.text, req.requestSeq), requestKey));   // requestSeq stamped from the REQUEST
     }
 
     // --- Catalog assembly (impure: reads PlayerPrefs) ------------------------
@@ -362,6 +363,13 @@ public class N8nSuggestionsProvider : ISuggestionsProvider
     /// — the model judged the message non-business; the quiet state, never the retry nag.
     /// <paramref name="requestSeq"/> is stamped from the REQUEST, not the server echo.
     /// </summary>
+    /// <summary>learning A: names the SET a result came from. Only an Ok result has a set; Empty/Error stay unnamed.</summary>
+    public static SuggestionResult WithRequestKey(SuggestionResult r, string requestKey)
+    {
+        if (r != null && r.status == SuggestionStatus.Ok) r.requestKey = requestKey;
+        return r;
+    }
+
     public static SuggestionResult MapResponse(string json, long requestSeq)
     {
         SuggestRepliesResponse r = null;
