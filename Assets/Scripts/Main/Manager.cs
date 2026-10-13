@@ -1083,9 +1083,18 @@ public partial class Manager : MonoBehaviour
     // so it is unit-testable without a Manager instance.
     public static string ComposeBusinessKnowledge(
         string description, string phone, string hours, string address, string instagram, string email)
+        => ComposeBusinessKnowledge(description, phone, hours, address, instagram, email, name: null);
+
+    // learning A (2026-10-13): the business NAME rides the owner's tail of the prompt (About Business), never the shared
+    // head — V10 classifies clone heads by content, so a per-bot substitution there would make every clone «custom».
+    // The «Границы темы» rule in _core.md names the business by this «Название:» line; without it the bot says «этого бизнеса».
+    public static string ComposeBusinessKnowledge(
+        string description, string phone, string hours, string address, string instagram, string email, string name)
     {
         var builder = new System.Text.StringBuilder();
-        builder.Append("About Business:\n").Append(description ?? "");
+        builder.Append("About Business:\n");
+        if (!string.IsNullOrWhiteSpace(name)) builder.Append("Название: ").Append(name.Trim()).Append('\n');
+        builder.Append(description ?? "");
 
         var contactLines = new System.Collections.Generic.List<string>();
         void AddContact(string label, string value)
@@ -1116,7 +1125,8 @@ public partial class Manager : MonoBehaviour
 
         return ComposeBusinessKnowledge(
             settings.BusinessField.Value,
-            Read(0), Read(1), Read(2), Read(3), Read(4));
+            Read(0), Read(1), Read(2), Read(3), Read(4),
+            settings.BotNameField != null ? settings.BotNameField.Value : null);
     }
 
     // Fills the contact cards from PlayerPrefs. Shared by the bot-recreate

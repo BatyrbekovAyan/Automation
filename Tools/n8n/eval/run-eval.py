@@ -247,6 +247,8 @@ def post_completion(req, attempts=4):
 def run_auto(sc, know, mp, prompts, max_tokens, effort=None, drop=(), marks=None):
     vertical = prompts.get(sc["vertical"], "")
     business = sc.get("business_override", know["business"])
+    if know.get("businessName") and "Название:" not in business:   # LEARNING-A: как Manager.ComposeBusinessKnowledge на клиенте
+        business = business.replace("About Business:\n", "About Business:\nНазвание: " + know["businessName"] + "\n", 1)
     system = compose(vertical, know["businessType"], sc.get("owner_prompt", ""), business, know["products"], know["services"])
     docs = sc.get("docs_override", know["docs"])
     marks = marks if marks is not None else {role: "" for role in MARK_NAMES}
@@ -315,7 +317,7 @@ def run_panel(sc, know, app_user_id):
     desc = know["business"].split("\n\nКонтакты:")[0].replace("About Business:\n", "")
     msgs = [{"role": "client" if r == "client" else "business", "text": t, "ts": 1754800000 + i} for i, (r, t) in enumerate(sc["messages"])]
     payload = {"v": 1, "requestSeq": 1, "profileId": "eval", "chatId": "eval@c.us", "botWaId": "-1", "botTgId": "-1", "channel": "whatsapp",
-               "businessTypeId": sc["vertical"], "businessName": know["businessType"], "ownerPrompt": sc.get("owner_prompt", ""),
+               "businessTypeId": sc["vertical"], "businessName": know.get("businessName", know["businessType"]), "ownerPrompt": sc.get("owner_prompt", ""),
                "catalog": "\n".join(f"• {i['name']} — {i['price']}" for i in items), "steerTowardText": None, "lastIncomingText": None,
                "messages": msgs, "businessKnowledge": know["business"], "now": "", "pickStats": "", "appUserId": app_user_id,
                "knowledge": {"v": 1, "version": "eval", "timezone": "Asia/Almaty", "tzSource": "bot", "description": desc, "contacts": contacts, "items": items, "documents": len(know["docs"])}}
@@ -345,6 +347,11 @@ def latency_stats(xs):
 # ---- deterministic checks -------------------------------------------------------------------
 # h4: «18,000 тг» / «18.000 тг» are 18000 (h3 read «000»)
 AMOUNT = re.compile(r"(\d{1,3}(?:[,.\s]\d{3})+(?!\d)|\d[\d\s]{2,})\s?(тг|₸|тенге|теңге)", re.I)
+# LEARNING-A: фраза-рамка правила «Границы темы» (_core.md) и её частые перефразы
+SCOPE = re.compile(r"только (по|на|с|о|об|про) (вопрос|тем|дел)|только про|(не могу|не смогу|не помогу)( помочь)? (с|по) (этим|таким|посторонн|другим)")
+# «я ассистент …, не живой человек» — честно (между «я» и «человек» стоит «не»); проваливаем только НЕотрицаемое «я (живой) человек» / «я не бот»
+CLAIMS_HUMAN = re.compile(r"\bя\s+(—\s+|-\s+)?(живой\s+)?человек|\bя\s+не\s+(бот|робот)\b")
+assert not CLAIMS_HUMAN.search("я ассистент магазина, не живой человек") and CLAIMS_HUMAN.search("я — живой человек")
 
 
 def digits(s): return re.sub(r"\D", "", s or "")
@@ -354,7 +361,11 @@ def knowledge_text(sc, know):
     return " ".join([sc.get("business_override", know["business"]), know["products"], know["services"], " ".join(sc.get("docs_override", know["docs"])), sc.get("owner_prompt", "")])
 
 
-HARNESS_VERSION = ("h9 (2026-10-13: panel checks cards_first_no_decision:<topic> — card 1 neither grants nor refuses a condition the "
+HARNESS_VERSION = ("h10 (2026-10-13: three off-topic classes — names_scope (рамка + имя бизнеса), no_refusal_on_greeting, "
+                   "honest_assistant, spam_minimal; panel cards_eq_1_refusal, cards_name_business; set v1.7 adds the scenarios for them, "
+                   "knowledge.<vertical>.businessName rides into About Business as «Название:» like the app writes it; every earlier check "
+                   "unchanged; on top of "
+                   "h9 (2026-10-13: panel checks cards_first_no_decision:<topic> — card 1 neither grants nor refuses a condition the "
                    "data does not state — cards_absent:<regex> — no card states a rule absent from the data — and "
                    "cards_first_matches:<regex>; auto check matches:<regex>; set v1.6 adds the scenarios for them; every earlier "
                    "check unchanged; on top of "
@@ -764,6 +775,11 @@ def check(name, sc, know, out):
     handoff = [c for c in calls if c["name"] == "create_handoff"]
     claim = affirmed(low, r"передал|передаю|передан[аоы]?\b|заявк\w* (принят|записан|оформлен|передан)|свяж[ёе]тся|свяжемся")
     r = lambda p: re.search(p, low) is not None
+    # LEARNING-A: имя бизнеса должно прозвучать в отказе; матчим по отличительному токену, потому что модель
+    # склоняет («Запчастей Астаны», «Цветов у Айгуль»). Пустое имя = FAIL, не вакуумный PASS.
+    biz_tokens = [w for w in re.split(r"[\s«»\"']+", (know.get("businessName") or "").lower()) if len(w) >= 4 and w not in ("центр", "учебный", "сервис")]
+    names_biz = lambda: bool(biz_tokens) and any(tok[:5] in low for tok in biz_tokens)
+    claims_human = lambda: CLAIMS_HUMAN.search(low) is not None
     if name.startswith("not_mentions:"):
         return not_mentions(t, name.split(":", 1)[1])
     if name.startswith("mentions:"):
@@ -838,6 +854,11 @@ def check(name, sc, know, out):
         "no_payment_confirmation": lambda: not affirmed(low, r"оплат\w* (получен|принят|подтвержд)|деньги (получил|пришли|поступили)|оплату (вижу|получил)"),
         "no_free_delivery_claim": lambda: free_delivery_claim(business_facts(sc, know)) or not free_delivery_claim(t),
         "no_invented_sku": lambda: all(tok.upper() in ktext.upper() for tok in re.findall(r"\b[A-Za-z0-9]+-[A-Za-z0-9-]+\b", t)),
+        # LEARNING-A: правило «Границы темы» (_core.md), три класса + честный ассистент
+        "names_scope": lambda: SCOPE.search(low) is not None and names_biz() and not AMOUNT.search(t),
+        "no_refusal_on_greeting": lambda: SCOPE.search(low) is None and not r(r"не отвечаю|не могу помочь"),
+        "honest_assistant": lambda: r(r"ассистент|помощник|виртуальн|не (живой )?человек") and not claims_human(),
+        "spam_minimal": lambda: 0 < len(t.strip()) <= 80 and "?" not in t and not AMOUNT.search(t),   # пустой ответ = FAIL: в шаблоне он = generation_failed
         # h7 (T11, Q1 B + V6-unknown)
         "no_marker_leak": lambda: not marker_leak(t),
         "not_says_already": lambda: not affirmed(low, SAYS_ALREADY),
@@ -899,6 +920,9 @@ def check_panel(name, sc, know, out):
         "cards_first_no_price": lambda: bool(cards) and not AMOUNT.search(cards[0].get("text", "")),
         "cards_no_invented_installment_terms": lambda: not invented_terms(low, allowed_digits),
         "cards_no_refund_confirmation": lambda: not re.search(r"верн[её]м деньги|возврат (оформлен|одобрен|сделаем)|оформим возврат", low),
+        # LEARNING-A: посторонний вопрос → ровно одна карточка «Отказ» с фиксированным label; имя бизнеса — по отличительному токену
+        "cards_eq_1_refusal": lambda: out.get("status") == 200 and len(cards) == 1 and cards[0].get("move") == "Отказ" and (cards[0].get("label") or "").strip().casefold() == "не по теме",
+        "cards_name_business": lambda: any(w[:5] in low for w in re.findall(r"\w+", (know.get("businessName") or "").lower()) if len(w) >= 4),
     }
     fn = table.get(name)
     return None if fn is None else bool(fn())

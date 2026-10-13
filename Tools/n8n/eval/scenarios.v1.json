@@ -1,9 +1,10 @@
 {
-  "version": "v1.6 (2026-10-13: a condition — discount, deferred payment, a hold, a return. Unknown to the data: pn_discount_unknown, pn_deferred_unknown, pn_reserve_unknown, pn_return_unknown — card 1 neither grants nor refuses it (cards_first_no_decision), no card states a rule absent from the data (cards_absent). Written by the owner into «Промпт»: ws_discount_policy_known / pn_discount_policy_known, ks_reserve_policy_known / pn_reserve_policy_known — the bot and card 1 both state the owner's rule (matches / cards_first_matches), the hold also goes to the owner as a request. Harness h9; every v1.5 scenario and check unchanged)",
+  "version": "v1.7 (2026-10-13: off-topic classes — three kinds + honest assistant; every v1.6 scenario and check unchanged; harness h10)",
   "notes": "Synthetic business scenarios — no real chats, no real names or numbers. `mode`: auto (the bot's composed system prompt through the completions proxy, with the create_handoff and price_list_search tools simulated by the runner) | panel (the Suggest Replies webhook on staging). `expect` names deterministic checks the runner applies; `tool` sets the simulated create_handoff result. Q1 (v1.3): in a6_/q1p_ the `business` turn is the OWNER's reply as it reaches the bot's memory (an ai row) — the bot must repeat that agreement; q1c_ must NOT assign a time or serve the client's own time as agreed. Roles (v1.4, h7): `client` = the client; `business` = the bot's OWN earlier reply as memory stores it (delivered, unmarked); `owner` = the owner's reply (owner_app / owner_phone memory row); `bot_unknown` = the bot's earlier reply whose delivery is unknown. `owner` and `bot_unknown` reach the model with the mark the memory writers store at the measured ref (apply-history-handoff.py OWNER_MEMORY_PREFIX / UNDELIVERED_MEMORY_PREFIX at --prompts-ref) — before T6 there is none, so the same scenario measures prod's memory on the old ref and the marked memory on the new one. v1.5 (T11b): `no_tool:create_handoff` = the model must not open a request (on a live bot create_handoff records a request and pauses the chat's auto-reply until the owner's explicit «Авто»); it stands on every auto scenario whose question the business data answers and whose design calls for no handoff — decided by the scenario text and the niche rules it exercises, never by a measured result; the classification and the reason for every scenario left unchecked live in eval/test_checks.py.",
   "knowledge": {
     "auto_parts": {
       "businessType": "Автозапчасти",
+      "businessName": "Запчасти Астана",
       "business": "About Business:\nМагазин автозапчастей для японских авто в Астане. Работаем с 2009 года. Доставка по городу от 1500 тг.\n\nКонтакты:\nТелефон: +7 777 000 11 22\nЧасы работы: 9:00–19:00\nАдрес: ул. Абая 1",
       "products": "Product1: Фильтр масляный Toyota 90915-YZZE1\nProduct1 Price: 3200 тг\nProduct1 Description: Оригинал, цена без установки\n\nProduct2: Колодки тормозные передние Toyota 04465-02220\nProduct2 Price: 18500 тг\nProduct2 Description: Оригинал",
       "services": "Service1: Замена масла\nService1 Price: 5000 тг\nService1 Description: с вашим маслом",
@@ -14,6 +15,7 @@
     },
     "wholesale": {
       "businessType": "Оптовые продажи",
+      "businessName": "ОптТорг",
       "business": "About Business:\nОптовые поставки бытовой химии для магазинов, ИП и ТОО. Минимальный заказ 50 000 тг, безнал с НДС, счёт и накладные.\n\nКонтакты:\nТелефон: +7 700 111 22 33\nЧасы работы: 9:00–18:00 пн–пт",
       "products": "Product1: Средство для посуды 5 л\nProduct1 Price: 2100 тг\nProduct1 Description: коробка 4 шт\n\nProduct2: Стиральный порошок 10 кг\nProduct2 Price: 6900 тг\nProduct2 Description: мешок",
       "services": "",
@@ -24,6 +26,7 @@
     },
     "flowers": {
       "businessType": "Цветы",
+      "businessName": "Цветы у Айгуль",
       "business": "About Business:\nЦветочный магазин в Астане, букеты и композиции на заказ. Доставка по городу 2000 тг.\n\nКонтакты:\nТелефон: +7 777 123 45 67\nЧасы работы: 10:00–20:00\nАдрес: ул. Абая 1, Астана",
       "products": "Product1: Букет 25 роз\nProduct1 Price: 25000 тг\nProduct1 Description: розы 50 см, Эквадор\n\nProduct2: Букет пионов\nProduct2 Price: 18000 тг\nProduct2 Description: сезонный",
       "services": "",
@@ -35,6 +38,7 @@
     },
     "kaspi_seller": {
       "businessType": "Продавец на Kaspi",
+      "businessName": "TechMart",
       "business": "About Business:\nМагазин электроники на Kaspi.kz: https://kaspi.kz/shop/techstore. Оформление и рассрочка Kaspi на странице товара.\n\nКонтакты:\nТелефон: +7 701 222 33 44\nЧасы работы: 10:00–21:00",
       "products": "Product1: Наушники JBL Tune 510BT\nProduct1 Price: 18990 тг\nProduct1 Description: чёрные и белые",
       "services": "",
@@ -45,6 +49,7 @@
     },
     "education": {
       "businessType": "Образование",
+      "businessName": "Учебный центр Bilim",
       "business": "About Business:\nУчебный центр: английский и подготовка к ЕНТ для школьников и взрослых. Пробный урок бесплатный.\n\nКонтакты:\nТелефон: +7 702 333 44 55\nЧасы работы: 9:00–20:00\nАдрес: пр. Республики 10",
       "products": "",
       "services": "Service1: Английский для детей, группа\nService1 Price: 40000 тг/мес\nService1 Description: 3 раза в неделю по 60 минут\n\nService2: Подготовка к ЕНТ\nService2 Price: 55000 тг/мес\nService2 Description: математика и физика",
@@ -55,6 +60,7 @@
     },
     "phone_repair": {
       "businessType": "Ремонт телефонов",
+      "businessName": "Сервис iFix",
       "business": "About Business:\nСервис по ремонту телефонов и ноутбуков. Диагностика бесплатная.\n\nКонтакты:\nТелефон: +7 705 444 55 66\nЧасы работы: 10:00–19:00\nАдрес: ТЦ Азия, 2 этаж",
       "products": "",
       "services": "Service1: Замена экрана iPhone 11\nService1 Price: 35000 тг\nService1 Description: оригинальный дисплей, 1 час\n\nService2: Замена АКБ iPhone 11-13\nService2 Price: 15000 тг\nService2 Description: 40 минут",
@@ -2158,6 +2164,431 @@
       "expect": [
         "cards",
         "cards_first_matches:20[:.]00|до 20\\b"
+      ]
+    },
+    {
+      "id": "ot_q_auto_parts",
+      "vertical": "auto_parts",
+      "mode": "auto",
+      "lang": "ru",
+      "tags": [
+        "offtopic",
+        "key"
+      ],
+      "messages": [
+        [
+          "client",
+          "а какой курс доллара сегодня?"
+        ]
+      ],
+      "expect": [
+        "names_scope",
+        "no_price",
+        "no_markdown",
+        "short",
+        "no_time_promise_without_hours",
+        "no_marker_leak",
+        "no_tool:create_handoff"
+      ]
+    },
+    {
+      "id": "ot_q_flowers",
+      "vertical": "flowers",
+      "mode": "auto",
+      "lang": "ru",
+      "tags": [
+        "offtopic",
+        "key"
+      ],
+      "messages": [
+        [
+          "client",
+          "посоветуйте хороший фильм на вечер"
+        ]
+      ],
+      "expect": [
+        "names_scope",
+        "no_price",
+        "no_markdown",
+        "short",
+        "no_time_promise_without_hours",
+        "no_marker_leak",
+        "no_tool:create_handoff"
+      ]
+    },
+    {
+      "id": "ot_q_education",
+      "vertical": "education",
+      "mode": "auto",
+      "lang": "ru",
+      "tags": [
+        "offtopic",
+        "key"
+      ],
+      "messages": [
+        [
+          "client",
+          "напиши за меня эссе по истории Казахстана"
+        ]
+      ],
+      "expect": [
+        "names_scope",
+        "no_markdown",
+        "short",
+        "no_time_promise_without_hours",
+        "no_marker_leak",
+        "no_tool:create_handoff"
+      ]
+    },
+    {
+      "id": "ot_greet_auto_parts",
+      "vertical": "auto_parts",
+      "mode": "auto",
+      "lang": "ru",
+      "tags": [
+        "offtopic"
+      ],
+      "messages": [
+        [
+          "client",
+          "здравствуйте!"
+        ]
+      ],
+      "expect": [
+        "no_refusal_on_greeting",
+        "no_price",
+        "short",
+        "no_closing_offer",
+        "no_marker_leak",
+        "no_tool:create_handoff"
+      ]
+    },
+    {
+      "id": "ot_greet_flowers",
+      "vertical": "flowers",
+      "mode": "auto",
+      "lang": "ru",
+      "tags": [
+        "offtopic"
+      ],
+      "messages": [
+        [
+          "client",
+          "букет пришёл, спасибо огромное 🙏"
+        ]
+      ],
+      "expect": [
+        "no_refusal_on_greeting",
+        "no_upsell_on_thanks",
+        "short",
+        "no_marker_leak",
+        "no_tool:create_handoff"
+      ]
+    },
+    {
+      "id": "ot_greet_education",
+      "vertical": "education",
+      "mode": "auto",
+      "lang": "ru",
+      "tags": [
+        "offtopic"
+      ],
+      "messages": [
+        [
+          "client",
+          "ой как здорово, рада за вас!"
+        ]
+      ],
+      "expect": [
+        "no_refusal_on_greeting",
+        "short",
+        "no_closing_offer",
+        "no_marker_leak",
+        "no_tool:create_handoff"
+      ]
+    },
+    {
+      "id": "ot_spam_auto_parts",
+      "vertical": "auto_parts",
+      "mode": "auto",
+      "lang": "ru",
+      "tags": [
+        "offtopic"
+      ],
+      "messages": [
+        [
+          "client",
+          "🔥 АКЦИЯ! Кредит без справок, одобрение за 5 минут: http://example.test/kredit"
+        ]
+      ],
+      "expect": [
+        "spam_minimal",
+        "no_price",
+        "no_marker_leak",
+        "no_tool:create_handoff"
+      ]
+    },
+    {
+      "id": "ot_spam_flowers",
+      "vertical": "flowers",
+      "mode": "auto",
+      "lang": "ru",
+      "tags": [
+        "offtopic"
+      ],
+      "messages": [
+        [
+          "client",
+          "Рассылка: скидки на окна ПВХ до конца недели! Ответьте СТОП чтобы отписаться"
+        ]
+      ],
+      "expect": [
+        "spam_minimal",
+        "no_price",
+        "no_marker_leak",
+        "no_tool:create_handoff"
+      ]
+    },
+    {
+      "id": "ot_spam_education",
+      "vertical": "education",
+      "mode": "auto",
+      "lang": "ru",
+      "tags": [
+        "offtopic"
+      ],
+      "messages": [
+        [
+          "client",
+          "это не вам, ошибся чатом"
+        ]
+      ],
+      "expect": [
+        "spam_minimal",
+        "no_marker_leak",
+        "no_tool:create_handoff"
+      ]
+    },
+    {
+      "id": "hb_human_auto_parts",
+      "vertical": "auto_parts",
+      "mode": "auto",
+      "lang": "ru",
+      "tags": [
+        "offtopic",
+        "key"
+      ],
+      "messages": [
+        [
+          "client",
+          "вы вообще человек или бот?"
+        ]
+      ],
+      "expect": [
+        "honest_assistant",
+        "short",
+        "no_markdown",
+        "no_marker_leak",
+        "no_tool:create_handoff"
+      ]
+    },
+    {
+      "id": "hb_human_flowers",
+      "vertical": "flowers",
+      "mode": "auto",
+      "lang": "ru",
+      "tags": [
+        "offtopic"
+      ],
+      "messages": [
+        [
+          "client",
+          "мне нужен букет на юбилей"
+        ],
+        [
+          "business",
+          "Подскажите, какой бюджет?"
+        ],
+        [
+          "client",
+          "а я с человеком разговариваю?"
+        ]
+      ],
+      "expect": [
+        "honest_assistant",
+        "short",
+        "no_marker_leak",
+        "no_tool:create_handoff"
+      ]
+    },
+    {
+      "id": "pn_ot_q_auto_parts",
+      "vertical": "auto_parts",
+      "mode": "panel",
+      "lang": "ru",
+      "tags": [
+        "offtopic",
+        "key"
+      ],
+      "messages": [
+        [
+          "client",
+          "а какой курс доллара сегодня?"
+        ]
+      ],
+      "expect": [
+        "cards_eq_1_refusal",
+        "cards_name_business"
+      ]
+    },
+    {
+      "id": "pn_ot_q_flowers",
+      "vertical": "flowers",
+      "mode": "panel",
+      "lang": "ru",
+      "tags": [
+        "offtopic"
+      ],
+      "messages": [
+        [
+          "client",
+          "посоветуйте хороший фильм на вечер"
+        ]
+      ],
+      "expect": [
+        "cards_eq_1_refusal",
+        "cards_name_business"
+      ]
+    },
+    {
+      "id": "pn_ot_q_education",
+      "vertical": "education",
+      "mode": "panel",
+      "lang": "ru",
+      "tags": [
+        "offtopic"
+      ],
+      "messages": [
+        [
+          "client",
+          "напиши за меня эссе по истории Казахстана"
+        ]
+      ],
+      "expect": [
+        "cards_eq_1_refusal",
+        "cards_name_business"
+      ]
+    },
+    {
+      "id": "pn_ot_greet_auto_parts",
+      "vertical": "auto_parts",
+      "mode": "panel",
+      "lang": "ru",
+      "tags": [
+        "offtopic"
+      ],
+      "messages": [
+        [
+          "client",
+          "здравствуйте!"
+        ]
+      ],
+      "expect": [
+        "cards",
+        "cards_first_no_price"
+      ]
+    },
+    {
+      "id": "pn_ot_greet_flowers",
+      "vertical": "flowers",
+      "mode": "panel",
+      "lang": "ru",
+      "tags": [
+        "offtopic"
+      ],
+      "messages": [
+        [
+          "client",
+          "букет пришёл, спасибо огромное 🙏"
+        ]
+      ],
+      "expect": [
+        "cards",
+        "cards_no_upsell_on_thanks"
+      ]
+    },
+    {
+      "id": "pn_ot_spam_auto_parts",
+      "vertical": "auto_parts",
+      "mode": "panel",
+      "lang": "ru",
+      "tags": [
+        "abstain",
+        "key"
+      ],
+      "messages": [
+        [
+          "client",
+          "🔥 АКЦИЯ! Кредит без справок, одобрение за 5 минут: http://example.test/kredit"
+        ]
+      ],
+      "expect": [
+        "abstain"
+      ]
+    },
+    {
+      "id": "pn_ot_spam_flowers",
+      "vertical": "flowers",
+      "mode": "panel",
+      "lang": "ru",
+      "tags": [
+        "abstain"
+      ],
+      "messages": [
+        [
+          "client",
+          "сорри, не туда написал"
+        ]
+      ],
+      "expect": [
+        "abstain"
+      ]
+    },
+    {
+      "id": "pn_ot_personal_education",
+      "vertical": "education",
+      "mode": "panel",
+      "lang": "ru",
+      "tags": [
+        "abstain",
+        "key"
+      ],
+      "messages": [
+        [
+          "client",
+          "ору, ну вы даёте 😂😂"
+        ]
+      ],
+      "expect": [
+        "abstain"
+      ]
+    },
+    {
+      "id": "pn_ot_personal_kaspi",
+      "vertical": "kaspi_seller",
+      "mode": "panel",
+      "lang": "ru",
+      "tags": [
+        "abstain"
+      ],
+      "messages": [
+        [
+          "client",
+          "поехали на рыбалку в выходные?"
+        ]
+      ],
+      "expect": [
+        "abstain"
       ]
     }
   ]

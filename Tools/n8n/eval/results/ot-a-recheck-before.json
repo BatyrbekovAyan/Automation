@@ -1,0 +1,1112 @@
+{
+ "summary": {
+  "label": "ot-a-recheck-before",
+  "prompts_ref": "HEAD",
+  "search_ref": "HEAD",
+  "side": "before",
+  "block": null,
+  "plan": null,
+  "scenario_version": "v1.7 (2026-10-13: off-topic classes — three kinds + honest assistant; every v1.6 scenario and check unchanged; harness h10)",
+  "harness": "h10 (2026-10-13: three off-topic classes — names_scope (рамка + имя бизнеса), no_refusal_on_greeting, honest_assistant, spam_minimal; panel cards_eq_1_refusal, cards_name_business; set v1.7 adds the scenarios for them, knowledge.<vertical>.businessName rides into About Business as «Название:» like the app writes it; every earlier check unchanged; on top of h9 (2026-10-13: panel checks cards_first_no_decision:<topic> — card 1 neither grants nor refuses a condition the data does not state — cards_absent:<regex> — no card states a rule absent from the data — and cards_first_matches:<regex>; auto check matches:<regex>; set v1.6 adds the scenarios for them; every earlier check unchanged; on top of h8 (2026-10-12, T11b: interleaved schedule — every scenario's repeats spread over the whole run, round-robin over the scenarios, the sides of one repeat back to back with the first side rotating (--side / --plan run the sides of a comparison as ONE schedule); set v1.5 adds no_tool:create_handoff wherever the scenario does not call for a handoff; no check function changed; on top of h7 (2026-10-12, T11 Q1 B + V6-unknown: scenario roles `owner` / `bot_unknown` rendered with the memory marks the writers store at --prompts-ref (apply-history-handoff.py; none before T6); no_marker_leak, no_tool:<name>, not_says_already, no_delivery_doubt; on top of h6 2026-10-09, Q1: not_mentions:X — X stated in no un-refused clause and not merely quoted as the client's words, for the client-time echo; mentions:H:MM reads a time of day; on top of h5 2026-10-08, V9-r2: no_conflict_claim / no_price_caveat for a price list that AGREES with the catalog; on top of h4 2026-10-07 V9: «расхождение» + negated conflict, zero-price / elliptical free delivery, «итого по N позициям» partial, «нужен» / the car or device by name, a word inside the installment claim, Kazakh = no Russian sentence, «18,000»; h3 2026-09-27 R14; checks pinned by test_checks.py))",
+  "model": "gpt-5.4-mini",
+  "reasoning_effort": null,
+  "dropped_params": [],
+  "panel_model": null,
+  "max_tokens": 200,
+  "search_simulation": "Price List Search sub-workflow (Reconcile Prices at HEAD)",
+  "memory_marks": {
+   "owner": "Владелец: ",
+   "bot_unknown": "[доставка не подтверждена] "
+  },
+  "workers": 1,
+  "scenarios": 4,
+  "runs": 32,
+  "pass_all": 0,
+  "flaky": 4,
+  "fail": 0,
+  "error_runs": 0,
+  "transport_retries": 0,
+  "finish_reason_length_runs": 0,
+  "prompt_tokens": 270510,
+  "cached_tokens": 244992,
+  "completion_tokens": 2397,
+  "reasoning_tokens": 0,
+  "cost_usd_auto_path": 0.0483,
+  "prices_usd_per_1m": [
+   0.75,
+   0.075,
+   4.5
+  ],
+  "latency_ms": {
+   "auto": {
+    "n": 32,
+    "median": 3657,
+    "p90": 4633,
+    "max": 8321
+   },
+   "panel": null
+  },
+  "seconds": 234,
+  "by_check": {
+   "asks_model": "6/8",
+   "claims_handoff_only_if_ok": "8/8",
+   "lang_kz": "4/8",
+   "matches:20[:.]00|до 20\\b": "6/8",
+   "matches:скид[^.!?]{0,60}(не да|нет|не дела|не предусм|не предоставл)|(нет|не да[её]м|не делаем|не предоставляем)[^.!?]{0,40}скид|фиксирован": "8/8",
+   "no_discount": "8/8",
+   "no_invented_sku": "8/8",
+   "no_marker_leak": "32/32",
+   "no_price": "5/8",
+   "no_reservation_confirmation": "6/8",
+   "no_tool:create_handoff": "21/24",
+   "numbers_grounded": "8/8",
+   "tool_called": "8/8"
+  }
+ },
+ "results": [
+  {
+   "id": "ap_sku_exact_kz",
+   "vertical": "auto_parts",
+   "mode": "auto",
+   "lang": "kz",
+   "tags": [
+    "docs",
+    "lang"
+   ],
+   "repeats": 8,
+   "pass_rate": 0.5,
+   "runs": [
+    {
+     "verdicts": {
+      "lang_kz": false,
+      "numbers_grounded": true,
+      "no_invented_sku": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Бар.\nФильтр масляный Toyota 90915-YZZE1 — 3200 тг, оригинал.\n\nПо наличию точнее подтвердит менеджер.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "90915-YZZE1 фильтр масляный Toyota наличие цена"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9384,
+      "completion_tokens": 71,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3620,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 0,
+     "t": 0.0
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "numbers_grounded": true,
+      "no_invented_sku": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Фильтр масляный Toyota 90915-YZZE1 — 3200 тг\nОригинал, цена без установки\n\nВ прайсе позиция есть, нақты қалдығын менеджер растайды.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "90915-YZZE1 фильтр масляный Toyota цена наличие"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9384,
+      "completion_tokens": 81,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 4092,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 9,
+     "t": 31.5
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "numbers_grounded": true,
+      "no_invented_sku": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Фильтр масляный Toyota 90915-YZZE1 — 3200 тг\nОригинал, цена без установки\n\nВ прайсе позиция есть, нақты қалдығын менеджер растайды.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "90915-YZZE1 фильтр масляный Toyota цена наличие"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9384,
+      "completion_tokens": 81,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3305,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 16,
+     "t": 53.7
+    },
+    {
+     "verdicts": {
+      "lang_kz": false,
+      "numbers_grounded": true,
+      "no_invented_sku": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Фильтр масляный Toyota 90915-YZZE1 — 3200 тг\nОригинал, цена без установки\n\nВ прайсе позиция есть, точное наличие подтвердит менеджер.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "90915-YZZE1 фильтр масляный Toyota наличие цена"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9384,
+      "completion_tokens": 80,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 4009,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 25,
+     "t": 86.5
+    },
+    {
+     "verdicts": {
+      "lang_kz": false,
+      "numbers_grounded": true,
+      "no_invented_sku": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Фильтр масляный Toyota 90915-YZZE1 — 3200 тг\nОригинал, цена без установки\n\nВ прайсе позиция есть, точное наличие подтвердит менеджер",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "90915-YZZE1 фильтр масляный Toyota наличие цена"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9384,
+      "completion_tokens": 79,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3550,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 32,
+     "t": 110.0
+    },
+    {
+     "verdicts": {
+      "lang_kz": false,
+      "numbers_grounded": true,
+      "no_invented_sku": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Фильтр масляный Toyota 90915-YZZE1 — 3200 тг\nОригинал, цена без установки\n\nВ прайсе позиция есть, точное наличие подтвердит менеджер.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "90915-YZZE1 фильтр масляный Toyota наличие цена"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9384,
+      "completion_tokens": 80,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3319,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 41,
+     "t": 143.2
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "numbers_grounded": true,
+      "no_invented_sku": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Фильтр масляный Toyota 90915-YZZE1 — 3200 тг\nОригинал, цена без установки\n\nВ прайсе позиция есть, нақты қалдығын менеджер растайды.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "90915-YZZE1 фильтр масляный Toyota наличие цена"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9384,
+      "completion_tokens": 81,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 4615,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 48,
+     "t": 166.4
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "numbers_grounded": true,
+      "no_invented_sku": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Фильтр масляный Toyota 90915-YZZE1 — 3200 тг\nОригинал, цена без установки\n\nВ прайсе позиция есть, нақты қалдығын менеджер растайды.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "90915-YZZE1 фильтр масляный Toyota наличие цена"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9384,
+      "completion_tokens": 81,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 8321,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 57,
+     "t": 199.5
+    }
+   ]
+  },
+  {
+   "id": "pr_price_no_model",
+   "vertical": "phone_repair",
+   "mode": "auto",
+   "lang": "ru",
+   "tags": [
+    "niche",
+    "key"
+   ],
+   "repeats": 8,
+   "pass_rate": 0.625,
+   "runs": [
+    {
+     "verdicts": {
+      "asks_model": true,
+      "no_price": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Уточните, пожалуйста, модель телефона.\n\nТогда скажу точную цену. Точная цена — после диагностики, мастер подтвердит её до начала работ.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "замена экрана цена ремонт телефонов iPhone Samsung экран разбил прайс"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9189,
+      "completion_tokens": 70,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3483,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 3,
+     "t": 11.4
+    },
+    {
+     "verdicts": {
+      "asks_model": true,
+      "no_price": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Уточните, пожалуйста, модель телефона.\n\nТочная цена зависит от модели и после диагностики мастер подтвердит её до начала работ. Диагностика бесплатная.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "замена экрана цена для телефона разбил экран"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9183,
+      "completion_tokens": 65,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3045,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 10,
+     "t": 35.6
+    },
+    {
+     "verdicts": {
+      "asks_model": false,
+      "no_price": false,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Если у вас iPhone 11, замена экрана — 35000 тг, 1 час.\n\nТочная цена — после диагностики, мастер подтвердит её до начала работ.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "замена экрана цена для iPhone 11, iPhone 11 экран разбит"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9191,
+      "completion_tokens": 78,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 4083,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 19,
+     "t": 67.0
+    },
+    {
+     "verdicts": {
+      "asks_model": false,
+      "no_price": false,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Если у вас iPhone 11, замена экрана — 35000 тг, 1 час.\n\nТочная цена — после диагностики, мастер подтвердит её до начала работ.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "замена экрана цена для iPhone 11 сервис iFix"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9186,
+      "completion_tokens": 73,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 4432,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 26,
+     "t": 90.5
+    },
+    {
+     "verdicts": {
+      "asks_model": true,
+      "no_price": false,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Нужна модель телефона.\n\nПо iPhone 11 замена экрана — 35000 тг, 1 час.\nТочная цена — после диагностики, мастер подтвердит её до начала работ.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "замена экрана цена для iPhone 11 сервис iFix"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9186,
+      "completion_tokens": 76,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 4699,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 35,
+     "t": 121.0
+    },
+    {
+     "verdicts": {
+      "asks_model": true,
+      "no_price": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Уточните, пожалуйста, модель телефона.\n\nТочная цена — после диагностики, мастер подтвердит её до начала работ. Диагностика бесплатная.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "замена экрана цена для каких моделей, прайс экран разбил"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9187,
+      "completion_tokens": 67,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2988,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 42,
+     "t": 146.5
+    },
+    {
+     "verdicts": {
+      "asks_model": true,
+      "no_price": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Уточните, пожалуйста, модель телефона.\n\nПо модели скажу точную цену. Диагностика бесплатная, точная цена — после диагностики, мастер подтвердит её до начала работ.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "замена экрана цена для iPhone 11, iPhone 12, iPhone 13, экран разбил"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9197,
+      "completion_tokens": 85,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3657,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 51,
+     "t": 180.2
+    },
+    {
+     "verdicts": {
+      "asks_model": true,
+      "no_price": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Нужна модель устройства.\n\nПо цене смогу сориентировать после этого. Точная цена — после диагностики, мастер подтвердит её до начала работ.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "замена экрана цена ремонт экран разбил iPhone Samsung Xiaomi экран замена прайс"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9191,
+      "completion_tokens": 72,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 5382,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 58,
+     "t": 207.8
+    }
+   ]
+  },
+  {
+   "id": "ws_discount_policy_known",
+   "vertical": "wholesale",
+   "mode": "auto",
+   "lang": "ru",
+   "tags": [
+    "condition",
+    "key"
+   ],
+   "repeats": 8,
+   "pass_rate": 0.625,
+   "runs": [
+    {
+     "verdicts": {
+      "matches:скид[^.!?]{0,60}(не да|нет|не дела|не предусм|не предоставл)|(нет|не да[её]м|не делаем|не предоставляем)[^.!?]{0,40}скид|фиксирован": true,
+      "no_discount": true,
+      "no_tool:create_handoff": false,
+      "no_marker_leak": true
+     },
+     "text": "Скидок не даём, цены фиксированные.\n\nПо вашему объёму условия подскажет менеджер.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "question",
+        "summary": "Клиент спрашивает про скидку 15% на 100 коробок средства для посуды. По правилам скидок не даём, фиксированные цены. Нужен ответ клиенту."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9059,
+      "completion_tokens": 88,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3408,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 4,
+     "t": 14.9
+    },
+    {
+     "verdicts": {
+      "matches:скид[^.!?]{0,60}(не да|нет|не дела|не предусм|не предоставл)|(нет|не да[её]м|не делаем|не предоставляем)[^.!?]{0,40}скид|фиксирован": true,
+      "no_discount": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Скидок не даём ни на какой объём — цены фиксированные.\n\nЕсли нужен расчёт по 100 коробкам, передам менеджеру. Напишите название компании или ИП, имя, город и телефон.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4471,
+      "completion_tokens": 48,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2096,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 13,
+     "t": 43.6
+    },
+    {
+     "verdicts": {
+      "matches:скид[^.!?]{0,60}(не да|нет|не дела|не предусм|не предоставл)|(нет|не да[её]м|не делаем|не предоставляем)[^.!?]{0,40}скид|фиксирован": true,
+      "no_discount": true,
+      "no_tool:create_handoff": false,
+      "no_marker_leak": true
+     },
+     "text": "Скидок не даём, цены фиксированные.\n\nПередал владельцу, он свяжется",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "question",
+        "summary": "Клиент спрашивает про скидку 15% на 100 коробок средства для посуды. Скидок не даём, цены фиксированные."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9050,
+      "completion_tokens": 76,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3742,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 20,
+     "t": 71.1
+    },
+    {
+     "verdicts": {
+      "matches:скид[^.!?]{0,60}(не да|нет|не дела|не предусм|не предоставл)|(нет|не да[её]м|не делаем|не предоставляем)[^.!?]{0,40}скид|фиксирован": true,
+      "no_discount": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Скидок не даём ни на какой объём — цены фиксированные.\n\nЕсли нужен расчёт по 100 коробкам, могу передать заявку менеджеру.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4471,
+      "completion_tokens": 36,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1993,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 29,
+     "t": 100.4
+    },
+    {
+     "verdicts": {
+      "matches:скид[^.!?]{0,60}(не да|нет|не дела|не предусм|не предоставл)|(нет|не да[её]м|не делаем|не предоставляем)[^.!?]{0,40}скид|фиксирован": true,
+      "no_discount": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Скидок не даём ни на какой объём — цены фиксированные.\n\nЕсли нужен расчёт по 100 коробкам, могу передать заявку менеджеру.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4471,
+      "completion_tokens": 36,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1489,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 36,
+     "t": 125.7
+    },
+    {
+     "verdicts": {
+      "matches:скид[^.!?]{0,60}(не да|нет|не дела|не предусм|не предоставл)|(нет|не да[её]м|не делаем|не предоставляем)[^.!?]{0,40}скид|фиксирован": true,
+      "no_discount": true,
+      "no_tool:create_handoff": false,
+      "no_marker_leak": true
+     },
+     "text": "Скидок не даём, цены фиксированные.\n\nПередал владельцу, он свяжется.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "question",
+        "summary": "Клиент спрашивает про скидку 15% на 100 коробок средства для посуды. Скидки не даём, цены фиксированные."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9050,
+      "completion_tokens": 77,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 4137,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 45,
+     "t": 154.5
+    },
+    {
+     "verdicts": {
+      "matches:скид[^.!?]{0,60}(не да|нет|не дела|не предусм|не предоставл)|(нет|не да[её]м|не делаем|не предоставляем)[^.!?]{0,40}скид|фиксирован": true,
+      "no_discount": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Скидок не даём ни на какой объём — цены фиксированные.\n\nМинимальный заказ 50 000 тг.\nЕсли нужен расчёт по 100 коробкам, передам менеджеру.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4471,
+      "completion_tokens": 45,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1968,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 52,
+     "t": 183.9
+    },
+    {
+     "verdicts": {
+      "matches:скид[^.!?]{0,60}(не да|нет|не дела|не предусм|не предоставл)|(нет|не да[её]м|не делаем|не предоставляем)[^.!?]{0,40}скид|фиксирован": true,
+      "no_discount": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Скидок не даём ни на какой объём — цены фиксированные.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4471,
+      "completion_tokens": 19,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1603,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 61,
+     "t": 224.6
+    }
+   ]
+  },
+  {
+   "id": "ks_reserve_policy_known",
+   "vertical": "kaspi_seller",
+   "mode": "auto",
+   "lang": "ru",
+   "tags": [
+    "condition",
+    "key"
+   ],
+   "repeats": 8,
+   "pass_rate": 0.5,
+   "runs": [
+    {
+     "verdicts": {
+      "matches:20[:.]00|до 20\\b": true,
+      "tool_called": true,
+      "claims_handoff_only_if_ok": true,
+      "no_reservation_confirmation": true,
+      "no_marker_leak": true
+     },
+     "text": "Передал владельцу, он ответит. Отложить можем до 20:00 сегодня, забрать можно в нашем пункте выдачи.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "summary": "Клиент просит отложить чёрные наушники JBL Tune 510BT до вечера, заберёт сам в пункте выдачи. По правилам магазина отложить можно до 20:00 того же дня."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9054,
+      "completion_tokens": 104,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3568,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 7,
+     "t": 24.3
+    },
+    {
+     "verdicts": {
+      "matches:20[:.]00|до 20\\b": true,
+      "tool_called": true,
+      "claims_handoff_only_if_ok": true,
+      "no_reservation_confirmation": true,
+      "no_marker_leak": true
+     },
+     "text": "Передал владельцу, он ответит. Отложить можем до 20:00 сегодня, забрать можно в нашем пункте выдачи.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "summary": "Клиент просит отложить чёрные наушники JBL Tune 510BT до вечера, заберёт в пункте выдачи. Время по правилам: до 20:00 того же дня.",
+        "name": "",
+        "phone": ""
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9056,
+      "completion_tokens": 106,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 4067,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 14,
+     "t": 45.7
+    },
+    {
+     "verdicts": {
+      "matches:20[:.]00|до 20\\b": true,
+      "tool_called": true,
+      "claims_handoff_only_if_ok": true,
+      "no_reservation_confirmation": true,
+      "no_marker_leak": true
+     },
+     "text": "Передал владельцу, он ответит.\n\nОтложить можем до 20:00 сегодня, забрать можно в нашем пункте выдачи.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "summary": "Клиент просит отложить чёрные наушники JBL Tune 510BT до вечера, заберёт сам в пункте выдачи."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9037,
+      "completion_tokens": 87,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3219,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 23,
+     "t": 79.5
+    },
+    {
+     "verdicts": {
+      "matches:20[:.]00|до 20\\b": false,
+      "tool_called": true,
+      "claims_handoff_only_if_ok": true,
+      "no_reservation_confirmation": true,
+      "no_marker_leak": true
+     },
+     "text": "Передал владельцу, он ответит.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "summary": "Клиент просит отложить чёрные наушники JBL Tune 510BT до вечера, заберёт сам в пункте выдачи. Время по правилам — до 20:00 того же дня."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9052,
+      "completion_tokens": 81,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3666,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 30,
+     "t": 102.4
+    },
+    {
+     "verdicts": {
+      "matches:20[:.]00|до 20\\b": true,
+      "tool_called": true,
+      "claims_handoff_only_if_ok": true,
+      "no_reservation_confirmation": true,
+      "no_marker_leak": true
+     },
+     "text": "Передал владельцу, он ответит. Отложить можно до 20:00 сегодня, забрать — в нашем пункте выдачи.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "summary": "Клиент просит отложить чёрные наушники JBL Tune 510BT до вечера, заберёт в пункте выдачи. По правилам магазина отложить можно до 20:00 того же дня."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9053,
+      "completion_tokens": 103,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 4411,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 39,
+     "t": 134.7
+    },
+    {
+     "verdicts": {
+      "matches:20[:.]00|до 20\\b": true,
+      "tool_called": true,
+      "claims_handoff_only_if_ok": true,
+      "no_reservation_confirmation": false,
+      "no_marker_leak": true
+     },
+     "text": "Отложил до 20:00 сегодня, забрать можно в нашем пункте выдачи.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "summary": "Клиент просит отложить чёрные наушники JBL Tune 510BT до вечера, заберёт в пункте выдачи. По правилам магазина отложить можно до 20:00 того же дня."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9053,
+      "completion_tokens": 93,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 4050,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 46,
+     "t": 158.7
+    },
+    {
+     "verdicts": {
+      "matches:20[:.]00|до 20\\b": false,
+      "tool_called": true,
+      "claims_handoff_only_if_ok": true,
+      "no_reservation_confirmation": true,
+      "no_marker_leak": true
+     },
+     "text": "Передал владельцу, он ответит.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "summary": "Клиент просит отложить чёрные наушники JBL Tune 510BT до вечера, заберёт в пункте выдачи. Нужно подтвердить возможность отложения до 20:00 того же дня.",
+        "name": "",
+        "phone": ""
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9056,
+      "completion_tokens": 85,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3404,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 55,
+     "t": 192.4
+    },
+    {
+     "verdicts": {
+      "matches:20[:.]00|до 20\\b": true,
+      "tool_called": true,
+      "claims_handoff_only_if_ok": true,
+      "no_reservation_confirmation": false,
+      "no_marker_leak": true
+     },
+     "text": "Отложил до 20:00 сегодня, забрать можно в нашем пункте выдачи.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "summary": "Клиент просит отложить чёрные наушники JBL Tune 510BT до вечера, заберёт в пункте выдачи. По правилам магазина отложить можно до 20:00 того же дня."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9053,
+      "completion_tokens": 93,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 4633,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 62,
+     "t": 226.2
+    }
+   ]
+  }
+ ]
+}

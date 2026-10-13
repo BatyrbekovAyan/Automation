@@ -219,4 +219,16 @@ public class BusinessContactFieldsTests
         Assert.IsNotNull(settings.BusinessField.GetComponent<ScrollableTextArea>(),
             "Description ScrollableTextArea lost.");
     }
+
+    // learning A (2026-10-13): the business NAME rides the owner's tail of the prompt as the first line under the heading —
+    // the shared head must stay per-vertical (V10 classifies clone heads by content), so this is the only carrier of the name.
+    [Test]
+    public void ComposeBusinessKnowledge_WithName_PutsItFirstUnderTheHeading()
+    {
+        Assert.AreEqual("About Business:\nНазвание: Запчасти Астана\nМагазин",
+            Manager.ComposeBusinessKnowledge("Магазин", "", "", "", "", "", "Запчасти Астана"));
+        Assert.AreEqual("About Business:\nМагазин", Manager.ComposeBusinessKnowledge("Магазин", "", "", "", "", "", "  "));
+        Assert.AreEqual("About Business:\nНазвание: Цветы\nСалон\n\nКонтакты:\nТелефон: +7 700",
+            Manager.ComposeBusinessKnowledge("Салон", "+7 700", "", "", "", "", " Цветы "));
+    }
 }

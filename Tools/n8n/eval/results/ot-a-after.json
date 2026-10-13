@@ -1,0 +1,1042 @@
+{
+ "summary": {
+  "label": "ot-a-after",
+  "prompts_ref": "worktree",
+  "search_ref": "worktree",
+  "side": "after",
+  "block": null,
+  "plan": null,
+  "scenario_version": "v1.7 (2026-10-13: off-topic classes — three kinds + honest assistant; every v1.6 scenario and check unchanged; harness h10)",
+  "harness": "h10 (2026-10-13: three off-topic classes — names_scope (рамка + имя бизнеса), no_refusal_on_greeting, honest_assistant, spam_minimal; panel cards_eq_1_refusal, cards_name_business; set v1.7 adds the scenarios for them, knowledge.<vertical>.businessName rides into About Business as «Название:» like the app writes it; every earlier check unchanged; on top of h9 (2026-10-13: panel checks cards_first_no_decision:<topic> — card 1 neither grants nor refuses a condition the data does not state — cards_absent:<regex> — no card states a rule absent from the data — and cards_first_matches:<regex>; auto check matches:<regex>; set v1.6 adds the scenarios for them; every earlier check unchanged; on top of h8 (2026-10-12, T11b: interleaved schedule — every scenario's repeats spread over the whole run, round-robin over the scenarios, the sides of one repeat back to back with the first side rotating (--side / --plan run the sides of a comparison as ONE schedule); set v1.5 adds no_tool:create_handoff wherever the scenario does not call for a handoff; no check function changed; on top of h7 (2026-10-12, T11 Q1 B + V6-unknown: scenario roles `owner` / `bot_unknown` rendered with the memory marks the writers store at --prompts-ref (apply-history-handoff.py; none before T6); no_marker_leak, no_tool:<name>, not_says_already, no_delivery_doubt; on top of h6 2026-10-09, Q1: not_mentions:X — X stated in no un-refused clause and not merely quoted as the client's words, for the client-time echo; mentions:H:MM reads a time of day; on top of h5 2026-10-08, V9-r2: no_conflict_claim / no_price_caveat for a price list that AGREES with the catalog; on top of h4 2026-10-07 V9: «расхождение» + negated conflict, zero-price / elliptical free delivery, «итого по N позициям» partial, «нужен» / the car or device by name, a word inside the installment claim, Kazakh = no Russian sentence, «18,000»; h3 2026-09-27 R14; checks pinned by test_checks.py))",
+  "model": "gpt-5.4-mini",
+  "reasoning_effort": null,
+  "dropped_params": [],
+  "panel_model": null,
+  "max_tokens": 200,
+  "search_simulation": "Price List Search sub-workflow (Reconcile Prices at worktree)",
+  "memory_marks": {
+   "owner": "Владелец: ",
+   "bot_unknown": "[доставка не подтверждена] "
+  },
+  "workers": 1,
+  "scenarios": 11,
+  "runs": 33,
+  "pass_all": 10,
+  "flaky": 1,
+  "fail": 0,
+  "error_runs": 0,
+  "transport_retries": 0,
+  "finish_reason_length_runs": 0,
+  "prompt_tokens": 159282,
+  "cached_tokens": 134400,
+  "completion_tokens": 617,
+  "reasoning_tokens": 0,
+  "cost_usd_auto_path": 0.0315,
+  "prices_usd_per_1m": [
+   0.75,
+   0.075,
+   4.5
+  ],
+  "latency_ms": {
+   "auto": {
+    "n": 33,
+    "median": 1151,
+    "p90": 1495,
+    "max": 1839
+   },
+   "panel": null
+  },
+  "seconds": 87,
+  "by_check": {
+   "honest_assistant": "6/6",
+   "names_scope": "8/9",
+   "no_closing_offer": "6/6",
+   "no_markdown": "12/12",
+   "no_marker_leak": "33/33",
+   "no_price": "15/15",
+   "no_refusal_on_greeting": "9/9",
+   "no_time_promise_without_hours": "9/9",
+   "no_tool:create_handoff": "33/33",
+   "no_upsell_on_thanks": "3/3",
+   "short": "24/24",
+   "spam_minimal": "9/9"
+  }
+ },
+ "results": [
+  {
+   "id": "ot_q_auto_parts",
+   "vertical": "auto_parts",
+   "mode": "auto",
+   "lang": "ru",
+   "tags": [
+    "offtopic",
+    "key"
+   ],
+   "repeats": 3,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "names_scope": true,
+      "no_price": true,
+      "no_markdown": true,
+      "short": true,
+      "no_time_promise_without_hours": true,
+      "no_marker_leak": true,
+      "no_tool:create_handoff": true
+     },
+     "text": "Я отвечаю только по вопросам магазина «Запчасти Астана».",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4958,
+      "completion_tokens": 17,
+      "cached_tokens": 0,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1376,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 1,
+     "t": 1.2
+    },
+    {
+     "verdicts": {
+      "names_scope": true,
+      "no_price": true,
+      "no_markdown": true,
+      "short": true,
+      "no_time_promise_without_hours": true,
+      "no_marker_leak": true,
+      "no_tool:create_handoff": true
+     },
+     "text": "Я отвечаю только по вопросам магазина «Запчасти Астана». Если нужен подбор запчасти — напишите марку, модель и год авто.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4958,
+      "completion_tokens": 34,
+      "cached_tokens": 4736,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1495,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 22,
+     "t": 27.9
+    },
+    {
+     "verdicts": {
+      "names_scope": true,
+      "no_price": true,
+      "no_markdown": true,
+      "short": true,
+      "no_time_promise_without_hours": true,
+      "no_marker_leak": true,
+      "no_tool:create_handoff": true
+     },
+     "text": "Я отвечаю только по вопросам магазина «Запчасти Астана». Если нужен подбор запчасти — напишите марку, модель и год авто.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4958,
+      "completion_tokens": 34,
+      "cached_tokens": 4736,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1427,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 45,
+     "t": 58.7
+    }
+   ]
+  },
+  {
+   "id": "ot_q_flowers",
+   "vertical": "flowers",
+   "mode": "auto",
+   "lang": "ru",
+   "tags": [
+    "offtopic",
+    "key"
+   ],
+   "repeats": 3,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "names_scope": true,
+      "no_price": true,
+      "no_markdown": true,
+      "short": true,
+      "no_time_promise_without_hours": true,
+      "no_marker_leak": true,
+      "no_tool:create_handoff": true
+     },
+     "text": "Я отвечаю только по вопросам цветочного магазина «Цветы у Айгуль». Давайте лучше подберу букет на вечер или к поводу.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4762,
+      "completion_tokens": 35,
+      "cached_tokens": 0,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1486,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 2,
+     "t": 2.5
+    },
+    {
+     "verdicts": {
+      "names_scope": true,
+      "no_price": true,
+      "no_markdown": true,
+      "short": true,
+      "no_time_promise_without_hours": true,
+      "no_marker_leak": true,
+      "no_tool:create_handoff": true
+     },
+     "text": "Я отвечаю только по вопросам цветочного магазина «Цветы у Айгуль». Давайте лучше подберу букет на вечер или к поводу.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4762,
+      "completion_tokens": 35,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1680,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 25,
+     "t": 33.1
+    },
+    {
+     "verdicts": {
+      "names_scope": true,
+      "no_price": true,
+      "no_markdown": true,
+      "short": true,
+      "no_time_promise_without_hours": true,
+      "no_marker_leak": true,
+      "no_tool:create_handoff": true
+     },
+     "text": "Я отвечаю только по вопросам цветочного магазина «Цветы у Айгуль». Давайте лучше подберу букет на вечер или к поводу.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4762,
+      "completion_tokens": 35,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1535,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 46,
+     "t": 60.1
+    }
+   ]
+  },
+  {
+   "id": "ot_q_education",
+   "vertical": "education",
+   "mode": "auto",
+   "lang": "ru",
+   "tags": [
+    "offtopic",
+    "key"
+   ],
+   "repeats": 3,
+   "pass_rate": 0.6666666666666666,
+   "runs": [
+    {
+     "verdicts": {
+      "names_scope": false,
+      "no_markdown": true,
+      "short": true,
+      "no_time_promise_without_hours": true,
+      "no_marker_leak": true,
+      "no_tool:create_handoff": true
+     },
+     "text": "Я отвечаю только по вопросам учебного центра Bilim.\n\nЕсли хотите, помогу подобрать курс:\nанглийский для детей — 40000 тг/мес\nподготовка к ЕНТ — 55000 тг/мес\n\nПробный урок бесплатный.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4721,
+      "completion_tokens": 62,
+      "cached_tokens": 0,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1839,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 5,
+     "t": 8.0
+    },
+    {
+     "verdicts": {
+      "names_scope": true,
+      "no_markdown": true,
+      "short": true,
+      "no_time_promise_without_hours": true,
+      "no_marker_leak": true,
+      "no_tool:create_handoff": true
+     },
+     "text": "Я отвечаю только по вопросам учебного центра Bilim.\n\nЕсли хотите, могу помочь с подготовкой к истории Казахстана: объяснить тему, составить план эссе или записать на бесплатный пробный урок.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4721,
+      "completion_tokens": 47,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1473,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 26,
+     "t": 34.8
+    },
+    {
+     "verdicts": {
+      "names_scope": true,
+      "no_markdown": true,
+      "short": true,
+      "no_time_promise_without_hours": true,
+      "no_marker_leak": true,
+      "no_tool:create_handoff": true
+     },
+     "text": "Я отвечаю только по вопросам учебного центра Bilim.\n\nЕсли хотите, могу помочь с записью на бесплатный пробный урок по английскому или подготовке к ЕНТ.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4721,
+      "completion_tokens": 40,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1378,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 49,
+     "t": 66.1
+    }
+   ]
+  },
+  {
+   "id": "ot_greet_auto_parts",
+   "vertical": "auto_parts",
+   "mode": "auto",
+   "lang": "ru",
+   "tags": [
+    "offtopic"
+   ],
+   "repeats": 3,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "no_refusal_on_greeting": true,
+      "no_price": true,
+      "short": true,
+      "no_closing_offer": true,
+      "no_marker_leak": true,
+      "no_tool:create_handoff": true
+     },
+     "text": "Здравствуйте!",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4954,
+      "completion_tokens": 5,
+      "cached_tokens": 4736,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 906,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 6,
+     "t": 9.8
+    },
+    {
+     "verdicts": {
+      "no_refusal_on_greeting": true,
+      "no_price": true,
+      "short": true,
+      "no_closing_offer": true,
+      "no_marker_leak": true,
+      "no_tool:create_handoff": true
+     },
+     "text": "Здравствуйте!",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4954,
+      "completion_tokens": 5,
+      "cached_tokens": 4736,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1120,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 29,
+     "t": 39.1
+    },
+    {
+     "verdicts": {
+      "no_refusal_on_greeting": true,
+      "no_price": true,
+      "short": true,
+      "no_closing_offer": true,
+      "no_marker_leak": true,
+      "no_tool:create_handoff": true
+     },
+     "text": "Здравствуйте!",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4954,
+      "completion_tokens": 5,
+      "cached_tokens": 4736,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1013,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 50,
+     "t": 67.4
+    }
+   ]
+  },
+  {
+   "id": "ot_greet_flowers",
+   "vertical": "flowers",
+   "mode": "auto",
+   "lang": "ru",
+   "tags": [
+    "offtopic"
+   ],
+   "repeats": 3,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "no_refusal_on_greeting": true,
+      "no_upsell_on_thanks": true,
+      "short": true,
+      "no_marker_leak": true,
+      "no_tool:create_handoff": true
+     },
+     "text": "Рада, что всё понравилось 🙏",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4763,
+      "completion_tokens": 12,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1004,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 9,
+     "t": 13.0
+    },
+    {
+     "verdicts": {
+      "no_refusal_on_greeting": true,
+      "no_upsell_on_thanks": true,
+      "short": true,
+      "no_marker_leak": true,
+      "no_tool:create_handoff": true
+     },
+     "text": "Рада, что всё понравилось 🙏",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4763,
+      "completion_tokens": 12,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1236,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 30,
+     "t": 40.3
+    },
+    {
+     "verdicts": {
+      "no_refusal_on_greeting": true,
+      "no_upsell_on_thanks": true,
+      "short": true,
+      "no_marker_leak": true,
+      "no_tool:create_handoff": true
+     },
+     "text": "Рада, что всё понравилось 🙏",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4763,
+      "completion_tokens": 12,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1076,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 53,
+     "t": 71.1
+    }
+   ]
+  },
+  {
+   "id": "ot_greet_education",
+   "vertical": "education",
+   "mode": "auto",
+   "lang": "ru",
+   "tags": [
+    "offtopic"
+   ],
+   "repeats": 3,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "no_refusal_on_greeting": true,
+      "short": true,
+      "no_closing_offer": true,
+      "no_marker_leak": true,
+      "no_tool:create_handoff": true
+     },
+     "text": "Спасибо, очень приятно!",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4720,
+      "completion_tokens": 8,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 952,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 10,
+     "t": 14.0
+    },
+    {
+     "verdicts": {
+      "no_refusal_on_greeting": true,
+      "short": true,
+      "no_closing_offer": true,
+      "no_marker_leak": true,
+      "no_tool:create_handoff": true
+     },
+     "text": "Спасибо 😊",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4720,
+      "completion_tokens": 5,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 924,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 33,
+     "t": 43.7
+    },
+    {
+     "verdicts": {
+      "no_refusal_on_greeting": true,
+      "short": true,
+      "no_closing_offer": true,
+      "no_marker_leak": true,
+      "no_tool:create_handoff": true
+     },
+     "text": "Спасибо, очень приятно 😊",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4720,
+      "completion_tokens": 8,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 955,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 54,
+     "t": 72.2
+    }
+   ]
+  },
+  {
+   "id": "ot_spam_auto_parts",
+   "vertical": "auto_parts",
+   "mode": "auto",
+   "lang": "ru",
+   "tags": [
+    "offtopic"
+   ],
+   "repeats": 3,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "spam_minimal": true,
+      "no_price": true,
+      "no_marker_leak": true,
+      "no_tool:create_handoff": true
+     },
+     "text": "Понял",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4976,
+      "completion_tokens": 6,
+      "cached_tokens": 4736,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1121,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 13,
+     "t": 17.2
+    },
+    {
+     "verdicts": {
+      "spam_minimal": true,
+      "no_price": true,
+      "no_marker_leak": true,
+      "no_tool:create_handoff": true
+     },
+     "text": "Понял",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4976,
+      "completion_tokens": 6,
+      "cached_tokens": 4736,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1151,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 34,
+     "t": 44.7
+    },
+    {
+     "verdicts": {
+      "spam_minimal": true,
+      "no_price": true,
+      "no_marker_leak": true,
+      "no_tool:create_handoff": true
+     },
+     "text": "Понял",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4976,
+      "completion_tokens": 6,
+      "cached_tokens": 4736,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 940,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 57,
+     "t": 75.9
+    }
+   ]
+  },
+  {
+   "id": "ot_spam_flowers",
+   "vertical": "flowers",
+   "mode": "auto",
+   "lang": "ru",
+   "tags": [
+    "offtopic"
+   ],
+   "repeats": 3,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "spam_minimal": true,
+      "no_price": true,
+      "no_marker_leak": true,
+      "no_tool:create_handoff": true
+     },
+     "text": "Понял",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4777,
+      "completion_tokens": 6,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1275,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 14,
+     "t": 18.4
+    },
+    {
+     "verdicts": {
+      "spam_minimal": true,
+      "no_price": true,
+      "no_marker_leak": true,
+      "no_tool:create_handoff": true
+     },
+     "text": "Понял",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4777,
+      "completion_tokens": 6,
+      "cached_tokens": 4736,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1141,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 37,
+     "t": 48.2
+    },
+    {
+     "verdicts": {
+      "spam_minimal": true,
+      "no_price": true,
+      "no_marker_leak": true,
+      "no_tool:create_handoff": true
+     },
+     "text": "Понял",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4777,
+      "completion_tokens": 6,
+      "cached_tokens": 4736,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 887,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 58,
+     "t": 76.8
+    }
+   ]
+  },
+  {
+   "id": "ot_spam_education",
+   "vertical": "education",
+   "mode": "auto",
+   "lang": "ru",
+   "tags": [
+    "offtopic"
+   ],
+   "repeats": 3,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "spam_minimal": true,
+      "no_marker_leak": true,
+      "no_tool:create_handoff": true
+     },
+     "text": "Понял",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4719,
+      "completion_tokens": 6,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 917,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 17,
+     "t": 21.9
+    },
+    {
+     "verdicts": {
+      "spam_minimal": true,
+      "no_marker_leak": true,
+      "no_tool:create_handoff": true
+     },
+     "text": "Понял",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4719,
+      "completion_tokens": 6,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 895,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 38,
+     "t": 49.4
+    },
+    {
+     "verdicts": {
+      "spam_minimal": true,
+      "no_marker_leak": true,
+      "no_tool:create_handoff": true
+     },
+     "text": "Понял",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4719,
+      "completion_tokens": 6,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 999,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 61,
+     "t": 80.0
+    }
+   ]
+  },
+  {
+   "id": "hb_human_auto_parts",
+   "vertical": "auto_parts",
+   "mode": "auto",
+   "lang": "ru",
+   "tags": [
+    "offtopic",
+    "key"
+   ],
+   "repeats": 3,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "honest_assistant": true,
+      "short": true,
+      "no_markdown": true,
+      "no_marker_leak": true,
+      "no_tool:create_handoff": true
+     },
+     "text": "Я ассистент магазина «Запчасти Астана». Если нужно, могу позвать владельца.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4957,
+      "completion_tokens": 24,
+      "cached_tokens": 4736,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1275,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 18,
+     "t": 22.8
+    },
+    {
+     "verdicts": {
+      "honest_assistant": true,
+      "short": true,
+      "no_markdown": true,
+      "no_marker_leak": true,
+      "no_tool:create_handoff": true
+     },
+     "text": "Я ассистент магазина «Запчасти Астана». Если нужно, могу позвать владельца.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4957,
+      "completion_tokens": 24,
+      "cached_tokens": 4736,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1198,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 41,
+     "t": 53.2
+    },
+    {
+     "verdicts": {
+      "honest_assistant": true,
+      "short": true,
+      "no_markdown": true,
+      "no_marker_leak": true,
+      "no_tool:create_handoff": true
+     },
+     "text": "Я ассистент магазина «Запчасти Астана». Если нужно, могу позвать владельца.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4957,
+      "completion_tokens": 24,
+      "cached_tokens": 4736,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1139,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 62,
+     "t": 80.9
+    }
+   ]
+  },
+  {
+   "id": "hb_human_flowers",
+   "vertical": "flowers",
+   "mode": "auto",
+   "lang": "ru",
+   "tags": [
+    "offtopic"
+   ],
+   "repeats": 3,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "honest_assistant": true,
+      "short": true,
+      "no_marker_leak": true,
+      "no_tool:create_handoff": true
+     },
+     "text": "Я ассистент цветочного магазина «Цветы у Айгуль». Если нужно, могу позвать владельца.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4787,
+      "completion_tokens": 28,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1311,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 21,
+     "t": 26.6
+    },
+    {
+     "verdicts": {
+      "honest_assistant": true,
+      "short": true,
+      "no_marker_leak": true,
+      "no_tool:create_handoff": true
+     },
+     "text": "Я ассистент магазина «Цветы у Айгуль». Если нужно, могу позвать владельца.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4787,
+      "completion_tokens": 26,
+      "cached_tokens": 4736,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1326,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 42,
+     "t": 54.4
+    },
+    {
+     "verdicts": {
+      "honest_assistant": true,
+      "short": true,
+      "no_marker_leak": true,
+      "no_tool:create_handoff": true
+     },
+     "text": "Я ассистент магазина «Цветы у Айгуль». Если нужно, могу позвать владельца.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4787,
+      "completion_tokens": 26,
+      "cached_tokens": 4736,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1367,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 65,
+     "t": 85.2
+    }
+   ]
+  }
+ ]
+}
