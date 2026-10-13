@@ -14,6 +14,7 @@ Transport routes (both /api/sync/ + /tapi/sync/, and /api/ + /tapi/ for profile 
     GET  messages/get?profile_id&chat_id&limit   -> {status:"done", messages:[newest first], count}
     GET  messages/id/get?profile_id&message_id    -> {status:"done", message:{...}}
     POST message/send?profile_id  {body,recipient}-> {status:"done", message_id, time}  (+ appends echo row, marked
+    POST message/reply?profile_id {body,message_id[,recipient]} -> {status:"done", message_id, time}
                                                      as the transport marks an API send: from_where "api", task_id)
     messages/get answers carry the top-level uuid = the profile id, as Wappi/tapi do (V7 checks it)
     POST message/mark/read | chat/typing/start | chats/typing/start | message/reaction | chat/delete
@@ -201,6 +202,24 @@ class Handler(BaseHTTPRequestHandler):
                 if isinstance(echo, dict):
                     row.update(echo)
                 STATE["messages"].setdefault(_key(pid, chat_id), []).append(row)
+                return 200, {"status": "done", "message_id": row["id"], "time": row["time"]}
+            if tail == "message/reply":
+                recipient = b.get("recipient") or ""
+                quoted = b.get("message_id")
+                chat_id = recipient
+                if not chat_id and quoted:
+                    for key, rows in STATE["messages"].items():
+                        if any(m.get("id") == quoted for m in rows):
+                            chat_id = key.split(":", 1)[1] if ":" in key else key
+                            break
+                mid = _new_id("sent")
+                row = {"id": mid, "chatId": chat_id, "from": chat_id, "fromMe": True, "type": "chat",
+                       "body": b.get("body", ""), "time": _now(), "senderName": "mock-bot", "quoted_message_id": quoted,
+                       "from_where": "api", "task_id": uuid.uuid4().hex, "isFromAPI": True}   # the API marks, as message/send (V7)
+                if isinstance(echo, dict):
+                    row.update(echo)
+                if chat_id:
+                    STATE["messages"].setdefault(_key(pid, chat_id), []).append(row)
                 return 200, {"status": "done", "message_id": row["id"], "time": row["time"]}
             if tail in ("message/mark/read", "chat/typing/start", "chats/typing/start",
                         "message/reaction", "chat/delete", "webhook/url/set", "webhook/types/set",

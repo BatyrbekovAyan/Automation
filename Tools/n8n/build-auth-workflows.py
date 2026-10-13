@@ -517,6 +517,16 @@ const PAIR_OPS = new Set(['qr', 'auth.code', 'tg.auth.phone', 'tg.auth.code', 't
 // V12 (iteration 2026-09-28): the ops that DESTROY a profile's link are decided by the database (Profile Owner): the
 // token's list is up to 12 h old, and a profile another install has since claimed by code must not be unlinked by it.
 const OWNER_OPS = new Set(['profile.delete', 'profile.logout']);
+// LEARNING-A (2026-09-25): происхождение отправки владельца из приложения. Валидируется как body,
+// эмитится в выход как `meta`, НИКОГДА не копируется в jsonBody — Wappi этих полей не видит.
+// Все поля опциональны: старый клиент (compat-окно) не шлёт ничего и проходит как раньше.
+// Int-правило take: слот 4 — DEFAULT, поэтому «опциональный int без дефолта» = [.., undefined, 'opt'].
+const META = { origin_kind: ['origin_kind', /^(card|edited|typed|none)$/, 'opt'],
+               origin_index: ['origin_index', 'int', 3, undefined, 'opt'],
+               origin_key: ['origin_key', /^[0-9a-f]{1,32}$/, 'opt'],
+               origin_edit: ['origin_edit', 'int', 100, undefined, 'opt'],
+               origin_top1: ['origin_top1', 'int', 1, undefined, 'opt'],
+               origin_set: ['origin_set', 'int', 4, undefined, 'opt'] };
 const OPS = {
   'profile.add':       { m: 'POST', path: 'profile/add', q: { name: ['name', NAME] }, noProfile: true, needsBilling: true },
   'profile.delete':    { m: 'POST', path: 'profile/delete', q: { profile_id: 'pid' } },
@@ -531,8 +541,8 @@ const OPS = {
   'messages.get':      { m: 'GET',  path: 'sync/messages/get', q: { profile_id: 'pid', chat_id: ['chat_id', ID], limit: ['limit', 'int', 200, 15], offset: ['offset', 'int', 100000, 0] } },
   'messages.id.get':   { m: 'GET',  path: 'sync/messages/id/get', q: { profile_id: 'pid', message_id: ['message_id', ID] } },
   'media.download':    { m: 'GET',  path: 'sync/message/media/download', q: { profile_id: 'pid', message_id: ['message_id', ID] }, timeout: 60000 },
-  'message.send':      { m: 'POST', path: 'sync/message/send', q: { profile_id: 'pid' }, body: { recipient: ['recipient', ID], body: ['body', 'text', 8192], quoted_message_id: ['quoted_message_id', ID, 'opt'] } },
-  'message.reply':     { m: 'POST', path: 'sync/message/reply', q: { profile_id: 'pid' }, body: { recipient: ['recipient', ID, 'opt'], body: ['body', 'text', 8192], message_id: ['message_id', ID] }, only: 'telegram' },
+  'message.send':      { m: 'POST', path: 'sync/message/send', q: { profile_id: 'pid' }, body: { recipient: ['recipient', ID], body: ['body', 'text', 8192], quoted_message_id: ['quoted_message_id', ID, 'opt'] }, meta: META },
+  'message.reply':     { m: 'POST', path: 'sync/message/reply', q: { profile_id: 'pid' }, body: { recipient: ['recipient', ID, 'opt'], body: ['body', 'text', 8192], message_id: ['message_id', ID] }, only: 'telegram', meta: { ...META, chat_id: ['chat_id', ID, 'opt'] } },
   'message.mark_read': { m: 'POST', path: 'sync/message/mark/read', q: { profile_id: 'pid', mark_all: ['mark_all', 'bool', 'opt'] }, body: { message_id: ['message_id', ID] } },
   'chat.delete':       { m: 'POST', path: 'sync/chat/delete', q: { profile_id: 'pid' }, body: { recipient: ['recipient', ID] } },
   'message.reaction':  { m: 'POST', path: 'sync/message/reaction', q: { profile_id: 'pid' }, body: { body: ['body', 'text', 64], message_id: ['message_id', ID], recipient: ['recipient', ID, 'opt'] } },
@@ -574,10 +584,12 @@ const take = (dest, key, rule) => {
 const query = {}, body = {};
 for (const [k, rule] of Object.entries(spec.q || {})) { const e = take(query, k, rule); if (e) return deny(400, 'bad_param', e); }
 for (const [k, rule] of Object.entries(spec.body || {})) { const e = take(body, k, rule); if (e) return deny(400, 'bad_param', e); }
+const meta = {};
+for (const [k, rule] of Object.entries(spec.meta || {})) { const e = take(meta, k, rule); if (e) return deny(400, 'bad_param', e); }
 let path = spec.path;
 if (spec.kind) { const kind = String(b.kind || ''); if (!path[kind]) return deny(400, 'bad_param', 'kind'); path = path[kind]; }
 else if (typeof path === 'object') path = path[channel];
-return [{ json: { ok: true, _status: 200, op, channel, profileId: pid, method: spec.m, url: BASE[channel] + path, query,
+return [{ json: { ok: true, _status: 200, op, channel, profileId: pid, method: spec.m, url: BASE[channel] + path, query, meta,
   jsonBody: spec.body ? body : {}, sendBody: !!spec.body, timeout: spec.timeout || 30000, claimPairing, ownerCheck: OWNER_OPS.has(op) }, pairedItem: { item: 0 } }];
 """
 
@@ -635,9 +647,13 @@ RECORD_OWNER_SEND_SQL = """-- A6 (stage 4): a message the OWNER sent from the ap
 -- T6 (Q1 B): the memory content opens with the owner mark — the model sees role + content only, and without the
 -- mark the owner's agreement read as the bot's own earlier answer. The history keeps the text as sent.
 with ev as (
-  insert into chat_history_events (profile_id, chat_id, message_id, source, body, msg_type, sent_at, execution_id)
-  values ($1, $2, $3, 'owner_app', $4, $5, now(), $6)
-  on conflict (profile_id, chat_id, message_id) do update set source = 'owner_app', body = excluded.body, execution_id = excluded.execution_id
+  insert into chat_history_events (profile_id, chat_id, message_id, source, body, msg_type, sent_at, execution_id,
+                                   origin_kind, origin_index, origin_key, origin_edit, origin_top1, origin_set)
+  values ($1, $2, $3, 'owner_app', $4, $5, now(), $6,
+          $7::text, $8::smallint, $9::text, $10::smallint, $11::smallint, $12::smallint)
+  on conflict (profile_id, chat_id, message_id) do update set source = 'owner_app', body = excluded.body, execution_id = excluded.execution_id,
+    origin_kind = excluded.origin_kind, origin_index = excluded.origin_index, origin_key = excluded.origin_key,
+    origin_edit = excluded.origin_edit, origin_top1 = excluded.origin_top1, origin_set = excluded.origin_set
   returning 1
 ), mem as (
   insert into n8n_chat_histories (session_id, message)
@@ -647,9 +663,11 @@ with ev as (
 )
 select exists(select 1 from ev) as recorded, exists(select 1 from mem) as remembered;""".replace("__OWNER_CONTENT__", OWNER_CONTENT_SQL % "$4")
 
-OWNER_SEND_PARAMS = """={{ (r => { const b = r.jsonBody || {}; const rec = String(b.recipient || ''); const chat = (r.channel === 'whatsapp' && rec && !rec.includes('@')) ? rec + '@c.us' : rec;
+OWNER_SEND_PARAMS = """={{ (r => { const b = r.jsonBody || {}; const m = r.meta || {}; const nz = (v) => (v === undefined || v === null || v === '') ? null : v;
+  const rec = String(b.recipient || m.chat_id || ''); const chat = (r.channel === 'whatsapp' && rec && !rec.includes('@')) ? rec + '@c.us' : rec;
   const text = r.op === 'media.send' ? ('[' + String(r.kind || 'file') + ']' + (b.caption ? ' ' + String(b.caption) : '')) : String(b.body || '');
-  return [ r.profileId, chat, String($('Wappi Call').first().json.body.message_id || ''), text.slice(0, 4000), r.op === 'media.send' ? String(r.kind || 'file') : 'chat', $execution.id ]; })($('Build Request').first().json) }}"""
+  return [ r.profileId, chat, String($('Wappi Call').first().json.body.message_id || ''), text.slice(0, 4000), r.op === 'media.send' ? String(r.kind || 'file') : 'chat', $execution.id,
+           nz(m.origin_kind), nz(m.origin_index), nz(m.origin_key), nz(m.origin_edit), nz(m.origin_top1), nz(m.origin_set) ]; })($('Build Request').first().json) }}"""
 
 
 def build_proxy():
