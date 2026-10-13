@@ -354,7 +354,11 @@ def knowledge_text(sc, know):
     return " ".join([sc.get("business_override", know["business"]), know["products"], know["services"], " ".join(sc.get("docs_override", know["docs"])), sc.get("owner_prompt", "")])
 
 
-HARNESS_VERSION = ("h8 (2026-10-12, T11b: interleaved schedule — every scenario's repeats spread over the whole run, round-robin over the "
+HARNESS_VERSION = ("h9 (2026-10-13: panel checks cards_first_no_decision:<topic> — card 1 neither grants nor refuses a condition the "
+                   "data does not state — cards_absent:<regex> — no card states a rule absent from the data — and "
+                   "cards_first_matches:<regex>; auto check matches:<regex>; set v1.6 adds the scenarios for them; every earlier "
+                   "check unchanged; on top of "
+                   "h8 (2026-10-12, T11b: interleaved schedule — every scenario's repeats spread over the whole run, round-robin over the "
                    "scenarios, the sides of one repeat back to back with the first side rotating (--side / --plan run the sides of a "
                    "comparison as ONE schedule); set v1.5 adds no_tool:create_handoff wherever the scenario does not call for a handoff; "
                    "no check function changed; on top of "
@@ -364,7 +368,7 @@ HARNESS_VERSION = ("h8 (2026-10-12, T11b: interleaved schedule — every scenari
                    "h5 2026-10-08, V9-r2: no_conflict_claim / no_price_caveat for a price list that AGREES with the catalog; on top of "
                    "h4 2026-10-07 V9: «расхождение» + negated conflict, zero-price / elliptical free delivery, «итого по N позициям» partial, "
                    "«нужен» / the car or device by name, a word inside the installment claim, Kazakh = no Russian sentence, «18,000»; "
-                   "h3 2026-09-27 R14; checks pinned by test_checks.py)")
+                   "h3 2026-09-27 R14; checks pinned by test_checks.py))")
 
 
 def client_text(sc):
@@ -768,6 +772,8 @@ def check(name, sc, know, out):
         return t.count("?") <= int(name.split(":")[1])
     if name.startswith("no_tool:"):
         return name.split(":", 1)[1] not in [c.get("name") for c in calls]
+    if name.startswith("matches:"):            # h9: the answer states what the regex names (an owner's rule, a time)
+        return re.search(name.split(":", 1)[1], low) is not None
     if name.startswith("no_price_for:"):
         word = name.split(":", 1)[1].lower()
         return not any(word in line and AMOUNT.search(line) for line in low.split("\n"))
@@ -846,6 +852,28 @@ def check(name, sc, know, out):
         return False
 
 
+# h9 (2026-10-13): a condition the data does not state — discount, deferred payment, a hold, a return. The panel read its
+# niche bans («НЕЛЬЗЯ: называть скидку… обещать отсрочку», «…подтверждать бронь») as the business's policy and answered
+# «скидок нет», «отсрочки не предоставляем, работаем по предоплате», «отложить не получится» (4 cards of 4), while «Авто»
+# hands the question to the owner (results/cmp-1013-auto-vs-panel.md). A refusal is a claim about the terms like a
+# consent: card 1 decides neither way. A sentence that names the topic and defers («уточню», «проверю и вернусь») is no
+# decision even with «можем»/«можно» in it.
+CONDITION_DECISION = re.compile(
+    r"\bне\s+(?:можем|могу|сможем|смогу|да[ёе]м|даю|предоставля\w*|дела\w*|получится|ориентиру\w*|практику\w*|работаем|"
+    r"бер[её]м|откладыва\w*|бронир\w*)|не\s+предусмотрен\w*|невозможн\w*|\bнет\b|\bотказ\w*"
+    r"|\b(?:дадим|дам|сделаем|сделаю|предостав(?:им|лю)|отложу|отложим|отложил\w*|забронир\w*|оформим\s+возврат|верн[её]м|"
+    r"можем|можно|возможн\w*)")
+CONDITION_DEFER = re.compile(r"уточн|провер|узна|соглас|вернусь|вернуться|отвечу|обсуд|посчита|подума|сообщу|напишу|решу|свяж")
+
+
+def first_card_decides(card_text, topic):
+    """True when a sentence of the card names the topic and decides it (yes or no) without deferring."""
+    for sentence in re.split(r"[.!?\n]+", (card_text or "").lower()):
+        if re.search(topic, sentence) and CONDITION_DECISION.search(sentence) and not CONDITION_DEFER.search(sentence):
+            return True
+    return False
+
+
 def check_panel(name, sc, know, out):
     body = out.get("body") or {}
     cards = body.get("suggestions") or []
@@ -853,6 +881,13 @@ def check_panel(name, sc, know, out):
     low = texts.lower()
     kset = {digits(x) for x in re.findall(r"\d[\d\s]*", knowledge_text(sc, know))}
     allowed_digits = kset | {digits(x) for x in re.findall(r"\d[\d\s]*", client_text(sc))}
+    if name.startswith("cards_first_no_decision:"):
+        return bool(cards) and not first_card_decides(cards[0].get("text", ""), name.split(":", 1)[1])
+    if name.startswith("cards_first_matches:"):
+        return bool(cards) and re.search(name.split(":", 1)[1], (cards[0].get("text") or "").lower()) is not None
+    if name.startswith("cards_absent:"):
+        rx = name.split(":", 1)[1]
+        return not re.search(rx, low) or re.search(rx, knowledge_text(sc, know).lower()) is not None
     table = {
         "abstain": lambda: out.get("status") == 200 and body.get("abstain") is True and len(cards) == 0,
         "cards": lambda: out.get("status") == 200 and 1 <= len(cards) <= 4 and not body.get("error"),

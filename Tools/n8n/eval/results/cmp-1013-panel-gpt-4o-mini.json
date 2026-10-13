@@ -1,0 +1,1236 @@
+{
+ "summary": {
+  "label": "cmp-1013-panel-gpt-4o-mini",
+  "prompts_ref": "worktree",
+  "search_ref": "worktree",
+  "side": null,
+  "block": null,
+  "plan": null,
+  "scenario_version": "v1.5 (2026-10-12: T11b — no_tool:create_handoff on every auto scenario whose question the business data answers and whose design calls for no handoff (34: a6_/q1p_ as in v1.4 + 25 more, among them ws_kz_min_order and ws_list_of_items); every auto scenario is classified in test_checks.py (NO_HANDOFF / HANDOFF_IN_DESIGN, each with its reason); roles and all other checks as v1.4; harness h8 — interleaved repeats)",
+  "harness": "h8 (2026-10-12, T11b: interleaved schedule — every scenario's repeats spread over the whole run, round-robin over the scenarios, the sides of one repeat back to back with the first side rotating (--side / --plan run the sides of a comparison as ONE schedule); set v1.5 adds no_tool:create_handoff wherever the scenario does not call for a handoff; no check function changed; on top of h7 (2026-10-12, T11 Q1 B + V6-unknown: scenario roles `owner` / `bot_unknown` rendered with the memory marks the writers store at --prompts-ref (apply-history-handoff.py; none before T6); no_marker_leak, no_tool:<name>, not_says_already, no_delivery_doubt; on top of h6 2026-10-09, Q1: not_mentions:X — X stated in no un-refused clause and not merely quoted as the client's words, for the client-time echo; mentions:H:MM reads a time of day; on top of h5 2026-10-08, V9-r2: no_conflict_claim / no_price_caveat for a price list that AGREES with the catalog; on top of h4 2026-10-07 V9: «расхождение» + negated conflict, zero-price / elliptical free delivery, «итого по N позициям» partial, «нужен» / the car or device by name, a word inside the installment claim, Kazakh = no Russian sentence, «18,000»; h3 2026-09-27 R14; checks pinned by test_checks.py)",
+  "model": "gpt-5.4-mini",
+  "reasoning_effort": null,
+  "dropped_params": [],
+  "panel_model": "gpt-4o-mini",
+  "max_tokens": 200,
+  "search_simulation": "Price List Search sub-workflow (Reconcile Prices at worktree)",
+  "memory_marks": {
+   "owner": "Владелец: ",
+   "bot_unknown": "[доставка не подтверждена] "
+  },
+  "workers": 1,
+  "scenarios": 12,
+  "runs": 60,
+  "pass_all": 12,
+  "flaky": 0,
+  "fail": 0,
+  "error_runs": 0,
+  "transport_retries": 0,
+  "finish_reason_length_runs": 0,
+  "prompt_tokens": 0,
+  "cached_tokens": 0,
+  "completion_tokens": 0,
+  "reasoning_tokens": 0,
+  "cost_usd_auto_path": 0.0,
+  "prices_usd_per_1m": [
+   0.75,
+   0.075,
+   4.5
+  ],
+  "latency_ms": {
+   "auto": null,
+   "panel": {
+    "n": 60,
+    "median": 2230,
+    "p90": 3201,
+    "max": 4578
+   }
+  },
+  "seconds": 120,
+  "by_check": {
+   "abstain": "20/20",
+   "cards": "40/40",
+   "cards_first_clarifies": "10/10",
+   "cards_first_no_price": "5/5",
+   "cards_kz": "5/5",
+   "cards_no_invented_installment_terms": "5/5",
+   "cards_no_refund_confirmation": "5/5",
+   "cards_no_upsell_on_thanks": "5/5",
+   "cards_numbers_grounded": "10/10",
+   "cards_ru": "5/5"
+  }
+ },
+ "results": [
+  {
+   "id": "pn_personal_congrats",
+   "vertical": "flowers",
+   "mode": "panel",
+   "lang": "ru",
+   "tags": [
+    "abstain",
+    "key"
+   ],
+   "repeats": 5,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "abstain": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [], \"abstain\": true}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 1357,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 0,
+     "t": 0.2
+    },
+    {
+     "verdicts": {
+      "abstain": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [], \"abstain\": true}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 820,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 12,
+     "t": 27.4
+    },
+    {
+     "verdicts": {
+      "abstain": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [], \"abstain\": true}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 798,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 24,
+     "t": 49.7
+    },
+    {
+     "verdicts": {
+      "abstain": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [], \"abstain\": true}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 791,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 36,
+     "t": 72.7
+    },
+    {
+     "verdicts": {
+      "abstain": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [], \"abstain\": true}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 809,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 48,
+     "t": 98.2
+    }
+   ]
+  },
+  {
+   "id": "pn_emotional_reaction",
+   "vertical": "kaspi_seller",
+   "mode": "panel",
+   "lang": "ru",
+   "tags": [
+    "abstain",
+    "key"
+   ],
+   "repeats": 5,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "abstain": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [], \"abstain\": true}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 1476,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 1,
+     "t": 1.5
+    },
+    {
+     "verdicts": {
+      "abstain": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [], \"abstain\": true}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 901,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 13,
+     "t": 28.2
+    },
+    {
+     "verdicts": {
+      "abstain": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [], \"abstain\": true}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 905,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 25,
+     "t": 50.5
+    },
+    {
+     "verdicts": {
+      "abstain": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [], \"abstain\": true}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 1070,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 37,
+     "t": 73.5
+    },
+    {
+     "verdicts": {
+      "abstain": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [], \"abstain\": true}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 1053,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 49,
+     "t": 99.0
+    }
+   ]
+  },
+  {
+   "id": "pn_go_to_cinema",
+   "vertical": "auto_parts",
+   "mode": "panel",
+   "lang": "ru",
+   "tags": [
+    "abstain"
+   ],
+   "repeats": 5,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "abstain": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [], \"abstain\": true}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 1084,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 2,
+     "t": 3.0
+    },
+    {
+     "verdicts": {
+      "abstain": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [], \"abstain\": true}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 857,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 14,
+     "t": 29.1
+    },
+    {
+     "verdicts": {
+      "abstain": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [], \"abstain\": true}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 806,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 26,
+     "t": 51.4
+    },
+    {
+     "verdicts": {
+      "abstain": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [], \"abstain\": true}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 1148,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 38,
+     "t": 74.6
+    },
+    {
+     "verdicts": {
+      "abstain": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [], \"abstain\": true}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 807,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 50,
+     "t": 100.1
+    }
+   ]
+  },
+  {
+   "id": "pn_thanks_in_business",
+   "vertical": "flowers",
+   "mode": "panel",
+   "lang": "ru",
+   "tags": [
+    "cards"
+   ],
+   "repeats": 5,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "cards": true,
+      "cards_no_upsell_on_thanks": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [{\"text\": \"Пожалуйста, ждем вас! Если будут вопросы, пишите.\", \"label\": \"На связи\", \"move\": \"Ответ\"}, {\"text\": \"Рады помочь! Оформляйте, будем ждать вас.\", \"label\": \"Ждем вас\", \"move\": \"Ответ\"}, {\"text\": \"Обращайтесь, если что-то понадобится!\", \"label\": \"Всегда рады\", \"move\": \"Ответ\"}, {\"text\": \"Отлично! Ждем вас завтра к 10:00.\", \"label\": \"Следующий шаг\", \"move\": \"К заказу\"}]}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 2782,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 3,
+     "t": 4.1
+    },
+    {
+     "verdicts": {
+      "cards": true,
+      "cards_no_upsell_on_thanks": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [{\"text\": \"Пожалуйста! Ждём вас завтра для оформления заказа. 😊\", \"label\": \"Тепло\", \"move\": \"Ответ\"}, {\"text\": \"Рады помочь! Если будут вопросы, пишите.\", \"label\": \"На связи\", \"move\": \"Ответ\"}, {\"text\": \"Обращайтесь, будем рады помочь с заказом!\", \"label\": \"Всегда рады\", \"move\": \"Ответ\"}, {\"text\": \"Ждём вас завтра к 12:00 для оформления букета!\", \"label\": \"Следующий шаг\", \"move\": \"К заказу\"}]}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 1885,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 15,
+     "t": 29.9
+    },
+    {
+     "verdicts": {
+      "cards": true,
+      "cards_no_upsell_on_thanks": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [{\"text\": \"Пожалуйста, ждем вас!\", \"label\": \"Тепло\", \"move\": \"Ответ\"}, {\"text\": \"Рады помочь! Если будут вопросы, пишите.\", \"label\": \"На связи\", \"move\": \"Ответ\"}, {\"text\": \"Обращайтесь, будем рады помочь с заказом!\", \"label\": \"С заботой\", \"move\": \"Ответ\"}, {\"text\": \"Ждём вас завтра к 12:00!\", \"label\": \"Следующий шаг\", \"move\": \"К заказу\"}]}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 2458,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 27,
+     "t": 52.2
+    },
+    {
+     "verdicts": {
+      "cards": true,
+      "cards_no_upsell_on_thanks": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [{\"text\": \"Пожалуйста! Ждём вашего заказа. Если будут вопросы, не стесняйтесь обращаться.\", \"label\": \"Рады помочь\", \"move\": \"Ответ\"}, {\"text\": \"Обращайтесь, если понадобится помощь с оформлением заказа!\", \"label\": \"На связи\", \"move\": \"Ответ\"}, {\"text\": \"Ждём вас завтра! Если что-то изменится, дайте знать.\", \"label\": \"До встречи\", \"move\": \"Ответ\"}, {\"text\": \"Если хотите, могу помочь с выбором открытки или доставки!\", \"label\": \"Дополнительно\", \"move\": \"Вариант\"}]}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 3979,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 39,
+     "t": 75.7
+    },
+    {
+     "verdicts": {
+      "cards": true,
+      "cards_no_upsell_on_thanks": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [{\"text\": \"Пожалуйста! Ждём вашего заказа завтра!\", \"label\": \"Тёплое завершение\", \"move\": \"Ответ\"}, {\"text\": \"Рады помочь! Если будут вопросы, пишите!\", \"label\": \"На связи\", \"move\": \"Ответ\"}, {\"text\": \"Обращайтесь! Будем рады помочь с оформлением!\", \"label\": \"Ожидаем вас\", \"move\": \"Ответ\"}, {\"text\": \"Всегда рады помочь! Ждём вас завтра к 10:00!\", \"label\": \"Следующий шаг\", \"move\": \"Ответ\"}]}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 1700,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 51,
+     "t": 100.9
+    }
+   ]
+  },
+  {
+   "id": "pn_price_question",
+   "vertical": "flowers",
+   "mode": "panel",
+   "lang": "ru",
+   "tags": [
+    "cards"
+   ],
+   "repeats": 5,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "cards": true,
+      "cards_numbers_grounded": true,
+      "cards_ru": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [{\"text\": \"Букет пионов стоит 18000 тг. Если хотите, могу помочь с заказом!\", \"label\": \"Цена\", \"move\": \"Ответ\"}, {\"text\": \"Какой размер букета вас интересует? Могу предложить разные варианты!\", \"label\": \"Варианты\", \"move\": \"Уточнить\"}, {\"text\": \"Если вы хотите заказать букет пионов, напишите, когда вам нужно его доставить!\", \"label\": \"Доставка\", \"move\": \"К заказу\"}, {\"text\": \"Уточню информацию и напишу через 15 минут!\", \"label\": \"Подождите\", \"move\": \"Отложить\"}]}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 2013,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 4,
+     "t": 6.9
+    },
+    {
+     "verdicts": {
+      "cards": true,
+      "cards_numbers_grounded": true,
+      "cards_ru": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [{\"text\": \"Букет пионов стоит 18000 тг. Если хотите, могу помочь с заказом!\", \"label\": \"Цена букета\", \"move\": \"Ответ\"}, {\"text\": \"Какой размер букета вас интересует? Могу предложить варианты!\", \"label\": \"Размер букета\", \"move\": \"Уточнить\"}, {\"text\": \"Также у нас есть букеты из роз — 25 роз за 25000 тг. Интересно?\", \"label\": \"Другие варианты\", \"move\": \"Вариант\"}, {\"text\": \"Если хотите заказать, напишите адрес и время доставки!\", \"label\": \"Оформить заказ\", \"move\": \"К заказу\"}]}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 2482,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 16,
+     "t": 31.8
+    },
+    {
+     "verdicts": {
+      "cards": true,
+      "cards_numbers_grounded": true,
+      "cards_ru": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [{\"text\": \"Букет пионов стоит 18,000 тг. Если хотите, могу помочь с заказом!\", \"label\": \"Цена\", \"move\": \"Ответ\"}, {\"text\": \"Какой размер букета вас интересует? Может, есть другие цветы на примете?\", \"label\": \"Состав\", \"move\": \"Уточнить\"}, {\"text\": \"Если вам интересен букет пионов, могу предложить добавить к нему что-то ещё, например, зелень или другой цветок!\", \"label\": \"Альтернатива\", \"move\": \"Вариант\"}, {\"text\": \"Хотите оформить заказ на букет пионов? Доставка по городу 2000 тг. Напишите, когда вам удобно!\", \"label\": \"Оформить?\", \"move\": \"К заказу\"}]}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 2476,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 28,
+     "t": 54.7
+    },
+    {
+     "verdicts": {
+      "cards": true,
+      "cards_numbers_grounded": true,
+      "cards_ru": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [{\"text\": \"Букет пионов стоит 18000 тг. Если хотите, могу помочь с заказом!\", \"label\": \"Цена\", \"move\": \"Ответ\"}, {\"text\": \"Какой размер букета вас интересует? Могу предложить разные варианты с пионами!\", \"label\": \"Размер букета\", \"move\": \"Уточнить\"}, {\"text\": \"Если вам нравятся пионы, могу предложить букеты с розами. Они тоже очень красивые!\", \"label\": \"Другие цветы\", \"move\": \"Вариант\"}, {\"text\": \"Хотите оформить заказ на букет? Доставка по городу 2000 тг.\", \"label\": \"Оформить заказ\", \"move\": \"К заказу\"}]}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 3380,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 40,
+     "t": 79.7
+    },
+    {
+     "verdicts": {
+      "cards": true,
+      "cards_numbers_grounded": true,
+      "cards_ru": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [{\"text\": \"Букет пионов стоит 18000 тг. Если хотите, могу помочь с заказом!\", \"label\": \"Цена\", \"move\": \"Ответ\"}, {\"text\": \"Какой размер букета вас интересует?\", \"label\": \"Размер букета\", \"move\": \"Уточнить\"}, {\"text\": \"Могу предложить также букет из 25 роз за 25000 тг. Интересно?\", \"label\": \"Альтернатива\", \"move\": \"Вариант\"}, {\"text\": \"Хотите оформить заказ на букет пионов? Напишите, когда и куда доставить!\", \"label\": \"Оформить заказ\", \"move\": \"К заказу\"}]}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 2150,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 52,
+     "t": 102.6
+    }
+   ]
+  },
+  {
+   "id": "pn_kz_question",
+   "vertical": "phone_repair",
+   "mode": "panel",
+   "lang": "kz",
+   "tags": [
+    "cards",
+    "lang"
+   ],
+   "repeats": 5,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "cards": true,
+      "cards_kz": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [{\"text\": \"iPhone 11 экранын ауыстыру бағасы 35000 тг. Ремонт 1 сағатта аяқталады. Келіп, диагностикадан өтсеңіз, қосымша ақпарат береміз.\", \"label\": \"Коротко\", \"move\": \"Ответ\"}, {\"text\": \"iPhone 11 экранын ауыстыру 35000 тг тұрады. Ремонт барысында диагностика тегін. Сізді күтеміз!\", \"label\": \"Теплее\", \"move\": \"Ответ\"}, {\"text\": \"Экранды ауыстыру 35000 тг, бірақ нақты бағасы диагностикадан кейін белгілі болады. Келіп, тексертіп кетсеңіз, қуаныштымыз!\", \"label\": \"Подробнее\", \"move\": \"Ответ\"}, {\"text\": \"Экранды ауыстыру үшін бізге келіңіз, диагностика тегін. Сізді ТЦ Азия, 2 этаж күтеміз!\", \"label\": \"Следующий шаг\", \"move\": \"К заказу\"}]}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 4578,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 5,
+     "t": 8.9
+    },
+    {
+     "verdicts": {
+      "cards": true,
+      "cards_kz": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [{\"text\": \"iPhone 11 экранын ауыстыру 35,000 тг тұрады. Диагностика тегін, келіп тексертіп көрсеңіз болады!\", \"label\": \"Цена\", \"move\": \"Ответ\"}, {\"text\": \"iPhone 11 экранын ауыстыру 35,000 тг. Диагностика тегін, келіп тексертіп көріңіз!\", \"label\": \"Коротко\", \"move\": \"Ответ\"}, {\"text\": \"Экранды ауыстыру 35,000 тг. Келіп тексерту үшін ТЦ Азия, 2 қабатында күтеміз!\", \"label\": \"Следующий шаг\", \"move\": \"К заказу\"}, {\"text\": \"Экранды ауыстыру 35,000 тг. Келіп тексерту үшін ТЦ Азия, 2 қабатында күтеміз!\", \"label\": \"Подробнее\", \"move\": \"Ответ\"}]}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 2262,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 17,
+     "t": 34.3
+    },
+    {
+     "verdicts": {
+      "cards": true,
+      "cards_kz": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [{\"text\": \"iPhone 11 экранын ауыстыру бағасы 35000 тг. Диагностика тегін, жұмыс уақыты 1 сағат. Келіп, тексертуге болады!\", \"label\": \"Коротко\", \"move\": \"Ответ\"}, {\"text\": \"iPhone 11 экранын ауыстыру үшін баға 35000 тг. Диагностика тегін, жұмысты 1 сағатта аяқтаймыз. Келіп, тексертуге шақырамыз!\", \"label\": \"Подробнее\", \"move\": \"Ответ\"}, {\"text\": \"iPhone 11 экранын ауыстыру 35000 тг тұрады. Тегін диагностикадан кейін жұмыс 1 сағатта аяқталады. Келіп, тексертуге болады!\", \"label\": \"Теплее\", \"move\": \"Ответ\"}, {\"text\": \"iPhone 11 экранын ауыстыру бағасы 35000 тг. Келіп, диагностикадан өтсеңіз, жұмысты 1 сағатта жасаймыз!\", \"label\": \"Официально\", \"move\": \"Ответ\"}]}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 3117,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 29,
+     "t": 57.1
+    },
+    {
+     "verdicts": {
+      "cards": true,
+      "cards_kz": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [{\"text\": \"iPhone 11 экранын ауыстыру бағасы 35000 тг. Ремонт уақыты 1 сағат. Диагностика тегін, келіп тексертуге болады!\", \"label\": \"Цена\", \"move\": \"Ответ\"}, {\"text\": \"Экранды ауыстыру үшін iPhone 11-дің жағдайын тексеру қажет. Келіп, диагностикадан өтіңіз, бағасын нақтылаймыз!\", \"label\": \"Уточнить\", \"move\": \"Уточнить\"}, {\"text\": \"Сізге iPhone 11 экранын ауыстырудан басқа қандай қызметтер қажет? Мысалы, батарея ауыстыру да бар!\", \"label\": \"Вариант\", \"move\": \"Вариант\"}, {\"text\": \"Сізді ТЦ Азия, 2 қабатында күтеміз. Диагностика тегін, келіңіз!\", \"label\": \"К заказу\", \"move\": \"К заказу\"}]}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 2937,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 41,
+     "t": 83.1
+    },
+    {
+     "verdicts": {
+      "cards": true,
+      "cards_kz": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [{\"text\": \"iPhone 11 экранын ауыстыру бағасы 35000 тг. Диагностика тегін, жұмыс уақыты 1 сағат.\", \"label\": \"Коротко\", \"move\": \"Ответ\"}, {\"text\": \"iPhone 11 экранын ауыстыру 35000 тг тұрады. Диагностика тегін, 1 сағатта аяқтаймыз. Келіп, тексерту үшін әкелсеңіз болады.\", \"label\": \"Подробнее\", \"move\": \"Ответ\"}, {\"text\": \"iPhone 11 экранын ауыстыру 35000 тг. Диагностика тегін, 1 сағатта жасаймыз. Сізді күтеміз!\", \"label\": \"Теплее\", \"move\": \"Ответ\"}, {\"text\": \"Экранды ауыстыру үшін ТЦ Азия, 2 қабатқа келіңіз. Диагностика тегін, 1 сағатта аяқтаймыз. Сұрақтарыңыз болса, хабарласыңыз!\", \"label\": \"Следующий шаг\", \"move\": \"К заказу\"}]}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 2880,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 53,
+     "t": 104.7
+    }
+   ]
+  },
+  {
+   "id": "pn_autoparts_no_car",
+   "vertical": "auto_parts",
+   "mode": "panel",
+   "lang": "ru",
+   "tags": [
+    "niche",
+    "key"
+   ],
+   "repeats": 5,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "cards": true,
+      "cards_first_clarifies": true,
+      "cards_first_no_price": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [{\"text\": \"Чтобы уточнить цену на колодки, мне нужно знать марку, модель и год вашего автомобиля. Напишите, пожалуйста!\", \"label\": \"Марка и год\", \"move\": \"Уточнить\"}, {\"text\": \"Колодки тормозные передние Toyota 04465-02220 стоят 18500 тг. Это оригинал. Если вам нужно больше информации, дайте знать!\", \"label\": \"Коротко\", \"move\": \"Ответ\"}, {\"text\": \"Если вас интересуют другие варианты колодок, у нас есть аналоги. Напишите, какую марку и модель вы ищете!\", \"label\": \"Другие варианты\", \"move\": \"Вариант\"}, {\"text\": \"Хотите оформить заказ на колодки? Напишите, пожалуйста, марку, модель и год авто, а также ваш номер телефона!\", \"label\": \"Оформить заказ\", \"move\": \"К заказу\"}]}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 2613,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 6,
+     "t": 13.5
+    },
+    {
+     "verdicts": {
+      "cards": true,
+      "cards_first_clarifies": true,
+      "cards_first_no_price": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [{\"text\": \"Чтобы назвать цену на колодки, мне нужно знать марку, модель и год вашего автомобиля. Напишите, пожалуйста, эту информацию!\", \"label\": \"Про авто\", \"move\": \"Уточнить\"}, {\"text\": \"Колодки передние стоят 18500 тг за оригинал. Если нужно что-то еще, дайте знать!\", \"label\": \"Коротко\", \"move\": \"Ответ\"}, {\"text\": \"Если вас интересует аналог колодок, могу предложить альтернативы. Напишите, если хотите узнать больше!\", \"label\": \"Альтернатива\", \"move\": \"Вариант\"}, {\"text\": \"Если вы готовы оформить заказ, напишите марку, модель и год вашего автомобиля, а также ваши контактные данные.\", \"label\": \"Оформить?\", \"move\": \"К заказу\"}]}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 2249,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 18,
+     "t": 36.6
+    },
+    {
+     "verdicts": {
+      "cards": true,
+      "cards_first_clarifies": true,
+      "cards_first_no_price": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [{\"text\": \"Чтобы назвать точную цену на колодки, мне нужно знать марку, модель и год вашего автомобиля. Напишите, пожалуйста!\", \"label\": \"Про авто\", \"move\": \"Уточнить\"}, {\"text\": \"Цена на передние тормозные колодки Toyota 04465-02220 составляет 18500 тг. Это оригинал, цена без установки. Если нужно, могу помочь с заказом!\", \"label\": \"Коротко\", \"move\": \"Ответ\"}, {\"text\": \"У нас есть оригинальные передние тормозные колодки Toyota за 18500 тг. Если вас интересует аналог, дайте знать, я подберу!\", \"label\": \"Аналог\", \"move\": \"Вариант\"}, {\"text\": \"Пожалуйста, уточните марку, модель и год вашего автомобиля, чтобы я мог точно ответить на ваш вопрос по колодкам.\", \"label\": \"Уточнить\", \"move\": \"Уточнить\"}]}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 2240,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 30,
+     "t": 60.3
+    },
+    {
+     "verdicts": {
+      "cards": true,
+      "cards_first_clarifies": true,
+      "cards_first_no_price": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [{\"text\": \"Чтобы назвать цену, мне нужно знать марку, модель и год вашего автомобиля. Напишите, пожалуйста!\", \"label\": \"Про авто\", \"move\": \"Уточнить\"}, {\"text\": \"Колодки передние стоят 18500 тг за оригинал. Если нужно что-то другое, дайте знать!\", \"label\": \"Цена\", \"move\": \"Ответ\"}, {\"text\": \"У нас также есть возможность замены масла. Если вас интересует, могу рассказать подробнее!\", \"label\": \"Дополнительно\", \"move\": \"Вариант\"}, {\"text\": \"Если вы готовы сделать заказ, напишите марку, модель и год авто, а также свой номер телефона!\", \"label\": \"Оформить?\", \"move\": \"К заказу\"}]}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 2230,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 42,
+     "t": 86.0
+    },
+    {
+     "verdicts": {
+      "cards": true,
+      "cards_first_clarifies": true,
+      "cards_first_no_price": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [{\"text\": \"Для точного ответа мне нужна информация о вашей машине: марка, модель и год выпуска. Тогда смогу сказать цену на колодки.\", \"label\": \"Про авто\", \"move\": \"Уточнить\"}, {\"text\": \"Колодки передние стоят 18500 тг за оригинал. Если вам нужна другая информация или есть вопросы, дайте знать!\", \"label\": \"Цена\", \"move\": \"Ответ\"}, {\"text\": \"Если вас интересуют другие детали или услуги, например, замена масла, дайте знать!\", \"label\": \"Дополнительно\", \"move\": \"Вариант\"}, {\"text\": \"Хотите, чтобы я проверил наличие колодок? Напишите марку, модель и год авто.\", \"label\": \"Проверить\", \"move\": \"Отложить\"}]}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 2536,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 54,
+     "t": 107.6
+    }
+   ]
+  },
+  {
+   "id": "pn_installment_kaspi",
+   "vertical": "kaspi_seller",
+   "mode": "panel",
+   "lang": "ru",
+   "tags": [
+    "installment",
+    "key"
+   ],
+   "repeats": 5,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "cards": true,
+      "cards_no_invented_installment_terms": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [{\"text\": \"Оформление рассрочки доступно на странице товара на Kaspi. Процент и условия можно узнать там. Вот ссылка на наушники: https://kaspi.kz/shop/techstore.\", \"label\": \"Условия рассрочки\", \"move\": \"Уточнить\"}, {\"text\": \"Рассрочка на наушники JBL Tune 510BT доступна. Для подробностей, включая процент, пожалуйста, посетите страницу товара на Kaspi: https://kaspi.kz/shop/techstore.\", \"label\": \"Процент рассрочки\", \"move\": \"Уточнить\"}, {\"text\": \"Да, наушники можно взять в рассрочку на 12 месяцев. Процент зависит от условий Kaspi. Подробности на странице товара: https://kaspi.kz/shop/techstore.\", \"label\": \"Рассрочка на 12 мес\", \"move\": \"Ответ\"}, {\"text\": \"Для оформления рассрочки и получения информации о проценте, пожалуйста, перейдите на страницу товара на Kaspi: https://kaspi.kz/shop/techstore.\", \"label\": \"Оформление рассрочки\", \"move\": \"К заказу\"}]}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 3764,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 7,
+     "t": 16.1
+    },
+    {
+     "verdicts": {
+      "cards": true,
+      "cards_no_invented_installment_terms": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [{\"text\": \"Чтобы узнать условия рассрочки на наушники JBL Tune 510BT, пожалуйста, перейдите на страницу товара в Kaspi: https://kaspi.kz/shop/techstore. Там указаны все детали.\", \"label\": \"Условия рассрочки\", \"move\": \"Уточнить\"}, {\"text\": \"Рассрочка доступна, но точные условия, включая процент, можно узнать на странице товара в Kaspi: https://kaspi.kz/shop/techstore. Проверьте, пожалуйста!\", \"label\": \"Процент рассрочки\", \"move\": \"Уточнить\"}, {\"text\": \"Наушники JBL Tune 510BT можно оформить в рассрочку на 12 месяцев. Процент и условия уточняйте на странице товара в Kaspi: https://kaspi.kz/shop/techstore.\", \"label\": \"Наушники в рассрочку\", \"move\": \"Ответ\"}, {\"text\": \"Рассрочка на наушники JBL Tune 510BT доступна. Для подробной информации о проценте и условиях, пожалуйста, посетите страницу товара в Kaspi: https://kaspi.kz/shop/techstore.\", \"label\": \"Подробности рассрочки\", \"move\": \"Ответ\"}]}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 3489,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 19,
+     "t": 38.8
+    },
+    {
+     "verdicts": {
+      "cards": true,
+      "cards_no_invented_installment_terms": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [{\"text\": \"Условия рассрочки можно узнать на странице товара на Kaspi. Перейдите по ссылке: https://kaspi.kz/shop/techstore и выберите наушники JBL Tune 510BT. Там будет вся информация!\", \"label\": \"Условия рассрочки\", \"move\": \"Уточнить\"}, {\"text\": \"Рассрочка на наушники JBL Tune 510BT доступна. Процент и другие условия можно посмотреть на странице товара на Kaspi: https://kaspi.kz/shop/techstore.\", \"label\": \"Процент и условия\", \"move\": \"Уточнить\"}, {\"text\": \"Перейдите на страницу товара на Kaspi, чтобы узнать условия рассрочки на наушники JBL Tune 510BT: https://kaspi.kz/shop/techstore. Там указаны все детали!\", \"label\": \"Ссылка на товар\", \"move\": \"Уточнить\"}, {\"text\": \"К сожалению, я не могу предоставить информацию о проценте рассрочки. Пожалуйста, проверьте на странице товара на Kaspi: https://kaspi.kz/shop/techstore.\", \"label\": \"Уточнить информацию\", \"move\": \"Уточнить\"}]}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 2632,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 31,
+     "t": 62.5
+    },
+    {
+     "verdicts": {
+      "cards": true,
+      "cards_no_invented_installment_terms": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [{\"text\": \"Оформление рассрочки доступно на странице товара на Kaspi. Процент и условия также можно увидеть там. Вот ссылка на наушники: https://kaspi.kz/shop/techstore.\", \"label\": \"Условия рассрочки\", \"move\": \"Уточнить\"}, {\"text\": \"К сожалению, я не могу точно сказать процент рассрочки. Рекомендую посмотреть информацию на странице товара на Kaspi: https://kaspi.kz/shop/techstore.\", \"label\": \"Процент рассрочки\", \"move\": \"Уточнить\"}, {\"text\": \"Наушники JBL Tune 510BT можно оформить в рассрочку на 12 месяцев. Подробности и условия можно найти на странице товара на Kaspi.\", \"label\": \"Рассрочка есть?\", \"move\": \"Ответ\"}, {\"text\": \"Если хотите, могу помочь с оформлением заказа на наушники. Просто перейдите по ссылке: https://kaspi.kz/shop/techstore.\", \"label\": \"Оформить заказ\", \"move\": \"К заказу\"}]}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 2693,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 43,
+     "t": 88.2
+    },
+    {
+     "verdicts": {
+      "cards": true,
+      "cards_no_invented_installment_terms": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [{\"text\": \"Условия рассрочки можно узнать на странице товара на Kaspi. Переходите по ссылке: https://kaspi.kz/shop/techstore и смотрите детали.\", \"label\": \"Условия рассрочки\", \"move\": \"Уточнить\"}, {\"text\": \"Рассрочка доступна, но точные условия, включая процент, вы можете найти на странице товара на Kaspi. Вот ссылка: https://kaspi.kz/shop/techstore.\", \"label\": \"Процент рассрочки\", \"move\": \"Уточнить\"}, {\"text\": \"Рассрочка на наушники JBL Tune 510BT доступна. Подробности, включая процент, смотрите на странице товара: https://kaspi.kz/shop/techstore.\", \"label\": \"Рассрочка наушников\", \"move\": \"Уточнить\"}, {\"text\": \"Чтобы узнать условия рассрочки на 12 месяцев и процент, перейдите на страницу товара на Kaspi: https://kaspi.kz/shop/techstore.\", \"label\": \"Ссылка на товар\", \"move\": \"Уточнить\"}]}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 2586,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 55,
+     "t": 110.1
+    }
+   ]
+  },
+  {
+   "id": "pn_mixed_lang",
+   "vertical": "wholesale",
+   "mode": "panel",
+   "lang": "mixed",
+   "tags": [
+    "lang"
+   ],
+   "repeats": 5,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "cards": true,
+      "cards_numbers_grounded": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [{\"text\": \"Здравствуйте! Да, у нас есть стиральный порошок 10 кг. Цена за мешок составляет 6900 тг. Если нужно, могу помочь с заказом!\", \"label\": \"Цена и наличие\", \"move\": \"Ответ\"}, {\"text\": \"Какой объём вы планируете заказать? Это поможет мне рассчитать общую стоимость и условия доставки.\", \"label\": \"Объём заказа\", \"move\": \"Уточнить\"}, {\"text\": \"Если вас интересует что-то ещё из бытовой химии, дайте знать! У нас есть также средство для посуды.\", \"label\": \"Другие товары\", \"move\": \"Вариант\"}, {\"text\": \"Хотите оформить заказ? Минимальный объём 50 000 тг. Могу помочь с оформлением!\", \"label\": \"Оформить заказ\", \"move\": \"К заказу\"}]}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 2011,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 8,
+     "t": 19.9
+    },
+    {
+     "verdicts": {
+      "cards": true,
+      "cards_numbers_grounded": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [{\"text\": \"Да, у нас есть стиральный порошок 10 кг. Он стоит 6900 тг за мешок. Если вас устраивает, можем обсудить детали заказа!\", \"label\": \"Цена и наличие\", \"move\": \"Ответ\"}, {\"text\": \"Какой объём вы планируете заказать? Это поможет мне лучше рассчитать условия.\", \"label\": \"Объём заказа\", \"move\": \"Уточнить\"}, {\"text\": \"Если вам нужно больше, у нас есть и другие средства для стирки. Могу отправить прайс на всю бытовую химию!\", \"label\": \"Другие товары\", \"move\": \"Вариант\"}, {\"text\": \"Давайте оформим заказ! Минимальный объём 50 000 тг. Какой у вас номер телефона для связи?\", \"label\": \"Оформить заказ\", \"move\": \"К заказу\"}]}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 2356,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 20,
+     "t": 42.3
+    },
+    {
+     "verdicts": {
+      "cards": true,
+      "cards_numbers_grounded": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [{\"text\": \"Да, стиральный порошок 10 кг есть в наличии. Цена за мешок составляет 6900 тг. Если вас интересует заказ, дайте знать!\", \"label\": \"Коротко\", \"move\": \"Ответ\"}, {\"text\": \"Стиральный порошок 10 кг у нас есть, цена — 6900 тг за мешок. Если хотите сделать заказ, напишите, пожалуйста, объём и ваши данные!\", \"label\": \"Подробнее\", \"move\": \"Ответ\"}, {\"text\": \"Какой объём вы планируете заказать? Стиральный порошок 10 кг у нас есть за 6900 тг за мешок.\", \"label\": \"Объём заказа\", \"move\": \"Уточнить\"}, {\"text\": \"Если вас интересует оптовая закупка, минимальный заказ у нас 50 000 тг. Напишите, сколько вам нужно, и я помогу оформить заказ!\", \"label\": \"Минимальный заказ\", \"move\": \"К заказу\"}]}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 2743,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 32,
+     "t": 65.1
+    },
+    {
+     "verdicts": {
+      "cards": true,
+      "cards_numbers_grounded": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [{\"text\": \"Да, стиральный порошок 10 кг есть в наличии, цена за мешок — 6900 тг. Если вас устраивает, можем обсудить детали заказа!\", \"label\": \"Коротко\", \"move\": \"Ответ\"}, {\"text\": \"Да, у нас есть стиральный порошок 10 кг за 6900 тг за мешок. Какой объём вы планируете заказать?\", \"label\": \"С вопросом\", \"move\": \"Уточнить\"}, {\"text\": \"Стиральный порошок 10 кг стоит 6900 тг за мешок. Если вам нужно больше, можем обсудить оптовые условия. Интересно?\", \"label\": \"С допродажей\", \"move\": \"Вариант\"}, {\"text\": \"Если вас устраивает цена 6900 тг за мешок, давайте оформим заказ. Вам нужно будет указать компанию и объём. Какой объём вас интересует?\", \"label\": \"Следующий шаг\", \"move\": \"К заказу\"}]}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 2883,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 44,
+     "t": 90.9
+    },
+    {
+     "verdicts": {
+      "cards": true,
+      "cards_numbers_grounded": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [{\"text\": \"Да, стиральный порошок 10 кг есть в наличии. Цена за мешок составляет 6900 тг. Если вас устраивает, можем обсудить заказ!\", \"label\": \"Коротко\", \"move\": \"Ответ\"}, {\"text\": \"Да, у нас есть стиральный порошок 10 кг. Он стоит 6900 тг за мешок. Какой объём вы планируете заказать?\", \"label\": \"С вопросом\", \"move\": \"Уточнить\"}, {\"text\": \"Стиральный порошок 10 кг стоит 6900 тг за мешок. Если вам нужно больше, можем обсудить оптовые условия. Интересно?\", \"label\": \"Вариант\", \"move\": \"Вариант\"}, {\"text\": \"Чтобы оформить заказ на стиральный порошок 10 кг, напишите, пожалуйста, объём и ваши контактные данные. Жду от вас!\", \"label\": \"Следующий шаг\", \"move\": \"К заказу\"}]}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 2427,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 56,
+     "t": 112.7
+    }
+   ]
+  },
+  {
+   "id": "pn_complaint",
+   "vertical": "kaspi_seller",
+   "mode": "panel",
+   "lang": "ru",
+   "tags": [
+    "complaint"
+   ],
+   "repeats": 5,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "cards": true,
+      "cards_no_refund_confirmation": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [{\"text\": \"Здравствуйте! Очень жаль слышать о проблеме с наушниками. Пожалуйста, свяжитесь с нашей службой поддержки по телефону +7 701 222 33 44, чтобы обсудить возврат и возврат денег.\", \"label\": \"Проблема с товаром\", \"move\": \"Ответ\"}, {\"text\": \"Могу уточнить, как именно произошла трещина? Это поможет нам лучше разобраться в ситуации.\", \"label\": \"Причина повреждения\", \"move\": \"Уточнить\"}, {\"text\": \"Если хотите, могу помочь вам с оформлением возврата через Kaspi. Вам нужно будет обратиться на страницу товара для начала процесса.\", \"label\": \"Оформление возврата\", \"move\": \"Вариант\"}, {\"text\": \"Пожалуйста, подождите немного, я уточню информацию по возврату и свяжусь с вами.\", \"label\": \"Возврат\", \"move\": \"Отложить\"}]}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 3201,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 9,
+     "t": 21.9
+    },
+    {
+     "verdicts": {
+      "cards": true,
+      "cards_no_refund_confirmation": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [{\"text\": \"Сожалею, что вы столкнулись с этой проблемой. Пожалуйста, свяжитесь с нашей службой поддержки через Kaspi для возврата. Они помогут вам с процессом.\", \"label\": \"Возврат товара\", \"move\": \"Ответ\"}, {\"text\": \"Какой именно товар вы хотите вернуть? Уточните, пожалуйста, модель и цвет наушников, чтобы я мог помочь вам быстрее.\", \"label\": \"Уточните модель\", \"move\": \"Уточнить\"}, {\"text\": \"Если вам нужны новые наушники, я могу предложить другие модели. Например, у нас есть наушники JBL Tune 510BT. Интересно?\", \"label\": \"Другие наушники\", \"move\": \"Вариант\"}, {\"text\": \"Пожалуйста, дайте знать, если вам нужна помощь с возвратом. Мы готовы помочь вам в этом процессе!\", \"label\": \"Помощь с возвратом\", \"move\": \"Ответ\"}]}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 2541,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 21,
+     "t": 44.7
+    },
+    {
+     "verdicts": {
+      "cards": true,
+      "cards_no_refund_confirmation": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [{\"text\": \"Здравствуйте! Очень жаль слышать о проблеме с наушниками. Пожалуйста, свяжитесь с нашей службой поддержки по телефону +7 701 222 33 44, чтобы мы могли помочь вам с возвратом.\", \"label\": \"Помощь с возвратом\", \"move\": \"Ответ\"}, {\"text\": \"Понимаю вашу ситуацию. Для возврата товара, пожалуйста, свяжитесь с нашей службой поддержки по номеру +7 701 222 33 44. Они подскажут, как вернуть наушники.\", \"label\": \"Контакты службы\", \"move\": \"Ответ\"}, {\"text\": \"К сожалению, я не могу обработать возврат напрямую. Свяжитесь с нашей службой поддержки по телефону +7 701 222 33 44, они помогут вам с возвратом.\", \"label\": \"Связь с поддержкой\", \"move\": \"Ответ\"}, {\"text\": \"Приношу извинения за неудобства. Пожалуйста, обратитесь в службу поддержки для решения вопроса с возвратом. Телефон: +7 701 222 33 44.\", \"label\": \"Извинения\", \"move\": \"Ответ\"}]}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 2653,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 33,
+     "t": 67.9
+    },
+    {
+     "verdicts": {
+      "cards": true,
+      "cards_no_refund_confirmation": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [{\"text\": \"Здравствуйте! Очень жаль слышать о проблеме с наушниками. Пожалуйста, свяжитесь с нашей службой поддержки по телефону +7 701 222 33 44 для решения вопроса с возвратом.\", \"label\": \"Проблема с товаром\", \"move\": \"Ответ\"}, {\"text\": \"Могу уточнить, какой именно товар вы приобрели? Это поможет быстрее разобраться с вашей проблемой.\", \"label\": \"Какой товар?\", \"move\": \"Уточнить\"}, {\"text\": \"Если вы хотите, я могу помочь вам оформить возврат через Kaspi. Напишите, как вам удобнее действовать!\", \"label\": \"Помощь с возвратом\", \"move\": \"Вариант\"}, {\"text\": \"Давайте я уточню детали возврата и свяжусь с вами через 15 минут. Это поможет разобраться с вашей ситуацией.\", \"label\": \"Возврат через 15 мин\", \"move\": \"Отложить\"}]}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 2381,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 45,
+     "t": 93.8
+    },
+    {
+     "verdicts": {
+      "cards": true,
+      "cards_no_refund_confirmation": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [{\"text\": \"Здравствуйте! Извините за неудобства. Пожалуйста, свяжитесь с нашей службой поддержки по телефону +7 701 222 33 44 для решения вопроса с возвратом.\", \"label\": \"Поддержка\", \"move\": \"Ответ\"}, {\"text\": \"Могу уточнить детали вашего заказа? Это поможет быстрее решить проблему с возвратом. Какой у вас номер заказа?\", \"label\": \"Номер заказа\", \"move\": \"Уточнить\"}, {\"text\": \"Если хотите, могу помочь с оформлением нового заказа на другие наушники. Есть модели JBL без повреждений.\", \"label\": \"Новые наушники\", \"move\": \"Вариант\"}, {\"text\": \"Давайте я уточню информацию и свяжусь с вами через 15 минут. Это поможет лучше разобраться с возвратом.\", \"label\": \"Пауза\", \"move\": \"Отложить\"}]}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 2333,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 57,
+     "t": 115.2
+    }
+   ]
+  },
+  {
+   "id": "pn_spam",
+   "vertical": "education",
+   "mode": "panel",
+   "lang": "ru",
+   "tags": [
+    "abstain"
+   ],
+   "repeats": 5,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "abstain": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [], \"abstain\": true}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 964,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 10,
+     "t": 25.1
+    },
+    {
+     "verdicts": {
+      "abstain": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [], \"abstain\": true}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 1210,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 22,
+     "t": 47.2
+    },
+    {
+     "verdicts": {
+      "abstain": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [], \"abstain\": true}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 864,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 34,
+     "t": 70.5
+    },
+    {
+     "verdicts": {
+      "abstain": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [], \"abstain\": true}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 912,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 46,
+     "t": 96.2
+    },
+    {
+     "verdicts": {
+      "abstain": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [], \"abstain\": true}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 845,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 58,
+     "t": 117.5
+    }
+   ]
+  },
+  {
+   "id": "pn_media_only",
+   "vertical": "phone_repair",
+   "mode": "panel",
+   "lang": "ru",
+   "tags": [
+    "media"
+   ],
+   "repeats": 5,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "cards": true,
+      "cards_first_clarifies": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [{\"text\": \"Не могу увидеть содержимое фото. Опишите, пожалуйста, что на нём изображено или какая проблема с устройством?\", \"label\": \"Что на фото?\", \"move\": \"Уточнить\"}]}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 1328,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 11,
+     "t": 26.0
+    },
+    {
+     "verdicts": {
+      "cards": true,
+      "cards_first_clarifies": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [{\"text\": \"Не могу увидеть содержимое фото. Напишите, пожалуйста, текстом, что именно вас интересует или какая проблема с устройством.\", \"label\": \"Опишите проблему\", \"move\": \"Уточнить\"}]}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 1279,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 23,
+     "t": 48.4
+    },
+    {
+     "verdicts": {
+      "cards": true,
+      "cards_first_clarifies": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [{\"text\": \"Не могли бы вы написать, что изображено на фото? Это поможет мне лучше понять, как вам помочь.\", \"label\": \"Что на фото?\", \"move\": \"Уточнить\"}]}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 1295,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 35,
+     "t": 71.4
+    },
+    {
+     "verdicts": {
+      "cards": true,
+      "cards_first_clarifies": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [{\"text\": \"Не могу увидеть содержимое фото. Напишите, пожалуйста, текстом, что именно вас интересует или какая проблема с устройством.\", \"label\": \"Что на фото?\", \"move\": \"Уточнить\"}]}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 1106,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 47,
+     "t": 97.1
+    },
+    {
+     "verdicts": {
+      "cards": true,
+      "cards_first_clarifies": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [{\"text\": \"Пожалуйста, напишите текстом, что именно на фото, чтобы я мог помочь.\", \"label\": \"Что на фото?\", \"move\": \"Уточнить\"}]}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 1108,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 59,
+     "t": 118.3
+    }
+   ]
+  }
+ ]
+}

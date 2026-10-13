@@ -1,0 +1,1484 @@
+{
+ "summary": {
+  "label": "cmp-0925-handoff-gpt-6-luna",
+  "prompts_ref": "worktree",
+  "scenario_version": "v1.1 (2026-09-22: absent-item check names the item; harness h2)",
+  "harness": "h2 (2026-09-22: derived totals, echoed client numbers, negation-aware claims, no_price_for)",
+  "model": "gpt-6-luna",
+  "reasoning_effort": "none",
+  "dropped_params": [
+   "frequency_penalty"
+  ],
+  "panel_model": null,
+  "max_tokens": 200,
+  "scenarios": 8,
+  "runs": 40,
+  "pass_all": 8,
+  "flaky": 0,
+  "fail": 0,
+  "error_runs": 0,
+  "finish_reason_length_runs": 0,
+  "prompt_tokens": 328052,
+  "cached_tokens": 322811,
+  "completion_tokens": 5044,
+  "reasoning_tokens": 0,
+  "cost_usd_auto_path": 0.0063,
+  "prices_usd_per_1m": [
+   0.1,
+   0.01,
+   0.5
+  ],
+  "latency_ms": {
+   "auto": {
+    "n": 40,
+    "median": 3571,
+    "p90": 6533,
+    "max": 6621
+   },
+   "panel": null
+  },
+  "seconds": 158,
+  "by_check": {
+   "claims_handoff_only_if_ok": "40/40",
+   "no_exact_time_confirmation": "10/10",
+   "no_invoice_in_chat": "5/5",
+   "no_photo_promise": "5/5",
+   "no_refund_confirmation": "5/5",
+   "no_time_assignment": "5/5",
+   "numbers_grounded": "10/10",
+   "polite": "5/5",
+   "tool_called": "40/40"
+  }
+ },
+ "results": [
+  {
+   "id": "ap_handoff_ok",
+   "vertical": "auto_parts",
+   "mode": "auto",
+   "lang": "ru",
+   "tags": [
+    "handoff",
+    "key"
+   ],
+   "repeats": 5,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "tool_called": true,
+      "claims_handoff_only_if_ok": true,
+      "numbers_grounded": true
+     },
+     "text": "Передал менеджеру, он свяжется и подтвердит.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "name": "Арман",
+        "phone": "87011234567",
+        "summary": "Клиент хочет купить передние тормозные колодки Toyota 04465-02220 для Toyota Camry 2019."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 7706,
+      "completion_tokens": 77,
+      "cached_tokens": 7584,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [
+      "frequency_penalty"
+     ],
+     "latency_ms": 3571,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "tool_called": true,
+      "claims_handoff_only_if_ok": true,
+      "numbers_grounded": true
+     },
+     "text": "Передал менеджеру, он свяжется и подтвердит.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "name": "Арман",
+        "phone": "87011234567",
+        "summary": "Клиент готов купить передние тормозные колодки Toyota 04465-02220 для Toyota Camry 2019."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 7706,
+      "completion_tokens": 77,
+      "cached_tokens": 7584,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [
+      "frequency_penalty"
+     ],
+     "latency_ms": 4017,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "tool_called": true,
+      "claims_handoff_only_if_ok": true,
+      "numbers_grounded": true
+     },
+     "text": "Передал менеджеру, он свяжется и подтвердит.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "name": "Арман",
+        "phone": "87011234567",
+        "summary": "Покупка передних тормозных колодок Toyota 04465-02220 для Toyota Camry 2019. Клиент готов купить."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 7709,
+      "completion_tokens": 80,
+      "cached_tokens": 7584,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [
+      "frequency_penalty"
+     ],
+     "latency_ms": 3332,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "tool_called": true,
+      "claims_handoff_only_if_ok": true,
+      "numbers_grounded": true
+     },
+     "text": "Передал менеджеру, он свяжется и подтвердит.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "name": "Арман",
+        "phone": "87011234567",
+        "summary": "Покупка передних тормозных колодок Toyota 04465-02220 для Toyota Camry 2019. Клиент готов купить; нужно подтвердить совместимость и наличие."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 7717,
+      "completion_tokens": 88,
+      "cached_tokens": 7584,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [
+      "frequency_penalty"
+     ],
+     "latency_ms": 3761,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "tool_called": true,
+      "claims_handoff_only_if_ok": true,
+      "numbers_grounded": true
+     },
+     "text": "Передал менеджеру, он свяжется и подтвердит.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "name": "Арман",
+        "phone": "87011234567",
+        "summary": "Клиент готов купить передние тормозные колодки Toyota 04465-02220 для Toyota Camry 2019."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 7706,
+      "completion_tokens": 77,
+      "cached_tokens": 7700,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [
+      "frequency_penalty"
+     ],
+     "latency_ms": 2325,
+     "status": null
+    }
+   ]
+  },
+  {
+   "id": "ap_handoff_fail",
+   "vertical": "auto_parts",
+   "mode": "auto",
+   "lang": "ru",
+   "tags": [
+    "handoff",
+    "key"
+   ],
+   "repeats": 5,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "tool_called": true,
+      "claims_handoff_only_if_ok": true
+     },
+     "text": "Не удалось автоматически передать заявку. Позвоните, пожалуйста, менеджеру по номеру +7 777 000 11 22 — он подтвердит наличие и заказ.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "name": "Арман",
+        "phone": "87011234567",
+        "summary": "Покупка передних тормозных колодок Toyota 04465-02220 для Toyota Camry 2019. Клиент готов купить; требуется подтвердить наличие и заказ."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 7713,
+      "completion_tokens": 110,
+      "cached_tokens": 7584,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [
+      "frequency_penalty"
+     ],
+     "latency_ms": 3438,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "tool_called": true,
+      "claims_handoff_only_if_ok": true
+     },
+     "text": "Не удалось автоматически передать заявку. Позвоните, пожалуйста, по номеру +7 777 000 11 22 — менеджер оформит заказ на колодки 04465-02220 для Camry 2019.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "name": "Арман",
+        "phone": "87011234567",
+        "summary": "Клиент готов купить передние тормозные колодки Toyota 04465-02220 для Toyota Camry 2019."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 7703,
+      "completion_tokens": 113,
+      "cached_tokens": 7697,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [
+      "frequency_penalty"
+     ],
+     "latency_ms": 3141,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "tool_called": true,
+      "claims_handoff_only_if_ok": true
+     },
+     "text": "Не удалось автоматически передать заявку. Позвоните менеджеру по номеру +7 777 000 11 22 — он подтвердит наличие и совместимость колодок для Camry 2019.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "name": "Арман",
+        "phone": "87011234567",
+        "summary": "Покупка передних тормозных колодок Toyota 04465-02220 для Toyota Camry 2019. Клиент готов купить; менеджеру подтвердить совместимость и наличие."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 7715,
+      "completion_tokens": 119,
+      "cached_tokens": 7584,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [
+      "frequency_penalty"
+     ],
+     "latency_ms": 3715,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "tool_called": true,
+      "claims_handoff_only_if_ok": true
+     },
+     "text": "Не удалось автоматически передать заявку. Позвоните менеджеру по номеру +7 777 000 11 22, чтобы оформить покупку колодок 04465-02220 для Camry 2019.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "name": "Арман",
+        "phone": "87011234567",
+        "summary": "Покупка передних тормозных колодок Toyota 04465-02220 для Toyota Camry 2019. Клиент готов купить."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 7706,
+      "completion_tokens": 113,
+      "cached_tokens": 7700,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [
+      "frequency_penalty"
+     ],
+     "latency_ms": 4145,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "tool_called": true,
+      "claims_handoff_only_if_ok": true
+     },
+     "text": "Не удалось автоматически передать заявку. Позвоните, пожалуйста, менеджеру по номеру +7 777 000 11 22 — колодки Toyota 04465-02220 для Camry 2019.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "name": "Арман",
+        "phone": "87011234567",
+        "summary": "Покупка передних тормозных колодок Toyota 04465-02220 для Toyota Camry 2019. Клиент готов купить."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 7706,
+      "completion_tokens": 113,
+      "cached_tokens": 7700,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [
+      "frequency_penalty"
+     ],
+     "latency_ms": 3166,
+     "status": null
+    }
+   ]
+  },
+  {
+   "id": "ws_handoff_order",
+   "vertical": "wholesale",
+   "mode": "auto",
+   "lang": "ru",
+   "tags": [
+    "handoff"
+   ],
+   "repeats": 5,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "tool_called": true,
+      "claims_handoff_only_if_ok": true,
+      "no_invoice_in_chat": true
+     },
+     "text": "Передал менеджеру, он свяжется. Счёт выставит менеджер.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "name": "Асель",
+        "phone": "87021112233",
+        "summary": "Заказ от ТОО «Ромашка», Караганда: стиральный порошок 10 кг — 40 мешков. Просит выставить счёт."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 7557,
+      "completion_tokens": 89,
+      "cached_tokens": 7428,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [
+      "frequency_penalty"
+     ],
+     "latency_ms": 3409,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "tool_called": true,
+      "claims_handoff_only_if_ok": true,
+      "no_invoice_in_chat": true
+     },
+     "text": "Передал менеджеру заявку на 40 мешков стирального порошка 10 кг. Менеджер свяжется по счёту.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "name": "Асель",
+        "phone": "87021112233",
+        "summary": "Заявка от ТОО «Ромашка», Караганда: стиральный порошок 10 кг — 40 мешков. Клиент просит выставить счёт."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 7560,
+      "completion_tokens": 104,
+      "cached_tokens": 7428,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [
+      "frequency_penalty"
+     ],
+     "latency_ms": 3384,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "tool_called": true,
+      "claims_handoff_only_if_ok": true,
+      "no_invoice_in_chat": true
+     },
+     "text": "Передал менеджеру, он свяжется. Счёт выставит менеджер.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "name": "Асель",
+        "phone": "87021112233",
+        "summary": "Заказ для ТОО «Ромашка», Караганда: стиральный порошок 10 кг — 40 мешков. Клиент просит выставить счёт."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 7559,
+      "completion_tokens": 91,
+      "cached_tokens": 7428,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [
+      "frequency_penalty"
+     ],
+     "latency_ms": 2830,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "tool_called": true,
+      "claims_handoff_only_if_ok": true,
+      "no_invoice_in_chat": true
+     },
+     "text": "Передал менеджеру, он свяжется. Счёт выставит менеджер.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "name": "Асель",
+        "phone": "87021112233",
+        "summary": "ТОО «Ромашка», Караганда. Стиральный порошок 10 кг — 40 мешков. Клиент просит выставить счёт."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 7557,
+      "completion_tokens": 89,
+      "cached_tokens": 7428,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [
+      "frequency_penalty"
+     ],
+     "latency_ms": 3466,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "tool_called": true,
+      "claims_handoff_only_if_ok": true,
+      "no_invoice_in_chat": true
+     },
+     "text": "Передал менеджеру, он свяжется. Счёт выставит менеджер.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "name": "Асель",
+        "phone": "87021112233",
+        "summary": "ТОО «Ромашка», Караганда. Стиральный порошок 10 кг — 40 мешков. Клиент просит выставить счёт."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 7557,
+      "completion_tokens": 89,
+      "cached_tokens": 7551,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [
+      "frequency_penalty"
+     ],
+     "latency_ms": 3410,
+     "status": null
+    }
+   ]
+  },
+  {
+   "id": "fl_order_steps",
+   "vertical": "flowers",
+   "mode": "auto",
+   "lang": "ru",
+   "tags": [
+    "order",
+    "long"
+   ],
+   "repeats": 5,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "tool_called": true,
+      "claims_handoff_only_if_ok": true,
+      "numbers_grounded": true,
+      "no_photo_promise": true
+     },
+     "text": "Передал флористу — он подтвердит заказ. Пожелание доставить завтра к 10:00 зафиксировал, точное время он подтвердит отдельно. Доставка по городу — 2 000 тг.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "name": "Ерлан",
+        "phone": "87051234567",
+        "summary": "Заказ: букет 25 роз (розы 50 см, Эквадор), 25 000 тг. Доставка завтра к 10:00 по адресу: Кабанбай батыра 5, Астана; доставка по городу 2 000 тг. Получатель: Дана, 87771234567. Открытка: «С днём рождения». Отправитель: Ерлан, 87051234567. Пожелание по времени зафиксировано, точное время подтвердит флорист."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 7694,
+      "completion_tokens": 200,
+      "cached_tokens": 7484,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [
+      "frequency_penalty"
+     ],
+     "latency_ms": 4443,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "tool_called": true,
+      "claims_handoff_only_if_ok": true,
+      "numbers_grounded": true,
+      "no_photo_promise": true
+     },
+     "text": "Передал флористу — он подтвердит заказ. Доставка по городу — 2 000 тг; пожелание на 10:00 зафиксировал, точное время подтвердит флорист. Состав букета может немного отличаться, замену флорист согласует с вами.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "name": "Ерлан",
+        "phone": "87051234567",
+        "summary": "Заказ: букет 25 роз (25 000 тг, розы 50 см, Эквадор). Доставка завтра к 10:00 по адресу: Астана, Кабанбай батыра 5; доставка по городу 2 000 тг. Получатель: Дана, 87771234567. Открытка: «С днём рождения». Отправитель: Ерлан, 87051234567. Пожелание по времени зафиксировано, точное время подтвердит флорист."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 7693,
+      "completion_tokens": 212,
+      "cached_tokens": 7484,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [
+      "frequency_penalty"
+     ],
+     "latency_ms": 4231,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "tool_called": true,
+      "claims_handoff_only_if_ok": true,
+      "numbers_grounded": true,
+      "no_photo_promise": true
+     },
+     "text": "Передал флористу — он подтвердит заказ. Букет 25 роз — 25 000 тг, доставка по городу — 2 000 тг. Наличие и точное время доставки подтвердит флорист.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "Букет 25 роз: цена, состав и наличие"
+       }
+      },
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "name": "Ерлан",
+        "phone": "87051234567",
+        "summary": "Заказ: букет 25 роз (50 см, 25000 тг). Доставка завтра к 10:00 на Кабанбай батыра, 5, Астана; доставка по городу 2000 тг. Получатель: Дана, 87771234567. Открытка: «С днём рождения». Желаемое время доставки зафиксировано, точное время и наличие подтвердит флорист."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 11610,
+      "completion_tokens": 210,
+      "cached_tokens": 11322,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [
+      "frequency_penalty"
+     ],
+     "latency_ms": 5434,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "tool_called": true,
+      "claims_handoff_only_if_ok": true,
+      "numbers_grounded": true,
+      "no_photo_promise": true
+     },
+     "text": "Заказ: букет из 25 роз — 25 000 тг, доставка по городу — 2 000 тг. Завтра к 10:00 на Кабанбай батыра, 5. Получатель — Дана, открытка «С днём рождения». Отправитель — Ерлан. Точное время доставки подтвердит флорист.\n\nПередал флористу — он подтвердит заказ.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "name": "Ерлан",
+        "phone": "87051234567",
+        "summary": "Заказ: букет 25 роз (розы 50 см, Эквадор), доставка завтра к 10:00 по адресу Кабанбай батыра 5. Получатель: Дана, 87771234567. Открытка: «С днём рождения». Отправитель: Ерлан, 87051234567. Доставка по городу 2000 тг; точное время подтвердит флорист."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 7672,
+      "completion_tokens": 219,
+      "cached_tokens": 7484,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [
+      "frequency_penalty"
+     ],
+     "latency_ms": 4490,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "tool_called": true,
+      "claims_handoff_only_if_ok": true,
+      "numbers_grounded": true,
+      "no_photo_promise": true
+     },
+     "text": "Передал флористу — он подтвердит заказ. Наличие букета и доставку к 10:00 уточнит отдельно. Букет — 25 000 тг, доставка — 2 000 тг.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "name": "Ерлан",
+        "phone": "87051234567",
+        "summary": "Заказ: букет 25 роз (25 000 тг; розы 50 см, Эквадор). Доставка завтра к 10:00 по адресу: Астана, Кабанбай батыра 5; доставка по городу 2 000 тг. Получатель: Дана, 87771234567. Открытка: «С днём рождения». Отправитель: Ерлан, 87051234567. Наличие и точное время доставки подтвердит флорист."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 7687,
+      "completion_tokens": 192,
+      "cached_tokens": 7484,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [
+      "frequency_penalty"
+     ],
+     "latency_ms": 4225,
+     "status": null
+    }
+   ]
+  },
+  {
+   "id": "fl_night_order_hours_known",
+   "vertical": "flowers",
+   "mode": "auto",
+   "lang": "ru",
+   "tags": [
+    "promise"
+   ],
+   "repeats": 5,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "tool_called": true,
+      "claims_handoff_only_if_ok": true,
+      "no_exact_time_confirmation": true
+     },
+     "text": "Букет пионов — 18 000 тг, состав может немного отличаться, замену флорист согласует с вами. Заявку на самовывоз утром передал флористу — он подтвердит заказ и время. Айгуль указала как получателя; для оформления ещё нужны имя и телефон отправителя.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "Букет пионов: цена, описание и наличие"
+       }
+      },
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "name": "Айгуль",
+        "phone": "87011111111",
+        "summary": "Заказ: букет пионов (сезонный), 18000 тг. Самовывоз утром; точное время не указано. Получатель: Айгуль, 87011111111. Нужны уточнения по времени самовывоза, имени и телефону отправителя, а также тексту открытки (если нужна)."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 11532,
+      "completion_tokens": 209,
+      "cached_tokens": 11265,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [
+      "frequency_penalty"
+     ],
+     "latency_ms": 6533,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "tool_called": true,
+      "claims_handoff_only_if_ok": true,
+      "no_exact_time_confirmation": true
+     },
+     "text": "Передал флористу заявку на букет пионов с самовывозом утром. Наличие и готовность к утру он подтвердит. Какое время самовывоза вам удобно?",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "Букет пионов: цена, описание, наличие и условия заказа на утро/самовывоз"
+       }
+      },
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "name": "Айгуль",
+        "phone": "87011111111",
+        "summary": "Заказ: букет пионов (сезонный), самовывоз утром. Клиент пишет в 2 ночи; точное время самовывоза не указано. Наличие и возможность подготовить к утру подтвердит флорист."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 11532,
+      "completion_tokens": 171,
+      "cached_tokens": 11275,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [
+      "frequency_penalty"
+     ],
+     "latency_ms": 6586,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "tool_called": true,
+      "claims_handoff_only_if_ok": true,
+      "no_exact_time_confirmation": true
+     },
+     "text": "Передал флористу заявку на букет пионов с самовывозом утром. Он подтвердит заказ и время.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "Букет пионов: цена, описание и наличие/условия заказа"
+       }
+      },
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "name": "Айгуль",
+        "phone": "87011111111",
+        "summary": "Заказ букета пионов за 18 000 тг, самовывоз утром. Клиент указал имя Айгуль и телефон 87011111111. Нужно уточнить время самовывоза и данные получателя."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 11584,
+      "completion_tokens": 214,
+      "cached_tokens": 11269,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [
+      "frequency_penalty"
+     ],
+     "latency_ms": 6579,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "tool_called": true,
+      "claims_handoff_only_if_ok": true,
+      "no_exact_time_confirmation": true
+     },
+     "text": "Букет пионов — 18 000 тг, сезонный. Наличие подтвердит флорист при оформлении. Самовывоз записала, передала флористу — он подтвердит заказ.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "Букет пионов: цена, описание и наличие"
+       }
+      },
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "name": "Айгуль",
+        "phone": "87011111111",
+        "summary": "Заказ букета пионов за 18 000 тг, самовывоз. Клиент спрашивает, можно ли забрать утром; дата и желаемое время не уточнены."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 11561,
+      "completion_tokens": 213,
+      "cached_tokens": 11361,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [
+      "frequency_penalty"
+     ],
+     "latency_ms": 5848,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "tool_called": true,
+      "claims_handoff_only_if_ok": true,
+      "no_exact_time_confirmation": true
+     },
+     "text": "Заявку на букет пионов и самовывоз утром передал флористу. Чтобы оформить заказ полностью, напишите желаемое время самовывоза и имя с телефоном получателя. Точное время подтвердит флорист.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "Букет пионов: цена, описание, наличие"
+       }
+      },
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "name": "Айгуль",
+        "phone": "87011111111",
+        "summary": "Заказ букета пионов за 18 000 тг, самовывоз утром. Клиент указала имя Айгуль и телефон 87011111111; желаемое время и данные получателя ещё не уточнены."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 11585,
+      "completion_tokens": 244,
+      "cached_tokens": 11265,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [
+      "frequency_penalty"
+     ],
+     "latency_ms": 6621,
+     "status": null
+    }
+   ]
+  },
+  {
+   "id": "ks_complaint",
+   "vertical": "kaspi_seller",
+   "mode": "auto",
+   "lang": "ru",
+   "tags": [
+    "complaint",
+    "handoff"
+   ],
+   "repeats": 5,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "tool_called": true,
+      "claims_handoff_only_if_ok": true,
+      "no_refund_confirmation": true,
+      "polite": true
+     },
+     "text": "Мария, передал владельцу. Он ответит в рабочее время с 10:00 до 21:00.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "escalation",
+        "name": "Мария",
+        "phone": "87074445566",
+        "summary": "Жалоба: наушники пришли с трещиной. Клиент требует возврат."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 7466,
+      "completion_tokens": 84,
+      "cached_tokens": 7350,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [
+      "frequency_penalty"
+     ],
+     "latency_ms": 3284,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "tool_called": true,
+      "claims_handoff_only_if_ok": true,
+      "no_refund_confirmation": true,
+      "polite": true
+     },
+     "text": "Передал владельцу, он ответит.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "escalation",
+        "name": "Мария",
+        "phone": "87074445566",
+        "summary": "Жалоба: наушники пришли с трещиной. Клиентка требует возврат."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 7467,
+      "completion_tokens": 68,
+      "cached_tokens": 7461,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [
+      "frequency_penalty"
+     ],
+     "latency_ms": 3064,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "tool_called": true,
+      "claims_handoff_only_if_ok": true,
+      "no_refund_confirmation": true,
+      "polite": true
+     },
+     "text": "Передал владельцу, он ответит.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "escalation",
+        "name": "Мария",
+        "phone": "87074445566",
+        "summary": "Жалоба: наушники пришли с трещиной. Клиентка требует возврат."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 7467,
+      "completion_tokens": 68,
+      "cached_tokens": 7461,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [
+      "frequency_penalty"
+     ],
+     "latency_ms": 2971,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "tool_called": true,
+      "claims_handoff_only_if_ok": true,
+      "no_refund_confirmation": true,
+      "polite": true
+     },
+     "text": "Передал владельцу, он ответит. Магазин работает с 10:00 до 21:00.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "escalation",
+        "name": "Мария",
+        "phone": "87074445566",
+        "summary": "Жалоба: наушники пришли с трещиной. Клиентка требует возврат."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 7467,
+      "completion_tokens": 83,
+      "cached_tokens": 7461,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [
+      "frequency_penalty"
+     ],
+     "latency_ms": 3182,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "tool_called": true,
+      "claims_handoff_only_if_ok": true,
+      "no_refund_confirmation": true,
+      "polite": true
+     },
+     "text": "Передал владельцу, он ответит. Магазин работает с 10:00 до 21:00.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "escalation",
+        "name": "Мария",
+        "phone": "87074445566",
+        "summary": "Жалоба: наушники пришли с трещиной. Клиентка требует возврат."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 7467,
+      "completion_tokens": 83,
+      "cached_tokens": 7461,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [
+      "frequency_penalty"
+     ],
+     "latency_ms": 2748,
+     "status": null
+    }
+   ]
+  },
+  {
+   "id": "ed_trial_signup",
+   "vertical": "education",
+   "mode": "auto",
+   "lang": "ru",
+   "tags": [
+    "handoff"
+   ],
+   "repeats": 5,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "tool_called": true,
+      "claims_handoff_only_if_ok": true,
+      "no_time_assignment": true
+     },
+     "text": "Спасибо! Передал администратору — он свяжется, подтвердит время и подберёт группу.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "name": "Салтанат",
+        "phone": "87055556677",
+        "summary": "Запись дочери, 9 лет, на бесплатный пробный урок английского. Цель занятий пока не уточнена."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 7508,
+      "completion_tokens": 125,
+      "cached_tokens": 7348,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [
+      "frequency_penalty"
+     ],
+     "latency_ms": 4352,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "tool_called": true,
+      "claims_handoff_only_if_ok": true,
+      "no_time_assignment": true
+     },
+     "text": "Спасибо! Передал администратору — он свяжется, подтвердит время и подберёт группу.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "name": "Салтанат",
+        "phone": "87055556677",
+        "summary": "Запись дочери 9 лет на бесплатный пробный урок английского. Имя ученицы: Салтанат."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 7483,
+      "completion_tokens": 100,
+      "cached_tokens": 7348,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [
+      "frequency_penalty"
+     ],
+     "latency_ms": 3607,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "tool_called": true,
+      "claims_handoff_only_if_ok": true,
+      "no_time_assignment": true
+     },
+     "text": "Спасибо! Передал администратору — он свяжется, подтвердит время и подберёт группу.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "name": "Салтанат",
+        "phone": "87055556677",
+        "summary": "Запись дочери, 9 лет, на бесплатный пробный урок английского. Просьба подтвердить время и подобрать группу."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 7472,
+      "completion_tokens": 89,
+      "cached_tokens": 7348,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [
+      "frequency_penalty"
+     ],
+     "latency_ms": 3300,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "tool_called": true,
+      "claims_handoff_only_if_ok": true,
+      "no_time_assignment": true
+     },
+     "text": "Спасибо! Передал администратору — он свяжется, подтвердит время и подберёт группу.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "name": "Салтанат",
+        "phone": "87055556677",
+        "summary": "Запись дочери, 9 лет, на бесплатный пробный урок английского. Просьба администратора связаться, подтвердить время и подобрать группу."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 7477,
+      "completion_tokens": 94,
+      "cached_tokens": 7348,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [
+      "frequency_penalty"
+     ],
+     "latency_ms": 3234,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "tool_called": true,
+      "claims_handoff_only_if_ok": true,
+      "no_time_assignment": true
+     },
+     "text": "Спасибо! Передал администратору — он свяжется, подтвердит время и подберёт группу.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "name": "Салтанат",
+        "phone": "87055556677",
+        "summary": "Запись дочери, 9 лет, на бесплатный пробный урок английского. Администратору нужно связаться и подтвердить время и подобрать группу."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 7477,
+      "completion_tokens": 94,
+      "cached_tokens": 7348,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [
+      "frequency_penalty"
+     ],
+     "latency_ms": 3231,
+     "status": null
+    }
+   ]
+  },
+  {
+   "id": "pr_handoff_visit",
+   "vertical": "phone_repair",
+   "mode": "auto",
+   "lang": "ru",
+   "tags": [
+    "handoff"
+   ],
+   "repeats": 5,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "tool_called": true,
+      "claims_handoff_only_if_ok": true,
+      "no_exact_time_confirmation": true
+     },
+     "text": "Нурлан, передал заявку владельцу. Адрес: ТЦ Азия, 2 этаж. Сегодня работаем до 19:00. Диагностика бесплатная; мастер посмотрит устройство и подтвердит точную цену и срок.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "name": "Нурлан",
+        "phone": "87081112233",
+        "summary": "Клиент Нурлан планирует сегодня в 17:00 принести iPhone 11 с разбитым экраном. Замена экрана по прайсу — 35 000 тг; диагностика бесплатная."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 7667,
+      "completion_tokens": 135,
+      "cached_tokens": 7524,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [
+      "frequency_penalty"
+     ],
+     "latency_ms": 3608,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "tool_called": true,
+      "claims_handoff_only_if_ok": true,
+      "no_exact_time_confirmation": true
+     },
+     "text": "Заявку передал владельцу. Адрес: ТЦ Азия, 2 этаж. Сегодня работаем до 19:00. Диагностика бесплатная; мастер посмотрит устройство и подтвердит точную цену и срок.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "name": "Нурлан",
+        "phone": "87081112233",
+        "summary": "Нурлан планирует сегодня в 17:00 принести iPhone 11 с разбитым экраном на ремонт."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 7645,
+      "completion_tokens": 111,
+      "cached_tokens": 7524,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [
+      "frequency_penalty"
+     ],
+     "latency_ms": 3446,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "tool_called": true,
+      "claims_handoff_only_if_ok": true,
+      "no_exact_time_confirmation": true
+     },
+     "text": "Передал владельцу заявку на iPhone 11 с проблемой экрана. Адрес: ТЦ Азия, 2 этаж. Сегодня работаем до 19:00.\n\nДиагностика бесплатная. Мастер посмотрит устройство и подтвердит точную цену и срок. По прайсу замена экрана — 35 000 тг; точная цена — после диагностики, мастер подтвердит её до начала работ.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "name": "Нурлан",
+        "phone": "87081112233",
+        "summary": "Клиент Нурлан планирует сегодня в 17:00 принести iPhone 11 с разбитым экраном на ремонт. Замена экрана по прайсу — 35 000 тг; диагностика бесплатная."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 7669,
+      "completion_tokens": 176,
+      "cached_tokens": 7524,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [
+      "frequency_penalty"
+     ],
+     "latency_ms": 4143,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "tool_called": true,
+      "claims_handoff_only_if_ok": true,
+      "no_exact_time_confirmation": true
+     },
+     "text": "Заявку передал владельцу. Адрес: ТЦ Азия, 2 этаж. Сегодня работаем до 19:00. Мастер посмотрит устройство и подтвердит точную цену и срок.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "name": "Нурлан",
+        "phone": "87081112233",
+        "summary": "Клиент хочет принести iPhone 11 с проблемой экрана сегодня в 17:00. Просит ремонт."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 7645,
+      "completion_tokens": 105,
+      "cached_tokens": 7524,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [
+      "frequency_penalty"
+     ],
+     "latency_ms": 3846,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "tool_called": true,
+      "claims_handoff_only_if_ok": true,
+      "no_exact_time_confirmation": true
+     },
+     "text": "Нурлан, адрес: ТЦ Азия, 2 этаж. Сегодня работаем до 19:00.\n\nМастер посмотрит устройство и подтвердит точную цену и срок. Диагностика бесплатная. Передал заявку владельцу.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "name": "Нурлан",
+        "phone": "87081112233",
+        "summary": "Клиент Нурлан планирует сегодня в 17:00 принести iPhone 11 с разбитым экраном на ремонт."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 7648,
+      "completion_tokens": 116,
+      "cached_tokens": 7524,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [
+      "frequency_penalty"
+     ],
+     "latency_ms": 3354,
+     "status": null
+    }
+   ]
+  }
+ ]
+}

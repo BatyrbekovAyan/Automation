@@ -509,6 +509,80 @@ class PanelChecks(unittest.TestCase):
                 self.assertIs(M.check_panel(name, sc, DATA["knowledge"][sc["vertical"]], out), want, f"{name} [{sid}] {why}")
 
 
+class PanelConditionChecks(unittest.TestCase):
+    """h9 (2026-10-13): card 1 neither grants nor refuses a condition the data does not state; no card states a rule absent
+    from the data. The FAIL rows are card texts the panel produced on staging that day (cmp-1013-auto-vs-panel*.json)."""
+    rows = [
+        ("pn_discount_unknown", "cards_first_no_decision:скид",
+         ["К сожалению, я не могу предложить скидку на оптовые заказы. Минимальный заказ составляет 50 000 тг."], FAIL, "gpt-4o-mini refusal"),
+        ("pn_discount_unknown", "cards_first_no_decision:скид",
+         ["На скидку 15% не ориентируемся. Могу проверить индивидуальные условия по такому объёму и вернуться с ответом."], FAIL,
+         "gpt-5.4-mini: a soft refusal, then a deferral in ANOTHER sentence"),
+        ("pn_discount_unknown", "cards_first_no_decision:скид", ["Уточню по скидке на такой объём и вернусь с ответом."], PASS, "defers"),
+        ("pn_discount_unknown", "cards_first_no_decision:скид",
+         ["Скидку на 100 коробок можем обсудить — на какой срок нужна поставка?"], PASS, "«можем» inside a deferral"),
+        ("pn_discount_unknown", "cards_first_no_decision:скид", ["Скидок нет, цены фиксированные."], FAIL, "«нет»"),
+        ("pn_discount_unknown", "cards_first_no_decision:скид", ["Дадим скидку 10% на такой объём!"], FAIL, "a grant"),
+        ("pn_deferred_unknown", "cards_first_no_decision:отсроч|рассроч",
+         ["Отсрочку на 2 недели не предоставляем. Работаем по безналу с НДС, счёт и накладные есть."], FAIL, "gpt-5.4-mini refusal"),
+        ("pn_deferred_unknown", "cards_first_no_decision:отсроч|рассроч",
+         ["По отсрочке на 2 недели уточню и напишу — на какую сумму заказ?"], PASS, "defers + asks"),
+        ("pn_reserve_unknown", "cards_first_no_decision:отлож|брон|резерв",
+         ["Могу оформить только через Kaspi, без брони и отложить товар не получится."], FAIL, "gpt-5.4-mini refusal"),
+        ("pn_reserve_unknown", "cards_first_no_decision:отлож|брон|резерв",
+         ["К сожалению, я не могу отложить наушники. Вы можете оформить заказ на странице товара на Kaspi."], FAIL, "gpt-4o-mini refusal"),
+        ("pn_reserve_unknown", "cards_first_no_decision:отлож|брон|резерв",
+         ["Проверю, можно ли отложить чёрные до вечера, и напишу."], PASS, "«можно» inside a deferral"),
+        ("pn_return_unknown", "cards_first_no_decision:возврат|верн",
+         ["Понимаю, это неприятно. Напишите, пожалуйста, номер заказа — проверю, как быстрее оформить возврат через Kaspi."], PASS,
+         "asks the order number, promises nothing"),
+        ("pn_return_unknown", "cards_first_no_decision:возврат|верн", ["Мария, вернём деньги в течение 3 дней."], FAIL, "a refund promise"),
+        ("pn_deferred_unknown", "cards_absent:предоплат",
+         ["Отсрочка платежа, к сожалению, не предусмотрена. Мы работаем на условиях предоплаты."], FAIL, "an invented rule"),
+        ("pn_deferred_unknown", "cards_absent:предоплат", ["Уточню по отсрочке и вернусь с ответом."], PASS, "no rule stated"),
+    ]
+
+    def test_rows(self):
+        for sid, name, texts, want, why in self.rows:
+            with self.subTest(check=name, why=why):
+                sc = SC[sid]
+                out = {"status": 200, "body": {"suggestions": [{"text": t, "label": "x", "move": "Ответ"} for t in texts]}}
+                self.assertIs(M.check_panel(name, sc, DATA["knowledge"][sc["vertical"]], out), want, f"{name} [{sid}] {why}")
+
+    def test_owner_rule_matches(self):
+        disc = next(e for e in SC["pn_discount_policy_known"]["expect"] if e.startswith("cards_first_matches:"))
+        hold = next(e for e in SC["pn_reserve_policy_known"]["expect"] if e.startswith("cards_first_matches:"))
+        for name, sid, text, want in (
+                (disc, "pn_discount_policy_known", "Скидок не даём — цены фиксированные. Оформим 100 коробок?", PASS),
+                (disc, "pn_discount_policy_known", "Скидку на такой объём не делаем, но могу посчитать сумму.", PASS),
+                (disc, "pn_discount_policy_known", "Уточню по скидке и вернусь с ответом.", FAIL),
+                (hold, "pn_reserve_policy_known", "Отложим чёрные до 20:00, заберёте в пункте выдачи.", PASS),
+                (hold, "pn_reserve_policy_known", "Проверю и напишу, можно ли отложить.", FAIL)):
+            with self.subTest(text=text):
+                sc = SC[sid]
+                out = {"status": 200, "body": {"suggestions": [{"text": text, "label": "x", "move": "Ответ"}]}}
+                self.assertIs(M.check_panel(name, sc, DATA["knowledge"][sc["vertical"]], out), want)
+        auto = next(e for e in SC["ws_discount_policy_known"]["expect"] if e.startswith("matches:"))
+        self.assertIs(verdict(auto, "ws_discount_policy_known", "Скидок не даём, цены фиксированные: 2100 тг за коробку."), PASS)
+        self.assertIs(verdict(auto, "ws_discount_policy_known", "Индивидуальные условия под ваш объём обсуждает менеджер."), FAIL)
+        hold_auto = next(e for e in SC["ks_reserve_policy_known"]["expect"] if e.startswith("matches:"))
+        self.assertIs(verdict(hold_auto, "ks_reserve_policy_known", "Отложить можем до 20:00 — передал владельцу, он отложит."), PASS)
+        self.assertIs(verdict(hold_auto, "ks_reserve_policy_known", "Передал владельцу, он ответит."), FAIL)
+
+    def test_a_rule_the_data_states_may_be_named(self):
+        sc = copy.deepcopy(SC["pn_deferred_unknown"])
+        know = copy.deepcopy(DATA["knowledge"][sc["vertical"]])
+        know["business"] += "\nРаботаем по предоплате."
+        out = {"status": 200, "body": {"suggestions": [{"text": "Работаем по предоплате, отсрочку уточню.", "label": "x", "move": "Ответ"}]}}
+        self.assertIs(M.check_panel("cards_absent:предоплат", sc, know, out), True)
+
+    def test_the_new_scenarios_carry_the_checks(self):
+        for sid in ("pn_discount_unknown", "pn_deferred_unknown", "pn_reserve_unknown", "pn_return_unknown"):
+            with self.subTest(scenario=sid):
+                self.assertEqual(SC[sid]["mode"], "panel")
+                self.assertTrue(any(e.startswith("cards_first_no_decision:") for e in SC[sid]["expect"]))
+
+
 # ---- h7 (T11, Q1 B + V6-unknown, 2026-10-12): the memory marks reach the measured model as the WRITERS store them ----
 # The memory node hands the model role + content only, so an owner's reply and a bot reply of unknown delivery differ from
 # the bot's own delivered reply ONLY by the mark the writer put into the content (apply-history-handoff.py). The eval must
@@ -579,9 +653,10 @@ class ScenarioSetV14(unittest.TestCase):
     q1c_client_time_history_phone_repair; the remaining business turns are earlier bot replies and keep their role."""
 
     def test_version(self):
-        # v1.5 (T11b) keeps every v1.4 role and adds checks only (ScenarioSetV15 below)
-        self.assertTrue(DATA["version"].startswith("v1.5"), DATA["version"])
-        self.assertFalse(DATA["version"].startswith("v1.4"), "the set changed — a v1.4 number must not be compared with v1.5")
+        # v1.5 (T11b) keeps every v1.4 role and adds checks only (ScenarioSetV15 below); v1.6 (2026-10-13) adds four panel
+        # scenarios only (PanelConditionChecks below) — an auto number of v1.5 and v1.6 is the same set, a panel number is not
+        self.assertTrue(DATA["version"].startswith("v1.6"), DATA["version"])
+        self.assertFalse(DATA["version"].startswith(("v1.4", "v1.5")), "the set changed — compare panel numbers within one version")
 
     def test_q1_business_turns_are_owner_turns(self):
         for sc in DATA["scenarios"]:
@@ -768,6 +843,8 @@ NO_HANDOFF = {
     # V6-unknown: the earlier price answer re-asked / a delivery question About Business answers
     "u1_unknown_reask": "price re-asked", "u2_unknown_new_question": "delivery cost is in About Business",
     "u3_sent_control": "price re-asked", "u4_kz_unknown": "price re-asked",
+    # v1.6 (2026-10-13): the owner wrote the rule into «Промпт» — it answers the question, nothing for the owner to do
+    "ws_discount_policy_known": "the owner's written rule «скидок не даём» answers it",
 }
 HANDOFF_IN_DESIGN = {
     # the scenario requires the request (tool_called)
@@ -793,6 +870,8 @@ HANDOFF_IN_DESIGN = {
     "q1c_client_time_education": "a trial at the client's time = the request ed_trial_signup requires",
     "q1c_client_time_phone_repair": "a visit at the client's time = the request pr_handoff_visit requires",
     "q1c_client_time_history_phone_repair": "the bot already took the request; the design accepts passing it",
+    # v1.6 (2026-10-13): the owner's rule allows a hold — the bot states it and passes the request so the owner holds the item
+    "ks_reserve_policy_known": "a hold the owner's written rule allows: state the rule + request (the owner puts the item aside)",
 }
 
 

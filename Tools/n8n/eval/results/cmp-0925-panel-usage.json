@@ -1,0 +1,89 @@
+{
+ "note": "Suggest Replies OpenAI usage per panel run, read from staging executions (LLM/LLM Retry node output) on 2026-09-25; '-fix' = re-run of the requests that hit the post-restart 404",
+ "runs": {
+  "4omini": {
+   "executions": 36,
+   "llm_calls": 36,
+   "retry_calls": 0,
+   "models": {
+    "gpt-4o-mini-2024-07-18": 36
+   },
+   "prompt_tokens": 97323,
+   "cached_tokens": 77312,
+   "completion_tokens": 4653,
+   "avg_in_per_call": 2703,
+   "avg_out_per_call": 129,
+   "llm_node_ms_median": 1915.5
+  },
+  "54mini-fix": {
+   "executions": 2,
+   "llm_calls": 2,
+   "retry_calls": 0,
+   "models": {
+    "gpt-5.4-mini-2026-03-17": 2
+   },
+   "prompt_tokens": 5402,
+   "cached_tokens": 4608,
+   "completion_tokens": 26,
+   "avg_in_per_call": 2701,
+   "avg_out_per_call": 13,
+   "llm_node_ms_median": 1375.0
+  },
+  "54mini": {
+   "executions": 35,
+   "llm_calls": 35,
+   "retry_calls": 0,
+   "models": {
+    "gpt-5.4-mini-2026-03-17": 35
+   },
+   "prompt_tokens": 94514,
+   "cached_tokens": 57600,
+   "completion_tokens": 4913,
+   "avg_in_per_call": 2700,
+   "avg_out_per_call": 140,
+   "llm_node_ms_median": 1770
+  },
+  "luna-fix": {
+   "executions": 12,
+   "llm_calls": 12,
+   "retry_calls": 0,
+   "models": {
+    "gpt-6-luna": 12
+   },
+   "prompt_tokens": 32451,
+   "cached_tokens": 18959,
+   "completion_tokens": 412,
+   "avg_in_per_call": 2704,
+   "avg_out_per_call": 34,
+   "llm_node_ms_median": 1202.0
+  },
+  "luna": {
+   "executions": 26,
+   "llm_calls": 26,
+   "retry_calls": 0,
+   "models": {
+    "gpt-6-luna": 26
+   },
+   "prompt_tokens": 70200,
+   "cached_tokens": 50523,
+   "completion_tokens": 2478,
+   "avg_in_per_call": 2700,
+   "avg_out_per_call": 95,
+   "llm_node_ms_median": 2268.5
+  },
+  "sol": {
+   "executions": 35,
+   "llm_calls": 35,
+   "retry_calls": 0,
+   "models": {
+    "gpt-6-sol": 35
+   },
+   "prompt_tokens": 94514,
+   "cached_tokens": 69190,
+   "completion_tokens": 3073,
+   "avg_in_per_call": 2700,
+   "avg_out_per_call": 88,
+   "llm_node_ms_median": 3749
+  }
+ }
+}

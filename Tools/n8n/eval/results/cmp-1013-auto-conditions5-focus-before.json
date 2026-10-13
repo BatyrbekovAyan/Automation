@@ -1,0 +1,3295 @@
+{
+ "summary": {
+  "label": "cmp-1013-auto-conditions5-focus-before",
+  "prompts_ref": "HEAD",
+  "search_ref": "HEAD",
+  "side": "before",
+  "block": null,
+  "plan": null,
+  "scenario_version": "v1.6 (2026-10-13: a condition — discount, deferred payment, a hold, a return. Unknown to the data: pn_discount_unknown, pn_deferred_unknown, pn_reserve_unknown, pn_return_unknown — card 1 neither grants nor refuses it (cards_first_no_decision), no card states a rule absent from the data (cards_absent). Written by the owner into «Промпт»: ws_discount_policy_known / pn_discount_policy_known, ks_reserve_policy_known / pn_reserve_policy_known — the bot and card 1 both state the owner's rule (matches / cards_first_matches), the hold also goes to the owner as a request. Harness h9; every v1.5 scenario and check unchanged)",
+  "harness": "h9 (2026-10-13: panel checks cards_first_no_decision:<topic> — card 1 neither grants nor refuses a condition the data does not state — cards_absent:<regex> — no card states a rule absent from the data — and cards_first_matches:<regex>; auto check matches:<regex>; set v1.6 adds the scenarios for them; every earlier check unchanged; on top of h8 (2026-10-12, T11b: interleaved schedule — every scenario's repeats spread over the whole run, round-robin over the scenarios, the sides of one repeat back to back with the first side rotating (--side / --plan run the sides of a comparison as ONE schedule); set v1.5 adds no_tool:create_handoff wherever the scenario does not call for a handoff; no check function changed; on top of h7 (2026-10-12, T11 Q1 B + V6-unknown: scenario roles `owner` / `bot_unknown` rendered with the memory marks the writers store at --prompts-ref (apply-history-handoff.py; none before T6); no_marker_leak, no_tool:<name>, not_says_already, no_delivery_doubt; on top of h6 2026-10-09, Q1: not_mentions:X — X stated in no un-refused clause and not merely quoted as the client's words, for the client-time echo; mentions:H:MM reads a time of day; on top of h5 2026-10-08, V9-r2: no_conflict_claim / no_price_caveat for a price list that AGREES with the catalog; on top of h4 2026-10-07 V9: «расхождение» + negated conflict, zero-price / elliptical free delivery, «итого по N позициям» partial, «нужен» / the car or device by name, a word inside the installment claim, Kazakh = no Russian sentence, «18,000»; h3 2026-09-27 R14; checks pinned by test_checks.py))",
+  "model": "gpt-5.4-mini",
+  "reasoning_effort": null,
+  "dropped_params": [],
+  "panel_model": null,
+  "max_tokens": 200,
+  "search_simulation": "Price List Search sub-workflow (Reconcile Prices at HEAD)",
+  "memory_marks": {
+   "owner": "Владелец: ",
+   "bot_unknown": "[доставка не подтверждена] "
+  },
+  "workers": 4,
+  "scenarios": 12,
+  "runs": 96,
+  "pass_all": 5,
+  "flaky": 5,
+  "fail": 2,
+  "error_runs": 0,
+  "transport_retries": 0,
+  "finish_reason_length_runs": 0,
+  "prompt_tokens": 775009,
+  "cached_tokens": 713856,
+  "completion_tokens": 8492,
+  "reasoning_tokens": 0,
+  "cost_usd_auto_path": 0.1376,
+  "prices_usd_per_1m": [
+   0.75,
+   0.075,
+   4.5
+  ],
+  "latency_ms": {
+   "auto": {
+    "n": 96,
+    "median": 3904,
+    "p90": 5585,
+    "max": 8641
+   },
+   "panel": null
+  },
+  "seconds": 181,
+  "by_check": {
+   "asks_car": "8/8",
+   "asks_for_whom_or_goal": "6/8",
+   "asks_model": "8/8",
+   "asks_variant_or_prices_both": "8/8",
+   "claims_handoff_only_if_ok": "8/8",
+   "lang_ru": "8/8",
+   "marks_unknown_item": "8/8",
+   "matches:20[:.]00|до 20\\b": "0/8",
+   "matches:скид[^.!?]{0,60}(не да|нет|не дела|не предусм|не предоставл)|(нет|не да[её]м|не делаем|не предоставляем)[^.!?]{0,40}скид|фиксирован": "7/8",
+   "mentions:1500": "8/8",
+   "no_closing_offer": "8/8",
+   "no_deferred_promise": "8/8",
+   "no_delivery_doubt": "8/8",
+   "no_discount": "16/16",
+   "no_free_delivery_claim": "8/8",
+   "no_markdown": "24/24",
+   "no_marker_leak": "96/96",
+   "no_price": "15/16",
+   "no_price_for:тюльпан": "8/8",
+   "no_reservation_confirmation": "16/16",
+   "no_stock_denial": "8/8",
+   "no_tool:create_handoff": "38/56",
+   "no_total_confirmation": "7/8",
+   "numbers_grounded": "16/16",
+   "offers_handoff_or_clarifies": "28/32",
+   "tool_called": "8/8"
+  }
+ },
+ "results": [
+  {
+   "id": "ap_price_without_car",
+   "vertical": "auto_parts",
+   "mode": "auto",
+   "lang": "ru",
+   "tags": [
+    "niche",
+    "key"
+   ],
+   "repeats": 8,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "no_price": true,
+      "asks_car": true,
+      "lang_ru": true,
+      "no_markdown": true,
+      "no_closing_offer": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Какая у вас марка, модель и год авто?",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "колодки передние Toyota 04465-02220 цена"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8947,
+      "completion_tokens": 46,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3802,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 0,
+     "t": 0.0
+    },
+    {
+     "verdicts": {
+      "no_price": true,
+      "asks_car": true,
+      "lang_ru": true,
+      "no_markdown": true,
+      "no_closing_offer": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Для какой марки, модели и года авто нужны передние колодки?",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4413,
+      "completion_tokens": 24,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1416,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 25,
+     "t": 21.6
+    },
+    {
+     "verdicts": {
+      "no_price": true,
+      "asks_car": true,
+      "lang_ru": true,
+      "no_markdown": true,
+      "no_closing_offer": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Для какой марки, модели и года авто нужны передние колодки?",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "колодки тормозные передние Toyota 04465-02220 цена"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8950,
+      "completion_tokens": 52,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 4296,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 48,
+     "t": 42.3
+    },
+    {
+     "verdicts": {
+      "no_price": true,
+      "asks_car": true,
+      "lang_ru": true,
+      "no_markdown": true,
+      "no_closing_offer": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Для подбора нужны марка, модель и год авто.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "колодки передние Toyota 04465-02220 цена наличие"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8948,
+      "completion_tokens": 48,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3380,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 73,
+     "t": 67.2
+    },
+    {
+     "verdicts": {
+      "no_price": true,
+      "asks_car": true,
+      "lang_ru": true,
+      "no_markdown": true,
+      "no_closing_offer": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Какая у вас марка, модель и год авто?",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "колодки передние Toyota 04465-02220 цена"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8947,
+      "completion_tokens": 46,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3106,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 96,
+     "t": 86.7
+    },
+    {
+     "verdicts": {
+      "no_price": true,
+      "asks_car": true,
+      "lang_ru": true,
+      "no_markdown": true,
+      "no_closing_offer": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Для какой марки, модели и года авто нужны передние колодки?",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "колодки передние Toyota 04465-02220 цена"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8947,
+      "completion_tokens": 49,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3855,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 121,
+     "t": 109.5
+    },
+    {
+     "verdicts": {
+      "no_price": true,
+      "asks_car": true,
+      "lang_ru": true,
+      "no_markdown": true,
+      "no_closing_offer": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Для какой марки, модели и года авто нужны передние колодки?",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "колодки тормозные передние Toyota 04465-02220 цена"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8950,
+      "completion_tokens": 52,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3457,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 144,
+     "t": 131.7
+    },
+    {
+     "verdicts": {
+      "no_price": true,
+      "asks_car": true,
+      "lang_ru": true,
+      "no_markdown": true,
+      "no_closing_offer": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Для какой марки, модели и года авто нужны передние колодки?",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "колодки передние Toyota 04465-02220 цена"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8947,
+      "completion_tokens": 49,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3266,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 169,
+     "t": 153.4
+    }
+   ]
+  },
+  {
+   "id": "ws_list_of_items",
+   "vertical": "wholesale",
+   "mode": "auto",
+   "lang": "ru",
+   "tags": [
+    "catalog",
+    "long"
+   ],
+   "repeats": 8,
+   "pass_rate": 0.25,
+   "runs": [
+    {
+     "verdicts": {
+      "numbers_grounded": true,
+      "no_markdown": true,
+      "marks_unknown_item": true,
+      "no_total_confirmation": true,
+      "no_tool:create_handoff": false,
+      "no_marker_leak": true
+     },
+     "text": "Средство для посуды 5 л, арт. WS-500 — 2100 тг/шт\n20 шт = 42 000 тг\n\nСтиральный порошок 10 кг, арт. WP-10 — 6900 тг/шт\n10 шт = 69 000 тг\n\nОтбеливатель 1 л — в прайсе не найден, уточнит менеджер\n\nИтого по подтверждённым позициям: 111 000 тг\n\nПередал менеджеру, он свяжется",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "Средство для посуды 5 л цена, Стиральный порошок 10 кг цена, отбеливатель 1 л цена"
+       }
+      },
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "summary": "Запрос прайса и расчёт: средство для посуды 5 л — 20 шт, стиральный порошок 10 кг — 10 шт, отбеливатель 1 л — 30 шт. Нужно уточнить позицию отбеливатель 1 л и подтвердить итоговую сумму.",
+        "name": "",
+        "phone": ""
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8747,
+      "completion_tokens": 268,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 7924,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 3,
+     "t": 0.0
+    },
+    {
+     "verdicts": {
+      "numbers_grounded": true,
+      "no_markdown": true,
+      "marks_unknown_item": true,
+      "no_total_confirmation": true,
+      "no_tool:create_handoff": false,
+      "no_marker_leak": true
+     },
+     "text": "Средство для посуды 5 л, арт. WS-500 — 2100 тг/шт\n20 шт = 42 000 тг\n\nСтиральный порошок 10 кг, арт. WP-10 — 6900 тг/шт\n10 шт = 69 000 тг\n\nОтбеливатель 1 л — уточнит менеджер, в прайсе не найден\n\nИтого по найденным позициям: 111 000 тг\nТочную итоговую сумму по всему списку подтвердит менеджер\n\nПередал менеджеру, он свяжется",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "Средство для посуды 5 л цена, упаковка, наличие; Стиральный порошок 10 кг цена, упаковка, наличие; Отбеливатель 1 л цена, упаковка, наличие"
+       }
+      },
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "summary": "Запрос на прайс и расчёт: средство для посуды 5 л — 20 шт, порошок 10 кг — 10 шт, отбеливатель 1 л — 30 шт. Нужна проверка цены и итоговой суммы. Клиент не указал компанию/ИП, имя, город и телефон."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8763,
+      "completion_tokens": 296,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 8641,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 26,
+     "t": 21.6
+    },
+    {
+     "verdicts": {
+      "numbers_grounded": true,
+      "no_markdown": true,
+      "marks_unknown_item": true,
+      "no_total_confirmation": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Средство для посуды 5 л, арт. WS-500 — 2100 тг/шт\n20 шт = 42 000 тг\n\nСтиральный порошок 10 кг, арт. WP-10 — 6900 тг/шт\n10 шт = 69 000 тг\n\nОтбеливатель 1 л — уточнит менеджер\n\nИтого по подтверждённым позициям: 111 000 тг\n\nПо отбеливателю цену и сумму уточнит менеджер, точный остаток тоже подтвердит менеджер.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "Средство для посуды 5 л цена, опт, коробка 4 шт"
+       }
+      },
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "Стиральный порошок 10 кг цена, опт, мешок"
+       }
+      },
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "Отбеливатель 1 л цена, опт"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8781,
+      "completion_tokens": 234,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 7942,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 51,
+     "t": 45.7
+    },
+    {
+     "verdicts": {
+      "numbers_grounded": true,
+      "no_markdown": true,
+      "marks_unknown_item": true,
+      "no_total_confirmation": true,
+      "no_tool:create_handoff": false,
+      "no_marker_leak": true
+     },
+     "text": "Средство для посуды 5 л, арт. WS-500 — 2100 тг/шт\n20 шт = 42 000 тг\n\nСтиральный порошок 10 кг, арт. WP-10 — 6900 тг/шт\n10 шт = 69 000 тг\n\nОтбеливатель 1 л — уточнит менеджер\n\nИтого по подтверждённым позициям: 111 000 тг\n\nПередал менеджеру, он свяжется",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "Средство для посуды 5 л цена, Стиральный порошок 10 кг цена, отбеливатель 1 л цена"
+       }
+      },
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "summary": "Запрос на прайс и расчет: средство для посуды 5 л — 20 шт, стиральный порошок 10 кг — 10 шт, отбеливатель 1 л — 30 шт. Нужна проверка цены и итоговой суммы.",
+        "name": "",
+        "phone": ""
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8738,
+      "completion_tokens": 252,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 7029,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 74,
+     "t": 68.5
+    },
+    {
+     "verdicts": {
+      "numbers_grounded": true,
+      "no_markdown": true,
+      "marks_unknown_item": true,
+      "no_total_confirmation": false,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Средство для посуды 5 л, арт. WS-500 — 2100 тг/шт\n20 шт = 42 000 тг\n\nСтиральный порошок 10 кг, арт. WP-10 — 6900 тг/шт\n10 шт = 69 000 тг\n\nОтбеливатель 1 л — в прайсе не найден, цену уточнит менеджер\n\nИтого по двум позициям: 111 000 тг\n\nЕсли нужно, передам заявку менеджеру на отбеливатель и общий заказ.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "средство для посуды 5 л цена"
+       }
+      },
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "стиральный порошок 10 кг цена"
+       }
+      },
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "отбеливатель 1 л цена"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8764,
+      "completion_tokens": 216,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 7320,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 99,
+     "t": 89.7
+    },
+    {
+     "verdicts": {
+      "numbers_grounded": true,
+      "no_markdown": true,
+      "marks_unknown_item": true,
+      "no_total_confirmation": true,
+      "no_tool:create_handoff": false,
+      "no_marker_leak": true
+     },
+     "text": "Средство для посуды 5 л, арт. WS-500 — 2100 тг/шт\n20 шт = 42 000 тг\n\nСтиральный порошок 10 кг, арт. WP-10 — 6900 тг/шт\n10 шт = 69 000 тг\n\nОтбеливатель 1 л — уточнит менеджер\n\nИтого по подтверждённым позициям: 111 000 тг\n\nПередал владельцу, он свяжется",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "Средство для посуды 5 л цена, Стиральный порошок 10 кг цена, отбеливатель 1 л цена"
+       }
+      },
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "summary": "Запрос на прайс и расчет: средство для посуды 5 л — 20 шт, стиральный порошок 10 кг — 10 шт, отбеливатель 1 л — 30 шт. Нужно уточнить позицию отбеливатель 1 л и подтвердить итоговую сумму.",
+        "name": "",
+        "phone": ""
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8746,
+      "completion_tokens": 260,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 6898,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 122,
+     "t": 109.8
+    },
+    {
+     "verdicts": {
+      "numbers_grounded": true,
+      "no_markdown": true,
+      "marks_unknown_item": true,
+      "no_total_confirmation": true,
+      "no_tool:create_handoff": false,
+      "no_marker_leak": true
+     },
+     "text": "Средство для посуды 5 л, арт. WS-500 — 2100 тг/шт\n20 шт = 42 000 тг\n\nСтиральный порошок 10 кг, арт. WP-10 — 6900 тг/шт\n10 шт = 69 000 тг\n\nОтбеливатель 1 л — уточнит менеджер\n\nИтого по подтверждённым позициям: 111 000 тг\n\nПередал менеджеру, он свяжется",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "Средство для посуды 5 л цена, стиральный порошок 10 кг цена, отбеливатель 1 л цена"
+       }
+      },
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "summary": "Запрос на прайс и расчет: средство для посуды 5 л — 20 шт, порошок 10 кг — 10 шт, отбеливатель 1 л — 30 шт. Нужна проверка позиции отбеливатель 1 л и итоговая сумма.",
+        "name": "",
+        "phone": ""
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8741,
+      "completion_tokens": 255,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 6550,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 147,
+     "t": 135.1
+    },
+    {
+     "verdicts": {
+      "numbers_grounded": true,
+      "no_markdown": true,
+      "marks_unknown_item": true,
+      "no_total_confirmation": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Средство для посуды 5 л, арт. WS-500 — 2100 тг/шт\n20 шт = 42 000 тг\n\nСтиральный порошок 10 кг, арт. WP-10 — 6900 тг/шт\n10 шт = 69 000 тг\n\nОтбеливатель 1 л — уточнит менеджер, в прайсе не найден\n\nИтого по найденным позициям: 111 000 тг\n\nПо отбеливателю и итоговой общей сумме с ним уточнит менеджер.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "средство для посуды 5 л цена прайс"
+       }
+      },
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "стиральный порошок 10 кг цена прайс"
+       }
+      },
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "отбеливатель 1 л цена прайс"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8770,
+      "completion_tokens": 223,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 6980,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 170,
+     "t": 154.4
+    }
+   ]
+  },
+  {
+   "id": "ws_discount_request",
+   "vertical": "wholesale",
+   "mode": "auto",
+   "lang": "ru",
+   "tags": [
+    "niche",
+    "key"
+   ],
+   "repeats": 8,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "no_discount": true,
+      "offers_handoff_or_clarifies": true,
+      "no_marker_leak": true
+     },
+     "text": "Индивидуальные условия под ваш объём обсуждает менеджер.\n\nПередал менеджеру, он свяжется.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "summary": "Клиент интересуется оптовой закупкой: 100 коробок средства для посуды 5 л, спрашивает про скидку 15%. Нужны индивидуальные условия по объёму."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8538,
+      "completion_tokens": 90,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3980,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 4,
+     "t": 1.4
+    },
+    {
+     "verdicts": {
+      "no_discount": true,
+      "offers_handoff_or_clarifies": true,
+      "no_marker_leak": true
+     },
+     "text": "Индивидуальные условия под ваш объём обсуждает менеджер.\n\nПередал менеджеру, он свяжется.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "summary": "Клиент интересуется заказом 100 коробок средства для посуды 5 л и спрашивает про скидку 15%. Индивидуальные условия под объём обсуждает менеджер."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8535,
+      "completion_tokens": 87,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3623,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 29,
+     "t": 23.4
+    },
+    {
+     "verdicts": {
+      "no_discount": true,
+      "offers_handoff_or_clarifies": true,
+      "no_marker_leak": true
+     },
+     "text": "Индивидуальные условия под ваш объём обсуждает менеджер.\n\nНапишите, пожалуйста:\nКомпания или ИП\nИмя\nГород\nТелефон\nЧто именно нужно: средство для посуды 5 л, 100 коробок\n\nПередал менеджеру, он свяжется.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "summary": "Клиент интересуется закупкой 100 коробок средства для посуды 5 л и спрашивает про индивидуальные условия/скидку 15%. Нужно уточнить компанию или ИП, имя, город и телефон."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8542,
+      "completion_tokens": 130,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 4494,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 52,
+     "t": 46.6
+    },
+    {
+     "verdicts": {
+      "no_discount": true,
+      "offers_handoff_or_clarifies": true,
+      "no_marker_leak": true
+     },
+     "text": "Индивидуальные условия под ваш объём обсуждает менеджер.\n\nПередал менеджеру, он свяжется.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "summary": "Клиент интересуется закупкой 100 коробок средства для посуды 5 л и спрашивает про скидку 15%. Нужны индивидуальные условия по объёму.",
+        "name": null,
+        "phone": null
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8541,
+      "completion_tokens": 93,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3829,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 77,
+     "t": 70.6
+    },
+    {
+     "verdicts": {
+      "no_discount": true,
+      "offers_handoff_or_clarifies": true,
+      "no_marker_leak": true
+     },
+     "text": "Индивидуальные условия под ваш объём обсуждает менеджер.\n\nНапишите, пожалуйста:\nКомпания или ИП\nИмя\nГород\nТелефон\nЧто именно берёте и в каком объёме\n\nПередал менеджеру, он свяжется",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "summary": "Клиент интересуется закупкой 100 коробок средства для посуды 5 л и спрашивает про индивидуальные условия/скидку 15%. Нужно уточнить компанию или ИП, имя, город и телефон."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8542,
+      "completion_tokens": 124,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 4575,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 100,
+     "t": 89.8
+    },
+    {
+     "verdicts": {
+      "no_discount": true,
+      "offers_handoff_or_clarifies": true,
+      "no_marker_leak": true
+     },
+     "text": "Индивидуальные условия под ваш объём обсуждает менеджер.\n\nПередал менеджеру, он свяжется.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "summary": "Клиент хочет 100 коробок средства для посуды 5 л и спрашивает про скидку 15%. Нужны индивидуальные условия по объёму.",
+        "name": ""
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8534,
+      "completion_tokens": 86,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 4043,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 125,
+     "t": 113.9
+    },
+    {
+     "verdicts": {
+      "no_discount": true,
+      "offers_handoff_or_clarifies": true,
+      "no_marker_leak": true
+     },
+     "text": "Индивидуальные условия под ваш объём обсуждает менеджер.\n\nПередал менеджеру, он свяжется.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "summary": "Клиент интересуется закупкой 100 коробок средства для посуды 5 л и спрашивает про индивидуальные условия/скидку 15%. Нужно уточнить условия по объёму.",
+        "name": ""
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8540,
+      "completion_tokens": 92,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 4000,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 148,
+     "t": 135.2
+    },
+    {
+     "verdicts": {
+      "no_discount": true,
+      "offers_handoff_or_clarifies": true,
+      "no_marker_leak": true
+     },
+     "text": "Индивидуальные условия под ваш объём обсуждает менеджер.\n\nПередал менеджеру, он свяжется.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "summary": "Клиент интересуется закупкой 100 коробок средства для посуды 5 л и спрашивает про скидку 15%. Нужны индивидуальные условия под объём."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8533,
+      "completion_tokens": 85,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3660,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 173,
+     "t": 156.7
+    }
+   ]
+  },
+  {
+   "id": "ws_deferred_payment",
+   "vertical": "wholesale",
+   "mode": "auto",
+   "lang": "ru",
+   "tags": [
+    "niche",
+    "key"
+   ],
+   "repeats": 8,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "no_deferred_promise": true,
+      "offers_handoff_or_clarifies": true,
+      "no_marker_leak": true
+     },
+     "text": "Индивидуальные условия под ваш объём обсуждает менеджер.\n\nПередал менеджеру, он свяжется.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "question",
+        "summary": "Клиент спрашивает об отсрочке платежа на 2 недели. Условия индивидуальные, без обещаний."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8553,
+      "completion_tokens": 113,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3911,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 7,
+     "t": 6.3
+    },
+    {
+     "verdicts": {
+      "no_deferred_promise": true,
+      "offers_handoff_or_clarifies": true,
+      "no_marker_leak": true
+     },
+     "text": "Индивидуальные условия под ваш объём обсуждает менеджер.\n\nНапишите, пожалуйста:\nКомпания или ИП\nИмя\nГород\nТелефон\nЧто планируете брать и в каком объёме\n\nПередам менеджеру на согласование.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4206,
+      "completion_tokens": 56,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1878,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 30,
+     "t": 26.4
+    },
+    {
+     "verdicts": {
+      "no_deferred_promise": true,
+      "offers_handoff_or_clarifies": true,
+      "no_marker_leak": true
+     },
+     "text": "Индивидуальные условия под ваш объём обсуждает менеджер.\n\nНапишите, пожалуйста:\nКомпания или ИП\nИмя\nГород\nЧто и в каком объёме нужно\nТелефон\n\nПередам менеджеру.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4206,
+      "completion_tokens": 50,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2106,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 55,
+     "t": 51.1
+    },
+    {
+     "verdicts": {
+      "no_deferred_promise": true,
+      "offers_handoff_or_clarifies": true,
+      "no_marker_leak": true
+     },
+     "text": "Индивидуальные условия под ваш объём обсуждает менеджер.\n\nНапишите, пожалуйста:\nКомпания или ИП\nИмя\nГород\nЧто и в каком объёме нужно\nТелефон\n\nПередам менеджеру.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4206,
+      "completion_tokens": 50,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1986,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 78,
+     "t": 72.2
+    },
+    {
+     "verdicts": {
+      "no_deferred_promise": true,
+      "offers_handoff_or_clarifies": true,
+      "no_marker_leak": true
+     },
+     "text": "Индивидуальные условия под ваш объём обсуждает менеджер.\n\nНапишите, пожалуйста:\nКомпания или ИП\nИмя\nГород\nЧто и в каком объёме нужно\nТелефон\n\nПередам менеджеру.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4206,
+      "completion_tokens": 50,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1848,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 103,
+     "t": 94.4
+    },
+    {
+     "verdicts": {
+      "no_deferred_promise": true,
+      "offers_handoff_or_clarifies": true,
+      "no_marker_leak": true
+     },
+     "text": "Индивидуальные условия под ваш объём обсуждает менеджер.\n\nПередал менеджеру, он свяжется.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "question",
+        "summary": "Клиент спрашивает про отсрочку платежа на 2 недели. Индивидуальные условия под объём нужно обсудить."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8516,
+      "completion_tokens": 76,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3505,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 126,
+     "t": 116.7
+    },
+    {
+     "verdicts": {
+      "no_deferred_promise": true,
+      "offers_handoff_or_clarifies": true,
+      "no_marker_leak": true
+     },
+     "text": "Индивидуальные условия под ваш объём обсуждает менеджер.\n\nПередал менеджеру, он свяжется.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "question",
+        "summary": "Клиент спрашивает об отсрочке платежа на 2 недели. Индивидуальные условия под объём обсуждает менеджер."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8516,
+      "completion_tokens": 76,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3319,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 151,
+     "t": 139.2
+    },
+    {
+     "verdicts": {
+      "no_deferred_promise": true,
+      "offers_handoff_or_clarifies": true,
+      "no_marker_leak": true
+     },
+     "text": "Индивидуальные условия под ваш объём обсуждает менеджер.\n\nПередал менеджеру, он свяжется.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "question",
+        "summary": "Клиент спрашивает про отсрочку платежа на 2 недели. Индивидуальные условия под объём нужно обсудить с менеджером."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8519,
+      "completion_tokens": 79,
+      "cached_tokens": 7424,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3904,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 174,
+     "t": 160.1
+    }
+   ]
+  },
+  {
+   "id": "fl_absent_item",
+   "vertical": "flowers",
+   "mode": "auto",
+   "lang": "ru",
+   "tags": [
+    "unknown",
+    "key"
+   ],
+   "repeats": 8,
+   "pass_rate": 0.5,
+   "runs": [
+    {
+     "verdicts": {
+      "no_stock_denial": true,
+      "no_price_for:тюльпан": true,
+      "offers_handoff_or_clarifies": false,
+      "no_marker_leak": true
+     },
+     "text": "Тюльпанов в прайсе не нашла.\n\nЕсть:\nБукет 25 роз — 25000 тг\nБукет пионов — 18000 тг\n\nЕсли хотите, подберу похожий букет под ваш бюджет.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "тюльпаны цена наличие букет тюльпанов"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8564,
+      "completion_tokens": 90,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3871,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 8,
+     "t": 7.2
+    },
+    {
+     "verdicts": {
+      "no_stock_denial": true,
+      "no_price_for:тюльпан": true,
+      "offers_handoff_or_clarifies": true,
+      "no_marker_leak": true
+     },
+     "text": "Тюльпанов в прайсе не нашла.\n\nЕсть:\nБукет 25 роз — 25000 тг\nБукет пионов — 18000 тг\n\nНаличие подтвердит флорист при оформлении.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "тюльпаны цена наличие букет тюльпанов"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8564,
+      "completion_tokens": 86,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 4562,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 33,
+     "t": 30.1
+    },
+    {
+     "verdicts": {
+      "no_stock_denial": true,
+      "no_price_for:тюльпан": true,
+      "offers_handoff_or_clarifies": true,
+      "no_marker_leak": true
+     },
+     "text": "Тюльпанов в прайсе не нашла.\n\nЕсть варианты:\nБукет 25 роз — 25000 тг\nБукет пионов — 18000 тг\n\nЕсли хотите, могу передать флористу вопрос по тюльпанам — он подтвердит наличие.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "тюльпаны цена наличие букет тюльпанов"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8564,
+      "completion_tokens": 99,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 4134,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 56,
+     "t": 52.4
+    },
+    {
+     "verdicts": {
+      "no_stock_denial": true,
+      "no_price_for:тюльпан": true,
+      "offers_handoff_or_clarifies": false,
+      "no_marker_leak": true
+     },
+     "text": "Тюльпанов в прайсе не нашла.\n\nЕсть:\nБукет 25 роз — 25000 тг\nБукет пионов — 18000 тг\n\nЕсли хотите, подберу букет под повод и бюджет.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "тюльпаны цена наличие букет тюльпанов"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8564,
+      "completion_tokens": 89,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 5157,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 81,
+     "t": 75.6
+    },
+    {
+     "verdicts": {
+      "no_stock_denial": true,
+      "no_price_for:тюльпан": true,
+      "offers_handoff_or_clarifies": false,
+      "no_marker_leak": true
+     },
+     "text": "Тюльпанов в прайсе не нашла.\n\nЕсть:\nБукет 25 роз — 25000 тг\nБукет пионов — 18000 тг\n\nЕсли хотите, могу подобрать букет на ваш бюджет.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "тюльпаны цена наличие букет тюльпанов"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8564,
+      "completion_tokens": 87,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3884,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 104,
+     "t": 95.9
+    },
+    {
+     "verdicts": {
+      "no_stock_denial": true,
+      "no_price_for:тюльпан": true,
+      "offers_handoff_or_clarifies": false,
+      "no_marker_leak": true
+     },
+     "text": "Тюльпанов в прайсе не нашла.\n\nЕсть:\nБукет 25 роз — 25000 тг\nБукет пионов — 18000 тг\n\nЕсли хотите, могу подобрать букет на ваш бюджет.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "тюльпаны цена наличие букет тюльпанов"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8564,
+      "completion_tokens": 87,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 4736,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 129,
+     "t": 119.2
+    },
+    {
+     "verdicts": {
+      "no_stock_denial": true,
+      "no_price_for:тюльпан": true,
+      "offers_handoff_or_clarifies": true,
+      "no_marker_leak": true
+     },
+     "text": "Тюльпанов в прайсе не нашла.\n\nМогу предложить:\nБукет 25 роз — 25000 тг\nБукет пионов — 18000 тг\n\nЕсли хотите, передам флористу вопрос по тюльпанам — наличие подтвердит он при оформлении.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "тюльпаны цена наличие букет тюльпанов"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8564,
+      "completion_tokens": 103,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 4019,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 152,
+     "t": 140.3
+    },
+    {
+     "verdicts": {
+      "no_stock_denial": true,
+      "no_price_for:тюльпан": true,
+      "offers_handoff_or_clarifies": true,
+      "no_marker_leak": true
+     },
+     "text": "Тюльпанов в прайсе не нашла.\n\nЕсть:\nБукет 25 роз — 25000 тг\nБукет пионов — 18000 тг\n\nЕсли хотите, могу передать флористу запрос на тюльпаны — он подтвердит наличие.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "тюльпаны цена наличие букет тюльпанов"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8564,
+      "completion_tokens": 98,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 4326,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 177,
+     "t": 162.3
+    }
+   ]
+  },
+  {
+   "id": "ks_variant_clarify",
+   "vertical": "kaspi_seller",
+   "mode": "auto",
+   "lang": "ru",
+   "tags": [
+    "niche"
+   ],
+   "repeats": 8,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "asks_variant_or_prices_both": true,
+      "numbers_grounded": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "JBL Tune 510BT — 18 990 тг\nЕсть чёрные и белые.\nОформление на странице магазина Kaspi: https://kaspi.kz/shop/techstore",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "JBL 510 цена, JBL Tune 510BT"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8559,
+      "completion_tokens": 72,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3919,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 11,
+     "t": 10.2
+    },
+    {
+     "verdicts": {
+      "asks_variant_or_prices_both": true,
+      "numbers_grounded": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "JBL Tune 510BT — 18 990 тг\nЕсть чёрные и белые\n\nОформление и рассрочка — на странице товара в Kaspi:\nhttps://kaspi.kz/shop/techstore",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "JBL 510 цена наушники JBL Tune 510BT"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8561,
+      "completion_tokens": 80,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 5585,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 34,
+     "t": 30.3
+    },
+    {
+     "verdicts": {
+      "asks_variant_or_prices_both": true,
+      "numbers_grounded": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Наушники JBL Tune 510BT стоят 18 990 тг.\nЕсть в чёрном и белом цвете.\nОформить можно на странице магазина в Kaspi: https://kaspi.kz/shop/techstore",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "JBL 510 цена наушники JBL Tune 510BT"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8561,
+      "completion_tokens": 81,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 5134,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 59,
+     "t": 53.7
+    },
+    {
+     "verdicts": {
+      "asks_variant_or_prices_both": true,
+      "numbers_grounded": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Наушники JBL Tune 510BT — 18990 тг\nЕсть чёрные и белые\n\nОформление и рассрочка — на странице товара в Kaspi:\nhttps://kaspi.kz/shop/techstore",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "JBL 510 цена наушники JBL Tune 510BT"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8561,
+      "completion_tokens": 81,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 4016,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 82,
+     "t": 75.8
+    },
+    {
+     "verdicts": {
+      "asks_variant_or_prices_both": true,
+      "numbers_grounded": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Наушники JBL Tune 510BT — 18990 тг\nЕсть чёрные и белые.\nОформление и рассрочка — на странице товара в Kaspi: https://kaspi.kz/shop/techstore",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "JBL 510 цена, JBL Tune 510BT стоимость"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8560,
+      "completion_tokens": 80,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 4241,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 107,
+     "t": 97.0
+    },
+    {
+     "verdicts": {
+      "asks_variant_or_prices_both": true,
+      "numbers_grounded": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Наушники JBL Tune 510BT — 18990 тг\nЕсть чёрные и белые\n\nОформление и рассрочка — на странице товара в Kaspi:\nhttps://kaspi.kz/shop/techstore",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "JBL 510 цена, JBL Tune 510BT стоимость, наличие, цвета"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8564,
+      "completion_tokens": 84,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 4400,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 130,
+     "t": 120.0
+    },
+    {
+     "verdicts": {
+      "asks_variant_or_prices_both": true,
+      "numbers_grounded": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Наушники JBL Tune 510BT — 18990 тг\nЕсть чёрные и белые\n\nОформить можно на странице магазина в Kaspi:\nhttps://kaspi.kz/shop/techstore",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "JBL 510 цена наушники JBL Tune 510BT"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8561,
+      "completion_tokens": 77,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3932,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 155,
+     "t": 142.5
+    },
+    {
+     "verdicts": {
+      "asks_variant_or_prices_both": true,
+      "numbers_grounded": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Наушники JBL Tune 510BT — 18 990 тг\nЕсть в чёрном и белом цвете.\nОформить можно на странице магазина в Kaspi: https://kaspi.kz/shop/techstore",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "JBL 510 цена наушники JBL Tune 510BT"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8561,
+      "completion_tokens": 81,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 6228,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 178,
+     "t": 162.8
+    }
+   ]
+  },
+  {
+   "id": "ks_reserve",
+   "vertical": "kaspi_seller",
+   "mode": "auto",
+   "lang": "ru",
+   "tags": [
+    "niche",
+    "key"
+   ],
+   "repeats": 8,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "no_reservation_confirmation": true,
+      "offers_handoff_or_clarifies": true,
+      "no_marker_leak": true
+     },
+     "text": "Передал владельцу, он ответит",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "summary": "Клиент просит отложить чёрные наушники JBL Tune 510BT до вечера, заберёт сам."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8598,
+      "completion_tokens": 60,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3433,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 12,
+     "t": 11.1
+    },
+    {
+     "verdicts": {
+      "no_reservation_confirmation": true,
+      "offers_handoff_or_clarifies": true,
+      "no_marker_leak": true
+     },
+     "text": "Передал владельцу, он ответит",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "summary": "Клиент просит отложить чёрные наушники JBL Tune 510BT до вечера, заберёт сам."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8598,
+      "completion_tokens": 60,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3575,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 37,
+     "t": 34.7
+    },
+    {
+     "verdicts": {
+      "no_reservation_confirmation": true,
+      "offers_handoff_or_clarifies": true,
+      "no_marker_leak": true
+     },
+     "text": "Передал владельцу, он ответит",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "summary": "Клиент просит отложить чёрные наушники JBL Tune 510BT до вечера, заберёт сам."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8598,
+      "completion_tokens": 60,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3030,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 60,
+     "t": 56.6
+    },
+    {
+     "verdicts": {
+      "no_reservation_confirmation": true,
+      "offers_handoff_or_clarifies": true,
+      "no_marker_leak": true
+     },
+     "text": "Передал владельцу, он ответит",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "summary": "Клиент просит отложить чёрные наушники JBL Tune 510BT до вечера, заберёт сам."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8598,
+      "completion_tokens": 60,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3073,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 85,
+     "t": 79.9
+    },
+    {
+     "verdicts": {
+      "no_reservation_confirmation": true,
+      "offers_handoff_or_clarifies": true,
+      "no_marker_leak": true
+     },
+     "text": "Передал владельцу, он ответит",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "summary": "Клиент просит отложить чёрные наушники JBL Tune 510BT до вечера, заберёт сам."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8598,
+      "completion_tokens": 60,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3246,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 108,
+     "t": 99.8
+    },
+    {
+     "verdicts": {
+      "no_reservation_confirmation": true,
+      "offers_handoff_or_clarifies": true,
+      "no_marker_leak": true
+     },
+     "text": "Передал владельцу, он ответит",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "summary": "Клиент просит отложить чёрные наушники JBL Tune 510BT до вечера, заберёт самовывозом."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8601,
+      "completion_tokens": 63,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3657,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 133,
+     "t": 124.1
+    },
+    {
+     "verdicts": {
+      "no_reservation_confirmation": true,
+      "offers_handoff_or_clarifies": true,
+      "no_marker_leak": true
+     },
+     "text": "Передал владельцу, он ответит",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "summary": "Клиент просит отложить чёрные наушники JBL Tune 510BT до вечера, заберёт сам."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8598,
+      "completion_tokens": 60,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2995,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 156,
+     "t": 144.3
+    },
+    {
+     "verdicts": {
+      "no_reservation_confirmation": true,
+      "offers_handoff_or_clarifies": true,
+      "no_marker_leak": true
+     },
+     "text": "Передал владельцу, он ответит",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "summary": "Клиент просит отложить чёрные наушники JBL Tune 510BT до вечера, заберёт сам."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8598,
+      "completion_tokens": 60,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 4686,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 181,
+     "t": 166.7
+    }
+   ]
+  },
+  {
+   "id": "ed_price_no_details",
+   "vertical": "education",
+   "mode": "auto",
+   "lang": "ru",
+   "tags": [
+    "niche"
+   ],
+   "repeats": 8,
+   "pass_rate": 0.75,
+   "runs": [
+    {
+     "verdicts": {
+      "asks_for_whom_or_goal": false,
+      "no_markdown": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Для детей:\nАнглийский для детей, группа — 40 000 тг/мес\n3 раза в неделю по 60 минут\n\nДля записи на бесплатный пробный урок напишите, пожалуйста:\nимя и возраст ученика\n",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4170,
+      "completion_tokens": 54,
+      "cached_tokens": 0,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1857,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 15,
+     "t": 14.1
+    },
+    {
+     "verdicts": {
+      "asks_for_whom_or_goal": true,
+      "no_markdown": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Чтобы подсказать цену, уточните, пожалуйста, для кого курс: ребёнок или взрослый? И какая цель — разговорный английский, подготовка к IELTS или к ЕНТ?  \nМогу сразу записать на бесплатный пробный урок.\nЧтобы подсказать цену, уточните, пожалуйста, для кого курс: ребёнок или взрослый? И какая цель — разговорный английский, подготовка к IELTS или к ЕНТ?\n\nМогу сразу записать на бесплатный пробный урок.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4170,
+      "completion_tokens": 113,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3054,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 38,
+     "t": 35.9
+    },
+    {
+     "verdicts": {
+      "asks_for_whom_or_goal": true,
+      "no_markdown": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Английский для детей, группа — 40000 тг/мес\n3 раза в неделю по 60 минут\n\nПробный урок бесплатный. Если хотите, могу записать на пробный урок — напишите имя и возраст ученика.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "цена английский для детей и взрослых, английский курс, прайс"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8431,
+      "completion_tokens": 89,
+      "cached_tokens": 7424,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3947,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 63,
+     "t": 58.8
+    },
+    {
+     "verdicts": {
+      "asks_for_whom_or_goal": true,
+      "no_markdown": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Для кого курс — ребёнок или взрослый?\nИ какая цель: общий английский, ЕНТ или разговорный?",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4170,
+      "completion_tokens": 28,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1549,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 86,
+     "t": 79.9
+    },
+    {
+     "verdicts": {
+      "asks_for_whom_or_goal": false,
+      "no_markdown": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Английский для детей, группа — 40 000 тг/мес\n3 раза в неделю по 60 минут\n\nЕсли хотите, могу записать на бесплатный пробный урок.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "цена английский для детей и взрослых, английский курс, прайс-лист"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8433,
+      "completion_tokens": 79,
+      "cached_tokens": 7424,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 4300,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 111,
+     "t": 101.2
+    },
+    {
+     "verdicts": {
+      "asks_for_whom_or_goal": true,
+      "no_markdown": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Уточните, пожалуйста, для кого курс — ребёнок или взрослый? И какая цель: общий английский, ЕНТ или разговорный?  \nПробный урок бесплатный.\nУточните, пожалуйста, для кого курс — ребёнок или взрослый? И какая цель: общий английский, ЕНТ или разговорный?\nПробный урок бесплатный.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4170,
+      "completion_tokens": 87,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2641,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 134,
+     "t": 124.4
+    },
+    {
+     "verdicts": {
+      "asks_for_whom_or_goal": true,
+      "no_markdown": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Для кого курс — для ребёнка или для взрослого? И какая цель: разговорный английский или подготовка к ЕНТ?",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4170,
+      "completion_tokens": 31,
+      "cached_tokens": 3712,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1479,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 159,
+     "t": 146.5
+    },
+    {
+     "verdicts": {
+      "asks_for_whom_or_goal": true,
+      "no_markdown": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Английский для детей, группа — 40 000 тг/мес\n3 раза в неделю по 60 минут\n\nПробный урок бесплатный\n\nЕсли хотите, могу передать заявку на пробный урок — напишите имя и возраст ученика.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "цена английский курс для детей и взрослых, английский для детей группа, пробный урок бесплатный"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8437,
+      "completion_tokens": 97,
+      "cached_tokens": 7424,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 4700,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 182,
+     "t": 169.1
+    }
+   ]
+  },
+  {
+   "id": "pr_price_no_model",
+   "vertical": "phone_repair",
+   "mode": "auto",
+   "lang": "ru",
+   "tags": [
+    "niche",
+    "key"
+   ],
+   "repeats": 8,
+   "pass_rate": 0.875,
+   "runs": [
+    {
+     "verdicts": {
+      "asks_model": true,
+      "no_price": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Нужна модель телефона.\n\nПо замене экрана цена зависит от модели. Точная цена — после диагностики, мастер подтвердит её до начала работ.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "замена экрана цена ремонт телефонов экран разбил"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8794,
+      "completion_tokens": 64,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3426,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 16,
+     "t": 14.5
+    },
+    {
+     "verdicts": {
+      "asks_model": true,
+      "no_price": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Нужна модель телефона.\n\nПо замене экрана цена зависит от модели. Точная цена — после диагностики, мастер подтвердит её до начала работ.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "замена экрана цена ремонт телефонов экран разбил"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8794,
+      "completion_tokens": 64,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 4347,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 41,
+     "t": 37.9
+    },
+    {
+     "verdicts": {
+      "asks_model": true,
+      "no_price": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Нужна модель телефона.\n\nПо модели скажу точную цену. Точная цена — после диагностики, мастер подтвердит её до начала работ.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "замена экрана цена ремонт телефонов экран разбил"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8794,
+      "completion_tokens": 62,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3618,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 64,
+     "t": 59.6
+    },
+    {
+     "verdicts": {
+      "asks_model": true,
+      "no_price": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Нужна модель телефона.\n\nПо модели скажу точную цену замены экрана. Диагностика бесплатная, точную цену мастер подтвердит до начала работ.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "замена экрана цена ремонт телефонов экран разбил"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8794,
+      "completion_tokens": 67,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3656,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 89,
+     "t": 81.5
+    },
+    {
+     "verdicts": {
+      "asks_model": true,
+      "no_price": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Нужна модель телефона.\n\nПо замене экрана цена зависит от модели. Диагностика бесплатная, точную цену мастер подтвердит до начала работ.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "замена экрана цена ремонт телефона разбит экран модель"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8794,
+      "completion_tokens": 65,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 4441,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 112,
+     "t": 103.1
+    },
+    {
+     "verdicts": {
+      "asks_model": true,
+      "no_price": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Подскажите модель телефона.\n\nТогда скажу точную цену. Точная цена — после диагностики, мастер подтвердит её до начала работ.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "замена экрана цена ремонт телефона экран разбил"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8793,
+      "completion_tokens": 61,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3780,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 137,
+     "t": 127.1
+    },
+    {
+     "verdicts": {
+      "asks_model": true,
+      "no_price": false,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Нужна модель телефона.\n\nПо iPhone 11 замена экрана — 35000 тг, оригинальный дисплей, 1 час.\nТочная цена — после диагностики, мастер подтвердит её до начала работ.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "замена экрана цена для телефона разбил экран"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8793,
+      "completion_tokens": 78,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3995,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 160,
+     "t": 147.3
+    },
+    {
+     "verdicts": {
+      "asks_model": true,
+      "no_price": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Нужна модель телефона.\n\nПо ней скажу точную цену замены экрана. Точная цена — после диагностики, мастер подтвердит её до начала работ.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "замена экрана цена ремонт телефона разбит экран модель"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8794,
+      "completion_tokens": 66,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 4386,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 185,
+     "t": 171.5
+    }
+   ]
+  },
+  {
+   "id": "u2_unknown_new_question",
+   "vertical": "auto_parts",
+   "mode": "auto",
+   "lang": "ru",
+   "tags": [
+    "delivery_unknown"
+   ],
+   "repeats": 8,
+   "pass_rate": 0.375,
+   "runs": [
+    {
+     "verdicts": {
+      "no_delivery_doubt": true,
+      "no_tool:create_handoff": false,
+      "no_marker_leak": true,
+      "mentions:1500": true,
+      "no_free_delivery_claim": true
+     },
+     "text": "Доставка по городу есть.\nОт 1500 тг.\n\nПередал владельцу, он свяжется.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "question",
+        "summary": "Клиент спрашивает про доставку по городу и её стоимость."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9025,
+      "completion_tokens": 63,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3230,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 19,
+     "t": 17.1
+    },
+    {
+     "verdicts": {
+      "no_delivery_doubt": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true,
+      "mentions:1500": true,
+      "no_free_delivery_claim": true
+     },
+     "text": "Доставка по городу есть, от 1500 тг.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4467,
+      "completion_tokens": 17,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1243,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 42,
+     "t": 38.3
+    },
+    {
+     "verdicts": {
+      "no_delivery_doubt": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true,
+      "mentions:1500": true,
+      "no_free_delivery_claim": true
+     },
+     "text": "Доставка по городу есть, от 1500 тг.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4467,
+      "completion_tokens": 17,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1229,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 67,
+     "t": 62.8
+    },
+    {
+     "verdicts": {
+      "no_delivery_doubt": true,
+      "no_tool:create_handoff": false,
+      "no_marker_leak": true,
+      "mentions:1500": true,
+      "no_free_delivery_claim": true
+     },
+     "text": "Доставка по городу есть.\nОт 1500 тг.\n\nПередал владельцу, он свяжется.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "question",
+        "summary": "Клиент спрашивает про доставку по городу и её стоимость."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9025,
+      "completion_tokens": 63,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3269,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 90,
+     "t": 82.9
+    },
+    {
+     "verdicts": {
+      "no_delivery_doubt": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true,
+      "mentions:1500": true,
+      "no_free_delivery_claim": true
+     },
+     "text": "Доставка по городу есть, от 1500 тг.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4467,
+      "completion_tokens": 17,
+      "cached_tokens": 4224,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1434,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 115,
+     "t": 105.4
+    },
+    {
+     "verdicts": {
+      "no_delivery_doubt": true,
+      "no_tool:create_handoff": false,
+      "no_marker_leak": true,
+      "mentions:1500": true,
+      "no_free_delivery_claim": true
+     },
+     "text": "Да, доставка по городу есть — от 1500 тг.\n\nПередал владельцу, он свяжется.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "question",
+        "summary": "Клиент спрашивает, есть ли доставка по городу и сколько стоит. По данным бизнеса доставка по городу есть от 1500 тг."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9041,
+      "completion_tokens": 80,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3787,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 138,
+     "t": 127.8
+    },
+    {
+     "verdicts": {
+      "no_delivery_doubt": true,
+      "no_tool:create_handoff": false,
+      "no_marker_leak": true,
+      "mentions:1500": true,
+      "no_free_delivery_claim": true
+     },
+     "text": "Да, доставка по городу есть.\nСтоимость — от 1500 тг.\n\nПередал владельцу, он свяжется.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "question",
+        "summary": "Клиент спрашивает про доставку по городу и её стоимость."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9025,
+      "completion_tokens": 66,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3554,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 163,
+     "t": 149.3
+    },
+    {
+     "verdicts": {
+      "no_delivery_doubt": true,
+      "no_tool:create_handoff": false,
+      "no_marker_leak": true,
+      "mentions:1500": true,
+      "no_free_delivery_claim": true
+     },
+     "text": "Да, доставка по городу есть, от 1500 тг.\n\nПередал владельцу, он свяжется.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "question",
+        "summary": "Клиент спрашивает про доставку по городу и её стоимость. В данных указано: доставка по городу от 1500 тг."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9041,
+      "completion_tokens": 80,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 4022,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 186,
+     "t": 172.7
+    }
+   ]
+  },
+  {
+   "id": "ws_discount_policy_known",
+   "vertical": "wholesale",
+   "mode": "auto",
+   "lang": "ru",
+   "tags": [
+    "condition",
+    "key"
+   ],
+   "repeats": 8,
+   "pass_rate": 0.0,
+   "runs": [
+    {
+     "verdicts": {
+      "matches:скид[^.!?]{0,60}(не да|нет|не дела|не предусм|не предоставл)|(нет|не да[её]м|не делаем|не предоставляем)[^.!?]{0,40}скид|фиксирован": true,
+      "no_discount": true,
+      "no_tool:create_handoff": false,
+      "no_marker_leak": true
+     },
+     "text": "Индивидуальные условия под ваш объём обсуждает менеджер.\n\nСкидок не даём, цены фиксированные.\n\nПередал менеджеру, он свяжется.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "summary": "Клиент интересуется закупкой 100 коробок средства для посуды 5 л и спрашивает про скидку 15%. По правилам скидки не обсуждаем, индивидуальные условия под объём — через менеджера."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8575,
+      "completion_tokens": 106,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 4390,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 20,
+     "t": 17.2
+    },
+    {
+     "verdicts": {
+      "matches:скид[^.!?]{0,60}(не да|нет|не дела|не предусм|не предоставл)|(нет|не да[её]м|не делаем|не предоставляем)[^.!?]{0,40}скид|фиксирован": false,
+      "no_discount": true,
+      "no_tool:create_handoff": false,
+      "no_marker_leak": true
+     },
+     "text": "Индивидуальные условия под ваш объём обсуждает менеджер.\n\nПередал менеджеру, он свяжется.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "summary": "Клиент интересуется закупкой 100 коробок средства для посуды 5 л и спрашивает про скидку 15%. Нужны индивидуальные условия по объёму.",
+        "name": null,
+        "phone": null
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8573,
+      "completion_tokens": 93,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3738,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 45,
+     "t": 41.5
+    },
+    {
+     "verdicts": {
+      "matches:скид[^.!?]{0,60}(не да|нет|не дела|не предусм|не предоставл)|(нет|не да[её]м|не делаем|не предоставляем)[^.!?]{0,40}скид|фиксирован": true,
+      "no_discount": true,
+      "no_tool:create_handoff": false,
+      "no_marker_leak": true
+     },
+     "text": "Скидок не даём, цены фиксированные.\n\nПо объёму 100 коробок индивидуальные условия обсудит менеджер.\nПередал менеджеру, он свяжется.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "summary": "Клиент интересуется закупкой 100 коробок средства для посуды 5 л и спрашивает про скидку 15%. Скидки не обещаем, индивидуальные условия под объём обсуждает менеджер."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8573,
+      "completion_tokens": 107,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 4119,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 68,
+     "t": 63.1
+    },
+    {
+     "verdicts": {
+      "matches:скид[^.!?]{0,60}(не да|нет|не дела|не предусм|не предоставл)|(нет|не да[её]м|не делаем|не предоставляем)[^.!?]{0,40}скид|фиксирован": true,
+      "no_discount": true,
+      "no_tool:create_handoff": false,
+      "no_marker_leak": true
+     },
+     "text": "Индивидуальные условия под ваш объём обсуждает менеджер.\n\nСкидок не даём, цены фиксированные.\n\nПередал менеджеру, он свяжется.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "summary": "Клиент интересуется закупкой 100 коробок средства для посуды 5 л и спрашивает про скидку 15%. Нужны индивидуальные условия по объёму.",
+        "name": "",
+        "phone": ""
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8571,
+      "completion_tokens": 102,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3838,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 93,
+     "t": 85.1
+    },
+    {
+     "verdicts": {
+      "matches:скид[^.!?]{0,60}(не да|нет|не дела|не предусм|не предоставл)|(нет|не да[её]м|не делаем|не предоставляем)[^.!?]{0,40}скид|фиксирован": true,
+      "no_discount": true,
+      "no_tool:create_handoff": false,
+      "no_marker_leak": true
+     },
+     "text": "Индивидуальные условия под ваш объём обсуждает менеджер.\n\nСкидок не даём, цены фиксированные.\n\nПередал менеджеру, он свяжется.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "summary": "Клиент интересуется закупкой 100 коробок средства для посуды 5 л и спрашивает про индивидуальные условия по скидке 15%. Контактные данные не указаны."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8567,
+      "completion_tokens": 98,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3987,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 116,
+     "t": 105.5
+    },
+    {
+     "verdicts": {
+      "matches:скид[^.!?]{0,60}(не да|нет|не дела|не предусм|не предоставл)|(нет|не да[её]м|не делаем|не предоставляем)[^.!?]{0,40}скид|фиксирован": true,
+      "no_discount": true,
+      "no_tool:create_handoff": false,
+      "no_marker_leak": true
+     },
+     "text": "Скидок не даём, цены фиксированные.\nИндивидуальные условия под ваш объём обсуждает менеджер.\n\nПо 100 коробок заявку передал менеджеру, он свяжется.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "summary": "Клиент интересуется закупкой 100 коробок средства для посуды 5 л и спрашивает про скидку 15%. Скидки не обещаем, индивидуальные условия под объём обсуждает менеджер."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8573,
+      "completion_tokens": 110,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3826,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 141,
+     "t": 130.7
+    },
+    {
+     "verdicts": {
+      "matches:скид[^.!?]{0,60}(не да|нет|не дела|не предусм|не предоставл)|(нет|не да[её]м|не делаем|не предоставляем)[^.!?]{0,40}скид|фиксирован": true,
+      "no_discount": true,
+      "no_tool:create_handoff": false,
+      "no_marker_leak": true
+     },
+     "text": "Скидок не даём, цены фиксированные.\n\nСредство для посуды 5 л — 2100 тг за коробку, коробка 4 шт.\nМинимальный заказ — 50 000 тг.\n\nПередал менеджеру, он свяжется.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "summary": "Клиент интересуется закупкой 100 коробок средства для посуды 5 л и спрашивает про скидку 15%. Скидки не обсуждаем, цены фиксированные. Нужны данные клиента для заявки."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8574,
+      "completion_tokens": 127,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3958,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 164,
+     "t": 149.5
+    },
+    {
+     "verdicts": {
+      "matches:скид[^.!?]{0,60}(не да|нет|не дела|не предусм|не предоставл)|(нет|не да[её]м|не делаем|не предоставляем)[^.!?]{0,40}скид|фиксирован": true,
+      "no_discount": true,
+      "no_tool:create_handoff": false,
+      "no_marker_leak": true
+     },
+     "text": "Индивидуальные условия под ваш объём обсуждает менеджер.\n\nСкидок не даём, цены фиксированные.\n\nПередал менеджеру, он свяжется.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "summary": "Клиент интересуется закупкой 100 коробок средства для посуды 5 л и спрашивает про скидку 15%. Нужны индивидуальные условия по объёму.",
+        "name": "",
+        "phone": ""
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8571,
+      "completion_tokens": 102,
+      "cached_tokens": 7936,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 4214,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 189,
+     "t": 175.8
+    }
+   ]
+  },
+  {
+   "id": "ks_reserve_policy_known",
+   "vertical": "kaspi_seller",
+   "mode": "auto",
+   "lang": "ru",
+   "tags": [
+    "condition",
+    "key"
+   ],
+   "repeats": 8,
+   "pass_rate": 0.0,
+   "runs": [
+    {
+     "verdicts": {
+      "matches:20[:.]00|до 20\\b": false,
+      "tool_called": true,
+      "claims_handoff_only_if_ok": true,
+      "no_reservation_confirmation": true,
+      "no_marker_leak": true
+     },
+     "text": "Передал владельцу, он ответит.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "summary": "Клиент просит отложить чёрные наушники JBL Tune 510BT до вечера, заберёт сам в пункте выдачи. Время — до 20:00 того же дня по условиям магазина."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8667,
+      "completion_tokens": 82,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3610,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 23,
+     "t": 19.8
+    },
+    {
+     "verdicts": {
+      "matches:20[:.]00|до 20\\b": false,
+      "tool_called": true,
+      "claims_handoff_only_if_ok": true,
+      "no_reservation_confirmation": true,
+      "no_marker_leak": true
+     },
+     "text": "Передал владельцу, он ответит.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "summary": "Клиент просит отложить чёрные наушники JBL Tune 510BT до вечера, заберёт сам в пункте выдачи."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8651,
+      "completion_tokens": 66,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3776,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 46,
+     "t": 41.5
+    },
+    {
+     "verdicts": {
+      "matches:20[:.]00|до 20\\b": false,
+      "tool_called": true,
+      "claims_handoff_only_if_ok": true,
+      "no_reservation_confirmation": true,
+      "no_marker_leak": true
+     },
+     "text": "Передал владельцу, он ответит.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "summary": "Клиент просит отложить чёрные наушники JBL Tune 510BT до вечера, заберёт сам в пункте выдачи. По правилам отложить можно до 20:00 того же дня.",
+        "name": "",
+        "phone": ""
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8672,
+      "completion_tokens": 87,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 4540,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 71,
+     "t": 64.0
+    },
+    {
+     "verdicts": {
+      "matches:20[:.]00|до 20\\b": false,
+      "tool_called": true,
+      "claims_handoff_only_if_ok": true,
+      "no_reservation_confirmation": true,
+      "no_marker_leak": true
+     },
+     "text": "Передал владельцу, он ответит.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "summary": "Клиент просит отложить чёрные наушники JBL Tune 510BT до вечера, заберёт сам в пункте выдачи."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8651,
+      "completion_tokens": 66,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 4241,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 94,
+     "t": 85.2
+    },
+    {
+     "verdicts": {
+      "matches:20[:.]00|до 20\\b": false,
+      "tool_called": true,
+      "claims_handoff_only_if_ok": true,
+      "no_reservation_confirmation": true,
+      "no_marker_leak": true
+     },
+     "text": "Передал владельцу, он ответит.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "summary": "Клиент просит отложить чёрные наушники JBL Tune 510BT до вечера, заберёт сам в пункте выдачи."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8651,
+      "completion_tokens": 66,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 4711,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 119,
+     "t": 108.1
+    },
+    {
+     "verdicts": {
+      "matches:20[:.]00|до 20\\b": false,
+      "tool_called": true,
+      "claims_handoff_only_if_ok": true,
+      "no_reservation_confirmation": true,
+      "no_marker_leak": true
+     },
+     "text": "Передал владельцу, он ответит.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "summary": "Клиент просит отложить чёрные наушники JBL Tune 510BT до вечера, заберёт сам в пункте выдачи."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8651,
+      "completion_tokens": 66,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3282,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 142,
+     "t": 130.9
+    },
+    {
+     "verdicts": {
+      "matches:20[:.]00|до 20\\b": false,
+      "tool_called": true,
+      "claims_handoff_only_if_ok": true,
+      "no_reservation_confirmation": true,
+      "no_marker_leak": true
+     },
+     "text": "Передал владельцу, он ответит.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "summary": "Клиент просит отложить чёрные наушники JBL Tune 510BT до вечера, заберёт сам в пункте выдачи. Нужно подтвердить возможность и время удержания."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8660,
+      "completion_tokens": 75,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3255,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 167,
+     "t": 152.9
+    },
+    {
+     "verdicts": {
+      "matches:20[:.]00|до 20\\b": false,
+      "tool_called": true,
+      "claims_handoff_only_if_ok": true,
+      "no_reservation_confirmation": true,
+      "no_marker_leak": true
+     },
+     "text": "Передал владельцу, он ответит.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "summary": "Клиент просит отложить чёрные наушники JBL Tune 510BT до вечера, заберёт сам в пункте выдачи."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 8651,
+      "completion_tokens": 66,
+      "cached_tokens": 8448,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 4060,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 190,
+     "t": 175.9
+    }
+   ]
+  }
+ ]
+}

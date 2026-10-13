@@ -1,0 +1,1105 @@
+{
+ "summary": {
+  "label": "cmp-0925-rerun-gpt-5.4-mini",
+  "prompts_ref": "worktree",
+  "scenario_version": "v1.1 (2026-09-22: absent-item check names the item; harness h2)",
+  "harness": "h2 (2026-09-22: derived totals, echoed client numbers, negation-aware claims, no_price_for)",
+  "model": "gpt-5.4-mini",
+  "reasoning_effort": null,
+  "dropped_params": [],
+  "panel_model": null,
+  "max_tokens": 200,
+  "scenarios": 7,
+  "runs": 35,
+  "pass_all": 2,
+  "flaky": 4,
+  "fail": 1,
+  "error_runs": 0,
+  "finish_reason_length_runs": 0,
+  "prompt_tokens": 265451,
+  "cached_tokens": 241280,
+  "completion_tokens": 3250,
+  "reasoning_tokens": 0,
+  "cost_usd_auto_path": 0.0508,
+  "prices_usd_per_1m": [
+   0.75,
+   0.075,
+   4.5
+  ],
+  "latency_ms": {
+   "auto": {
+    "n": 35,
+    "median": 3142,
+    "p90": 3664,
+    "max": 3935
+   },
+   "panel": null
+  },
+  "seconds": 110,
+  "by_check": {
+   "asks_car": "5/5",
+   "asks_model": "5/5",
+   "lang_kz": "4/5",
+   "lang_ru": "5/5",
+   "mentions:15000": "4/5",
+   "no_closing_offer": "5/5",
+   "no_discount": "5/5",
+   "no_fresh_price_pick": "4/5",
+   "no_markdown": "15/15",
+   "no_price": "4/10",
+   "no_price_for:тюльпан": "5/5",
+   "no_stock_denial": "5/5",
+   "numbers_grounded": "10/10",
+   "offers_handoff_or_clarifies": "9/10"
+  }
+ },
+ "results": [
+  {
+   "id": "ap_price_without_car",
+   "vertical": "auto_parts",
+   "mode": "auto",
+   "lang": "ru",
+   "tags": [
+    "niche",
+    "key"
+   ],
+   "repeats": 5,
+   "pass_rate": 0.0,
+   "runs": [
+    {
+     "verdicts": {
+      "no_price": false,
+      "asks_car": true,
+      "lang_ru": true,
+      "no_markdown": true,
+      "no_closing_offer": true
+     },
+     "text": "Для точного подбора нужны марка, модель и год авто.\n\nЕсли речь про Toyota Camry 2018–2023, колодки тормозные передние 04465-02220 — 18500 тг.\nВ прайсе позиция есть, точное наличие подтвердит менеджер.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "передние колодки Toyota 04465-02220 цена наличие"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 7667,
+      "completion_tokens": 101,
+      "cached_tokens": 7424,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3220,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "no_price": false,
+      "asks_car": true,
+      "lang_ru": true,
+      "no_markdown": true,
+      "no_closing_offer": true
+     },
+     "text": "Для Toyota Camry 2018–2023 передние колодки 04465-02220 стоят 18500 тг.\n\nЕсли у вас другая Toyota, напишите марку, модель и год — подберу точно.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "колодки передние Toyota 04465-02220 цена"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 7665,
+      "completion_tokens": 83,
+      "cached_tokens": 7424,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2734,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "no_price": false,
+      "asks_car": true,
+      "lang_ru": true,
+      "no_markdown": true,
+      "no_closing_offer": true
+     },
+     "text": "Колодки тормозные передние Toyota 04465-02220 — 18500 тг.\n\nЕсли хотите, могу сразу подобрать по вашей машине точнее: марка, модель и год авто.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "передние колодки Toyota цена артикул"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 7663,
+      "completion_tokens": 74,
+      "cached_tokens": 7424,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3142,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "no_price": false,
+      "asks_car": true,
+      "lang_ru": true,
+      "no_markdown": true,
+      "no_closing_offer": true
+     },
+     "text": "Колодки тормозные передние Toyota 04465-02220 — 18500 тг.\n\nЕсли подбираем точно, напишите марку, модель и год авто.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "передние колодки Toyota цена артикул"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 7663,
+      "completion_tokens": 70,
+      "cached_tokens": 7424,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3163,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "no_price": false,
+      "asks_car": true,
+      "lang_ru": true,
+      "no_markdown": true,
+      "no_closing_offer": true
+     },
+     "text": "Для Toyota Camry 2018–2023 колодки тормозные передние 04465-02220 — 18500 тг.\n\nЕсли у вас другая Toyota, напишите марку, модель и год — подберу точно.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "колодки передние Toyota 04465-02220 цена"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 7665,
+      "completion_tokens": 86,
+      "cached_tokens": 7424,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2604,
+     "status": null
+    }
+   ]
+  },
+  {
+   "id": "ap_source_conflict",
+   "vertical": "auto_parts",
+   "mode": "auto",
+   "lang": "ru",
+   "tags": [
+    "conflict",
+    "key"
+   ],
+   "repeats": 5,
+   "pass_rate": 0.8,
+   "runs": [
+    {
+     "verdicts": {
+      "no_fresh_price_pick": true,
+      "no_markdown": true
+     },
+     "text": "Фильтр масляный 90915-YZZE1 — 3900 тг, оригинал.\n\nВ прайсе позиция есть, точное наличие подтвердит менеджер.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "Toyota Camry 2019 фильтр масляный 90915-YZZE1 цена наличие"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 7647,
+      "completion_tokens": 80,
+      "cached_tokens": 7424,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2626,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "no_fresh_price_pick": true,
+      "no_markdown": true
+     },
+     "text": "Фильтр масляный 90915-YZZE1 — 3900 тг, оригинал.\nВ прайсе позиция есть, точное наличие подтвердит менеджер.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "Toyota Camry 2019 фильтр масляный 90915-YZZE1 цена наличие"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 7647,
+      "completion_tokens": 80,
+      "cached_tokens": 7424,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2723,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "no_fresh_price_pick": true,
+      "no_markdown": true
+     },
+     "text": "Фильтр масляный 90915-YZZE1 — 3900 тг, оригинал.\n\nВ прайсе позиция есть, точное наличие подтвердит менеджер.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "Toyota Camry 2019 масляный фильтр 90915-YZZE1 цена наличие"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 7647,
+      "completion_tokens": 80,
+      "cached_tokens": 7424,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3243,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "no_fresh_price_pick": true,
+      "no_markdown": true
+     },
+     "text": "Фильтр масляный 90915-YZZE1 — 3900 тг, оригинал.\n\nПо прайсу позиция есть, точное наличие подтвердит менеджер.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "Toyota Camry 2019 фильтр масляный 90915-YZZE1 цена наличие"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 7647,
+      "completion_tokens": 80,
+      "cached_tokens": 7424,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3193,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "no_fresh_price_pick": false,
+      "no_markdown": true
+     },
+     "text": "Фильтр масляный 90915-YZZE1 — 3900 тг, оригинал.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "Toyota Camry 2019 фильтр масляный 90915-YZZE1 цена"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 7646,
+      "completion_tokens": 63,
+      "cached_tokens": 7424,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2897,
+     "status": null
+    }
+   ]
+  },
+  {
+   "id": "ws_discount_request",
+   "vertical": "wholesale",
+   "mode": "auto",
+   "lang": "ru",
+   "tags": [
+    "niche",
+    "key"
+   ],
+   "repeats": 5,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "no_discount": true,
+      "offers_handoff_or_clarifies": true
+     },
+     "text": "Индивидуальные условия под ваш объём обсуждает менеджер.\n\nПередал менеджеру, он свяжется.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "summary": "Клиент интересуется закупкой 100 коробок средства для посуды 5 л и спрашивает про скидку 15%. Нужны индивидуальные условия по объёму.",
+        "name": null,
+        "phone": null
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 7519,
+      "completion_tokens": 93,
+      "cached_tokens": 6400,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3377,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "no_discount": true,
+      "offers_handoff_or_clarifies": true
+     },
+     "text": "Индивидуальные условия под ваш объём обсуждает менеджер.\n\nПередал менеджеру, он свяжется.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "summary": "Клиент интересуется закупкой 100 коробок средства для посуды 5 л и спрашивает про скидку 15%. Нужны индивидуальные условия по объёму.",
+        "name": "",
+        "phone": ""
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 7517,
+      "completion_tokens": 91,
+      "cached_tokens": 6400,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3142,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "no_discount": true,
+      "offers_handoff_or_clarifies": true
+     },
+     "text": "Индивидуальные условия под ваш объём обсуждает менеджер.\n\nПередал менеджеру, он свяжется.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "summary": "Клиент интересуется закупкой 100 коробок средства для посуды 5 л и спрашивает про скидку 15%. Нужны индивидуальные условия по объёму.",
+        "name": null,
+        "phone": null
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 7519,
+      "completion_tokens": 93,
+      "cached_tokens": 6400,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3110,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "no_discount": true,
+      "offers_handoff_or_clarifies": true
+     },
+     "text": "Индивидуальные условия под ваш объём обсуждает менеджер.\n\nПередал менеджеру, он свяжется.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "summary": "Клиент интересуется оптовой закупкой: 100 коробок средства для посуды 5 л, спрашивает про скидку 15%. Нужны индивидуальные условия по объёму.",
+        "name": "",
+        "phone": ""
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 7521,
+      "completion_tokens": 95,
+      "cached_tokens": 6912,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3277,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "no_discount": true,
+      "offers_handoff_or_clarifies": true
+     },
+     "text": "Индивидуальные условия под ваш объём обсуждает менеджер.\n\nПередал менеджеру, он свяжется.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "summary": "Клиент интересуется закупкой 100 коробок средства для посуды 5 л и спрашивает про скидку 15%. Нужны индивидуальные условия по объёму.",
+        "name": ""
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 7515,
+      "completion_tokens": 89,
+      "cached_tokens": 6400,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2934,
+     "status": null
+    }
+   ]
+  },
+  {
+   "id": "fl_absent_item",
+   "vertical": "flowers",
+   "mode": "auto",
+   "lang": "ru",
+   "tags": [
+    "unknown",
+    "key"
+   ],
+   "repeats": 5,
+   "pass_rate": 0.8,
+   "runs": [
+    {
+     "verdicts": {
+      "no_stock_denial": true,
+      "no_price_for:тюльпан": true,
+      "offers_handoff_or_clarifies": true
+     },
+     "text": "Тюльпанов в прайсе не вижу.\n\nЕсть:\nБукет 25 роз — 25000 тг\nБукет пионов — 18000 тг\n\nНаличие подтвердит флорист при оформлении.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "тюльпаны цена наличие букет тюльпанов"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 7542,
+      "completion_tokens": 86,
+      "cached_tokens": 6400,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3049,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "no_stock_denial": true,
+      "no_price_for:тюльпан": true,
+      "offers_handoff_or_clarifies": true
+     },
+     "text": "Тюльпанов в прайсе не нашла.\n\nЕсть:\nБукет 25 роз — 25000 тг\nБукет пионов 9 шт — 18000 тг\n\nЕсли хотите, могу передать флористу вопрос по тюльпанам — он подтвердит наличие.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "тюльпаны цена наличие букет тюльпанов"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 7542,
+      "completion_tokens": 101,
+      "cached_tokens": 6912,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2990,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "no_stock_denial": true,
+      "no_price_for:тюльпан": true,
+      "offers_handoff_or_clarifies": false
+     },
+     "text": "Тюльпанов в прайсе не вижу.\n\nЕсть:\nБукет 25 роз — 25000 тг\nБукет пионов 9 шт — 18000 тг\n\nЕсли хотите, подберу букет по поводу и бюджету.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "тюльпаны цена наличие букет тюльпанов"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 7542,
+      "completion_tokens": 93,
+      "cached_tokens": 6912,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3419,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "no_stock_denial": true,
+      "no_price_for:тюльпан": true,
+      "offers_handoff_or_clarifies": true
+     },
+     "text": "Тюльпанов в прайсе не вижу.\n\nЕсть:\nБукет 25 роз — 25000 тг\nБукет пионов — 18000 тг\n\nЕсли хотите, могу передать флористу вопрос по тюльпанам — он подтвердит наличие.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "тюльпаны цена наличие букет тюльпанов"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 7542,
+      "completion_tokens": 98,
+      "cached_tokens": 6400,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3387,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "no_stock_denial": true,
+      "no_price_for:тюльпан": true,
+      "offers_handoff_or_clarifies": true
+     },
+     "text": "Тюльпанов в прайсе не вижу.\n\nЕсть:\nБукет 25 роз — 25000 тг\nБукет пионов — 18000 тг\n\nЕсли хотите, флорист подскажет, что сейчас есть из тюльпанов и соберёт вариант под ваш бюджет.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "тюльпаны цена наличие букет тюльпанов"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 7542,
+      "completion_tokens": 103,
+      "cached_tokens": 6400,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3808,
+     "status": null
+    }
+   ]
+  },
+  {
+   "id": "pr_price_no_model",
+   "vertical": "phone_repair",
+   "mode": "auto",
+   "lang": "ru",
+   "tags": [
+    "niche",
+    "key"
+   ],
+   "repeats": 5,
+   "pass_rate": 0.8,
+   "runs": [
+    {
+     "verdicts": {
+      "asks_model": true,
+      "no_price": true
+     },
+     "text": "Подскажите, пожалуйста, модель телефона.\n\nПосле этого скажу цену. Точная цена — после диагностики, мастер подтвердит её до начала работ.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "замена экрана цена ремонт экран разбил модель iPhone 11"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 7603,
+      "completion_tokens": 66,
+      "cached_tokens": 7424,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2706,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "asks_model": true,
+      "no_price": true
+     },
+     "text": "Уточните, пожалуйста, модель телефона.\n\nЦена зависит от модели и без неё я не смогу назвать стоимость.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "замена экрана цена ремонт экран разбил модель iPhone 11"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 7603,
+      "completion_tokens": 58,
+      "cached_tokens": 7424,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2932,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "asks_model": true,
+      "no_price": false
+     },
+     "text": "Уточните, пожалуйста, модель телефона и что именно случилось с экраном.\n\nПо iPhone 11 замена экрана — 35000 тг, оригинальный дисплей, 1 час.\nТочная цена — после диагностики, мастер подтвердит её до начала работ.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "замена экрана цена для телефона разбил экран"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 7599,
+      "completion_tokens": 89,
+      "cached_tokens": 7424,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2867,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "asks_model": true,
+      "no_price": true
+     },
+     "text": "Уточните, пожалуйста, модель телефона.\n\nПосле этого скажу цену. Точная цена — после диагностики, мастер подтвердит её до начала работ.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "замена экрана цена для телефона разбил экран"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 7599,
+      "completion_tokens": 62,
+      "cached_tokens": 7424,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2509,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "asks_model": true,
+      "no_price": true
+     },
+     "text": "Уточните, пожалуйста, модель телефона.\n\nПосле этого скажу точную цену. Диагностика бесплатная, точная цена — после диагностики, мастер подтвердит её до начала работ.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "замена экрана цена для модели телефона разбил экран"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 7600,
+      "completion_tokens": 72,
+      "cached_tokens": 7424,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3543,
+     "status": null
+    }
+   ]
+  },
+  {
+   "id": "pr_kz_battery",
+   "vertical": "phone_repair",
+   "mode": "auto",
+   "lang": "kz",
+   "tags": [
+    "lang"
+   ],
+   "repeats": 5,
+   "pass_rate": 0.6,
+   "runs": [
+    {
+     "verdicts": {
+      "lang_kz": false,
+      "mentions:15000": true,
+      "numbers_grounded": true
+     },
+     "text": "iPhone 12 батареясын ауыстыру — 15000 тг.\n\nТочная цена — после диагностики, мастер подтвердит её до начала работ. Диагностика бесплатная.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "iPhone 12 батарея ауыстыру цена"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 7613,
+      "completion_tokens": 72,
+      "cached_tokens": 7424,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2839,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "mentions:15000": true,
+      "numbers_grounded": true
+     },
+     "text": "iPhone 12 үшін батарея ауыстыру бағасын нақтылау керек.\n\nПрайста iPhone 11–13 үшін АКБ ауыстыру бар: 15000 тг, 40 минут.\nТочная цена — после диагностики, мастер подтвердит её до начала работ.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "question",
+        "summary": "Клиент сұрады: iPhone 12 батареясын ауыстыру бағасы. Прайста нақты iPhone 12 үшін баға жоқ, модель мен ақауды нақтылап, жауап беру керек."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 7635,
+      "completion_tokens": 128,
+      "cached_tokens": 7424,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3320,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "mentions:15000": true,
+      "numbers_grounded": true
+     },
+     "text": "iPhone 12 үшін батарея ауыстыру — 15000 тг.\n\nТочная цена — после диагностики, мастер подтвердит её до начала работ.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "iPhone 12 батарея ауыстыру цена"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 7613,
+      "completion_tokens": 64,
+      "cached_tokens": 7424,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2716,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "mentions:15000": true,
+      "numbers_grounded": true
+     },
+     "text": "iPhone 12 үшін батарея ауыстыру — 15000 тг.\n\nТочная цена — после диагностики, мастер подтвердит её до начала работ.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "iPhone 12 батарея ауыстыру цена"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 7613,
+      "completion_tokens": 64,
+      "cached_tokens": 7424,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2784,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "mentions:15000": false,
+      "numbers_grounded": true
+     },
+     "text": "iPhone 12 үшін нақты бағаны шебер тексеріп айтады.\n\nДиагностика тегін\nТочная цена — после диагностики, мастер подтвердит её до начала работ\n\nМодель мен ақауды жазып жіберсеңіз, иесіне нақтылап беремін.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "question",
+        "summary": "Клиент сұрады: iPhone 12 батареясын ауыстыру бағасы. Прайста нақты iPhone 12 үшін баға жоқ, тек iPhone 11-13 АКБ ауыстыру бар. Нақты бағаны шебер/иесі диагностикадан кейін нақтылайды."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 7655,
+      "completion_tokens": 151,
+      "cached_tokens": 7424,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3935,
+     "status": null
+    }
+   ]
+  },
+  {
+   "id": "gen_markdown_bait",
+   "vertical": "wholesale",
+   "mode": "auto",
+   "lang": "ru",
+   "tags": [
+    "format"
+   ],
+   "repeats": 5,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "no_markdown": true,
+      "numbers_grounded": true
+     },
+     "text": "Вот цены по прайсу:\n\nТовар | Артикул | Цена | Фасовка\nСредство для посуды 5 л | WS-500 | 2100 тг/шт | коробка 4 шт\nСтиральный порошок 10 кг | WP-10 | 6900 тг/шт | мешок\n\nЕсли нужно, могу сразу собрать заявку по нужным позициям и объёму.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "все товары и цены прайс бытовая химия оптом"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 7487,
+      "completion_tokens": 124,
+      "cached_tokens": 6400,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3400,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "no_markdown": true,
+      "numbers_grounded": true
+     },
+     "text": "Вот что есть в прайсе:\n\nТовар | Артикул | Цена | Фасовка\nСредство для посуды 5 л | WS-500 | 2100 тг/шт | коробка 4 шт\nСтиральный порошок 10 кг | WP-10 | 6900 тг/шт | мешок\n\nЕсли нужно, могу сразу собрать заявку по нужным позициям и объёму.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "все товары и цены прайс бытовая химия оптовые поставки"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 7490,
+      "completion_tokens": 128,
+      "cached_tokens": 5888,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3517,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "no_markdown": true,
+      "numbers_grounded": true
+     },
+     "text": "Вот что есть в прайсе:\n\nПозиция | Артикул | Цена | Фасовка\nСредство для посуды 5 л | WS-500 | 2100 тг/шт | коробка 4 шт\nСтиральный порошок 10 кг | WP-10 | 6900 тг/шт | мешок\n\nМинимальный заказ — 50 000 тг.\nОплата — безнал с НДС, счёт и накладные.\n\nЕсли нужно, могу собрать заявку по нужным позициям и объёму.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "Все товары и цены из прайса для оптовых поставок бытовой химии. Нужен полный список позиций, если есть."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 7504,
+      "completion_tokens": 170,
+      "cached_tokens": 5888,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3933,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "no_markdown": true,
+      "numbers_grounded": true
+     },
+     "text": "Вот что есть в прайсе:\n\nТовар | Артикул | Цена | Фасовка\nСредство для посуды 5 л | WS-500 | 2100 тг/шт | коробка 4 шт\nСтиральный порошок 10 кг | WP-10 | 6900 тг/шт | мешок\n\nМинимальный заказ — 50 000 тг.\nБезнал с НДС, счёт и накладные.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "полный прайс, все товары и цены, бытовая химия оптом"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 7490,
+      "completion_tokens": 136,
+      "cached_tokens": 2688,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3567,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "no_markdown": true,
+      "numbers_grounded": true
+     },
+     "text": "Вот что есть в прайсе:\n\nТовар | Артикул | Цена | Фасовка\nСредство для посуды 5 л | WS-500 | 2100 тг/шт | коробка 4 шт\nСтиральный порошок 10 кг | WP-10 | 6900 тг/шт | мешок\n\nЕсли нужно, могу отдельно собрать заявку по нужным позициям и объёму.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "полный прайс, все товары и цены бытовая химия оптом"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 7489,
+      "completion_tokens": 127,
+      "cached_tokens": 6400,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3664,
+     "status": null
+    }
+   ]
+  }
+ ]
+}

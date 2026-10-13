@@ -1,0 +1,256 @@
+{
+ "summary": {
+  "label": "cmp-1013-panel-before-v16-policy",
+  "prompts_ref": "worktree",
+  "search_ref": "worktree",
+  "side": null,
+  "block": null,
+  "plan": null,
+  "scenario_version": "v1.6 (2026-10-13: a condition — discount, deferred payment, a hold, a return. Unknown to the data: pn_discount_unknown, pn_deferred_unknown, pn_reserve_unknown, pn_return_unknown — card 1 neither grants nor refuses it (cards_first_no_decision), no card states a rule absent from the data (cards_absent). Written by the owner into «Промпт»: ws_discount_policy_known / pn_discount_policy_known, ks_reserve_policy_known / pn_reserve_policy_known — the bot and card 1 both state the owner's rule (matches / cards_first_matches), the hold also goes to the owner as a request. Harness h9; every v1.5 scenario and check unchanged)",
+  "harness": "h9 (2026-10-13: panel checks cards_first_no_decision:<topic> — card 1 neither grants nor refuses a condition the data does not state — cards_absent:<regex> — no card states a rule absent from the data — and cards_first_matches:<regex>; auto check matches:<regex>; set v1.6 adds the scenarios for them; every earlier check unchanged; on top of h8 (2026-10-12, T11b: interleaved schedule — every scenario's repeats spread over the whole run, round-robin over the scenarios, the sides of one repeat back to back with the first side rotating (--side / --plan run the sides of a comparison as ONE schedule); set v1.5 adds no_tool:create_handoff wherever the scenario does not call for a handoff; no check function changed; on top of h7 (2026-10-12, T11 Q1 B + V6-unknown: scenario roles `owner` / `bot_unknown` rendered with the memory marks the writers store at --prompts-ref (apply-history-handoff.py; none before T6); no_marker_leak, no_tool:<name>, not_says_already, no_delivery_doubt; on top of h6 2026-10-09, Q1: not_mentions:X — X stated in no un-refused clause and not merely quoted as the client's words, for the client-time echo; mentions:H:MM reads a time of day; on top of h5 2026-10-08, V9-r2: no_conflict_claim / no_price_caveat for a price list that AGREES with the catalog; on top of h4 2026-10-07 V9: «расхождение» + negated conflict, zero-price / elliptical free delivery, «итого по N позициям» partial, «нужен» / the car or device by name, a word inside the installment claim, Kazakh = no Russian sentence, «18,000»; h3 2026-09-27 R14; checks pinned by test_checks.py))",
+  "model": "gpt-5.4-mini",
+  "reasoning_effort": null,
+  "dropped_params": [],
+  "panel_model": "gpt-4o-mini",
+  "max_tokens": 200,
+  "search_simulation": "Price List Search sub-workflow (Reconcile Prices at worktree)",
+  "memory_marks": {
+   "owner": "Владелец: ",
+   "bot_unknown": "[доставка не подтверждена] "
+  },
+  "workers": 1,
+  "scenarios": 2,
+  "runs": 10,
+  "pass_all": 2,
+  "flaky": 0,
+  "fail": 0,
+  "error_runs": 0,
+  "transport_retries": 0,
+  "finish_reason_length_runs": 0,
+  "prompt_tokens": 0,
+  "cached_tokens": 0,
+  "completion_tokens": 0,
+  "reasoning_tokens": 0,
+  "cost_usd_auto_path": 0.0,
+  "prices_usd_per_1m": [
+   0.75,
+   0.075,
+   4.5
+  ],
+  "latency_ms": {
+   "auto": null,
+   "panel": {
+    "n": 10,
+    "median": 2683,
+    "p90": 2838,
+    "max": 2838
+   }
+  },
+  "seconds": 27,
+  "by_check": {
+   "cards": "10/10",
+   "cards_first_matches:20[:.]00|до 20\\b": "5/5",
+   "cards_first_matches:скид[^.!?]{0,60}(не да|нет|не дела|не предусм|не предоставл)|(нет|не да[её]м|не делаем|не предоставляем)[^.!?]{0,40}скид|фиксирован": "5/5"
+  }
+ },
+ "results": [
+  {
+   "id": "pn_discount_policy_known",
+   "vertical": "wholesale",
+   "mode": "panel",
+   "lang": "ru",
+   "tags": [
+    "condition",
+    "key"
+   ],
+   "repeats": 5,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "cards": true,
+      "cards_first_matches:скид[^.!?]{0,60}(не да|нет|не дела|не предусм|не предоставл)|(нет|не да[её]м|не делаем|не предоставляем)[^.!?]{0,40}скид|фиксирован": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [{\"text\": \"К сожалению, скидок не даём, цены фиксированные. Если вас устраивает цена, можем обсудить детали заказа.\", \"label\": \"Про скидки\", \"move\": \"Отказ\"}, {\"text\": \"К сожалению, у нас фиксированные цены, и скидок не предусмотрено. Если хотите, можем обсудить заказ.\", \"label\": \"Скидки нет\", \"move\": \"Отказ\"}, {\"text\": \"К сожалению, скидки не предоставляем. Если вы готовы оформить заказ, сообщите, пожалуйста, детали.\", \"label\": \"Скидки\", \"move\": \"Отказ\"}, {\"text\": \"К сожалению, скидок не предусмотрено. Если вас устраивает цена, можем обсудить дальнейшие шаги по заказу.\", \"label\": \"Обсудим заказ\", \"move\": \"Отказ\"}]}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 2624,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 0,
+     "t": 0.2
+    },
+    {
+     "verdicts": {
+      "cards": true,
+      "cards_first_matches:скид[^.!?]{0,60}(не да|нет|не дела|не предусм|не предоставл)|(нет|не да[её]м|не делаем|не предоставляем)[^.!?]{0,40}скид|фиксирован": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [{\"text\": \"Скидок не даём, цены фиксированные. Могу оформить заказ на 100 коробок средства для посуды. Напишите, как удобнее оплатить и получить.\", \"label\": \"Без скидки\", \"move\": \"Отказ\"}, {\"text\": \"К сожалению, скидок у нас нет, но я могу помочь с оформлением заказа на 100 коробок. Какой способ оплаты вам удобен?\", \"label\": \"По заказу\", \"move\": \"Отказ\"}, {\"text\": \"У нас фиксированные цены, скидок не предоставляем. Если вас устраивает цена, давайте оформим заказ на 100 коробок.\", \"label\": \"Оформить заказ\", \"move\": \"Отказ\"}, {\"text\": \"К сожалению, скидки не предусмотрены. Если всё устраивает, дайте знать, как будем оформлять заказ на 100 коробок.\", \"label\": \"Следующий шаг\", \"move\": \"Отказ\"}]}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 2683,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 2,
+     "t": 5.6
+    },
+    {
+     "verdicts": {
+      "cards": true,
+      "cards_first_matches:скид[^.!?]{0,60}(не да|нет|не дела|не предусм|не предоставл)|(нет|не да[её]м|не делаем|не предоставляем)[^.!?]{0,40}скид|фиксирован": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [{\"text\": \"Скидок не даём, цена фиксированная: 2100 тг за коробку. Если вас устраивает, можем обсудить детали заказа!\", \"label\": \"Цена фиксированная\", \"move\": \"Отказ\"}, {\"text\": \"К сожалению, скидок не предоставляем. Цена за коробку остаётся 2100 тг. Если хотите, можем оформить заказ!\", \"label\": \"Без скидки\", \"move\": \"Отказ\"}, {\"text\": \"К сожалению, скидок не предусмотрено. Цена за коробку составляет 2100 тг. Давайте обсудим ваш заказ!\", \"label\": \"Обсудим заказ\", \"move\": \"Отказ\"}, {\"text\": \"Скидок не даём, цена остаётся 2100 тг за коробку. Если вас это устраивает, можем перейти к оформлению!\", \"label\": \"Далее к заказу\", \"move\": \"Отказ\"}]}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 2825,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 4,
+     "t": 10.8
+    },
+    {
+     "verdicts": {
+      "cards": true,
+      "cards_first_matches:скид[^.!?]{0,60}(не да|нет|не дела|не предусм|не предоставл)|(нет|не да[её]м|не делаем|не предоставляем)[^.!?]{0,40}скид|фиксирован": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [{\"text\": \"К сожалению, скидок на оптовые заказы не предоставляем, цены фиксированные. Могу помочь с оформлением заказа на 100 коробок средства для посуды.\", \"label\": \"По цене\", \"move\": \"Отказ\"}, {\"text\": \"Скидок не даём, но можем обсудить детали заказа на 100 коробок. Напишите, как удобно оформить заказ.\", \"label\": \"Оформление\", \"move\": \"Вариант\"}, {\"text\": \"К сожалению, мы не предоставляем скидки на оптовые заказы. Если вас интересует заказ 100 коробок, дайте знать, как будем оформлять.\", \"label\": \"По скидке\", \"move\": \"Отказ\"}, {\"text\": \"Скидок не предусмотрено, но можем обсудить детали заказа на 100 коробок средства. Как вам удобно продолжить?\", \"label\": \"Дальше\", \"move\": \"Вариант\"}]}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 2677,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 6,
+     "t": 16.0
+    },
+    {
+     "verdicts": {
+      "cards": true,
+      "cards_first_matches:скид[^.!?]{0,60}(не да|нет|не дела|не предусм|не предоставл)|(нет|не да[её]м|не делаем|не предоставляем)[^.!?]{0,40}скид|фиксирован": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [{\"text\": \"Скидок, к сожалению, не даём, так как цены фиксированные. Заказываете 100 коробок средства для посуды по 2100 тг за коробку?\", \"label\": \"По скидке\", \"move\": \"Отказ\"}, {\"text\": \"К сожалению, скидок не предусмотрено. Если вас устраивает цена, можем оформить заказ на 100 коробок средства для посуды.\", \"label\": \"Цена фиксированная\", \"move\": \"Отказ\"}, {\"text\": \"Сожалею, но скидок не даём. Если вас устраивает цена, давайте обсудим детали заказа на 100 коробок.\", \"label\": \"Обсудим детали\", \"move\": \"Отказ\"}, {\"text\": \"Понимаю, что скидка интересует, но мы работаем по фиксированным ценам. Готовы оформить заказ на 100 коробок?\", \"label\": \"Готовы оформить?\", \"move\": \"Отказ\"}]}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 2646,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 8,
+     "t": 21.5
+    }
+   ]
+  },
+  {
+   "id": "pn_reserve_policy_known",
+   "vertical": "kaspi_seller",
+   "mode": "panel",
+   "lang": "ru",
+   "tags": [
+    "condition",
+    "key"
+   ],
+   "repeats": 5,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "cards": true,
+      "cards_first_matches:20[:.]00|до 20\\b": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [{\"text\": \"Отложить чёрные наушники JBL Tune 510BT до 20:00. Вы сможете забрать их в нашем пункте выдачи. Жду вас!\", \"label\": \"Подтверждение\", \"move\": \"К заказу\"}, {\"text\": \"К сожалению, я не могу забронировать наушники. Но вы можете оформить заказ на странице товара в Kaspi.\", \"label\": \"Оформление\", \"move\": \"Отказ\"}, {\"text\": \"Отложить товар могу до 20:00. Если вы хотите, я могу напомнить вам об этом позже!\", \"label\": \"Напомнить\", \"move\": \"Отложить\"}, {\"text\": \"Конечно, отложу чёрные наушники до вечера. Не забудьте забрать их до 20:00!\", \"label\": \"Запомнить\", \"move\": \"К заказу\"}]}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 2814,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 1,
+     "t": 2.8
+    },
+    {
+     "verdicts": {
+      "cards": true,
+      "cards_first_matches:20[:.]00|до 20\\b": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [{\"text\": \"Отложу чёрные наушники JBL Tune 510BT до 20:00. Жду вас за ними!\", \"label\": \"Подтверждение\", \"move\": \"К заказу\"}, {\"text\": \"К сожалению, я не могу отложить товар. Но вы можете оформить заказ на странице Kaspi.\", \"label\": \"Каспи\", \"move\": \"Отказ\"}, {\"text\": \"Отложить могу до 20:00. Напоминаю, что забрать можно в нашем пункте выдачи!\", \"label\": \"Время отложить\", \"move\": \"Отложить\"}, {\"text\": \"Отложу наушники до вечера, но помните, что нужно будет оформить через Kaspi.\", \"label\": \"Оформление\", \"move\": \"К заказу\"}]}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 2491,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 3,
+     "t": 8.3
+    },
+    {
+     "verdicts": {
+      "cards": true,
+      "cards_first_matches:20[:.]00|до 20\\b": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [{\"text\": \"Отложу чёрные наушники JBL Tune 510BT до 20:00. Жду вас за ними!\", \"label\": \"Подтверждение\", \"move\": \"К заказу\"}, {\"text\": \"К сожалению, я не могу забронировать товар. Заказывайте на странице Kaspi, и я помогу вам с оформлением!\", \"label\": \"Не могу отложить\", \"move\": \"Отказ\"}, {\"text\": \"Отложу наушники до вечера. Вы сможете забрать их в нашем пункте выдачи!\", \"label\": \"На вечер\", \"move\": \"К заказу\"}, {\"text\": \"Отложить смогу до 20:00. Напомню, что забрать можно в пункте выдачи!\", \"label\": \"До 20:00\", \"move\": \"К заказу\"}]}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 2363,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 5,
+     "t": 13.6
+    },
+    {
+     "verdicts": {
+      "cards": true,
+      "cards_first_matches:20[:.]00|до 20\\b": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [{\"text\": \"Отложу чёрные наушники JBL Tune 510BT до 20:00. Жду вас за ними!\", \"label\": \"Подтверждение\", \"move\": \"К заказу\"}, {\"text\": \"К сожалению, я не могу зарезервировать товар. Вы можете оформить заказ на странице Kaspi.\", \"label\": \"Информация\", \"move\": \"Отказ\"}, {\"text\": \"Отложу наушники до вечера, но помните, что товар может быть продан другим клиентам. Лучше оформить заказ на Kaspi!\", \"label\": \"Напоминание\", \"move\": \"Отложить\"}, {\"text\": \"К сожалению, я не могу отложить товар. Заказ можно оформить только через Kaspi. Обращайтесь!\", \"label\": \"Уточнение\", \"move\": \"Отказ\"}]}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 2806,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 7,
+     "t": 18.7
+    },
+    {
+     "verdicts": {
+      "cards": true,
+      "cards_first_matches:20[:.]00|до 20\\b": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [{\"text\": \"Я могу отложить чёрные наушники JBL Tune 510BT до 20:00. После этого времени они могут быть доступны другим клиентам. Жду вас!\", \"label\": \"Подтверждение\", \"move\": \"К заказу\"}, {\"text\": \"Отложу чёрные наушники до вечера, заберите до 20:00. Если что-то изменится, дайте знать!\", \"label\": \"На вечер\", \"move\": \"К заказу\"}, {\"text\": \"Отложу чёрные наушники до 20:00. Напоминаю, что забрать можно только до этого времени!\", \"label\": \"Важно\", \"move\": \"К заказу\"}, {\"text\": \"К сожалению, я не могу гарантировать резервирование наушников. Если вы хотите, могу отложить их до 20:00. Как вам?\", \"label\": \"С вопросом\", \"move\": \"Отложить\"}]}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 2838,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 9,
+     "t": 24.1
+    }
+   ]
+  }
+ ]
+}

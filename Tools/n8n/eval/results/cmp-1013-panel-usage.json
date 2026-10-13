@@ -1,0 +1,47 @@
+{
+ "note": "Suggest Replies OpenAI usage per panel run on staging, canon 886eaf82, 2026-10-13",
+ "runs": {
+  "4omini": {
+   "executions": 60,
+   "llm_calls": 61,
+   "retry_calls": 1,
+   "models": {
+    "gpt-4o-mini-2024-07-18": 61
+   },
+   "prompt_tokens": 170011,
+   "cached_tokens": 126592,
+   "completion_tokens": 6707,
+   "avg_in_per_call": 2787,
+   "avg_out_per_call": 110,
+   "llm_node_ms_median": 1964.0
+  },
+  "54mini": {
+   "executions": 60,
+   "llm_calls": 60,
+   "retry_calls": 0,
+   "models": {
+    "gpt-5.4-mini-2026-03-17": 60
+   },
+   "prompt_tokens": 166855,
+   "cached_tokens": 109568,
+   "completion_tokens": 7668,
+   "avg_in_per_call": 2781,
+   "avg_out_per_call": 128,
+   "llm_node_ms_median": 1837.0
+  },
+  "luna": {
+   "executions": 60,
+   "llm_calls": 60,
+   "retry_calls": 0,
+   "models": {
+    "gpt-6-luna": 60
+   },
+   "prompt_tokens": 166855,
+   "cached_tokens": 104806,
+   "completion_tokens": 4415,
+   "avg_in_per_call": 2781,
+   "avg_out_per_call": 74,
+   "llm_node_ms_median": 2138.0
+  }
+ }
+}

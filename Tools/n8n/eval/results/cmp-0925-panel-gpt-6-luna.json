@@ -1,0 +1,713 @@
+{
+ "summary": {
+  "label": "cmp-0925-panel-gpt-6-luna",
+  "prompts_ref": "worktree",
+  "scenario_version": "v1.1 (2026-09-22: absent-item check names the item; harness h2)",
+  "harness": "h2 (2026-09-22: derived totals, echoed client numbers, negation-aware claims, no_price_for)",
+  "model": "gpt-5.4-mini",
+  "reasoning_effort": null,
+  "dropped_params": [],
+  "panel_model": "gpt-6-luna (reasoning_effort none)",
+  "max_tokens": 200,
+  "scenarios": 12,
+  "runs": 36,
+  "pass_all": 8,
+  "flaky": 1,
+  "fail": 3,
+  "error_runs": 10,
+  "finish_reason_length_runs": 0,
+  "prompt_tokens": 0,
+  "cached_tokens": 0,
+  "completion_tokens": 0,
+  "reasoning_tokens": 0,
+  "cost_usd_auto_path": 0.0,
+  "prices_usd_per_1m": [
+   0.75,
+   0.075,
+   4.5
+  ],
+  "latency_ms": {
+   "auto": null,
+   "panel": {
+    "n": 36,
+    "median": 2015,
+    "p90": 2912,
+    "max": 4506
+   }
+  },
+  "seconds": 63,
+  "by_check": {
+   "abstain": "3/12",
+   "cards": "23/24",
+   "cards_first_clarifies": "6/6",
+   "cards_first_no_price": "3/3",
+   "cards_kz": "3/3",
+   "cards_no_invented_installment_terms": "3/3",
+   "cards_no_refund_confirmation": "3/3",
+   "cards_no_upsell_on_thanks": "3/3",
+   "cards_numbers_grounded": "6/6",
+   "cards_ru": "3/3"
+  }
+ },
+ "results": [
+  {
+   "id": "pn_personal_congrats",
+   "vertical": "flowers",
+   "mode": "panel",
+   "lang": "ru",
+   "tags": [
+    "abstain",
+    "key"
+   ],
+   "repeats": 3,
+   "pass_rate": 0.0,
+   "runs": [
+    {
+     "verdicts": {
+      "abstain": false
+     },
+     "text": "{\"code\": 404, \"message\": \"The requested webhook \\\"POST SuggestReplies\\\" is not registered.\", \"hint\": \"The workflow must be active for a production URL to run successfully. You can activate the workflow using the toggle in the top-right of the editor. Note that unlike test URL calls, production URL calls aren't shown on the canvas (only in the executions list)\", \"stacktrace\": \"ResponseError: The requested webhook \\\"POST SuggestReplies\\\" is not registered.\\n    at LiveWebhooks.findWebhook (/usr/local/lib/node_modules/n8n/src/webhooks/live-webhooks.ts:239:10)\\n    at LiveWebhooks.executeWebhook (/usr/local/lib/node_modules/n8n/src/webhooks/live-webhooks.ts:91:19)\\n    at WebhookRequestHandler.handleRequest (/usr/local/lib/node_modules/n8n/src/webhooks/webhook-request-handler.ts:64:21)\\n    at /usr/local/lib/node_modules/n8n/src/webhooks/webhook-request-handler.ts:247:3\"}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 133,
+     "status": 404
+    },
+    {
+     "verdicts": {
+      "abstain": false
+     },
+     "text": "{\"code\": 404, \"message\": \"The requested webhook \\\"POST SuggestReplies\\\" is not registered.\", \"hint\": \"The workflow must be active for a production URL to run successfully. You can activate the workflow using the toggle in the top-right of the editor. Note that unlike test URL calls, production URL calls aren't shown on the canvas (only in the executions list)\", \"stacktrace\": \"ResponseError: The requested webhook \\\"POST SuggestReplies\\\" is not registered.\\n    at LiveWebhooks.findWebhook (/usr/local/lib/node_modules/n8n/src/webhooks/live-webhooks.ts:239:10)\\n    at LiveWebhooks.executeWebhook (/usr/local/lib/node_modules/n8n/src/webhooks/live-webhooks.ts:91:19)\\n    at WebhookRequestHandler.handleRequest (/usr/local/lib/node_modules/n8n/src/webhooks/webhook-request-handler.ts:64:21)\\n    at /usr/local/lib/node_modules/n8n/src/webhooks/webhook-request-handler.ts:247:3\"}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 6,
+     "status": 404
+    },
+    {
+     "verdicts": {
+      "abstain": false
+     },
+     "text": "{\"code\": 404, \"message\": \"The requested webhook \\\"POST SuggestReplies\\\" is not registered.\", \"hint\": \"The workflow must be active for a production URL to run successfully. You can activate the workflow using the toggle in the top-right of the editor. Note that unlike test URL calls, production URL calls aren't shown on the canvas (only in the executions list)\", \"stacktrace\": \"ResponseError: The requested webhook \\\"POST SuggestReplies\\\" is not registered.\\n    at LiveWebhooks.findWebhook (/usr/local/lib/node_modules/n8n/src/webhooks/live-webhooks.ts:239:10)\\n    at LiveWebhooks.executeWebhook (/usr/local/lib/node_modules/n8n/src/webhooks/live-webhooks.ts:91:19)\\n    at WebhookRequestHandler.handleRequest (/usr/local/lib/node_modules/n8n/src/webhooks/webhook-request-handler.ts:64:21)\\n    at /usr/local/lib/node_modules/n8n/src/webhooks/webhook-request-handler.ts:247:3\"}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 7,
+     "status": 404
+    }
+   ]
+  },
+  {
+   "id": "pn_emotional_reaction",
+   "vertical": "kaspi_seller",
+   "mode": "panel",
+   "lang": "ru",
+   "tags": [
+    "abstain",
+    "key"
+   ],
+   "repeats": 3,
+   "pass_rate": 0.0,
+   "runs": [
+    {
+     "verdicts": {
+      "abstain": false
+     },
+     "text": "{\"code\": 404, \"message\": \"The requested webhook \\\"POST SuggestReplies\\\" is not registered.\", \"hint\": \"The workflow must be active for a production URL to run successfully. You can activate the workflow using the toggle in the top-right of the editor. Note that unlike test URL calls, production URL calls aren't shown on the canvas (only in the executions list)\", \"stacktrace\": \"ResponseError: The requested webhook \\\"POST SuggestReplies\\\" is not registered.\\n    at LiveWebhooks.findWebhook (/usr/local/lib/node_modules/n8n/src/webhooks/live-webhooks.ts:239:10)\\n    at LiveWebhooks.executeWebhook (/usr/local/lib/node_modules/n8n/src/webhooks/live-webhooks.ts:91:19)\\n    at WebhookRequestHandler.handleRequest (/usr/local/lib/node_modules/n8n/src/webhooks/webhook-request-handler.ts:64:21)\\n    at /usr/local/lib/node_modules/n8n/src/webhooks/webhook-request-handler.ts:247:3\"}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 12,
+     "status": 404
+    },
+    {
+     "verdicts": {
+      "abstain": false
+     },
+     "text": "{\"code\": 404, \"message\": \"The requested webhook \\\"POST SuggestReplies\\\" is not registered.\", \"hint\": \"The workflow must be active for a production URL to run successfully. You can activate the workflow using the toggle in the top-right of the editor. Note that unlike test URL calls, production URL calls aren't shown on the canvas (only in the executions list)\", \"stacktrace\": \"ResponseError: The requested webhook \\\"POST SuggestReplies\\\" is not registered.\\n    at LiveWebhooks.findWebhook (/usr/local/lib/node_modules/n8n/src/webhooks/live-webhooks.ts:239:10)\\n    at LiveWebhooks.executeWebhook (/usr/local/lib/node_modules/n8n/src/webhooks/live-webhooks.ts:91:19)\\n    at WebhookRequestHandler.handleRequest (/usr/local/lib/node_modules/n8n/src/webhooks/webhook-request-handler.ts:64:21)\\n    at /usr/local/lib/node_modules/n8n/src/webhooks/webhook-request-handler.ts:247:3\"}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 60,
+     "status": 404
+    },
+    {
+     "verdicts": {
+      "abstain": false
+     },
+     "text": "{\"code\": 404, \"message\": \"The requested webhook \\\"POST SuggestReplies\\\" is not registered.\", \"hint\": \"The workflow must be active for a production URL to run successfully. You can activate the workflow using the toggle in the top-right of the editor. Note that unlike test URL calls, production URL calls aren't shown on the canvas (only in the executions list)\", \"stacktrace\": \"ResponseError: The requested webhook \\\"POST SuggestReplies\\\" is not registered.\\n    at LiveWebhooks.findWebhook (/usr/local/lib/node_modules/n8n/src/webhooks/live-webhooks.ts:239:10)\\n    at LiveWebhooks.executeWebhook (/usr/local/lib/node_modules/n8n/src/webhooks/live-webhooks.ts:91:19)\\n    at WebhookRequestHandler.handleRequest (/usr/local/lib/node_modules/n8n/src/webhooks/webhook-request-handler.ts:64:21)\\n    at /usr/local/lib/node_modules/n8n/src/webhooks/webhook-request-handler.ts:247:3\"}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 26,
+     "status": 404
+    }
+   ]
+  },
+  {
+   "id": "pn_go_to_cinema",
+   "vertical": "auto_parts",
+   "mode": "panel",
+   "lang": "ru",
+   "tags": [
+    "abstain"
+   ],
+   "repeats": 3,
+   "pass_rate": 0.0,
+   "runs": [
+    {
+     "verdicts": {
+      "abstain": false
+     },
+     "text": "{\"code\": 404, \"message\": \"The requested webhook \\\"POST SuggestReplies\\\" is not registered.\", \"hint\": \"The workflow must be active for a production URL to run successfully. You can activate the workflow using the toggle in the top-right of the editor. Note that unlike test URL calls, production URL calls aren't shown on the canvas (only in the executions list)\", \"stacktrace\": \"ResponseError: The requested webhook \\\"POST SuggestReplies\\\" is not registered.\\n    at LiveWebhooks.findWebhook (/usr/local/lib/node_modules/n8n/src/webhooks/live-webhooks.ts:239:10)\\n    at LiveWebhooks.executeWebhook (/usr/local/lib/node_modules/n8n/src/webhooks/live-webhooks.ts:91:19)\\n    at WebhookRequestHandler.handleRequest (/usr/local/lib/node_modules/n8n/src/webhooks/webhook-request-handler.ts:64:21)\\n    at /usr/local/lib/node_modules/n8n/src/webhooks/webhook-request-handler.ts:247:3\"}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 31,
+     "status": 404
+    },
+    {
+     "verdicts": {
+      "abstain": false
+     },
+     "text": "{\"code\": 404, \"message\": \"The requested webhook \\\"POST SuggestReplies\\\" is not registered.\", \"hint\": \"The workflow must be active for a production URL to run successfully. You can activate the workflow using the toggle in the top-right of the editor. Note that unlike test URL calls, production URL calls aren't shown on the canvas (only in the executions list)\", \"stacktrace\": \"ResponseError: The requested webhook \\\"POST SuggestReplies\\\" is not registered.\\n    at LiveWebhooks.findWebhook (/usr/local/lib/node_modules/n8n/src/webhooks/live-webhooks.ts:239:10)\\n    at LiveWebhooks.executeWebhook (/usr/local/lib/node_modules/n8n/src/webhooks/live-webhooks.ts:91:19)\\n    at WebhookRequestHandler.handleRequest (/usr/local/lib/node_modules/n8n/src/webhooks/webhook-request-handler.ts:64:21)\\n    at /usr/local/lib/node_modules/n8n/src/webhooks/webhook-request-handler.ts:247:3\"}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 18,
+     "status": 404
+    },
+    {
+     "verdicts": {
+      "abstain": false
+     },
+     "text": "{\"code\": 404, \"message\": \"The requested webhook \\\"POST SuggestReplies\\\" is not registered.\", \"hint\": \"The workflow must be active for a production URL to run successfully. You can activate the workflow using the toggle in the top-right of the editor. Note that unlike test URL calls, production URL calls aren't shown on the canvas (only in the executions list)\", \"stacktrace\": \"ResponseError: The requested webhook \\\"POST SuggestReplies\\\" is not registered.\\n    at LiveWebhooks.findWebhook (/usr/local/lib/node_modules/n8n/src/webhooks/live-webhooks.ts:239:10)\\n    at LiveWebhooks.executeWebhook (/usr/local/lib/node_modules/n8n/src/webhooks/live-webhooks.ts:91:19)\\n    at WebhookRequestHandler.handleRequest (/usr/local/lib/node_modules/n8n/src/webhooks/webhook-request-handler.ts:64:21)\\n    at /usr/local/lib/node_modules/n8n/src/webhooks/webhook-request-handler.ts:247:3\"}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 11,
+     "status": 404
+    }
+   ]
+  },
+  {
+   "id": "pn_thanks_in_business",
+   "vertical": "flowers",
+   "mode": "panel",
+   "lang": "ru",
+   "tags": [
+    "cards"
+   ],
+   "repeats": 3,
+   "pass_rate": 0.6666666666666666,
+   "runs": [
+    {
+     "verdicts": {
+      "cards": false,
+      "cards_no_upsell_on_thanks": true
+     },
+     "text": "{\"code\": 404, \"message\": \"This webhook is not registered for POST requests. Did you mean to make a POST request?\", \"stacktrace\": \"ResponseError: This webhook is not registered for POST requests. Did you mean to make a POST request?\\n    at LiveWebhooks.findWebhook (/usr/local/lib/node_modules/n8n/src/webhooks/live-webhooks.ts:239:10)\\n    at LiveWebhooks.executeWebhook (/usr/local/lib/node_modules/n8n/src/webhooks/live-webhooks.ts:91:19)\\n    at WebhookRequestHandler.handleRequest (/usr/local/lib/node_modules/n8n/src/webhooks/webhook-request-handler.ts:64:21)\\n    at /usr/local/lib/node_modules/n8n/src/webhooks/webhook-request-handler.ts:247:3\"}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 668,
+     "status": 404
+    },
+    {
+     "verdicts": {
+      "cards": true,
+      "cards_no_upsell_on_thanks": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [{\"text\": \"Пожалуйста, будем рады помочь!\", \"label\": \"Тепло\", \"move\": \"Ответ\"}, {\"text\": \"Рады, что помогли 😊\", \"label\": \"Дружелюбно\", \"move\": \"Ответ\"}, {\"text\": \"Хорошо, обращайтесь, когда будете готовы.\", \"label\": \"На связи\", \"move\": \"Ответ\"}, {\"text\": \"Будем ждать вашего сообщения завтра!\", \"label\": \"До завтра\", \"move\": \"Ответ\"}]}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 3562,
+     "status": 200
+    },
+    {
+     "verdicts": {
+      "cards": true,
+      "cards_no_upsell_on_thanks": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [{\"text\": \"Пожалуйста, будем рады помочь!\", \"label\": \"Тепло\", \"move\": \"Ответ\"}, {\"text\": \"Рады помочь 😊\", \"label\": \"Коротко\", \"move\": \"Ответ\"}, {\"text\": \"Обращайтесь, будем ждать вас завтра!\", \"label\": \"До завтра\", \"move\": \"Ответ\"}, {\"text\": \"Хорошо, до связи!\", \"label\": \"Нейтрально\", \"move\": \"Ответ\"}]}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 2207,
+     "status": 200
+    }
+   ]
+  },
+  {
+   "id": "pn_price_question",
+   "vertical": "flowers",
+   "mode": "panel",
+   "lang": "ru",
+   "tags": [
+    "cards"
+   ],
+   "repeats": 3,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "cards": true,
+      "cards_numbers_grounded": true,
+      "cards_ru": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [{\"text\": \"Букет пионов — 18 000 тг. Пионы сезонные, наличие лучше уточнить перед заказом.\", \"label\": \"Цена и наличие\", \"move\": \"Ответ\"}, {\"text\": \"В каталоге букет пионов указан за 18 000 тг. Хотите, уточню наличие на нужную дату?\", \"label\": \"На дату\", \"move\": \"К заказу\"}, {\"text\": \"Если рассматриваете альтернативу, букет из 25 эквадорских роз стоит 25 000 тг. Пионы сезонные, их наличие уточню.\", \"label\": \"Розы\", \"move\": \"Вариант\"}]}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 2912,
+     "status": 200
+    },
+    {
+     "verdicts": {
+      "cards": true,
+      "cards_numbers_grounded": true,
+      "cards_ru": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [{\"text\": \"Букет пионов — 18 000 тг. Пионы сезонные, наличие уточню перед оформлением.\", \"label\": \"Цена пионов\", \"move\": \"Ответ\"}, {\"text\": \"Букет пионов стоит 18 000 тг. Хотите, уточню наличие на нужную дату?\", \"label\": \"На дату\", \"move\": \"Уточнить\"}]}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 1868,
+     "status": 200
+    },
+    {
+     "verdicts": {
+      "cards": true,
+      "cards_numbers_grounded": true,
+      "cards_ru": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [{\"text\": \"Букет пионов — 18 000 тг. Состав и наличие уточню перед оформлением.\", \"label\": \"Цена пионов\", \"move\": \"Ответ\"}, {\"text\": \"В каталоге букет пионов указан за 18 000 тг. Хотите, уточню наличие на нужную дату?\", \"label\": \"Наличие\", \"move\": \"Уточнить\"}]}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 2515,
+     "status": 200
+    }
+   ]
+  },
+  {
+   "id": "pn_kz_question",
+   "vertical": "phone_repair",
+   "mode": "panel",
+   "lang": "kz",
+   "tags": [
+    "cards",
+    "lang"
+   ],
+   "repeats": 3,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "cards": true,
+      "cards_kz": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [{\"text\": \"iPhone 11 экранын ауыстыру — 35 000 тг. Бұл баға бастапқы, нақты соманы диагностикадан кейін айтамыз. Диагностика тегін.\", \"label\": \"Бағасы\", \"move\": \"Ответ\"}, {\"text\": \"iPhone 11 экранын ауыстыру 35 000 тг-ден басталады, нақты бағасы диагностикадан кейін белгілі болады. Диагностика тегін.\", \"label\": \"Қысқаша\", \"move\": \"Ответ\"}]}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 2461,
+     "status": 200
+    },
+    {
+     "verdicts": {
+      "cards": true,
+      "cards_kz": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [{\"text\": \"iPhone 11 экранын ауыстыру — 35 000 тг. Диагностика тегін, нақты сомасы диагностикадан кейін белгілі болады.\", \"label\": \"Бағасы\", \"move\": \"Ответ\"}, {\"text\": \"iPhone 11 экранын ауыстыру 35 000 тг тұрады, дисплейі — түпнұсқа. Нақты сомасын диагностикадан кейін айтамыз.\", \"label\": \"Түпнұсқа дисплей\", \"move\": \"Ответ\"}]}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 2167,
+     "status": 200
+    },
+    {
+     "verdicts": {
+      "cards": true,
+      "cards_kz": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [{\"text\": \"iPhone 11 экранын ауыстыру — 35 000 тг. Диагностика тегін, нақты сомасы диагностикадан кейін белгілі болады.\", \"label\": \"Бағасы\", \"move\": \"Ответ\"}, {\"text\": \"iPhone 11 экранын ауыстыру 35 000 тг тұрады, дисплей — түпнұсқа. Нақты сома диагностикадан кейін айтылады, диагностика тегін.\", \"label\": \"Толығырақ\", \"move\": \"Ответ\"}, {\"text\": \"iPhone 11 экранын ауыстыру — 35 000 тг, нақты сомасы диагностикадан кейін белгілі болады. Қаласаңыз, ТЦ Азия, 2-қабатқа келіңіз.\", \"label\": \"Келу\", \"move\": \"К заказу\"}]}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 4506,
+     "status": 200
+    }
+   ]
+  },
+  {
+   "id": "pn_autoparts_no_car",
+   "vertical": "auto_parts",
+   "mode": "panel",
+   "lang": "ru",
+   "tags": [
+    "niche",
+    "key"
+   ],
+   "repeats": 3,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "cards": true,
+      "cards_first_clarifies": true,
+      "cards_first_no_price": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [{\"text\": \"Подскажите марку, модель и год автомобиля — тогда проверю цену на передние колодки.\", \"label\": \"Марка и год\", \"move\": \"Уточнить\"}]}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 1934,
+     "status": 200
+    },
+    {
+     "verdicts": {
+      "cards": true,
+      "cards_first_clarifies": true,
+      "cards_first_no_price": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [{\"text\": \"Подскажите марку, модель и год автомобиля — тогда проверю цену на передние колодки.\", \"label\": \"Марка и год\", \"move\": \"Уточнить\"}]}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 2015,
+     "status": 200
+    },
+    {
+     "verdicts": {
+      "cards": true,
+      "cards_first_clarifies": true,
+      "cards_first_no_price": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [{\"text\": \"Подскажите марку, модель и год автомобиля — тогда проверю цену на передние колодки.\", \"label\": \"Марка и год\", \"move\": \"Уточнить\"}, {\"text\": \"Для какой машины нужны передние колодки? Напишите марку, модель и год — подберу подходящий вариант и уточню стоимость.\", \"label\": \"Подбор\", \"move\": \"Уточнить\"}]}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 2854,
+     "status": 200
+    }
+   ]
+  },
+  {
+   "id": "pn_installment_kaspi",
+   "vertical": "kaspi_seller",
+   "mode": "panel",
+   "lang": "ru",
+   "tags": [
+    "installment",
+    "key"
+   ],
+   "repeats": 3,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "cards": true,
+      "cards_no_invented_installment_terms": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [{\"text\": \"Условия рассрочки на 12 месяцев и процент зависят от предложения Kaspi. Посмотрите их на странице товара: https://kaspi.kz/shop/techstore — оформление только там.\", \"label\": \"Условия Kaspi\", \"move\": \"Уточнить\"}, {\"text\": \"Какую модель и цвет наушников рассматриваете? В магазине есть JBL Tune 510BT в чёрном и белом цвете; условия рассрочки и процент будут указаны на странице товара в Kaspi.\", \"label\": \"Модель и цвет\", \"move\": \"Уточнить\"}]}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 2496,
+     "status": 200
+    },
+    {
+     "verdicts": {
+      "cards": true,
+      "cards_no_invented_installment_terms": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [{\"text\": \"Условия рассрочки на 12 месяцев и процент зависят от предложения Kaspi. Посмотрите их на странице товара: https://kaspi.kz/shop/techstore — оформление только там.\", \"label\": \"Условия Kaspi\", \"move\": \"Уточнить\"}, {\"text\": \"Для каких именно наушников смотрите рассрочку — JBL Tune 510BT, чёрные или белые? Условия и процент будут указаны на странице товара в Kaspi: https://kaspi.kz/shop/techstore.\", \"label\": \"Выбор цвета\", \"move\": \"Уточнить\"}]}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 2739,
+     "status": 200
+    },
+    {
+     "verdicts": {
+      "cards": true,
+      "cards_no_invented_installment_terms": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [{\"text\": \"Условия рассрочки на 12 месяцев и процент отображаются на странице товара в Kaspi. Посмотрите их там перед оформлением: https://kaspi.kz/shop/techstore\", \"label\": \"Условия Kaspi\", \"move\": \"Уточнить\"}, {\"text\": \"Для какой модели наушников уточняете? В магазине есть JBL Tune 510BT; условия рассрочки и процент проверьте на странице товара в Kaspi: https://kaspi.kz/shop/techstore\", \"label\": \"Модель и условия\", \"move\": \"Уточнить\"}]}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 2279,
+     "status": 200
+    }
+   ]
+  },
+  {
+   "id": "pn_mixed_lang",
+   "vertical": "wholesale",
+   "mode": "panel",
+   "lang": "mixed",
+   "tags": [
+    "lang"
+   ],
+   "repeats": 3,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "cards": true,
+      "cards_numbers_grounded": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [{\"text\": \"Сәлем! Стиральный порошок 10 кг — 6 900 тг за мешок. Наличие проверю и сообщу.\", \"label\": \"Цена и остаток\", \"move\": \"Отложить\"}, {\"text\": \"Сәлем! Порошок 10 кг — 6 900 тг за мешок. Вам проверить наличие и оформить заказ?\", \"label\": \"Следующий шаг\", \"move\": \"К заказу\"}]}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 2424,
+     "status": 200
+    },
+    {
+     "verdicts": {
+      "cards": true,
+      "cards_numbers_grounded": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [{\"text\": \"Сәлем! Стиральный порошок 10 кг — 6 900 тг за мешок. Остаток проверю и сообщу.\", \"label\": \"Цена и остаток\", \"move\": \"Отложить\"}, {\"text\": \"Сәлем! Уточните, пожалуйста, какой именно порошок нужен: в каталоге указана только фасовка 10 кг, без марки или артикула.\", \"label\": \"Марка порошка\", \"move\": \"Уточнить\"}]}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 2664,
+     "status": 200
+    },
+    {
+     "verdicts": {
+      "cards": true,
+      "cards_numbers_grounded": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [{\"text\": \"Сәлем! Стиральный порошок 10 кг — 6 900 тг за мешок. Остаток уточню и напишу.\", \"label\": \"Цена и остаток\", \"move\": \"Отложить\"}, {\"text\": \"Сәлем! Порошок 10 кг — 6 900 тг за мешок. Сколько мешков вам нужно?\", \"label\": \"Объём заказа\", \"move\": \"Уточнить\"}]}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 2340,
+     "status": 200
+    }
+   ]
+  },
+  {
+   "id": "pn_complaint",
+   "vertical": "kaspi_seller",
+   "mode": "panel",
+   "lang": "ru",
+   "tags": [
+    "complaint"
+   ],
+   "repeats": 3,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "cards": true,
+      "cards_no_refund_confirmation": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [{\"text\": \"Понимаю, неприятная ситуация. Напишите, пожалуйста, номер заказа и телефон, указанный при оформлении, — проверим заказ и подскажем, как оформить возврат через Kaspi.\", \"label\": \"Проверить заказ\", \"move\": \"Уточнить\"}, {\"text\": \"Сожалею, что наушники пришли с трещиной. Оформление заказа было через Kaspi? Пришлите номер заказа и телефон для проверки.\", \"label\": \"Уточнить покупку\", \"move\": \"Уточнить\"}, {\"text\": \"Понимаю вас. Напишите номер заказа и телефон, пожалуйста, чтобы мы проверили ситуацию и помогли разобраться с возвратом.\", \"label\": \"Помочь с возвратом\", \"move\": \"Уточнить\"}]}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 3420,
+     "status": 200
+    },
+    {
+     "verdicts": {
+      "cards": true,
+      "cards_no_refund_confirmation": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [{\"text\": \"Понимаю, неприятная ситуация. Напишите, пожалуйста, номер заказа и телефон, указанный при оформлении, — подскажем, как оформить возврат через Kaspi.\", \"label\": \"Возврат\", \"move\": \"Уточнить\"}, {\"text\": \"Сожалею, что наушники пришли с трещиной. Оформление покупки и возврата проходит через Kaspi; пришлите номер заказа и телефон, чтобы мы могли разобраться.\", \"label\": \"Через Kaspi\", \"move\": \"Уточнить\"}]}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 2603,
+     "status": 200
+    },
+    {
+     "verdicts": {
+      "cards": true,
+      "cards_no_refund_confirmation": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [{\"text\": \"Понимаю, неприятная ситуация. Напишите, пожалуйста, номер заказа и телефон, указанный при оформлении, — уточним, как оформить возврат через Kaspi.\", \"label\": \"Возврат\", \"move\": \"Уточнить\"}, {\"text\": \"Сожалею, что наушники пришли с трещиной. Оформление заказа было через Kaspi? Пришлите номер заказа и телефон — подскажем дальнейшие шаги.\", \"label\": \"Проверить заказ\", \"move\": \"Уточнить\"}]}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 2884,
+     "status": 200
+    }
+   ]
+  },
+  {
+   "id": "pn_spam",
+   "vertical": "education",
+   "mode": "panel",
+   "lang": "ru",
+   "tags": [
+    "abstain"
+   ],
+   "repeats": 3,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "abstain": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [], \"abstain\": true}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 1556,
+     "status": 200
+    },
+    {
+     "verdicts": {
+      "abstain": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [], \"abstain\": true}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 1211,
+     "status": 200
+    },
+    {
+     "verdicts": {
+      "abstain": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [], \"abstain\": true}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 1164,
+     "status": 200
+    }
+   ]
+  },
+  {
+   "id": "pn_media_only",
+   "vertical": "phone_repair",
+   "mode": "panel",
+   "lang": "ru",
+   "tags": [
+    "media"
+   ],
+   "repeats": 3,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "cards": true,
+      "cards_first_clarifies": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [{\"text\": \"Напишите, пожалуйста, текстом, что нужно отремонтировать, или назовите модель устройства и проблему — по фото я не могу определить детали.\", \"label\": \"Про устройство\", \"move\": \"Уточнить\"}]}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 2015,
+     "status": 200
+    },
+    {
+     "verdicts": {
+      "cards": true,
+      "cards_first_clarifies": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [{\"text\": \"Напишите, пожалуйста, текстом, что нужно отремонтировать, или назовите модель устройства и неисправность — фото я не вижу.\", \"label\": \"Про фото\", \"move\": \"Уточнить\"}]}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 1785,
+     "status": 200
+    },
+    {
+     "verdicts": {
+      "cards": true,
+      "cards_first_clarifies": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [{\"text\": \"Не вижу, что на фото. Напишите, пожалуйста, модель устройства и что с ним случилось — подскажу, что делать дальше.\", \"label\": \"Про поломку\", \"move\": \"Уточнить\"}]}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 1681,
+     "status": 200
+    }
+   ]
+  }
+ ]
+}

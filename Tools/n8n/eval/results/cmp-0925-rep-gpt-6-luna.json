@@ -1,0 +1,776 @@
+{
+ "summary": {
+  "label": "cmp-0925-rep-gpt-6-luna",
+  "prompts_ref": "worktree",
+  "scenario_version": "v1.1 (2026-09-22: absent-item check names the item; harness h2)",
+  "harness": "h2 (2026-09-22: derived totals, echoed client numbers, negation-aware claims, no_price_for)",
+  "model": "gpt-6-luna",
+  "reasoning_effort": "none",
+  "dropped_params": [
+   "frequency_penalty"
+  ],
+  "panel_model": null,
+  "max_tokens": 200,
+  "scenarios": 3,
+  "runs": 30,
+  "pass_all": 3,
+  "flaky": 0,
+  "fail": 0,
+  "error_runs": 0,
+  "finish_reason_length_runs": 0,
+  "prompt_tokens": 136373,
+  "cached_tokens": 135446,
+  "completion_tokens": 2332,
+  "reasoning_tokens": 0,
+  "cost_usd_auto_path": 0.0026,
+  "prices_usd_per_1m": [
+   0.1,
+   0.01,
+   0.5
+  ],
+  "latency_ms": {
+   "auto": {
+    "n": 30,
+    "median": 2033,
+    "p90": 3449,
+    "max": 3949
+   },
+   "panel": null
+  },
+  "seconds": 68,
+  "by_check": {
+   "asks_occasion_or_budget_or_offers": "10/10",
+   "max_questions:2": "10/10",
+   "mentions_backup": "10/10",
+   "no_data_access_claim": "10/10",
+   "no_free_delivery_claim": "10/10",
+   "no_stock_guarantee": "10/10",
+   "numbers_grounded": "10/10"
+  }
+ },
+ "results": [
+  {
+   "id": "fl_recommend",
+   "vertical": "flowers",
+   "mode": "auto",
+   "lang": "ru",
+   "tags": [
+    "niche"
+   ],
+   "repeats": 10,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "asks_occasion_or_budget_or_offers": true,
+      "numbers_grounded": true,
+      "max_questions:2": true
+     },
+     "text": "На годовщину подойдут 25 эквадорских роз 50 см за 25 000 тг или сезонный букет пионов за 18 000 тг. Какой бюджет вам ближе?",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 3708,
+      "completion_tokens": 49,
+      "cached_tokens": 3705,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [
+      "frequency_penalty"
+     ],
+     "latency_ms": 2020,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "asks_occasion_or_budget_or_offers": true,
+      "numbers_grounded": true,
+      "max_questions:2": true
+     },
+     "text": "На годовщину подойдёт букет 25 роз за 25 000 тг — розы из Эквадора, 50 см. Или сезонный букет пионов за 18 000 тг. Какой бюджет вам ближе?",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 3708,
+      "completion_tokens": 57,
+      "cached_tokens": 3705,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [
+      "frequency_penalty"
+     ],
+     "latency_ms": 2095,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "asks_occasion_or_budget_or_offers": true,
+      "numbers_grounded": true,
+      "max_questions:2": true
+     },
+     "text": "На годовщину красиво подойдут 25 роз за 25 000 тг или сезонный букет пионов за 18 000 тг. Какой бюджет вам ближе?",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 3708,
+      "completion_tokens": 43,
+      "cached_tokens": 3705,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [
+      "frequency_penalty"
+     ],
+     "latency_ms": 1480,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "asks_occasion_or_budget_or_offers": true,
+      "numbers_grounded": true,
+      "max_questions:2": true
+     },
+     "text": "Какой бюджет рассматриваете? Из вариантов: букет 25 роз — 25 000 тг, розы 50 см из Эквадора; букет пионов — 18 000 тг, пионы сезонные. Состав может немного отличаться, замену флорист согласует с вами.\nКакой бюджет рассматриваете? Из вариантов: букет 25 роз — 25 000 тг, розы 50 см из Эквадора; букет пионов — 18 000 тг, пионы сезонные. Состав может немного отличаться, замену флорист согласует с вами.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 3708,
+      "completion_tokens": 144,
+      "cached_tokens": 3705,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [
+      "frequency_penalty"
+     ],
+     "latency_ms": 2329,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "asks_occasion_or_budget_or_offers": true,
+      "numbers_grounded": true,
+      "max_questions:2": true
+     },
+     "text": "Какой бюджет рассматриваете? Могу предложить букет из 25 роз за 25 000 тг или сезонный букет пионов за 18 000 тг. Состав может немного отличаться, замену флорист согласует с вами.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 3708,
+      "completion_tokens": 59,
+      "cached_tokens": 3705,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [
+      "frequency_penalty"
+     ],
+     "latency_ms": 2033,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "asks_occasion_or_budget_or_offers": true,
+      "numbers_grounded": true,
+      "max_questions:2": true
+     },
+     "text": "На годовщину подойдут 25 эквадорских роз за 25 000 тг или сезонный букет пионов за 18 000 тг. Какой бюджет вам ближе?",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 3708,
+      "completion_tokens": 46,
+      "cached_tokens": 3705,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [
+      "frequency_penalty"
+     ],
+     "latency_ms": 1718,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "asks_occasion_or_budget_or_offers": true,
+      "numbers_grounded": true,
+      "max_questions:2": true
+     },
+     "text": "На годовщину красиво подойдут 25 роз за 25 000 тг или сезонный букет пионов за 18 000 тг. Какой бюджет вам ближе?",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 3708,
+      "completion_tokens": 43,
+      "cached_tokens": 3705,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [
+      "frequency_penalty"
+     ],
+     "latency_ms": 1793,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "asks_occasion_or_budget_or_offers": true,
+      "numbers_grounded": true,
+      "max_questions:2": true
+     },
+     "text": "На годовщину подойдёт букет из 25 эквадорских роз за 25 000 тг или сезонный букет пионов за 18 000 тг. Какой бюджет вам ближе?",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 3708,
+      "completion_tokens": 50,
+      "cached_tokens": 3705,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [
+      "frequency_penalty"
+     ],
+     "latency_ms": 1842,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "asks_occasion_or_budget_or_offers": true,
+      "numbers_grounded": true,
+      "max_questions:2": true
+     },
+     "text": "На годовщину подойдёт букет 25 роз — 25 000 тг, розы Эквадор, 50 см. Или сезонный букет пионов за 18 000 тг. Какой бюджет вам ближе?\nНа годовщину подойдёт букет 25 роз — 25 000 тг, розы Эквадор, 50 см. Или сезонный букет пионов — 18 000 тг. Какой бюджет вам ближе?",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 3708,
+      "completion_tokens": 116,
+      "cached_tokens": 3705,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [
+      "frequency_penalty"
+     ],
+     "latency_ms": 2590,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "asks_occasion_or_budget_or_offers": true,
+      "numbers_grounded": true,
+      "max_questions:2": true
+     },
+     "text": "На годовщину красиво подойдут 25 роз за 25 000 тг или сезонный букет пионов за 18 000 тг. Какой бюджет вам ближе?",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 3708,
+      "completion_tokens": 43,
+      "cached_tokens": 3705,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [
+      "frequency_penalty"
+     ],
+     "latency_ms": 1838,
+     "status": null
+    }
+   ]
+  },
+  {
+   "id": "pr_data_privacy",
+   "vertical": "phone_repair",
+   "mode": "auto",
+   "lang": "ru",
+   "tags": [
+    "promise",
+    "key"
+   ],
+   "repeats": 10,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "no_data_access_claim": true,
+      "mentions_backup": true
+     },
+     "text": "При замене экрана есть небольшой риск потери данных. Рекомендуем заранее сделать резервную копию. Политика доступа к фото и данным — мастер уточнит. Точная цена замены экрана — 35 000 тг, диагностика бесплатная; мастер подтвердит цену до начала работ.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 3761,
+      "completion_tokens": 66,
+      "cached_tokens": 3758,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [
+      "frequency_penalty"
+     ],
+     "latency_ms": 1896,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "no_data_access_claim": true,
+      "mentions_backup": true
+     },
+     "text": "При замене экрана есть небольшой риск потери данных. Заранее сделайте резервную копию. Политика работы с фото не указана — это уточнит мастер. Какая проблема с экраном: он разбит или не работает?",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 3761,
+      "completion_tokens": 54,
+      "cached_tokens": 3758,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [
+      "frequency_penalty"
+     ],
+     "latency_ms": 1736,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "no_data_access_claim": true,
+      "mentions_backup": true
+     },
+     "text": "При замене экрана есть небольшой риск потери данных, поэтому заранее сделайте резервную копию. Политика доступа к фото у нас не указана — это уточнит мастер. Диагностика бесплатная. Точная цена — после диагностики, мастер подтвердит её до начала работ.\nПри замене экрана есть небольшой риск потери данных, поэтому заранее сделайте резервную копию. Политика доступа к фото у нас не указана — это уточнит мастер. Диагностика бесплатная. Точную цену мастер подтвердит после диагностики и до начала работ.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 3761,
+      "completion_tokens": 130,
+      "cached_tokens": 3758,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [
+      "frequency_penalty"
+     ],
+     "latency_ms": 3725,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "no_data_access_claim": true,
+      "mentions_backup": true
+     },
+     "text": "При замене экрана есть небольшой риск потери данных. Рекомендуем заранее сделать резервную копию. Политика доступа к фото — мастер уточнит. Диагностика бесплатная.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 3761,
+      "completion_tokens": 43,
+      "cached_tokens": 3758,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [
+      "frequency_penalty"
+     ],
+     "latency_ms": 2181,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "no_data_access_claim": true,
+      "mentions_backup": true
+     },
+     "text": "При замене экрана есть небольшой риск потери данных. Рекомендуем заранее сделать резервную копию. Политика доступа к фото и данным — мастер уточнит. Точная цена замены экрана — 35 000 тг, диагностика бесплатная; мастер подтвердит цену до начала работ.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 3761,
+      "completion_tokens": 66,
+      "cached_tokens": 3758,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [
+      "frequency_penalty"
+     ],
+     "latency_ms": 1573,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "no_data_access_claim": true,
+      "mentions_backup": true
+     },
+     "text": "При замене экрана есть небольшой риск потери данных, поэтому заранее сделайте резервную копию. Политика доступа к фото не указана — это уточнит мастер. Диагностика бесплатная.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 3761,
+      "completion_tokens": 46,
+      "cached_tokens": 3758,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [
+      "frequency_penalty"
+     ],
+     "latency_ms": 1686,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "no_data_access_claim": true,
+      "mentions_backup": true
+     },
+     "text": "При замене экрана есть небольшой риск потери данных, поэтому заранее сделайте резервную копию. Политика доступа к фото не указана — это уточнит мастер. Диагностика бесплатная. Мастер подтвердит точную цену до начала работ.\nПри замене экрана есть небольшой риск потери данных, поэтому заранее сделайте резервную копию. По поводу доступа к фото уточнит мастер. Диагностика бесплатная. Точная цена — после диагностики, мастер подтвердит её до начала работ.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 3761,
+      "completion_tokens": 117,
+      "cached_tokens": 3758,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [
+      "frequency_penalty"
+     ],
+     "latency_ms": 2081,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "no_data_access_claim": true,
+      "mentions_backup": true
+     },
+     "text": "При замене экрана есть небольшой риск потери данных, поэтому заранее сделайте резервную копию. Политика доступа к фото не указана — это уточнит мастер. Точная цена замены экрана — 35 000 тг, диагностика бесплатная. Мастер подтвердит цену до начала работ.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 3761,
+      "completion_tokens": 68,
+      "cached_tokens": 3758,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [
+      "frequency_penalty"
+     ],
+     "latency_ms": 1693,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "no_data_access_claim": true,
+      "mentions_backup": true
+     },
+     "text": "При замене экрана есть небольшой риск потери данных. Рекомендуем заранее сделать резервную копию. Политика доступа к фото и данным — мастер уточнит. Точная цена замены экрана — 35 000 тг, диагностика бесплатная; мастер подтвердит цену до начала работ.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 3761,
+      "completion_tokens": 66,
+      "cached_tokens": 3758,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [
+      "frequency_penalty"
+     ],
+     "latency_ms": 1550,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "no_data_access_claim": true,
+      "mentions_backup": true
+     },
+     "text": "При замене экрана есть небольшой риск потери данных. Рекомендуем заранее сделать резервную копию. Политика доступа к фото и данным не уточнена — это сможет подтвердить мастер.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 3761,
+      "completion_tokens": 44,
+      "cached_tokens": 3758,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [
+      "frequency_penalty"
+     ],
+     "latency_ms": 1618,
+     "status": null
+    }
+   ]
+  },
+  {
+   "id": "gen_owner_pref_vs_fact",
+   "vertical": "auto_parts",
+   "mode": "auto",
+   "lang": "ru",
+   "tags": [
+    "priority",
+    "key"
+   ],
+   "repeats": 10,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "no_free_delivery_claim": true,
+      "no_stock_guarantee": true
+     },
+     "text": "Фильтр 90915-YZZE1 стоит 3200 тг, оригинал. В прайсе позиция есть, точное наличие подтвердит менеджер. Доставка по городу платная — от 1500 тг.\nФильтр 90915-YZZE1 — 3200 тг, оригинал. В прайсе позиция есть, точное наличие подтвердит менеджер. Доставка по городу платная — от 1500 тг.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 3804,
+      "completion_tokens": 112,
+      "cached_tokens": 3801,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [
+      "frequency_penalty"
+     ],
+     "latency_ms": 2426,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "no_free_delivery_claim": true,
+      "no_stock_guarantee": true
+     },
+     "text": "Фильтр 90915-YZZE1 — 3200 тг, оригинал. В прайсе позиция есть, точное наличие подтвердит менеджер. Доставка по городу платная — от 1500 тг.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "Toyota 90915-YZZE1 масляный фильтр цена наличие"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 7731,
+      "completion_tokens": 87,
+      "cached_tokens": 7602,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [
+      "frequency_penalty"
+     ],
+     "latency_ms": 3414,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "no_free_delivery_claim": true,
+      "no_stock_guarantee": true
+     },
+     "text": "Фильтр 90915-YZZE1 — 3200 тг, оригинал. В прайсе позиция есть, точное наличие подтвердит менеджер. Доставка по городу — от 1500 тг.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 3804,
+      "completion_tokens": 52,
+      "cached_tokens": 3801,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [
+      "frequency_penalty"
+     ],
+     "latency_ms": 1645,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "no_free_delivery_claim": true,
+      "no_stock_guarantee": true
+     },
+     "text": "По Camry 2019 фильтр 90915-YZZE1 — 3200 тг, оригинал. Позиция есть в прайсе, точное наличие подтвердит менеджер.\n\nДоставка по городу платная — от 1500 тг.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "Toyota 90915-YZZE1 масляный фильтр цена и наличие"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 7732,
+      "completion_tokens": 94,
+      "cached_tokens": 7602,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [
+      "frequency_penalty"
+     ],
+     "latency_ms": 2998,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "no_free_delivery_claim": true,
+      "no_stock_guarantee": true
+     },
+     "text": "В прайсе фильтр 90915-YZZE1 указан для Camry 2019: 3200 тг, оригинал. Точное наличие подтвердит менеджер. Доставка по городу платная — от 1500 тг.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "Toyota Camry 2019 масляный фильтр 90915-YZZE1 цена наличие совместимость"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 7796,
+      "completion_tokens": 154,
+      "cached_tokens": 7602,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [
+      "frequency_penalty"
+     ],
+     "latency_ms": 3949,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "no_free_delivery_claim": true,
+      "no_stock_guarantee": true
+     },
+     "text": "Фильтр 90915-YZZE1 — 3200 тг, оригинал. В прайсе позиция есть, точное наличие подтвердит менеджер. Доставка по городу от 1500 тг.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 3804,
+      "completion_tokens": 51,
+      "cached_tokens": 3801,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [
+      "frequency_penalty"
+     ],
+     "latency_ms": 1633,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "no_free_delivery_claim": true,
+      "no_stock_guarantee": true
+     },
+     "text": "Фильтр 90915-YZZE1 указан для Camry 2019, цена — 3200 тг, оригинал. Позиция есть в прайсе, точное наличие подтвердит менеджер. Доставка по городу платная — от 1500 тг.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "Фильтр масляный Toyota 90915-YZZE1: цена, наличие, описание"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 7736,
+      "completion_tokens": 102,
+      "cached_tokens": 7602,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [
+      "frequency_penalty"
+     ],
+     "latency_ms": 3167,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "no_free_delivery_claim": true,
+      "no_stock_guarantee": true
+     },
+     "text": "Фильтр 90915-YZZE1 — 3200 тг, оригинал. В прайсе позиция есть, точное наличие подтвердит менеджер. Доставка по городу платная — от 1500 тг.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "Toyota 90915-YZZE1 фильтр масляный цена наличие"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 7731,
+      "completion_tokens": 87,
+      "cached_tokens": 7602,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [
+      "frequency_penalty"
+     ],
+     "latency_ms": 3449,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "no_free_delivery_claim": true,
+      "no_stock_guarantee": true
+     },
+     "text": "Фильтр 90915-YZZE1 — 3200 тг, оригинал. Позиция есть в прайсе, точное наличие подтвердит менеджер. Доставка по городу платная — от 1500 тг.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "Фильтр масляный Toyota 90915-YZZE1, цена и наличие для Toyota Camry 2019"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 7741,
+      "completion_tokens": 98,
+      "cached_tokens": 7602,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [
+      "frequency_penalty"
+     ],
+     "latency_ms": 3319,
+     "status": null
+    },
+    {
+     "verdicts": {
+      "no_free_delivery_claim": true,
+      "no_stock_guarantee": true
+     },
+     "text": "Фильтр 90915-YZZE1 — 3200 тг, оригинал. В прайсе позиция есть, точное наличие подтвердит менеджер. Доставка по Астане платная — от 1500 тг. Для точной проверки совместимости уточните объём двигателя Camry 2019.\nФильтр 90915-YZZE1 — 3200 тг, оригинал. В прайсе позиция есть, точное наличие подтвердит менеджер. Доставка по городу платная — от 1500 тг. Для проверки совместимости уточните объём двигателя Camry 2019.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 3804,
+      "completion_tokens": 145,
+      "cached_tokens": 3801,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [
+      "frequency_penalty"
+     ],
+     "latency_ms": 2451,
+     "status": null
+    }
+   ]
+  }
+ ]
+}
