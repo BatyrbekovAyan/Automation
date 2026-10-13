@@ -121,16 +121,74 @@ def check_suggest_prompts(wf):
     return STAGE_BLOCK in gd and GATE_RETURN_NEW in gd and ASM_PREFS_NEW in asm and ASM_OFFTOPIC_RULE in asm
 
 
+RECORD_SET_SQL = """-- Learning A: журнал показанных наборов панели «Вместе» — знаменатель теневого счёта. Пишется ПОСЛЕ
+-- Respond (responseNode), fail-open; повтор с тем же request_key (retry после таймаута) — не второй набор.
+insert into suggestion_sets (request_key, profile_id, chat_id, tail_ts, business_type_id, stage, items, prompt_version, usage)
+select $1, $2, $3, $4::bigint, $5, $6, $7::jsonb, $8, $9::jsonb
+where $1 <> '' and $2 <> ''            -- a legacy client without requestKey writes nothing (never a '' primary key)
+on conflict (profile_id, request_key) do nothing
+returning 1;"""
+RECORD_SET_PARAMS = ("={{ (g => { const msgs = Array.isArray(g.messages) ? g.messages : []; const last = msgs.length ? msgs[msgs.length - 1] : null;"
+                     " const usage = (() => { try { const r = $('LLM Retry').first().json; if (r && r.usage) return r.usage; } catch (e) {}"
+                     " try { return $('LLM').first().json.usage || null; } catch (e) { return null; } })();"
+                     " const items = ($json.suggestions || []).slice(0, 4).map(s => ({ label: String(s.label || ''), move: String(s.move || ''), text: String(s.text || '').slice(0, 300) }));"
+                     " return [ String(g.requestKey || ''), String(g.profileId || ''), String(g.chatId || ''), last && last.ts ? Number(last.ts) : null,"
+                     " String(g.businessTypeId || ''), String(g.stage || 'trained'), JSON.stringify(items), '" + PROMPT_VERSION + "', usage ? JSON.stringify(usage) : null ]; })($('Gate Decision').first().json) }}")
+# Has Set? must NOT reference $('Gate Decision'): on the `If invalid?` path that node never ran and the reference
+# would throw inside the If (after the response, but as an errored execution). Record Set DOES read Gate Decision —
+# it is safe only because Has Set? filters invalid / refused / abstain (empty suggestions) first. Never weaken this.
+HAS_SET_EXPR = "={{ Array.isArray($json.suggestions) && $json.suggestions.length > 0 && !$json.abstain && !$json.error }}"
+
+
+def patch_suggest_nodes(wf):
+    ch = False
+    if node(wf, "Has Set?") is None:
+        wf["nodes"].append({"parameters": {"conditions": {"options": {"caseSensitive": True, "leftValue": "", "typeValidation": "loose", "version": 2},
+                                                          "conditions": [{"id": nid("has-set", "cond"), "leftValue": HAS_SET_EXPR, "rightValue": "",
+                                                                          "operator": {"type": "boolean", "operation": "true", "singleValue": True}}], "combinator": "and"}, "options": {}},
+                            "id": nid("has-set"), "name": "Has Set?", "type": "n8n-nodes-base.if", "typeVersion": 2.2, "position": [2860, 300], "executeOnce": True})
+        ch = True
+    if node(wf, "Record Set") is None:
+        wf["nodes"].append({"parameters": {"operation": "executeQuery", "query": RECORD_SET_SQL, "options": {"queryReplacement": RECORD_SET_PARAMS}},
+                            "id": nid("record-set"), "name": "Record Set", "type": "n8n-nodes-base.postgres", "typeVersion": 2.6, "position": [3080, 300],
+                            "credentials": {"postgres": dict(PG_CRED)}, "alwaysOutputData": True, "onError": "continueRegularOutput", "executeOnce": True})
+        ch = True
+    rs = node(wf, "Record Set")
+    if rs["parameters"]["query"] != RECORD_SET_SQL or rs["parameters"]["options"].get("queryReplacement") != RECORD_SET_PARAMS:
+        rs["parameters"]["query"] = RECORD_SET_SQL
+        rs["parameters"]["options"]["queryReplacement"] = RECORD_SET_PARAMS
+        ch = True
+    hs = node(wf, "Has Set?")
+    if hs["parameters"]["conditions"]["conditions"][0]["leftValue"] != HAS_SET_EXPR:
+        hs["parameters"]["conditions"]["conditions"][0]["leftValue"] = HAS_SET_EXPR
+        ch = True
+    ch |= set_edges(wf, "Respond", [["Has Set?"]])
+    ch |= set_edges(wf, "Has Set?", [["Record Set"], []])
+    return ch
+
+
+def check_suggest_nodes(wf):
+    rs, hs = node(wf, "Record Set"), node(wf, "Has Set?")
+    return (rs is not None and hs is not None and rs["parameters"]["query"] == RECORD_SET_SQL
+            and rs["parameters"]["options"].get("queryReplacement") == RECORD_SET_PARAMS
+            and wf["connections"].get("Respond") == {"main": [[{"node": "Has Set?", "type": "main", "index": 0}]]}
+            and wf["connections"].get("Has Set?") == {"main": [[{"node": "Record Set", "type": "main", "index": 0}], []]})
+
+
+
 def patch_all():
+    out = {}
     wf = load(SUGGEST)
-    ch = patch_suggest_prompts(wf)
+    ch = patch_suggest_prompts(wf) | patch_suggest_nodes(wf)
     if ch:
         save(SUGGEST, wf)
-    return {SUGGEST: ch}
+    out[SUGGEST] = ch
+    return out
 
 
 def check_all():
-    return {SUGGEST: check_suggest_prompts(load(SUGGEST))}
+    wf = load(SUGGEST)
+    return {SUGGEST: check_suggest_prompts(wf) and check_suggest_nodes(wf)}
 
 
 def main():

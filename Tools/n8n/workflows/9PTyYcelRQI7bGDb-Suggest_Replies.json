@@ -587,6 +587,67 @@
       "alwaysOutputData": true,
       "onError": "continueRegularOutput",
       "executeOnce": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "1dcc83b1-abcb-5d93-af48-3ec4bc966657",
+              "leftValue": "={{ Array.isArray($json.suggestions) && $json.suggestions.length > 0 && !$json.abstain && !$json.error }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "8e2bb50d-c092-5975-9e0a-7a24351ddbc6",
+      "name": "Has Set?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2860,
+        300
+      ],
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Learning A: журнал показанных наборов панели «Вместе» — знаменатель теневого счёта. Пишется ПОСЛЕ\n-- Respond (responseNode), fail-open; повтор с тем же request_key (retry после таймаута) — не второй набор.\ninsert into suggestion_sets (request_key, profile_id, chat_id, tail_ts, business_type_id, stage, items, prompt_version, usage)\nselect $1, $2, $3, $4::bigint, $5, $6, $7::jsonb, $8, $9::jsonb\nwhere $1 <> '' and $2 <> ''            -- a legacy client without requestKey writes nothing (never a '' primary key)\non conflict (profile_id, request_key) do nothing\nreturning 1;",
+        "options": {
+          "queryReplacement": "={{ (g => { const msgs = Array.isArray(g.messages) ? g.messages : []; const last = msgs.length ? msgs[msgs.length - 1] : null; const usage = (() => { try { const r = $('LLM Retry').first().json; if (r && r.usage) return r.usage; } catch (e) {} try { return $('LLM').first().json.usage || null; } catch (e) { return null; } })(); const items = ($json.suggestions || []).slice(0, 4).map(s => ({ label: String(s.label || ''), move: String(s.move || ''), text: String(s.text || '').slice(0, 300) })); return [ String(g.requestKey || ''), String(g.profileId || ''), String(g.chatId || ''), last && last.ts ? Number(last.ts) : null, String(g.businessTypeId || ''), String(g.stage || 'trained'), JSON.stringify(items), 'A0-2026-09-25', usage ? JSON.stringify(usage) : null ]; })($('Gate Decision').first().json) }}"
+        }
+      },
+      "id": "5283f6d6-4e06-520b-9edf-214271fd6516",
+      "name": "Record Set",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        3080,
+        300
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "vvRrFiEXzLVqKjOx",
+          "name": "Postgres"
+        }
+      },
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput",
+      "executeOnce": true
     }
   ],
   "connections": {
@@ -884,6 +945,29 @@
             "index": 0
           }
         ]
+      ]
+    },
+    "Respond": {
+      "main": [
+        [
+          {
+            "node": "Has Set?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Set?": {
+      "main": [
+        [
+          {
+            "node": "Record Set",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
       ]
     }
   },

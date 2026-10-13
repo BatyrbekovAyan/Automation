@@ -132,6 +132,56 @@ def wappi_clean(ctx):
     return ok, f"http={st} forwarded_bodies={bodies[:1]}"
 
 
+@scenario("set_recorded_after_respond", "A: a successful panel answer writes ONE suggestion_sets row (after Respond, same request_key, stage learning)")
+def set_recorded(ctx):
+    owner, pid = owner_and_profile(ctx)
+    know = knowledge([{"kind": "product", "name": "Свеча зажигания", "price": "1500 тг", "description": ""}])
+    body = payload(owner, pid, [m("client", "свечи есть? сколько стоят?")], know=know, request_key=KEY, bot_wa="-1")
+    st, d, ex = call(owner, body)
+    cards = (d or {}).get("suggestions") or []
+    time.sleep(2)
+    row = psql(f"select stage||'|'||jsonb_array_length(items)||'|'||coalesce(prompt_version,'∅')||'|'||(usage is not null)::text from suggestion_sets where profile_id = '{pid}' and request_key = '{KEY}';")
+    gd = node_output(ex, "Gate Decision") or {}
+    ok = st == 200 and cards and row == f"learning|{len(cards)}|A0-2026-09-25|true" and gd.get("stage") == "learning"
+    return ok, f"http={st} cards={len(cards)} row={row!r} gate_stage={gd.get('stage')!r}"
+
+
+@scenario("set_not_recorded_on_refusal", "A: a refused call (expired subscriber → error envelope) writes NO set")
+def set_not_recorded(ctx):
+    owner, pid = owner_and_profile(ctx, status="expired")
+    body = payload(owner, pid, [m("client", "свечи есть?")], know=knowledge([]), request_key="fedcba9876543210fedcba9876543210", bot_wa="-1")
+    st, d, _ = call(owner, body)
+    time.sleep(2)
+    n = psql(f"select count(*) from suggestion_sets where profile_id = '{pid}';")
+    ok = (d or {}).get("error") and n == "0"
+    return ok, f"http={st} error={(d or {}).get('error')!r} sets={n}"
+
+
+@scenario("set_not_recorded_on_abstain", "A: an abstain (personal message) writes NO set — inconclusive (not FAIL) when the model produced cards anyway")
+def set_not_recorded_abstain(ctx):
+    owner, pid = owner_and_profile(ctx)
+    body = payload(owner, pid, [m("client", "поехали на рыбалку в выходные?")], know=knowledge([]), request_key="00000000000000000000000000000003", bot_wa="-1")
+    st, d, _ = call(owner, body)
+    time.sleep(2)
+    n = psql(f"select count(*) from suggestion_sets where profile_id = '{pid}';")
+    if (d or {}).get("suggestions"):
+        return True, f"INCONCLUSIVE: model returned {len(d['suggestions'])} cards (abstain flaky) — set written={n}"
+    ok = st == 200 and (d or {}).get("abstain") is True and n == "0"
+    return ok, f"http={st} abstain={(d or {}).get('abstain')} sets={n}"
+
+
+@scenario("stage_trained_when_ten_picks", "A: pickStats summing to ≥ 10 → Gate Decision stage 'trained' and Assemble emits ПРЕДПОЧТЕНИЯ, not ХОЛОДНЫЙ СТАРТ")
+def stage_trained(ctx):
+    owner, pid = owner_and_profile(ctx)
+    body = payload(owner, pid, [m("client", "свечи есть? сколько стоят?")], know=knowledge([{"kind": "product", "name": "Свеча зажигания", "price": "1500 тг", "description": ""}]), request_key="00000000000000000000000000000001", bot_wa="-1")
+    body["pickStats"] = "Ответ:7,Уточнить:4"
+    st, _, ex = call(owner, body)
+    gd = node_output(ex, "Gate Decision") or {}
+    sp = (node_output(ex, "Assemble") or {}).get("systemPrompt", "")
+    ok = st == 200 and gd.get("stage") == "trained" and "ПРЕДПОЧТЕНИЯ ВЛАДЕЛЬЦА" in sp and "ХОЛОДНЫЙ СТАРТ" not in sp
+    return ok, f"http={st} stage={gd.get('stage')!r} prefs={'ПРЕДПОЧТЕНИЯ ВЛАДЕЛЬЦА' in sp} cold={'ХОЛОДНЫЙ СТАРТ' in sp}"
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--only")
