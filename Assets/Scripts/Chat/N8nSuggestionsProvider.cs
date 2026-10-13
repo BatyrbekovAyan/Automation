@@ -217,7 +217,7 @@ public class N8nSuggestionsProvider : ISuggestionsProvider
     }
 
     // Preference learning v1 (2026-08-11): per-bot pick counters, written by
-    // SuggestionsController.RecordPick under {botName}SuggestPick{move}. Emitted as a
+    // SuggestionPickStats.RecordFromOrigin at the successful send (learning A) under {botName}SuggestPick{move}. Emitted as a
     // compact "move:count" ranking hint; empty string when the owner has never picked.
     // Counts the closed move taxonomy (SuggestionMoves) — free-form titles never mint keys.
     private static string BuildPickStats(string botName)

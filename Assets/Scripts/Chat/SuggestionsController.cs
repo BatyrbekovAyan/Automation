@@ -411,6 +411,8 @@ public class SuggestionsController : MonoBehaviour
         // header retitle + pickStats, and pushes THIS set for ‹. Safe: StartFreshRound just
         // nulled the previous chat's set, and the cache stores only fresh (round-1) sets.
         _currentRendered = cached;
+        if (cached?.items != null && cached.items.Count > 0)
+            SendOriginTracker.SetShown(cached.requestKey, cached.items.Count, cached.items[0].text, fresh: true);   // learning A: a re-opened chat shows its cached fresh set
         return true;
     }
 
@@ -457,6 +459,7 @@ public class SuggestionsController : MonoBehaviour
             _pendingShow = false;
             _pendingOpenRequest = false;                       // toggle-OFF also kills a parked open request
             HidePanel();                                       // D-11: off = hide; composer untouched
+            if (!(SendOriginTracker.Current?.HasPick ?? false)) SendOriginTracker.Clear();   // learning A: a hidden set cannot explain a send; a tapped card can
         }
     }
 
@@ -509,7 +512,8 @@ public class SuggestionsController : MonoBehaviour
         _semiAutoOn = EffectiveSemiAuto(suppressed);
         if (_toggle != null) _toggle.SetLit(_semiAutoOn);
         if (_slotKey != null) _slotKey.SetVisible(_semiAutoOn);
-        if (_semiAutoOn) ShowPanel(claimSlotFromKeyboard: false); else HidePanel();
+        if (_semiAutoOn) ShowPanel(claimSlotFromKeyboard: false);
+        else { HidePanel(); if (!(SendOriginTracker.Current?.HasPick ?? false)) SendOriginTracker.Clear(); }   // learning A
     }
 
     // --- Issue + guard (DATA-03 — capture seq + chat, discard superseded/chat-switched) ---
@@ -548,6 +552,8 @@ public class SuggestionsController : MonoBehaviour
         // Rounds: only an Ok set becomes the restorable "current round" — an error/empty render
         // leaves _currentRendered on the last good set, so a pick-after-retry still pushes it.
         if (result != null && result.status == SuggestionStatus.Ok) _currentRendered = result;
+        if (result != null && result.status == SuggestionStatus.Ok && result.items != null && result.items.Count > 0)
+            SendOriginTracker.SetShown(result.requestKey, result.items.Count, result.items[0].text, fresh: freshSet);   // learning A
         // F9 verify-at-store, narrowed by the drill flow (2026-08-18): only FRESH sets are
         // cached — a re-opened chat must render a round-1 set under the default header, never
         // a mid-drill set whose steer/back context is gone. Tail drift still degrades to a
@@ -564,13 +570,15 @@ public class SuggestionsController : MonoBehaviour
             StartCoroutine(WriteComposerRoutine(_bottomPanel.inputField, replyText));
         // Rounds flow: record the round being left (cards + steer + header) so ‹ restores it
         // locally, remember the new direction for refresh re-rolls, retitle the header to the
-        // picked card's title (drill flow 2026-08-18), and count the pick's MOVE.
+        // picked card's title (drill flow 2026-08-18), and snapshot the pick for the send (learning A).
         SuggestionItem picked = FindRenderedItem(replyText);
         _rounds.Push(_currentRendered, _currentSteer, _currentHeader);
         _currentSteer = replyText;
         if (picked != null) _currentHeader = picked.intentLabel;
         if (_panel != null) _panel.SetHeaderTitle(_currentHeader);
-        RecordPick(picked);
+        // learning A: a tap is a SNAPSHOT for the send, not a preference — SuggestionPickStats counts on the successful send.
+        int pickedIndex = (picked != null && _currentRendered?.items != null) ? _currentRendered.items.IndexOf(picked) : -1;
+        SendOriginTracker.SetPick(_currentRendered?.requestKey, _currentRendered?.items?.Count ?? 0, pickedIndex, replyText, ResolvePickStatsMove(picked));
         UpdateBackUi();
         IssueRequest(steerTowardText: replyText, lastIncomingText: null);   // next round drills into the pick (INT-04/D-01)
         // NEVER auto-send — only the existing composer Send button delivers a message (D-03).
@@ -598,27 +606,14 @@ public class SuggestionsController : MonoBehaviour
         _currentSteer = previousSteer;
         _currentHeader = previousHeader;
         _currentRendered = previous;
+        if (previous?.items != null && previous.items.Count > 0)
+            SendOriginTracker.SetShown(previous.requestKey, previous.items.Count, previous.items[0].text, fresh: false);   // learning A: no-op while the turn's snapshot lives
         if (_panel != null)
         {
             _panel.Render(previous);
             _panel.SetHeaderTitle(previousHeader);
         }
         UpdateBackUi();
-    }
-
-    // Preference learning v1 under the drill redesign: count the picked card's internal MOVE
-    // (server field since 2026-08-18); a legacy server without `move` still counts when the
-    // display label IS one of the 6 moves (the pre-redesign contract). Free-form titles never
-    // mint PlayerPrefs keys — the counter namespace must stay the closed taxonomy.
-    private void RecordPick(SuggestionItem picked)
-    {
-        if (ChatManager.Instance == null) return;
-        string botName = ChatManager.Instance.CurrentBotId;
-        string move = ResolvePickStatsMove(picked);
-        if (string.IsNullOrEmpty(botName) || move == null) return;
-        string key = botName + "SuggestPick" + move;
-        PlayerPrefs.SetInt(key, PlayerPrefs.GetInt(key, 0) + 1);
-        PlayerPrefs.Save();   // mobile apps get killed — flush (bot-persistence)
     }
 
     /// <summary>Pure pick-stats resolution: the item's move when valid, else its label if
@@ -634,6 +629,7 @@ public class SuggestionsController : MonoBehaviour
     // A fresh round 1: new incoming, chat/bot switch, explicit toggle-on, answered run.
     private void StartFreshRound()
     {
+        SendOriginTracker.Clear();   // learning A: a new turn — the previous set can no longer explain a send
         _rounds.Clear();
         _currentSteer = null;
         _currentRendered = null;   // a pick on a cache-restored set must not push the PREVIOUS chat's round
