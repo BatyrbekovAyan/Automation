@@ -513,7 +513,7 @@ with Case('T5 L6: the order and the honest answer stay — originals first (a st
             and preds(DBF, 'List Bot Originals') == [('Owned?', 0)], 'Delete Bot Files order')
     counters = {'retiredProfiles': 1, 'bookedClones': 1}
     mem_ok = {k: 0 for k in ('deletedMemoryRows', 'deletedOutcomes', 'deletedReplyFlags', 'deletedHistoryEvents', 'deletedHandoffs',
-                             'deletedReplyEvents', 'deletedChatStates')}
+                             'deletedReplyEvents', 'deletedChatStates', 'deletedSuggestionSets')}
     c.check(cond(DBF, 'Deletion Settled?', mem_ok, {'Retire Bot Profiles': counters, 'Delete Bot Chunks': {'deletedChunks': 0}}) is True
             and cond(DBF, 'Deletion Settled?', mem_ok, {'Retire Bot Profiles': {'error': {'message': 'relation "clone_retirements" does not exist'}},
                                                          'Delete Bot Chunks': {'deletedChunks': 0}}) is False

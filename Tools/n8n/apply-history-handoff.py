@@ -610,6 +610,22 @@ SELECT (SELECT count(*)::int FROM hist)        AS "deletedMemoryRows",
 # re-paired / reconnected bot (the pre-F1 orphans, a superseded predecessor, the other channel's retired row) — not only
 # the two profile ids the app names. The head is clone_lineage's (the same fragment and parameters as Delete Bot Files'
 # other deleting nodes, apply-auth-gate.py); this file keeps owning the deletes (the seven tables, DELETE_NEW_TAIL).
+# Learning A (2026-10-13): the «Вместе» panel's shown sets (suggestion_sets) are the bot's data too — deleted by the SAME
+# statement and judged by the SAME verdict (V12: nothing runs after the answer; success only when every counter is a
+# number). The T5 shape stays recognisable so the patcher can bring a T5 canon forward.
+DELETE_T5_TAIL = DELETE_NEW_TAIL
+DELETE_NEW_TAIL = DELETE_T5_TAIL.replace(
+    ")\nSELECT (SELECT count(*)::int FROM hist)        AS \"deletedMemoryRows\",",
+    "), sets AS (          -- learning A: the panel's shown sets of every profile of the line\n"
+    "  DELETE FROM public.suggestion_sets s\n"
+    "  WHERE s.profile_id IN (SELECT profile_id FROM valid)\n"
+    "  RETURNING 1\n"
+    ")\nSELECT (SELECT count(*)::int FROM hist)        AS \"deletedMemoryRows\",", 1).replace(
+    "       (SELECT count(*)::int FROM states)      AS \"deletedChatStates\";",
+    "       (SELECT count(*)::int FROM states)      AS \"deletedChatStates\",\n"
+    "       (SELECT count(*)::int FROM sets)        AS \"deletedSuggestionSets\";", 1)
+assert DELETE_NEW_TAIL != DELETE_T5_TAIL and DELETE_NEW_TAIL.count("suggestion_sets") == 1, "learning A: the sets CTE did not land"
+
 DELETE_CHAT_MEMORY_SQL = """-- Privacy deletion (2026-09-01, store audit / Data Safety «можно запросить удаление»), by the bot's line (T5):
 -- a deleted bot's server-side conversation memory goes with it — under every profile of its line (session: this
 -- install's rows of the same bot key, both channels, and the superseded chain; legacy: the named ids only). Chat
@@ -636,6 +652,10 @@ RESPOND_OLD_TAIL = '"deletedReplyFlags": $json.deletedReplyFlags ?? null } }}'
 RESPOND_NEW_TAIL = ('"deletedReplyFlags": $json.deletedReplyFlags ?? null, "deletedHistoryEvents": $json.deletedHistoryEvents ?? null, '
                     '"deletedHandoffs": $json.deletedHandoffs ?? null, "deletedReplyEvents": $json.deletedReplyEvents ?? null, '
                     '"deletedChatStates": $json.deletedChatStates ?? null } }}')
+RESPOND_T5_TAIL = RESPOND_NEW_TAIL
+RESPOND_NEW_TAIL = RESPOND_T5_TAIL.replace('"deletedChatStates": $json.deletedChatStates ?? null } }}',
+                                           '"deletedChatStates": $json.deletedChatStates ?? null, "deletedSuggestionSets": $json.deletedSuggestionSets ?? null } }}', 1)
+assert RESPOND_NEW_TAIL != RESPOND_T5_TAIL
 
 
 def patch_delete_bot():
@@ -645,7 +665,7 @@ def patch_delete_bot():
     n = node(wf, "Delete Chat Memory")
     q = n["parameters"]["query"]
     if q != DELETE_CHAT_MEMORY_SQL:
-        assert DELETE_OLD_TAIL in q or DELETE_NEW_TAIL in q, "Delete Chat Memory has an unexpected shape"
+        assert DELETE_OLD_TAIL in q or DELETE_T5_TAIL in q or DELETE_NEW_TAIL in q, "Delete Chat Memory has an unexpected shape"
         n["parameters"]["query"] = DELETE_CHAT_MEMORY_SQL
         ch = True
     if n["parameters"].setdefault("options", {}).get("queryReplacement") != DELETE_CHAT_MEMORY_PARAMS:
@@ -653,9 +673,11 @@ def patch_delete_bot():
         ch = True
     r = node(wf, "Respond")
     body = r["parameters"]["responseBody"]
-    if RESPOND_OLD_TAIL in body:
-        r["parameters"]["responseBody"] = body.replace(RESPOND_OLD_TAIL, RESPOND_NEW_TAIL)
-        ch = True
+    for old in (RESPOND_OLD_TAIL, RESPOND_T5_TAIL):   # the pre-T5 and the T5 answer shapes both come forward
+        if old in body and RESPOND_NEW_TAIL not in body:
+            body = body.replace(old, RESPOND_NEW_TAIL, 1)
+            r["parameters"]["responseBody"] = body
+            ch = True
     else:
         assert RESPOND_NEW_TAIL in body, "Delete Bot Files Respond has an unexpected shape"
     if ch:

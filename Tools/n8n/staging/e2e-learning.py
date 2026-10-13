@@ -182,6 +182,20 @@ def stage_trained(ctx):
     return ok, f"http={st} stage={gd.get('stage')!r} prefs={'ПРЕДПОЧТЕНИЯ ВЛАДЕЛЬЦА' in sp} cold={'ХОЛОДНЫЙ СТАРТ' in sp}"
 
 
+@scenario("delete_bot_clears_sets", "A: DeleteBotFiles for the profile removes its suggestion_sets rows (history rows go with chat_history_events)")
+def delete_clears(ctx):
+    owner, pid = owner_and_profile(ctx)
+    body = payload(owner, pid, [m("client", "свечи есть? сколько стоят?")], know=knowledge([{"kind": "product", "name": "Свеча", "price": "1500 тг", "description": ""}]), request_key=KEY)
+    call(owner, body)
+    time.sleep(2)
+    n0 = psql(f"select count(*) from suggestion_sets where profile_id = '{pid}';")
+    st, d = e2e_auth.hook("DeleteBotFiles", owner.token, {"botWaId": "-1", "botTgId": "-1", "waProfileId": pid, "tgProfileId": "-1", "appUserId": owner.app_user_id})
+    time.sleep(3)
+    n1 = psql(f"select count(*) from suggestion_sets where profile_id = '{pid}';")
+    ok = n0 == "1" and st == 200 and (d or {}).get("success") is True and (d or {}).get("deletedSuggestionSets") == 1 and n1 == "0"
+    return ok, f"sets before/after = {n0}/{n1}, delete http={st} body={d}"
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--only")

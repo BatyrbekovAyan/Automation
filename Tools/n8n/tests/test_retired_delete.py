@@ -45,7 +45,7 @@ RB = '$RCAnonymousID:' + 'fedcba9876543210' * 2
 LIKE = 'create temp table {0} (like public.{0} including all);\n'
 SETUP = ''.join(LIKE.format(t) for t in ('installs', 'bot_profiles', 'billing_bindings', 'subscribers', 'documents', 'n8n_chat_histories',
                                          'chat_history_events', 'handoff_requests', 'reply_events', 'chat_reply_state',
-                                         'conversation_outcomes', 'reply_mode_flags', 'uploaded_files', 'clone_retirements'))
+                                         'conversation_outcomes', 'reply_mode_flags', 'uploaded_files', 'clone_retirements', 'suggestion_sets'))
 CHANNELS = (('whatsapp', 'wa'), ('telegram', 'tg'))
 
 
@@ -362,7 +362,7 @@ with Case('V12 M1: Delete Bot Files says success only on real counters; storage 
     bad_mem = {'error': {'message': 'Connection terminated'}}
     c.check(cond(DBF, 'Deletion Settled?', bad_mem, {'Retire Bot Profiles': {'retiredProfiles': 1}, 'Delete Bot Chunks': {'deletedChunks': 0, 'fileIds': []}}) is False
             and cond(DBF, 'Deletion Settled?', {**{k: 0 for k in ('deletedMemoryRows', 'deletedOutcomes', 'deletedReplyFlags', 'deletedHistoryEvents',
-                                                                 'deletedHandoffs', 'deletedReplyEvents', 'deletedChatStates')}},
+                                                                 'deletedHandoffs', 'deletedReplyEvents', 'deletedChatStates', 'deletedSuggestionSets')}},
                      {'Retire Bot Profiles': {'error': {'message': 'x'}}, 'Delete Bot Chunks': {'deletedChunks': 0}}) is False,
             'an error item from Delete Chat Memory or Retire must never become success:true')
     for n in ('Delete Bot Chunks', 'Delete Chat Memory', 'Retire Bot Profiles', 'Delete Ownership', 'List Bot Originals'):

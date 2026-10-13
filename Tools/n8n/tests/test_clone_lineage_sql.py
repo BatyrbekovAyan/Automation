@@ -57,7 +57,7 @@ CH = {
 DBF_F = 'lmjYsdNcQA2IE5rl-Delete_Bot_Files.json'
 PROXY_F = 'crWappiProxy0001-Wappi_Proxy.json'
 MEMORY_TABLES = ('n8n_chat_histories', 'chat_history_events', 'conversation_outcomes', 'handoff_requests', 'reply_events',
-                 'chat_reply_state', 'reply_mode_flags')
+                 'chat_reply_state', 'reply_mode_flags', 'suggestion_sets')   # learning A (2026-10-13): the panel's shown sets
 
 
 def canon(name, pinned=False):

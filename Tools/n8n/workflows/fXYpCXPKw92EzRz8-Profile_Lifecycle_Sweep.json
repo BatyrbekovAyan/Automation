@@ -1264,6 +1264,28 @@
       },
       "alwaysOutputData": true,
       "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Learning A retention (180 дней): наборы панели и метки происхождения на строках истории.\n-- Строки chat_history_events НЕ удаляются — только их origin_* обнуляются (по origin_kind, чтобы и «none» истекал).\n-- Ветка висит прямо на триггере и НЕ подчиняется Sweep Config.dryRun: удаление по возрасту, не по профилю.\nwith sets as (delete from public.suggestion_sets where created_at < now() - interval '180 days' returning 1),\n     origins as (update public.chat_history_events\n                   set origin_kind = null, origin_index = null, origin_key = null, origin_edit = null, origin_top1 = null, origin_set = null\n                 where origin_kind is not null and created_at < now() - interval '180 days' returning 1)\nselect (select count(*)::int from sets) as expired_sets, (select count(*)::int from origins) as expired_origins;",
+        "options": {}
+      },
+      "id": "edaa9a0c-7b96-576d-80d4-52efa81e4358",
+      "name": "Expire Learning Rows",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -680,
+        600
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "vvRrFiEXzLVqKjOx",
+          "name": "Postgres"
+        }
+      },
+      "onError": "continueRegularOutput"
     }
   ],
   "connections": {
@@ -1272,6 +1294,11 @@
         [
           {
             "node": "Sweep Config",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Expire Learning Rows",
             "type": "main",
             "index": 0
           }

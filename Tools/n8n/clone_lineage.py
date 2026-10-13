@@ -51,10 +51,12 @@ CHANNELS = {
                  "file_column": "bot_tg_id"},
 }
 
-# The seven tables Delete Chat Memory clears (Delete Bot Files) — the bind moves EXACTLY these (pinned by the test against
+# The eight tables Delete Chat Memory clears (Delete Bot Files) — the bind moves EXACTLY these (pinned by the test against
 # the canon). dialog_counts are billing usage records keyed by the app user, not chat content: never moved, never deleted.
+# suggestion_sets (learning A, 2026-10-13): the «Вместе» panel's shown sets — the learning journal follows the bot's line
+# like its memory does, so a re-paired bot keeps its shadow score.
 MOVED_TABLES = ("n8n_chat_histories", "chat_history_events", "conversation_outcomes", "handoff_requests", "reply_events",
-                "chat_reply_state", "reply_mode_flags")
+                "chat_reply_state", "reply_mode_flags", "suggestion_sets")
 
 
 def protected_ids():
@@ -329,6 +331,19 @@ with me as (
   delete from reply_mode_flags f using fl_r r
   where f.profile_id = r.pid and f.chat_id = r.chat_id and (r.rn > 1 or r.taken)
   returning 1
+), set_r as (          -- learning A: the panel's shown sets (PK profile_id + request_key): the new profile's own row wins,
+  select s.profile_id as pid, s.request_key,                                   -- among predecessors the freshest
+    row_number() over (partition by s.request_key order by s.created_at desc, s.profile_id desc) as rn,
+    exists (select 1 from suggestion_sets x where x.profile_id = $1 and x.request_key = s.request_key) as taken
+  from suggestion_sets s where s.profile_id in (select pid from p)
+), set_mv as (
+  update suggestion_sets s set profile_id = $1 from set_r r
+  where s.profile_id = r.pid and s.request_key = r.request_key and r.rn = 1 and not r.taken
+  returning 1
+), set_dup as (
+  delete from suggestion_sets s using set_r r
+  where s.profile_id = r.pid and s.request_key = r.request_key and (r.rn > 1 or r.taken)
+  returning 1
 )
 select exists (select 1 from bind where workflow_id = $2) as bound, $2::text as workflow_id,
   coalesce((select jsonb_agg(a.pid order by a.pid) from (
@@ -346,8 +361,9 @@ select exists (select 1 from bind where workflow_id = $2) as bound, $2::text as 
   (select count(*) from ev_mv)::int as moved_events,
   (select count(*) from st_mv)::int as moved_states,
   (select count(*) from fl_mv)::int as moved_flags,
+  (select count(*) from set_mv)::int as moved_sets,
   ((select count(*) from hist_dup) + (select count(*) from outc_dup) + (select count(*) from hand_dup)
-   + (select count(*) from ev_dup) + (select count(*) from st_dup) + (select count(*) from fl_dup))::int as dropped_rows"""
+   + (select count(*) from ev_dup) + (select count(*) from st_dup) + (select count(*) from fl_dup) + (select count(*) from set_dup))::int as dropped_rows"""
 
 
 def bind_workflow_sql(channel):

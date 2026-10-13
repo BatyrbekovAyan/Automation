@@ -175,6 +175,41 @@ def check_suggest_nodes(wf):
             and wf["connections"].get("Has Set?") == {"main": [[{"node": "Record Set", "type": "main", "index": 0}], []]})
 
 
+EXPIRE_SQL = """-- Learning A retention (180 дней): наборы панели и метки происхождения на строках истории.
+-- Строки chat_history_events НЕ удаляются — только их origin_* обнуляются (по origin_kind, чтобы и «none» истекал).
+-- Ветка висит прямо на триггере и НЕ подчиняется Sweep Config.dryRun: удаление по возрасту, не по профилю.
+with sets as (delete from public.suggestion_sets where created_at < now() - interval '180 days' returning 1),
+     origins as (update public.chat_history_events
+                   set origin_kind = null, origin_index = null, origin_key = null, origin_edit = null, origin_top1 = null, origin_set = null
+                 where origin_kind is not null and created_at < now() - interval '180 days' returning 1)
+select (select count(*)::int from sets) as expired_sets, (select count(*)::int from origins) as expired_origins;"""
+
+
+def patch_sweep(wf):
+    ch = False
+    if node(wf, "Expire Learning Rows") is None:
+        trig = node(wf, "Every 6 Hours")
+        wf["nodes"].append({"parameters": {"operation": "executeQuery", "query": EXPIRE_SQL, "options": {}},
+                            "id": nid("expire-learning"), "name": "Expire Learning Rows", "type": "n8n-nodes-base.postgres", "typeVersion": 2.6,
+                            "position": [trig["position"][0] + 220, trig["position"][1] + 400], "credentials": {"postgres": dict(PG_CRED)}, "onError": "continueRegularOutput"})
+        ch = True
+    n = node(wf, "Expire Learning Rows")
+    if n["parameters"]["query"] != EXPIRE_SQL:
+        n["parameters"]["query"] = EXPIRE_SQL
+        ch = True
+    outs = wf["connections"].get("Every 6 Hours", {}).get("main", [[]])
+    if not any(e["node"] == "Expire Learning Rows" for e in outs[0]):
+        outs[0].append({"node": "Expire Learning Rows", "type": "main", "index": 0})
+        wf["connections"]["Every 6 Hours"] = {"main": outs}
+        ch = True
+    return ch
+
+
+def check_sweep(wf):
+    n = node(wf, "Expire Learning Rows")
+    return n is not None and n["parameters"]["query"] == EXPIRE_SQL and any(e["node"] == "Expire Learning Rows" for e in wf["connections"].get("Every 6 Hours", {}).get("main", [[]])[0])
+
+
 
 def patch_all():
     out = {}
@@ -183,12 +218,17 @@ def patch_all():
     if ch:
         save(SUGGEST, wf)
     out[SUGGEST] = ch
+    wf = load(SWEEP)
+    ch = patch_sweep(wf)
+    if ch:
+        save(SWEEP, wf)
+    out[SWEEP] = ch
     return out
 
 
 def check_all():
-    wf = load(SUGGEST)
-    return {SUGGEST: check_suggest_prompts(wf) and check_suggest_nodes(wf)}
+    return {SUGGEST: check_suggest_prompts(load(SUGGEST)) and check_suggest_nodes(load(SUGGEST)),
+            SWEEP: check_sweep(load(SWEEP))}
 
 
 def main():

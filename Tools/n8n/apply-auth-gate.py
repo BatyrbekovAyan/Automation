@@ -257,7 +257,7 @@ DELETION_SETTLED = ("={{ typeof $('Retire Bot Profiles').first().json.retiredPro
                     "typeof $('Delete Bot Chunks').first().json.deletedChunks === 'number' && "
                     + " && ".join(f"typeof $json.{k} === 'number'" for k in ("deletedMemoryRows", "deletedOutcomes", "deletedReplyFlags",
                                                                            "deletedHistoryEvents", "deletedHandoffs", "deletedReplyEvents",
-                                                                           "deletedChatStates")) + " }}")
+                                                                           "deletedChatStates", "deletedSuggestionSets")) + " }}")
 DELETE_FAILED_BODY = "={{ { \"success\": false, \"error\": ($json.originals && $json.originals.error) || \"db_unavailable\" } }}"
 
 # Set Workflow State: which calls the database decides, the token rule kept for everything else (activate), the item
