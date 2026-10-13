@@ -1,0 +1,874 @@
+{
+ "summary": {
+  "label": "panel-a2-after",
+  "prompts_ref": "worktree",
+  "search_ref": "worktree",
+  "side": "after",
+  "block": null,
+  "plan": null,
+  "scenario_version": "v1.7 (2026-10-13: off-topic classes — three kinds + honest assistant; every v1.6 scenario and check unchanged; harness h10)",
+  "harness": "h10 (2026-10-13: three off-topic classes — names_scope (рамка + имя бизнеса), no_refusal_on_greeting, honest_assistant, spam_minimal; panel cards_eq_1_refusal, cards_name_business; set v1.7 adds the scenarios for them, knowledge.<vertical>.businessName rides into About Business as «Название:» like the app writes it; every earlier check unchanged; on top of h9 (2026-10-13: panel checks cards_first_no_decision:<topic> — card 1 neither grants nor refuses a condition the data does not state — cards_absent:<regex> — no card states a rule absent from the data — and cards_first_matches:<regex>; auto check matches:<regex>; set v1.6 adds the scenarios for them; every earlier check unchanged; on top of h8 (2026-10-12, T11b: interleaved schedule — every scenario's repeats spread over the whole run, round-robin over the scenarios, the sides of one repeat back to back with the first side rotating (--side / --plan run the sides of a comparison as ONE schedule); set v1.5 adds no_tool:create_handoff wherever the scenario does not call for a handoff; no check function changed; on top of h7 (2026-10-12, T11 Q1 B + V6-unknown: scenario roles `owner` / `bot_unknown` rendered with the memory marks the writers store at --prompts-ref (apply-history-handoff.py; none before T6); no_marker_leak, no_tool:<name>, not_says_already, no_delivery_doubt; on top of h6 2026-10-09, Q1: not_mentions:X — X stated in no un-refused clause and not merely quoted as the client's words, for the client-time echo; mentions:H:MM reads a time of day; on top of h5 2026-10-08, V9-r2: no_conflict_claim / no_price_caveat for a price list that AGREES with the catalog; on top of h4 2026-10-07 V9: «расхождение» + negated conflict, zero-price / elliptical free delivery, «итого по N позициям» partial, «нужен» / the car or device by name, a word inside the installment claim, Kazakh = no Russian sentence, «18,000»; h3 2026-09-27 R14; checks pinned by test_checks.py))",
+  "model": "gpt-5.4-mini",
+  "reasoning_effort": null,
+  "dropped_params": [],
+  "panel_model": "gpt-5.4-mini (reasoning_effort none)",
+  "max_tokens": 200,
+  "search_simulation": "Price List Search sub-workflow (Reconcile Prices at worktree)",
+  "memory_marks": {
+   "owner": "Владелец: ",
+   "bot_unknown": "[доставка не подтверждена] "
+  },
+  "workers": 1,
+  "scenarios": 13,
+  "runs": 39,
+  "pass_all": 12,
+  "flaky": 1,
+  "fail": 0,
+  "error_runs": 0,
+  "transport_retries": 0,
+  "finish_reason_length_runs": 0,
+  "prompt_tokens": 0,
+  "cached_tokens": 0,
+  "completion_tokens": 0,
+  "reasoning_tokens": 0,
+  "cost_usd_auto_path": 0.0,
+  "prices_usd_per_1m": [
+   0.75,
+   0.075,
+   4.5
+  ],
+  "latency_ms": {
+   "auto": null,
+   "panel": {
+    "n": 39,
+    "median": 1609,
+    "p90": 2553,
+    "max": 4089
+   }
+  },
+  "seconds": 75,
+  "by_check": {
+   "abstain": "24/24",
+   "cards": "6/6",
+   "cards_eq_1_refusal": "9/9",
+   "cards_first_no_price": "3/3",
+   "cards_name_business": "8/9",
+   "cards_no_upsell_on_thanks": "3/3"
+  }
+ },
+ "results": [
+  {
+   "id": "pn_personal_congrats",
+   "vertical": "flowers",
+   "mode": "panel",
+   "lang": "ru",
+   "tags": [
+    "abstain",
+    "key"
+   ],
+   "repeats": 3,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "abstain": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [], \"abstain\": true}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 3309,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 0,
+     "t": 1.1
+    },
+    {
+     "verdicts": {
+      "abstain": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [], \"abstain\": true}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 1529,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 13,
+     "t": 30.8
+    },
+    {
+     "verdicts": {
+      "abstain": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [], \"abstain\": true}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 1074,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 26,
+     "t": 49.8
+    }
+   ]
+  },
+  {
+   "id": "pn_emotional_reaction",
+   "vertical": "kaspi_seller",
+   "mode": "panel",
+   "lang": "ru",
+   "tags": [
+    "abstain",
+    "key"
+   ],
+   "repeats": 3,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "abstain": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [], \"abstain\": true}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 2282,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 1,
+     "t": 4.5
+    },
+    {
+     "verdicts": {
+      "abstain": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [], \"abstain\": true}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 1648,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 14,
+     "t": 32.4
+    },
+    {
+     "verdicts": {
+      "abstain": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [], \"abstain\": true}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 1440,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 27,
+     "t": 50.9
+    }
+   ]
+  },
+  {
+   "id": "pn_go_to_cinema",
+   "vertical": "auto_parts",
+   "mode": "panel",
+   "lang": "ru",
+   "tags": [
+    "abstain"
+   ],
+   "repeats": 3,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "abstain": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [], \"abstain\": true}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 2824,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 2,
+     "t": 6.7
+    },
+    {
+     "verdicts": {
+      "abstain": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [], \"abstain\": true}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 1127,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 15,
+     "t": 34.0
+    },
+    {
+     "verdicts": {
+      "abstain": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [], \"abstain\": true}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 1089,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 28,
+     "t": 52.4
+    }
+   ]
+  },
+  {
+   "id": "pn_spam",
+   "vertical": "education",
+   "mode": "panel",
+   "lang": "ru",
+   "tags": [
+    "abstain"
+   ],
+   "repeats": 3,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "abstain": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [], \"abstain\": true}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 2227,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 3,
+     "t": 9.6
+    },
+    {
+     "verdicts": {
+      "abstain": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [], \"abstain\": true}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 1418,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 16,
+     "t": 35.1
+    },
+    {
+     "verdicts": {
+      "abstain": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [], \"abstain\": true}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 2089,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 29,
+     "t": 53.5
+    }
+   ]
+  },
+  {
+   "id": "pn_ot_q_auto_parts",
+   "vertical": "auto_parts",
+   "mode": "panel",
+   "lang": "ru",
+   "tags": [
+    "offtopic",
+    "key"
+   ],
+   "repeats": 3,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "cards_eq_1_refusal": true,
+      "cards_name_business": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [{\"text\": \"Мы отвечаем только по вопросам нашего магазина автозапчастей. Если нужен подбор или цена по детали — напишите марку, модель и год авто.\", \"label\": \"Не по теме\", \"move\": \"Отказ\"}]}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 4089,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 4,
+     "t": 11.8
+    },
+    {
+     "verdicts": {
+      "cards_eq_1_refusal": true,
+      "cards_name_business": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [{\"text\": \"Мы отвечаем только по вопросам про наши запчасти и услуги. Если нужен подбор или цена по детали — напишите марку, модель и год авто.\", \"label\": \"Не по теме\", \"move\": \"Отказ\"}]}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 1295,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 17,
+     "t": 36.5
+    },
+    {
+     "verdicts": {
+      "cards_eq_1_refusal": true,
+      "cards_name_business": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [{\"text\": \"Мы отвечаем только по вопросам нашего магазина и запчастей. Если нужен подбор или цена по детали — напишите марку, модель и год авто.\", \"label\": \"Не по теме\", \"move\": \"Отказ\"}]}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 2087,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 30,
+     "t": 55.5
+    }
+   ]
+  },
+  {
+   "id": "pn_ot_q_flowers",
+   "vertical": "flowers",
+   "mode": "panel",
+   "lang": "ru",
+   "tags": [
+    "offtopic"
+   ],
+   "repeats": 3,
+   "pass_rate": 0.6666666666666666,
+   "runs": [
+    {
+     "verdicts": {
+      "cards_eq_1_refusal": true,
+      "cards_name_business": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [{\"text\": \"Мы отвечаем только по цветам и заказам в «Цветы у Айгуль». Если хотите, помогу подобрать букет или оформить доставку.\", \"label\": \"Не по теме\", \"move\": \"Отказ\"}]}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 2553,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 5,
+     "t": 15.9
+    },
+    {
+     "verdicts": {
+      "cards_eq_1_refusal": true,
+      "cards_name_business": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [{\"text\": \"Мы отвечаем только по вопросам про цветы и заказы в «Цветы у Айгуль». Если хотите, помогу подобрать букет или оформить доставку.\", \"label\": \"Не по теме\", \"move\": \"Отказ\"}]}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 1416,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 18,
+     "t": 37.8
+    },
+    {
+     "verdicts": {
+      "cards_eq_1_refusal": true,
+      "cards_name_business": false
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [{\"text\": \"У нас только по цветам подсказываем — если хотите, помогу выбрать букет на вечер или на подарок 🌷\", \"label\": \"Не по теме\", \"move\": \"Отказ\"}]}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 1492,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 31,
+     "t": 57.6
+    }
+   ]
+  },
+  {
+   "id": "pn_ot_q_education",
+   "vertical": "education",
+   "mode": "panel",
+   "lang": "ru",
+   "tags": [
+    "offtopic"
+   ],
+   "repeats": 3,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "cards_eq_1_refusal": true,
+      "cards_name_business": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [{\"text\": \"Мы отвечаем только по вопросам учебного центра Bilim. Если нужен английский или подготовка к ЕНТ — подскажу с радостью.\", \"label\": \"Не по теме\", \"move\": \"Отказ\"}]}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 2072,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 6,
+     "t": 18.4
+    },
+    {
+     "verdicts": {
+      "cards_eq_1_refusal": true,
+      "cards_name_business": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [{\"text\": \"Мы отвечаем только по вопросам учебного центра Bilim. Если хотите, подскажем по английскому или подготовке к ЕНТ.\", \"label\": \"Не по теме\", \"move\": \"Отказ\"}]}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 1481,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 19,
+     "t": 39.3
+    },
+    {
+     "verdicts": {
+      "cards_eq_1_refusal": true,
+      "cards_name_business": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [{\"text\": \"Мы отвечаем только по вопросам учебного центра Bilim. Если нужна информация по нашим курсам, с радостью помогу.\", \"label\": \"Не по теме\", \"move\": \"Отказ\"}]}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 1635,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 32,
+     "t": 59.1
+    }
+   ]
+  },
+  {
+   "id": "pn_ot_greet_auto_parts",
+   "vertical": "auto_parts",
+   "mode": "panel",
+   "lang": "ru",
+   "tags": [
+    "offtopic"
+   ],
+   "repeats": 3,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "cards": true,
+      "cards_first_no_price": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [{\"text\": \"Здравствуйте! Чем могу помочь по запчастям для японских авто?\", \"label\": \"Приветствие\", \"move\": \"Ответ\"}, {\"text\": \"Здравствуйте! Напишите марку, модель и год авто — подберу запчасть.\", \"label\": \"Марка и год\", \"move\": \"Уточнить\"}, {\"text\": \"Здравствуйте! Если уже знаете артикул, можете сразу прислать его — так быстрее проверю.\", \"label\": \"Артикул\", \"move\": \"Уточнить\"}, {\"text\": \"Здравствуйте! Можете написать, что именно нужно — подберу вариант и сориентирую по доставке.\", \"label\": \"Что нужно\", \"move\": \"Уточнить\"}]}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 2120,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 7,
+     "t": 20.5
+    },
+    {
+     "verdicts": {
+      "cards": true,
+      "cards_first_no_price": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [{\"text\": \"Здравствуйте! Чем могу помочь по запчастям?\", \"label\": \"Приветствие\", \"move\": \"Ответ\"}, {\"text\": \"Здравствуйте! Напишите марку, модель и год авто — подберу нужную деталь.\", \"label\": \"Марка и год\", \"move\": \"Уточнить\"}, {\"text\": \"Здравствуйте! Могу сразу проверить по VIN, если он у вас есть.\", \"label\": \"С VIN\", \"move\": \"Уточнить\"}, {\"text\": \"Здравствуйте! Если уже знаете артикул, скиньте его — быстро посмотрю.\", \"label\": \"По артикулу\", \"move\": \"Уточнить\"}]}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 1930,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 20,
+     "t": 40.7
+    },
+    {
+     "verdicts": {
+      "cards": true,
+      "cards_first_no_price": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [{\"text\": \"Здравствуйте! Чем могу помочь по запчастям для вашего авто?\", \"label\": \"Приветствие\", \"move\": \"Ответ\"}, {\"text\": \"Здравствуйте! Напишите марку, модель и год авто — подберу нужную деталь.\", \"label\": \"Марка и год\", \"move\": \"Уточнить\"}, {\"text\": \"Здравствуйте! Если уже знаете артикул, можете прислать его — быстро проверю.\", \"label\": \"Артикул\", \"move\": \"Уточнить\"}, {\"text\": \"Здравствуйте! Могу сразу посмотреть доставку по Астане или самовывоз с Абая 1.\", \"label\": \"Доставка\", \"move\": \"Вариант\"}]}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 2524,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 33,
+     "t": 60.8
+    }
+   ]
+  },
+  {
+   "id": "pn_ot_greet_flowers",
+   "vertical": "flowers",
+   "mode": "panel",
+   "lang": "ru",
+   "tags": [
+    "offtopic"
+   ],
+   "repeats": 3,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "cards": true,
+      "cards_no_upsell_on_thanks": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [{\"text\": \"Пожалуйста, очень рады, что всё понравилось 🙏 Обращайтесь ещё, с радостью соберём букет снова.\", \"label\": \"Тепло\", \"move\": \"Ответ\"}, {\"text\": \"Спасибо за отзыв! Будем рады видеть вас снова 😊\", \"label\": \"Коротко\", \"move\": \"Ответ\"}, {\"text\": \"Рады помочь! Если понадобится букет на следующий повод — пишите.\", \"label\": \"Снова\", \"move\": \"Ответ\"}, {\"text\": \"Спасибо, что написали. Пусть букет радует как можно дольше 🌷\", \"label\": \"Пожелание\", \"move\": \"Ответ\"}]}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 2286,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 8,
+     "t": 22.6
+    },
+    {
+     "verdicts": {
+      "cards": true,
+      "cards_no_upsell_on_thanks": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [{\"text\": \"Пожалуйста, очень рады, что букет понравился 🙏\", \"label\": \"Тепло\", \"move\": \"Ответ\"}, {\"text\": \"Спасибо вам за заказ! Обращайтесь ещё, будем рады помочь 🌷\", \"label\": \"Ещё раз\", \"move\": \"Ответ\"}, {\"text\": \"Рады, что всё дошло хорошо. Если захотите ещё букет — напишите, подберём с удовольствием.\", \"label\": \"С шагом\", \"move\": \"Ответ\"}, {\"text\": \"Спасибо за отзыв, это очень приятно. Хорошего вам дня!\", \"label\": \"Коротко\", \"move\": \"Ответ\"}]}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 1946,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 21,
+     "t": 42.7
+    },
+    {
+     "verdicts": {
+      "cards": true,
+      "cards_no_upsell_on_thanks": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [{\"text\": \"Пожалуйста, очень рады, что всё понравилось 🙏 Обращайтесь ещё, с радостью соберём вам букет снова.\", \"label\": \"Тепло\", \"move\": \"Ответ\"}, {\"text\": \"Спасибо вам за отзыв 🙏 Рады, что букет дошёл и понравился. Если понадобится ещё — будем на связи.\", \"label\": \"Коротко\", \"move\": \"Ответ\"}, {\"text\": \"Пожалуйста 😊 Очень приятно, что букет пришёл вовремя. Обращайтесь, всегда рады помочь.\", \"label\": \"Мягко\", \"move\": \"Ответ\"}, {\"text\": \"Рады были помочь 🙏 Если захотите следующий букет, напишите — подберём что-то красивое.\", \"label\": \"С шагом\", \"move\": \"Ответ\"}]}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 2456,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 34,
+     "t": 63.3
+    }
+   ]
+  },
+  {
+   "id": "pn_ot_spam_auto_parts",
+   "vertical": "auto_parts",
+   "mode": "panel",
+   "lang": "ru",
+   "tags": [
+    "abstain",
+    "key"
+   ],
+   "repeats": 3,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "abstain": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [], \"abstain\": true}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 1493,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 9,
+     "t": 24.9
+    },
+    {
+     "verdicts": {
+      "abstain": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [], \"abstain\": true}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 1168,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 22,
+     "t": 44.6
+    },
+    {
+     "verdicts": {
+      "abstain": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [], \"abstain\": true}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 2535,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 35,
+     "t": 65.7
+    }
+   ]
+  },
+  {
+   "id": "pn_ot_spam_flowers",
+   "vertical": "flowers",
+   "mode": "panel",
+   "lang": "ru",
+   "tags": [
+    "abstain"
+   ],
+   "repeats": 3,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "abstain": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [], \"abstain\": true}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 1441,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 10,
+     "t": 26.4
+    },
+    {
+     "verdicts": {
+      "abstain": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [], \"abstain\": true}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 1183,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 23,
+     "t": 45.8
+    },
+    {
+     "verdicts": {
+      "abstain": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [], \"abstain\": true}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 1261,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 36,
+     "t": 68.3
+    }
+   ]
+  },
+  {
+   "id": "pn_ot_personal_education",
+   "vertical": "education",
+   "mode": "panel",
+   "lang": "ru",
+   "tags": [
+    "abstain",
+    "key"
+   ],
+   "repeats": 3,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "abstain": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [], \"abstain\": true}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 1430,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 11,
+     "t": 27.9
+    },
+    {
+     "verdicts": {
+      "abstain": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [], \"abstain\": true}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 1137,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 24,
+     "t": 47.0
+    },
+    {
+     "verdicts": {
+      "abstain": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [], \"abstain\": true}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 1609,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 37,
+     "t": 69.5
+    }
+   ]
+  },
+  {
+   "id": "pn_ot_personal_kaspi",
+   "vertical": "kaspi_seller",
+   "mode": "panel",
+   "lang": "ru",
+   "tags": [
+    "abstain"
+   ],
+   "repeats": 3,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "abstain": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [], \"abstain\": true}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 1533,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 12,
+     "t": 29.3
+    },
+    {
+     "verdicts": {
+      "abstain": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [], \"abstain\": true}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 1743,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 25,
+     "t": 48.1
+    },
+    {
+     "verdicts": {
+      "abstain": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [], \"abstain\": true}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null,
+     "latency_ms": 1586,
+     "status": 200,
+     "transport_retries": 0,
+     "seq": 38,
+     "t": 71.1
+    }
+   ]
+  }
+ ]
+}
