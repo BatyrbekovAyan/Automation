@@ -337,3 +337,6 @@ e2e-handoff 12/14 в полном прогоне — оба провала (`not
 `RETIREMENTS_DRY_RUN = False` и выкладка Sweep'а; новая клиентская сборка с HEAD → `inspect-artifact.sh` → device-pass §5.4 → живой
 canary → сторы. **Не проверено на проде (нужен живой бот с новой сборки):** переподключение после истёкшего триала с переносом данных,
 «Сменить номер» / «Получить код ещё раз» без второго клона, удаление бота по линии, Q1 на живом боте, журнал V3 на реальном конфликте.
+
+## Learning A «Фундамент» — реализовано, ждёт go на деплой (2026-10-14; коммиты 126f44c2…HEAD)
+Правило «Границы темы» + eval v1.7 (before/after: ot-a: 4·2·5 → 10·1·0; core-a 83 авто: 71·1·11 → 76·4·3, просевшие ×8 — шум; панель 9·2·2 → 12·1·0), панель «Отказ»/холодный старт, origin_* через meta прокси, suggestion_sets после Respond, CTE sets в Delete Chat Memory, Expire Learning Rows, клиент SendOrigin*/SuggestionPickStats, privacy §3. Staging: e2e-learning 10/10, e2e-suggest 12/12, e2e-auth/e2e-handoff без регрессий; Unity EditMode 3017/3017; n8n harness run_all 32 файла OK.

@@ -130,6 +130,7 @@ prompt editing, RAG file upload/delete, and (in progress) live reply suggestions
   clone a live row outside the line drives, never a protected id; chunks go through the expression indexes and are
   deleted by primary key. Behaviour: `tests/test_clone_retirements.py`; shape: `verify-auth-gate.py` /
   `verify-history-handoff.py` (`--dir`) / `verify-clone-lifecycle.py` (11).
+- **Learning A (2026-09-25, `docs/superpowers/specs/2026-09-25-learning-loop-foundation-design.md`):** `apply-learning-a.py` (Suggest Replies: stage в Gate Decision, ХОЛОДНЫЙ СТАРТ + общее правило ПОСТОРОННИЙ ВОПРОС в Assemble, `Has Set?` → `Record Set` ПОСЛЕ Respond; Sweep: `Expire Learning Rows` 180 дней), удаление наборов — CTE `sets` в `Delete Chat Memory` (`apply-history-handoff.py`) + счётчик в `Deletion Settled?` (`apply-auth-gate.py`), `verify-learning-a.py`, SQL `sql/2026-09-25-learning-foundation.sql`, staging `staging/e2e-learning.py` (8 сценариев), `report-learning.py` (только чтение). Прокси: секция `meta` (origin_*) в `build-auth-workflows.py` — валидируется, в Wappi не уходит, пишется `Record Owner Send`.
   `$execution.id` as correlationId). `verify-message-batching.py` / `verify-telegram-parity.py` pin the
   stamp's wiring and the winner → billing-gate → Input type path (their pre-2026-09 expectations were
   stale and failed every run).
