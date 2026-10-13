@@ -1,6 +1,8 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using Newtonsoft.Json;
 
 /// <summary>
 /// Outbox concerns split out of ChatManager — keeps the god-object trimmer
@@ -132,6 +134,13 @@ public partial class ChatManager
         // so a same-frame bot switch can't redirect the retry's cache write to the
         // wrong bot's folder.
         string retryCacheRoot = GetCacheRoot();
+        // learning A: the origin was resolved once, at the first attempt (the panel snapshot is consumed there);
+        // a retry carries that copy. A broken string degrades to null (= legacy), never to an exception.
+        SendOrigin retryOrigin = null;
+        if (!string.IsNullOrEmpty(entry.originJson))
+        {
+            try { retryOrigin = JsonConvert.DeserializeObject<SendOrigin>(entry.originJson); } catch (Exception) { retryOrigin = null; }
+        }
         try
         {
             if (entry.kind == (int)OutboxKind.Media)
@@ -139,7 +148,7 @@ public partial class ChatManager
             else
                 // Rebuild the send URL from the entry's snapshotted channel (legacy
                 // entries default to WhatsApp) so a cross-session retry hits the right base.
-                yield return PostTextMessageRoutine(entry.chatId, entry.text, tempId, entry.profileId, retryCacheRoot, entry.quotedMessageId, (ChatChannel)entry.channel);
+                yield return PostTextMessageRoutine(entry.chatId, entry.text, tempId, entry.profileId, retryCacheRoot, entry.quotedMessageId, (ChatChannel)entry.channel, retryOrigin);
         }
         finally
         {

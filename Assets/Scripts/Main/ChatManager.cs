@@ -2202,6 +2202,13 @@ IEnumerator SendTextMessageRoutine(string chatId, string text)
     // lands in the bot the message was sent on, even if the user switches bots
     // while the request is in flight.
     string sendCacheRoot = GetCacheRoot();
+    // learning A: classify the send against what the panel showed/tapped — BEFORE the optimistic
+    // OnLiveMessagesReceived echo below (not merely before the first yield): that Invoke is SYNCHRONOUS,
+    // SuggestionsController.HandleLive folds the outgoing bubble to Cancel → StartFreshRound →
+    // SendOriginTracker.Clear, so a resolve placed after it always reads `none`. Consumed once per send;
+    // the retry path reads the copy persisted in the outbox entry. Pinned by SendOriginWiringTests.
+    SendOrigin sendOrigin = SendOriginTracker.ResolveAndClear(text);
+    sendOrigin.botId = CurrentBotId;   // the coroutine outlives a bot switch (it runs on Manager.Instance)
 
     // --- INSTANT UI: Fire before ANY network call ---
     string tempId = "sending_" + DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
@@ -2256,10 +2263,11 @@ IEnumerator SendTextMessageRoutine(string chatId, string text)
         profileId       = activeProfileId,
         quotedMessageId = quotedId,
         channel         = (int)ActiveChannel,   // snapshot channel alongside profileId for cross-session retry
+        originJson      = JsonConvert.SerializeObject(sendOrigin),   // learning A: a retry carries the same origin (never re-resolved)
     });
 
     // --- BACKGROUND: Send to server silently ---
-    yield return PostTextMessageRoutine(chatId, text, tempId, activeProfileId, sendCacheRoot, quotedId, ActiveChannel);
+    yield return PostTextMessageRoutine(chatId, text, tempId, activeProfileId, sendCacheRoot, quotedId, ActiveChannel, sendOrigin);
 }
 
 /// <summary>
@@ -2276,7 +2284,8 @@ private IEnumerator PostTextMessageRoutine(
     string profileId,
     string sendCacheRoot,
     string quotedMessageId = null,
-    ChatChannel channel = ChatChannel.WhatsApp)
+    ChatChannel channel = ChatChannel.WhatsApp,
+    SendOrigin origin = null)
 {
     // Telegram replies use the dedicated message/reply endpoint (body {body, message_id},
     // no recipient); WhatsApp — and Telegram non-replies — go to message/send. The URL
@@ -2285,18 +2294,21 @@ private IEnumerator PostTextMessageRoutine(
     bool telegramReply = channel == ChatChannel.Telegram && !string.IsNullOrEmpty(quotedMessageId);
 
     string op;
-    object args;
+    JObject args;
     if (telegramReply)
     {
         op = WappiProxy.Op.MessageReply;
-        args = new { profile_id = profileId, body = text, message_id = quotedMessageId };
+        // chat_id rides the proxy's meta section (never forwarded to Wappi): the reply body carries no recipient,
+        // and without it Record Owner Send wrote chat_id = '' for every Telegram quote-reply (A6 defect).
+        args = JObject.FromObject(new { profile_id = profileId, body = text, message_id = quotedMessageId, chat_id = ChatIdFormat.Recipient(chatId) });
     }
     else
     {
         string recipient = ChatIdFormat.Recipient(chatId);
         op = WappiProxy.Op.MessageSend;
-        args = new { profile_id = profileId, body = text, recipient, quoted_message_id = quotedMessageId };
+        args = JObject.FromObject(new { profile_id = profileId, body = text, recipient, quoted_message_id = quotedMessageId });
     }
+    SendOriginWire.Append(args, origin);   // learning A: origin_* ride the same call (OPS meta, never forwarded to Wappi); null adds nothing
 
     UnityWebRequest www = null;
     yield return WappiProxy.Send(op, channel, args, r => www = r);
@@ -2334,6 +2346,7 @@ private IEnumerator PostTextMessageRoutine(
         PersistSendCache(sendCacheRoot, chatId, cachedList);
 
         Outbox.RemoveAt(sendCacheRoot, chatId, tempId);
+        SuggestionPickStats.RecordFromOrigin(origin?.botId ?? CurrentBotId, origin);   // learning A: a card sent (as is or edited) is the preference, not the tap; credited to the bot it was sent on
         // A false adopt here means the poll's echo already reconciled the bubble (it is the
         // newest entry and never evicted in-session) and may have left it at ✓✓ — announce the
         // fresher of the two, never a hard-coded Sent that would step it back for a poll interval.

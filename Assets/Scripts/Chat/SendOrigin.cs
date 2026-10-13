@@ -36,6 +36,7 @@ public sealed class SendOrigin
     public bool top1Match;         // similarity(sent, fresh card #1) ≥ SendOriginResolver.Top1Threshold
     public int setSize;            // cards in the attributed set
     public string pickedMove;      // move of the tapped card (Card/Edited), for the preference counter
+    public string botId;          // bot the send was made on — the preference counter must not credit a bot the owner switched to mid-flight
 
     public string KindWire => kind == SendOriginKind.Card ? "card"
                             : kind == SendOriginKind.Edited ? "edited"

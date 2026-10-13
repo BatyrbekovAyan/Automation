@@ -41,7 +41,7 @@ public class SendOriginWiringTests
         Assert.IsTrue(echoAt >= 0, "SendTextMessageRoutine no longer announces the optimistic bubble — re-derive where the snapshot is cleared");
         Assert.IsTrue(resolveAt < echoAt, "classify BEFORE the optimistic bubble is announced — SuggestionsController.HandleLive folds it as an answered run and StartFreshRound clears the snapshot SYNCHRONOUSLY, in the same call stack");
         Assert.IsTrue(yieldAt < 0 || resolveAt < yieldAt, "…and before the first yield (the poll's own echo is the second, later reset)");
-        Assert.IsTrue(send.Contains("originJson ="), "the resolved origin must be persisted in the outbox entry so a retry carries it");
+        Assert.IsTrue(Regex.IsMatch(send, @"originJson\s*="), "the resolved origin must be persisted in the outbox entry so a retry carries it");   // the initializer aligns its `=` columns
         string post = MethodBody("Scripts/Main/ChatManager.cs", "PostTextMessageRoutine");
         Assert.IsTrue(post.Contains("SendOriginWire.Append("), "origin_* must ride the same WappiProxy.Send args");
         Assert.IsTrue(post.Contains("chat_id = ChatIdFormat.Recipient(chatId)"), "a Telegram reply must name its chat in meta (the client sends no recipient there)");

@@ -53,6 +53,9 @@ public class OutboxStore
 
         // --- appended for channel awareness (append-only; JsonUtility fills missing as 0) ---
         public int    channel;           // ChatChannel ordinal; 0 = WhatsApp (back-compat default; JsonUtility fills missing as 0)
+
+        // --- appended for learning A (append-only; JsonUtility fills missing as null) ---
+        public string originJson;        // JsonConvert-serialised SendOrigin resolved at the FIRST attempt; null = legacy/no panel
     }
 
     [Serializable]
