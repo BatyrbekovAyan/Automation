@@ -103,6 +103,8 @@ cmd_migrate() {
     "${N8N_DIR}/sql/2026-10-11-bot-lineage.sql"
     # M3 (T7): a data backfill of the memory marks, idempotent; on prod it runs AFTER the T6 workflows (F1F2-plan §6)
     "${N8N_DIR}/sql/2026-10-12-memory-marks-backfill.sql"
+    # learning A (2026-10-13): origin_* on chat_history_events (ALTERs the stage-4 table above) + suggestion_sets
+    "${N8N_DIR}/sql/2026-09-25-learning-foundation.sql"
   )
   for f in "${files[@]}"; do
     [ -s "$f" ] || { echo "skip (missing) $f"; continue; }

@@ -116,6 +116,10 @@ def main():
         if psql("select to_regclass('public.clone_retirements') is not null;") == "t":
             for pid in a.profile_id:
                 n = int(n or 0) + int(psql("with a as (delete from clone_retirements where profile_id = :'p0' returning 1) select count(*) from a;", pid) or 0)
+        # learning A (2026-10-13): the panel's shown sets of a fixture profile (only once the learning migration is applied)
+        if psql("select to_regclass('public.suggestion_sets') is not null;") == "t":
+            for pid in a.profile_id:
+                n = int(n or 0) + int(psql("with a as (delete from suggestion_sets where profile_id = :'p0' returning 1) select count(*) from a;", pid) or 0)
         print(f"deleted rows: {n}")
 
 
