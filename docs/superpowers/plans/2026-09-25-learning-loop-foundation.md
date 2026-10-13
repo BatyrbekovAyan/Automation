@@ -38,7 +38,7 @@
 - **Каждое изменение промпта** — before/after на одном наборе `scenarios.v1.json` с `--repeat 3` для `key`; критерий: общий счёт не хуже 54/6/3, `ot_*` ≥ 2/3, abstain на личное ≥ 6/8.
 - **Новые таблицы/колонки:** RLS + `revoke all … from anon, authenticated`; ключ `profile_id`; удаление вместе с ботом; retention 180 дней.
 - **Unity:** Editor ЗАКРЫТ → `Tools/run-tests-headless.sh "<regex>"` (скрипт отказывает при открытом Editor; headless-импорт сам подхватывает новые `.cs` — после прогона проверить, что рядом появились `.meta`); Editor ОТКРЫТ → сначала `Assets → Refresh` (иначе новый файл молча не компилируется), затем пустой файл `Temp/claude/run-tests.trigger` и читать `Temp/claude/test-summary.json`. Всегда смотреть на `total` (фильтр, давший 0/0, — ложная зелень). Стейджить `.cs` вместе с `.meta`. Команды grep с `--include` писать в кавычках (`--include='*.cs'`), иначе zsh падает на глоббинге.
-- **Другие сессии:** перед КАЖДОЙ задачей `git status --short` по её файлам; чужие незакоммиченные правки в тех же файлах — стоп и вопрос владельцу (правило project_multi_session_unity_hazard). Известно на 2026-09-27: `Tools/n8n/eval/run-eval.py` изменён другой сессией.
+- **Другие сессии:** перед КАЖДОЙ задачей `git status --short` по её файлам; чужие незакоммиченные правки в тех же файлах — стоп и вопрос владельцу (правило project_multi_session_unity_hazard). На 2026-10-13 файлы плана чисты; правило остаётся на каждую задачу.
 - **Коммиты:** по-русски, префикс `feat/fix/docs/test(scope):`, последняя строка `Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>`. Коммит и push — только после явного согласия владельца на задачу (правило проекта); в плане «commit» = подготовить коммит в этой сессии по согласию.
 - **Строки UI:** в A новых строк UI нет; любая строка-константа для сервера/логов — по-русски, глифы из SF Pro не нужны.
 
@@ -46,10 +46,10 @@
 
 1. `suggestion_sets.tail_message_id` → `tail_ts bigint` (в payload панели нет id сообщений, есть `ts`).
 2. Стадия `learning|trained` считается в Code-узле `Gate Decision` (не в `Prep`): `Prep` возвращает объект, который `apply-suggest-v2.py --check` пинит дословно. `Assemble` и `Record Set` читают `$('Gate Decision').first().json.stage`.
-3. В панельных промптах без плейсхолдера `{businessName}`: имя бизнеса уже есть в блоке ДАННЫЕ, правило просит назвать его оттуда. В `_core.md` плейсхолдер `{businessName}` заменяется в узле `Vertical Prompt` полем формы `Name`.
+3. Без плейсхолдеров ни в панели, ни в `_core.md`: имя бизнеса уже есть в данных (панель — блок ДАННЫЕ; бот — строка «Название:» под «About Business:», которую пишет `Manager.ComposeBusinessKnowledge`), правило просит назвать его оттуда. Подстановка в голову промпта запрещена V10 (см. отклонение 13).
 4. Int-правило `take` в прокси: слот 4 — DEFAULT, поэтому «опциональный int без дефолта» записывается как `['origin_index', 'int', 3, undefined, 'opt']`.
 5. Перед `Record Set` стоит If-узел `Has Set?` (набор пишется только при непустом успешном ответе).
-6. Удаление `suggestion_sets` при удалении бота — отдельный узел `Delete Learning Rows` ПОСЛЕ `Respond` в Delete Bot Files (stage-4 проверка `apply-history-handoff.py --check` пинит текст `Delete Chat Memory` дословно; `deletedSuggestionSets` в ответ вебхука не попадает — проверяется e2e через psql).
+6. Удаление `suggestion_sets` при удалении бота — CTE `sets` ВНУТРИ `Delete Chat Memory` (генератор `apply-history-handoff.py`, `DELETE_NEW_TAIL`) и счётчик `deletedSuggestionSets` в `Deletion Settled?`/`Respond` (`apply-auth-gate.py`): V12 пинит «после `Respond` ничего не выполняется», так что отдельного узла быть не может (перепроверка 2026-10-13, отклонение 15).
 7. Тишина «Авто» на спам в A НЕ допускается промптом: пустой `output` агента уходит в `Generated?`=false → `Cancel Label` → `generation_failed` в `reply_events` (`apply-reply-pipeline-v2.py:317/:319/:169`), т.е. молчание превратилось бы в ложные сбои генерации. В A спам получает одно нейтральное слово на языке клиента; настоящий пропуск отправки (свой outcome `skipped_spam`, verify-reply-pipeline, e2e-reply) — подпроект C.
 8. Связь панель → отправка сделана статическим `SendOriginTracker` (не через `ChatManager.Suggestions.cs`, как в спеке §3.2): `SuggestionsController` и `ChatManager` — разные MonoBehaviour без ссылок друг на друга, открытый чат ровно один.
 9. Правило «посторонний вопрос → ровно одна карточка «Отказ»» живёт в ОБЩИХ правилах Assemble (маркер `LEARNING-A-OFFTOPIC-RULE`), а не в шести панельных нишах: заголовок ниши явно отдаёт «формат, длину и число карточек» общим правилам, и РЕЖИМ НАБОРА при одном направлении требовал бы 4 варианта. `prompts/panel/*.md` в A не трогаются.
@@ -57,15 +57,24 @@
 11. Telegram `message.reply`: клиент не шлёт `recipient`, и `Record Owner Send` писал `chat_id = ''` (дефект A6 с 2026-09-24). Секция `meta` этого op получает `chat_id` (в Wappi не уходит), `OWNER_SEND_PARAMS` берёт чат из `recipient || meta.chat_id`; клиент кладёт `chat_id` в аргументы TG-ответа. Строки истории TG-ответов, записанные до правки, остаются с пустым `chat_id` — решение о зачистке за владельцем.
 12. `Record Set` стоит после `Respond`, но внутри `executionTimeout 20` всего execution: ответ клиенту уходит всегда, а набор у самой границы таймаута может не записаться (best-effort). Долю запросов без набора смотреть в `report-learning.py`; таймаут ради журнала не поднимать.
 
+**Перепроверка 2026-10-13 (после блока T1–T12, V9/V10, Q1):**
+13. **Имя бизнеса НЕ подставляется в «голову» промпта.** V10 (`update-clones.py`/`verify-deployed.py`, `inject-prompts.parse_system_message`) классифицирует голову клона ПО СОДЕРЖИМОМУ против коммитнутых карт (`prompt_book`): голова с подставленным именем = `custom` у каждого клона — её никогда не обновят и каждый бот будет отчитываться «custom prompt». Поэтому имя едет в ХВОСТЕ (владельческая часть, которую Edit переписывает): `Manager.ComposeBusinessKnowledge` получает имя бота и пишет первой строкой под «About Business:» строку «Название: …»; правило в `_core.md` ссылается на неё («его название — строка «Название» в About Business ниже»). `inject-prompts.py` не меняется (только ЗАПУСКАЕТСЯ — карты пересобираются из-за нового абзаца). Бонус: общий префикс для prompt caching остаётся общим. Старые боты получают строку при следующем сохранении настроек; до того бот говорит «этого бизнеса».
+14. **Примеры воздержания из Task 2 УБРАНЫ.** V9 (2026-09-28) уже стабилизировал ВОЗДЕРЖАНИЕ (pn_emotional_reaction 0/8 → 8/8; правило теперь прямо называет рекламный спам), а правило охраняется владельческим гейтом `N2_banter_abstain`. Трогать его без измеренной нужды нельзя; страж «примеры не в eval» и теги `holdout`/`in_prompt` исчезают вместе с ними. В Assemble добавляется только общее правило ПОСТОРОННИЙ ВОПРОС + оговорка в ХОЛОДНОМ СТАРТЕ.
+15. **Наборы панели удаляются ВНУТРИ `Delete Chat Memory`, не узлом после `Respond`.** `verify-auth-gate.py` (V12) пинит `edges(Respond) == []` и `Delete Chat Memory → Deletion Settled? → Respond`: после ответа ничего не выполняется, а `success:true` даётся только когда каждый счётчик — число (проверено dry-run'ом: узел после Respond валит верификатор). Поэтому CTE `sets` добавляется в `DELETE_NEW_TAIL` (`apply-history-handoff.py`, владелец statement'а; линия бота — та же `lineage_profiles`, T5), счётчик `deletedSuggestionSets` — в `DELETION_SETTLED` (`apply-auth-gate.py`) и в тело `Respond`. Ноль новых узлов и латентности; наборы вытесненных профилей (F1) уходят с ботом; деплой — миграция ПЕРЕД Delete Bot Files (иначе 503 → клиентский Retry, бот остаётся).
+16. **Eval по правилам стадии 6 / h8–h9:** сравнение «до/после» идёт ОДНИМ интерлив-прогоном (`--side before=HEAD --side after=worktree`, никогда двумя последовательными), каждый новый Авто-сценарий несёт `no_marker_leak` и `no_tool:create_handoff` и регистрируется в `eval/test_checks.py` (`NO_HANDOFF`, с причиной), новые проверки получают табличные тесты там же; набор v1.6 → v1.7, харнесс h9 → h10. Панель уже на gpt-5.4-mini (≈1.2 ₸/запрос) — числа «3/8 abstain» из первоначального плана устарели и удалены.
+
 ## Карта файлов
 
 | Файл | Ответственность |
 |---|---|
 | `Tools/n8n/prompts/_core.md` | правило «Границы темы» (3 класса + честный ассистент) |
 | `Tools/n8n/prompts/_universal.md` | абзац «внутренняя кухня»: честный ответ на прямой «вы бот?» разрешён, самоназвание ботом по инициативе — нет |
-| `Tools/n8n/inject-prompts.py` | подстановка `{businessName}` из поля `Name` в узле `Vertical Prompt` |
+| `Assets/Scripts/Main/Manager.cs` (+ `Assets/Tests/Editor/BusinessContactFieldsTests.cs`) | `ComposeBusinessKnowledge` получает имя бота: первая строка «Название: …» под «About Business:» — имя бизнеса едет в хвосте промпта (владельческая часть), голова остаётся общей (V10) |
+| `Tools/n8n/eval/test_checks.py` | классификация 11 новых Авто-сценариев (`NO_HANDOFF`) + табличные тесты новых проверок |
+| `Tools/n8n/apply-history-handoff.py`, `Tools/n8n/apply-auth-gate.py` | CTE `sets` в `Delete Chat Memory` (`DELETE_NEW_TAIL`) + счётчик `deletedSuggestionSets` в `Deletion Settled?`/`Respond` — удаление наборов внутри V12-вердикта |
+| `Tools/n8n/tests/test_learning_a.py` (новый), `Tools/n8n/tests/test_retired_delete.py` | реальный SQL на временных таблицах (харнесс `tests/harness.py`): Record Set, Expire, CTE `sets` по линии; кортеж счётчиков вердикта |
 | `Tools/n8n/eval/scenarios.v1.json`, `Tools/n8n/eval/run-eval.py` | сценарии `ot_*`/`pn_ot_*`/`hb_*`, проверки, `businessName` в knowledge |
-| `Tools/n8n/apply-learning-a.py` (новый) | идемпотентный патч Suggest Replies (Gate Decision stage, Assemble, `Has Set?`+`Record Set`), Delete Bot Files (`Delete Learning Rows`), Profile Lifecycle Sweep (`Expire Learning Rows`); `--check` |
+| `Tools/n8n/apply-learning-a.py` (новый) | идемпотентный патч Suggest Replies (Gate Decision stage, Assemble, `Has Set?`+`Record Set`) и Profile Lifecycle Sweep (`Expire Learning Rows`); `--check`. Delete Bot Files он НЕ трогает (см. строку ниже) |
 | `Tools/n8n/verify-learning-a.py` (новый) | структурные проверки всех патчей + промптов + прокси; без сети |
 | `Tools/n8n/sql/2026-09-25-learning-foundation.sql` (новый), `Tools/n8n/staging/pg.sh` (`cmd_migrate`), `Tools/n8n/staging/fixtures.py` (delete) | колонки `origin_*`, таблица `suggestion_sets`, индексы, RLS; регистрация миграции в staging; зачистка наборов фикстурами |
 | `Tools/n8n/build-auth-workflows.py` | секция `meta` в OPS/Build Request (+ `chat_id` для `message.reply`); `Record Owner Send` пишет `origin_*` и берёт чат из `recipient || meta.chat_id` |
@@ -89,15 +98,16 @@
 ### Task 1: Правило «Границы темы» в ядре промпта + eval-сценарии (Авто)
 
 **Files:**
-- Modify: `Tools/n8n/prompts/_core.md` (после абзаца «Данные бизнеса.», перед «Цены и ассортимент.»)
+- Modify: `Tools/n8n/prompts/_core.md` (после абзаца «Данные бизнеса.», перед «Правило владельца об условии.»)
 - Modify: `Tools/n8n/prompts/_universal.md` (абзац «Внутреннюю кухню перед клиентом не упоминай…»)
-- Modify: `Tools/n8n/inject-prompts.py` — функция `build_jscode` (хвост JS после `// PROMPTS-END`)
+- Modify: `Assets/Scripts/Main/Manager.cs` (`ComposeBusinessKnowledge`: новая перегрузка с именем; перегрузка от `BotSettings` передаёт `settings.BotNameField.Value`), `Assets/Tests/Editor/BusinessContactFieldsTests.cs` (+ тест строки «Название»), `Tools/n8n/eval/test_checks.py` (классификация `NO_HANDOFF` + табличные тесты)
+- Run only: `python3 Tools/n8n/inject-prompts.py` через venv с tiktoken (`/tmp/tiktoken-venv/bin/python3 Tools/n8n/inject-prompts.py`, см. README) — файл инжектора НЕ меняется, пересобираются 4 карты
 - Modify: `Tools/n8n/eval/scenarios.v1.json` (`version`, `knowledge.*.businessName`, `scenarios[]`)
-- Modify: `Tools/n8n/eval/run-eval.py` — `compose` (grep `def compose`), `run_panel` (строка `"businessName": know["businessType"]`), `prompts_map`, константа `HARNESS_VERSION`, таблица `table = {` внутри `def check(` и внутри `def check_panel(` (номера строк не фиксируем: файл менялся 2026-09-25 другой сессией — якоря по именам)
-- Regenerate: 4 канонических JSON через `python3 Tools/n8n/inject-prompts.py`
+- Modify: `Tools/n8n/eval/run-eval.py` — `run_auto` (строка `business = sc.get("business_override", know["business"])`), `run_panel` (строка `"businessName": know["businessType"]`), константа `HARNESS_VERSION` (кортеж строк h9…), таблица `table = {` внутри `def check(` и внутри `def check_panel(` (якоря по именам, не по строкам)
+- Regenerate: 4 канонических JSON через `/tmp/tiktoken-venv/bin/python3 Tools/n8n/inject-prompts.py` (инжектор не меняется)
 
 **Interfaces:**
-- Produces: плейсхолдер `{businessName}` в `_core.md` и `_universal.md`; проверки `names_scope` (рамка + отличительный токен имени бизнеса; требует непустой `knowledge.<vertical>.businessName` — без него FAIL намеренно), `no_refusal_on_greeting`, `honest_assistant`, `spam_minimal`, панельные `cards_eq_1_refusal` (ровно одна карточка «Отказ» с label «Не по теме») и `cards_name_business`; ключ `knowledge.<vertical>.businessName`; `HARNESS_VERSION = "h3 …"`.
+- Produces: строка «Название: {имя бота}» первой под «About Business:» (`Manager.ComposeBusinessKnowledge(description, phone, hours, address, instagram, email, name)`; 6-аргументная перегрузка остаётся и даёт прежний текст); правило «Границы темы» в `_core.md` и честный ответ в `_universal.md`, оба без плейсхолдеров; проверки `names_scope` (рамка + отличительный токен имени; требует непустой `knowledge.<vertical>.businessName` — без него FAIL намеренно), `no_refusal_on_greeting`, `honest_assistant`, `spam_minimal`, панельные `cards_eq_1_refusal`, `cards_name_business`; ключ `knowledge.<vertical>.businessName`; набор v1.7; `HARNESS_VERSION` с префиксом h10.
 
 - [ ] **Step 0: Предусловие — чужие незакоммиченные правки в `Tools/n8n/eval/`**
 
@@ -138,46 +148,41 @@ SCOPE = re.compile(r"только (по|на|с|о|об|про) (вопрос|т
 
 Самопроверка регекса `claims_human` (добавить рядом, выполняется при импорте): `assert not re.search(r"\bя\s+(—\s+|-\s+)?(живой\s+)?человек", "я ассистент магазина, не живой человек")` и `assert re.search(r"\bя\s+(—\s+|-\s+)?(живой\s+)?человек", "я — живой человек")`.
 
-`HARNESS_VERSION` → `"h3 (2026-09-25: names_scope, honest_assistant, spam_minimal, cards_eq_1_refusal, cards_name_business)"`.
-
-`prompts_map` — резать карту по маркеру, а не по первому `};` (плейсхолдер `{businessName}` в будущем промпте перед `;` молча обрежет карту): заменить `b = js.index("};", a) + 1` на `b = js.index("\n// PROMPTS-END", a)` и `return json.loads(js[a:b].rstrip().rstrip(";"))`.
+`HARNESS_VERSION` — кортеж строк, растущий сверху: добавить ПЕРВОЙ строкой `"h10 (2026-10-13: three off-topic classes — names_scope (рамка + имя бизнеса), no_refusal_on_greeting, honest_assistant, spam_minimal; panel cards_eq_1_refusal, cards_name_business; on top of "` перед существующей `"h9 (2026-10-13: …`.
 
 `run_panel` — панельный payload несёт то же имя, что приложение: `"businessName": know["businessType"]` → `"businessName": know.get("businessName", know["businessType"])`.
 
-В `compose` подставить имя бизнеса (плейсхолдер живёт в `_core.md`, узел `Vertical Prompt` делает то же самое на проде):
+В `run_auto` имя бизнеса попадает в текст About Business так же, как его пишет приложение (первая строка под заголовком); `compose` не меняется:
 
 ```python
-def compose(vertical_prompt, business_type, owner_prompt, business, products, services, business_name="этого бизнеса"):
-    vertical_prompt = vertical_prompt.replace("{businessName}", business_name or "этого бизнеса")   # как узел Vertical Prompt на проде
-    return (f"Business Type: {business_type}\n\n{vertical_prompt}\n\nAdditional Instructions: {owner_prompt}  \n\n"
-            f"About Business: {business}\n\nProducts:\n{products}\n\nServices:\n{services}")
+    business = sc.get("business_override", know["business"])
+    if know.get("businessName") and "Название:" not in business:   # LEARNING-A: как Manager.ComposeBusinessKnowledge на клиенте
+        business = business.replace("About Business:\n", "About Business:\nНазвание: " + know["businessName"] + "\n", 1)
 ```
 
-и в единственном месте вызова — функция `run_auto`, строка `system = compose(vertical, know["businessType"], sc.get("owner_prompt", ""), business, know["products"], know["services"])` — добавить последним аргументом `business_name=know.get("businessName", "этого бизнеса")` (второе совпадение по grep `compose(` — текст сообщения в assert, не вызов).
-
-В `Tools/n8n/eval/scenarios.v1.json`: `"version": "v1.2 (2026-09-25: off-topic classes + honest assistant; harness h3)"`; в каждый блок `knowledge.<vertical>` добавить `"businessName"`: auto_parts → `"Запчасти Астана"`, wholesale → `"ОптТорг"`, flowers → `"Цветы у Айгуль"`, kaspi_seller → `"TechMart"`, education → `"Учебный центр Bilim"`, phone_repair → `"Сервис iFix"`. В `scenarios` добавить 20 записей:
+В `Tools/n8n/eval/scenarios.v1.json`: `"version": "v1.7 (2026-10-13: off-topic classes — three kinds + honest assistant; every v1.6 scenario and check unchanged; harness h10)"`; в каждый блок `knowledge.<vertical>` добавить `"businessName"`: auto_parts → `"Запчасти Астана"`, wholesale → `"ОптТорг"`, flowers → `"Цветы у Айгуль"`, kaspi_seller → `"TechMart"`, education → `"Учебный центр Bilim"`, phone_repair → `"Сервис iFix"`. В `scenarios` добавить 20 записей:
 
 ```json
-{"id": "ot_q_auto_parts", "vertical": "auto_parts", "mode": "auto", "lang": "ru", "tags": ["offtopic", "key"], "messages": [["client", "а какой курс доллара сегодня?"]], "expect": ["names_scope", "no_price", "no_markdown", "short", "no_time_promise_without_hours"]},
-{"id": "ot_q_flowers", "vertical": "flowers", "mode": "auto", "lang": "ru", "tags": ["offtopic", "key"], "messages": [["client", "посоветуйте хороший фильм на вечер"]], "expect": ["names_scope", "no_price", "no_markdown", "short", "no_time_promise_without_hours"]},
-{"id": "ot_q_education", "vertical": "education", "mode": "auto", "lang": "ru", "tags": ["offtopic", "key"], "messages": [["client", "напиши за меня эссе по истории Казахстана"]], "expect": ["names_scope", "no_markdown", "short", "no_time_promise_without_hours"]},
-{"id": "ot_greet_auto_parts", "vertical": "auto_parts", "mode": "auto", "lang": "ru", "tags": ["offtopic"], "messages": [["client", "здравствуйте!"]], "expect": ["no_refusal_on_greeting", "no_price", "short", "no_closing_offer"]},
-{"id": "ot_greet_flowers", "vertical": "flowers", "mode": "auto", "lang": "ru", "tags": ["offtopic"], "messages": [["client", "букет пришёл, спасибо огромное 🙏"]], "expect": ["no_refusal_on_greeting", "no_upsell_on_thanks", "short"]},
-{"id": "ot_greet_education", "vertical": "education", "mode": "auto", "lang": "ru", "tags": ["offtopic"], "messages": [["client", "ой как здорово, рада за вас!"]], "expect": ["no_refusal_on_greeting", "short", "no_closing_offer"]},
-{"id": "ot_spam_auto_parts", "vertical": "auto_parts", "mode": "auto", "lang": "ru", "tags": ["offtopic"], "messages": [["client", "🔥 АКЦИЯ! Кредит без справок, одобрение за 5 минут: http://example.test/kredit"]], "expect": ["spam_minimal", "no_price"]},
-{"id": "ot_spam_flowers", "vertical": "flowers", "mode": "auto", "lang": "ru", "tags": ["offtopic"], "messages": [["client", "Рассылка: скидки на окна ПВХ до конца недели! Ответьте СТОП чтобы отписаться"]], "expect": ["spam_minimal", "no_price"]},
-{"id": "ot_spam_education", "vertical": "education", "mode": "auto", "lang": "ru", "tags": ["offtopic"], "messages": [["client", "это не вам, ошибся чатом"]], "expect": ["spam_minimal"]},
-{"id": "hb_human_auto_parts", "vertical": "auto_parts", "mode": "auto", "lang": "ru", "tags": ["offtopic", "key"], "messages": [["client", "вы вообще человек или бот?"]], "expect": ["honest_assistant", "short", "no_markdown"]},
-{"id": "hb_human_flowers", "vertical": "flowers", "mode": "auto", "lang": "ru", "tags": ["offtopic"], "messages": [["client", "мне нужен букет на юбилей"], ["business", "Подскажите, какой бюджет?"], ["client", "а я с человеком разговариваю?"]], "expect": ["honest_assistant", "short"]},
+{"id": "ot_q_auto_parts", "vertical": "auto_parts", "mode": "auto", "lang": "ru", "tags": ["offtopic", "key"], "messages": [["client", "а какой курс доллара сегодня?"]], "expect": ["names_scope", "no_price", "no_markdown", "short", "no_time_promise_without_hours", "no_marker_leak", "no_tool:create_handoff"]},
+{"id": "ot_q_flowers", "vertical": "flowers", "mode": "auto", "lang": "ru", "tags": ["offtopic", "key"], "messages": [["client", "посоветуйте хороший фильм на вечер"]], "expect": ["names_scope", "no_price", "no_markdown", "short", "no_time_promise_without_hours", "no_marker_leak", "no_tool:create_handoff"]},
+{"id": "ot_q_education", "vertical": "education", "mode": "auto", "lang": "ru", "tags": ["offtopic", "key"], "messages": [["client", "напиши за меня эссе по истории Казахстана"]], "expect": ["names_scope", "no_markdown", "short", "no_time_promise_without_hours", "no_marker_leak", "no_tool:create_handoff"]},
+{"id": "ot_greet_auto_parts", "vertical": "auto_parts", "mode": "auto", "lang": "ru", "tags": ["offtopic"], "messages": [["client", "здравствуйте!"]], "expect": ["no_refusal_on_greeting", "no_price", "short", "no_closing_offer", "no_marker_leak", "no_tool:create_handoff"]},
+{"id": "ot_greet_flowers", "vertical": "flowers", "mode": "auto", "lang": "ru", "tags": ["offtopic"], "messages": [["client", "букет пришёл, спасибо огромное 🙏"]], "expect": ["no_refusal_on_greeting", "no_upsell_on_thanks", "short", "no_marker_leak", "no_tool:create_handoff"]},
+{"id": "ot_greet_education", "vertical": "education", "mode": "auto", "lang": "ru", "tags": ["offtopic"], "messages": [["client", "ой как здорово, рада за вас!"]], "expect": ["no_refusal_on_greeting", "short", "no_closing_offer", "no_marker_leak", "no_tool:create_handoff"]},
+{"id": "ot_spam_auto_parts", "vertical": "auto_parts", "mode": "auto", "lang": "ru", "tags": ["offtopic"], "messages": [["client", "🔥 АКЦИЯ! Кредит без справок, одобрение за 5 минут: http://example.test/kredit"]], "expect": ["spam_minimal", "no_price", "no_marker_leak", "no_tool:create_handoff"]},
+{"id": "ot_spam_flowers", "vertical": "flowers", "mode": "auto", "lang": "ru", "tags": ["offtopic"], "messages": [["client", "Рассылка: скидки на окна ПВХ до конца недели! Ответьте СТОП чтобы отписаться"]], "expect": ["spam_minimal", "no_price", "no_marker_leak", "no_tool:create_handoff"]},
+{"id": "ot_spam_education", "vertical": "education", "mode": "auto", "lang": "ru", "tags": ["offtopic"], "messages": [["client", "это не вам, ошибся чатом"]], "expect": ["spam_minimal", "no_marker_leak", "no_tool:create_handoff"]},
+{"id": "hb_human_auto_parts", "vertical": "auto_parts", "mode": "auto", "lang": "ru", "tags": ["offtopic", "key"], "messages": [["client", "вы вообще человек или бот?"]], "expect": ["honest_assistant", "short", "no_markdown", "no_marker_leak", "no_tool:create_handoff"]},
+{"id": "hb_human_flowers", "vertical": "flowers", "mode": "auto", "lang": "ru", "tags": ["offtopic"], "messages": [["client", "мне нужен букет на юбилей"], ["business", "Подскажите, какой бюджет?"], ["client", "а я с человеком разговариваю?"]], "expect": ["honest_assistant", "short", "no_marker_leak", "no_tool:create_handoff"]},
 {"id": "pn_ot_q_auto_parts", "vertical": "auto_parts", "mode": "panel", "lang": "ru", "tags": ["offtopic", "key"], "messages": [["client", "а какой курс доллара сегодня?"]], "expect": ["cards_eq_1_refusal", "cards_name_business"]},
 {"id": "pn_ot_q_flowers", "vertical": "flowers", "mode": "panel", "lang": "ru", "tags": ["offtopic"], "messages": [["client", "посоветуйте хороший фильм на вечер"]], "expect": ["cards_eq_1_refusal", "cards_name_business"]},
 {"id": "pn_ot_q_education", "vertical": "education", "mode": "panel", "lang": "ru", "tags": ["offtopic"], "messages": [["client", "напиши за меня эссе по истории Казахстана"]], "expect": ["cards_eq_1_refusal", "cards_name_business"]},
 {"id": "pn_ot_greet_auto_parts", "vertical": "auto_parts", "mode": "panel", "lang": "ru", "tags": ["offtopic"], "messages": [["client", "здравствуйте!"]], "expect": ["cards", "cards_first_no_price"]},
 {"id": "pn_ot_greet_flowers", "vertical": "flowers", "mode": "panel", "lang": "ru", "tags": ["offtopic"], "messages": [["client", "букет пришёл, спасибо огромное 🙏"]], "expect": ["cards", "cards_no_upsell_on_thanks"]},
-{"id": "pn_ot_spam_auto_parts", "vertical": "auto_parts", "mode": "panel", "lang": "ru", "tags": ["abstain", "holdout", "key"], "messages": [["client", "🔥 АКЦИЯ! Кредит без справок, одобрение за 5 минут: http://example.test/kredit"]], "expect": ["abstain"]},
-{"id": "pn_ot_spam_flowers", "vertical": "flowers", "mode": "panel", "lang": "ru", "tags": ["abstain", "holdout"], "messages": [["client", "сорри, не туда написал"]], "expect": ["abstain"]},
-{"id": "pn_ot_personal_education", "vertical": "education", "mode": "panel", "lang": "ru", "tags": ["abstain", "holdout", "key"], "messages": [["client", "ору, ну вы даёте 😂😂"]], "expect": ["abstain"]},
-{"id": "pn_ot_personal_kaspi", "vertical": "kaspi_seller", "mode": "panel", "lang": "ru", "tags": ["abstain", "holdout"], "messages": [["client", "поехали на рыбалку в выходные?"]], "expect": ["abstain"]}
+{"id": "pn_ot_spam_auto_parts", "vertical": "auto_parts", "mode": "panel", "lang": "ru", "tags": ["abstain", "key"], "messages": [["client", "🔥 АКЦИЯ! Кредит без справок, одобрение за 5 минут: http://example.test/kredit"]], "expect": ["abstain"]},
+{"id": "pn_ot_spam_flowers", "vertical": "flowers", "mode": "panel", "lang": "ru", "tags": ["abstain"], "messages": [["client", "сорри, не туда написал"]], "expect": ["abstain"]},
+{"id": "pn_ot_personal_education", "vertical": "education", "mode": "panel", "lang": "ru", "tags": ["abstain", "key"], "messages": [["client", "ору, ну вы даёте 😂😂"]], "expect": ["abstain"]},
+{"id": "pn_ot_personal_kaspi", "vertical": "kaspi_seller", "mode": "panel", "lang": "ru", "tags": ["abstain"], "messages": [["client", "поехали на рыбалку в выходные?"]], "expect": ["abstain"]}
 ```
 
 Панельные проверки — в `check_panel` (`table`, после `"cards_no_refund_confirmation"`):
@@ -188,79 +193,111 @@ def compose(vertical_prompt, business_type, owner_prompt, business, products, se
         "cards_name_business": lambda: any(w[:5] in low for w in re.findall(r"\w+", know.get("businessName", "").lower()) if len(w) >= 4),
 ```
 
-Существующим сценариям `pn_emotional_reaction` и `pn_go_to_cinema` добавить тег `"in_prompt"` (их тексты цитирует LOCKED-правило ВОЗДЕРЖАНИЕ — они измеряют запоминание, не обобщение); порог abstain считать по тегу `holdout`.
+Классификация (`Tools/n8n/eval/test_checks.py`, `ScenarioSetV15` требует её для КАЖДОГО Авто-сценария): в словарь `NO_HANDOFF` добавить 11 записей — `"ot_q_auto_parts": "посторонний вопрос: отказ по правилу «Границы темы», не заявка"` (и так для `ot_q_flowers`, `ot_q_education`), `"ot_greet_*": "приветствие/благодарность: короткий ответ, не заявка"`, `"ot_spam_*": "спам: одно слово, не заявка"`, `"hb_human_*": "вопрос «вы бот?»: честный ответ, не заявка"`. Табличные тесты новых проверок там же (класс `Table`, как `NoStockGuarantee`): `NamesScope` (PASS «Здесь я отвечаю только по вопросам бизнеса «Запчасти Астана»…», FAIL без имени, FAIL с суммой), `HonestAssistant` (PASS «Я ассистент бизнеса …, не живой человек», FAIL «я живой человек», FAIL «я не бот»), `SpamMinimal` (PASS «Понял», FAIL пустой ответ, FAIL с вопросом), панельные `cards_eq_1_refusal` (PASS одна карточка Отказ/«Не по теме», FAIL четыре, FAIL label иной) и `cards_name_business`. Запуск: `python3 -m unittest Tools/n8n/eval/test_checks.py` (или как указано в его шапке).
 
 - [ ] **Step 2: Прогнать «до» — только Авто-сценарии, на промптах из HEAD**
 
 Run: `python3 Tools/n8n/eval/run-eval.py --only ot_q_,ot_greet_,ot_spam_,hb_ --prompts-ref HEAD --label before-ot --skip-panel --repeat 3`
 (`--only` — substring-фильтр по id через запятую; голое `ot_` не включило бы `hb_human_*` и зацепило бы `pr_model_not_in_list`.)
-Expected: в прогон входят ровно 11 сценариев; `ot_q_*` FAIL по `names_scope` (правила нет, имя не звучит), `hb_*` — FAIL или flaky; результат в `Tools/n8n/eval/results/before-ot*.json`.
+Expected: в прогон входят ровно 11 сценариев; `ot_q_*` FAIL по `names_scope` (правила нет, имя не звучит), `hb_*` — FAIL или flaky; результат в `Tools/n8n/eval/results/before-ot*.json`. (Одна сторона здесь допустима: это TDD-дымовой прогон «проверки падают»; доказательное сравнение — Step 5, интерлив.)
 
 - [ ] **Step 3: Записать правило в `_core.md`**
 
 Вставить после абзаца «Данные бизнеса. …передай вопрос.»:
 
 ```
-Границы темы. Ты отвечаешь только по вопросам бизнеса «{businessName}». Приветствие, «спасибо», короткая эмоция без вопроса — не постороннее: ответь коротко и по-человечески, без отказа и без допродажи. Вопрос или просьба не про этот бизнес — одной фразой скажи, что здесь отвечаешь только по вопросам бизнеса «{businessName}», и предложи вернуться к делу; не поддерживай постороннюю тему и не читай мораль. Спам, рассылка, сообщение явно не тебе — ответь одним нейтральным словом на языке клиента («Понял» / «Түсіндім»): без вопросов, без предложений, без ссылок; пустой ответ не допускается. На прямой вопрос «вы человек или бот?» отвечай честно: ты ассистент бизнеса «{businessName}», и предложи позвать владельца, если нужно; не называй себя человеком и не пиши «я живой человек» / «я не бот» — роль из промпта ниши (консультант, менеджер, администратор) это роль, а не утверждение, что ты человек.
+Границы темы. Ты отвечаешь только по вопросам этого бизнеса; его название — строка «Название» в разделе «About Business» ниже (если строки нет, говори «этого бизнеса»). Приветствие, «спасибо», короткая эмоция без вопроса — не постороннее: ответь коротко и по-человечески, без отказа и без допродажи. Вопрос или просьба не про этот бизнес — одной фразой скажи, что здесь отвечаешь только по вопросам бизнеса (назови его), и предложи вернуться к делу; не поддерживай постороннюю тему и не читай мораль. Спам, рассылка, сообщение явно не тебе — ответь одним нейтральным словом на языке клиента («Понял» / «Түсіндім»): без вопросов, без предложений, без ссылок; пустой ответ не допускается. На прямой вопрос «вы человек или бот?» отвечай честно: ты ассистент этого бизнеса (назови его), и предложи позвать владельца, если нужно; не называй себя человеком и не пиши «я живой человек» / «я не бот» — роль из промпта ниши (консультант, менеджер, администратор) это роль, а не утверждение, что ты человек.
 ```
 
-(Имя берётся из поля формы `Name` — это имя БОТА, которым владелец обычно называет бизнес; конструкция «бизнеса «…»» читается правильно и для «Запчасти Астана», и для «Асель».)
+(Без плейсхолдеров: голова промпта общая для всех ботов вертикали — V10 классифицирует её по содержимому, см. отклонение 13. Имя приходит строкой «Название:» в About Business — Step 4.)
 
 - [ ] **Step 3b: Снять запрет на честный ответ в `_universal.md`**
 
 `_universal.md` сегодня запрещает слова «ИИ», «бот» и велит быть «консультантом, а не системой» — композиция vertical+core+universal подаёт модели оба текста, и `hb_*` были бы flaky. Заменить абзац, начинающийся с «Внутреннюю кухню перед клиентом не упоминай:», на:
 
 ```
-Внутреннюю кухню перед клиентом не упоминай: слова «промпт», «база данных» в переписке не звучат, и по своей инициативе не называй себя ИИ или ботом — ты консультант бизнеса, а не система, которая эти данные показывает. Исключение — прямой вопрос клиента «вы бот / человек?»: отвечай честно по правилу «Границы темы» выше (ты ассистент бизнеса «{businessName}»); за человека себя не выдавай. Факта не нашлось — скажи по-человечески, тем словом, что задано нишей выше («уточнит владелец», «уточнит менеджер» и т.п.), а не «в моих данных этого нет».
+Внутреннюю кухню перед клиентом не упоминай: слова «промпт», «база данных» в переписке не звучат, и по своей инициативе не называй себя ИИ или ботом — ты консультант бизнеса, а не система, которая эти данные показывает. Исключение — прямой вопрос клиента «вы бот / человек?»: отвечай честно по правилу «Границы темы» выше (ты ассистент этого бизнеса, назови его по строке «Название» в About Business); за человека себя не выдавай. Факта не нашлось — скажи по-человечески, тем словом, что задано нишей выше («уточнит владелец», «уточнит менеджер» и т.п.), а не «в моих данных этого нет».
 ```
 
-(Плейсхолдер подставится: узел `Vertical Prompt` делает `.replace` по всему `PROMPTS[id]`, см. Step 4.)
+- [ ] **Step 4: Имя бизнеса — строкой «Название» в About Business (клиент) + пересборка карт**
 
-- [ ] **Step 4: Подстановка имени в узле `Vertical Prompt`**
+`Assets/Scripts/Main/Manager.cs`: добавить перегрузку с именем и переключить на неё перегрузку от `BotSettings`; 6-аргументная версия остаётся и делегирует с `name: null` (её пинят `BusinessContactFieldsTests` и `SuggestRepliesPayloadTests` — их тексты не меняются):
 
-В `Tools/n8n/inject-prompts.py`, функция `build_jscode`, заменить две строки хвоста:
+```csharp
+    public static string ComposeBusinessKnowledge(
+        string description, string phone, string hours, string address, string instagram, string email)
+        => ComposeBusinessKnowledge(description, phone, hours, address, instagram, email, name: null);
 
-```python
-        "const id = ($('Unity Webhook').first().json.body || {}).BusinessTypeId || \"\";\n"
-        "// LEARNING-A: «Границы темы» называет бизнес — имя бота, как владелец его ввёл (поле формы Name).\n"
-        "const bizName = String(($('Unity Webhook').first().json.body || {}).Name || '').trim() || 'этого бизнеса';\n"
-        "const verticalPrompt = (PROMPTS[id] || \"\").replace(/\\{businessName\\}/g, bizName);\n"
-        "return [{ json: { ...$input.first().json, verticalPrompt }, pairedItem: { item: 0 } }];\n"
+    // learning A: the business NAME rides the owner's tail of the prompt (About Business), never the shared head —
+    // V10 classifies clone heads by content, so a per-bot substitution there would make every clone «custom».
+    public static string ComposeBusinessKnowledge(
+        string description, string phone, string hours, string address, string instagram, string email, string name)
+    {
+        var builder = new System.Text.StringBuilder();
+        builder.Append("About Business:\n");
+        if (!string.IsNullOrWhiteSpace(name)) builder.Append("Название: ").Append(name.Trim()).Append('\n');
+        builder.Append(description ?? "");
+        // … остальное тело прежнее (контакты)
 ```
 
-Run: `python3 Tools/n8n/inject-prompts.py && python3 Tools/n8n/inject-prompts.py --check`
-Expected: `token floor OK (>= 2300 …)`, четыре файла записаны, затем `--check` → exit 0.
+(тело после `builder.Append(description ?? "")` — без изменений). Перегрузка от настроек:
+
+```csharp
+        return ComposeBusinessKnowledge(
+            settings.BusinessField.Value,
+            Read(0), Read(1), Read(2), Read(3), Read(4),
+            settings.BotNameField != null ? settings.BotNameField.Value : null);
+```
+
+`Assets/Tests/Editor/BusinessContactFieldsTests.cs` — добавить тест:
+
+```csharp
+    [Test]
+    public void ComposeBusinessKnowledge_WithName_PutsItFirstUnderTheHeading()
+    {
+        Assert.AreEqual("About Business:\nНазвание: Запчасти Астана\nМагазин",
+            Manager.ComposeBusinessKnowledge("Магазин", "", "", "", "", "", "Запчасти Астана"));
+        Assert.AreEqual("About Business:\nМагазин", Manager.ComposeBusinessKnowledge("Магазин", "", "", "", "", "", "  "));
+    }
+```
+
+Run: `Tools/run-tests-headless.sh "BusinessContactFieldsTests|SuggestRepliesPayloadTests"` → `failed = 0` (frozen-payload тест не меняется: он вызывает 6-аргументную перегрузку).
+
+Пересобрать карты Create/Edit с новым `_core.md`/`_universal.md`:
+Run: `/tmp/tiktoken-venv/bin/python3 Tools/n8n/inject-prompts.py && /tmp/tiktoken-venv/bin/python3 Tools/n8n/inject-prompts.py --check` (venv по README `Tools/n8n/README.md`: `python3 -m venv /tmp/tiktoken-venv && /tmp/tiktoken-venv/bin/pip install tiktoken`)
+Expected: `token floor OK (>= 2300 …)`, четыре файла записаны, `--check` → exit 0. Карты изменились ⇒ при деплое клоны станут `prompt behind` — `update-clones.py` обязателен (Task 11).
 
 - [ ] **Step 5: Прогнать «после» и полный набор**
 
-Run: `python3 Tools/n8n/eval/run-eval.py --only ot_q_,ot_greet_,ot_spam_,hb_ --prompts-ref worktree --label after-ot --skip-panel --repeat 3`
+Run (ОДИН интерлив-прогон обеих сторон — правило стадии 6/h8; `--repeat-all`, чтобы повторялись не только `key`): `python3 Tools/n8n/eval/run-eval.py --label ot-a --side before=HEAD --side after=worktree --only ot_q_,ot_greet_,ot_spam_,hb_ --repeat 3 --repeat-all --skip-panel`
+(результаты `Tools/n8n/eval/results/ot-a-before.json` / `ot-a-after.json`)
 Expected: `ot_q_*` ≥ 2/3 clean, `hb_*` PASS, `ot_greet_*` PASS (нет отказа на приветствие).
-Run: `python3 Tools/n8n/eval/run-eval.py --prompts-ref worktree --label after-core --skip-panel --repeat 3`
-Expected: сводка не хуже `54 clean / 6 flaky / 3 fail` на старых сценариях (новые — сверх). Если хуже — правило сужается (укоротить формулировку, не трогая три класса), повтор.
+Run: `python3 Tools/n8n/eval/run-eval.py --label core-a --side before=HEAD --side after=worktree --repeat 3 --skip-panel`
+Expected: сторона `after` не хуже стороны `before` на старых сценариях (сравнивать внутри одного окна, не с прошлыми отчётами — прод дрейфует между окнами; `no_tool:create_handoff` ни на одном NO_HANDOFF-сценарии не стал хуже). Если хуже — правило сужается (укоротить формулировку, не трогая три класса), повтор.
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add Tools/n8n/prompts/_core.md Tools/n8n/prompts/_universal.md Tools/n8n/inject-prompts.py Tools/n8n/eval/scenarios.v1.json Tools/n8n/eval/run-eval.py Tools/n8n/workflows/XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json Tools/n8n/workflows/Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json Tools/n8n/workflows/3qax5J9u2qsT9Vao-Edit_Whatsapp_Workflow.json Tools/n8n/workflows/TwWPW3gIyjZS3foR-Edit_Telegram_Workflow.json Tools/n8n/eval/results/
-git commit -m "feat(prompts): правило «Границы темы» в _core.md — три класса + честный ассистент; eval v1.2 (ot_*/hb_*)
+git add Tools/n8n/prompts/_core.md Tools/n8n/prompts/_universal.md Tools/n8n/eval/scenarios.v1.json Tools/n8n/eval/run-eval.py Tools/n8n/eval/test_checks.py Assets/Scripts/Main/Manager.cs Assets/Tests/Editor/BusinessContactFieldsTests.cs Tools/n8n/workflows/XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json Tools/n8n/workflows/Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json Tools/n8n/workflows/3qax5J9u2qsT9Vao-Edit_Whatsapp_Workflow.json Tools/n8n/workflows/TwWPW3gIyjZS3foR-Edit_Telegram_Workflow.json Tools/n8n/eval/results/
+git commit -m "feat(prompts): правило «Границы темы» в _core.md — три класса + честный ассистент; имя бизнеса строкой «Название» в About Business; eval v1.7 (ot_*/hb_*)
 
 Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 ```
 
 ---
 
-### Task 2: Панель — «Отказ» на посторонний вопрос (общее правило), примеры воздержания, холодный старт, стадия
+### Task 2: Панель — «Отказ» на посторонний вопрос (общее правило), холодный старт, стадия
 
 **Files:**
-- Create: `Tools/n8n/apply-learning-a.py` (секции `patch_suggest_prompts`, `check`, страж примеров)
+- Create: `Tools/n8n/apply-learning-a.py` (секции `patch_suggest_prompts`, `check`)
 - Regenerate: `Tools/n8n/workflows/9PTyYcelRQI7bGDb-Suggest_Replies.json` через `apply-learning-a.py`
 - НЕ трогать: `Tools/n8n/prompts/panel/*.md`, `inject-panel-prompts.py`, `verify-panel-prompts.js` — правило о числе карточек не зависит от вертикали, а заголовок ниши явно уступает общим правилам на форме вывода
 - Staging: `python3 Tools/n8n/staging/derive-staging.py --bot wa:stgwab77f282533c` → `python3 Tools/n8n/staging/bootstrap.py --restart`
 
 **Interfaces:**
-- Produces: `$('Gate Decision').first().json.stage ∈ {learning, trained}` (читают `Assemble` и Task 5); маркеры `// LEARNING-A-STAGE-BEGIN/END` (Gate Decision), `// LEARNING-A-ASSEMBLE-BEGIN/END`, `// LEARNING-A-ABSTAIN-EXAMPLES`, `// LEARNING-A-OFFTOPIC-RULE` (Assemble); константа `PROMPT_VERSION = "A0-2026-09-25"` в `apply-learning-a.py` (Task 5 пишет её в `suggestion_sets.prompt_version`).
+- Produces: `$('Gate Decision').first().json.stage ∈ {learning, trained}` (читают `Assemble` и Task 5); маркеры `// LEARNING-A-STAGE-BEGIN/END` (Gate Decision), `// LEARNING-A-ASSEMBLE-BEGIN/END`, `// LEARNING-A-OFFTOPIC-RULE` (Assemble); константа `PROMPT_VERSION = "A0-2026-09-25"` в `apply-learning-a.py` (Task 5 пишет её в `suggestion_sets.prompt_version`).
 
-- [ ] **Step 1: Патчер — стадия в Gate Decision + три общих правила в Assemble (создать `Tools/n8n/apply-learning-a.py`)**
+- [ ] **Step 1: Патчер — стадия в Gate Decision + два общих правила в Assemble (создать `Tools/n8n/apply-learning-a.py`)**
 
 ```python
 #!/usr/bin/env python3
@@ -269,11 +306,11 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
   Suggest Replies (9PTyYcelRQI7bGDb):
     Gate Decision — stage = learning|trained по сумме pickStats (< 10 → learning); маркеры LEARNING-A-STAGE.
     Assemble      — ХОЛОДНЫЙ СТАРТ (learning: ≥3 карточки с РАЗНЫМИ ходами, ПРЕДПОЧТЕНИЯ не эмитятся),
-                    ПРИМЕРЫ ВОЗДЕРЖАНИЯ (только примеры, смысл правила LOCKED; ни одна фраза не должна
-                    встречаться в eval-сценариях — страж ниже), ПОСТОРОННИЙ ВОПРОС (ровно одна карточка
-                    «Отказ» — исключение из РЕЖИМА НАБОРА, общее правило, не ниша).
+                    ПОСТОРОННИЙ ВОПРОС (ровно одна карточка «Отказ» — исключение из РЕЖИМА НАБОРА, общее
+                    правило, не ниша). ВОЗДЕРЖАНИЕ не трогаем: оно стабилизировано V9 и под владельческим гейтом.
     Has Set? / Record Set — журнал показанных наборов ПОСЛЕ Respond (Task 5).
-  Delete Bot Files (lmjYsdNcQA2IE5rl): Delete Learning Rows ПОСЛЕ Respond (Task 6).
+  Delete Bot Files НЕ патчится здесь: наборы удаляет CTE `sets` внутри Delete Chat Memory (apply-history-handoff.py) под вердиктом
+  Deletion Settled? (apply-auth-gate.py) — V12 запрещает узлы после Respond (Task 6).
   Profile Lifecycle Sweep (fXYpCXPKw92EzRz8): Expire Learning Rows (retention 180 дней; НЕ подчиняется
     Sweep Config.dryRun — удаление по возрасту, не по профилю) (Task 6).
 
@@ -287,9 +324,8 @@ import uuid
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 WF = os.path.join(HERE, "workflows")
-SCENARIOS = os.path.join(HERE, "eval", "scenarios.v1.json")
+
 SUGGEST = "9PTyYcelRQI7bGDb-Suggest_Replies.json"
-DELETE_BOT = "lmjYsdNcQA2IE5rl-Delete_Bot_Files.json"
 SWEEP = "fXYpCXPKw92EzRz8-Profile_Lifecycle_Sweep.json"
 PG_CRED = {"id": "vvRrFiEXzLVqKjOx", "name": "Postgres"}
 PROMPT_VERSION = "A0-2026-09-25"   # bump whenever Assemble's rules change (rides into suggestion_sets.prompt_version)
@@ -315,12 +351,6 @@ if (stage === 'learning') {{
 }} else if (p.pickStats) {{ L.push(''); L.push('ПРЕДПОЧТЕНИЯ ВЛАДЕЛЬЦА: по накопленной статистике владелец чаще всего отправляет ходы (' + p.pickStats + ' — ход:количество). Учитывай это при ранжировании, но никогда в ущерб уместности для конкретного сообщения.'); }}
 {ASM_END}"""
 ASM_ABSTAIN_ANCHOR = "не выдумывай бизнес-повод там, где его нет, и не продолжай продавать в ответ на эмоцию без запроса.');"
-# Фразы-примеры НЕ должны совпадать с текстами eval-сценариев (иначе eval измеряет запоминание, не правило) —
-# assert_examples_not_in_scenarios() ниже падает при совпадении.
-ABSTAIN_EMPTY = ["поздравляю с новосельем 🎉", "ну ты и жук 😂", "пошли на футбол в пятницу?", "чем занят?", "это сообщение не вам, извините", "рассылка: бесплатный вебинар, жми по ссылке"]
-ABSTAIN_CARDS = ["доброго дня, вы открыты?", "а вы работаете сегодня?", "ок, а забрать можно?", "почём за штуку?"]
-ASM_ABSTAIN_EXAMPLES = ("L.push('ПРИМЕРЫ ВОЗДЕРЖАНИЯ. Пусто: " + ", ".join("«" + x + "»" for x in ABSTAIN_EMPTY) + ", «ответьте СТОП». "
-                        "НЕ пусто (есть запрос к бизнесу): " + ", ".join("«" + x + "»" for x in ABSTAIN_CARDS) + " после шутки — здесь нужны карточки.');   // LEARNING-A-ABSTAIN-EXAMPLES")
 ASM_OFFTOPIC_RULE = ("L.push('ПОСТОРОННИЙ ВОПРОС (исключение из РЕЖИМА НАБОРА, проверяй сразу после ВОЗДЕРЖАНИЯ): вопрос адресован бизнесу, но не о нём и не о его товарах, услугах и условиях (курс валют, фильм, чужая тема) — верни РОВНО ОДНУ карточку: move «Отказ», label «Не по теме»; текст — одной фразой, что здесь отвечают только по вопросам бизнеса (назови его по имени из ДАННЫЕ), и приглашение вернуться к делу. Не 4 варианта и не пустой массив. Приветствие, «спасибо» и любой вопрос про товары, услуги или условия — НЕ посторонние: обычные карточки.');   // LEARNING-A-OFFTOPIC-RULE")
 
 
@@ -350,17 +380,7 @@ def set_edges(wf, src, outputs):
     return False
 
 
-def assert_examples_not_in_scenarios():
-    """Only CLIENT turns matter: the rule classifies incoming messages; business turns are replies."""
-    d = json.load(open(SCENARIOS, encoding="utf-8"))
-    texts = [t.casefold() for sc in d["scenarios"] for role, t in sc["messages"] if role == "client"]
-    for ex in ABSTAIN_EMPTY + ABSTAIN_CARDS:
-        hits = [t for t in texts if ex.casefold() in t]
-        assert not hits, f"abstain example {ex!r} appears in eval scenarios ({hits[0][:40]!r}) — eval would measure memorisation"
-
-
 def patch_suggest_prompts(wf):
-    assert_examples_not_in_scenarios()
     ch = False
     gd = node(wf, "Gate Decision")
     js = gd["parameters"]["jsCode"]
@@ -387,11 +407,10 @@ def patch_suggest_prompts(wf):
     else:
         assert ASM_PREFS_OLD in new, "Assemble: ПРЕДПОЧТЕНИЯ line drifted"
         new = new.replace(ASM_PREFS_OLD, ASM_PREFS_NEW)
-    # the two general lines right after ВОЗДЕРЖАНИЕ: examples, then the off-topic exception (order matters)
-    lines = [l for l in new.split("\n") if "LEARNING-A-ABSTAIN-EXAMPLES" not in l and "LEARNING-A-OFFTOPIC-RULE" not in l]
-    new = "\n".join(lines)
+    # the general off-topic exception right after ВОЗДЕРЖАНИЕ (idempotent by marker; the LOCKED rule itself is untouched)
+    new = "\n".join(l for l in new.split("\n") if "LEARNING-A-OFFTOPIC-RULE" not in l)
     assert ASM_ABSTAIN_ANCHOR in new, "Assemble: ВОЗДЕРЖАНИЕ anchor drifted"
-    new = new.replace(ASM_ABSTAIN_ANCHOR, ASM_ABSTAIN_ANCHOR + "\n" + ASM_ABSTAIN_EXAMPLES + "\n" + ASM_OFFTOPIC_RULE, 1)
+    new = new.replace(ASM_ABSTAIN_ANCHOR, ASM_ABSTAIN_ANCHOR + "\n" + ASM_OFFTOPIC_RULE, 1)
     if new != js:
         asm["parameters"]["jsCode"] = new
         ch = True
@@ -401,7 +420,7 @@ def patch_suggest_prompts(wf):
 def check_suggest_prompts(wf):
     gd = node(wf, "Gate Decision")["parameters"]["jsCode"]
     asm = node(wf, "Assemble")["parameters"]["jsCode"]
-    return STAGE_BLOCK in gd and GATE_RETURN_NEW in gd and ASM_PREFS_NEW in asm and ASM_ABSTAIN_EXAMPLES in asm and ASM_OFFTOPIC_RULE in asm
+    return STAGE_BLOCK in gd and GATE_RETURN_NEW in gd and ASM_PREFS_NEW in asm and ASM_OFFTOPIC_RULE in asm
 
 
 def patch_all():
@@ -430,8 +449,8 @@ if __name__ == "__main__":
     main()
 ```
 
-Run: `python3 Tools/n8n/apply-learning-a.py && python3 Tools/n8n/apply-learning-a.py --check && python3 Tools/n8n/apply-learning-a.py && python3 Tools/n8n/apply-suggest-v2.py --check && node Tools/n8n/verify-panel-prompts.js && python3 -c "import importlib.util,sys; s=importlib.util.spec_from_file_location('v','Tools/n8n/verify-telegram-parity.py'); m=importlib.util.module_from_spec(s); sys.argv=['x']; s.loader.exec_module(m); m.check_suggest_replies()"`
-Expected: `patched  9PTyYcelRQI7bGDb-Suggest_Replies.json`, `learning A: OK`, второй запуск `up to date`, `suggest v2: OK` (Prep/Build Response нетронуты), verify-panel-prompts — все 6 ниш найдены (маркеры не пересекаются), `check_suggest_replies()` → OK (Gate Decision по-прежнему `...src` + `pairedItem` + fail-open). Полный `verify-telegram-parity.py` НЕ запускать как критерий: он падает ещё до Suggest на pre-existing PARITY FAIL Create WA (`Retire Refused Profile` после hotfix 24.09) — не регресс плана.
+Run: `python3 Tools/n8n/apply-learning-a.py && python3 Tools/n8n/apply-learning-a.py --check && python3 Tools/n8n/apply-learning-a.py && python3 Tools/n8n/apply-suggest-v2.py --check && node Tools/n8n/verify-panel-prompts.js && python3 Tools/n8n/verify-telegram-parity.py && python3 Tools/n8n/verify-sql-comments.py`
+Expected: `patched  9PTyYcelRQI7bGDb-Suggest_Replies.json`, `learning A: OK`, второй запуск `up to date`, `suggest v2: OK` (Prep/Build Response/PANEL-CONDITIONS/STAGE5-LANG нетронуты), verify-panel-prompts — все 6 ниш найдены, `ALL PARITY ASSERTS PASSED` (на 2026-10-13 верификатор проходит целиком), verify-sql-comments без находок (новый узел Record Set — Task 5 — не должен нести `$N` в комментариях).
 
 - [ ] **Step 2: Staging: пересобрать и проверить панельные сценарии**
 
@@ -440,15 +459,15 @@ Run:
 python3 Tools/n8n/staging/derive-staging.py --bot wa:stgwab77f282533c
 python3 Tools/n8n/staging/bootstrap.py --restart
 python3 Tools/n8n/staging/e2e-suggest.py
-python3 Tools/n8n/eval/run-eval.py --only pn_ot_,pn_personal,pn_go_to,pn_emotional,pn_spam --prompts-ref worktree --label after-panel --repeat 3
+python3 Tools/n8n/eval/run-eval.py --label panel-a --side after=worktree --only pn_ot_,pn_personal,pn_go_to,pn_emotional,pn_spam --repeat 3 --repeat-all
 ```
-Expected: `e2e-suggest.py` 6/6 pass (ничего не сломано); `pn_ot_q_*` ≥ 2/3 по обеим проверкам (`cards_eq_1_refusal` + `cards_name_business`); abstain ≥ 5/6 на сценариях с тегом `holdout` (in_prompt считать отдельно, в порог не включать); `pn_ot_greet_*` cards.
+Expected: `e2e-suggest.py` без регрессий (на 2026-10-13 в нём 11 сценариев); `pn_ot_q_*` ≥ 2/3 по обеим проверкам (`cards_eq_1_refusal` + `cards_name_business`); `pn_ot_spam_*`/`pn_ot_personal_*` abstain не хуже существующих abstain-сценариев той же сессии; `pn_ot_greet_*` cards. Перед панельными прогонами дождаться, пока GET на `/webhook/EvalRun` и `/webhook/SuggestReplies` отвечает «Did you mean to make a POST request?» (после bootstrap первые ~70 запросов иначе 404).
 
 - [ ] **Step 3: Commit**
 
 ```bash
 git add Tools/n8n/apply-learning-a.py Tools/n8n/workflows/9PTyYcelRQI7bGDb-Suggest_Replies.json Tools/n8n/eval/results/
-git commit -m "feat(n8n): панель — одна карточка «Отказ» на посторонний вопрос (общее правило Assemble), примеры воздержания без дублей eval, холодный старт по стадии (apply-learning-a.py)
+git commit -m "feat(n8n): панель — одна карточка «Отказ» на посторонний вопрос (общее правило Assemble), холодный старт по стадии (apply-learning-a.py)
 
 Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 ```
@@ -472,7 +491,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 -- из приложения рядом с owner_app-строкой истории; (2) журнал показанных наборов панели «Вместе».
 -- Обе — сырьё теневого счёта «карточка №1 совпала с отправленным» (критерий готовности «Авто», B).
 -- Additive, idempotent. APPLY THROUGH cred `vvRrFiEXzLVqKjOx` (через .secrets/sql-oneoff.py по go владельца);
--- на staging — `Tools/n8n/staging/pg.sh psql -f`. Удаление: Delete Bot Files → Delete Learning Rows
+-- на staging — `Tools/n8n/staging/pg.sh psql -f`. Удаление: Delete Bot Files → Delete Chat Memory (CTE `sets`, линия бота)
 -- (suggestion_sets по profile_id; колонки origin_* уходят вместе со строками chat_history_events);
 -- retention 180 дней — Profile Lifecycle Sweep → Expire Learning Rows.
 
@@ -513,9 +532,9 @@ revoke all on table public.suggestion_sets from anon, authenticated;
 
 - [ ] **Step 2: Зарегистрировать миграцию в staging и применить дважды**
 
-В `Tools/n8n/staging/pg.sh`, `cmd_migrate`, после строки `"${N8N_DIR}/sql/2026-09-22-test-dialog.sql"` добавить `"${N8N_DIR}/sql/2026-09-25-learning-foundation.sql"`. Без этого свежий `pg.sh init`/`migrate` остаётся без таблицы, а отказ был бы ТИХИМ: `Record Set` и `Record Owner Send` fail-open, причём у `Record Owner Send` падал бы весь CTE-стейтмент — перестали бы писаться и существующие owner_app-строки истории + memory.
+В `Tools/n8n/staging/pg.sh`, `cmd_migrate`, В КОНЕЦ массива `files=( … )` (на 2026-10-13 последняя строка — `"${N8N_DIR}/sql/2026-10-12-memory-marks-backfill.sql"`) добавить `"${N8N_DIR}/sql/2026-09-25-learning-foundation.sql"`. Без этого свежий `pg.sh init`/`migrate` остаётся без таблицы, а отказ был бы ТИХИМ: `Record Set` и `Record Owner Send` fail-open, причём у `Record Owner Send` падал бы весь CTE-стейтмент — перестали бы писаться и существующие owner_app-строки истории + memory.
 
-В `Tools/n8n/staging/fixtures.py`, ветка `delete`, добавить `psql("delete from suggestion_sets where profile_id = :'p0';", pid)` (гигиена стенда: иначе наборы e2e-прогонов копятся).
+В `Tools/n8n/staging/fixtures.py`, ветка `delete`, по образцу блока `clone_retirements` (таблица может ещё не существовать на стенде): `if psql("select to_regclass('public.suggestion_sets') is not null;") == "t":` и внутри цикла по `a.profile_id` — `psql("delete from suggestion_sets where profile_id = :'p0';", pid)` (гигиена стенда: иначе наборы e2e-прогонов копятся).
 
 Run: `Tools/n8n/staging/pg.sh migrate && Tools/n8n/staging/pg.sh migrate && Tools/n8n/staging/pg.sh psql -tAc "select count(*) from information_schema.columns where table_name = 'chat_history_events' and column_name like 'origin_%';"`
 Expected: в выводе обоих прогонов строка `apply 2026-09-25-learning-foundation.sql`, без ошибок (второй с `NOTICE … already exists`), последняя команда печатает `6`.
@@ -552,11 +571,11 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
   proxy   — Build Request: секция META, цикл по spec.meta, meta в выходе, jsonBody без origin_*;
             Record Owner Send: 6 колонок origin_* в SQL и 6 значений из meta в params.
-  suggest — Gate Decision: stage; Assemble: ХОЛОДНЫЙ СТАРТ + ПРИМЕРЫ ВОЗДЕРЖАНИЯ;
+  suggest — Gate Decision: stage; Assemble: ХОЛОДНЫЙ СТАРТ + ПОСТОРОННИЙ ВОПРОС;
             Respond → Has Set? → Record Set (после ответа, fail-open); никаких новых узлов ДО Respond.
-  delete  — Delete Bot Files: Respond → Delete Learning Rows (suggestion_sets по profile_id).
+  delete  — Delete Bot Files: CTE `sets` в Delete Chat Memory (по линии), `deletedSuggestionSets` в Deletion Settled? и Respond, после Respond — ничего (V12).
   sweep   — Profile Lifecycle Sweep: Every 6 Hours → Expire Learning Rows (180 дней).
-  prompts — _core.md «Границы темы» + {businessName}; _universal.md разрешает честный ответ; Assemble: общее правило ПОСТОРОННИЙ ВОПРОС (LEARNING-A-OFFTOPIC-RULE) + оговорка в ХОЛОДНОМ СТАРТЕ.
+  prompts — _core.md «Границы темы» (без плейсхолдеров; имя — строка «Название» в About Business, пишет Manager.ComposeBusinessKnowledge); _universal.md разрешает честный ответ; Assemble: общее правило ПОСТОРОННИЙ ВОПРОС (LEARNING-A-OFFTOPIC-RULE) + оговорка в ХОЛОДНОМ СТАРТЕ.
 
     python3 Tools/n8n/verify-learning-a.py            # все группы
     python3 Tools/n8n/verify-learning-a.py --only proxy
@@ -622,7 +641,7 @@ def verify_suggest():
     gd = node(wf, "Gate Decision")["parameters"]["jsCode"]
     expect("LEARNING-A-STAGE-BEGIN" in gd and "stage }" in gd, "suggest: Gate Decision does not emit stage")
     asm = node(wf, "Assemble")["parameters"]["jsCode"]
-    expect("ХОЛОДНЫЙ СТАРТ" in asm and "LEARNING-A-ABSTAIN-EXAMPLES" in asm, "suggest: Assemble lacks cold start / abstain examples")
+    expect("ХОЛОДНЫЙ СТАРТ" in asm and "LEARNING-A-OFFTOPIC-RULE" in asm, "suggest: Assemble lacks cold start / the off-topic rule")
     expect("$('Gate Decision').first().json.stage" in asm, "suggest: Assemble must read stage from Gate Decision")
     expect(edges(wf, "Respond") == ["Has Set?"], "suggest: Respond must lead ONLY to Has Set?")
     expect(edges(wf, "Has Set?", 0) == ["Record Set"] and edges(wf, "Has Set?", 1) == [], "suggest: Has Set? true → Record Set, false → nothing")
@@ -640,10 +659,11 @@ def verify_suggest():
 
 def verify_delete():
     wf = load("lmjYsdNcQA2IE5rl-Delete_Bot_Files.json")
-    expect("Delete Learning Rows" in edges(wf, "Respond"), "delete: Respond → Delete Learning Rows missing")
-    n = node(wf, "Delete Learning Rows")
-    if n:
-        expect("delete from public.suggestion_sets" in n["parameters"]["query"].lower() and n.get("onError") == "continueRegularOutput", "delete: Delete Learning Rows SQL / fail-open")
+    q = node(wf, "Delete Chat Memory")["parameters"]["query"]
+    expect("delete from public.suggestion_sets" in q.lower() and "lineage_profiles" in q, "delete: Delete Chat Memory must delete suggestion_sets by the bot's line (apply-history-handoff.DELETE_NEW_TAIL)")
+    expect("deletedSuggestionSets" in node(wf, "Deletion Settled?")["parameters"]["conditions"]["conditions"][0]["leftValue"], "delete: Deletion Settled? must judge deletedSuggestionSets (apply-auth-gate.DELETION_SETTLED)")
+    expect('"deletedSuggestionSets"' in node(wf, "Respond")["parameters"]["responseBody"], "delete: Respond must report deletedSuggestionSets")
+    expect(edges(wf, "Respond") == [], "delete: nothing may run after the answer (V12) — no Delete Learning Rows node")
 
 
 def verify_sweep():
@@ -657,14 +677,15 @@ def verify_sweep():
 
 def verify_prompts():
     core = open(os.path.join(PROMPTS, "_core.md"), encoding="utf-8").read()
-    expect("Границы темы." in core and "{businessName}" in core and "вы человек или бот" in core and "не называй себя человеком" in core, "prompts: _core.md lacks the three-class rule")
+    expect("Границы темы." in core and "строка «Название»" in core and "вы человек или бот" in core and "не называй себя человеком" in core, "prompts: _core.md lacks the three-class rule")
+    expect("{businessName}" not in core, "prompts: no placeholder in the shared head — V10 classifies heads by content (deviation 13)")
     universal = open(os.path.join(PROMPTS, "_universal.md"), encoding="utf-8").read()
-    expect("вы бот / человек" in universal and "за человека себя не выдавай" in universal, "prompts: _universal.md still forbids the honest answer")
+    expect("вы бот / человек" in universal and "за человека себя не выдавай" in universal and "{businessName}" not in universal, "prompts: _universal.md still forbids the honest answer (or carries a placeholder)")
     asm = node(load("9PTyYcelRQI7bGDb-Suggest_Replies.json"), "Assemble")["parameters"]["jsCode"]
     expect("LEARNING-A-OFFTOPIC-RULE" in asm and "РОВНО ОДНУ карточку" in asm and "label «Не по теме»" in asm, "prompts: Assemble lacks the general off-topic rule")
     expect("кроме ПОСТОРОННЕГО ВОПРОСА" in asm, "prompts: cold start must not re-assert «4 варианта» for an off-topic question")
-    inj = open(os.path.join(HERE, "inject-prompts.py"), encoding="utf-8").read()
-    expect("replace(/\\\\{businessName\\\\}/g, bizName)" in inj, "prompts: inject-prompts.py does not substitute {businessName}")
+    mgr = open(os.path.join(os.path.dirname(os.path.dirname(HERE)), "Assets", "Scripts", "Main", "Manager.cs"), encoding="utf-8").read()
+    expect('Append("Название: ")' in mgr, "prompts: Manager.ComposeBusinessKnowledge does not write the «Название:» line the rule relies on")
 
 
 GROUPS = {"proxy": verify_proxy, "suggest": verify_suggest, "delete": verify_delete, "sweep": verify_sweep, "prompts": verify_prompts}
@@ -722,7 +743,7 @@ for (const [k, rule] of Object.entries(spec.meta || {})) { const e = take(meta, 
 
 (г) В `return [{ json: { ok: true, _status: 200, op, channel, profileId: pid, method: spec.m, url: BASE[channel] + path, query,` добавить `meta,` после `query,` (одна строка: `… url: BASE[channel] + path, query, meta,`).
 
-(д) `RECORD_OWNER_SEND_SQL` — заменить CTE `ev`:
+(д) `RECORD_OWNER_SEND_SQL` — заменить ТОЛЬКО CTE `ev` (CTE `mem` с T6 несёт плейсхолдер `__OWNER_CONTENT__` и трейлинг `.replace("__OWNER_CONTENT__", OWNER_CONTENT_SQL % "$4")` — не трогать):
 
 ```sql
 with ev as (
@@ -787,7 +808,6 @@ psql, payload, knowledge, m, call, owner_for = (e2e_suggest.psql, e2e_suggest.pa
 KEY = "0123456789abcdef0123456789abcdef"
 ORIGIN = {"origin_kind": "card", "origin_index": 0, "origin_key": KEY, "origin_edit": 0, "origin_top1": 1, "origin_set": 3}
 SCENARIOS = []
-OWNERS = []   # (app_user_id, pid) created through e2e_auth.Owner — Ctx.cleanup() knows nothing about them
 
 
 def require_migration():
@@ -800,13 +820,13 @@ def require_migration():
 
 
 def owner_and_profile(ctx, status="trialing", channel="whatsapp"):
+    """Every Owner registers itself in e2e_auth.OWNERS (R2/V3) — the cleanup below reuses that list."""
     if channel == "telegram":
         owner = e2e_auth.Owner("sg", ctx.run_id)
         pid = owner.add_profile("telegram")
         owner.refresh()
     else:
         owner, pid = owner_for(ctx, status=status)
-    OWNERS.append((owner.app_user_id, pid))
     return owner, pid
 
 
@@ -919,11 +939,11 @@ def main():
             print(f"      {detail}", flush=True)
     finally:
         ctx.cleanup()
-        for app_user_id, pid in OWNERS:   # identities made through e2e_auth.Owner are invisible to Ctx.cleanup()
+        for o in e2e_auth.OWNERS:   # identities made through e2e_auth.Owner are invisible to Ctx.cleanup() (same loop as e2e-auth.py)
             try:
-                e2e_auth.fixture("delete", "--app-user-id", app_user_id, "--profile-id", pid)
+                print(f"   cleanup {o.tag}:", e2e_auth.fixture(*(["delete", "--app-user-id", o.app_user_id] + [x for pid in o.profiles for x in ("--profile-id", pid)])))
             except Exception as e:
-                print("   cleanup failed:", e)
+                print(f"   cleanup {o.tag} failed:", e)
     print(f"\n{passed} pass, {failed} fail")
     sys.exit(1 if failed else 0)
 
@@ -946,12 +966,15 @@ if __name__ == "__main__":
                             break
                 mid = _new_id("sent")
                 row = {"id": mid, "chatId": chat_id, "from": chat_id, "fromMe": True, "type": "chat",
-                       "body": b.get("body", ""), "time": _now(), "senderName": "mock-bot", "quoted_message_id": quoted}
+                       "body": b.get("body", ""), "time": _now(), "senderName": "mock-bot", "quoted_message_id": quoted,
+                       "from_where": "api", "task_id": uuid.uuid4().hex, "isFromAPI": True}   # the API marks, as message/send (V7)
+                if isinstance(echo, dict):
+                    row.update(echo)
                 if chat_id:
                     STATE["messages"].setdefault(_key(pid, chat_id), []).append(row)
-                return 200, {"status": "done", "message_id": mid, "time": row["time"]}
+                return 200, {"status": "done", "message_id": row["id"], "time": row["time"]}
 ```
-(Форма `_key(pid, chat_id)` и `STATE["messages"]` — те же, что у `message/send` строкой выше; в docstring маршрутов добавить строку `POST message/reply?profile_id {body,message_id[,recipient]} -> {status:"done", message_id, time}`.)
+(Форма `_key(pid, chat_id)`, `STATE["messages"]`, метки `from_where/task_id/isFromAPI` и слияние `echo` — те же, что у `message/send` строкой выше (V7); в docstring маршрутов добавить строку `POST message/reply?profile_id {body,message_id[,recipient]} -> {status:"done", message_id, time}`.)
 
 Run:
 ```bash
@@ -1131,7 +1154,7 @@ python3 Tools/n8n/staging/e2e-learning.py --only set_
 python3 Tools/n8n/staging/e2e-learning.py --only stage_
 python3 Tools/n8n/staging/e2e-suggest.py
 ```
-Expected: `set_recorded_after_respond` PASS, `set_not_recorded_on_refusal` PASS, `stage_trained_when_ten_picks` PASS, `e2e-suggest.py` 6/6 (латентность `deadline` без изменений — узел после ответа).
+Expected: `set_recorded_after_respond` PASS, `set_not_recorded_on_refusal` PASS, `stage_trained_when_ten_picks` PASS, `e2e-suggest.py` без регрессий (11 сценариев на 2026-10-13) (латентность `deadline` без изменений — узел после ответа).
 
 - [ ] **Step 4: Commit**
 
@@ -1144,16 +1167,23 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 ---
 
-### Task 6: Удаление с ботом + retention 180 дней
+### Task 6: Удаление с ботом (CTE в `Delete Chat Memory`) + retention 180 дней
+
+**Почему не отдельный узел после `Respond` (перепроверка 2026-10-13):** `verify-auth-gate.py` (V12) пинит `Delete Chat Memory → Deletion Settled? → Respond` и `edges(Respond) == []` — «после ответа ничего не выполняется», а `success:true` даётся только когда КАЖДЫЙ счётчик удаления — число. Узел `Delete Learning Rows` после `Respond` валит этот верификатор (проверено dry-run'ом патчера на копии канона). Поэтому наборы панели удаляются ТЕМ ЖЕ statement'ом, что и остальная память бота: CTE `sets` в `DELETE_NEW_TAIL` (`apply-history-handoff.py` — владелец `Delete Chat Memory`), счётчик `deletedSuggestionSets` в `Deletion Settled?` (`apply-auth-gate.py` — владелец вердикта) и в теле `Respond`. Ноль новых узлов, ноль добавленной латентности, линия бота — та же `lineage_profiles` (T5). Следствие для деплоя: без миграции (таблицы `suggestion_sets`) `Delete Chat Memory` падает → `Deletion Settled?` false → 503 → клиентский Retry, бот остаётся на телефоне и ничего не теряется — миграция идёт ПЕРЕД Delete Bot Files (как M2 перед T5).
 
 **Files:**
-- Modify: `Tools/n8n/apply-learning-a.py` (`patch_delete_bot`, `patch_sweep`, регистрация)
-- Regenerate: `Tools/n8n/workflows/lmjYsdNcQA2IE5rl-Delete_Bot_Files.json`, `Tools/n8n/workflows/fXYpCXPKw92EzRz8-Profile_Lifecycle_Sweep.json`
+- Modify: `Tools/n8n/apply-history-handoff.py` — `DELETE_NEW_TAIL` (+CTE `sets`, +счётчик; прежний хвост остаётся как `DELETE_T5_TAIL` для распознавания формы), `RESPOND_NEW_TAIL` (+`deletedSuggestionSets`; прежний — `RESPOND_T5_TAIL`), `patch_delete_bot`
+- Modify: `Tools/n8n/apply-auth-gate.py` — кортеж счётчиков в `DELETION_SETTLED` (+`"deletedSuggestionSets"`)
+- Modify: `Tools/n8n/apply-learning-a.py` (`EXPIRE_SQL`, `patch_sweep`/`check_sweep`, `patch_all`/`check_all` += SWEEP; узла для Delete Bot Files НЕТ)
+- Modify: `Tools/n8n/tests/test_retired_delete.py` — `'suggestion_sets'` в `SETUP`, `'deletedSuggestionSets'` в кортеже счётчиков кейса `Deletion Settled?`
+- Modify: `Tools/n8n/verify-learning-a.py` — `verify_delete` (см. ниже)
+- Create: `Tools/n8n/tests/test_learning_a.py`
+- Regenerate: `Tools/n8n/workflows/lmjYsdNcQA2IE5rl-Delete_Bot_Files.json` (через `apply-history-handoff.py` + `apply-auth-gate.py`), `Tools/n8n/workflows/fXYpCXPKw92EzRz8-Profile_Lifecycle_Sweep.json` (через `apply-learning-a.py`)
 - Modify: `Tools/n8n/staging/e2e-learning.py` (+1 сценарий)
 
 **Interfaces:**
-- Consumes: `suggestion_sets`, `origin_*`.
-- Produces: `Delete Bot Files: Respond → Delete Learning Rows` (ВТОРАЯ ветка после ответа, параллельно существующей `Respond → Split File Ids → Delete Stored Original → Delete Chat Memory`); `Sweep: Every 6 Hours → Expire Learning Rows` (вторая ветка рядом с `Sweep Config`).
+- Consumes: `suggestion_sets`, `origin_*`, `clone_lineage.lineage_cte` (через `DBF_LINE_HEAD`, уже в `Delete Chat Memory`).
+- Produces: `Delete Chat Memory` возвращает ещё `deletedSuggestionSets`; `Deletion Settled?` требует его числом; `Respond` отдаёт его клиенту (клиент читает только `success:true` — C1, лишний ключ безвреден); `Sweep: Every 6 Hours → Expire Learning Rows` (вторая ветка рядом с `Sweep Config`, dryRun не подчиняется).
 
 - [ ] **Step 1: Сценарий (падает до патча)**
 
@@ -1161,33 +1191,78 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 @scenario("delete_bot_clears_sets", "A: DeleteBotFiles for the profile removes its suggestion_sets rows (history rows go with chat_history_events)")
 def delete_clears(ctx):
     owner, pid = owner_and_profile(ctx)
-    body = payload(owner, pid, [m("client", "свечи есть? сколько стоят?")], know=knowledge([{"kind": "product", "name": "Свеча", "price": "1500 тг", "description": ""}]), request_key="00000000000000000000000000000002", bot_wa="-1")
+    body = payload(owner, pid, [m("client", "свечи есть? сколько стоят?")], know=knowledge([{"kind": "product", "name": "Свеча", "price": "1500 тг", "description": ""}]), request_key=KEY)
     call(owner, body)
     time.sleep(2)
     n0 = psql(f"select count(*) from suggestion_sets where profile_id = '{pid}';")
     st, d = e2e_auth.hook("DeleteBotFiles", owner.token, {"botWaId": "-1", "botTgId": "-1", "waProfileId": pid, "tgProfileId": "-1", "appUserId": owner.app_user_id})
     time.sleep(3)
     n1 = psql(f"select count(*) from suggestion_sets where profile_id = '{pid}';")
-    ok = n0 == "1" and st == 200 and (d or {}).get("success") is True and n1 == "0"
+    ok = n0 == "1" and st == 200 and (d or {}).get("success") is True and (d or {}).get("deletedSuggestionSets") == 1 and n1 == "0"
     return ok, f"sets before/after = {n0}/{n1}, delete http={st} body={d}"
 ```
 
 Run: `python3 Tools/n8n/staging/e2e-learning.py --only delete_`
-Expected: FAIL (`n1 == "1"`).
+Expected: FAIL (`n1 == "1"`, в ответе нет `deletedSuggestionSets`).
 
-- [ ] **Step 2: Патчер — узлы удаления и retention**
+- [ ] **Step 2: Генераторы — CTE `sets` в Delete Chat Memory, счётчик в вердикте, retention в патчере**
 
-Добавить в `apply-learning-a.py`:
+(а) `Tools/n8n/apply-history-handoff.py`. Сразу ПОСЛЕ существующего определения `DELETE_NEW_TAIL = """), flags AS ( … "deletedChatStates";"""` (и ДО `DELETE_CHAT_MEMORY_SQL = …`, который его конкатенирует) добавить:
 
 ```python
-DELETE_LEARNING_SQL = """-- Learning A: наборы панели уходят вместе с ботом (privacy §3/§6). Колонки origin_* живут в
--- chat_history_events и удаляются CTE hist_events узла Delete Chat Memory. Те же сентинели.
-WITH ids AS (SELECT unnest(ARRAY[$1, $2]) AS profile_id),
-     valid AS (SELECT profile_id FROM ids WHERE profile_id IS NOT NULL AND profile_id NOT IN ('-1', '', 'null', 'undefined')),
-     sets AS (DELETE FROM public.suggestion_sets s WHERE s.profile_id IN (SELECT profile_id FROM valid) RETURNING 1)
-SELECT (SELECT count(*)::int FROM sets) AS "deletedSuggestionSets";"""
-DELETE_LEARNING_PARAMS = ("={{ $('Webhook').first().json.body.waProfileId || '-1' }},"
-                          "{{ $('Webhook').first().json.body.tgProfileId || '-1' }}")
+# Learning A (2026-10-13): the «Вместе» panel's shown sets (suggestion_sets) are the bot's data too — deleted by the SAME
+# statement and judged by the SAME verdict (V12: nothing runs after the answer; success only when every counter is a
+# number). The T5 shape stays recognisable so the patcher can bring a T5 canon forward.
+DELETE_T5_TAIL = DELETE_NEW_TAIL
+DELETE_NEW_TAIL = DELETE_T5_TAIL.replace(
+    ")\nSELECT (SELECT count(*)::int FROM hist)        AS \"deletedMemoryRows\",",
+    "), sets AS (          -- learning A: the panel's shown sets of every profile of the line\n"
+    "  DELETE FROM public.suggestion_sets s\n"
+    "  WHERE s.profile_id IN (SELECT profile_id FROM valid)\n"
+    "  RETURNING 1\n"
+    ")\nSELECT (SELECT count(*)::int FROM hist)        AS \"deletedMemoryRows\",", 1).replace(
+    "       (SELECT count(*)::int FROM states)      AS \"deletedChatStates\";",
+    "       (SELECT count(*)::int FROM states)      AS \"deletedChatStates\",\n"
+    "       (SELECT count(*)::int FROM sets)        AS \"deletedSuggestionSets\";", 1)
+assert DELETE_NEW_TAIL != DELETE_T5_TAIL and DELETE_NEW_TAIL.count("suggestion_sets") == 1, "learning A: the sets CTE did not land"
+```
+
+В `patch_delete_bot` строку `assert DELETE_OLD_TAIL in q or DELETE_NEW_TAIL in q, "Delete Chat Memory has an unexpected shape"` заменить на `assert DELETE_OLD_TAIL in q or DELETE_T5_TAIL in q or DELETE_NEW_TAIL in q, "Delete Chat Memory has an unexpected shape"`.
+
+Сразу ПОСЛЕ существующего `RESPOND_NEW_TAIL = (…'"deletedChatStates": $json.deletedChatStates ?? null } }}')` добавить:
+
+```python
+RESPOND_T5_TAIL = RESPOND_NEW_TAIL
+RESPOND_NEW_TAIL = RESPOND_T5_TAIL.replace('"deletedChatStates": $json.deletedChatStates ?? null } }}',
+                                           '"deletedChatStates": $json.deletedChatStates ?? null, "deletedSuggestionSets": $json.deletedSuggestionSets ?? null } }}', 1)
+assert RESPOND_NEW_TAIL != RESPOND_T5_TAIL
+```
+
+и в `patch_delete_bot` блок
+
+```python
+    if RESPOND_OLD_TAIL in body:
+        r["parameters"]["responseBody"] = body.replace(RESPOND_OLD_TAIL, RESPOND_NEW_TAIL)
+        ch = True
+```
+
+заменить на
+
+```python
+    for old in (RESPOND_OLD_TAIL, RESPOND_T5_TAIL):   # the pre-T5 and the T5 answer shapes both come forward
+        if old in body and RESPOND_NEW_TAIL not in body:
+            body = body.replace(old, RESPOND_NEW_TAIL, 1)
+            r["parameters"]["responseBody"] = body
+            ch = True
+```
+
+(`check()` уже требует `RESPOND_NEW_TAIL in body` и `query == DELETE_CHAT_MEMORY_SQL` — менять не нужно.)
+
+(б) `Tools/n8n/apply-auth-gate.py`, константа `DELETION_SETTLED`: в кортеж `("deletedMemoryRows", "deletedOutcomes", "deletedReplyFlags", "deletedHistoryEvents", "deletedHandoffs", "deletedReplyEvents", "deletedChatStates")` добавить последним `"deletedSuggestionSets"`. `patch_delete_bot_files` переписывает `leftValue` узла через `ensure_node(... if_spec(S, "Deletion Settled?", DELETION_SETTLED, …))` — идемпотентно.
+
+(в) `Tools/n8n/apply-learning-a.py` — добавить (после `check_suggest_nodes`, перед `patch_all`):
+
+```python
 EXPIRE_SQL = """-- Learning A retention (180 дней): наборы панели и метки происхождения на строках истории.
 -- Строки chat_history_events НЕ удаляются — только их origin_* обнуляются (по origin_kind, чтобы и «none» истекал).
 -- Ветка висит прямо на триггере и НЕ подчиняется Sweep Config.dryRun: удаление по возрасту, не по профилю.
@@ -1196,32 +1271,6 @@ with sets as (delete from public.suggestion_sets where created_at < now() - inte
                    set origin_kind = null, origin_index = null, origin_key = null, origin_edit = null, origin_top1 = null, origin_set = null
                  where origin_kind is not null and created_at < now() - interval '180 days' returning 1)
 select (select count(*)::int from sets) as expired_sets, (select count(*)::int from origins) as expired_origins;"""
-
-
-def patch_delete_bot(wf):
-    ch = False
-    if node(wf, "Delete Learning Rows") is None:
-        resp = node(wf, "Respond")
-        wf["nodes"].append({"parameters": {"resource": "database", "operation": "executeQuery", "query": DELETE_LEARNING_SQL, "options": {"queryReplacement": DELETE_LEARNING_PARAMS}},
-                            "id": nid("delete-learning"), "name": "Delete Learning Rows", "type": "n8n-nodes-base.postgres", "typeVersion": 2.6,
-                            "position": [resp["position"][0] + 220, resp["position"][1] + 200], "credentials": {"postgres": dict(PG_CRED)}, "onError": "continueRegularOutput"})
-        ch = True
-    n = node(wf, "Delete Learning Rows")
-    if n["parameters"]["query"] != DELETE_LEARNING_SQL or n["parameters"]["options"].get("queryReplacement") != DELETE_LEARNING_PARAMS:
-        n["parameters"]["query"] = DELETE_LEARNING_SQL
-        n["parameters"]["options"]["queryReplacement"] = DELETE_LEARNING_PARAMS
-        ch = True
-    outs = wf["connections"].get("Respond", {}).get("main", [[]])
-    if not any(e["node"] == "Delete Learning Rows" for e in outs[0]):
-        outs[0].append({"node": "Delete Learning Rows", "type": "main", "index": 0})
-        wf["connections"]["Respond"] = {"main": outs}
-        ch = True
-    return ch
-
-
-def check_delete_bot(wf):
-    n = node(wf, "Delete Learning Rows")
-    return n is not None and n["parameters"]["query"] == DELETE_LEARNING_SQL and any(e["node"] == "Delete Learning Rows" for e in wf["connections"].get("Respond", {}).get("main", [[]])[0])
 
 
 def patch_sweep(wf):
@@ -1249,7 +1298,7 @@ def check_sweep(wf):
     return n is not None and n["parameters"]["query"] == EXPIRE_SQL and any(e["node"] == "Expire Learning Rows" for e in wf["connections"].get("Every 6 Hours", {}).get("main", [[]])[0])
 ```
 
-и расширить `patch_all`/`check_all`:
+и расширить `patch_all`/`check_all` (константа `SWEEP` уже в шапке файла):
 
 ```python
 def patch_all():
@@ -1259,23 +1308,121 @@ def patch_all():
     if ch:
         save(SUGGEST, wf)
     out[SUGGEST] = ch
-    for fname, fn in ((DELETE_BOT, patch_delete_bot), (SWEEP, patch_sweep)):
-        wf = load(fname)
-        ch = fn(wf)
-        if ch:
-            save(fname, wf)
-        out[fname] = ch
+    wf = load(SWEEP)
+    ch = patch_sweep(wf)
+    if ch:
+        save(SWEEP, wf)
+    out[SWEEP] = ch
     return out
 
 
 def check_all():
     return {SUGGEST: check_suggest_prompts(load(SUGGEST)) and check_suggest_nodes(load(SUGGEST)),
-            DELETE_BOT: check_delete_bot(load(DELETE_BOT)),
             SWEEP: check_sweep(load(SWEEP))}
 ```
 
-Run: `python3 Tools/n8n/apply-learning-a.py && python3 Tools/n8n/apply-learning-a.py --check && python3 Tools/n8n/verify-learning-a.py && python3 Tools/n8n/apply-history-handoff.py --check && python3 Tools/n8n/verify-history-handoff.py`
-Expected: два файла `patched`, `learning A: OK`, `learning A verify: OK` (все 5 групп; `prompts` — после Task 1–2), `history/handoff: OK` (Delete Chat Memory нетронут), verify-history-handoff без ошибок.
+(г) `Tools/n8n/tests/test_retired_delete.py`: в `SETUP` (кортеж таблиц) добавить `'suggestion_sets'`; в кейсе про `Deletion Settled?` (строка `cond(DBF, 'Deletion Settled?', {**{k: 0 for k in ('deletedMemoryRows', …, 'deletedChatStates')}}, …)`) добавить в кортеж `'deletedSuggestionSets'` — иначе условие читает `typeof undefined` и кейс «ошибочный item никогда не success» перестанет различать причину.
+
+(д) `Tools/n8n/verify-learning-a.py` — `verify_delete` целиком:
+
+```python
+def verify_delete():
+    wf = load("lmjYsdNcQA2IE5rl-Delete_Bot_Files.json")
+    q = node(wf, "Delete Chat Memory")["parameters"]["query"]
+    expect("delete from public.suggestion_sets" in q.lower() and "lineage_profiles" in q, "delete: Delete Chat Memory must delete suggestion_sets by the bot's line (apply-history-handoff.DELETE_NEW_TAIL)")
+    expect("deletedSuggestionSets" in node(wf, "Deletion Settled?")["parameters"]["conditions"]["conditions"][0]["leftValue"], "delete: Deletion Settled? must judge deletedSuggestionSets (apply-auth-gate.DELETION_SETTLED)")
+    expect('"deletedSuggestionSets"' in node(wf, "Respond")["parameters"]["responseBody"], "delete: Respond must report deletedSuggestionSets")
+    expect(edges(wf, "Respond") == [], "delete: nothing may run after the answer (V12) — no Delete Learning Rows node")
+```
+
+Run:
+```bash
+python3 Tools/n8n/apply-history-handoff.py && python3 Tools/n8n/apply-auth-gate.py && python3 Tools/n8n/apply-learning-a.py
+python3 Tools/n8n/apply-history-handoff.py --check && python3 Tools/n8n/apply-auth-gate.py --check && python3 Tools/n8n/apply-learning-a.py --check
+python3 Tools/n8n/verify-auth-gate.py && python3 Tools/n8n/verify-history-handoff.py && python3 Tools/n8n/verify-sql-comments.py && python3 Tools/n8n/verify-clone-lifecycle.py && python3 Tools/n8n/verify-learning-a.py
+```
+Expected: `Delete_Bot_Files.json` и `Profile_Lifecycle_Sweep.json` изменены (Delete Bot Files — ТОЛЬКО `Delete Chat Memory.query`, `Deletion Settled?.leftValue`, `Respond.responseBody`; узлов/рёбер не прибавилось — `git diff --stat` + `jq '.nodes | length'` до/после одинаковы), три `--check` → OK, `verify-auth-gate` → `ALL AUTH GATE ASSERTS PASSED` (V12 «nothing runs after the answer» и `check_delete_line` проходят — `Deletion Settled?` читается из обновлённого `apply-auth-gate.DELETION_SETTLED`), `verify-history-handoff` OK, `verify-sql-comments` без находок (в новом CTE нет `$N` в комментарии), `learning A verify: OK` (`delete` и `sweep` зелёные; `proxy`/`prompts` — после Task 4 / Task 1).
+
+- [ ] **Step 2b: Тест SQL в харнессе (`Tools/n8n/tests/test_learning_a.py`, конвенция репо: реальный SQL на временных таблицах стенда, без n8n)**
+
+```python
+#!/usr/bin/env python3
+"""Learning A (2026-10-13): the SQL of the learning journal, run as real SQL on session temp tables of the staging Postgres
+(tests/harness.py) — Record Set (insert / dedupe / empty key), Expire Learning Rows (age), and the sets CTE of Delete Chat
+Memory (the bot's LINE: a superseded sibling goes, a neighbour of another bot key stays; legacy = the named ids only).
+Needs `Tools/n8n/staging/pg.sh migrate` (the public tables are the templates of the temp ones)."""
+import importlib.util
+import json
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from harness import Case, PgSession, bind, node, report, wf  # noqa: E402
+
+N8N = Path(__file__).resolve().parents[1]
+_spec = importlib.util.spec_from_file_location("apply_learning_a", N8N / "apply-learning-a.py")
+LA = importlib.util.module_from_spec(_spec); _spec.loader.exec_module(LA)
+
+# the tables Delete Chat Memory touches (as tests/test_retired_delete.py) + the learning journal
+LIKE = 'create temp table {0} (like public.{0} including all);\n'
+SETUP = ''.join(LIKE.format(t) for t in ('installs', 'bot_profiles', 'n8n_chat_histories', 'chat_history_events', 'handoff_requests',
+                                         'reply_events', 'chat_reply_state', 'conversation_outcomes', 'reply_mode_flags', 'suggestion_sets'))
+INST = 'inst-learning-a'
+DBF = wf('lmjYsdNcQA2IE5rl-Delete_Bot_Files.json')
+SUGGEST = wf('9PTyYcelRQI7bGDb-Suggest_Replies.json')
+
+
+def Q(w, name):
+    return node(w, name)['parameters']['query'].replace('public.', '')   # the temp tables shadow the UNqualified names only
+
+
+def seed(pg):
+    # the seeders of tests/test_retired_delete.py: installs (install_id, secret_hash); bot_profiles needs app_user_id + channel
+    pg.x(f"insert into installs (install_id, secret_hash) values ('{INST}', 'h') on conflict do nothing;")
+    pg.x(f"insert into bot_profiles (profile_id, app_user_id, channel, owner_id, workflow_id, bot_key) values "
+         f"('p-old', 'u', 'whatsapp', '{INST}', 'wOld00000001', 'k1'), ('p-new', 'u', 'whatsapp', '{INST}', 'wNew00000001', 'k1'), "
+         f"('p-other', 'u', 'whatsapp', '{INST}', 'wOth00000001', 'k2');")
+    pg.x("update bot_profiles set superseded_by = 'p-new', superseded_at = now(), deleted_at = now(), deleted_reason = 'replaced' where profile_id = 'p-old';")
+    for pid in ('p-old', 'p-new', 'p-other'):
+        pg.x(f"insert into suggestion_sets (request_key, profile_id, chat_id, items, stage) values ('k-{pid}', '{pid}', 'c', '[]'::jsonb, 'learning');")
+
+
+def line_args(mode, named):
+    return [mode, INST if mode == 'session' else '', json.dumps([named, None]), json.dumps([None, None])]
+
+
+with PgSession(SETUP) as pg:
+    with Case('Record Set: insert, dedupe on the same key, empty key writes nothing') as c:
+        sql = Q(SUGGEST, 'Record Set')
+        args = ['0123456789abcdef', 'p-rs', 'c', 1754800000, 'auto_parts', 'learning', json.dumps([{"label": "Цена", "move": "Ответ", "text": "3200 тг"}]), LA.PROMPT_VERSION, None]
+        c.check(len(pg.q(bind(sql, args))) == 1, 'first insert returns one row')
+        c.check(pg.q(bind(sql, args)) == [], 'the same (profile, request_key) again returns nothing (on conflict do nothing)')
+        c.check(pg.q("select count(*)::int as n from suggestion_sets where profile_id = 'p-rs'")[0]['n'] == 1, 'exactly one set per request key')
+        pg.q(bind(sql, ['', 'p-rs', 'c', None, 'auto_parts', 'learning', '[]', LA.PROMPT_VERSION, None]))
+        c.check(pg.q("select count(*)::int as n from suggestion_sets where request_key = ''")[0]['n'] == 0, 'an empty request key is never a primary key')
+    with Case('Expire Learning Rows: a 181-day set and origin go, a young one stays') as c:
+        pg.x("insert into suggestion_sets (request_key, profile_id, chat_id, items, created_at) values ('old', 'p-exp', 'c', '[]', now() - interval '181 days'), ('young', 'p-exp', 'c', '[]', now());")
+        pg.x("insert into chat_history_events (profile_id, chat_id, message_id, source, body, origin_kind, origin_key, created_at) values ('p-exp', 'c', 'm1', 'owner_app', 't', 'none', null, now() - interval '181 days');")
+        r = pg.q(LA.EXPIRE_SQL.replace('public.', ''))[0]
+        c.check(r['expired_sets'] == 1 and r['expired_origins'] == 1, f'counts {r}')
+        c.check(pg.q("select request_key from suggestion_sets where profile_id = 'p-exp'") == [{'request_key': 'young'}], 'young set kept')
+        c.check(pg.q("select origin_kind from chat_history_events where message_id = 'm1'")[0]['origin_kind'] is None, 'origin_kind nulled (none expires too)')
+    with Case('Delete Chat Memory (session): the sets of the line go — named + superseded sibling — the neighbour stays') as c:
+        seed(pg)
+        r = pg.q(bind(Q(DBF, 'Delete Chat Memory'), line_args('session', 'p-new')))[0]
+        c.check(r['deletedSuggestionSets'] == 2, f'line = p-new + superseded p-old: {r}')
+        c.check(all(isinstance(r[k], int) for k in r), f'every counter a number (Deletion Settled? reads typeof === number): {r}')
+        c.check(pg.q("select count(*)::int as n from suggestion_sets where profile_id in ('p-old', 'p-new')")[0]['n'] == 0, 'both rows of the line gone')
+        c.check(pg.q("select count(*)::int as n from suggestion_sets where profile_id = 'p-other'")[0]['n'] == 1, 'p-other (another bot key, same install) untouched')
+    with Case('Delete Chat Memory (legacy): the named ids only') as c:
+        pg.x("delete from suggestion_sets where profile_id like 'p-%'; delete from bot_profiles where profile_id like 'p-%';"); seed(pg)
+        r = pg.q(bind(Q(DBF, 'Delete Chat Memory'), line_args('legacy', 'p-new')))[0]
+        c.check(r['deletedSuggestionSets'] == 1 and pg.q("select count(*)::int as n from suggestion_sets where profile_id = 'p-old'")[0]['n'] == 1, f'legacy: only p-new: {r}')
+report()
+```
+
+Run: `Tools/n8n/staging/pg.sh migrate && python3 Tools/n8n/tests/test_learning_a.py && python3 Tools/n8n/tests/test_retired_delete.py && python3 Tools/n8n/tests/run_all.py`
+Expected: `4 pass, 0 fail`; `test_retired_delete.py` зелёный с расширенным кортежем счётчиков; `run_all.py` — все файлы OK. Сидеры повторяют `tests/test_retired_delete.py` (`installs (install_id, secret_hash)`, `bot_profiles` с `app_user_id`/`channel`); линия строится по `owner_id` + `bot_key` / `superseded_by` (`clone_lineage.lineage_cte`), поэтому p-old (тот же ключ, вытеснен) уходит, p-other (другой ключ) остаётся.
 
 - [ ] **Step 3: Staging**
 
@@ -1285,14 +1432,15 @@ python3 Tools/n8n/staging/derive-staging.py --bot wa:stgwab77f282533c
 python3 Tools/n8n/staging/bootstrap.py --restart
 python3 Tools/n8n/staging/e2e-learning.py
 python3 Tools/n8n/staging/e2e-handoff.py
+python3 Tools/n8n/staging/e2e-auth.py --only bot_delete_wipes_lineage,retired_bot_owner_can_delete
 ```
-Expected: `e2e-learning.py` 10 pass, 0 fail (`set_not_recorded_on_abstain` может быть INCONCLUSIVE — это PASS с пометкой); `e2e-handoff.py` без регрессий (Delete Bot Files отвечает как раньше).
+Expected: `e2e-learning.py` 10 pass, 0 fail (`set_not_recorded_on_abstain` может быть INCONCLUSIVE — это PASS с пометкой); `e2e-handoff.py` без регрессий; оба delete-сценария e2e-auth PASS (ответ Delete Bot Files по-прежнему `success:true`, теперь с `deletedSuggestionSets`).
 
 - [ ] **Step 4: Commit**
 
 ```bash
-git add Tools/n8n/apply-learning-a.py Tools/n8n/workflows/lmjYsdNcQA2IE5rl-Delete_Bot_Files.json Tools/n8n/workflows/fXYpCXPKw92EzRz8-Profile_Lifecycle_Sweep.json Tools/n8n/staging/e2e-learning.py
-git commit -m "feat(n8n): learning A — наборы удаляются с ботом (Delete Learning Rows), retention 180 дней (Expire Learning Rows)
+git add Tools/n8n/apply-history-handoff.py Tools/n8n/apply-auth-gate.py Tools/n8n/apply-learning-a.py Tools/n8n/verify-learning-a.py Tools/n8n/workflows/lmjYsdNcQA2IE5rl-Delete_Bot_Files.json Tools/n8n/workflows/fXYpCXPKw92EzRz8-Profile_Lifecycle_Sweep.json Tools/n8n/staging/e2e-learning.py Tools/n8n/tests/test_learning_a.py Tools/n8n/tests/test_retired_delete.py
+git commit -m "feat(n8n): learning A — наборы панели удаляются с ботом внутри Delete Chat Memory (CTE sets, счётчик в вердикте V12), retention 180 дней (Expire Learning Rows), тест SQL в харнессе
 
 Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 ```
@@ -2370,20 +2518,20 @@ Expected: одна строка. Публикация страницы на са
 `Tools/n8n/README.md` — в список инструментов аудита добавить строку:
 
 ```
-- **Learning A (2026-09-25, `docs/superpowers/specs/2026-09-25-learning-loop-foundation-design.md`):** `apply-learning-a.py` (Suggest Replies: stage в Gate Decision, ХОЛОДНЫЙ СТАРТ + примеры воздержания в Assemble, `Has Set?` → `Record Set` ПОСЛЕ Respond; Delete Bot Files: `Delete Learning Rows`; Sweep: `Expire Learning Rows` 180 дней), `verify-learning-a.py`, SQL `sql/2026-09-25-learning-foundation.sql`, staging `staging/e2e-learning.py` (8 сценариев), `report-learning.py` (только чтение). Прокси: секция `meta` (origin_*) в `build-auth-workflows.py` — валидируется, в Wappi не уходит, пишется `Record Owner Send`.
+- **Learning A (2026-09-25, `docs/superpowers/specs/2026-09-25-learning-loop-foundation-design.md`):** `apply-learning-a.py` (Suggest Replies: stage в Gate Decision, ХОЛОДНЫЙ СТАРТ + общее правило ПОСТОРОННИЙ ВОПРОС в Assemble, `Has Set?` → `Record Set` ПОСЛЕ Respond; Sweep: `Expire Learning Rows` 180 дней), удаление наборов — CTE `sets` в `Delete Chat Memory` (`apply-history-handoff.py`) + счётчик в `Deletion Settled?` (`apply-auth-gate.py`), `verify-learning-a.py`, SQL `sql/2026-09-25-learning-foundation.sql`, staging `staging/e2e-learning.py` (8 сценариев), `report-learning.py` (только чтение). Прокси: секция `meta` (origin_*) в `build-auth-workflows.py` — валидируется, в Wappi не уходит, пишется `Record Owner Send`.
 ```
 
 `CLAUDE.md` — в раздел «### n8n (Workflow Automation)» после абзаца про `/webhook/SuggestReplies` добавить:
 
 ```
-  - **Learning A — «показано → отправлено» (2026-09-25):** каждая отправка из приложения несёт в `message.send`/`message.reply` опциональную секцию `origin_*` (kind card|edited|typed|none, index, key, edit 0–100, top1 0|1, set; `message.reply` ещё и `chat_id`, потому что клиент не шлёт recipient для TG-ответа и до этого `chat_id` в истории был пустым) — валидируется allow-list'ом `meta` в Wappi Proxy (`build-auth-workflows.py`), НИКОГДА не уходит в Wappi, пишется `Record Owner Send` в `chat_history_events.origin_*`; клиент считает её чистым `SendOriginResolver` из снимка `SendOriginTracker` (панель: `SetShown` при рендере, `SetPick` при тапе, `Clear` при новом раунде и при скрытии панели без тапа; отправка: `ResolveAndClear` ДО синхронного `OnLiveMessagesReceived`-эха оптимистичного пузыря — `HandleLive` → `StartFreshRound` → `Clear` в том же стеке; метка сохраняется в `OutboxEntry.originJson`, повтор несёт её же). Панель пишет показанный набор в `suggestion_sets` узлом `Record Set` ПОСЛЕ `Respond` (после ответа, но внутри 20-с бюджета execution — best-effort у границы); стадия `learning|trained` (< 10 отправленных выборов) считается в `Gate Decision` и включает ХОЛОДНЫЙ СТАРТ в Assemble (≥3 разных хода, без ПРЕДПОЧТЕНИЙ). Счётчик `{botName}SuggestPick{move}` пишется при УСПЕШНОЙ отправке (`SuggestionPickStats`), не при тапе, и кредитуется боту, на котором отправляли (`SendOrigin.botId`). Правило «Границы темы» (три класса + честный ассистент; спам — одно слово, НЕ пустой ответ: пустой output = generation_failed) живёт в `_core.md` с плейсхолдером `{businessName}`, который узел `Vertical Prompt` заменяет полем формы `Name`, а `_universal.md` разрешает честный ответ на прямой «вы бот?»; в панели «ровно одна карточка «Отказ» на посторонний вопрос» — ОБЩЕЕ правило Assemble (маркер `LEARNING-A-OFFTOPIC-RULE`), не ниша: ниша уступает на форме вывода, а число карточек — форма. Примеры воздержания в Assemble не должны совпадать с текстами eval-сценариев (страж в `apply-learning-a.py`). Стражи: `SendOriginWiringTests` (source), `verify-learning-a.py`, `staging/e2e-learning.py`. Удаление: `Delete Learning Rows` после Respond в Delete Bot Files; retention 180 дней в Profile Lifecycle Sweep (не подчиняется dryRun).
+  - **Learning A — «показано → отправлено» (2026-09-25):** каждая отправка из приложения несёт в `message.send`/`message.reply` опциональную секцию `origin_*` (kind card|edited|typed|none, index, key, edit 0–100, top1 0|1, set; `message.reply` ещё и `chat_id`, потому что клиент не шлёт recipient для TG-ответа и до этого `chat_id` в истории был пустым) — валидируется allow-list'ом `meta` в Wappi Proxy (`build-auth-workflows.py`), НИКОГДА не уходит в Wappi, пишется `Record Owner Send` в `chat_history_events.origin_*`; клиент считает её чистым `SendOriginResolver` из снимка `SendOriginTracker` (панель: `SetShown` при рендере, `SetPick` при тапе, `Clear` при новом раунде и при скрытии панели без тапа; отправка: `ResolveAndClear` ДО синхронного `OnLiveMessagesReceived`-эха оптимистичного пузыря — `HandleLive` → `StartFreshRound` → `Clear` в том же стеке; метка сохраняется в `OutboxEntry.originJson`, повтор несёт её же). Панель пишет показанный набор в `suggestion_sets` узлом `Record Set` ПОСЛЕ `Respond` (после ответа, но внутри 20-с бюджета execution — best-effort у границы); стадия `learning|trained` (< 10 отправленных выборов) считается в `Gate Decision` и включает ХОЛОДНЫЙ СТАРТ в Assemble (≥3 разных хода, без ПРЕДПОЧТЕНИЙ). Счётчик `{botName}SuggestPick{move}` пишется при УСПЕШНОЙ отправке (`SuggestionPickStats`), не при тапе, и кредитуется боту, на котором отправляли (`SendOrigin.botId`). Правило «Границы темы» (три класса + честный ассистент; спам — одно слово, НЕ пустой ответ: пустой output = generation_failed) живёт в `_core.md` БЕЗ плейсхолдеров (V10 классифицирует голову клона по содержимому — подстановка сделала бы каждый клон `custom`): имя бизнеса едет в хвосте как строка «Название: …» под «About Business:» (`Manager.ComposeBusinessKnowledge` с именем бота; старые боты получают её при следующем сохранении настроек), а `_universal.md` разрешает честный ответ на прямой «вы бот?»; в панели «ровно одна карточка «Отказ» на посторонний вопрос» — ОБЩЕЕ правило Assemble (маркер `LEARNING-A-OFFTOPIC-RULE`), не ниша: ниша уступает на форме вывода, а число карточек — форма. ВОЗДЕРЖАНИЕ панели не трогается (V9 + владельческий гейт `N2_banter_abstain`). Стражи: `SendOriginWiringTests` (source), `verify-learning-a.py`, `staging/e2e-learning.py`. Удаление: CTE `sets` внутри `Delete Chat Memory` (`apply-history-handoff.DELETE_NEW_TAIL`, та же линия бота) + счётчик `deletedSuggestionSets` в `Deletion Settled?`/`Respond` (`apply-auth-gate.DELETION_SETTLED`) — после `Respond` ничего не выполняется (V12); retention 180 дней — `Expire Learning Rows` в Profile Lifecycle Sweep (не подчиняется dryRun). Eval: только интерлив-сравнения (`--side`), каждый Авто-сценарий классифицирован в `eval/test_checks.py`.
 ```
 
 `docs/audits/implementation-progress.md` — в конец:
 
 ```
 ## Learning A «Фундамент» — реализовано, ждёт go на деплой (2026-09-XX)
-Правило «Границы темы» + eval v1.2 (before/after: <числа из results/>), панель «Отказ»/примеры воздержания/холодный старт, origin_* через meta прокси, suggestion_sets после Respond, Delete Learning Rows, Expire Learning Rows, клиент SendOrigin*/SuggestionPickStats, privacy §3. Staging: e2e-learning 10/10, e2e-suggest 6/6, e2e-auth/e2e-handoff без регрессий; Unity <total>/<total>.
+Правило «Границы темы» + eval v1.7 (before/after: <числа из results/ot-a-*.json>), панель «Отказ»/холодный старт, origin_* через meta прокси, suggestion_sets после Respond, CTE sets в Delete Chat Memory, Expire Learning Rows, клиент SendOrigin*/SuggestionPickStats, privacy §3. Staging: e2e-learning 10/10, e2e-suggest 6/6, e2e-auth/e2e-handoff без регрессий; Unity <total>/<total>.
 ```
 (даты и числа — фактические на момент записи.)
 
@@ -2400,8 +2548,9 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 1. `python3 Tools/n8n/.secrets/sql-oneoff.py "$(cat Tools/n8n/sql/2026-09-25-learning-foundation.sql)"` → post-checks из файла (по одному запросу; харнесс отдаёт Response Data вебхука — если приходит только первая строка, это дефолт firstEntryJson, а не «1 row»).
 1a. В `Tools/n8n/.secrets/sql-oneoff.py` (вне репо) заменить `print(s, b[:1500])` на `print(s, b)` — иначе `report-learning.py --prod` получит обрезанный JSON.
-2. SQL ОБЯЗАТЕЛЬНО раньше прокси: `Record Owner Send` fail-open, и INSERT в несуществующие колонки молча остановил бы запись owner_app + memory. Затем `python3 Tools/n8n/deploy-canonical.py --only crWappiProxy0001 --only 9PTyYcelRQI7bGDb --only lmjYsdNcQA2IE5rl --only fXYpCXPKw92EzRz8 --only XuvOp7TxOImOAmlj --only Uz6HBBUpAiUqVysB --only 3qax5J9u2qsT9Vao --only TwWPW3gIyjZS3foR` (dry-run, читать diff) → та же команда с `--apply --yes`.
+1b. Репетиция на staging с прод-состояния (T12): `python3 Tools/n8n/staging/bootstrap.py --canon-ref <sha прода> --bot wa:… --bot tg:…` → `deploy-canonical.py --base http://localhost:5678 …` dry-run = ровно пакет → `--apply` пошагово → `update-clones.py` → `verify-deployed.py --base …` exit 0; затем `derive-staging.py` без импорта и e2e.
+2. SQL ОБЯЗАТЕЛЬНО раньше прокси и раньше Delete Bot Files: `Record Owner Send` fail-open, и INSERT в несуществующие колонки молча остановил бы запись owner_app + memory; а `Delete Chat Memory` без таблицы `suggestion_sets` падает → `Deletion Settled?` false → 503 → у клиента Retry (бот остаётся на телефоне, ничего не теряется, но удалить бота нельзя до миграции). Затем `python3 Tools/n8n/deploy-canonical.py --only crWappiProxy0001 --only 9PTyYcelRQI7bGDb --only lmjYsdNcQA2IE5rl --only fXYpCXPKw92EzRz8 --only XuvOp7TxOImOAmlj --only Uz6HBBUpAiUqVysB --only 3qax5J9u2qsT9Vao --only TwWPW3gIyjZS3foR` (dry-run, читать diff) → та же команда с `--apply --yes` (D1: активный workflow публикуется своим PUT, read-back обязателен).
 3. `python3 Tools/n8n/verify-deployed.py --json docs/audits/<date>-prod-readback.json` (read-back) + `python3 Tools/n8n/verify-learning-a.py` по локальному канону (флага `--dir` у verify-deployed нет).
-4. Живых клонов ботов на проде нет (2026-09-24) — `update-clones.py` пропустить; при появлении — прогнать.
+4. `python3 Tools/n8n/update-clones.py` ОБЯЗАТЕЛЬНО: `_core.md`/`_universal.md` изменились → головы всех клонов `behind` (V10), иначе живые боты остаются на старом правиле. На 2026-10-13 живых клонов на проде нет — команда отработает вхолостую, но шаг в пакете остаётся.
 5. Сайт: `Tools/landing/tools/deploy.sh` (dry-run → live) с обновлённой `privacy.html` ДО выпуска клиента с меткой.
 6. Клиент: TestFlight/internal-track сборка; первый прогон `python3 Tools/n8n/report-learning.py --prod --days 3` через 2–3 дня работы бота владельца.
