@@ -205,4 +205,42 @@ public class BotCardModelTests
         }
         return null;
     }
+
+    // ---- learning B: the capsule's third face ----
+
+    [Test]
+    public void PillKind_ConnectOutranksLearning_LearningOnlyWhileSemiAndLocked()
+    {
+        Assert.AreEqual(BotPillKind.Connect, BotCardModel.PillKind(connect: true, autoOn: false, locked: true));
+        Assert.AreEqual(BotPillKind.Learning, BotCardModel.PillKind(connect: false, autoOn: false, locked: true));
+        Assert.AreEqual(BotPillKind.Auto, BotCardModel.PillKind(connect: false, autoOn: true, locked: true), "an enabled «Авто» is never relabelled");
+        Assert.AreEqual(BotPillKind.Auto, BotCardModel.PillKind(connect: false, autoOn: false, locked: false), "Semi without a lock is the plain capsule");
+        Assert.AreEqual(BotCardModel.AutoPillWidth, BotCardModel.PillWidth(BotPillKind.Auto, 400f), "«Авто» keeps its authored width");
+        Assert.AreEqual(BotCardModel.PillWidth(true, 200f), BotCardModel.PillWidth(BotPillKind.Learning, 200f), "learning measures like «Подключить»");
+        Assert.AreEqual(BotCardModel.PillWidth(true, 200f), BotCardModel.PillWidth(BotPillKind.Connect, 200f));
+    }
+
+    [Test]
+    public void TheRealCapsuleLabel_FitsTheLearningFace_OnceTheCapsuleGrows()
+    {
+        var prefab = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/Bot.prefab");
+        Assert.IsNotNull(prefab, "Bot.prefab");
+        var card = Object.Instantiate(prefab);
+        try
+        {
+            Transform pill = FindDeep(card.transform, "AutoPill");
+            Assert.IsNotNull(pill, "the C2 capsule (BotCardAutoPillBuilder)");
+            var label = FindDeep(pill, "Label").GetComponent<TMPro.TextMeshProUGUI>();
+            float learning = label.GetPreferredValues(AutoReadinessCopy.PillText(17)).x;   // the widest two-digit progress
+            Assert.Greater(learning, label.rectTransform.sizeDelta.x, "«Учится · 17/20» does not fit the authored «Авто» box — the runtime must grow it");
+            float width = BotCardModel.PillWidth(BotPillKind.Learning, learning);
+            TestContext.Out.WriteLine($"«{AutoReadinessCopy.PillText(17)}» {learning:F1}u → capsule {width:F0}u (authored {BotCardModel.AutoPillWidth:F0}u)");
+            Assert.GreaterOrEqual(width, learning + 2f * BotCardModel.ConnectPillPadding - 0.01f, "the label sits inside the pill");
+            Assert.LessOrEqual(width, 360f, $"the grown capsule ({width:F0}u) must leave the name column room on a 1080 card");
+        }
+        finally
+        {
+            Object.DestroyImmediate(card);
+        }
+    }
 }

@@ -106,6 +106,8 @@ public class Bot : MonoBehaviour
     private string authoredPillText;
     private float authoredLabelWidth;
     private bool cardStateReady;
+    private BotPillKind pillKind = BotPillKind.Auto;   // learning B: the capsule's face, decided in RefreshCardState
+    private int learningMatches;                        // learning B: the N of «Учится · N/20»
     private Coroutine initRoutine;
 
 
@@ -130,6 +132,7 @@ public class Bot : MonoBehaviour
         ReplyModeToggleBinder.OnReplyModeChanged += HandleReplyModeChanged;
         ReplyModeSyncService.OnStateChanged += HandleReplyModeSyncState;
         ProfileRetirement.Changed += HandleRetirementChanged;
+        UsageStore.OnUsageChanged += HandleUsageChanged;   // learning B: a fresh Get Usage can flip the capsule's face
 
         // Returning to the Боты tab after Bot Settings: the channel toggles or
         // the business type may have changed while this card was inactive.
@@ -147,6 +150,7 @@ public class Bot : MonoBehaviour
         ReplyModeToggleBinder.OnReplyModeChanged -= HandleReplyModeChanged;
         ReplyModeSyncService.OnStateChanged -= HandleReplyModeSyncState;
         ProfileRetirement.Changed -= HandleRetirementChanged;
+        UsageStore.OnUsageChanged -= HandleUsageChanged;
         KillSublineBlink();
         KillPillTweens();
 
@@ -458,6 +462,12 @@ public class Bot : MonoBehaviour
         if (cardStateReady && botKey == transform.name) RefreshCardState(animatePill: false);
     }
 
+    // learning B: «Учится · N/20» ↔ «Авто» follows the server's verdict, which arrives with Get Usage and no other card event.
+    private void HandleUsageChanged()
+    {
+        if (cardStateReady) RefreshCardState(animatePill: false);
+    }
+
     // Deferred one frame: Manager renames the instantiated card and writes its
     // PlayerPrefs after Instantiate, so an Awake-time read would see another
     // bot's defaults (the old SetSwitches used the same trick).
@@ -504,6 +514,11 @@ public class Bot : MonoBehaviour
         string tgRetired = ProfileRetirement.ActiveReason(transform.name, ChatChannel.Telegram, telegramProfileId, claims);
         showsConnect = BotCardModel.ShowConnectPill(whatsappProfileId, waRetired, telegramProfileId, tgRetired);
 
+        // learning B: the capsule's third face — «Учится · N/20» while «Авто» is off and the server says the bot is not ready.
+        AutoReadinessEntry readiness = AutoReadinessStore.Current(transform.name);
+        learningMatches = AutoReadinessPolicy.Progress(readiness);
+        pillKind = BotCardModel.PillKind(showsConnect, AutoOn, AutoReadinessPolicy.Verdict(readiness) == AutoReadinessVerdict.Locked);
+
         // The capsule is the chats-header «Авто» pill 1:1 — one painter, one
         // look, and since the unification one STORE (the bot's ReplyMode).
         // Kill first, exactly like ReplyModeToggleBinder.SetVisualMode: an
@@ -532,15 +547,17 @@ public class Bot : MonoBehaviour
             authoredLabelWidth = labelRect.sizeDelta.x;
         }
 
-        string text = showsConnect ? RetiredChannelCopy.ConnectPill : authoredPillText;
-        float labelWidth = showsConnect ? Mathf.Ceil(autoPillLabel.GetPreferredValues(text).x) : authoredLabelWidth;
-        float pillWidth = BotCardModel.PillWidth(showsConnect, labelWidth);
+        string text = pillKind == BotPillKind.Connect ? RetiredChannelCopy.ConnectPill
+                    : pillKind == BotPillKind.Learning ? AutoReadinessCopy.PillText(learningMatches)
+                    : authoredPillText;
+        float labelWidth = pillKind == BotPillKind.Auto ? authoredLabelWidth : Mathf.Ceil(autoPillLabel.GetPreferredValues(text).x);
+        float pillWidth = BotCardModel.PillWidth(pillKind, labelWidth);
         if (autoPillLabel.text == text && Mathf.Approximately(labelRect.sizeDelta.x, labelWidth)
             && (rootLayout == null || Mathf.Approximately(rootLayout.preferredWidth, pillWidth))) return;
 
         autoPillLabel.text = text;
         labelRect.sizeDelta = new Vector2(labelWidth, labelRect.sizeDelta.y);
-        if (autoPillDotRing != null) autoPillDotRing.gameObject.SetActive(!showsConnect);
+        if (autoPillDotRing != null) autoPillDotRing.gameObject.SetActive(pillKind == BotPillKind.Auto);   // the lamp belongs to «Авто» alone
         if (rootLayout != null) rootLayout.minWidth = rootLayout.preferredWidth = pillWidth;
         if (autoPillButton.transform.parent is RectTransform row) LayoutRebuilder.MarkLayoutForRebuild(row);
     }
