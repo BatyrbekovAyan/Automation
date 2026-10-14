@@ -356,3 +356,22 @@ Delete Bot Files, Profile Lifecycle Sweep) через `deploy-canonical.py --onl
 сжатие ассетов; live 404 на текущий `assets/e85b3e936c`), а `tools/check.mjs` на этой машине не поднялся (headless-навигация); клиент
 с меткой ещё не выпущен, так что страница не просрочена — отдельное «да» владельца. Дальше: device pass трёх пунктов learning A,
 первый `report-learning.py --prod --days 3` через 2–3 дня работы бота.
+
+## Развёртывание 2026-10-14 (прод, шаг 12 пакета блока F1 + F2, по «да» владельца)
+
+Пакет — `docs/audits/2026-10-09-followups/README.md` «Пакет выкладки блока», шаг 12: ветка A Profile Lifecycle Sweep из режима
+«только журнал» в рабочий.
+
+| Шаг | Результат | Доказательство |
+|---|---|---|
+| Журнал первых суток | проверка `sweep-branch-a-check-1014` (только чтение): 5 запусков Sweep 13–14.10 — все success, ошибок в узлах нет; `Clone Retirements` 0 строк (к удалению ничего), `clone_retirements` пуст, логи n8n чистые, verify-deployed 0 | отчёт задачи |
+| Прод до | 10:40 другая сессия выложила learning A + панель 13.10 (`56bdc56b`); verify-deployed: канон 27, diff 0 — изменение канона в одном флаге = изменение прода в одном флаге | `verify-deployed` |
+| Канон | `RETIREMENTS_DRY_RUN = False` в `apply-sweep-clone-deactivate.py` → одна строка `Sweep Config` (`"value": false`); повторный прогон без диффа, `--check` 0; verify-clone-lifecycle ALL PASSED, test_clone_retirements 21/0, test_verify_clone_lifecycle 44/0 | `4761117b` |
+| Dry-run | `deploy-canonical.py`: would_update 1 (только Sweep), up_to_date 24; точка отката `versionId c96f4306-025d-46e9-9a0d-b7a112db8c38` | вывод инструмента |
+| Выкладка | `--only fXYpCXPKw92EzRz8 --apply --yes` (06:53 UTC): updated 1, опубликован самим PUT (без окна deactivate), read-back ok | вывод инструмента |
+| Read-back | verify-deployed exit 0 (канон 27, diff 0, клонов 0); сохранённая и действующая версии: `retirementsDryRun = false`, `dryRun = false`, active | `docs/audits/2026-10-14-step12-prod-after.json` |
+| Первый рабочий запуск | execution 19518, 07:00:29–07:00:31 UTC: success, ошибок в узлах нет; `Clone Retirements` 0 строк — удалять нечего; `Expire Learning Rows` отработал | API executions |
+| Логи | с 06:53 UTC ни одной строки с ошибкой | `docker compose logs` |
+
+Откат: `deploy-canonical.py` с JSON Sweep из `4761117b^` (флаг true) — или публикация версии `c96f4306-…` по точке отката.
+Дальше по пакету — только шаг 13 (новая клиентская сборка), по отдельному «да».

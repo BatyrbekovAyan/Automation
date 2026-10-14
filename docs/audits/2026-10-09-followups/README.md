@@ -124,8 +124,10 @@ smoke ок, логи чистые; журнал — `docs/audits/implementation-
 пробы прав (она удалила свой workflow сразу → сброс insights падал каждые 30 с) снят рестартом n8n в 20:19:37; после рестарта
 логи чистые. Журнал — `docs/audits/implementation-progress.md` «Развёртывание 2026-10-13», снимки
 `docs/audits/2026-10-13-prod-{before,after}.json`, точки отката `docs/audits/2026-10-13-deploy-rollback-pointers.txt`, проба —
-`evidence/deploy-1013-admin-cred-probe.txt`. **Не сделано (отдельные «да»):** шаг 12 (флип `retirementsDryRun` через сутки, если
-журнал ветки A чист) и шаг 13 (новая сборка → device-pass §5.4 → canary → сторы).
+`evidence/deploy-1013-admin-cred-probe.txt`. **Шаг 12 сделан 2026-10-14** (по «да» владельца): журнал ветки A за сутки чистый (5 запусков, к удалению 0,
+`clone_retirements` пуст) → `RETIREMENTS_DRY_RUN = False` (`4761117b`), выложен только Sweep (точка отката
+`c96f4306-025d-46e9-9a0d-b7a112db8c38`), read-back ok, verify-deployed 0; журнал — «Развёртывание 2026-10-14 (шаг 12)».
+**Не сделано (отдельное «да»):** шаг 13 (новая сборка → device-pass §5.4 → canary → сторы).
 
 ## Пакет выкладки блока F1 + F2 + Q1 B + V6-unknown + V3 (готов 2026-10-12; сервер ВЫЛОЖЕН 2026-10-13, шаги 1–11)
 
