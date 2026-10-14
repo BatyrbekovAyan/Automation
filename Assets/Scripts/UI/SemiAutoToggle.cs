@@ -98,8 +98,13 @@ public class SemiAutoToggle : MonoBehaviour
 
         // Turning auto ON for this chat — the bot starts writing this client, so
         // the same confirm gate as the header button, scoped to one conversation.
-        if (!ReplyModeToggleBinder.ShowConfirm(EnableTitle, EnableBody, () => OnToggled?.Invoke(false)))
-            OnToggled?.Invoke(false);  // no popup wired — commit straight away
+        // learning B: the per-chat enable meets the same soft lock (the sheet says «в этом чате»), then its own confirm.
+        string botKey = ChatManager.Instance != null ? ChatManager.Instance.CurrentBotId : null;
+        AutoLockGate.TryEnable(botKey, label != null ? label.font : null, perChat: true, () =>
+        {
+            if (!ReplyModeToggleBinder.ShowConfirm(EnableTitle, EnableBody, () => OnToggled?.Invoke(false)))
+                OnToggled?.Invoke(false);  // no popup wired — commit straight away
+        });
     }
 
     private void ApplyVisuals(bool semi, bool animate)

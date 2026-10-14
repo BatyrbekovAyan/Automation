@@ -1,0 +1,77 @@
+using System.Collections.Generic;
+using System.IO;
+using System.Text.RegularExpressions;
+using NUnit.Framework;
+using UnityEngine;
+
+/// <summary>
+/// Learning B source guard: every path that turns «Авто» ON for the owner goes through AutoLockGate.TryEnable BEFORE it
+/// commits — the card capsule, the chats header + bot-switcher row (RequestEnableAuto), the per-chat toggle. Disabling and
+/// the server reconciliation stay outside the gate. EditMode cannot tap a capsule, so the wiring is pinned by text.
+/// </summary>
+public class AutoLockWiringTests
+{
+    [Test]
+    public void TheCapsule_TheHeaderPaths_AndThePerChatToggle_GoThroughTheGate_BeforeTheyCommit()
+    {
+        string card = MethodBody("Scripts/Main/Bot.cs", "OnAutoPillTapped");
+        Assert.GreaterOrEqual(card.IndexOf("AutoLockGate.TryEnable("), 0, "card capsule");
+        Assert.Greater(card.IndexOf("ReplyMode.Auto"), card.IndexOf("AutoLockGate.TryEnable("), "card capsule: the gate, then CommitMode(Auto)");
+
+        string header = MethodBody("Scripts/UI/ReplyModeToggleBinder.cs", "RequestEnableAuto");
+        Assert.GreaterOrEqual(header.IndexOf("AutoLockGate.TryEnable("), 0, "chats header + switcher row share RequestEnableAuto");
+        Assert.Greater(header.IndexOf("ReplyMode.Auto"), header.IndexOf("AutoLockGate.TryEnable("), "header: the gate, then CommitMode(Auto)");
+
+        string chat = MethodBody("Scripts/UI/SemiAutoToggle.cs", "HandlePressed");
+        Assert.GreaterOrEqual(chat.IndexOf("AutoLockGate.TryEnable("), 0, "per-chat toggle");
+        Assert.IsTrue(chat.Contains("perChat: true"), "the per-chat sheet says «в этом чате»");
+        Assert.Greater(chat.IndexOf("OnToggled?.Invoke(false)"), chat.IndexOf("AutoLockGate.TryEnable("), "per-chat: the gate, then the enable");
+    }
+
+    [Test]
+    public void DisablingAndServerReconcile_StayOutsideTheGate()
+    {
+        Assert.IsFalse(MethodBody("Scripts/UI/ReplyModeToggleBinder.cs", "DisableAuto").Contains("AutoLockGate"), "switching back to «Вместе» is instant");
+        Assert.IsFalse(MethodBody("Scripts/UI/ReplyModeToggleBinder.cs", "ReconcileFromServer").Contains("AutoLockGate"), "a server-side truth is not the owner's tap");
+    }
+
+    [Test]
+    public void OnlyTheGateAndTheCard_ReadTheReadinessStore()
+    {
+        var users = new List<string>();
+        foreach (string path in Directory.GetFiles(Path.Combine(Application.dataPath, "Scripts"), "*.cs", SearchOption.AllDirectories))
+        {
+            string file = Path.GetFileName(path);
+            if (file == "AutoLockGate.cs" || file == "Bot.cs" || file == "AutoReadiness.cs") continue;
+            if (File.ReadAllText(path).Contains("AutoReadinessStore.Current(")) users.Add(file);
+        }
+        Assert.IsEmpty(users, "only the gate (the lock) and the card (its face) read readiness: " + string.Join(", ", users));
+    }
+
+    /// <summary>The method's body: a brace-matched block, or — for an expression-bodied member — its `=> …;` expression.</summary>
+    private static string MethodBody(string relativePath, string method)
+    {
+        string path = Path.Combine(Application.dataPath, relativePath);
+        Assert.IsTrue(File.Exists(path), $"{relativePath} moved — update AutoLockWiringTests");
+        string source = File.ReadAllText(path);
+        var decl = Regex.Match(source,
+            @"^[ \t]*(?:(?:public|private|internal|protected|static)[ \t]+)*(?!return\b)[\w<>.]+[ \t]+" + Regex.Escape(method) + @"[ \t]*\(",
+            RegexOptions.Multiline);
+        Assert.IsTrue(decl.Success, $"{method} not found in {relativePath}");
+        int open = source.IndexOf('{', decl.Index);
+        int arrow = source.IndexOf("=>", decl.Index, System.StringComparison.Ordinal);
+        if (arrow >= 0 && (open < 0 || arrow < open))
+        {
+            int end = source.IndexOf(';', arrow);
+            return source.Substring(arrow, end - arrow + 1);
+        }
+        int depth = 0;
+        for (int i = open; i < source.Length; i++)
+        {
+            if (source[i] == '{') depth++;
+            else if (source[i] == '}' && --depth == 0) return source.Substring(open, i - open + 1);
+        }
+        Assert.Fail($"unbalanced braces after {method}");
+        return null;
+    }
+}

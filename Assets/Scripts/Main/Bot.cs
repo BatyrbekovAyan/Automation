@@ -424,11 +424,17 @@ public class Bot : MonoBehaviour
         // and commits through the same binder entry; the repaint (and the
         // chats-header sync) arrives via OnReplyModeChanged.
         if (AutoButtonModel.ConfirmRequired(ReplyModeToggleBinder.GetMode(transform.name)))
-            BotActivationConfirm.Show(BotName != null ? BotName.font : null, () =>
-            {
-                if (this != null)   // card may die before confirm
-                    ReplyModeToggleBinder.CommitMode(transform.name, ReplyModeToggleBinder.ReplyMode.Auto);
-            });
+        {
+            string botKey = transform.name;
+            TMP_FontAsset font = BotName != null ? BotName.font : null;
+            // learning B: the soft lock first (the server's verdict), then the activation confirm — the same two-step on every path.
+            AutoLockGate.TryEnable(botKey, font, perChat: false, () =>
+                BotActivationConfirm.Show(font, () =>
+                {
+                    if (this != null)   // card may die before confirm
+                        ReplyModeToggleBinder.CommitMode(botKey, ReplyModeToggleBinder.ReplyMode.Auto);
+                }));
+        }
         else
             ReplyModeToggleBinder.DisableAuto(transform.name);
     }

@@ -136,8 +136,13 @@ public class ReplyModeToggleBinder : MonoBehaviour
     {
         if (string.IsNullOrEmpty(botName)) return;
 
-        if (!ShowConfirm(EnableTitle, EnableBody, () => CommitMode(botName, ReplyMode.Auto)))
-            CommitMode(botName, ReplyMode.Auto);
+        // learning B: the soft lock first (the server's verdict), then the shared confirm; «Включить всё равно» re-enters here.
+        TMP_FontAsset font = instance != null && instance.confirmTitle != null ? instance.confirmTitle.font : null;
+        AutoLockGate.TryEnable(botName, font, perChat: false, () =>
+        {
+            if (!ShowConfirm(EnableTitle, EnableBody, () => CommitMode(botName, ReplyMode.Auto)))
+                CommitMode(botName, ReplyMode.Auto);
+        });
     }
 
     /// <summary>
