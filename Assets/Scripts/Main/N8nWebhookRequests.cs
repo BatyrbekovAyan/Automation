@@ -60,21 +60,42 @@ public static class VerifyIdentityRequest
         JsonConvert.SerializeObject(new BodyShape { appUserId = appUserId, originalAppUserId = originalAppUserId });
 
     /// <summary>
+    /// True when the body is the server's positive answer: a JSON object whose <c>success</c> is the BOOLEAN true (a repeat
+    /// that moved nothing included). Anything else — a refusal, a string "true", garbage — is not. The identity-heal latch is
+    /// stamped only on this (IdentityHealTrigger.ShouldStamp).
+    /// </summary>
+    public static bool Succeeded(string json) => Parse(json) is { } jo && IsTrue(jo["success"]);
+
+    /// <summary>
     /// True when the server's answer says the heal MOVED something (an alias consolidated or a bot re-keyed) — the usage
     /// snapshot of this id is stale then. A refusal, a repeat that changed nothing, or an unreadable body changes nothing.
     /// </summary>
     public static bool HealedSomething(string json)
     {
-        if (string.IsNullOrEmpty(json)) return false;
+        if (!(Parse(json) is { } jo) || !IsTrue(jo["success"])) return false;
         try
         {
-            var jo = Newtonsoft.Json.Linq.JObject.Parse(json);
-            return jo.Value<bool?>("success") == true
-                && ((jo.Value<int?>("consolidated") ?? 0) > 0 || (jo.Value<int?>("rekeyed") ?? 0) > 0);
+            return (jo.Value<int?>("consolidated") ?? 0) > 0 || (jo.Value<int?>("rekeyed") ?? 0) > 0;
         }
         catch (System.Exception)
         {
             return false;
+        }
+    }
+
+    private static bool IsTrue(Newtonsoft.Json.Linq.JToken token)
+        => token != null && token.Type == Newtonsoft.Json.Linq.JTokenType.Boolean && (bool)token;
+
+    private static Newtonsoft.Json.Linq.JObject Parse(string json)
+    {
+        if (string.IsNullOrEmpty(json)) return null;
+        try
+        {
+            return Newtonsoft.Json.Linq.JObject.Parse(json);
+        }
+        catch (System.Exception)
+        {
+            return null;
         }
     }
 

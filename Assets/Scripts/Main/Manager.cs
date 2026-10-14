@@ -397,9 +397,12 @@ public partial class Manager : MonoBehaviour
     // A reinstall gets a new anonymous RevenueCat id; RevenueCat merges it with the old one, but the server's subscription
     // mirror stays under the old id until RevenueCat's next event (up to a month of trial limits; the lifecycle sweep
     // deletes the bots created after the reinstall). When CustomerInfo reveals the merge, the server is asked to heal — it
-    // asks RevenueCat for the aliases itself and consolidates them INTO the token's billing id. Once per (original,
-    // current) pair per launch: an instance field, like _launchExpiryPaywallShown.
-    private string _identityHealLastPair;
+    // asks RevenueCat for the aliases itself and consolidates them INTO the token's billing id.
+    // Two latches: the PERSISTED one (IdentityHealLatch — stamped only by the server's positive answer) keeps a healed pair
+    // quiet for 24 h across launches; this per-launch one (an instance field, like _launchExpiryPaywallShown) keeps a pair
+    // the server refused, or one still in flight, from being asked again on every CustomerInfo update of the same launch —
+    // a refusal is retried at the next launch.
+    private string _identityHealAttemptedPair;
 
     /// <summary>
     /// Runs inside <see cref="BillingService.OnEntitlementChanged"/>'s multicast (RevenueCat's CustomerInfo callback), so it
@@ -412,8 +415,11 @@ public partial class Manager : MonoBehaviour
             string current = BillingIdentity.AppUserId;
             string original = BillingService.OriginalAppUserId;
             bool conflict = AuthClient.Existing != null && AuthClient.Existing.BillingConflict;
-            if (!IdentityHealTrigger.ShouldCall(current, original, conflict, _identityHealLastPair)) return;
-            _identityHealLastPair = IdentityHealTrigger.PairOf(current, original);
+            long now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+            if (!IdentityHealTrigger.ShouldCall(current, original, conflict, IdentityHealLatch.LastPair, IdentityHealLatch.LastHealedAtMs, now)) return;
+            string pair = IdentityHealTrigger.PairOf(current, original);
+            if (string.Equals(_identityHealAttemptedPair, pair, StringComparison.Ordinal)) return;
+            _identityHealAttemptedPair = pair;
             StartCoroutine(VerifyIdentityRoutine(current, original));
         }
         catch (Exception e)
@@ -425,7 +431,8 @@ public partial class Manager : MonoBehaviour
     /// <summary>
     /// POST /webhook/VerifyIdentity through <see cref="AuthorizedRequest"/>. Skipped when the token carries no billing
     /// identity (billingConflict — another install holds the id): there is no id to heal INTO and the gate would refuse.
-    /// A heal that moved something leaves the usage snapshot stale, so it is re-read.
+    /// Only the server's positive answer (a 2xx success:true) stamps the persisted latch; a heal that moved something
+    /// leaves the usage snapshot stale, so it is re-read.
     /// </summary>
     private IEnumerator VerifyIdentityRoutine(string appUserId, string originalAppUserId)
     {
@@ -439,13 +446,16 @@ public partial class Manager : MonoBehaviour
             r => www = r);
         using var wwwScope = www;
 
+        string body = www.downloadHandler?.text;
+        if (IdentityHealTrigger.ShouldStamp(www.responseCode, body))
+            IdentityHealLatch.Stamp(IdentityHealTrigger.PairOf(appUserId, originalAppUserId), DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
         if (www.result != UnityWebRequest.Result.Success)
         {
-            Debug.LogWarning($"[VerifyIdentity] [{www.responseCode}] {www.url}: {www.error} {www.downloadHandler?.text}");
+            Debug.LogWarning($"[VerifyIdentity] [{www.responseCode}] {www.url}: {www.error} {body}");
             yield break;
         }
-        if (!VerifyIdentityRequest.HealedSomething(www.downloadHandler?.text)) yield break;
-        Debug.Log($"[VerifyIdentity] healed: {www.downloadHandler.text}");
+        if (!VerifyIdentityRequest.HealedSomething(body)) yield break;
+        Debug.Log($"[VerifyIdentity] healed: {body}");
         StartCoroutine(UsageClient.FetchRoutine());
     }
 
