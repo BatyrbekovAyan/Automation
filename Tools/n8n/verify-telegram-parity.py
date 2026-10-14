@@ -733,6 +733,173 @@ def check_rc_transfer_carry_gate():
     print(f"OK  {RC_EVENTS} (usage carry gated on snapshot acceptance)")
 
 
+RC_GATE = "Dedup Gate"
+RC_DUP_IF = "If Duplicate?"
+# Anything in the gate's statement that can change data (or take a row lock) — it must only read.
+_RC_WRITE_WORD = re.compile(r"\b(insert|update|delete|merge|truncate|copy|alter|drop|create|grant|revoke|lock|call)\b", re.I)
+
+
+def _array_items(expr):
+    """The top-level items of a `={{ [ a, b, … ] }}` queryReplacement — brackets and quotes respected."""
+    s = (expr or "").strip()
+    if not (s.startswith("={{") and s.endswith("}}")):
+        return None
+    s = s[3:-2].strip()
+    if not (s.startswith("[") and s.endswith("]")):
+        return None
+    items, cur, depth, quote = [], "", 0, None
+    for ch in s[1:-1]:
+        if quote:
+            quote = None if ch == quote else quote
+        elif ch in "'\"`":
+            quote = ch
+        elif ch in "([{":
+            depth += 1
+        elif ch in ")]}":
+            depth -= 1
+        elif ch == "," and depth == 0:
+            items.append(cur.strip())
+            cur = ""
+            continue
+        cur += ch
+    return items + ([cur.strip()] if cur.strip() else [])
+
+
+def _paren_body(text, open_idx):
+    """(inside, index of the closing parenthesis) of the parenthesis opened at text[open_idx]."""
+    depth = 0
+    for i in range(open_idx, len(text)):
+        if text[i] == "(":
+            depth += 1
+        elif text[i] == ")":
+            depth -= 1
+            if depth == 0:
+                return text[open_idx + 1:i], i
+    return None, -1
+
+
+def check_rc_event_ledger():
+    """A1 «защита платящих» (2026-10-14): RevenueCat Events changes the books ONCE per event id. RevenueCat delivers at
+    least once, and Upsert Subscriber's `topup_balance + <top-up>` is not idempotent — a replayed NON_RENEWING_PURCHASE
+    credited 500 dialogs twice. Shape (hand-edited: this workflow has no owning generator):
+      Webhook → Dedup Gate (Postgres, ONLY reads rc_event_ledger; alwaysOutputData + continueRegularOutput = fail-open)
+              → If Duplicate? (a non-empty `event_id` of the gate's ROW — never «the node continued»)
+                  TRUE → Respond 200 (nothing changes) · FALSE → Map Event → … (unchanged)
+    The id is WRITTEN only by Upsert Subscriber's CTE `ledger`, in the upsert's own statement (= transaction): a row
+    written earlier would turn RevenueCat's retry of a failed upsert into a «duplicate» and lose the event. Map Event
+    reads the payload from the Webhook by name (the gate's output is its row, not the webhook item) and hands
+    `event_id` on; Consolidate Aliases / Transfer Subscriber carry it through their final select.
+    Each assert is a way this rots silently on a re-export or a hand edit; tests/test_rc_event_ledger.py runs the
+    graph (real SQL) and the one-mutation negatives of this check."""
+    f = RC_EVENTS
+    wf = load(f)
+    ns, conns = wf["nodes"], wf["connections"]
+
+    def rc_node(name):
+        hit = [n for n in ns if n.get("name") == name]
+        assert len(hit) == 1, f"{f}: expected exactly one node {name!r}, found {len(hit)}"
+        return hit[0]
+
+    gate, dup, mapper, upsert = (rc_node(x) for x in (RC_GATE, RC_DUP_IF, "Map Event", "Upsert Subscriber"))
+
+    def pg_cred(n):
+        return ((n.get("credentials") or {}).get("postgres") or {}).get("id")
+
+    def id_param(n, what):
+        """The 1-based parameter number the node's queryReplacement gives `$json.event_id`."""
+        items = _array_items((n["parameters"].get("options") or {}).get("queryReplacement"))
+        assert items is not None, f"{f}: {n['name']} queryReplacement is not the `={{{{ [ … ] }}}}` array form"
+        hits = [i for i, it in enumerate(items) if "$json.event_id" in it]
+        assert len(hits) == 1, f"{f}: {n['name']} must pass `$json.event_id` exactly once ({what}); items: {items}"
+        assert "??" in items[hits[0]], \
+            f"{f}: {n['name']} passes the event id without `?? null` — n8n SKIPS an undefined value and shifts the rest"
+        return hits[0] + 1
+
+    # (1) the gate: a live Postgres read that fails OPEN and always hands an item on
+    assert gate.get("type") == "n8n-nodes-base.postgres" and \
+        gate.get("parameters", {}).get("operation", "executeQuery") == "executeQuery", \
+        f"{f}: {RC_GATE} is not a Postgres executeQuery node"
+    assert not gate.get("disabled"), f"{f}: {RC_GATE} is disabled — every replay credits again"
+    assert gate.get("alwaysOutputData") is True, \
+        f"{f}: {RC_GATE} lost alwaysOutputData — a NEW event (zero rows) hands on no item: nothing runs, no answer, " \
+        f"every event lost to RevenueCat's retries"
+    assert gate.get("onError") == "continueRegularOutput", \
+        f"{f}: {RC_GATE} onError is {gate.get('onError')!r} — a read error must let the event through (fail-open, " \
+        f"continueRegularOutput), never stop it or land on an unconnected error output"
+    assert pg_cred(gate) and pg_cred(gate) == pg_cred(upsert), \
+        f"{f}: {RC_GATE} credential {pg_cred(gate)!r} != Upsert Subscriber's {pg_cred(upsert)!r} — another database"
+    # (2) it only reads
+    stmts = _pg_statements(gate["parameters"].get("query", ""))
+    assert len(stmts) == 1 and _top_level_command(stmts[0]) == "SELECT", \
+        f"{f}: {RC_GATE} must be ONE top-level SELECT, found {len(stmts)} statement(s): {stmts}"
+    assert not _RC_WRITE_WORD.search(stmts[0]), \
+        f"{f}: {RC_GATE} writes ({_RC_WRITE_WORD.search(stmts[0]).group(0)}) — the id must be recorded ONLY inside the " \
+        f"upsert's statement, or a crash before the upsert turns RevenueCat's retry into a dropped «duplicate»"
+    assert re.search(r"\bfrom\s+rc_event_ledger\b", stmts[0], re.I) and \
+        re.search(r"\bwhere\s+event_id\s*=\s*\$1(?!\d)", stmts[0], re.I), \
+        f"{f}: {RC_GATE} no longer looks the id up in rc_event_ledger by its first parameter: {stmts[0]}"
+    items = _array_items((gate["parameters"].get("options") or {}).get("queryReplacement"))
+    assert items is not None and len(items) == 1 and "$('Webhook').first().json.body" in items[0] and ".id" in items[0], \
+        f"{f}: {RC_GATE} must take ONE value — the event id from $('Webhook').first().json.body — got {items}"
+    # (3) the wiring: nothing reaches Map Event except a gate verdict «not a duplicate»
+    assert _main_targets(conns, "Webhook") == [[RC_GATE]], \
+        f"{f}: Webhook must lead to {RC_GATE} only, not {_main_targets(conns, 'Webhook')}"
+    assert _main_targets(conns, RC_GATE) == [[RC_DUP_IF]], \
+        f"{f}: {RC_GATE} must lead to {RC_DUP_IF} only, not {_main_targets(conns, RC_GATE)}"
+    assert _main_targets(conns, RC_DUP_IF) == [["Respond 200"], ["Map Event"]], \
+        f"{f}: {RC_DUP_IF} must be TRUE → Respond 200, FALSE → Map Event, not {_main_targets(conns, RC_DUP_IF)}"
+    into_map = sorted((src, i) for src, v in conns.items() for i, br in enumerate((v or {}).get("main") or [])
+                      for e in br or [] if e.get("node") == "Map Event")
+    assert into_map == [(RC_DUP_IF, 1)], f"{f}: Map Event is entered from {into_map}, only {RC_DUP_IF}[FALSE] may enter it"
+    # (4) the duplicate verdict is a POSITIVE field of the gate's row
+    assert dup.get("type") == "n8n-nodes-base.if" and not dup.get("disabled"), f"{f}: {RC_DUP_IF} is not a live If node"
+    cond = (dup.get("parameters") or {}).get("conditions") or {}
+    cs = cond.get("conditions") or []
+    assert cond.get("combinator") == "and" and len(cs) == 1 and str(cs[0].get("leftValue", "")).strip() == "={{ $json.event_id }}" \
+        and (cs[0].get("operator") or {}).get("type") == "string" and (cs[0].get("operator") or {}).get("operation") == "notEmpty", \
+        f"{f}: {RC_DUP_IF} must be the one condition `$json.event_id` is not empty (the gate's row); got {cs}"
+    # (5) Map Event reads the Webhook by name and hands the id on
+    assert not mapper.get("disabled"), f"{f}: Map Event is disabled"
+    jc = js_code(mapper["parameters"].get("jsCode", ""))
+    assert "$('Webhook').first().json.body" in jc and "$json.body" not in jc, \
+        f"{f}: Map Event must read the payload as $('Webhook').first().json.body — after a Postgres node $json is the " \
+        f"gate's row, not the webhook item"
+    assert len(re.findall(r"\bevent_id\s*:", jc)) >= 2, \
+        f"{f}: Map Event must hand `event_id` on in every item it returns (the payload item AND the TRANSFER item)"
+    # (6) the ledger is written in the upsert's OWN statement, guarded against an empty id
+    assert not upsert.get("disabled"), f"{f}: Upsert Subscriber is disabled"
+    assert len(_pg_statements(upsert["parameters"].get("query", ""))) == 1, \
+        f"{f}: Upsert Subscriber must stay ONE statement — the ledger row is only atomic with the effect inside it"
+    code = sql_code(upsert["parameters"].get("query", ""))
+    m = re.search(r"\bwith\s+ledger\s+as\s*\(", code, re.I)
+    assert m, f"{f}: Upsert Subscriber lost the CTE `ledger` — the event id is never recorded, every replay credits again"
+    ledger, close = _paren_body(code, m.end() - 1)
+    assert ledger is not None and re.search(r"\binsert\s+into\s+rc_event_ledger\b", ledger, re.I) and \
+        re.search(r"\bon\s+conflict\s+do\s+nothing\b", ledger, re.I), \
+        f"{f}: the CTE `ledger` must `insert into rc_event_ledger … on conflict do nothing`: {ledger}"
+    n_id = id_param(upsert, "the ledger's id")
+    used = set(re.findall(r"\$(\d+)", ledger))
+    assert used == {str(n_id)} and re.search(r"\bwhere\s+nullif\s*\(\s*\$%d\b[^)]*\)\s+is\s+not\s+null" % n_id, ledger, re.I), \
+        f"{f}: the CTE `ledger` must record ONLY the event id (parameter {n_id}) and only when it is not empty — an " \
+        f"empty id recorded once would make every later id-less event a «duplicate»: {ledger}"
+    assert re.match(r"\s*insert\s+into\s+subscribers\b", code[close + 1:], re.I), \
+        f"{f}: the statement under the CTE `ledger` must be the subscribers upsert itself"
+    # (7) both paths into Upsert carry the id; Transfer hands it on too (its branch never writes the ledger)
+    for name in ("Consolidate Aliases", "Transfer Subscriber"):
+        n = rc_node(name)
+        k = id_param(n, "carried through the final select")
+        assert re.search(r"\$%d::text\s+as\s+event_id\b" % k, sql_code(n["parameters"].get("query", "")), re.I), \
+            f"{f}: {name} must hand the event id on as `${k}::text as event_id` in its final select — a Postgres node " \
+            f"drops its input json, so without it the alias path never records the id"
+    # (8) the gate never wrote, and no node but Upsert Subscriber writes the ledger
+    for n in ns:
+        if n.get("type") == "n8n-nodes-base.postgres" and n.get("name") != "Upsert Subscriber":
+            assert not re.search(r"\b(insert\s+into|update|delete\s+from|merge\s+into|truncate(\s+table)?)\s+rc_event_ledger\b",
+                                 sql_code(n["parameters"].get("query", "")), re.I), \
+                f"{f}: {n.get('name')} writes rc_event_ledger — only Upsert Subscriber may, inside its own statement"
+    print(f"OK  {f} (idempotency ledger: read-only fail-open gate, written only inside the upsert statement)")
+
+
 REFUSED_DELETE_NODE = "Delete Refused Profile"
 REFUSED_RETIRE_NODE = "Retire Refused Profile"
 REFUSAL_RESPONSE_NODE = "Respond Channel Limit"
@@ -966,6 +1133,7 @@ def checks():
         ("model id WA", lambda: check_model_id(WA_BOT)),
         ("suggest replies", check_suggest_replies),
         ("revenuecat transfer", check_rc_transfer_carry_gate),
+        ("revenuecat ledger", check_rc_event_ledger),
     ]
 
 

@@ -31,13 +31,13 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        220,
+        660,
         0
       ],
       "parameters": {
         "mode": "runOnceForAllItems",
         "language": "javaScript",
-        "jsCode": "const e = $json.body.event ?? $json.body;\nconst type = e.type;                       // INITIAL_PURCHASE | RENEWAL | TRANSFER | ...\nconst appUserId = e.app_user_id;\nconst ent = (e.entitlement_ids && e.entitlement_ids[0]) || '';\nconst planByEnt = { tier_start: 'start', tier_business: 'business', tier_network: 'network' };\nconst out = { app_user_id: appUserId, topup_delta: 0 };\nconst ids = (a) => (Array.isArray(a) ? a.filter((x) => typeof x === 'string' && x.length > 0) : []);\n\nif (type === 'TRANSFER') {\n  // TRANSFER несёт ТОЛЬКО transferred_from/transferred_to (в доках RC — String arrays,\n  // «App User ID(s)»); ни app_user_id, ни product_id, ни entitlement_ids в нём НЕТ.\n  // Это МЕЖАККАУНТНЫЙ переезд. Переустановку на том же устройстве RC шлёт НЕ так — см. ниже.\n  const from = ids(e.transferred_from);\n  const to = ids(e.transferred_to);\n  if (!from.length || !to.length) return [{ json: out }];   // пустые массивы -> no-op (Respond No-Op)\n  return [{ json: { app_user_id: '', topup_delta: 0, to_ids: JSON.stringify(to), from_ids: JSON.stringify(from) } }];\n}\n\n// СКЛЕЙКА ИДЕНТИЧНОСТЕЙ (alias-merge). При переустановке RC НЕ шлёт TRANSFER: событие\n// приходит под НОВЫМ app_user_id, а старый лежит в original_app_user_id и в aliases[]\n// (живые события 3150/3151/3153 от 2026-08-26; transferred_* там null). Доки RC прямо\n// говорят искать «both the original_app_user_id and the aliases array». Алиасы едут на\n// КАЖДОМ событии всегда, поэтому alias_ids выставляется только когда есть что сводить —\n// иначе If-гейт ниже экономит целый round-trip в Postgres.\nconst cur = typeof appUserId === 'string' ? appUserId : '';\nconst aliasIds = [...new Set([\n  ...ids(e.aliases),\n  ...(typeof e.original_app_user_id === 'string' ? [e.original_app_user_id] : []),\n].filter((x) => x && x !== cur))];\nif (cur && aliasIds.length) out.alias_ids = JSON.stringify(aliasIds);\n\nif (type === 'NON_RENEWING_PURCHASE' && e.product_id === 'topup.dialogs.500') {\n  out.topup_delta = 500;                   // план/статус/product_id не трогаем\n} else if (['INITIAL_PURCHASE','RENEWAL','UNCANCELLATION','PRODUCT_CHANGE'].includes(type)) {\n  out.plan = planByEnt[ent] ?? 'none';\n  out.status = 'active';\n  out.period_end = e.expiration_at_ms ? new Date(e.expiration_at_ms).toISOString() : null;\n  // PRODUCT_CHANGE несёт СТАРЫЙ sku в product_id, а новый — в new_product_id (доки RC;\n  // живое наблюдение 2026-08-26, exec 3128: product_id=sub.start.month при апгрейде на\n  // sub.business.month). `??` выбран НАМЕРЕННО: он одинаково обрабатывает и отсутствие\n  // ключа, и явный null — не менять на `'new_product_id' in e`. На этом инстансе все 34\n  // реальные доставки несли этот ключ только у PRODUCT_CHANGE, но доки описывают его как\n  // «omitted when null», а не «никогда не приходит null».\n  out.product_id = e.new_product_id ?? e.product_id ?? null;   // .month/.year суффикс SKU -> интервал в Get Usage\n} else if (type === 'EXPIRATION') {\n  out.status = 'expired';\n} else if (type === 'CANCELLATION') {\n  return [];                               // автопродление выключили — доступ до period_end, ничего не меняем\n}\nreturn [{ json: out }];"
+        "jsCode": "// A1 (2026-10-14): вход этой ноды — уже не Webhook, а Dedup Gate (Postgres-нода отдаёт ТОЛЬКО строки своего\n// запроса и роняет входной json), поэтому тело RevenueCat читается из Webhook по имени.\nconst body = $('Webhook').first().json.body;\nconst e = body.event ?? body;\nconst type = e.type;                       // INITIAL_PURCHASE | RENEWAL | TRANSFER | ...\nconst appUserId = e.app_user_id;\n// id события RevenueCat (A1): Upsert Subscriber пишет его в rc_event_ledger в одном statement'е с эффектом события,\n// Dedup Gate ищет ровно этот id — тот же источник, то же правило (только строка; иначе пусто = без журнала).\nconst eventId = typeof e.id === 'string' ? e.id : '';\nconst ent = (e.entitlement_ids && e.entitlement_ids[0]) || '';\nconst planByEnt = { tier_start: 'start', tier_business: 'business', tier_network: 'network' };\nconst out = { app_user_id: appUserId, topup_delta: 0, event_id: eventId };\nconst ids = (a) => (Array.isArray(a) ? a.filter((x) => typeof x === 'string' && x.length > 0) : []);\n\nif (type === 'TRANSFER') {\n  // TRANSFER несёт ТОЛЬКО transferred_from/transferred_to (в доках RC — String arrays,\n  // «App User ID(s)»); ни app_user_id, ни product_id, ни entitlement_ids в нём НЕТ.\n  // Это МЕЖАККАУНТНЫЙ переезд. Переустановку на том же устройстве RC шлёт НЕ так — см. ниже.\n  const from = ids(e.transferred_from);\n  const to = ids(e.transferred_to);\n  if (!from.length || !to.length) return [{ json: out }];   // пустые массивы -> no-op (Respond No-Op)\n  return [{ json: { app_user_id: '', topup_delta: 0, to_ids: JSON.stringify(to), from_ids: JSON.stringify(from), event_id: eventId } }];\n}\n\n// СКЛЕЙКА ИДЕНТИЧНОСТЕЙ (alias-merge). При переустановке RC НЕ шлёт TRANSFER: событие\n// приходит под НОВЫМ app_user_id, а старый лежит в original_app_user_id и в aliases[]\n// (живые события 3150/3151/3153 от 2026-08-26; transferred_* там null). Доки RC прямо\n// говорят искать «both the original_app_user_id and the aliases array». Алиасы едут на\n// КАЖДОМ событии всегда, поэтому alias_ids выставляется только когда есть что сводить —\n// иначе If-гейт ниже экономит целый round-trip в Postgres.\nconst cur = typeof appUserId === 'string' ? appUserId : '';\nconst aliasIds = [...new Set([\n  ...ids(e.aliases),\n  ...(typeof e.original_app_user_id === 'string' ? [e.original_app_user_id] : []),\n].filter((x) => x && x !== cur))];\nif (cur && aliasIds.length) out.alias_ids = JSON.stringify(aliasIds);\n\nif (type === 'NON_RENEWING_PURCHASE' && e.product_id === 'topup.dialogs.500') {\n  out.topup_delta = 500;                   // план/статус/product_id не трогаем\n} else if (['INITIAL_PURCHASE','RENEWAL','UNCANCELLATION','PRODUCT_CHANGE'].includes(type)) {\n  out.plan = planByEnt[ent] ?? 'none';\n  out.status = 'active';\n  out.period_end = e.expiration_at_ms ? new Date(e.expiration_at_ms).toISOString() : null;\n  // PRODUCT_CHANGE несёт СТАРЫЙ sku в product_id, а новый — в new_product_id (доки RC;\n  // живое наблюдение 2026-08-26, exec 3128: product_id=sub.start.month при апгрейде на\n  // sub.business.month). `??` выбран НАМЕРЕННО: он одинаково обрабатывает и отсутствие\n  // ключа, и явный null — не менять на `'new_product_id' in e`. На этом инстансе все 34\n  // реальные доставки несли этот ключ только у PRODUCT_CHANGE, но доки описывают его как\n  // «omitted when null», а не «никогда не приходит null».\n  out.product_id = e.new_product_id ?? e.product_id ?? null;   // .month/.year суффикс SKU -> интервал в Get Usage\n} else if (type === 'EXPIRATION') {\n  out.status = 'expired';\n} else if (type === 'CANCELLATION') {\n  return [];                               // автопродление выключили — доступ до period_end, ничего не меняем\n}\nreturn [{ json: out }];"
       },
       "alwaysOutputData": true
     },
@@ -47,15 +47,15 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.6,
       "position": [
-        1320,
+        1760,
         200
       ],
       "parameters": {
         "resource": "database",
         "operation": "executeQuery",
-        "query": "insert into subscribers (app_user_id, plan, status, current_period_end, topup_balance, product_id, updated_at)\nvalues ($1, coalesce($2,'trial'), coalesce($3,'trialing'), $4, greatest($5,0), $6, now())\non conflict (app_user_id) do update set\n  plan = coalesce($2, subscribers.plan),\n  status = coalesce($3, subscribers.status),\n  current_period_end = coalesce($4, subscribers.current_period_end),\n  topup_balance = subscribers.topup_balance + $5,\n  product_id = coalesce($6, subscribers.product_id),\n  updated_at = now();",
+        "query": "-- A1 «защита платящих» (2026-10-14): журнал идемпотентности RC-вебхука пишется ЗДЕСЬ — CTE ledger в одном\n-- statement'е (= одной транзакции) с эффектом события. Dedup Gate в начале графа его только читает: id найден ->\n-- 200 без изменений. Запись раньше upsert'а при сбое между ними превратила бы ретрай RevenueCat в «дубль» и\n-- потеряла событие; здесь запись откатывается вместе с upsert'ом. Событие без id (седьмой параметр пуст) проходит\n-- без записи. on conflict do nothing: вторая доставка того же id, прошедшая гейт ДО коммита первой, не падает (и\n-- применяет свой эффект — гейт закрывает повторы после коммита; ретраи RevenueCat приходят через минуты).\n-- Параметры: с первого по шестой — payload события из Map Event / Consolidate Aliases, седьмой — id события.\nwith ledger as (\n  insert into rc_event_ledger (event_id)\n  select $7::text where nullif($7::text, '') is not null\n  on conflict do nothing\n)\ninsert into subscribers (app_user_id, plan, status, current_period_end, topup_balance, product_id, updated_at)\nvalues ($1, coalesce($2,'trial'), coalesce($3,'trialing'), $4, greatest($5,0), $6, now())\non conflict (app_user_id) do update set\n  plan = coalesce($2, subscribers.plan),\n  status = coalesce($3, subscribers.status),\n  current_period_end = coalesce($4, subscribers.current_period_end),\n  topup_balance = subscribers.topup_balance + $5,\n  product_id = coalesce($6, subscribers.product_id),\n  updated_at = now();",
         "options": {
-          "queryReplacement": "={{ [$json.app_user_id, ($json.plan ?? null), ($json.status ?? null), ($json.period_end ?? null), $json.topup_delta, ($json.product_id ?? null)] }}"
+          "queryReplacement": "={{ [$json.app_user_id, ($json.plan ?? null), ($json.status ?? null), ($json.period_end ?? null), $json.topup_delta, ($json.product_id ?? null), ($json.event_id ?? null)] }}"
         }
       },
       "credentials": {
@@ -72,7 +72,7 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        1100,
+        1540,
         60
       ],
       "parameters": {
@@ -105,7 +105,7 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.5,
       "position": [
-        1540,
+        1980,
         200
       ],
       "parameters": {
@@ -120,7 +120,7 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.5,
       "position": [
-        1320,
+        1760,
         -80
       ],
       "parameters": {
@@ -135,7 +135,7 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.5,
       "position": [
-        1540,
+        1980,
         380
       ],
       "parameters": {
@@ -152,7 +152,7 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        440,
+        880,
         0
       ],
       "parameters": {
@@ -185,15 +185,15 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.6,
       "position": [
-        660,
+        1100,
         -380
       ],
       "parameters": {
         "resource": "database",
         "operation": "executeQuery",
-        "query": "-- RC TRANSFER (Task 16): МЕЖАККАУНТНЫЙ переезд подписки. Один statement = одна транзакция,\n-- поэтому перенос и гашение не могут примениться наполовину. Само событие не несёт ни плана,\n-- ни SKU — всё читается из СТАРОЙ строки. Параметры по порядку: JSON-массив transferred_to,\n-- затем JSON-массив transferred_from.\nwith to_ids as (\n  -- дедуп + позиция: снимок получают ВСЕ id из transferred_to («App User ID(s) receiving the\n  -- transactions and entitlements»), а ДЕНЬГИ — только первый: баланс размножать нельзя.\n  -- Дубликат в массиве без дедупа = «ON CONFLICT DO UPDATE cannot affect row a second time».\n  select app_user_id, min(ord) as ord from (\n    select value as app_user_id, ordinality as ord\n    from jsonb_array_elements_text($1::jsonb) with ordinality as t(value, ordinality)\n  ) x group by app_user_id\n), src_ids as (\n  select distinct value as app_user_id from jsonb_array_elements_text($2::jsonb) as t(value)\n), locked as (\n  -- FOR UPDATE, а не снимок: этот инстанс демонстрируемо доставляет события ОДНОГО подписчика\n  -- параллельно (execs 3128/3129 и 3150/3151 перекрываются по времени), а снимочный\n  -- sum(topup_balance) в такой гонке начислит баланс дважды. Блокировка строки сериализует\n  -- и заставляет перечитать свежую версию, поэтому вторая доставка увидит уже 0.\n  -- Получатели исключены целиком (self-transfer и любой id, который есть в обоих массивах).\n  select * from subscribers\n  where app_user_id in (select app_user_id from src_ids)\n    and app_user_id not in (select app_user_id from to_ids)\n  for update\n), src as (\n  -- снимок, который переезжает: самая «живая» строка-источник\n  select * from locked\n  order by current_period_end desc nulls last, updated_at desc nulls last\n  limit 1\n), moved as (\n  insert into subscribers (app_user_id, plan, status, current_period_end, topup_balance, product_id, updated_at)\n  select t.app_user_id, src.plan, src.status, src.current_period_end,\n         case when t.ord = (select min(ord) from to_ids)\n              then coalesce((select sum(topup_balance) from locked), 0) else 0 end,\n         src.product_id, now()\n  from to_ids t cross join src\n  on conflict (app_user_id) do update set\n    -- Снимок переезжает только если источник СТРОГО свежее получателя И не гасит живую строку:\n    -- (1) RENEWAL под новым id законно приходит раньше TRANSFER, а RC ретраит любой не-2xx —\n    -- ничья отдаётся получателю, что и делает повторную доставку идемпотентным no-op'ом;\n    -- (2) СРОК — не признак жизни: истёкшая строка с более поздним period_end штамповала бы\n    -- status='expired' поверх живого trialing (у которого period_end NULL = -infinity и он\n    -- всегда проигрывает), а Count Dialog не считает диалоги при status in (expired,grace) —\n    -- то есть свежая установка замолчала бы. Деньги при этом всё равно переезжают.\n    plan = case when coalesce(subscribers.current_period_end, '-infinity'::timestamptz)\n                   < coalesce(excluded.current_period_end, '-infinity'::timestamptz)\n                 and not (subscribers.status in ('active','trialing')\n                          and excluded.status in ('expired','grace'))\n                then excluded.plan else subscribers.plan end,\n    status = case when coalesce(subscribers.current_period_end, '-infinity'::timestamptz)\n                   < coalesce(excluded.current_period_end, '-infinity'::timestamptz)\n                 and not (subscribers.status in ('active','trialing')\n                          and excluded.status in ('expired','grace'))\n                  then excluded.status else subscribers.status end,\n    product_id = case when coalesce(subscribers.current_period_end, '-infinity'::timestamptz)\n                   < coalesce(excluded.current_period_end, '-infinity'::timestamptz)\n                 and not (subscribers.status in ('active','trialing')\n                          and excluded.status in ('expired','grace'))\n                      then coalesce(excluded.product_id, subscribers.product_id)\n                      else subscribers.product_id end,\n    -- период едет ВМЕСТЕ со снимком, а не отдельно: отказали в снимке — не берём и срок\n    -- (когда снимок выигрывает, он строго свежее, так что это и есть greatest из двух)\n    current_period_end = case when coalesce(subscribers.current_period_end, '-infinity'::timestamptz)\n                   < coalesce(excluded.current_period_end, '-infinity'::timestamptz)\n                 and not (subscribers.status in ('active','trialing')\n                          and excluded.status in ('expired','grace'))\n                              then excluded.current_period_end else subscribers.current_period_end end,\n    -- ПРИБАВЛЯЕМ, а не ПРИСВАИВАЕМ: у получателя мог быть свой топ-ап, и прибавление ложится\n    -- на заблокированное живое значение строки, а не на снимок этого statement'а\n    topup_balance = subscribers.topup_balance + excluded.topup_balance,\n    updated_at = now()\n  returning app_user_id, plan, status, current_period_end, topup_balance, product_id\n), accepted as (\n  -- N-1 (ревью 2026-08-26): получатели, которые ДЕЙСТВИТЕЛЬНО взяли снимок. Расход — это долг\n  -- против КОНКРЕТНОЙ квоты, поэтому он обязан ехать ВМЕСТЕ с планом. Без этого гарда\n  -- `carried` ниже отдавал бы обратно ровно то, что защищают freshness/liveness-термы выше:\n  -- истёкший business с 300 диалогами за месяц против живого свежего trial (квота 150) —\n  -- снимок справедливо отвергнут, а 300 строк расхода всё равно переехали бы и мгновенно\n  -- обнулили квоту получателя (бот молчит, панель «Вместе» вместо ответов).\n  -- Считаем это ИЗ РЕЗУЛЬТАТА statement'а, а не повторяя предикат в третий раз: если снимок\n  -- принят, все три поля строки после записи РАВНЫ снимку; если отвергнут — получатель\n  -- сохранил свои, и хотя бы одно поле разойдётся. Совпадение всех трёх при «отказе»\n  -- означает, что у получателя И ТАК тот же план/статус/срок — тогда перенос расхода верен.\n  select m.app_user_id\n  from moved m, src\n  where m.plan = src.plan\n    and m.status = src.status\n    and m.current_period_end is not distinct from src.current_period_end\n), retired as (\n  update subscribers s set\n    status = 'expired',   -- убивает квоту зомби: Count Dialog не считает status in (expired,grace)\n    topup_balance = 0,    -- баланс уже перенесён выше; обнуление делает перенос ровно консервативным\n    -- Клэмп передаёт профили старой личности ветке A свипа Profile Lifecycle Sweep, которая\n    -- смотрит на (status in ('expired','grace') and\n    -- coalesce(current_period_end, now() - interval '99 days') < now() - interval '3 days').\n    -- ОБА coalesce здесь обязательны: будущий оплаченный период продержал бы зомби-профили\n    -- до месяца по 23₽/день, а NULL — наоборот, сделал бы строку кандидатом МГНОВЕННО (тот\n    -- самый coalesce на -99 дней), и топ-ап-only личность лишилась бы реальных профилей\n    -- Wappi в ближайшие ≤6 часов без всякого grace. now() даёт ровно те же 3 дня, что и\n    -- любой другой churn. Значение только УМЕНЬШАЕТСЯ: просроченная строка остаётся просроченной.\n    current_period_end = least(coalesce(s.current_period_end, now()), now()),\n    updated_at = now()\n  where s.app_user_id in (select app_user_id from locked)\n    -- уже полностью погашенную строку не переписываем (ноль новых версий строки)\n    and (s.status <> 'expired' or s.topup_balance <> 0\n         or s.current_period_end is null or s.current_period_end > now())\n  returning s.app_user_id\n)\n, carried as (\n  -- I-4 (Task 17a): расход переезжает ВМЕСТЕ СО СНИМКОМ — буквально: только к тем id из\n  -- transferred_to, которые снимок ПРИНЯЛИ (CTE `accepted` выше). Деньги по-прежнему только\n  -- первому: баланс размножать нельзя, а расход — консервативно наоборот, получатель плана\n  -- получает и его израсходованную часть. Окно — текущий месяц, как у\n  -- Count Dialog/Get Usage. on conflict do nothing делает это идемпотентным на ретрае RC\n  -- (существование строки И ЕСТЬ счёт), distinct — на случай одного (chat, date) у двух\n  -- источников. Строки источников не удаляем: погашенный id никто не читает.\n  insert into dialog_counts (app_user_id, chat_id, d)\n  select distinct a.app_user_id, dc.chat_id, dc.d\n  from accepted a, dialog_counts dc\n  where dc.app_user_id in (select app_user_id from locked)\n    and date_trunc('month', dc.d)\n        = date_trunc('month', (now() at time zone 'Asia/Almaty')::date)\n  on conflict (app_user_id, chat_id, d) do nothing\n  returning 1\n)\nselect (select count(*) from to_ids) as to_rows,\n       (select count(*) from locked) as source_rows,\n       (select count(*) from moved) as moved_rows,\n       (select count(*) from retired) as retired_rows,\n       (select count(*) from accepted) as accepted_rows,\n       (select count(*) from carried) as carried_rows,\n       (select topup_balance from moved order by topup_balance desc limit 1) as to_topup_balance;",
+        "query": "-- RC TRANSFER (Task 16): МЕЖАККАУНТНЫЙ переезд подписки. Один statement = одна транзакция,\n-- поэтому перенос и гашение не могут примениться наполовину. Само событие не несёт ни плана,\n-- ни SKU — всё читается из СТАРОЙ строки. Параметры по порядку: JSON-массив transferred_to,\n-- затем JSON-массив transferred_from, третий — id события RevenueCat (A1): он только проносится в\n-- результат; эта ветка не доходит до Upsert Subscriber, поэтому журнал идемпотентности не пишет.\nwith to_ids as (\n  -- дедуп + позиция: снимок получают ВСЕ id из transferred_to («App User ID(s) receiving the\n  -- transactions and entitlements»), а ДЕНЬГИ — только первый: баланс размножать нельзя.\n  -- Дубликат в массиве без дедупа = «ON CONFLICT DO UPDATE cannot affect row a second time».\n  select app_user_id, min(ord) as ord from (\n    select value as app_user_id, ordinality as ord\n    from jsonb_array_elements_text($1::jsonb) with ordinality as t(value, ordinality)\n  ) x group by app_user_id\n), src_ids as (\n  select distinct value as app_user_id from jsonb_array_elements_text($2::jsonb) as t(value)\n), locked as (\n  -- FOR UPDATE, а не снимок: этот инстанс демонстрируемо доставляет события ОДНОГО подписчика\n  -- параллельно (execs 3128/3129 и 3150/3151 перекрываются по времени), а снимочный\n  -- sum(topup_balance) в такой гонке начислит баланс дважды. Блокировка строки сериализует\n  -- и заставляет перечитать свежую версию, поэтому вторая доставка увидит уже 0.\n  -- Получатели исключены целиком (self-transfer и любой id, который есть в обоих массивах).\n  select * from subscribers\n  where app_user_id in (select app_user_id from src_ids)\n    and app_user_id not in (select app_user_id from to_ids)\n  for update\n), src as (\n  -- снимок, который переезжает: самая «живая» строка-источник\n  select * from locked\n  order by current_period_end desc nulls last, updated_at desc nulls last\n  limit 1\n), moved as (\n  insert into subscribers (app_user_id, plan, status, current_period_end, topup_balance, product_id, updated_at)\n  select t.app_user_id, src.plan, src.status, src.current_period_end,\n         case when t.ord = (select min(ord) from to_ids)\n              then coalesce((select sum(topup_balance) from locked), 0) else 0 end,\n         src.product_id, now()\n  from to_ids t cross join src\n  on conflict (app_user_id) do update set\n    -- Снимок переезжает только если источник СТРОГО свежее получателя И не гасит живую строку:\n    -- (1) RENEWAL под новым id законно приходит раньше TRANSFER, а RC ретраит любой не-2xx —\n    -- ничья отдаётся получателю, что и делает повторную доставку идемпотентным no-op'ом;\n    -- (2) СРОК — не признак жизни: истёкшая строка с более поздним period_end штамповала бы\n    -- status='expired' поверх живого trialing (у которого period_end NULL = -infinity и он\n    -- всегда проигрывает), а Count Dialog не считает диалоги при status in (expired,grace) —\n    -- то есть свежая установка замолчала бы. Деньги при этом всё равно переезжают.\n    plan = case when coalesce(subscribers.current_period_end, '-infinity'::timestamptz)\n                   < coalesce(excluded.current_period_end, '-infinity'::timestamptz)\n                 and not (subscribers.status in ('active','trialing')\n                          and excluded.status in ('expired','grace'))\n                then excluded.plan else subscribers.plan end,\n    status = case when coalesce(subscribers.current_period_end, '-infinity'::timestamptz)\n                   < coalesce(excluded.current_period_end, '-infinity'::timestamptz)\n                 and not (subscribers.status in ('active','trialing')\n                          and excluded.status in ('expired','grace'))\n                  then excluded.status else subscribers.status end,\n    product_id = case when coalesce(subscribers.current_period_end, '-infinity'::timestamptz)\n                   < coalesce(excluded.current_period_end, '-infinity'::timestamptz)\n                 and not (subscribers.status in ('active','trialing')\n                          and excluded.status in ('expired','grace'))\n                      then coalesce(excluded.product_id, subscribers.product_id)\n                      else subscribers.product_id end,\n    -- период едет ВМЕСТЕ со снимком, а не отдельно: отказали в снимке — не берём и срок\n    -- (когда снимок выигрывает, он строго свежее, так что это и есть greatest из двух)\n    current_period_end = case when coalesce(subscribers.current_period_end, '-infinity'::timestamptz)\n                   < coalesce(excluded.current_period_end, '-infinity'::timestamptz)\n                 and not (subscribers.status in ('active','trialing')\n                          and excluded.status in ('expired','grace'))\n                              then excluded.current_period_end else subscribers.current_period_end end,\n    -- ПРИБАВЛЯЕМ, а не ПРИСВАИВАЕМ: у получателя мог быть свой топ-ап, и прибавление ложится\n    -- на заблокированное живое значение строки, а не на снимок этого statement'а\n    topup_balance = subscribers.topup_balance + excluded.topup_balance,\n    updated_at = now()\n  returning app_user_id, plan, status, current_period_end, topup_balance, product_id\n), accepted as (\n  -- N-1 (ревью 2026-08-26): получатели, которые ДЕЙСТВИТЕЛЬНО взяли снимок. Расход — это долг\n  -- против КОНКРЕТНОЙ квоты, поэтому он обязан ехать ВМЕСТЕ с планом. Без этого гарда\n  -- `carried` ниже отдавал бы обратно ровно то, что защищают freshness/liveness-термы выше:\n  -- истёкший business с 300 диалогами за месяц против живого свежего trial (квота 150) —\n  -- снимок справедливо отвергнут, а 300 строк расхода всё равно переехали бы и мгновенно\n  -- обнулили квоту получателя (бот молчит, панель «Вместе» вместо ответов).\n  -- Считаем это ИЗ РЕЗУЛЬТАТА statement'а, а не повторяя предикат в третий раз: если снимок\n  -- принят, все три поля строки после записи РАВНЫ снимку; если отвергнут — получатель\n  -- сохранил свои, и хотя бы одно поле разойдётся. Совпадение всех трёх при «отказе»\n  -- означает, что у получателя И ТАК тот же план/статус/срок — тогда перенос расхода верен.\n  select m.app_user_id\n  from moved m, src\n  where m.plan = src.plan\n    and m.status = src.status\n    and m.current_period_end is not distinct from src.current_period_end\n), retired as (\n  update subscribers s set\n    status = 'expired',   -- убивает квоту зомби: Count Dialog не считает status in (expired,grace)\n    topup_balance = 0,    -- баланс уже перенесён выше; обнуление делает перенос ровно консервативным\n    -- Клэмп передаёт профили старой личности ветке A свипа Profile Lifecycle Sweep, которая\n    -- смотрит на (status in ('expired','grace') and\n    -- coalesce(current_period_end, now() - interval '99 days') < now() - interval '3 days').\n    -- ОБА coalesce здесь обязательны: будущий оплаченный период продержал бы зомби-профили\n    -- до месяца по 23₽/день, а NULL — наоборот, сделал бы строку кандидатом МГНОВЕННО (тот\n    -- самый coalesce на -99 дней), и топ-ап-only личность лишилась бы реальных профилей\n    -- Wappi в ближайшие ≤6 часов без всякого grace. now() даёт ровно те же 3 дня, что и\n    -- любой другой churn. Значение только УМЕНЬШАЕТСЯ: просроченная строка остаётся просроченной.\n    current_period_end = least(coalesce(s.current_period_end, now()), now()),\n    updated_at = now()\n  where s.app_user_id in (select app_user_id from locked)\n    -- уже полностью погашенную строку не переписываем (ноль новых версий строки)\n    and (s.status <> 'expired' or s.topup_balance <> 0\n         or s.current_period_end is null or s.current_period_end > now())\n  returning s.app_user_id\n)\n, carried as (\n  -- I-4 (Task 17a): расход переезжает ВМЕСТЕ СО СНИМКОМ — буквально: только к тем id из\n  -- transferred_to, которые снимок ПРИНЯЛИ (CTE `accepted` выше). Деньги по-прежнему только\n  -- первому: баланс размножать нельзя, а расход — консервативно наоборот, получатель плана\n  -- получает и его израсходованную часть. Окно — текущий месяц, как у\n  -- Count Dialog/Get Usage. on conflict do nothing делает это идемпотентным на ретрае RC\n  -- (существование строки И ЕСТЬ счёт), distinct — на случай одного (chat, date) у двух\n  -- источников. Строки источников не удаляем: погашенный id никто не читает.\n  insert into dialog_counts (app_user_id, chat_id, d)\n  select distinct a.app_user_id, dc.chat_id, dc.d\n  from accepted a, dialog_counts dc\n  where dc.app_user_id in (select app_user_id from locked)\n    and date_trunc('month', dc.d)\n        = date_trunc('month', (now() at time zone 'Asia/Almaty')::date)\n  on conflict (app_user_id, chat_id, d) do nothing\n  returning 1\n)\nselect (select count(*) from to_ids) as to_rows,\n       (select count(*) from locked) as source_rows,\n       (select count(*) from moved) as moved_rows,\n       (select count(*) from retired) as retired_rows,\n       (select count(*) from accepted) as accepted_rows,\n       (select count(*) from carried) as carried_rows,\n       (select topup_balance from moved order by topup_balance desc limit 1) as to_topup_balance,\n       $3::text as event_id;",
         "options": {
-          "queryReplacement": "={{ [$json.to_ids, $json.from_ids] }}"
+          "queryReplacement": "={{ [$json.to_ids, $json.from_ids, ($json.event_id ?? null)] }}"
         }
       },
       "credentials": {
@@ -210,7 +210,7 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        660,
+        1100,
         0
       ],
       "parameters": {
@@ -243,15 +243,15 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.6,
       "position": [
-        880,
+        1320,
         -60
       ],
       "parameters": {
         "resource": "database",
         "operation": "executeQuery",
-        "query": "-- СКЛЕЙКА ИДЕНТИЧНОСТЕЙ (Task 16, fix round). RC НЕ шлёт TRANSFER при переустановке на том же\n-- устройстве — он СКЛЕИВАЕТ идентичности: событие приходит под НОВЫМ app_user_id, старый лежит\n-- в original_app_user_id и aliases[] (живые события 3150/3151/3153 от 2026-08-26).\n-- Параметры по порядку: текущий app_user_id, JSON-массив алиасов (текущий id уже исключён в Map\n-- Event), затем с третьего по седьмой — payload события, который эта нода ОБЯЗАНА пронести дальше: Postgres-нода отдаёт\n-- только результат запроса и роняет входной json (та же ловушка, что у Count Dialog в Task 9).\n--\n-- ТОЛЬКО перенос баланса и гашение — НИКАКОГО копирования снимка. Событие, которое едет следом\n-- в Upsert Subscriber, уже несёт авторитетные план/статус/период; копировать сюда снимок строки-\n-- алиаса значило бы поставить риск понижения на путь, который срабатывает ВЕЧНО, на каждом событии.\n--\n-- И порядок: эта нода стоит ДО Upsert Subscriber. `topup_balance + <топ-ап события>` в апсерте НЕ идемпотентен\n-- к ретраю, поэтому падение ПОСЛЕ него -> RC передоставляет -> топ-ап самого события начислится\n-- дважды. Слева от апсерта безопасно в обе стороны: упали здесь — апсерт ещё не применялся;\n-- упал апсерт — алиасы уже погашены и повторная склейка ничего не начислит (guard ниже).\nwith alias_ids as (\n  select distinct value as app_user_id from jsonb_array_elements_text($2::jsonb) as t(value)\n), locked as (\n  -- FOR UPDATE: инстанс доставляет события одного подписчика параллельно (3150/3151 перекрылись),\n  -- а снимочный sum() в такой гонке начислил бы баланс дважды. Блокировка сериализует и\n  -- перечитывает свежую версию, поэтому «второй» увидит уже 0.\n  select * from subscribers\n  where app_user_id in (select app_user_id from alias_ids)\n    and app_user_id <> $1\n  for update\n), credited as (\n  -- Пишем ТОЛЬКО когда есть что переносить: settled-набор алиасов (а он приезжает на каждом\n  -- событии до конца жизни аккаунта) не должен плодить версии строк. Если строки получателя\n  -- ещё нет — создаём её с trial/trialing по умолчанию, а идущий следом Upsert Subscriber\n  -- положит поверх настоящие план/статус, не трогая баланс.\n  insert into subscribers (app_user_id, plan, status, topup_balance, updated_at)\n  select $1, 'trial', 'trialing', x.total, now()\n  from (select coalesce(sum(topup_balance), 0) as total from locked) x\n  where x.total > 0\n  on conflict (app_user_id) do update set\n    topup_balance = subscribers.topup_balance + excluded.topup_balance,\n    updated_at = now()\n  returning app_user_id, topup_balance\n), retired as (\n  update subscribers s set\n    status = 'expired',   -- гасит автоответы старой личности через существующий квота-гейт\n    topup_balance = 0,    -- баланс уже переехал выше\n    -- тот же клэмп, что и на пути TRANSFER: не мгновенное удаление профилей (NULL стал бы\n    -- кандидатом свипа сразу же), а ровно 3 дня grace, как у любого другого churn\n    current_period_end = least(coalesce(s.current_period_end, now()), now()),\n    updated_at = now()\n  where s.app_user_id in (select app_user_id from locked)\n    and (s.status <> 'expired' or s.topup_balance <> 0\n         or s.current_period_end is null or s.current_period_end > now())\n  returning s.app_user_id\n)\n, carried as (\n  -- I-4 (Task 17a): ОПЛАЧЕННЫЙ РАСХОД переезжает вместе с деньгами. dialog_counts ключится\n  -- по app_user_id, поэтому переустановка обнуляла месячный счётчик: подписка и баланс\n  -- переезжали, а «300 из 300» превращалось в «0 из 300» — целый месяц квоты бесплатно.\n  -- Копируем строки ТЕКУЩЕГО месяца (окно то же, что у Count Dialog и Get Usage) на живой id.\n  -- СУЩЕСТВОВАНИЕ строки И ЕСТЬ счёт (PK user+chat+date), поэтому on conflict do nothing\n  -- идемпотентен ПО ПОСТРОЕНИЮ: settled-набор алиасов приезжает на каждом событии до конца\n  -- жизни аккаунта, и на повторе КАЖДАЯ строка конфликтует — ноль новых версий строк, тот же\n  -- инвариант, что у `credited`/`retired` выше. distinct нужен, когда два алиаса несут один и\n  -- тот же (chat, date): без него один INSERT дважды вставлял бы один ключ.\n  -- Старые строки НЕ удаляем: их никто не читает (все запросы ключуются по живому\n  -- app_user_id), а удаление стоило бы истории задаром.\n  insert into dialog_counts (app_user_id, chat_id, d)\n  select distinct $1, dc.chat_id, dc.d\n  from dialog_counts dc\n  where dc.app_user_id in (select app_user_id from locked)\n    and date_trunc('month', dc.d)\n        = date_trunc('month', (now() at time zone 'Asia/Almaty')::date)\n  on conflict (app_user_id, chat_id, d) do nothing\n  returning 1\n)\nselect $1::text as app_user_id, $3::text as plan, $4::text as status,\n       $5::timestamptz as period_end, $6::int as topup_delta, $7::text as product_id,\n       (select count(*) from locked) as alias_rows,\n       (select count(*) from retired) as retired_rows,\n       (select count(*) from carried) as carried_rows,\n       (select topup_balance from credited) as balance_after;",
+        "query": "-- СКЛЕЙКА ИДЕНТИЧНОСТЕЙ (Task 16, fix round). RC НЕ шлёт TRANSFER при переустановке на том же\n-- устройстве — он СКЛЕИВАЕТ идентичности: событие приходит под НОВЫМ app_user_id, старый лежит\n-- в original_app_user_id и aliases[] (живые события 3150/3151/3153 от 2026-08-26).\n-- Параметры по порядку: текущий app_user_id, JSON-массив алиасов (текущий id уже исключён в Map\n-- Event), затем с третьего по восьмой — payload события (восьмой — id события RevenueCat для журнала\n-- Upsert Subscriber, A1), который эта нода ОБЯЗАНА пронести дальше: Postgres-нода отдаёт\n-- только результат запроса и роняет входной json (та же ловушка, что у Count Dialog в Task 9).\n--\n-- ТОЛЬКО перенос баланса и гашение — НИКАКОГО копирования снимка. Событие, которое едет следом\n-- в Upsert Subscriber, уже несёт авторитетные план/статус/период; копировать сюда снимок строки-\n-- алиаса значило бы поставить риск понижения на путь, который срабатывает ВЕЧНО, на каждом событии.\n--\n-- И порядок: эта нода стоит ДО Upsert Subscriber. `topup_balance + <топ-ап события>` в апсерте НЕ идемпотентен\n-- к ретраю, поэтому падение ПОСЛЕ него -> RC передоставляет -> топ-ап самого события начислится\n-- дважды. Слева от апсерта безопасно в обе стороны: упали здесь — апсерт ещё не применялся;\n-- упал апсерт — алиасы уже погашены и повторная склейка ничего не начислит (guard ниже).\nwith alias_ids as (\n  select distinct value as app_user_id from jsonb_array_elements_text($2::jsonb) as t(value)\n), locked as (\n  -- FOR UPDATE: инстанс доставляет события одного подписчика параллельно (3150/3151 перекрылись),\n  -- а снимочный sum() в такой гонке начислил бы баланс дважды. Блокировка сериализует и\n  -- перечитывает свежую версию, поэтому «второй» увидит уже 0.\n  select * from subscribers\n  where app_user_id in (select app_user_id from alias_ids)\n    and app_user_id <> $1\n  for update\n), credited as (\n  -- Пишем ТОЛЬКО когда есть что переносить: settled-набор алиасов (а он приезжает на каждом\n  -- событии до конца жизни аккаунта) не должен плодить версии строк. Если строки получателя\n  -- ещё нет — создаём её с trial/trialing по умолчанию, а идущий следом Upsert Subscriber\n  -- положит поверх настоящие план/статус, не трогая баланс.\n  insert into subscribers (app_user_id, plan, status, topup_balance, updated_at)\n  select $1, 'trial', 'trialing', x.total, now()\n  from (select coalesce(sum(topup_balance), 0) as total from locked) x\n  where x.total > 0\n  on conflict (app_user_id) do update set\n    topup_balance = subscribers.topup_balance + excluded.topup_balance,\n    updated_at = now()\n  returning app_user_id, topup_balance\n), retired as (\n  update subscribers s set\n    status = 'expired',   -- гасит автоответы старой личности через существующий квота-гейт\n    topup_balance = 0,    -- баланс уже переехал выше\n    -- тот же клэмп, что и на пути TRANSFER: не мгновенное удаление профилей (NULL стал бы\n    -- кандидатом свипа сразу же), а ровно 3 дня grace, как у любого другого churn\n    current_period_end = least(coalesce(s.current_period_end, now()), now()),\n    updated_at = now()\n  where s.app_user_id in (select app_user_id from locked)\n    and (s.status <> 'expired' or s.topup_balance <> 0\n         or s.current_period_end is null or s.current_period_end > now())\n  returning s.app_user_id\n)\n, carried as (\n  -- I-4 (Task 17a): ОПЛАЧЕННЫЙ РАСХОД переезжает вместе с деньгами. dialog_counts ключится\n  -- по app_user_id, поэтому переустановка обнуляла месячный счётчик: подписка и баланс\n  -- переезжали, а «300 из 300» превращалось в «0 из 300» — целый месяц квоты бесплатно.\n  -- Копируем строки ТЕКУЩЕГО месяца (окно то же, что у Count Dialog и Get Usage) на живой id.\n  -- СУЩЕСТВОВАНИЕ строки И ЕСТЬ счёт (PK user+chat+date), поэтому on conflict do nothing\n  -- идемпотентен ПО ПОСТРОЕНИЮ: settled-набор алиасов приезжает на каждом событии до конца\n  -- жизни аккаунта, и на повторе КАЖДАЯ строка конфликтует — ноль новых версий строк, тот же\n  -- инвариант, что у `credited`/`retired` выше. distinct нужен, когда два алиаса несут один и\n  -- тот же (chat, date): без него один INSERT дважды вставлял бы один ключ.\n  -- Старые строки НЕ удаляем: их никто не читает (все запросы ключуются по живому\n  -- app_user_id), а удаление стоило бы истории задаром.\n  insert into dialog_counts (app_user_id, chat_id, d)\n  select distinct $1, dc.chat_id, dc.d\n  from dialog_counts dc\n  where dc.app_user_id in (select app_user_id from locked)\n    and date_trunc('month', dc.d)\n        = date_trunc('month', (now() at time zone 'Asia/Almaty')::date)\n  on conflict (app_user_id, chat_id, d) do nothing\n  returning 1\n)\nselect $1::text as app_user_id, $3::text as plan, $4::text as status,\n       $5::timestamptz as period_end, $6::int as topup_delta, $7::text as product_id,\n       (select count(*) from locked) as alias_rows,\n       (select count(*) from retired) as retired_rows,\n       (select count(*) from carried) as carried_rows,\n       (select topup_balance from credited) as balance_after,\n       $8::text as event_id;",
         "options": {
-          "queryReplacement": "={{ [$json.app_user_id, $json.alias_ids, ($json.plan ?? null), ($json.status ?? null), ($json.period_end ?? null), $json.topup_delta, ($json.product_id ?? null)] }}"
+          "queryReplacement": "={{ [$json.app_user_id, $json.alias_ids, ($json.plan ?? null), ($json.status ?? null), ($json.period_end ?? null), $json.topup_delta, ($json.product_id ?? null), ($json.event_id ?? null)] }}"
         }
       },
       "credentials": {
@@ -268,7 +268,7 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.5,
       "position": [
-        880,
+        1320,
         -520
       ],
       "parameters": {
@@ -285,7 +285,7 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.5,
       "position": [
-        1100,
+        1540,
         -220
       ],
       "parameters": {
@@ -295,11 +295,99 @@
           "responseCode": 500
         }
       }
+    },
+    {
+      "id": "46a0ea01-b447-4b48-bb95-b2a25fe85913",
+      "name": "Dedup Gate",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        220,
+        0
+      ],
+      "parameters": {
+        "resource": "database",
+        "operation": "executeQuery",
+        "query": "-- A1 «защита платящих» (2026-10-14): журнал идемпотентности RC-вебхука — ТОЛЬКО чтение. id события найден ->\n-- If Duplicate? отвечает 200 и ничего не меняет (повтор доставки RevenueCat после закоммиченного upsert'а\n-- начислял топ-ап дважды). Пишет журнал только Upsert Subscriber — в одном statement'е с эффектом события.\n-- Ошибка чтения событие не останавливает (continueRegularOutput + alwaysOutputData: дальше идёт элемент без\n-- event_id, и If Duplicate? отправляет его в Map Event). Первый параметр = id события из тела вебхука\n-- (пустая строка, если id нет — такой строки в журнале не бывает).\nselect event_id from rc_event_ledger where event_id = $1;",
+        "options": {
+          "queryReplacement": "={{ [ (e => typeof e.id === 'string' ? e.id : '')(($('Webhook').first().json.body ?? {}).event ?? $('Webhook').first().json.body ?? {}) ] }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "id": "vvRrFiEXzLVqKjOx",
+          "name": "Postgres"
+        }
+      },
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "c7566380-2390-4ee9-840a-0b8464078c7f",
+      "name": "If Duplicate?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        440,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cb6abcd3-8617-4579-9a5b-dada1e99d884",
+              "leftValue": "={{ $json.event_id }}",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
     }
   ],
   "connections": {
     "Webhook": {
       "main": [
+        [
+          {
+            "node": "Dedup Gate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Dedup Gate": {
+      "main": [
+        [
+          {
+            "node": "If Duplicate?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Duplicate?": {
+      "main": [
+        [
+          {
+            "node": "Respond 200",
+            "type": "main",
+            "index": 0
+          }
+        ],
         [
           {
             "node": "Map Event",

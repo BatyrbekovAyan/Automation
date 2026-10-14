@@ -1218,15 +1218,19 @@ def booking(wid):
               f"|| '|' || coalesce(last_status, '-') || '|' || attempts from clone_retirements where workflow_id = '{wid}';")
 
 
-def probe_workflow(run_id, src_file, keep, entry, tag, edit=None, response_node=False):
+def probe_workflow(run_id, src_file, keep, entry, tag, edit=None, response_node=False, trigger="Probe Webhook"):
     """A TEMPORARY staging-only workflow: a webhook → the DERIVED canonical nodes `keep` of `src_file` (credentials already
     remapped by derive-staging), entered at `entry`. Runs exactly those nodes on the real n8n; the caller deletes it.
-    A node `keep` names that the canon does not have fails the probe — the canon before the block lacks branch A."""
+    A node `keep` names that the canon does not have fails the probe — the canon before the block lacks branch A.
+    `trigger` names the probe's own webhook: a probe whose nodes read the canonical trigger BY NAME (RevenueCat Events'
+    Dedup Gate / Map Event read $('Webhook') since A1) passes "Webhook" — the canonical one (its header secret) stays out."""
     src = json.load(open(os.path.join(N8N_DIR, "workflows-staging", src_file), encoding="utf-8"))
     nodes = [copy.deepcopy(n) for n in src["nodes"] if n["name"] in keep]
     missing = sorted(set(keep) - {n["name"] for n in nodes})
     if missing:
         raise RuntimeError(f"{src_file}: no {missing} in this canon")
+    if trigger in keep:
+        raise RuntimeError(f"{src_file}: the probe trigger {trigger!r} would shadow a kept node")
     if edit:
         edit({n["name"]: n for n in nodes})
     conns = {k: {kind: [[e for e in out or [] if e["node"] in keep] for out in lists] for kind, lists in v.items()}
@@ -1234,9 +1238,9 @@ def probe_workflow(run_id, src_file, keep, entry, tag, edit=None, response_node=
     path = f"t10-{tag}-{run_id}"
     nodes.append({"parameters": {"httpMethod": "POST", "path": path, "responseMode": "responseNode" if response_node else "onReceived",
                                  "options": {}},
-                  "id": f"probe-{tag}", "name": "Probe Webhook", "type": "n8n-nodes-base.webhook", "typeVersion": 2,
+                  "id": f"probe-{tag}", "name": trigger, "type": "n8n-nodes-base.webhook", "typeVersion": 2,
                   "position": [-900, 900], "webhookId": path})
-    conns["Probe Webhook"] = {"main": [[{"node": entry, "type": "main", "index": 0}]]}
+    conns[trigger] = {"main": [[{"node": entry, "type": "main", "index": 0}]]}
     st, created = admin_api("POST", "/workflows", {"name": f"STAGING probe {tag} {run_id}", "settings": {"executionOrder": "v1"},
                                                    "nodes": nodes, "connections": conns})
     if st != 200:
@@ -1293,18 +1297,36 @@ def throwaway_workflow(tag, path=None, active=False):
     return d["id"]
 
 
-def rc_purchase(run_id, app_user_id, entitlement="tier_business", product="sub.business.month"):
-    """A store purchase as RevenueCat reports it: the DERIVED RevenueCat Events workflow (Map Event → … → Upsert Subscriber)
-    behind a temporary auth-free webhook — the real mapping and upsert, without the RevenueCat header secret."""
-    keep = ("Map Event", "If Is Transfer?", "Transfer Subscriber", "If Needs Consolidation?", "Consolidate Aliases", "If Has Payload?",
-            "Upsert Subscriber", "Respond 200", "Respond No-Op", "Respond Error", "Respond Error Transfer", "Respond Error Consolidate")
-    wid = None
+RC_EVENTS_FILE = "ZGYr6srzS3rSSXHp-RevenueCat_Events.json"
+# Every node of RevenueCat Events but its trigger (the canonical Webhook carries the RevenueCat header secret): since A1
+# the delivery enters at Dedup Gate, which — like Map Event — reads the payload from the trigger BY NAME («Webhook»).
+RC_KEEP = ("Dedup Gate", "If Duplicate?", "Map Event", "If Is Transfer?", "Transfer Subscriber", "If Needs Consolidation?",
+           "Consolidate Aliases", "If Has Payload?", "Upsert Subscriber", "Respond 200", "Respond No-Op", "Respond Error",
+           "Respond Error Transfer", "Respond Error Consolidate")
+
+
+def rc_deliver(run_id, payloads):
+    """RevenueCat deliveries as RevenueCat sends them, through the DERIVED RevenueCat Events graph (Dedup Gate → … → Upsert
+    Subscriber) behind ONE temporary auth-free webhook named «Webhook» — the real gate, mapping and upsert on the staging
+    Postgres, without the header secret. Returns [(status, body, execution)] in order (each delivery after the last ended)."""
+    wid, out = None, []
     try:
-        wid, url = probe_workflow(run_id, "ZGYr6srzS3rSSXHp-RevenueCat_Events.json", keep, "Map Event", f"rc{int(time.time())}", response_node=True)
-        return http("POST", url, {"event": {"type": "INITIAL_PURCHASE", "app_user_id": app_user_id, "entitlement_ids": [entitlement],
-                                            "product_id": product, "expiration_at_ms": int(time.time() * 1000) + 30 * 86400_000}})
+        wid, url = probe_workflow(run_id, RC_EVENTS_FILE, RC_KEEP, "Dedup Gate", f"rc{int(time.time())}", response_node=True,
+                                  trigger="Webhook")
+        for p in payloads:
+            since = newest_execution_id(wid)
+            st, body = http("POST", url, p)
+            out.append((st, body, newest_execution(wid, since)))
+        return out
     finally:
         drop_probe(wid)
+
+
+def rc_purchase(run_id, app_user_id, entitlement="tier_business", product="sub.business.month"):
+    """A store purchase as RevenueCat reports it (no event id: nothing for the ledger) — (status, body)."""
+    st, body, _ = rc_deliver(run_id, [{"event": {"type": "INITIAL_PURCHASE", "app_user_id": app_user_id, "entitlement_ids": [entitlement],
+                                                 "product_id": product, "expiration_at_ms": int(time.time() * 1000) + 30 * 86400_000}}])[0]
+    return st, body
 
 
 def clone_executions(wid, since_id, n=1, wait_s=60):
@@ -1728,6 +1750,37 @@ def s_line_branch_a(ctx):
           and res["live"][young] == (200, f"replaced|-|{pid}|false|-|0") and res["live"][live] == (200, f"replaced|-|{pid}|false|-|0")
           and res["second_run_picks"] == [])
     return ok, json.dumps(res, ensure_ascii=False)
+
+
+@scenario("rc_webhook_replay_credits_once", "A1: RevenueCat delivers the SAME top-up event twice (an answer it did not get → its retry) through the DERIVED RevenueCat Events graph behind a temporary webhook: both answered 200, topup_balance +500 exactly ONCE, ONE rc_event_ledger row; the replay ends at If Duplicate? (Map Event and Upsert never run); a second top-up with its own id credits again")
+def s_rc_replay(ctx):
+    o = Owner("rcr", ctx["run_id"])                                   # a trial subscriber row (cleaned up with the owner)
+    ids = [f"e2e-rcr-{ctx['run_id']}-{uuid.uuid4().hex[:8]}" for _ in range(2)]
+
+    def topup(eid):
+        return {"api_version": "1.0", "event": {"id": eid, "type": "NON_RENEWING_PURCHASE", "app_user_id": o.app_user_id,
+                                                "original_app_user_id": o.app_user_id, "aliases": [o.app_user_id],
+                                                "product_id": "topup.dialogs.500", "store": "APP_STORE", "environment": "SANDBOX",
+                                                "event_timestamp_ms": int(time.time() * 1000)}}
+    bal = lambda: int(pg(f"select topup_balance from subscribers where app_user_id = '{o.app_user_id}';") or -1)
+    led = lambda: pg(f"select string_agg(event_id, ',' order by event_id) from rc_event_ledger where event_id in ('{ids[0]}', '{ids[1]}');")
+    try:
+        before = bal()
+        res = rc_deliver(ctx["run_id"], [topup(ids[0]), topup(ids[0])])
+        after_replay, ledger_after_replay = bal(), led()
+        res += rc_deliver(ctx["run_id"], [topup(ids[1])])
+        after_new, ledger_end = bal(), led()
+        ran = [ran_nodes(ex) for _, _, ex in res]
+        ok = ([st for st, _, _ in res] == [200, 200, 200] and all((b or {}).get("success") is True for _, b, _ in res)
+              and after_replay == before + 500 and ledger_after_replay == ids[0]
+              and {"Dedup Gate", "If Duplicate?", "Map Event", "Upsert Subscriber"} <= ran[0]
+              and "If Duplicate?" in ran[1] and not ({"Map Event", "Upsert Subscriber"} & ran[1])
+              and after_new == before + 1000 and ledger_end == ",".join(sorted(ids)))
+        return ok, (f"answers={[(st, b) for st, b, _ in res]} balance {before} → after same id twice {after_replay} → after a new id "
+                    f"{after_new}; ledger after replay={ledger_after_replay!r} at end={ledger_end!r}; replay ran "
+                    f"{sorted(ran[1])}; first ran Upsert={'Upsert Subscriber' in ran[0]}")
+    finally:
+        pg(f"delete from rc_event_ledger where event_id in ('{ids[0]}', '{ids[1]}');")
 
 
 @scenario("billing_conflict_is_logged", "V3 (T1): a refresh that answers billingConflict (a second install naming a billing id another install holds) writes ONE billing_conflicts row — claimant, the CURRENT holder, attempts — a repeat bumps attempts, a refresh without a conflict writes nothing, the answer itself is unchanged; once support revokes the holder the id moves on the claimant's next refresh")

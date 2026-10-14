@@ -105,6 +105,8 @@ cmd_migrate() {
     "${N8N_DIR}/sql/2026-10-12-memory-marks-backfill.sql"
     # learning A (2026-10-13): origin_* on chat_history_events (ALTERs the stage-4 table above) + suggestion_sets
     "${N8N_DIR}/sql/2026-09-25-learning-foundation.sql"
+    # A1 «защита платящих» (2026-10-14): the RevenueCat webhook's idempotency ledger (read by Dedup Gate, written in Upsert Subscriber)
+    "${N8N_DIR}/sql/2026-10-14-rc-event-ledger.sql"
   )
   for f in "${files[@]}"; do
     [ -s "$f" ] || { echo "skip (missing) $f"; continue; }

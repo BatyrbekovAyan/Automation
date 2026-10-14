@@ -123,19 +123,22 @@ PINNED = [
     dict(file='Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json', node='Register Profile', text=[0, 1, 3],
          setup=REG_SETUP, legit=['tg-profile-1', RC_ID, 'telegram', 'Bot0'], after=REG_AFTER,
          expect=[f'tg-profile-1|{RC_ID}|telegram|Bot0', f'{RC_ID}|trial|trialing']),
-    dict(file='ZGYr6srzS3rSSXHp-RevenueCat_Events.json', node='Transfer Subscriber', text=[], json=[0, 1],
+    # A1 (2026-10-14): + the RevenueCat event id, handed on in the final select (text, the third value)
+    dict(file='ZGYr6srzS3rSSXHp-RevenueCat_Events.json', node='Transfer Subscriber', text=[2], json=[0, 1],
          setup=UTC + LIKE.format('subscribers') + LIKE.format('dialog_counts') +
          """insert into subscribers (app_user_id, plan, status, current_period_end, topup_balance, product_id)
               values ('old-id', 'business', 'active', '2099-01-01T00:00:00Z', 5, 'cr_business_m');""",
-         legit=['["new-id"]', '["old-id"]'],
+         legit=['["new-id"]', '["old-id"]', 'evt-transfer-1'],
          after="select app_user_id, plan, status, topup_balance from subscribers order by 1;",
-         expect=['1|1|1|1|1|0|5', 'new-id|business|active|5', 'old-id|business|expired|0']),
-    dict(file='ZGYr6srzS3rSSXHp-RevenueCat_Events.json', node='Consolidate Aliases', text=[0, 2, 3, 6], json=[1],
+         expect=['1|1|1|1|1|0|5|evt-transfer-1', 'new-id|business|active|5', 'old-id|business|expired|0']),
+    # A1 (2026-10-14): + the RevenueCat event id, handed on in the final select (text, the eighth value)
+    dict(file='ZGYr6srzS3rSSXHp-RevenueCat_Events.json', node='Consolidate Aliases', text=[0, 2, 3, 6, 7], json=[1],
          setup=UTC + LIKE.format('subscribers') + LIKE.format('dialog_counts') +
          """insert into subscribers (app_user_id, plan, status, topup_balance) values ('alias-id', 'start', 'active', 3);""",
-         legit=['live-id', '["alias-id"]', 'business', 'active', '2099-02-01T00:00:00Z', 2, 'cr_business_m'],
+         legit=['live-id', '["alias-id"]', 'business', 'active', '2099-02-01T00:00:00Z', 2, 'cr_business_m', 'evt-alias-1'],
          after="select app_user_id, status, topup_balance from subscribers order by 1;",
-         expect=['live-id|business|active|2099-02-01 00:00:00+00|2|cr_business_m|1|1|0|3', 'alias-id|expired|0', 'live-id|trialing|3']),
+         expect=['live-id|business|active|2099-02-01 00:00:00+00|2|cr_business_m|1|1|0|3|evt-alias-1', 'alias-id|expired|0',
+                 'live-id|trialing|3']),
 ]
 
 
