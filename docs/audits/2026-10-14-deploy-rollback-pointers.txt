@@ -14,3 +14,6 @@
     rollback pointer: versionId 4deacbfa-b254-4d26-8844-ade4c9f7c873 (activeVersionId 4deacbfa-b254-4d26-8844-ade4c9f7c873)
 ~ lmjYsdNcQA2IE5rl 'Delete Bot Files' active=True nodes 19 → 19 (+0 -0)
     rollback pointer: versionId e978f769-2913-43ce-b89b-a3f03a2e577d (activeVersionId e978f769-2913-43ce-b89b-a3f03a2e577d)
+
+# Learning B — Get Usage (2026-10-14, owner go «пушь, go на деплой Get Usage»)
+jtbssfzXbOxwTK4k Get Usage: previous activeVersionId 764345c7-f554-4002-99ef-566a97184ac2 (rollback: POST /workflows/jtbssfzXbOxwTK4k/activate {"versionId": "764345c7-f554-4002-99ef-566a97184ac2"} or deploy-canonical.py from e70d70da)

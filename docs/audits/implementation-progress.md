@@ -389,3 +389,14 @@ Unity EditMode 3037/3037; n8n test_learning_b 8/8, run_all 33 файлов OK; v
 Деплой: один workflow (Get Usage, `deploy-canonical.py --only jtbssfzXbOxwTK4k`) по «go»; миграций нет; клиент — в сборке вместе с A.
 После независимого ревью (тот же день, 0 Critical / 1 Important / 7 Minor, вердикт «ready»): фикс-пасс — (1) предусловие деплоя «B требует колонок A» (чек-лист шаг 0 + CLAUDE.md, пинит `verify-learning-b.py`); (2) пер-чатный тоггл бота, уже стоящего в «Авто» (возобновление чата после хэндоффа), замок НЕ встречает — `AutoLockGate.TryEnableChat` по режиму бота (спека §0 важнее перечня §3); (3) e2e-сценарий проверяет и legacy-вызов (`readiness: []`). Unity EditMode 3038/3038. Отложенные Minor — в итоговом сообщении сессии и в ledger.
 Minor ревью закрыты тем же днём по слову владельца: копия листа «Авто откроется, когда…» (спека §3 обновлена); геометрия AutoLockSheet запинена в ConfirmCardLayoutTests (24u как у близнеца); AutoLockWiringTests — модификатор обязателен в regex + глобальный скан: каждый `CommitMode(…ReplyMode.Auto)` только внутри двух гейтируемых тел ПОСЛЕ вызова гейта; READINESS_SQL отчёта рендерится из фрагментов apply-learning-b (`send_filter`/`readiness_columns`, канон байт-в-байт тот же) и показывает только ботов с живой строкой (SQL-кейс 9/9); спека §3 — реальные триггеры обновления вместо «фокуса». Unity EditMode 3040/3040.
+
+## Развёртывание 2026-10-14 (B): Get Usage с readiness — по «go» владельца («пушь, go на деплой Get Usage»)
+Шаг 0 — предусловие: на проде `information_schema.columns` → `{"n":"2"}` (колонки A `origin_set`/`origin_top1` есть). Репетиция на
+стенде с прод-состояния (`bootstrap.py --canon-ref e70d70da`): dry-run назвал ровно `jtbssfzXbOxwTK4k`, apply «published by the PUT, read-back
+ok», verify-deployed diff 0, derive без импорта, e2e `readiness_in_get_usage` PASS. Прод: before = ровно 1 DIFF (Get Usage, stored и published),
+`deploy-canonical.py --only jtbssfzXbOxwTK4k --apply --yes` → updated 1, опубликовано самим PUT (без окна деактивации), read-back ok; after =
+canonical 27, diff 0; GET-проба вебхука — «Did you mean to make a POST request?»; смок legacy-вызовом (токен отсутствует, compat-окно) →
+200 `{"success":true,"plan":"trial",…,"readiness":[]}` — новый SQL выполняется на прод-Postgres. Снимки `docs/audits/2026-10-14-prod-{before,after}-b.json`,
+точка отката в `docs/audits/2026-10-14-deploy-rollback-pointers.txt` (activeVersionId 764345c7-…). Миграций и `update-clones.py` не было.
+Клиентская часть B едет в новой сборке вместе с A; до неё поле `readiness` старый клиент игнорирует.
+
