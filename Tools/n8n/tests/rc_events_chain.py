@@ -51,7 +51,9 @@ function handle(v) {
   const $=(n)=>{ if(!(n in named)) throw new Error('Referenced node is unexecuted: '+n);
     const items=(Array.isArray(named[n])?named[n]:[named[n]]).map(j=>({json:j}));
     return {first:()=>items[0], all:()=>items, item:items[0], last:()=>items[items.length-1], isExecuted:true}; };
-  const data={$json:v.json, $, $execution:{id:'synthetic-exec'}, String, Array, RegExp, Math, Number, JSON, Boolean, Object, Date};
+  // + the URI / number globals n8n's own Expression.initializeGlobalContext hands every expression (n8n-workflow expression.js)
+  const data={$json:v.json, $, $execution:{id:'synthetic-exec'}, String, Array, RegExp, Math, Number, JSON, Boolean, Object, Date,
+              encodeURI, encodeURIComponent, decodeURI, decodeURIComponent, parseInt, parseFloat};
   const ev=(e)=>evaluateExpression(String(e).replace(/^=/, ''), data);
   try {
     if (v.kind === 'params') {

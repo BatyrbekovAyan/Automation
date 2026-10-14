@@ -211,6 +211,14 @@ def check_session():
     vc = node(wf, "Verify Claim Code")["parameters"]["query"]
     assert "claim_code_expires_at > now()" in vc and "claim_pending_by = $2" in vc and "(owner_id is null or owner_id <> $2)" in vc, \
         "claim verify must be scoped to the claiming install, expiring, and allow a proven transfer"
+    # A3 (2026-10-14, spec §1): the bound row follows the claimant's billing id — the one Verify Install verified for the
+    # install (the token's u), never a request field; an install without one (billingConflict / nothing bound) leaves it.
+    hit = vc.split("with hit as (", 1)[-1].split("), miss as (", 1)[0]
+    assert "app_user_id = coalesce(nullif($4, ''), app_user_id)" in hit, \
+        "A3: Verify Claim Code must re-key the bound row onto the claimant's billing id (coalesce: an install without one leaves it)"
+    vcr = node(wf, "Verify Claim Code")["parameters"]["options"]["queryReplacement"]
+    assert vcr.endswith(", ($('Verify Install').first().json.app_user_id || '') ] }}") and "appUserId" not in vcr, \
+        f"A3: the re-key's billing id must be Verify Install's verdict for the install (never the request's appUserId): {vcr!r}"
     check_conflict_journal(wf)
     print("OK  crAuthSession001-Auth_Session.json (cap, hash compare, single round-trip refresh, TTL, claim scoping, M4 retired refusal, V3 conflict journal)")
 

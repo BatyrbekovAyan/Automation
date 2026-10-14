@@ -19,6 +19,7 @@ import sys
 import threading
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 import uuid
 
@@ -230,7 +231,7 @@ def s_hooks(ctx):
     return ok, json.dumps(r) + f"  (token-less expected {legacy_expected}: compat {'CLOSED' if COMPAT_CLOSED else 'open'})"
 
 
-@scenario("claim_by_code_transfers_ownership", "a legacy/other-install profile: claim.start sends a code to the bot's OWN chat; claim.verify binds it to the claiming install")
+@scenario("claim_by_code_transfers_ownership", "a legacy/other-install profile: claim.start sends a code to the bot's OWN chat; claim.verify binds it to the claiming install — A3: and the row's app_user_id follows the claimant's billing id (a wrong code moves nothing)")
 def s_claim_code(ctx):
     a, b = ctx["A"], ctx["B"]
     victim = b.profiles[0]                                   # owned by B (stands in for 'a previous install')
@@ -245,15 +246,23 @@ def s_claim_code(ctx):
     code = "".join(ch for ch in body_text if ch.isdigit())[-6:]
     st2, d2 = session({"op": "claim.start", "installId": a.install_id, "installSecret": a.secret, "appUserId": a.app_user_id, "profileId": victim, "channel": "whatsapp"})
     sends2, _ = mock_calls(since, "message/send")
+    key = lambda: pg(f"select app_user_id from bot_profiles where profile_id = '{victim}';")
+    key_before = key()
     st3, d3 = session({"op": "claim.verify", "installId": a.install_id, "installSecret": a.secret, "appUserId": a.app_user_id, "profileId": victim, "channel": "whatsapp", "code": "000000" if code != "000000" else "111111"})
+    key_after_wrong = key()
     st4, d4 = session({"op": "claim.verify", "installId": a.install_id, "installSecret": a.secret, "appUserId": a.app_user_id, "profileId": victim, "channel": "whatsapp", "code": code})
+    key_after = key()
     a.token = d4.get("token", a.token)
     b_after = b.refresh()
     ok = (recipient == "77001112233" and d2.get("codeReused") is True and len(sends2) == 1 and st3 == 403 and d3.get("error") == "claim_code_rejected"
-          and st4 == 200 and victim in d4.get("profiles", []) and victim not in b_after["profiles"])
+          and st4 == 200 and victim in d4.get("profiles", []) and victim not in b_after["profiles"]
+          # A3 (spec §1): the claimed row follows the claimant's billing id (the token's u) — a wrong code moves nothing
+          and key_before == b.app_user_id and key_after_wrong == b.app_user_id and key_after == a.app_user_id == d4.get("appUserId"))
     if ok:
         a.profiles.append(victim)
-    return ok, f"recipient_is_own_phone={recipient == '77001112233'} second_start_reuses_code={d2.get('codeReused')} wrong_code={st3} verify={st4} now_owned_by_A={victim in d4.get('profiles', [])} B_lost_it={victim not in b_after['profiles']}"
+    return ok, (f"recipient_is_own_phone={recipient == '77001112233'} second_start_reuses_code={d2.get('codeReused')} wrong_code={st3} verify={st4} "
+                f"now_owned_by_A={victim in d4.get('profiles', [])} B_lost_it={victim not in b_after['profiles']} "
+                f"app_user_id B's={key_before == b.app_user_id} after a wrong code B's={key_after_wrong == b.app_user_id} after the code A's={key_after == a.app_user_id}")
 
 
 @scenario("claim_reauth_then_code_binds", "V2: an UNAUTHORISED legacy profile: claim.start → reauth; a pairing alone binds NOTHING (claim.status); claim.start then sends ONE code into the paired account's own chat and claim.verify binds it")
@@ -1836,6 +1845,135 @@ def s_rc_topup_first(ctx):
     finally:
         pg(f"delete from bot_profiles where profile_id = '{pid}'; delete from subscribers where app_user_id = '{old}'; "
            f"delete from dialog_counts where app_user_id = '{old}'; delete from rc_event_ledger where event_id = '{eid}';")
+
+
+# ---------------------------------------------------------------------------------------------- A3 identity-heal
+RC_PROJECT = "0f8c9529"     # build-verify-identity.RC_PROJECT_ID — the mock answers any project; the path is asserted
+
+
+def rc_aliases(customer, aliases=None, status=None):
+    """A3: the RevenueCat customer the mock knows (derive-staging.py points https://api.revenuecat.com/ at <mock>/revenuecat/):
+    its v2 alias list (configure the customer's own id on it, as RevenueCat lists it), or an error status; neither forgets it."""
+    body = {"customer_id": customer, "aliases": aliases}
+    if status:
+        body["status"] = status
+    st, d = http("POST", f"{MOCK}/__mock/rc_aliases", body)
+    assert st == 200, f"mock rc_aliases: {st} {d}"
+
+
+def heal_fixture(ctx, tag):
+    """A3: the owner after a reinstall — a fresh install whose token's billing id u is the trial seed; the OLD id (a fixture
+    RevenueCat id) holds the paid month (business/active/+30 days/SKU, 500 dialogs of balance, 2 dialogs this month);
+    bot_profiles: a live row of THIS install still under the old id (claimed before the heal) and a row of ANOTHER install
+    under it. Returns (owner, old, mine, other, the old period as text)."""
+    o = Owner(tag, ctx["run_id"])
+    old = rc_fixture_id(ctx["run_id"], tag + "old")
+    mine, other = f"e2e-{tag}-{uuid.uuid4().hex[:12]}", f"e2e-{tag}-{uuid.uuid4().hex[:12]}"
+    pg(f"insert into subscribers (app_user_id, plan, status, topup_balance, current_period_end, product_id) values "
+       f"('{old}', 'business', 'active', 500, now() + interval '30 days', 'sub.business.month'); "
+       f"insert into dialog_counts (app_user_id, chat_id, d) values ('{old}', 'e2e-a3-c1', (now() at time zone 'Asia/Almaty')::date), "
+       f"('{old}', 'e2e-a3-c2', (now() at time zone 'Asia/Almaty')::date); "
+       f"insert into bot_profiles (profile_id, app_user_id, channel, owner_id) values ('{mine}', '{old}', 'whatsapp', '{o.install_id}'), "
+       f"('{other}', '{old}', 'telegram', 'e2e-other-install-{ctx['run_id']}');")
+    return o, old, mine, other, pg(f"select current_period_end::text from subscribers where app_user_id = '{old}';")
+
+
+def heal_cleanup(u, old, *pids):
+    rc_aliases(u, None)
+    pg("delete from bot_profiles where profile_id in (" + ", ".join(f"'{x}'" for x in pids) + f"); "
+       f"delete from subscribers where app_user_id = '{old}'; delete from dialog_counts where app_user_id = '{old}';")
+
+
+def heal_row(uid):
+    return pg(f"select plan || '|' || status || '|' || topup_balance || '|' || coalesce(current_period_end::text, '-') || '|' "
+              f"|| coalesce(product_id, '-') from subscribers where app_user_id = '{uid}';")
+
+
+def heal_versions(u, old, *pids):
+    """Every row version the heal could write (subscribers u + old, the bot_profiles rows, both ids' dialog rows)."""
+    return pg("select string_agg(t || ':' || k || ':' || v, ',' order by t, k) from ("
+              f"select 's' as t, app_user_id as k, xmin::text as v from subscribers where app_user_id in ('{u}', '{old}') "
+              "union all select 'b', profile_id, xmin::text from bot_profiles where profile_id in (" + ", ".join(f"'{x}'" for x in pids) + ") "
+              f"union all select 'd', app_user_id || chat_id, xmin::text from dialog_counts where app_user_id in ('{u}', '{old}')) x;")
+
+
+@scenario("identity_heal_consolidates_into_token_id", "A3: after a reinstall the app calls VerifyIdentity; RevenueCat (the mock: v2 aliases of the TOKEN's id, asked with the «RevenueCat API» credential) lists [old, u] → the old id's paid month (business/active/its period/SKU, 500 of balance, this month's dialogs) moves INTO the token's id and the old id is retired; this install's live bot_profiles row under the old id follows u, another install's stays; a repeat changes nothing (row versions)")
+def s_identity_heal(ctx):
+    o, old, mine, other, period = heal_fixture(ctx, "a3h")
+    u = o.app_user_id
+    body = {"appUserId": u, "originalAppUserId": old}
+    try:
+        rc_aliases(u, [old, u])
+        before = heal_row(u)
+        since = mock_total()
+        st, d = hook("VerifyIdentity", o.token, body)
+        calls, _ = mock_calls(since, "/revenuecat/")
+        after, alias_after = heal_row(u), heal_row(old)
+        keyed = pg(f"select string_agg(profile_id || '=' || app_user_id, ',' order by profile_id) from bot_profiles where profile_id in ('{mine}', '{other}');")
+        used = pg(f"select count(*) from dialog_counts where app_user_id = '{u}' and date_trunc('month', d) = date_trunc('month', (now() at time zone 'Asia/Almaty')::date);")
+        v1 = heal_versions(u, old, mine, other)
+        st2, d2 = hook("VerifyIdentity", o.token, body)
+        v2 = heal_versions(u, old, mine, other)
+        want_path = f"/revenuecat/v2/projects/{RC_PROJECT}/customers/{urllib.parse.quote(u, safe='')}/aliases"
+        want_keyed = ",".join(sorted([f"{mine}={u}", f"{other}={old}"]))
+        ok = (st == 200 and d == {"success": True, "aliases": 1, "consolidated": 1, "rekeyed": 1, "truncated": False}
+              and before == "trial|trialing|0|-|-" and after == f"business|active|500|{period}|sub.business.month"
+              and alias_after.split("|")[1:3] == ["expired", "0"] and keyed == want_keyed and used == "2"
+              and len(calls) == 1 and calls[0]["method"] == "GET" and calls[0]["path"] == want_path
+              and calls[0]["query"] == {"limit": "1000"} and calls[0]["auth_scheme"] == "Bearer"
+              and st2 == 200 and d2 == {"success": True, "aliases": 1, "consolidated": 0, "rekeyed": 0, "truncated": False} and v1 == v2)
+        return ok, (f"answer={st} {d} owner {before} → {after} (alias period {period}); alias → {alias_after}; bot_profiles {keyed} "
+                    f"(want {want_keyed}); this month's dialogs on u={used}; RevenueCat calls={[(c['method'], c['path'], c['query'], c['auth_scheme']) for c in calls]} "
+                    f"(want {want_path}); repeat={st2} {d2} row versions unchanged={v1 == v2}")
+    finally:
+        heal_cleanup(u, old, mine, other)
+
+
+@scenario("identity_heal_refuses_without_token", "A3: VerifyIdentity without a token / with a forged one → 401; with a token that carries NO billing id (billingConflict: another install holds it) or a body naming another recipient → 403 — RevenueCat is never asked, nothing is written")
+def s_identity_heal_auth(ctx):
+    o, old, mine, other, _ = heal_fixture(ctx, "a3n")
+    u = o.app_user_id
+    x = Owner("a3x", ctx["run_id"], app_user_id=u)                   # the same id named by another install → u = null
+    try:
+        rc_aliases(u, [old, u])
+        v0 = heal_versions(u, old, mine, other)
+        since = mock_total()
+        body = {"appUserId": u, "originalAppUserId": old}
+        st0, d0 = hook("VerifyIdentity", None, body)
+        st1, d1 = hook("VerifyIdentity", forge({"i": o.install_id, "u": u, "p": [], "w": [], "e": int(time.time()) + 999}), body)
+        st2, d2 = hook("VerifyIdentity", x.token, body)
+        st3, d3 = hook("VerifyIdentity", o.token, {"appUserId": old, "originalAppUserId": u})
+        calls, _ = mock_calls(since, "/revenuecat/")
+        v1 = heal_versions(u, old, mine, other)
+        ok = (st0 == 401 and (d0 or {}).get("success") is False and st1 == 401 and st2 == 403
+              and str((d2 or {}).get("reason", "")).startswith("forbidden:appUserId") and st3 == 403 and calls == [] and v0 == v1
+              and x.refresh().get("billingConflict") is True)
+        return ok, (f"no token={st0} {d0} forged={st1} no-billing-id token={st2} {d2} foreign recipient={st3} {d3} "
+                    f"RevenueCat calls={len(calls)} row versions unchanged={v0 == v1}")
+    finally:
+        heal_cleanup(u, old, mine, other)
+
+
+@scenario("identity_heal_ignores_foreign_hint", "A3: a hint RevenueCat does NOT list for the token's id → 200 {success:false, reason:hint_not_alias} and NOTHING written — although RevenueCat lists a real alias; a RevenueCat error (500) → 502 rc_unavailable, nothing written")
+def s_identity_heal_foreign(ctx):
+    o, old, mine, other, _ = heal_fixture(ctx, "a3f")
+    u = o.app_user_id
+    foreign = rc_fixture_id(ctx["run_id"], "a3foreign")
+    try:
+        rc_aliases(u, [old, u])
+        v0 = heal_versions(u, old, mine, other)
+        since = mock_total()
+        st, d = hook("VerifyIdentity", o.token, {"appUserId": u, "originalAppUserId": foreign})
+        rc_aliases(u, None, status=500)
+        st2, d2 = hook("VerifyIdentity", o.token, {"appUserId": u, "originalAppUserId": old})
+        calls, _ = mock_calls(since, "/revenuecat/")
+        v1 = heal_versions(u, old, mine, other)
+        ok = (st == 200 and d == {"success": False, "reason": "hint_not_alias"} and st2 == 502 and d2 == {"success": False, "reason": "rc_unavailable"}
+              and len(calls) == 2 and [c["status"] for c in calls] == [200, 500] and v0 == v1 and heal_row(u) == "trial|trialing|0|-|-")
+        return ok, (f"foreign hint={st} {d} RevenueCat 500={st2} {d2} RevenueCat calls={[(c['path'][-20:], c['status']) for c in calls]} "
+                    f"row versions unchanged={v0 == v1} owner={heal_row(u)}")
+    finally:
+        heal_cleanup(u, old, mine, other)
 
 
 @scenario("billing_conflict_is_logged", "V3 (T1): a refresh that answers billingConflict (a second install naming a billing id another install holds) writes ONE billing_conflicts row — claimant, the CURRENT holder, attempts — a repeat bumps attempts, a refresh without a conflict writes nothing, the answer itself is unchanged; once support revokes the holder the id moves on the claimant's next refresh")

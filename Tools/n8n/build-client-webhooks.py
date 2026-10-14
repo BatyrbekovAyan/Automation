@@ -86,6 +86,7 @@ PROTECTED_IDS = [
     "crTestDialog0001",  # Test Dialog — the owner's safe test (stage 7.1, 2026-09-22)
     "crHandoffDry0001",  # Handoff Request (dry) — the test dialog's tool target (stage 7.1, 2026-09-22)
     "crPriceSearch001",  # Price List Search — the bots' / test dialog's reconciling price-list tool (V9, 2026-09-28)
+    "crVerifyIdent001",  # Verify Identity — identity-heal after a reinstall (A3 «защита платящих», 2026-10-14)
 ]
 
 

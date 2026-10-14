@@ -36,6 +36,10 @@ n8n's own expression engine — and asserts the CORRECT outcome:
       no pending claim, never in the token's c; a live Wappi profile behind it (liveness false positive) gets no code
   S19 M4: the invariant the defect broke — every claimMethod:'owned' answer issues a token whose p lists the profile
       (a matrix of row states: own / foreign / owner-less × live / retired)
+  S20 A3: claim.verify by an install WITH a billing identity moves the claimed row onto it — owner_id AND app_user_id (spec
+      §1: the row follows the owning install's billing id; else a heal retires the old id and the claimed bots fall silent)
+  S21 A3: claim.verify by an install WITHOUT one (billingConflict / nothing bound) moves the owner and leaves app_user_id
+  S22 A3: a wrong / foreign-install / retired claim changes no app_user_id
 
 M4 (follow-ups 2026-10-09): Claim Decide answered 'owned' for the install's own RETIRED row (deleted_at set) while the
 token — built from live rows only — never listed it; the client's boot loop read 'owned' as «done, next» and asked the
@@ -86,17 +90,18 @@ def sha(code_):
                   {'json': {'c': code_}})[0]['json']['h']
 
 
-def claim(pg, op, install, pid, status, code_='', channel='whatsapp', send=SEND_OK, status_http=200):
+def claim(pg, op, install, pid, status, code_='', channel='whatsapp', send=SEND_OK, status_http=200, u=None):
     """One Auth Session claim.* call from Verify Install on (the install is authenticated), walking the canonical graph.
     Returns what the client would see (`issued` = Issue Token's response) plus the side effects:
     {decide, status_called, sent_code, recipient, bound, verify_rows, reload, issued}. `status_http` is the HTTP status
-    Wappi's get/status answers with (fullResponse) when it is called."""
+    Wappi's get/status answers with (fullResponse) when it is called. `u` = the billing id Verify Install hands on for the
+    install (the token's u; None = no billing identity — billingConflict or nothing bound)."""
     route = {'op': op, 'profileId': pid, 'channel': channel, 'installId': install, 'code': code_,
              'codeHash': sha(code_) if code_ else '', 'nowSec': now(pg), 'installSecret': ''}
-    inst = {'verdict': 'checked', 'install_id': install, 'app_user_id': None}
+    inst = {'verdict': 'checked', 'install_id': install, 'app_user_id': u}
     if has(W, 'Install Verified?'):
         assert expr(IF(W, 'Install Verified?'), inst, {'Route': route}) is True
-    start = pg.q(bind(Q(W, 'Claim Start'), [pid, install, '', channel, op]))[0]
+    start = pg.q(bind(Q(W, 'Claim Start'), [pid, install, u or '', channel, op]))[0]   # its replacement: (app_user_id || '')
     named = {'Route': route, 'Verify Install': inst, 'Claim Start': start}
     status_called = expr(IF(W, 'Needs Status?'), start, named) if has(W, 'Needs Status?') else True
     item = {'json': {'statusCode': status_http, 'body': status}} if status_called else {'json': start}
@@ -104,7 +109,8 @@ def claim(pg, op, install, pid, status, code_='', channel='whatsapp', send=SEND_
     named['Claim Decide'] = dec
     out = {'decide': dec, 'status_called': status_called, 'sent_code': None, 'recipient': None, 'bound': None, 'verify_rows': None}
     if expr(IF(W, 'Claim Verify?'), dec, named):
-        rows = pg.q(bind(Q(W, 'Verify Claim Code'), [pid, install, route['codeHash']]))
+        # A3: bound by the node's OWN queryReplacement (n8n's expression engine) — it names the install's billing id too
+        rows = pg.q(bind(Q(W, 'Verify Claim Code'), expr(REPL(W, 'Verify Claim Code'), dec, named)))
         named['Verify Claim Code'] = rows[0] if rows else {}
         out['verify_rows'] = [r for r in rows if r.get('profile_id')]
     elif expr(IF(W, 'Send Code?'), dec, named):
@@ -491,7 +497,54 @@ with Case('M4 S19: invariant — every claimMethod:\'owned\' answer issues a tok
                     c.check(i.get('success') is False, f'{label} {op}: a retired row answered success ({i.get("claimMethod")})')
         c.check(owned_seen, 'positive control: the install\'s own live row must answer «owned» (else the invariant is vacuous)')
 
-with Case('V2/M4 negative: verify-auth-gate.py rejects an Auth Session that binds on a pairing again, lets claim.verify call Wappi, or loses either half of the M4 retired-row refusal') as c:
+def keyed_row(pg, pid):
+    return pg.q(f"select owner_id, app_user_id, workflow_id, claimed_at is not null as claimed from bot_profiles where profile_id = {sql_literal(pid)}")[0]
+
+
+with Case('A3 S20: claim.verify by an install WITH a billing identity moves the claimed row onto it — owner_id AND app_user_id '
+          '(spec §1: the row follows the owning install\'s billing id); the workflow and the rest of the row stay') as c:
+    with PgSession(SETUP) as pg:
+        pg.x("insert into bot_profiles (profile_id, app_user_id, channel, owner_id, workflow_id) values ('P20', 'rc-O', 'whatsapp', 'inst-O', 'wf-20');")
+        s = claim(pg, 'claim.start', 'inst-N', 'P20', AUTH_OLD(pg), u='rc-N')
+        c.check(keyed_row(pg, 'P20')['app_user_id'] == 'rc-O', f'claim.start must not move the billing key: {keyed_row(pg, "P20")}')
+        good = claim(pg, 'claim.verify', 'inst-N', 'P20', AUTH_OLD(pg), s['sent_code'] or '', u='rc-N')
+        row = keyed_row(pg, 'P20')
+        c.check(row == {'owner_id': 'inst-N', 'app_user_id': 'rc-N', 'workflow_id': 'wf-20', 'claimed': True} and 'P20' in (good['reload']['p'] or []),
+                f'the claimed row must follow the claimant\'s billing id: {row} issued={good["issued"]}')
+        pg.x("insert into bot_profiles (profile_id, app_user_id, channel, workflow_id) values ('P20L', 'rc-legacy', 'telegram', 'wf-20l');")
+        tg = {'authorized': True, 'phone': '70000000009', 'account': {'phone': '70000000001'}, 'authorized_at': iso(now(pg) - 60)}
+        s2 = claim(pg, 'claim.start', 'inst-N', 'P20L', tg, channel='telegram', u='rc-N')
+        claim(pg, 'claim.verify', 'inst-N', 'P20L', tg, s2['sent_code'] or '', channel='telegram', u='rc-N')
+        c.check(keyed_row(pg, 'P20L')['app_user_id'] == 'rc-N' and keyed_row(pg, 'P20L')['owner_id'] == 'inst-N',
+                f'an owner-less (compat-era) row claimed by code follows the claimant too: {keyed_row(pg, "P20L")}')
+
+with Case('A3 S21: claim.verify by an install WITHOUT a billing identity (u = null: billingConflict, or nothing bound) moves the '
+          'owner and leaves app_user_id as it is — never NULL, never the empty string') as c:
+    with PgSession(SETUP) as pg:
+        pg.x("insert into bot_profiles (profile_id, app_user_id, channel, owner_id) values ('P21', 'rc-O', 'whatsapp', 'inst-O');")
+        s = claim(pg, 'claim.start', 'inst-N', 'P21', AUTH_OLD(pg), u=None)
+        claim(pg, 'claim.verify', 'inst-N', 'P21', AUTH_OLD(pg), s['sent_code'] or '', u=None)
+        row = keyed_row(pg, 'P21')
+        c.check(row['owner_id'] == 'inst-N' and row['app_user_id'] == 'rc-O', f'u = null must leave app_user_id: {row}')
+        pg.x("insert into bot_profiles (profile_id, app_user_id, channel, owner_id) values ('P21e', 'rc-O', 'whatsapp', 'inst-O');")
+        s = claim(pg, 'claim.start', 'inst-N', 'P21e', AUTH_OLD(pg), u='')
+        claim(pg, 'claim.verify', 'inst-N', 'P21e', AUTH_OLD(pg), s['sent_code'] or '', u='')
+        c.check(keyed_row(pg, 'P21e')['app_user_id'] == 'rc-O', f'an empty u must leave app_user_id: {keyed_row(pg, "P21e")}')
+
+with Case('A3 S22: a wrong code, another install\'s guess and a retired row change NO app_user_id (only a bound claim re-keys)') as c:
+    with PgSession(SETUP) as pg:
+        pg.x("insert into bot_profiles (profile_id, app_user_id, channel, owner_id) values ('P22', 'rc-O', 'whatsapp', 'inst-O');")
+        s = claim(pg, 'claim.start', 'inst-N', 'P22', AUTH_OLD(pg), u='rc-N')
+        claim(pg, 'claim.verify', 'inst-N', 'P22', AUTH_OLD(pg), wrong(s['sent_code'] or ''), u='rc-N')
+        claim(pg, 'claim.verify', 'inst-A', 'P22', AUTH_OLD(pg), s['sent_code'] or '', u='rc-A')     # not the pending install
+        c.check(keyed_row(pg, 'P22')['app_user_id'] == 'rc-O' and keyed_row(pg, 'P22')['owner_id'] == 'inst-O',
+                f'a refused claim moved the billing key: {keyed_row(pg, "P22")}')
+        retire(pg, 'P22r', 'inst-O', 'trial_expiry')
+        claim(pg, 'claim.verify', 'inst-O', 'P22r', UNAUTH, '123456', u='rc-N')
+        c.check(keyed_row(pg, 'P22r')['app_user_id'] == 'rc-O', f'a retired row was re-keyed: {keyed_row(pg, "P22r")}')
+
+
+with Case('V2/M4/A3 negative: verify-auth-gate.py rejects an Auth Session that binds on a pairing again, lets claim.verify call Wappi, loses either half of the M4 retired-row refusal, or claims without re-keying the row onto the claimant\'s billing id (A3)') as c:
     import shutil
     import subprocess
     import sys
@@ -517,6 +570,12 @@ with Case('V2/M4 negative: verify-auth-gate.py rejects an Auth Session that bind
         ('M4 retired asks Wappi', lambda w: node(w, 'Needs Status?')['parameters']['conditions']['conditions'][0].__setitem__(
             'leftValue', "={{ $('Route').first().json.op !== 'claim.verify' }}"), 'M4'),
         ('M4 pending on a retired row', pending_on_retired, 'M4'),
+        # A3: the claimed row must follow the claimant's billing id (the SQL) from Verify Install's verdict (the parameter)
+        ('A3 claim without the re-key', lambda w: node(w, 'Verify Claim Code')['parameters'].__setitem__('query', re.sub(
+            r",\s*app_user_id = coalesce\(nullif\(\$4, ''\), app_user_id\)", '', node(w, 'Verify Claim Code')['parameters']['query'])), 'A3'),
+        ('A3 re-key from the request', lambda w: node(w, 'Verify Claim Code')['parameters']['options'].__setitem__('queryReplacement',
+            node(w, 'Verify Claim Code')['parameters']['options']['queryReplacement'].replace(
+                "$('Verify Install').first().json.app_user_id", "$('Route').first().json.appUserId")), 'A3'),
     ):
         d = Path(tempfile.mkdtemp(prefix='v2-neg-'))
         try:

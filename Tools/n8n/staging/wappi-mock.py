@@ -36,10 +36,17 @@ Control routes (never exist on the real transport):
                            the echo row the send appends — e.g. {"id": "<owner row id>"} or {"from_where": ""}
     POST /__mock/profile   {profile_id, authorized, phone, authorized_at, account_phone}   status fields for get/status
                            (account_phone: tapi only — the authorised account, returned as account.phone)
+    POST /__mock/rc_aliases {customer_id, aliases:[ids] | null, status?, body?}   the RevenueCat customer the mock knows
+                           (A3 identity-heal): derive-staging.py rewrites https://api.revenuecat.com/ to <mock>/revenuecat/,
+                           and GET /revenuecat/v2/projects/<p>/customers/<id>/aliases answers like RevenueCat v2 (fact-check
+                           2026-10-15): 200 {object:"list", items:[{object:"customer.alias", id, created_at}], next_page:null,
+                           url} for a configured id (its own id is on the list — configure it), 404 resource_missing for an
+                           unknown one; `status`/`body` answer an error instead; `aliases: null` forgets the customer
     GET  /__mock/state
 """
 import json
 import os
+import re
 import sys
 import threading
 import time
@@ -52,7 +59,7 @@ HOST = os.environ.get("WAPPI_MOCK_HOST", "127.0.0.1")
 LOG = os.environ.get("WAPPI_MOCK_LOG", "")
 
 LOCK = threading.Lock()
-STATE = {"messages": {}, "calls": [], "faults": [], "seq": 0, "profiles": {}}
+STATE = {"messages": {}, "calls": [], "faults": [], "seq": 0, "profiles": {}, "rc_aliases": {}}
 
 
 def _key(profile_id, chat_id):
@@ -138,8 +145,9 @@ class Handler(BaseHTTPRequestHandler):
         if path.startswith("/__mock/"):
             return self._control(method, path, query, body)
         fault = _take_fault(path, query.get("profile_id") or (body.get("profile_id") if isinstance(body, dict) else "") or "")
+        authz = self.headers.get("Authorization") or ""
         entry = {"ts": time.time(), "method": method, "path": path, "query": query, "body": body,
-                 "auth": bool(self.headers.get("Authorization")), "fault": fault and fault["mode"]}
+                 "auth": bool(authz), "auth_scheme": authz.split(" ", 1)[0] if authz else "", "fault": fault and fault["mode"]}
         if fault and fault["mode"] == "drop":
             # the connection dies BEFORE the transport processes anything: nothing is sent, no echo
             # will ever appear — the honest final state for the caller is send_unknown.
@@ -156,7 +164,10 @@ class Handler(BaseHTTPRequestHandler):
                 break
         if fault and fault["mode"] == "cross":
             query = dict(query, chat_id=fault.get("cross_chat") or "")
-        status, resp = self._transport(method, tail, channel, query, body, echo=(fault or {}).get("echo"))
+        if path.startswith("/revenuecat/"):
+            status, resp = self._revenuecat(method, path)
+        else:
+            status, resp = self._transport(method, tail, channel, query, body, echo=(fault or {}).get("echo"))
         entry["status"] = status
         entry["resp"] = resp
         if fault and fault["mode"] == "status":
@@ -248,11 +259,31 @@ class Handler(BaseHTTPRequestHandler):
                 return 200, {"status": "done", "dialogs": []}
         return 404, {"status": "error", "detail": f"mock: unknown route {tail}"}
 
+    # ---- RevenueCat API v2 (A3 identity-heal) -----------------------------------------------
+    RC_ALIASES = re.compile(r"^/revenuecat/v2/projects/([^/]+)/customers/([^/]+)/aliases$")
+    RC_MISSING = {"object": "error", "type": "resource_missing", "message": "Could not find customer ID associated with this project",
+                  "retryable": False, "doc_url": "https://errors.rev.cat/resource-missing"}
+
+    def _revenuecat(self, method, path):
+        m = self.RC_ALIASES.match(path)
+        if method != "GET" or not m:
+            return 404, {"object": "error", "type": "resource_missing", "message": f"mock: unknown RevenueCat route {method} {path}"}
+        customer = urllib.parse.unquote(m.group(2))
+        with LOCK:
+            cfg = STATE["rc_aliases"].get(customer)
+        if cfg is None:
+            return 404, dict(self.RC_MISSING)
+        if int(cfg.get("status") or 200) != 200:
+            return int(cfg["status"]), cfg.get("body") or {"object": "error", "type": "server_error", "message": "mock: injected"}
+        items = [{"object": "customer.alias", "id": i, "created_at": 1787731781561 + k} for k, i in enumerate(cfg.get("aliases") or [])]
+        return 200, {"object": "list", "items": items, "next_page": None,
+                     "url": f"https://api.revenuecat.com/v2/projects/{m.group(1)}/customers/{customer}/aliases"}
+
     # ---- control -------------------------------------------------------------------------
     def _control(self, method, path, q, b):
         with LOCK:
             if path == "/__mock/reset" and method == "POST":
-                STATE.update({"messages": {}, "calls": [], "faults": [], "seq": 0, "profiles": {}})
+                STATE.update({"messages": {}, "calls": [], "faults": [], "seq": 0, "profiles": {}, "rc_aliases": {}})
                 return self._send(200, {"ok": True})
             if path == "/__mock/messages" and method == "POST":
                 STATE["messages"][_key(b["profile_id"], b["chat_id"])] = list(b.get("messages") or [])
@@ -281,13 +312,20 @@ class Handler(BaseHTTPRequestHandler):
                      "echo": b.get("echo") if isinstance(b.get("echo"), dict) else None}
                 STATE["faults"].append(f)
                 return self._send(200, {"ok": True, "fault": f})
+            if path == "/__mock/rc_aliases" and method == "POST":
+                if b.get("aliases") is None and not b.get("status"):
+                    STATE["rc_aliases"].pop(b["customer_id"], None)
+                else:
+                    STATE["rc_aliases"][b["customer_id"]] = {"aliases": list(b.get("aliases") or []), "status": int(b.get("status") or 200),
+                                                             "body": b.get("body")}
+                return self._send(200, {"ok": True, "customer": STATE["rc_aliases"].get(b["customer_id"])})
             if path == "/__mock/profile" and method == "POST":
                 STATE["profiles"].setdefault(b["profile_id"], {}).update({k: v for k, v in b.items() if k != "profile_id"})
                 return self._send(200, {"ok": True, "profile": STATE["profiles"][b["profile_id"]]})
             if path == "/__mock/state" and method == "GET":
                 return self._send(200, {"chats": {k: len(v) for k, v in STATE["messages"].items()},
                                         "calls": len(STATE["calls"]), "faults": STATE["faults"],
-                                        "profiles": STATE["profiles"]})
+                                        "profiles": STATE["profiles"], "rc_aliases": STATE["rc_aliases"]})
         return self._send(404, {"error": "unknown control route"})
 
 

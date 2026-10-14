@@ -8,6 +8,8 @@ could reach production or a real customer:
 
   * every n8n self-call  https://n8n.choosereply.com/{api/v1,webhook}/ -> http://localhost:<port>/...
   * every Wappi call     https://wappi.pro/                             -> <mock base>/
+  * every RevenueCat API call https://api.revenuecat.com/                -> <mock base>/revenuecat/ (A3 identity-heal: the
+    mock answers v2 …/customers/<id>/aliases from what a scenario configured; the real API is never asked)
   * credentials are re-bound BY NAME to the staging instance's own credentials; the Postgres
     binding is remapped to the credential named "Postgres Staging" and the run ABORTS if that
     credential does not exist (a staging set bound to the shared prod DB is the failure mode
@@ -47,6 +49,7 @@ MOCK = os.environ.get("WAPPI_MOCK_BASE", "http://127.0.0.1:8765").rstrip("/")
 CANON_HOST = "https://n8n.choosereply.com"
 LOCAL_HOST = f"http://localhost:{PORT}"
 WAPPI = "https://wappi.pro"
+RC_API = "https://api.revenuecat.com"   # A3 (2026-10-14): Verify Identity's RC Aliases -> the mock's /revenuecat/ routes
 TEMPLATES = {"wa": "4wYitz5ek30SVNlT-WhatsApp_Bot.json", "tg": "4VN3gsFaC2HUYmcc-Telegram_Bot.json"}
 PG_STAGING_NAME = "Postgres Staging"
 # Deliberately ABSENT on staging: the Support Message relay must never reach the owner's real support
@@ -223,6 +226,7 @@ def derive_file(text):
     text = text.replace(CANON_HOST + "/api/v1", LOCAL_HOST + "/api/v1")
     text = text.replace(CANON_HOST + "/webhook/", LOCAL_HOST + "/webhook/")
     text = text.replace(WAPPI + "/", MOCK + "/")
+    text = text.replace(RC_API + "/", MOCK + "/revenuecat/")
     text = text.replace("/activate ", "/activate")
     return text
 
@@ -276,7 +280,7 @@ def derive(args, src):
             remap(node, creds, missing)
         wf["active"] = False
         text = json.dumps(wf, ensure_ascii=False)
-        for forbidden in (CANON_HOST, WAPPI, "wappi.pro"):
+        for forbidden in (CANON_HOST, WAPPI, "wappi.pro", RC_API, "api.revenuecat.com"):
             if forbidden in text:
                 sys.exit(f"REFUSED: {f} still references {forbidden} after derivation")
         if supabase_writers_left(wf):

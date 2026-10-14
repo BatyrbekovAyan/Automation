@@ -262,15 +262,24 @@ where profile_id = $1 and claim_code_hash = $2
 returning profile_id;"""
 
 MAX_CODE_ATTEMPTS = 5
+# A3: the fourth value is the billing id Verify Install verified for the install (`|| ''`: never undefined — n8n SKIPS an
+# undefined value and the later parameters would shift).
+VERIFY_CLAIM_CODE_PARAMS = ("={{ [ $('Route').first().json.profileId, $('Route').first().json.installId, $('Route').first().json.codeHash, "
+                            "($('Verify Install').first().json.app_user_id || '') ] }}")
 
 VERIFY_CLAIM_CODE_SQL = """-- A1 claim by self-message code: binds ownership only for the install that started the claim, with an
 -- unexpired matching code. V2 (2026-09-28): the code is the ONLY proof for every profile, so it is guarded — a wrong
 -- answer from the pending install counts, and the fifth kills the code (hash cleared, the expiry kept: no new code
 -- until its window ends). Exactly one row: profile_id when bound, attempts after a miss, code_dead when an earlier
 -- statement had already killed it (the final select reads the snapshot from before this statement's own updates).
+-- A3 (2026-10-14, spec §1): the bound row also takes the claimant's billing id. The fourth parameter is the id Verify
+-- Install verified for THIS install (the token's u — never the request's); empty when it has none (billingConflict or
+-- nothing bound), and then app_user_id stays as it is. Without it an identity-heal (or RevenueCat's own alias merge)
+-- retires the old id under the re-claimed bots and they fall silent.
 with hit as (
   update bot_profiles set owner_id = $2, claimed_at = now(), claim_pending_by = null, claim_pending_at = null,
-    claim_code_hash = null, claim_code_expires_at = null, claim_code_attempts = 0
+    claim_code_hash = null, claim_code_expires_at = null, claim_code_attempts = 0,
+    app_user_id = coalesce(nullif($4, ''), app_user_id)
   where profile_id = $1 and (owner_id is null or owner_id <> $2) and claim_pending_by = $2
     and claim_code_hash = $3 and claim_code_expires_at > now() and claim_code_attempts < __MAX__
   returning profile_id
@@ -448,8 +457,7 @@ def build_session():
     n.append(http_wappi("Claim Status", "GET", CLAIM_STATUS_URL, [1540, 420], query_expr=CLAIM_STATUS_QUERY))
     n.append(code("Claim Decide", CLAIM_DECIDE_JS.replace("__TOKEN__", tok), [1760, 520]))
     n.append(if_true("Claim Verify?", "={{ $json.op === 'claim.verify' && !$json.claimError }}", [1980, 520]))
-    n.append(postgres("Verify Claim Code", VERIFY_CLAIM_CODE_SQL,
-                      "={{ [ $('Route').first().json.profileId, $('Route').first().json.installId, $('Route').first().json.codeHash ] }}", [2200, 400]))
+    n.append(postgres("Verify Claim Code", VERIFY_CLAIM_CODE_SQL, VERIFY_CLAIM_CODE_PARAMS, [2200, 400]))
     n.append(if_true("Send Code?", "={{ $json.op === 'claim.start' && $json.claimMethod === 'code' && !$json.codeReused && !!$json.code }}", [2200, 640]))
     n.append(postgres("Store Claim Code", STORE_CLAIM_CODE_SQL,
                       "={{ [ $('Route').first().json.profileId, $('Route').first().json.installId, $('Claim Decide').first().json.codeHash ] }}", [2420, 560]))

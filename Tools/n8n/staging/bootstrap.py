@@ -9,7 +9,8 @@ Steps (each skipped when already done):
   3. owner + API key: POST /rest/owner/setup (first run only), /rest/login, POST /rest/api-keys
      (all scopes) → Tools/n8n/.secrets/staging-n8n.json.
   4. n8n-API credentials [server stopped]: «n8n account» (n8nApi), «n8nAPIKey» + «n8n Admin API»
-     (httpHeaderAuth X-N8N-API-KEY) bound to the STAGING key and http://localhost:<port>/api/v1.
+     (httpHeaderAuth X-N8N-API-KEY) bound to the STAGING key and http://localhost:<port>/api/v1; «RevenueCat API»
+     (httpHeaderAuth Authorization, a dummy value — derive-staging.py points the RevenueCat host at the mock, A3).
   5. workflows: derive-staging.py (+ --bot specs) → import:workflow → publish the ones prod runs
      active (the two clone templates stay inactive, as on prod) → start server.
 
@@ -56,6 +57,7 @@ ACTIVE_CANONICAL = ["0DP79STI3pafXO9B", "2htWSV5IHO8E2CgB", "2islisFH7jjLoPQM", 
                     "crHandoffReq0001", "crHandoffNtfy001", "crHandoffsApi001",   # A5 (stage 4): handoff tool target, notifier, app webhook
                     "crTestDialog0001", "crHandoffDry0001",   # stage 7.1: the safe test dialog + its dry handoff target
                     "crPriceSearch001",   # V9 (2026-09-28): the reconciling price-list search (bots' + test dialog's tool)
+                    "crVerifyIdent001",   # A3 «защита платящих» (2026-10-14): identity-heal after a reinstall (/webhook/VerifyIdentity)
                     "stgEvalRunner001"]   # STAGING-ONLY (stage 6): completions proxy for the eval runner
 
 
@@ -244,6 +246,13 @@ def main():
             {"id": "stgN8nBearer00001", "name": "Bearer Auth account", "type": "httpBearerAuth", "data": {"token": sec["apiKey"]}},
         ])
         print("4. created n8n-API credentials bound to the staging key")
+    # A3 (2026-10-14): Verify Identity asks RevenueCat for a customer's aliases with the «RevenueCat API» Header-Auth
+    # credential. On staging the host is the mock (derive-staging.py) — the value is a dummy, never a RevenueCat key.
+    if "RevenueCat API" not in cred_names():
+        stop_server()
+        import_decrypted_creds([{"id": "stgRevenueCatApi1", "name": "RevenueCat API", "type": "httpHeaderAuth",
+                                 "data": {"name": "Authorization", "value": "Bearer stg-mock-not-a-revenuecat-key"}}])
+        print("4. created «RevenueCat API» (dummy, the staging RevenueCat host is the mock)")
     # 5. workflows
     if not a.skip_workflows:
         stop_server()
