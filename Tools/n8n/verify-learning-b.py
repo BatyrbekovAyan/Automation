@@ -38,6 +38,16 @@ expect("crAuth.installId" in params and "crAuth.mode" in params and "appUserId" 
 expect("row.readiness" in sr["parameters"]["jsCode"] and "LEARNING-B" in sr["parameters"]["jsCode"], "get usage: Shape Response lacks readiness")
 expect(ag is not None and wf["connections"]["Authorized?"]["main"][0][0]["node"] == "Read Usage", "get usage: gate wiring changed")
 expect(ru.get("onError") == "continueErrorOutput", "get usage: Read Usage must keep its error output (Respond Error)")
+# Deploy precondition (review 2026-10-14, Important #1): the readiness CTE sits INSIDE the plan/quota statement — on a database
+# without learning A's columns every Get Usage answers 500 (paywall, quota and «Подписка» lose their snapshot, not just the lock).
+ROOT = os.path.dirname(os.path.dirname(HERE))
+mig = open(os.path.join(HERE, "sql", "2026-09-25-learning-foundation.sql"), encoding="utf-8").read()
+expect("origin_set" in mig and "origin_top1" in mig, "precondition: learning A's migration must declare origin_set/origin_top1 (the CTE reads them)")
+plan = open(os.path.join(ROOT, "docs", "superpowers", "plans", "2026-10-14-learning-loop-readiness.md"), encoding="utf-8").read()
+expect("information_schema.columns" in plan and "origin_top1" in plan,
+       "plan: the deploy checklist must check A's columns on the target BEFORE --apply (without them Get Usage fails entirely)")
+claude = open(os.path.join(ROOT, "CLAUDE.md"), encoding="utf-8").read()
+expect("требует колонок A" in claude, "CLAUDE.md: the Learning-B bullet must state the A-columns dependency and its blast radius")
 rep = open(os.path.join(HERE, "report-learning.py"), encoding="utf-8").read()
 expect("apply-learning-b" in rep and "readiness" in rep, "report: report-learning.py must import the module's constants and print readiness (Task 2)")
 print("learning B verify:", "OK" if not problems else f"{len(problems)} problem(s)")

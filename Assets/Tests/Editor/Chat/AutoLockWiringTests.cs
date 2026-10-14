@@ -23,9 +23,9 @@ public class AutoLockWiringTests
         Assert.Greater(header.IndexOf("ReplyMode.Auto"), header.IndexOf("AutoLockGate.TryEnable("), "header: the gate, then CommitMode(Auto)");
 
         string chat = MethodBody("Scripts/UI/SemiAutoToggle.cs", "HandlePressed");
-        Assert.GreaterOrEqual(chat.IndexOf("AutoLockGate.TryEnable("), 0, "per-chat toggle");
-        Assert.IsTrue(chat.Contains("perChat: true"), "the per-chat sheet says «в этом чате»");
-        Assert.Greater(chat.IndexOf("OnToggled?.Invoke(false)"), chat.IndexOf("AutoLockGate.TryEnable("), "per-chat: the gate, then the enable");
+        Assert.GreaterOrEqual(chat.IndexOf("AutoLockGate.TryEnableChat("), 0, "per-chat toggle goes through the chat door of the gate");
+        Assert.IsTrue(chat.Contains("ReplyModeToggleBinder.GetMode("), "the chat door needs the bot's own mode: a resume inside «Авто» is never locked (spec §0)");
+        Assert.Greater(chat.IndexOf("OnToggled?.Invoke(false)"), chat.IndexOf("AutoLockGate.TryEnableChat("), "per-chat: the gate, then the enable");
     }
 
     [Test]

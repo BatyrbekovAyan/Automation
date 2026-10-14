@@ -45,4 +45,37 @@ public class AutoLockGateTests
         Assert.AreEqual(0, n);
         Assert.IsFalse(AutoLockSheet.IsShowing);
     }
+
+    [Test]
+    public void PerChatEnable_OnABotAlreadyInAuto_SkipsTheLock_ButMeetsItOnASemiBot()
+    {
+        int n = 0;
+        Snapshot(new AutoReadinessEntry { botKey = "Bot0", matches = 2, total = 4, chats = 1, days = 1, ready = false });
+        // The bot is in «Авто»: resuming one paused chat is a move INSIDE an enabled mode — the lock never applies (spec §0).
+        AutoLockGate.TryEnableChat("Bot0", ReplyModeToggleBinder.ReplyMode.Auto, null, () => n++);
+        Assert.AreEqual(1, n);
+        Assert.IsFalse(AutoLockSheet.IsShowing);
+        // The bot is in «Вместе»: turning «Авто» on for one chat IS an enable — the sheet, with the per-chat body.
+        AutoLockGate.TryEnableChat("Bot0", ReplyModeToggleBinder.ReplyMode.Semi, null, () => n++);
+        Assert.AreEqual(1, n);
+        Assert.IsTrue(AutoLockSheet.IsShowing);
+        var body = AutoLockSheetTestsAccess.BodyText();
+        StringAssert.Contains("в этом чате", body);
+        AutoLockSheet.EnableAnyway();
+        Assert.AreEqual(2, n);
+    }
+}
+
+/// <summary>Reads the live sheet's body through the EditMode seam (the panel is built lazily on the first Show).</summary>
+internal static class AutoLockSheetTestsAccess
+{
+    public static string BodyText()
+    {
+        var panel = AutoLockSheet.PanelForTests;
+        Assert.IsNotNull(panel, "the sheet was shown");
+        foreach (var tmp in panel.GetComponentsInChildren<TMPro.TextMeshProUGUI>(true))
+            if (tmp.name == "Body") return tmp.text;
+        Assert.Fail("Body label not found");
+        return null;
+    }
 }

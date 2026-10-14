@@ -19,4 +19,19 @@ public static class AutoLockGate
         }
         AutoLockSheet.Show(font, AutoReadinessPolicy.Progress(entry), perChat, proceed);
     }
+
+    /// <summary>
+    /// The per-chat door. A chat of a bot already in «Авто» is a RESUME inside an enabled mode (a handoff pause, a manual
+    /// «Вместе» for one client) — the lock never applies to an enabled mode (spec §0), so the ordinary path runs at once.
+    /// A chat of a bot in «Вместе» is an enable for one client and meets the lock with the «в этом чате» body.
+    /// </summary>
+    public static void TryEnableChat(string botKey, ReplyModeToggleBinder.ReplyMode botMode, TMP_FontAsset font, Action proceed)
+    {
+        if (AutoButtonModel.IsAutoOn(botMode))
+        {
+            proceed?.Invoke();
+            return;
+        }
+        TryEnable(botKey, font, perChat: true, proceed);
+    }
 }

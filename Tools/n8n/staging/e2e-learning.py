@@ -218,11 +218,13 @@ def readiness_in_get_usage(ctx):
     send(owner, pid, dict(ORIGIN, origin_top1=1), recipient=chats[1])
     time.sleep(2)
     st3, ten = bot0()
-    ok = (st1 == 200 and nine is not None and nine.get("total") == 9 and nine.get("ready") is False
+    st_legacy, legacy = e2e_auth.hook("GetUsage", None, {"appUserId": owner.app_user_id})   # compat window: token-less → []
+    legacy_ok = st_legacy == 200 and isinstance(legacy, dict) and legacy.get("readiness") == [] and legacy.get("success") is True
+    ok = (legacy_ok and st1 == 200 and nine is not None and nine.get("total") == 9 and nine.get("ready") is False
           and st2 == 200 and after_group is not None and after_group.get("total") == 9
           and st3 == 200 and ten is not None and ten.get("total") == 10 and ten.get("matches") == 10
           and ten.get("chats") == 3 and ten.get("days") == 2 and ten.get("ready") is True)
-    return ok, f"nine={nine} after_group={after_group} ten={ten}"
+    return ok, f"nine={nine} after_group={after_group} ten={ten} legacy={st_legacy}/{legacy.get('readiness') if isinstance(legacy, dict) else legacy}"
 
 
 def main():
