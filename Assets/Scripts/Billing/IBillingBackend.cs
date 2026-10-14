@@ -20,6 +20,14 @@ public interface IBillingBackend
     /// <summary>The app user id this backend is tracking purchases under (may be empty before/without init).</summary>
     string AppUserId { get; }
 
+    /// <summary>
+    /// RevenueCat's <c>CustomerInfo.OriginalAppUserId</c> — the FIRST app user id of the customer <see cref="AppUserId"/>
+    /// belongs to. It differs from <see cref="AppUserId"/> once RevenueCat merged a reinstall's new anonymous id with the
+    /// old one (A3 identity-heal: the server's subscription mirror may still live under the old id). Empty until a
+    /// CustomerInfo has landed. Only ever a HINT to the server, which asks RevenueCat itself.
+    /// </summary>
+    string OriginalAppUserId { get; }
+
     /// <summary>The MAX tier among this user's currently active entitlements (None if none/uninitialized).</summary>
     PlanTier PurchasedTier { get; }
 

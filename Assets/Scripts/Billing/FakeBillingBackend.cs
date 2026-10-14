@@ -9,6 +9,7 @@ using System;
 public class FakeBillingBackend : IBillingBackend
 {
     public string AppUserId { get; set; } = "";
+    public string OriginalAppUserId { get; set; } = "";
     public PlanTier PurchasedTier { get; set; } = PlanTier.None;
 
     // Recorded for test assertions — never read by BillingService itself.

@@ -79,6 +79,13 @@ public static class BillingService
     public static string AppUserId =>
         !string.IsNullOrEmpty(_backend?.AppUserId) ? _backend.AppUserId : SystemInfo.deviceUniqueIdentifier;
 
+    /// <summary>
+    /// RevenueCat's <c>CustomerInfo.OriginalAppUserId</c> through the active backend (no fallback: empty until a
+    /// CustomerInfo has landed). A value different from <see cref="AppUserId"/> means RevenueCat merged a reinstall's
+    /// new id with an older one — the A3 identity-heal trigger (<see cref="IdentityHealTrigger"/>).
+    /// </summary>
+    public static string OriginalAppUserId => _backend?.OriginalAppUserId ?? "";
+
     public static void Purchase(string sku, Action<bool, string> done)
     {
         if (_backend == null) { done?.Invoke(false, BillingFailure.NotInitialized); return; }

@@ -4,6 +4,8 @@ using NUnit.Framework;
 // (WorkflowStateRequest / SupportRelayRequest, Assets/Scripts/Main/N8nWebhookRequests.cs).
 // The server-side workflows (Tools/n8n/build-client-webhooks.py) validate exactly
 // these shapes: { workflowId, action } with the closed 3-action enum, and { text }.
+// A3 (2026-10-14): VerifyIdentityRequest — { appUserId, originalAppUserId } for the identity-heal webhook
+// (Tools/n8n/build-verify-identity.py: the gate binds appUserId to the token's billing id, Validate reads the hint).
 public class N8nWebhookRequestTests
 {
     [Test]
@@ -45,5 +47,48 @@ public class N8nWebhookRequestTests
         Assert.AreEqual(
             "{\"text\":\"a \\\"b\\\"\\nc\"}",
             SupportRelayRequest.ComposeBody("a \"b\"\nc"));
+    }
+
+    private const string Current = "$RCAnonymousID:a3a3a3a3c4c4c4c4a3a3a3a3c4c4c4c4";
+    private const string Original = "$RCAnonymousID:b5b5b5b5d6d6d6d6b5b5b5b5d6d6d6d6";
+
+    [Test]
+    public void VerifyIdentity_PathMatchesDeployedWebhook()
+    {
+        Assert.AreEqual("/webhook/VerifyIdentity", VerifyIdentityRequest.Path);
+    }
+
+    [Test]
+    public void VerifyIdentity_ComposesExactBody()
+    {
+        // The gate compares appUserId with the token's billing id; Validate reads originalAppUserId as the hint.
+        Assert.AreEqual(
+            "{\"appUserId\":\"" + Current + "\",\"originalAppUserId\":\"" + Original + "\"}",
+            VerifyIdentityRequest.ComposeBody(Current, Original));
+    }
+
+    [Test]
+    public void VerifyIdentity_AMissingHintTravelsAsNull()
+    {
+        // The server reads a null hint as «no hint» (RevenueCat's own alias list then decides alone).
+        Assert.AreEqual(
+            "{\"appUserId\":\"" + Current + "\",\"originalAppUserId\":null}",
+            VerifyIdentityRequest.ComposeBody(Current, null));
+    }
+
+    [TestCase("{\"success\":true,\"aliases\":1,\"consolidated\":1,\"rekeyed\":0,\"truncated\":false}", true)]
+    [TestCase("{\"success\":true,\"aliases\":1,\"consolidated\":0,\"rekeyed\":2,\"truncated\":false}", true)]
+    [TestCase("{\"success\":true,\"aliases\":1,\"consolidated\":0,\"rekeyed\":0,\"truncated\":false}", false)]   // a repeat: nothing moved
+    [TestCase("{\"success\":false,\"reason\":\"hint_not_alias\"}", false)]
+    [TestCase("{\"success\":false,\"reason\":\"rc_unavailable\"}", false)]
+    [TestCase("{\"success\":false,\"error\":\"unauthorized\",\"reason\":\"unauthorized:missing\"}", false)]
+    [TestCase("{\"success\":\"yes\",\"consolidated\":1}", false)]
+    [TestCase("[1,2]", false)]
+    [TestCase("<html>502</html>", false)]
+    [TestCase("", false)]
+    [TestCase(null, false)]
+    public void VerifyIdentity_OnlyAHealThatMovedSomethingCounts(string body, bool healed)
+    {
+        Assert.AreEqual(healed, VerifyIdentityRequest.HealedSomething(body));
     }
 }

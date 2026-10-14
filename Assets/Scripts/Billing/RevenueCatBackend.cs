@@ -35,6 +35,7 @@ public class RevenueCatBackend : IBillingBackend
     private string _activeSubscriptionProductId;
 
     public string AppUserId { get; private set; } = "";
+    public string OriginalAppUserId { get; private set; } = "";
     public PlanTier PurchasedTier { get; private set; } = PlanTier.None;
 
     public void Initialize(string apiKey, Action<PlanTier> onEntitlementChanged)
@@ -233,6 +234,9 @@ public class RevenueCatBackend : IBillingBackend
         // roll back a previously-good id to BillingService's device-id fallback.
         var freshAppUserId = _purchases?.GetAppUserId();
         if (!string.IsNullOrEmpty(freshAppUserId)) AppUserId = freshAppUserId;
+        // A3 identity-heal: the customer's FIRST id — differs from AppUserId once RevenueCat merged a reinstall's new
+        // anonymous id with the old one. Same «only when non-empty» rule as the id above.
+        if (!string.IsNullOrEmpty(info.OriginalAppUserId)) OriginalAppUserId = info.OriginalAppUserId;
 
         PlanTier max = PlanTier.None;
         string activeProduct = null;

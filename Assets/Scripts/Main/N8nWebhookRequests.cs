@@ -46,3 +46,42 @@ public static class SupportRelayRequest
         public string text;
     }
 }
+
+// POST {n8nBaseUrl}/webhook/VerifyIdentity — A3 identity-heal after a reinstall (crVerifyIdent001, build-verify-identity.py).
+// appUserId must be the token's billing id (the gate refuses anything else, and a token without one); originalAppUserId is
+// RevenueCat's CustomerInfo.OriginalAppUserId — a HINT the server checks against RevenueCat's own alias list (asked with the
+// server's key), never a recipient. The server consolidates the ids RevenueCat lists INTO the token's id and answers
+// { success: true, aliases, consolidated, rekeyed, truncated } or { success: false, reason }.
+public static class VerifyIdentityRequest
+{
+    public const string Path = "/webhook/VerifyIdentity";
+
+    public static string ComposeBody(string appUserId, string originalAppUserId) =>
+        JsonConvert.SerializeObject(new BodyShape { appUserId = appUserId, originalAppUserId = originalAppUserId });
+
+    /// <summary>
+    /// True when the server's answer says the heal MOVED something (an alias consolidated or a bot re-keyed) — the usage
+    /// snapshot of this id is stale then. A refusal, a repeat that changed nothing, or an unreadable body changes nothing.
+    /// </summary>
+    public static bool HealedSomething(string json)
+    {
+        if (string.IsNullOrEmpty(json)) return false;
+        try
+        {
+            var jo = Newtonsoft.Json.Linq.JObject.Parse(json);
+            return jo.Value<bool?>("success") == true
+                && ((jo.Value<int?>("consolidated") ?? 0) > 0 || (jo.Value<int?>("rekeyed") ?? 0) > 0);
+        }
+        catch (System.Exception)
+        {
+            return false;
+        }
+    }
+
+    [System.Serializable]
+    private class BodyShape
+    {
+        public string appUserId;
+        public string originalAppUserId;
+    }
+}

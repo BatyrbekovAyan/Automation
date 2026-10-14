@@ -272,6 +272,10 @@ public partial class Manager : MonoBehaviour
     {
         yield return Secrets.Preload();
 
+        // A3 identity-heal: subscribed BEFORE Initialize, so the first CustomerInfo — the one that reveals a reinstall's
+        // merge — cannot slip past it. A static event: unsubscribed in OnDestroy.
+        BillingService.OnEntitlementChanged += OnEntitlementChangedHealIdentity;
+
         try
         {
             BillingService.Initialize();
@@ -386,6 +390,63 @@ public partial class Manager : MonoBehaviour
 
         _launchExpiryPaywallShown = true;
         EntitlementGate.RequestPaywall(PaywallTrigger.TrialExpired);
+    }
+
+    // ── A3 identity-heal after a reinstall («защита платящих», spec §3 A3) ──
+    //
+    // A reinstall gets a new anonymous RevenueCat id; RevenueCat merges it with the old one, but the server's subscription
+    // mirror stays under the old id until RevenueCat's next event (up to a month of trial limits; the lifecycle sweep
+    // deletes the bots created after the reinstall). When CustomerInfo reveals the merge, the server is asked to heal — it
+    // asks RevenueCat for the aliases itself and consolidates them INTO the token's billing id. Once per (original,
+    // current) pair per launch: an instance field, like _launchExpiryPaywallShown.
+    private string _identityHealLastPair;
+
+    /// <summary>
+    /// Runs inside <see cref="BillingService.OnEntitlementChanged"/>'s multicast (RevenueCat's CustomerInfo callback), so it
+    /// must never throw — an escaping exception would starve the handlers after it.
+    /// </summary>
+    private void OnEntitlementChangedHealIdentity(PlanTier _)
+    {
+        try
+        {
+            string current = BillingIdentity.AppUserId;
+            string original = BillingService.OriginalAppUserId;
+            bool conflict = AuthClient.Existing != null && AuthClient.Existing.BillingConflict;
+            if (!IdentityHealTrigger.ShouldCall(current, original, conflict, _identityHealLastPair)) return;
+            _identityHealLastPair = IdentityHealTrigger.PairOf(current, original);
+            StartCoroutine(VerifyIdentityRoutine(current, original));
+        }
+        catch (Exception e)
+        {
+            Debug.LogError($"[Manager] identity-heal trigger threw — continuing: {e}");
+        }
+    }
+
+    /// <summary>
+    /// POST /webhook/VerifyIdentity through <see cref="AuthorizedRequest"/>. Skipped when the token carries no billing
+    /// identity (billingConflict — another install holds the id): there is no id to heal INTO and the gate would refuse.
+    /// A heal that moved something leaves the usage snapshot stale, so it is re-read.
+    /// </summary>
+    private IEnumerator VerifyIdentityRoutine(string appUserId, string originalAppUserId)
+    {
+        var auth = AuthClient.Instance;
+        if (auth != null) yield return auth.EnsureSession();
+        if (auth != null && auth.BillingConflict) yield break;
+
+        UnityWebRequest www = null;
+        yield return AuthorizedRequest.Send(
+            () => AuthorizedRequest.JsonPost($"{n8nBaseUrl}{VerifyIdentityRequest.Path}", VerifyIdentityRequest.ComposeBody(appUserId, originalAppUserId), 30),
+            r => www = r);
+        using var wwwScope = www;
+
+        if (www.result != UnityWebRequest.Result.Success)
+        {
+            Debug.LogWarning($"[VerifyIdentity] [{www.responseCode}] {www.url}: {www.error} {www.downloadHandler?.text}");
+            yield break;
+        }
+        if (!VerifyIdentityRequest.HealedSomething(www.downloadHandler?.text)) yield break;
+        Debug.Log($"[VerifyIdentity] healed: {www.downloadHandler.text}");
+        StartCoroutine(UsageClient.FetchRoutine());
     }
 
     public void Start()
@@ -740,6 +801,7 @@ public partial class Manager : MonoBehaviour
         // waiting for the first CustomerInfo would otherwise leave a delegate pointing at a dead
         // MonoBehaviour (Task 15a). Unsubscribing an unsubscribed handler is a no-op.
         BillingService.OnEntitlementChanged -= OnFirstEntitlementResolved;
+        BillingService.OnEntitlementChanged -= OnEntitlementChangedHealIdentity;
     }
 
     // Coroutines are dead on the quit path, so this blocks the main thread
