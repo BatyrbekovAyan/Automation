@@ -303,6 +303,7 @@ public class FontGlyphCoverageTests
             typeof(BotDeletionCopy),    // V12 refused / failed bot deletion (2026-10-07)
             typeof(ProfileRetirementCopy), // M4 retired-channel subline of the bot card (2026-10-09)
             typeof(RetiredChannelCopy),    // F2 reconnect screens: banner, row hint, «Подключить», sheet, server wait (2026-10-11)
+            typeof(AutoReadinessCopy),     // learning B: capsule «Учится · N/20» + sheet «Бот ещё учится» (2026-10-14)
         };
         foreach (var t in constTypes)
             foreach (var f in t.GetFields(BindingFlags.Public | BindingFlags.Static))
@@ -374,6 +375,10 @@ public class FontGlyphCoverageTests
         // The sheet row's authored half (the bot's own name stands in as placeholder text the app does not control).
         yield return ("RetiredChannelCopy.SheetRow(wa)", RetiredChannelCopy.SheetRow("Бот", ChatChannel.WhatsApp));
         yield return ("RetiredChannelCopy.SheetRow(tg)", RetiredChannelCopy.SheetRow("Бот", ChatChannel.Telegram));
+        // learning B: the soft-lock sheet body mid-way and the capsule's learning face (2026-10-14)
+        yield return ("AutoReadinessCopy.SheetBody(bot)", AutoReadinessCopy.SheetBody(7, perChat: false));
+        yield return ("AutoReadinessCopy.SheetBody(chat)", AutoReadinessCopy.SheetBody(7, perChat: true));
+        yield return ("AutoReadinessCopy.PillText", AutoReadinessCopy.PillText(7));
 
         foreach (OutcomeStatus s in Enum.GetValues(typeof(OutcomeStatus)))
             yield return ($"DashboardStatusInfo.Label({s})", DashboardStatusInfo.Label(s));

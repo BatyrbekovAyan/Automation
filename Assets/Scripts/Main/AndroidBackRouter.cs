@@ -122,6 +122,7 @@ public class AndroidBackRouter : MonoBehaviour
                 () => ReactionBarController.Instance != null && ReactionBarController.Instance.IsShowing,
                 () => ReactionBarController.Instance.Hide()),
             new BackTarget("bot-activation-confirm", () => BotActivationConfirm.IsShowing, BotActivationConfirm.Cancel),
+            new BackTarget("auto-lock-sheet", () => AutoLockSheet.IsShowing, AutoLockSheet.Dismiss),   // learning B: Back = «Понятно»
             new BackTarget("billing-gate-sheet", () => BillingGateSheet.IsOpen, BillingGateSheet.Dismiss),
             new BackTarget("reconnect-bots-sheet", () => ReconnectBotsSheet.IsOpen, ReconnectBotsSheet.Dismiss),   // F2 (T9): Back = «Позже»
             new BackTarget("bot-test-sheet", () => BotTestSheet.IsShowing, BotTestSheet.Hide),

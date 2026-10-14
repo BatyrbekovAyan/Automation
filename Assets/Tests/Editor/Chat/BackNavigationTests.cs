@@ -97,4 +97,22 @@ public class BackNavigationTests
         string sheetSrc = File.ReadAllText(Path.Combine(Application.dataPath, "Scripts/Main/ReconnectBotsSheet.cs"));
         StringAssert.Contains("PopupUI.WireFingerUp(button, Dismiss)", sheetSrc, "«Позже» is Dismiss — the action Back repeats");
     }
+
+    /// <summary>
+    /// Learning B: the «Бот ещё учится» sheet (a runtime overlay, sortingOrder 3) joins the router in its z-order — above the
+    /// scene popups and the paywall — and Back does what its own «Понятно» does: <c>AutoLockSheet.Dismiss</c>, which closes
+    /// the sheet and enables nothing. Source guard; the dismiss behaviour itself is pinned on the real sheet by AutoLockSheetTests.
+    /// </summary>
+    [Test]
+    public void TheAutoLockSheet_IsOnTheRouter_AndBackIsUnderstood()
+    {
+        string router = File.ReadAllText(Path.Combine(Application.dataPath, "Scripts/Main/AndroidBackRouter.cs"));
+        const string entry = "new BackTarget(\"auto-lock-sheet\", () => AutoLockSheet.IsShowing, AutoLockSheet.Dismiss)";
+        int sheet = router.IndexOf(entry, System.StringComparison.Ordinal);
+        Assert.GreaterOrEqual(sheet, 0, "the learning sheet must be a Back target, closed by its own «Понятно» action");
+        foreach (string below in new[] { "new BackTarget(\"popup\"", "new BackTarget(\"paywall\"", "new BackTarget(\"bot-settings\"" })
+            Assert.Less(sheet, router.IndexOf(below, System.StringComparison.Ordinal), $"the overlay sheet sits above {below}");
+        Assert.Greater(sheet, router.IndexOf("new BackTarget(\"loading\"", System.StringComparison.Ordinal),
+            "a loading cover still swallows Back first");
+    }
 }
