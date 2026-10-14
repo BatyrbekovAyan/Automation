@@ -131,14 +131,31 @@ PINNED = [
          legit=['["new-id"]', '["old-id"]', 'evt-transfer-1'],
          after="select app_user_id, plan, status, topup_balance from subscribers order by 1;",
          expect=['1|1|1|1|1|0|5|evt-transfer-1', 'new-id|business|active|5', 'old-id|business|expired|0']),
-    # A1 (2026-10-14): + the RevenueCat event id, handed on in the final select (text, the eighth value)
+    # A1 (2026-10-14): + the RevenueCat event id, handed on in the final select (text, the eighth value).
+    # A2 (2026-10-14): + plan_after / rekeyed_rows in the final select; the merge also touches bot_profiles (the re-key CTE,
+    # install = SQL NULL here). The event carries a plan ('business'), so the alias's plan is NOT handed over: the
+    # recipient row is created trial/trialing with the moved balance, as before.
     dict(file='ZGYr6srzS3rSSXHp-RevenueCat_Events.json', node='Consolidate Aliases', text=[0, 2, 3, 6, 7], json=[1],
-         setup=UTC + LIKE.format('subscribers') + LIKE.format('dialog_counts') +
+         setup=UTC + LIKE.format('subscribers') + LIKE.format('dialog_counts') + LIKE.format('bot_profiles') +
          """insert into subscribers (app_user_id, plan, status, topup_balance) values ('alias-id', 'start', 'active', 3);""",
          legit=['live-id', '["alias-id"]', 'business', 'active', '2099-02-01T00:00:00Z', 2, 'cr_business_m', 'evt-alias-1'],
          after="select app_user_id, status, topup_balance from subscribers order by 1;",
-         expect=['live-id|business|active|2099-02-01 00:00:00+00|2|cr_business_m|1|1|0|3|evt-alias-1', 'alias-id|expired|0',
-                 'live-id|trialing|3']),
+         expect=['live-id|business|active|2099-02-01 00:00:00+00|2|cr_business_m|1|1|0|3|trial|0|evt-alias-1',
+                 'alias-id|expired|0', 'live-id|trialing|3']),
+    # A2 (2026-10-14): the top-up first after a reinstall — the event carries NO plan (the third value is null), so the active
+    # alias's plan/period/SKU are handed over to the recipient in the same upsert; a live bot_profiles row of an install under the
+    # alias stays put (RevenueCat Events re-keys nothing).
+    dict(file='ZGYr6srzS3rSSXHp-RevenueCat_Events.json', node='Consolidate Aliases', text=[0, 2, 3, 6, 7], json=[1],
+         setup=UTC + LIKE.format('subscribers') + LIKE.format('dialog_counts') + LIKE.format('bot_profiles') +
+         """insert into subscribers (app_user_id, plan, status, topup_balance, current_period_end, product_id)
+              values ('alias-id', 'business', 'active', 500, '2099-03-01T00:00:00Z', 'sub.business.month');
+            insert into bot_profiles (profile_id, app_user_id, channel, owner_id) values ('wa-1', 'alias-id', 'whatsapp', 'inst-A');""",
+         legit=['live-id', '["alias-id"]', None, None, None, 500, None, 'evt-topup-1'],
+         after="select app_user_id, plan, status, topup_balance, current_period_end, product_id from subscribers where app_user_id = 'live-id';"
+               "\nselect app_user_id, status, topup_balance, current_period_end <= now() from subscribers where app_user_id = 'alias-id';"
+               "\nselect profile_id, app_user_id from bot_profiles;",
+         expect=['live-id||||500||1|1|0|500|business|0|evt-topup-1',
+                 'live-id|business|active|500|2099-03-01 00:00:00+00|sub.business.month', 'alias-id|expired|0|t', 'wa-1|alias-id']),
 ]
 
 

@@ -1791,6 +1791,53 @@ def s_rc_replay(ctx):
         pg(f"delete from rc_event_ledger where event_id in ('{ids[0]}', '{ids[1]}');")
 
 
+@scenario("rc_topup_first_carries_alias_plan", "A2: a reinstall's FIRST RevenueCat event is a top-up (NON_RENEWING_PURCHASE carries no plan) delivered under the new id, the old id an alias holding an active business subscription with 500 dialogs: through the DERIVED RevenueCat Events graph the new identity (Create's trial/trialing seed) becomes business/active with the alias's period and SKU and 500 + 500, the alias is retired (expired, 0); RevenueCat never re-keys a bot (the alias's live bot_profiles row of this very install stays put); the same alias set once more PAST the gate rewrites nothing")
+def s_rc_topup_first(ctx):
+    o = Owner("a2t", ctx["run_id"])                                   # trial/trialing, no period (cleaned up with the owner)
+    old = rc_fixture_id(ctx["run_id"], "a2old")                       # the same owner before the reinstall
+    eid = f"e2e-a2t-{ctx['run_id']}-{uuid.uuid4().hex[:8]}"
+    pid = f"e2e-a2t-{uuid.uuid4().hex[:12]}"
+    body = {"api_version": "1.0", "event": {"id": eid, "type": "NON_RENEWING_PURCHASE", "app_user_id": o.app_user_id,
+                                            "original_app_user_id": old, "aliases": [o.app_user_id, old],
+                                            "product_id": "topup.dialogs.500", "store": "APP_STORE", "environment": "SANDBOX",
+                                            "event_timestamp_ms": int(time.time() * 1000)}}
+    row = lambda uid: pg(f"select plan || '|' || status || '|' || topup_balance || '|' || coalesce(current_period_end::text, '-') "
+                         f"|| '|' || coalesce(product_id, '-') from subscribers where app_user_id = '{uid}';")
+    vers = lambda: pg(f"select string_agg(app_user_id || ':' || xmin::text, ',' order by app_user_id) from subscribers "
+                      f"where app_user_id in ('{o.app_user_id}', '{old}');")
+
+    def merged(ex):                                                    # what Consolidate Aliases handed on
+        runs = ((ex or {}).get("data") or {}).get("resultData", {}).get("runData", {}).get("Consolidate Aliases") or [{}]
+        return (((runs[0].get("data") or {}).get("main") or [[{}]])[0] or [{}])[0].get("json", {})
+    try:
+        pg(f"insert into subscribers (app_user_id, plan, status, topup_balance, current_period_end, product_id) values "
+           f"('{old}', 'business', 'active', 500, now() + interval '30 days', 'sub.business.month'); "
+           f"insert into bot_profiles (profile_id, app_user_id, channel, owner_id) values ('{pid}', '{old}', 'whatsapp', '{o.install_id}');")
+        period, before = pg(f"select current_period_end::text from subscribers where app_user_id = '{old}';"), row(o.app_user_id)
+        res = rc_deliver(ctx["run_id"], [body])
+        after, alias_after, versions_after = row(o.app_user_id), row(old), vers()
+        bot = pg(f"select app_user_id from bot_profiles where profile_id = '{pid}';")
+        res += rc_deliver(ctx["run_id"], [body], gate=False)          # the same alias set again, past the gate
+        again, versions_again = row(o.app_user_id), vers()
+        ran = [ran_nodes(ex) for _, _, ex in res]
+        m = merged(res[0][2])
+        ok = ([st for st, _, _ in res] == [200, 200] and all((b or {}).get("success") is True for _, b, _ in res)
+              and before == "trial|trialing|0|-|-" and after == f"business|active|1000|{period}|sub.business.month"
+              and alias_after.split("|")[1:3] == ["expired", "0"] and bot == old
+              # count(*) is a bigint: n8n's pg driver hands it on as the STRING '0'
+              and m.get("plan_after") == "business" and m.get("balance_after") == 500 and str(m.get("rekeyed_rows")) == "0"
+              and {"Dedup Gate", "Map Event", "Consolidate Aliases", "Upsert Subscriber"} <= ran[0]
+              and {"Consolidate Aliases", "Upsert Subscriber"} <= ran[1] and "Dedup Gate" not in ran[1]
+              and again == after and versions_again == versions_after)
+        return ok, (f"answers={[(st, b) for st, b, _ in res]} owner {before} → {after} (alias period {period}) → past the gate "
+                    f"{again}; alias → {alias_after}; bot_profiles row stays on {'the alias' if bot == old else bot!r}; "
+                    f"Consolidate handed on plan_after={m.get('plan_after')!r} balance_after={m.get('balance_after')!r} "
+                    f"rekeyed_rows={m.get('rekeyed_rows')!r}; row versions unchanged by the replay={versions_again == versions_after}")
+    finally:
+        pg(f"delete from bot_profiles where profile_id = '{pid}'; delete from subscribers where app_user_id = '{old}'; "
+           f"delete from dialog_counts where app_user_id = '{old}'; delete from rc_event_ledger where event_id = '{eid}';")
+
+
 @scenario("billing_conflict_is_logged", "V3 (T1): a refresh that answers billingConflict (a second install naming a billing id another install holds) writes ONE billing_conflicts row — claimant, the CURRENT holder, attempts — a repeat bumps attempts, a refresh without a conflict writes nothing, the answer itself is unchanged; once support revokes the holder the id moves on the claimant's next refresh")
 def s_billing_conflict_log(ctx):
     a = fresh_owner(ctx, "v3j")

@@ -9,11 +9,26 @@
                            RC_CONSOLIDATE; Task A3's identity-heal renders the same CTE chain with its own parameters.
   TRANSFER_SQL             the cross-account TRANSFER (RevenueCat Events' `Transfer Subscriber`).
 
+A2 changed the alias merge in two ways (the TRANSFER is unchanged — Task 16/17 of Block 1):
+
+  (1) the PLAN follows an active alias when nothing else would set it. A reinstall's first event can be a top-up
+      (NON_RENEWING_PURCHASE carries no plan): the balance moved and the alias was retired, but the new identity stayed
+      trial/trialing until the next renewal — up to a month of trial limits, and the lifecycle sweep deleting the bots
+      created after the reinstall. Now `plan_source` takes the ACTIVE alias row of a PAID tier (start/business/network —
+      never `none`, whose base quota is 0) with the latest period (Transfer's `src` order) when the event carries no plan, and `credited` hands it over in its ONE upsert (a row cannot be changed by two
+      CTEs of one statement) — only to a recipient that is trialing without a period (a fresh install's seed: nothing is
+      ever downgraded), and creates a missing recipient row even at a zero balance so the plan is not lost with the alias.
+      A settled alias set (it rides every event for the life of the account) still writes no row version: the update runs
+      only when there is money or a plan to hand over.
+  (2) REKEY_CTE — the recipient takes over the live bot_profiles rows of the named install (spec §1: the row's
+      app_user_id follows the owning install's billing id). RevenueCat Events renders install = SQL NULL — its webhook has
+      no install, so nothing is ever re-keyed there; Task A3's identity-heal passes the token's install.
+
 apply-billing-consolidation.py writes both texts into the canonical RevenueCat Events JSON — it owns ONLY the two
 `query` fields; Map Event, the queryReplacement arrays and the wiring stay hand-authored. verify-billing-consolidation.py
-pins node text == module text. Every statement names its parameters in words (V1: no dollar + digit inside a comment or a
-literal); the CTE chain takes its recipient / alias-list expressions as tokens, so a caller with another parameter order
-renders the same chain.
+pins node text == module text and the shape the behaviour rests on. Every statement names its parameters in words (V1: no
+dollar + digit inside a comment or a literal); the CTE chain takes its expressions as tokens, so a caller with another
+parameter order renders the same chain. Behaviour: tests/test_billing_consolidation.py (real SQL on the staging Postgres).
 
     python3 Tools/n8n/billing_consolidation.py --print consolidate|transfer    # the RevenueCat Events texts
 """
@@ -21,8 +36,33 @@ import re
 import sys
 
 # ------------------------------------------------------------------------------------------------- the alias merge
-# The CTE chain (alias_ids → locked → credited → retired → carried). Tokens: <TO> = the recipient app user id (text),
-# <ALIASES> = the JSON array (text) of the alias ids, the recipient already excluded by the caller.
+# The CTE chain (alias_ids → locked → plan_source → credited → retired → carried → rekeyed). Tokens: <TO> = the recipient
+# app user id (text); <ALIASES> = the JSON array (text) of the alias ids, the recipient already excluded by the caller;
+# <EVENT_PLAN> = the plan the event itself carries (text, NULL = none: the alias's plan may be handed over); <INSTALL> = the
+# install whose live bot_profiles rows follow the recipient (text, NULL = re-key nothing).
+
+# The recipient row may take the alias's plan: it is still a fresh install's seed (trialing, no period) and there IS a plan
+# to hand over. Evaluated on the conflicting row under its lock (`subscribers.` in ON CONFLICT DO UPDATE), never on a snapshot.
+TAKE = ("subscribers.status = 'trialing' and subscribers.current_period_end is null\n"
+        "                     and exists (select 1 from plan_source)")
+
+
+def REKEY_CTE(to, install, from_ids="alias_ids"):
+    """The body of the re-key CTE: the live bot_profiles rows of `install` that name one of `from_ids` (a CTE of
+    app_user_id values) move to the recipient `to`. `install` NULL matches no row (`owner_id = NULL` is never true)."""
+    return f"""  -- A2 (спека §1): app_user_id строки bot_profiles следует за биллинг-ID владеющей установки — иначе
+  -- консолидация гасит старый ID, а боты, заново привязанные к нему, замолкают. ТОЛЬКО живые строки ТОЙ установки,
+  -- которую назвал вызывающий; без установки (вебхук RevenueCat её не знает) сравнение с NULL ложно для каждой
+  -- строки — не перепривязывается ничего. Строки, уже записанные на получателя, не переписываются.
+  update bot_profiles b set app_user_id = {to}
+  where b.app_user_id in (select app_user_id from {from_ids})
+    and b.app_user_id <> {to}
+    and b.owner_id = {install}
+    and b.deleted_at is null
+  returning b.profile_id
+"""
+
+
 CONSOLIDATE_BODY = """with alias_ids as (
   select distinct value as app_user_id from jsonb_array_elements_text(<ALIASES>::jsonb) as t(value)
 ), locked as (
@@ -33,19 +73,41 @@ CONSOLIDATE_BODY = """with alias_ids as (
   where app_user_id in (select app_user_id from alias_ids)
     and app_user_id <> <TO>
   for update
+), plan_source as (
+  -- A2 «защита платящих» (2026-10-14): снимок плана, который может переехать к получателю. Та же «самая живая»
+  -- строка-алиас, что src в Transfer Subscriber (позднейший период, затем свежайшая запись), но ТОЛЬКО оплаченная:
+  -- status = 'active' (expired/grace/trialing — не подписка) и план из платных (none — неизвестное право с базовой
+  -- квотой 0 против 150 у триала: получатель потерял бы ответы), и ТОЛЬКО когда событие само плана не несёт (план
+  -- события пуст: топ-ап NON_RENEWING_PURCHASE, EXPIRATION, BILLING_ISSUE …). Событие с планом кладёт свой,
+  -- авторитетный, следом в Upsert Subscriber. Читается из locked — из версии под блокировкой: вторая из гонки
+  -- доставок видит уже погашенную строку и не переносит ничего.
+  select plan, status, current_period_end, product_id
+  from locked
+  where status = 'active' and plan in ('start', 'business', 'network') and <EVENT_PLAN> is null
+  order by current_period_end desc nulls last, updated_at desc nulls last
+  limit 1
 ), credited as (
-  -- Пишем ТОЛЬКО когда есть что переносить: settled-набор алиасов (а он приезжает на каждом
-  -- событии до конца жизни аккаунта) не должен плодить версии строк. Если строки получателя
-  -- ещё нет — создаём её с trial/trialing по умолчанию, а идущий следом Upsert Subscriber
-  -- положит поверх настоящие план/статус, не трогая баланс.
-  insert into subscribers (app_user_id, plan, status, topup_balance, updated_at)
-  select <TO>, 'trial', 'trialing', x.total, now()
+  -- Баланс алиасов (сумма под блокировкой; переезжает только положительная, как и раньше) — получателю всегда;
+  -- снимок plan_source — в ТОМ ЖЕ upsert'е (одну строку нельзя менять из двух CTE одного statement'а) и ТОЛЬКО
+  -- получателю, который ещё trialing без периода (свежая установка): ничего не понижает, получатель со своим планом,
+  -- периодом или статусом снимок не берёт, а деньги всё равно переезжают. Строки получателя ещё нет — создаём её
+  -- (план алиаса, если он есть, иначе trial/trialing) даже при нулевом балансе: иначе план, который ниже гасится
+  -- вместе с алиасом, пропал бы. Обновление идёт, ТОЛЬКО когда есть деньги или снимок: settled-набор алиасов (он
+  -- приезжает на каждом событии до конца жизни аккаунта) не плодит версии строк.
+  insert into subscribers (app_user_id, plan, status, current_period_end, product_id, topup_balance, trial_started_at, updated_at)
+  select <TO>, coalesce(s.plan, 'trial'), coalesce(s.status, 'trialing'), s.current_period_end, s.product_id,
+         greatest(x.total, 0), now(), now()
   from (select coalesce(sum(topup_balance), 0) as total from locked) x
-  where x.total > 0
+  left join plan_source s on true
   on conflict (app_user_id) do update set
     topup_balance = subscribers.topup_balance + excluded.topup_balance,
+    plan = case when <TAKE> then excluded.plan else subscribers.plan end,
+    status = case when <TAKE> then excluded.status else subscribers.status end,
+    current_period_end = case when <TAKE> then excluded.current_period_end else subscribers.current_period_end end,
+    product_id = case when <TAKE> then excluded.product_id else subscribers.product_id end,
     updated_at = now()
-  returning app_user_id, topup_balance
+  where excluded.topup_balance > 0 or (<TAKE>)
+  returning app_user_id, plan, topup_balance
 ), retired as (
   update subscribers s set
     status = 'expired',   -- гасит автоответы старой личности через существующий квота-гейт
@@ -80,6 +142,8 @@ CONSOLIDATE_BODY = """with alias_ids as (
   on conflict (app_user_id, chat_id, d) do nothing
   returning 1
 )
+, rekeyed as (
+<REKEY>)
 """
 
 # RevenueCat Events: the comment head (its parameter order) and the final select that hands the event's payload on to
@@ -92,9 +156,12 @@ RC_CONSOLIDATE_HEAD = """-- СКЛЕЙКА ИДЕНТИЧНОСТЕЙ (Task 16, 
 -- Upsert Subscriber, A1), который эта нода ОБЯЗАНА пронести дальше: Postgres-нода отдаёт
 -- только результат запроса и роняет входной json (та же ловушка, что у Count Dialog в Task 9).
 --
--- ТОЛЬКО перенос баланса и гашение — НИКАКОГО копирования снимка. Событие, которое едет следом
--- в Upsert Subscriber, уже несёт авторитетные план/статус/период; копировать сюда снимок строки-
--- алиаса значило бы поставить риск понижения на путь, который срабатывает ВЕЧНО, на каждом событии.
+-- Перенос баланса и гашение — на каждом событии. Снимок плана строки-алиаса (A2, CTE plan_source) — ТОЛЬКО из
+-- АКТИВНОЙ строки платного плана, ТОЛЬКО когда событие само плана не несёт (третий параметр пуст: топ-ап первым событием после
+-- переустановки, EXPIRATION, BILLING_ISSUE …) и ТОЛЬКО получателю-trialing без периода. Событие с планом едет следом в Upsert Subscriber и кладёт
+-- свои авторитетные план/статус/период; получатель со своим планом или периодом не трогается — риска понижения на
+-- пути, который срабатывает ВЕЧНО, на каждом событии, по-прежнему нет. Перепривязки bot_profiles (CTE rekeyed)
+-- здесь нет по построению: у вебхука RevenueCat нет установки, вместо неё — NULL.
 --
 -- И порядок: эта нода стоит ДО Upsert Subscriber. `topup_balance + <топ-ап события>` в апсерте НЕ идемпотентен
 -- к ретраю, поэтому падение ПОСЛЕ него -> RC передоставляет -> топ-ап самого события начислится
@@ -107,9 +174,20 @@ RC_CONSOLIDATE_RESULT = """select $1::text as app_user_id, $3::text as plan, $4:
        (select count(*) from retired) as retired_rows,
        (select count(*) from carried) as carried_rows,
        (select topup_balance from credited) as balance_after,
+       (select plan from credited) as plan_after,
+       (select count(*) from rekeyed) as rekeyed_rows,
        $8::text as event_id;"""
-RC_CONSOLIDATE = {"head": RC_CONSOLIDATE_HEAD, "to": "$1", "aliases": "$2", "result": RC_CONSOLIDATE_RESULT}
-PARAM_KEYS = ("head", "to", "aliases", "result")
+# install = SQL NULL: the RevenueCat webhook has no install — RevenueCat Events can never re-key a bot (by construction:
+# no parameter feeds it).
+RC_CONSOLIDATE = {"head": RC_CONSOLIDATE_HEAD, "to": "$1", "aliases": "$2", "event_plan": "$3::text", "install": "null::text",
+                  "result": RC_CONSOLIDATE_RESULT}
+PARAM_KEYS = ("head", "to", "aliases", "event_plan", "install", "result")
+# The hand-authored queryReplacement arrays (NOT written by the generator — Map Event and these arrays stay hand-authored) that
+# the RevenueCat renderings' parameter order is written for: the app user id, the alias list, then the event's payload
+# (plan, status, period, top-up, SKU) and its id; TRANSFER: the two id arrays and the event id. verify-billing-consolidation.py
+# pins them, so the generated SQL and its parameters cannot drift apart.
+RC_CONSOLIDATE_REPLACEMENT = "={{ [$json.app_user_id, $json.alias_ids, ($json.plan ?? null), ($json.status ?? null), ($json.period_end ?? null), $json.topup_delta, ($json.product_id ?? null), ($json.event_id ?? null)] }}"
+RC_TRANSFER_REPLACEMENT = "={{ [$json.to_ids, $json.from_ids, ($json.event_id ?? null)] }}"
 
 
 def _render(text, **tokens):
@@ -122,10 +200,13 @@ def _render(text, **tokens):
 
 
 def CONSOLIDATE_SQL(params):
-    """The whole alias-merge statement: params = {head, to, aliases, result} (RC_CONSOLIDATE for RevenueCat Events)."""
+    """The whole alias-merge statement: params = {head, to, aliases, event_plan, install, result} (RC_CONSOLIDATE for
+    RevenueCat Events) — head + the CTE chain + the caller's final select."""
     missing = [k for k in PARAM_KEYS if k not in params]
     assert not missing, f"CONSOLIDATE_SQL: missing params {missing}"
-    return params["head"] + _render(CONSOLIDATE_BODY, TO=params["to"], ALIASES=params["aliases"]) + params["result"]
+    body = CONSOLIDATE_BODY.replace("<REKEY>", REKEY_CTE("<TO>", "<INSTALL>")).replace("<TAKE>", TAKE)
+    return params["head"] + _render(body, TO=params["to"], ALIASES=params["aliases"], EVENT_PLAN=params["event_plan"],
+                                    INSTALL=params["install"]) + params["result"]
 
 
 # ------------------------------------------------------------------------------------------------- the TRANSFER
