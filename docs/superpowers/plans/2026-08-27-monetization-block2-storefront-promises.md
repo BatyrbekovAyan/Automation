@@ -1,5 +1,9 @@
 # Блок 2 «обещания витрины» — Implementation Plan
 
+> **SUPERSEDED 2026-10-14.** Причина блока исчезла 2026-09-01 (`3752d237` вырезал несделанные обещания из
+> пейволла); план устарел по процессу (A1-гейты, staging, генераторы). Не исполнять. Замена:
+> `docs/superpowers/specs/2026-10-14-paying-users-protection-and-schedule-design.md`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Закрыть все строки пейволла «Во всех тарифах» (алерты, недельный отчёт, Сводка «Всё время» + CSV, расписание, голосовые в «Вместе») и пять технических хвостов Блока 1 — по спеке `docs/superpowers/specs/2026-08-27-monetization-block2-storefront-promises-design.md`.
