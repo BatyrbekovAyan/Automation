@@ -379,3 +379,11 @@ Delete Bot Files, Profile Lifecycle Sweep) через `deploy-canonical.py --onl
 Сайт выложен 2026-10-14 07:29Z по «сайт — да» владельца: `tools/deploy.sh --go` (бэкап site.bak-20261014-122912 + Caddyfile.bak-20261014-122912,
 rsync без --delete, Caddy validate + reload, smoke 200 на /, /privacy.html, /terms.html; review-видео и healthz как до); вместе уехал
 коммит 2839245c (esbuild-сжатие ассетов); живой privacy.html несёт «срок хранения — до 180 дней». Push main — fast-forward.
+
+## Learning B «Теневой счёт и замок «Авто»» — реализовано, ждёт go на деплой (2026-10-14; коммиты b00ee499…HEAD)
+Get Usage отдаёт readiness по ботам (окно 20, ≥10 совпадений, ≥3 чата, ≥2 дня; legacy → []); клиент: AutoReadinessPolicy/Store
+(заперто ТОЛЬКО по вердикту сервера), AutoLockGate на четырёх точках включения «Авто», лист «Бот ещё учится» («Понятно» /
+«Включить всё равно», Back = «Понятно»), капсула «Учится · N/20» (190 → 291u для «17/20»). Стенд (канон пересобран): e2e-learning 11/11
+(readiness_in_get_usage падал на пре-B каноне — nine=None), e2e-auth hooks_reject_foreign_ids + billing_id_first_bind без регрессий;
+Unity EditMode 3037/3037; n8n test_learning_b 8/8, run_all 33 файлов OK; verify-learning-b / verify-sql-comments / verify-auth-gate OK.
+Деплой: один workflow (Get Usage, `deploy-canonical.py --only jtbssfzXbOxwTK4k`) по «go»; миграций нет; клиент — в сборке вместе с A.

@@ -60,8 +60,8 @@ def scenario(id_, title):
     return deco
 
 
-def send(owner, pid, extra=None):
-    body = {"op": "message.send", "channel": "whatsapp", "profile_id": pid, "recipient": "77010001234", "body": "Здравствуйте! Есть в наличии."}
+def send(owner, pid, extra=None, recipient="77010001234"):
+    body = {"op": "message.send", "channel": "whatsapp", "profile_id": pid, "recipient": recipient, "body": "Здравствуйте! Есть в наличии."}
     body.update(extra or {})
     return e2e_auth.proxy(owner.token, body)
 
@@ -194,6 +194,35 @@ def delete_clears(ctx):
     n1 = psql(f"select count(*) from suggestion_sets where profile_id = '{pid}';")
     ok = n0 == "1" and st == 200 and (d or {}).get("success") is True and (d or {}).get("deletedSuggestionSets") == 1 and n1 == "0"
     return ok, f"sets before/after = {n0}/{n1}, delete http={st} body={d}"
+
+
+@scenario("readiness_in_get_usage", "B: 10 owner sends with a shown set, card #1 matched, over 3 personal chats on 2 days → Get Usage readiness ready=true for the bot; at 9 it is false; a group send never counts")
+def readiness_in_get_usage(ctx):
+    owner, pid = owner_and_profile(ctx)
+    psql(f"update bot_profiles set bot_key = 'Bot0' where profile_id = '{pid}';")   # a real bot gets it from Create's Register Profile
+
+    def bot0():
+        st, d = e2e_auth.hook("GetUsage", owner.token, {"appUserId": owner.app_user_id})
+        rows = d.get("readiness") if isinstance(d, dict) else None
+        return st, next((r for r in rows or [] if r.get("botKey") == "Bot0"), None)
+
+    chats = ["77010001001", "77010001002", "77010001003"]
+    for i in range(9):
+        send(owner, pid, dict(ORIGIN, origin_top1=1), recipient=chats[i % 3])
+    time.sleep(2)                                           # Record Owner Send runs after the proxy's Respond
+    psql(f"update chat_history_events set created_at = created_at - interval '1 day' where profile_id = '{pid}' and chat_id like '77010001001%';")
+    st1, nine = bot0()
+    send(owner, pid, dict(ORIGIN, origin_top1=1), recipient="120363000000@g.us")   # a group: excluded from the window
+    time.sleep(2)
+    st2, after_group = bot0()
+    send(owner, pid, dict(ORIGIN, origin_top1=1), recipient=chats[1])
+    time.sleep(2)
+    st3, ten = bot0()
+    ok = (st1 == 200 and nine is not None and nine.get("total") == 9 and nine.get("ready") is False
+          and st2 == 200 and after_group is not None and after_group.get("total") == 9
+          and st3 == 200 and ten is not None and ten.get("total") == 10 and ten.get("matches") == 10
+          and ten.get("chats") == 3 and ten.get("days") == 2 and ten.get("ready") is True)
+    return ok, f"nine={nine} after_group={after_group} ten={ten}"
 
 
 def main():
