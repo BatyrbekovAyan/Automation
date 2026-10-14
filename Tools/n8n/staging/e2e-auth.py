@@ -1305,14 +1305,17 @@ RC_KEEP = ("Dedup Gate", "If Duplicate?", "Map Event", "If Is Transfer?", "Trans
            "Respond Error Transfer", "Respond Error Consolidate")
 
 
-def rc_deliver(run_id, payloads):
+def rc_deliver(run_id, payloads, gate=True):
     """RevenueCat deliveries as RevenueCat sends them, through the DERIVED RevenueCat Events graph (Dedup Gate → … → Upsert
     Subscriber) behind ONE temporary auth-free webhook named «Webhook» — the real gate, mapping and upsert on the staging
-    Postgres, without the header secret. Returns [(status, body, execution)] in order (each delivery after the last ended)."""
+    Postgres, without the header secret. Returns [(status, body, execution)] in order (each delivery after the last ended).
+    gate=False enters at Map Event — a replay that got past the gate (it read before the first delivery committed, or
+    its read failed): only Upsert Subscriber's own ledger check stands between it and a second credit."""
+    keep = RC_KEEP if gate else tuple(n for n in RC_KEEP if n not in ("Dedup Gate", "If Duplicate?"))
     wid, out = None, []
     try:
-        wid, url = probe_workflow(run_id, RC_EVENTS_FILE, RC_KEEP, "Dedup Gate", f"rc{int(time.time())}", response_node=True,
-                                  trigger="Webhook")
+        wid, url = probe_workflow(run_id, RC_EVENTS_FILE, keep, "Dedup Gate" if gate else "Map Event", f"rc{int(time.time())}",
+                                  response_node=True, trigger="Webhook")
         for p in payloads:
             since = newest_execution_id(wid)
             st, body = http("POST", url, p)
@@ -1752,7 +1755,7 @@ def s_line_branch_a(ctx):
     return ok, json.dumps(res, ensure_ascii=False)
 
 
-@scenario("rc_webhook_replay_credits_once", "A1: RevenueCat delivers the SAME top-up event twice (an answer it did not get → its retry) through the DERIVED RevenueCat Events graph behind a temporary webhook: both answered 200, topup_balance +500 exactly ONCE, ONE rc_event_ledger row; the replay ends at If Duplicate? (Map Event and Upsert never run); a second top-up with its own id credits again")
+@scenario("rc_webhook_replay_credits_once", "A1: RevenueCat delivers the SAME top-up event twice (an answer it did not get → its retry) through the DERIVED RevenueCat Events graph behind a temporary webhook: both answered 200, topup_balance +500 exactly ONCE, ONE rc_event_ledger row; the replay ends at If Duplicate? (Map Event and Upsert never run). Fix round: the same id once more PAST the gate (a probe entering at Map Event) reaches Upsert Subscriber and changes nothing (its update is gated on recording the id); a second top-up with its own id credits again")
 def s_rc_replay(ctx):
     o = Owner("rcr", ctx["run_id"])                                   # a trial subscriber row (cleaned up with the owner)
     ids = [f"e2e-rcr-{ctx['run_id']}-{uuid.uuid4().hex[:8]}" for _ in range(2)]
@@ -1768,17 +1771,22 @@ def s_rc_replay(ctx):
         before = bal()
         res = rc_deliver(ctx["run_id"], [topup(ids[0]), topup(ids[0])])
         after_replay, ledger_after_replay = bal(), led()
+        res += rc_deliver(ctx["run_id"], [topup(ids[0])], gate=False)      # the same id PAST the gate
+        after_ungated, ledger_after_ungated = bal(), led()
         res += rc_deliver(ctx["run_id"], [topup(ids[1])])
         after_new, ledger_end = bal(), led()
         ran = [ran_nodes(ex) for _, _, ex in res]
-        ok = ([st for st, _, _ in res] == [200, 200, 200] and all((b or {}).get("success") is True for _, b, _ in res)
+        ok = ([st for st, _, _ in res] == [200, 200, 200, 200] and all((b or {}).get("success") is True for _, b, _ in res)
               and after_replay == before + 500 and ledger_after_replay == ids[0]
               and {"Dedup Gate", "If Duplicate?", "Map Event", "Upsert Subscriber"} <= ran[0]
               and "If Duplicate?" in ran[1] and not ({"Map Event", "Upsert Subscriber"} & ran[1])
+              and "Upsert Subscriber" in ran[2] and "Dedup Gate" not in ran[2]
+              and after_ungated == before + 500 and ledger_after_ungated == ids[0]
               and after_new == before + 1000 and ledger_end == ",".join(sorted(ids)))
-        return ok, (f"answers={[(st, b) for st, b, _ in res]} balance {before} → after same id twice {after_replay} → after a new id "
-                    f"{after_new}; ledger after replay={ledger_after_replay!r} at end={ledger_end!r}; replay ran "
-                    f"{sorted(ran[1])}; first ran Upsert={'Upsert Subscriber' in ran[0]}")
+        return ok, (f"answers={[(st, b) for st, b, _ in res]} balance {before} → after same id twice {after_replay} → same id past "
+                    f"the gate {after_ungated} → after a new id {after_new}; ledger after replay={ledger_after_replay!r} after the "
+                    f"ungated replay={ledger_after_ungated!r} at end={ledger_end!r}; replay ran {sorted(ran[1])}; ungated ran "
+                    f"Upsert={'Upsert Subscriber' in ran[2]}; first ran Upsert={'Upsert Subscriber' in ran[0]}")
     finally:
         pg(f"delete from rc_event_ledger where event_id in ('{ids[0]}', '{ids[1]}');")
 

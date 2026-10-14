@@ -786,7 +786,10 @@ def check_rc_event_ledger():
               → If Duplicate? (a non-empty `event_id` of the gate's ROW — never «the node continued»)
                   TRUE → Respond 200 (nothing changes) · FALSE → Map Event → … (unchanged)
     The id is WRITTEN only by Upsert Subscriber's CTE `ledger`, in the upsert's own statement (= transaction): a row
-    written earlier would turn RevenueCat's retry of a failed upsert into a «duplicate» and lose the event. Map Event
+    written earlier would turn RevenueCat's retry of a failed upsert into a «duplicate» and lose the event. And the
+    upsert's update runs ONLY when that CTE recorded the id (`returning event_id` + `where nullif(<id>,'') is null or
+    exists (select 1 from ledger)`): a replay that got past the gate — read before the first delivery committed, or
+    the read failed (fail-open) — finds the id taken and changes nothing; an event without an id updates as before. Map Event
     reads the payload from the Webhook by name (the gate's output is its row, not the webhook item) and hands
     `event_id` on; Consolidate Aliases / Transfer Subscriber carry it through their final select.
     Each assert is a way this rots silently on a re-export or a hand edit; tests/test_rc_event_ledger.py runs the
@@ -877,6 +880,8 @@ def check_rc_event_ledger():
     assert ledger is not None and re.search(r"\binsert\s+into\s+rc_event_ledger\b", ledger, re.I) and \
         re.search(r"\bon\s+conflict\s+do\s+nothing\b", ledger, re.I), \
         f"{f}: the CTE `ledger` must `insert into rc_event_ledger … on conflict do nothing`: {ledger}"
+    assert re.search(r"\breturning\s+event_id\b", ledger, re.I), \
+        f"{f}: the CTE `ledger` must return the id it recorded (`returning event_id`) — the upsert's update is gated on it"
     n_id = id_param(upsert, "the ledger's id")
     used = set(re.findall(r"\$(\d+)", ledger))
     assert used == {str(n_id)} and re.search(r"\bwhere\s+nullif\s*\(\s*\$%d\b[^)]*\)\s+is\s+not\s+null" % n_id, ledger, re.I), \
@@ -884,6 +889,12 @@ def check_rc_event_ledger():
         f"empty id recorded once would make every later id-less event a «duplicate»: {ledger}"
     assert re.match(r"\s*insert\s+into\s+subscribers\b", code[close + 1:], re.I), \
         f"{f}: the statement under the CTE `ledger` must be the subscribers upsert itself"
+    assert re.search(r"\bon\s+conflict\s*\(\s*app_user_id\s*\)\s*do\s+update\s+set\b.*\bwhere\s+nullif\s*\(\s*\$%d(::text)?\s*,"
+                     r"\s*''\s*\)\s+is\s+null\s+or\s+exists\s*\(\s*select\s+1\s+from\s+ledger\s*\)\s*;?\s*$" % n_id,
+                     code[close + 1:], re.I | re.S), \
+        f"{f}: the upsert's update must end with `where nullif(${n_id}::text, '') is null or exists (select 1 from ledger)` — " \
+        f"without it a replay that got past the gate (read before the first commit, or a failed read) credits again; " \
+        f"without its first half an event with no id never updates an existing subscriber"
     # (7) both paths into Upsert carry the id; Transfer hands it on too (its branch never writes the ledger)
     for name in ("Consolidate Aliases", "Transfer Subscriber"):
         n = rc_node(name)
@@ -897,7 +908,7 @@ def check_rc_event_ledger():
             assert not re.search(r"\b(insert\s+into|update|delete\s+from|merge\s+into|truncate(\s+table)?)\s+rc_event_ledger\b",
                                  sql_code(n["parameters"].get("query", "")), re.I), \
                 f"{f}: {n.get('name')} writes rc_event_ledger — only Upsert Subscriber may, inside its own statement"
-    print(f"OK  {f} (idempotency ledger: read-only fail-open gate, written only inside the upsert statement)")
+    print(f"OK  {f} (idempotency ledger: read-only fail-open gate, written only inside the upsert statement, update gated on it)")
 
 
 REFUSED_DELETE_NODE = "Delete Refused Profile"

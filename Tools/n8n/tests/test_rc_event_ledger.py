@@ -8,7 +8,11 @@ schedule-design.md §2.3, §3 A1). The fix: `Dedup Gate` (Webhook → Dedup Gate
 rc_event_ledger — an id found there is acknowledged by Respond 200 and changes nothing; the id is WRITTEN only by
 Upsert Subscriber's CTE `ledger`, inside the same statement (= transaction) as the event's effect, so a failed upsert
 leaves no row and RevenueCat's retry still processes the event. The read is fail-open: a read error lets the event
-through. An event without an id passes unrecorded; the branches without Upsert (TRANSFER, the no-op) write nothing.
+through. The upsert's UPDATE runs only when its own CTE recorded the id (fix round, `returning event_id` + `where
+nullif(id,'') is null or exists (select 1 from ledger)`): a replay that got past the gate — the gate read before the
+first delivery committed (a concurrent delivery), or its read failed / saw nothing — finds the id taken and changes
+nothing. An event without an id passes unrecorded and updates as before; the branches without Upsert (TRANSFER, the
+no-op) write nothing.
 
 What runs — no n8n server, no network, never production: the REAL graph of the canonical RevenueCat Events JSON,
 walked edge by edge from Webhook to the Respond node it reaches. Code bodies through harness.code; every If through
@@ -20,12 +24,19 @@ Postgres on session temp tables (`like public.X`, autocommit, a real clock). A n
 hands on for its onError setting (regular / error output, the input item for an error thrown outside the query
 runner, or no answer at all). Faults are real Postgres errors, never mocks.
 
+The race (C-cases) runs the REAL Upsert Subscriber statement on TWO real PostgreSQL connections of the staging
+database — the tables live in a uniquely named fixture schema (session temp tables are invisible to another
+connection; dropped afterwards): delivery A holds its transaction open, delivery B of the same id blocks on A's lock,
+A commits, B's update must be skipped. The same race over the pre-fix statement (commit 8a9e2a40) must credit twice —
+the race is real, not a vacuous pass.
+
 The verifier half (verify-telegram-parity.py `check_rc_event_ledger`) is exercised at the end: the canonical set
 passes, and each one-mutation copy of RevenueCat Events (a writing gate, the CTE gone, a disabled node, Map Event
 reading `$json`, …) fails it, naming the file.
 
     python3 Tools/n8n/tests/test_rc_event_ledger.py
 """
+import concurrent.futures
 import contextlib
 import json
 import re
@@ -33,9 +44,11 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
+import uuid
 from pathlib import Path
 
-from harness import N8N, PG, WF, Case, PgSession, code, module, node, report, sql_literal, sql_run, wf
+from harness import N8N, PG, ROOT, WF, Case, PgSession, code, module, node, report, sql_literal, sql_run, wf
 
 RC_FILE = 'ZGYr6srzS3rSSXHp-RevenueCat_Events.json'
 W = wf(RC_FILE)
@@ -327,7 +340,7 @@ with Case('A1 L3: NON_RENEWING_PURCHASE (top-up 500) delivered twice with one id
         c.check([x['event_id'] for x in ledger(pg)] == ['evt-l3', 'evt-l3-next'], f'ledger {ledger(pg)}')
 
 # ---------------------------------------------------------------------------------------------------- L4–L5: boundaries
-with Case('A1 L4: an event WITHOUT an id is processed (the top-up credited) and leaves NO ledger row (nothing to dedup on)') as c:
+with Case('A1 L4: an event WITHOUT an id is processed and leaves NO ledger row (nothing to dedup on) — on a new row AND on an existing one (the update is not gated for it: fail-open on a missing id)') as c:
     with Session(SETUP) as pg:
         r = deliver(pg, topup(None))
         c.check(ok_answer(r) and rows(pg, U) and rows(pg, U)[0]['topup_balance'] == 500, f'{r} / {rows(pg)}')
@@ -372,6 +385,27 @@ with Case('A1 L7: Upsert fails (a real CHECK violation on this subscriber) → 5
         c.check(ok_answer(retry) and ok_answer(dup) and rows(pg, U)[0]['topup_balance'] == 500, f'{retry} / {dup} / {rows(pg)}')
         c.check([x['event_id'] for x in ledger(pg)] == ['evt-l7'] and dup.trail[-2:] == [DUP_IF, 'Respond 200'],
                 f'ledger {ledger(pg)} dup trail {dup.trail}')
+
+EMPTY_READ = ("alter table pg_temp.rc_event_ledger rename to rc_event_ledger_real; "
+              "create temp table rc_event_ledger (like pg_temp.rc_event_ledger_real including all);",
+              "drop table pg_temp.rc_event_ledger; alter table pg_temp.rc_event_ledger_real rename to rc_event_ledger;")
+
+for label, fault, premise in (
+        ('its READ FAILS (a real Postgres error)', UNREADABLE, lambda g: 'does not exist' in str(g.get('message', ''))),
+        ('it reads NOTHING (an empty / stale read: no row, alwaysOutputData hands on {})', EMPTY_READ, lambda g: g == {})):
+    with Case(f'A1 L13 fix round: a replay gets past the gate — {label} — the chain runs to Upsert Subscriber, its ledger '
+              f'insert meets the recorded id, the UPDATE is skipped: no second credit, the row byte-identical, still 200') as c:
+        with Session(SETUP) as pg:
+            pg.x(f"insert into subscribers (app_user_id, plan, status, topup_balance) values ({sql_literal(U)}, 'business', 'active', 40);")
+            first = deliver(pg, topup('evt-l13'))
+            before, led = rows(pg), ledger(pg)
+            r = deliver(pg, topup('evt-l13'), faults={GATE: fault})
+            c.check(premise(r.named.get(GATE, [None])[0] or {}) if r.named.get(GATE) else False,
+                    f'premise: the gate must hand on what the fault simulates: {r.named.get(GATE)}')
+            c.check(ok_answer(first) and before[0]['topup_balance'] == 540, f'first {first} / {before}')
+            c.check('Map Event' in r.trail and 'Upsert Subscriber' in r.trail, f'premise: the replay must reach the upsert: {r.trail}')
+            c.check(ok_answer(r) and rows(pg) == before and ledger(pg) == led, f'{r} / {before} -> {rows(pg)} / {led} -> {ledger(pg)}')
+
 
 # ---------------------------------------------------------------------------------------------------- L8–L9: other paths
 with Case('A1 L8: the ALIAS path (Consolidate Aliases carries the id through its select) — the purchase after a reinstall moves '
@@ -461,6 +495,108 @@ with Case('A1 L12: If Duplicate? keys on a POSITIVE field — only a ledger row 
         c.check(r['ok'] and r['pass'] is want, f'{label}: {r} (expected {want})')
     edges = (W['connections'].get(DUP_IF) or {}).get('main') or []
     c.check([[e['node'] for e in b] for b in edges] == [['Respond 200'], ['Map Event']], f'If Duplicate? edges {edges}')
+
+
+# ---------------------------------------------------------------------------------------------------- C: the race
+PRE_FIX = json.loads(subprocess.run(['git', '-C', str(ROOT), 'show', f'8a9e2a40:Tools/n8n/workflows/{RC_FILE}'],
+                                    capture_output=True, text=True, check=True).stdout)
+
+
+def upsert_sql(w, body):
+    """The Upsert Subscriber statement `w` holds, bound with the values its own queryReplacement gives for the item Map
+    Event (of the canonical graph) makes of `body` — exactly what the node sends for that delivery."""
+    wh = {'body': body, 'headers': {}, 'params': {}, 'query': {}}
+    mapped = code(W, 'Map Event', item={'json': {}}, named={'Webhook': wh}, strict=True)[0]['json']
+    n = node(w, 'Upsert Subscriber')
+    p = engine('params', expr=n['parameters']['options']['queryReplacement'], json=mapped, named={'Webhook': wh})
+    assert p['ok'] and not p['skipped'], p
+    return pg_bind(n['parameters']['query'], p['values'])
+
+
+class RaceFixture:
+    """Three connections (main + two deliveries) on one fixture schema of the staging database; dropped on exit."""
+
+    def __enter__(self):
+        self.schema = 't_a1r_' + uuid.uuid4().hex[:16]
+        self.main, self.a, self.b = PgSession(), PgSession(), PgSession()
+        self.main.x(f'create schema {self.schema}; set search_path = {self.schema};')
+        for t in ('subscribers', 'rc_event_ledger'):
+            self.main.x(f'create table {t} (like public.{t} including all);')
+        for conn in (self.a, self.b):
+            conn.x(f"set search_path = {self.schema}; set statement_timeout = '15s'; set timezone = 'UTC';")
+        return self
+
+    def __exit__(self, *exc):
+        for conn in (self.a, self.b):
+            try:
+                conn.x('rollback;')
+            except Exception:
+                pass
+        try:
+            self.main.x(f'drop schema if exists {self.schema} cascade;')
+        finally:
+            for conn in (self.main, self.a, self.b):
+                conn.close()
+
+
+def race(fx, stmt_a, stmt_b):
+    """Delivery A runs inside an open transaction (its locks held); delivery B runs meanwhile on the second connection.
+    A commits once B waits on a lock (or after ~10 s — never a hang). Returns the wait B was in ('' = it never waited)."""
+    fx.a.x('begin;')
+    fx.a.x(stmt_a)
+    pid = fx.b.q('select pg_backend_pid() as pid')[0]['pid']
+    waited = ''
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+        pending = pool.submit(fx.b.x, stmt_b)
+        try:
+            for _ in range(500):
+                if pending.done():
+                    break
+                st = fx.main.q(f'select wait_event_type, wait_event from pg_stat_activity where pid = {pid}')
+                if st and st[0]['wait_event_type'] == 'Lock':
+                    waited = st[0]['wait_event']
+                    break
+                time.sleep(0.02)
+        finally:
+            fx.a.x('commit;')
+        pending.result(timeout=20)
+    return waited
+
+
+def race_result(w, seed, id_a, id_b):
+    """(balance, ledger ids, rows of U, the wait B was in) after the race of two top-ups through `w`'s Upsert."""
+    with RaceFixture() as fx:
+        if seed is not None:
+            fx.main.x(f"insert into subscribers (app_user_id, plan, status, topup_balance) values ({sql_literal(U)}, 'business', 'active', {seed});")
+        waited = race(fx, upsert_sql(w, topup(id_a)), upsert_sql(w, topup(id_b)))
+        subs = fx.main.q(f'select topup_balance from subscribers where app_user_id = {sql_literal(U)}')
+        led = [r['event_id'] for r in fx.main.q('select event_id from rc_event_ledger order by event_id')]
+        return (subs[0]['topup_balance'] if subs else None), led, len(subs), waited
+
+
+with Case('A1 C1 fix round (the race, an existing subscriber): delivery B of the SAME id blocks on delivery A\'s lock; after '
+          'A commits, B\'s update is skipped — +500 ONCE, one ledger row') as c:
+    bal, led, n, waited = race_result(W, 40, 'evt-c1', 'evt-c1')
+    c.check(waited != '', 'premise: B must have WAITED on A\'s lock (no race happened)')
+    c.check((bal, led, n) == (540, ['evt-c1'], 1), f'balance {bal} ledger {led} rows {n} (expected 540, [evt-c1], 1) — B waited on {waited!r}')
+
+with Case('A1 C2 fix round (the race, NO subscriber row yet): B of the same id blocks on A\'s uncommitted row (the unique '
+          'index); after A commits B takes the conflict path and its update is skipped — 500, one row, one ledger row') as c:
+    bal, led, n, waited = race_result(W, None, 'evt-c2', 'evt-c2')
+    c.check(waited != '', 'premise: B must have WAITED on A\'s lock (no race happened)')
+    c.check((bal, led, n) == (500, ['evt-c2'], 1), f'balance {bal} ledger {led} rows {n} (expected 500, [evt-c2], 1) — B waited on {waited!r}')
+
+with Case('A1 C3 fix round (control): two DIFFERENT events of one subscriber racing — both credited (+1000), both recorded, '
+          'no deadlock — the gate blocks only the same id') as c:
+    bal, led, n, waited = race_result(W, 40, 'evt-c3a', 'evt-c3b')
+    c.check((bal, led, n) == (1040, ['evt-c3a', 'evt-c3b'], 1), f'balance {bal} ledger {led} rows {n} — B waited on {waited!r}')
+
+with Case('A1 C4 fix round (non-vacuous): the SAME race over the pre-fix statement (8a9e2a40 — CTE without the gate) credits '
+          'TWICE, on an existing row and on a new one — exactly what C1/C2 rule out') as c:
+    for seed, want in ((40, 1040), (None, 1000)):
+        bal, led, n, waited = race_result(PRE_FIX, seed, 'evt-c4', 'evt-c4')
+        c.check(waited != '' and (bal, led) == (want, ['evt-c4']),
+                f'seed {seed}: pre-fix balance {bal} ledger {led} waited {waited!r} (expected the double credit {want})')
 
 
 # ---------------------------------------------------------------------------------------------------- V: the verifier
@@ -566,10 +702,26 @@ def m_upsert_param_dropped(w):      # Upsert reads no id: nothing is ever record
     o['queryReplacement'] = o['queryReplacement'].replace(', ($json.event_id ?? null)', '')
 
 
+def m_upsert_gate_removed(w):      # the update no longer depends on this transaction recording the id
+    p = nd(w, 'Upsert Subscriber')['parameters']
+    p['query'] = re.sub(r"\nwhere nullif\(\$7::text, ''\) is null or exists \(select 1 from ledger\);", ';', p['query'])
+
+
+def m_upsert_gate_idless_dropped(w):   # an event with no id would never update an existing subscriber again
+    p = nd(w, 'Upsert Subscriber')['parameters']
+    p['query'] = p['query'].replace("where nullif($7::text, '') is null or exists (select 1 from ledger);",
+                                    "where exists (select 1 from ledger);")
+
+
+def m_ledger_no_returning(w):       # the gate below reads nothing: an invalid statement, every event answers 500
+    p = nd(w, 'Upsert Subscriber')['parameters']
+    p['query'] = p['query'].replace('  on conflict do nothing\n  returning event_id\n)', '  on conflict do nothing\n)')
+
+
 MUTATIONS = [m_gate_writes, m_gate_insert_statement, m_ledger_cte_removed, m_ledger_separate_statement, m_ledger_unguarded,
              m_gate_disabled, m_if_disabled, m_map_event_reads_json, m_gate_bypassed, m_branches_swapped,
              m_gate_no_always_output, m_gate_fail_closed, m_gate_error_output, m_if_negative_field, m_consolidate_drops_id,
-             m_upsert_param_dropped]
+             m_upsert_param_dropped, m_upsert_gate_removed, m_upsert_gate_idless_dropped, m_ledger_no_returning]
 
 CONTROL_RC, CONTROL_OUT = run_parity()
 with Case('A1 V0: the canonical set passes verify-telegram-parity (exit 0) and the RevenueCat ledger check reports OK') as c:
