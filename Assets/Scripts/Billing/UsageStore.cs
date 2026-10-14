@@ -33,6 +33,13 @@ public class UsageSnapshot
     /// monthly as the known default (<see cref="SubscriptionPageRows.ActiveSubline"/>).
     /// </summary>
     public string interval;
+
+    /// <summary>
+    /// Learning B (2026-10-14): per-bot readiness of «Авто» — the server's verdict over the last 20 owner sends with a shown
+    /// set (Get Usage `readiness`). Null on a payload from an older server; an empty list for a legacy (token-less) caller.
+    /// Read through <see cref="AutoReadinessStore.Current"/>, judged by <see cref="AutoReadinessPolicy"/>.
+    /// </summary>
+    public System.Collections.Generic.List<AutoReadinessEntry> readiness;
 }
 
 /// <summary>

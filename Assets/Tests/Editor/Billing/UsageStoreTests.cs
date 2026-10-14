@@ -143,4 +143,20 @@ public class UsageStoreTests
         UsageStore.Apply(UsageStore.Parse(ValidJson));   // would fire the leaked subscriber if not cleared
         Assert.IsFalse(called, "a subscriber surviving ResetSeamsForTests would leak into other tests");
     }
+
+    // --- learning B ----------------------------------------------------------------------
+
+    [Test] public void Parse_ReadsReadiness_AndTreatsAMissingFieldAsNull()
+    {
+        var with = UsageStore.Parse("{\"success\":true,\"plan\":\"trial\",\"readiness\":[{\"botKey\":\"Bot0\",\"matches\":7,\"total\":12,\"chats\":3,\"days\":2,\"ready\":false}]}");
+        Assert.AreEqual(1, with.readiness.Count);
+        Assert.AreEqual("Bot0", with.readiness[0].botKey);
+        Assert.AreEqual(7, with.readiness[0].matches);
+        Assert.AreEqual(12, with.readiness[0].total);
+        Assert.IsFalse(with.readiness[0].ready);
+
+        var without = UsageStore.Parse(ValidJson);
+        Assert.IsNull(without.readiness, "an old server never breaks the snapshot");
+        Assert.AreEqual(1000, without.quota);
+    }
 }
