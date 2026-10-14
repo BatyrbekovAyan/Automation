@@ -375,3 +375,7 @@ Delete Bot Files, Profile Lifecycle Sweep) через `deploy-canonical.py --onl
 
 Откат: `deploy-canonical.py` с JSON Sweep из `4761117b^` (флаг true) — или публикация версии `c96f4306-…` по точке отката.
 Дальше по пакету — только шаг 13 (новая клиентская сборка), по отдельному «да».
+
+Сайт выложен 2026-10-14 07:29Z по «сайт — да» владельца: `tools/deploy.sh --go` (бэкап site.bak-20261014-122912 + Caddyfile.bak-20261014-122912,
+rsync без --delete, Caddy validate + reload, smoke 200 на /, /privacy.html, /terms.html; review-видео и healthz как до); вместе уехал
+коммит 2839245c (esbuild-сжатие ассетов); живой privacy.html несёт «срок хранения — до 180 дней». Push main — fast-forward.
