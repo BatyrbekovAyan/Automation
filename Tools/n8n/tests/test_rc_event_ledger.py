@@ -27,8 +27,11 @@ runner, or no answer at all). Faults are real Postgres errors, never mocks.
 The race (C-cases) runs the REAL Upsert Subscriber statement on TWO real PostgreSQL connections of the staging
 database — the tables live in a uniquely named fixture schema (session temp tables are invisible to another
 connection; dropped afterwards): delivery A holds its transaction open, delivery B of the same id blocks on A's lock,
-A commits, B's update must be skipped. The same race over the pre-fix statement (commit 8a9e2a40) must credit twice —
-the race is real, not a vacuous pass.
+A commits, B's update must be skipped. The same race over the pre-fix statement (the canon with this file's own mutation
+`upsert_gate_removed`: the update no longer gated on the ledger, as commit 8a9e2a40 had it) must credit twice — the race
+is real, not a vacuous pass.
+
+The graph walker, n8n's engine bridge and the race helpers live in rc_events_chain.py (shared with test_billing_consolidation.py).
 
 The verifier half (verify-telegram-parity.py `check_rc_event_ledger`) is exercised at the end: the canonical set
 passes, and each one-mutation copy of RevenueCat Events (a writing gate, the CTE gone, a disabled node, Map Event
@@ -36,215 +39,23 @@ reading `$json`, …) fails it, naming the file.
 
     python3 Tools/n8n/tests/test_rc_event_ledger.py
 """
-import concurrent.futures
 import contextlib
+import copy
 import json
 import re
 import shutil
 import subprocess
 import sys
 import tempfile
-import time
-import uuid
 from pathlib import Path
 
-from harness import N8N, PG, ROOT, WF, Case, PgSession, code, module, node, report, sql_literal, sql_run, wf
+from harness import N8N, WF, Case, code, node, report, sql_literal, sql_run
+from rc_events_chain import (CANON as W, RC_FILE, SETUP, RaceFixture, Session, bound_sql, deliver, engine, ok_answer, pg_bind,
+                             race)
 
-RC_FILE = 'ZGYr6srzS3rSSXHp-RevenueCat_Events.json'
-W = wf(RC_FILE)
 PARITY = N8N / 'verify-telegram-parity.py'
-parity = module('verify-telegram-parity.py')    # its statement splitter mirrors n8n's own (Postgres v2 utils.js)
 MIGRATION = N8N / 'sql' / '2026-10-14-rc-event-ledger.sql'
-
-WEBHOOK, CODE, IF, POSTGRES, RESPOND = ('n8n-nodes-base.webhook', 'n8n-nodes-base.code', 'n8n-nodes-base.if',
-                                        'n8n-nodes-base.postgres', 'n8n-nodes-base.respondToWebhook')
 GATE, DUP_IF = 'Dedup Gate', 'If Duplicate?'
-
-# ---------------------------------------------------------------------------------------------------- n8n's engine
-_ENGINE = r"""const path=require('path'), os=require('os');
-const N = process.env.N8N_MODULES || path.join(os.homedir(), '.n8n-staging/app/node_modules');
-const {evaluateExpression,setErrorHandler}=require(N + '/n8n-workflow/dist/cjs/expression-evaluator-proxy.js');
-const {executeFilter}=require(N + '/n8n-workflow/dist/cjs/node-parameters/filter-parameter.js');
-setErrorHandler(e=>{throw e;});
-function handle(v) {
-  const named=v.named||{};
-  const $=(n)=>{ if(!(n in named)) throw new Error('Referenced node is unexecuted: '+n);
-    const items=(Array.isArray(named[n])?named[n]:[named[n]]).map(j=>({json:j}));
-    return {first:()=>items[0], all:()=>items, item:items[0], last:()=>items[items.length-1], isExecuted:true}; };
-  const data={$json:v.json, $, $execution:{id:'synthetic-exec'}, String, Array, RegExp, Math, Number, JSON, Boolean, Object, Date};
-  const ev=(e)=>evaluateExpression(String(e).replace(/^=/, ''), data);
-  try {
-    if (v.kind === 'params') {
-      // executeQuery.operation.js (n8n-nodes-base 2.36, node typeVersion >= 2.5), the array branch: an undefined value is
-      // SKIPPED (the following parameters shift), an object is JSON-stringified, anything else goes to pg-promise as is
-      const r = ev(v.expr);
-      if (!Array.isArray(r)) throw new Error('queryReplacement did not evaluate to an array: ' + JSON.stringify(r));
-      const values = [], skipped = [];
-      r.forEach((x, i) => { if (x === undefined) { skipped.push(i); return; }
-                            values.push(typeof x === 'object' && x !== null ? JSON.stringify(x) : x); });
-      return {ok: true, values, skipped};
-    }
-    if (v.kind === 'if') {
-      const f = v.filter, res = (x) => (typeof x === 'string' && x.startsWith('=') ? ev(x) : x);
-      const conditions = f.conditions.map(c => Object.assign({}, c, {leftValue: res(c.leftValue), rightValue: res(c.rightValue)}));
-      return {ok: true, pass: executeFilter(Object.assign({}, f, {conditions}))};
-    }
-    return {ok: true, value: ev(v.expr)};
-  } catch (e) { return {ok: false, error: String((e && e.message) || e)}; }
-}
-// one request per line in, one answer per line out — the engine is loaded ONCE (≈ 0.6 s) for the whole file
-require('readline').createInterface({input: process.stdin}).on('line', (line) => {
-  process.stdout.write(JSON.stringify(handle(JSON.parse(line)), (k, x) => (x === undefined ? null : x)) + '\n');
-});"""
-
-
-class _Engine:
-    """ONE node process holding n8n's expression and filter engine (n8n-workflow), JSON lines over stdin/stdout."""
-
-    def __init__(self):
-        self.p = None
-
-    def __call__(self, kind, **kw):
-        if self.p is None or self.p.poll() is not None:
-            self.p = subprocess.Popen(['node', '-e', _ENGINE], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                                      stderr=subprocess.PIPE, text=True, bufsize=1)
-        self.p.stdin.write(json.dumps(dict(kind=kind, **kw)) + '\n')
-        self.p.stdin.flush()
-        line = self.p.stdout.readline()
-        if not line:
-            raise RuntimeError('n8n engine died: ' + self.p.stderr.read()[-1500:])
-        return json.loads(line)
-
-
-engine = _Engine()
-
-
-def pg_bind(query, values):
-    """harness.bind as pg-promise does it with `partial: true`: a placeholder without a value stays in the text (Postgres
-    then refuses it) — so a skipped undefined fails here the way it fails on n8n, instead of an IndexError."""
-    return re.sub(r'\$([1-9]\d{0,16})(?!\d)',
-                  lambda m: sql_literal(values[int(m[1]) - 1]) if int(m[1]) <= len(values) else m[0], query)
-
-
-class Session(PgSession):
-    """harness.PgSession whose psql SURVIVES a failed statement (ON_ERROR_STOP off): a node's real SQL error reaches the
-    walker as RuntimeError and the scenario goes on in the same session (autocommit: the failed statement rolled back
-    alone — exactly the n8n Postgres node's single-statement query)."""
-
-    def __init__(self, setup=''):
-        self.p = subprocess.Popen([str(PG), 'psql', '-X', '-q', '-t', '-A', '-P', 'pager=off', '-v', 'ON_ERROR_STOP=0'],
-                                  stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
-        self.n = 0
-        self.x('set search_path = pg_temp, public;\n' + setup)
-
-
-SETUP = """set timezone = 'UTC';
-create temp table subscribers (like public.subscribers including all);
-create temp table dialog_counts (like public.dialog_counts including all);
-create temp table rc_event_ledger (like public.rc_event_ledger including all);"""
-
-
-# ---------------------------------------------------------------------------------------------------- the walker
-class Halt(Exception):
-    """The execution ends in an error: no Respond node answers (n8n's own 500 to RevenueCat, which retries)."""
-
-
-class Run:
-    def __init__(self):
-        self.answer, self.trail, self.named, self.halt = None, [], {}, None
-
-    def __repr__(self):
-        return f'answer={self.answer} trail={self.trail} halt={self.halt}'
-
-
-def _pg_node(pg, n, items, named):
-    if len(items) != 1:
-        raise NotImplementedError(f"{n['name']}: {len(items)} input items (the RC graph carries one)")
-    cont = n.get('onError') in ('continueRegularOutput', 'continueErrorOutput') or n.get('continueOnFail') is True
-    p = engine('params', expr=(n['parameters'].get('options') or {}).get('queryReplacement', '={{ [] }}'),
-               json=items[0], named=named)
-    if not p['ok']:                   # thrown OUTSIDE the query runner: a continuing node hands its INPUT on (output 0)
-        if cont:
-            return [items]
-        raise Halt(f"{n['name']}: {p['error']}")
-    q = n['parameters']['query']
-    stmts = parity._pg_statements(q)
-    is_select = bool(stmts) and all(parity._top_level_command(s) == 'SELECT' for s in stmts)
-    if not is_select and re.search(r'\breturning\b', parity.sql_code(q).split(')')[-1], re.I):
-        raise NotImplementedError(f"{n['name']}: a top-level RETURNING on a non-SELECT is not modelled")
-    sql = pg_bind(q, p['values'])
-    try:
-        rows = pg.q(sql) if is_select else (pg.x(sql), [])[1]
-    except RuntimeError as e:         # the query runner's own error item (continueOnFail)
-        if not cont:
-            raise Halt(f"{n['name']}: {str(e).splitlines()[0]}")
-        err = {'message': str(e).splitlines()[0][:300], 'error': {'message': str(e)[:300]}}
-        return [[], [err]] if n.get('onError') == 'continueErrorOutput' else [[err]]
-    if not rows and not is_select:    # typeVersion >= 2.3: a statement that is not a SELECT and returned nothing
-        rows = [{'success': True}]
-    return [rows]
-
-
-def _step(pg, n, items, named, wh, run):
-    t = n['type']
-    if n.get('disabled'):             # n8n skips a disabled node and hands its input on
-        return [items]
-    if t == WEBHOOK:
-        return [[wh]]
-    if t == CODE:
-        res = code(W, n['name'], item={'json': items[0]}, items=[{'json': x} for x in items], named=named, strict=True)
-        return [[r.get('json', {}) for r in res]]
-    if t == POSTGRES:
-        return _pg_node(pg, n, items, named)
-    if t == IF:
-        yes, no = [], []
-        for it in items:
-            r = engine('if', filter=n['parameters']['conditions'], json=it, named=named)
-            if not r['ok']:
-                raise Halt(f"{n['name']}: {r['error']}")
-            (yes if r['pass'] else no).append(it)
-        return [yes, no]
-    if t == RESPOND:
-        p = n['parameters']
-        body = engine('expr', expr=p.get('responseBody', '={{ {} }}'), json=items[0], named=named)
-        if not body['ok']:
-            raise Halt(f"{n['name']}: {body['error']}")
-        if run.answer is None:        # the first Respond answers; n8n ignores any later one
-            run.answer = (int((p.get('options') or {}).get('responseCode', 200)), body['value'])
-        return [items]
-    raise NotImplementedError(f"{n['name']}: node type {t}")
-
-
-def deliver(pg, body, faults=None):
-    """One RevenueCat delivery through the canonical graph. `faults` = {node name: (sql before it, sql after it)} — a
-    real Postgres condition that holds only while that node runs."""
-    wh = {'headers': {'content-type': 'application/json', 'authorization': 'Bearer synthetic'}, 'params': {}, 'query': {},
-          'body': body, 'webhookUrl': 'http://localhost:5678/webhook/RevenueCatEvent', 'executionMode': 'production'}
-    run, queue = Run(), [('Webhook', [wh])]
-    while queue:
-        name, items = queue.pop(0)
-        n = node(W, name)
-        run.trail.append(name)
-        before, after = (faults or {}).get(name, (None, None))
-        if before:
-            pg.x(before)
-        try:
-            outs = _step(pg, n, items, run.named, wh, run)
-        except Halt as e:
-            run.halt = str(e)
-            return run
-        finally:
-            if after:
-                pg.x(after)
-        if n.get('alwaysOutputData') and not (outs and outs[0]):
-            outs = [[{}]] + list(outs[1:])
-        run.named[name] = next((o for o in outs if o), [{}])
-        branches = (W['connections'].get(name) or {}).get('main') or []
-        for idx, out in enumerate(outs):
-            if out and idx < len(branches):
-                queue.extend((e['node'], out) for e in branches[idx] or [])
-    return run
-
 
 # ---------------------------------------------------------------------------------------------------- fixtures
 U = '$RCAnonymousID:' + 'a1a1a1a1b2b2b2b2' * 2          # the paying owner
@@ -280,10 +91,6 @@ def rows(pg, uid=None):
 
 def ledger(pg):
     return pg.q("select event_id, xmin::text as ver, received_at::text as received_at from rc_event_ledger order by event_id")
-
-
-def ok_answer(run):
-    return run.answer is not None and run.answer[0] == 200 and (run.answer[1] or {}).get('success') is True
 
 
 # ---------------------------------------------------------------------------------------------------- L0: the table
@@ -497,125 +304,8 @@ with Case('A1 L12: If Duplicate? keys on a POSITIVE field — only a ledger row 
     c.check([[e['node'] for e in b] for b in edges] == [['Respond 200'], ['Map Event']], f'If Duplicate? edges {edges}')
 
 
-# ---------------------------------------------------------------------------------------------------- C: the race
-PRE_FIX = json.loads(subprocess.run(['git', '-C', str(ROOT), 'show', f'8a9e2a40:Tools/n8n/workflows/{RC_FILE}'],
-                                    capture_output=True, text=True, check=True).stdout)
-
-
-def upsert_sql(w, body):
-    """The Upsert Subscriber statement `w` holds, bound with the values its own queryReplacement gives for the item Map
-    Event (of the canonical graph) makes of `body` — exactly what the node sends for that delivery."""
-    wh = {'body': body, 'headers': {}, 'params': {}, 'query': {}}
-    mapped = code(W, 'Map Event', item={'json': {}}, named={'Webhook': wh}, strict=True)[0]['json']
-    n = node(w, 'Upsert Subscriber')
-    p = engine('params', expr=n['parameters']['options']['queryReplacement'], json=mapped, named={'Webhook': wh})
-    assert p['ok'] and not p['skipped'], p
-    return pg_bind(n['parameters']['query'], p['values'])
-
-
-class RaceFixture:
-    """Three connections (main + two deliveries) on one fixture schema of the staging database; dropped on exit."""
-
-    def __enter__(self):
-        self.schema = 't_a1r_' + uuid.uuid4().hex[:16]
-        self.main, self.a, self.b = PgSession(), PgSession(), PgSession()
-        self.main.x(f'create schema {self.schema}; set search_path = {self.schema};')
-        for t in ('subscribers', 'rc_event_ledger'):
-            self.main.x(f'create table {t} (like public.{t} including all);')
-        for conn in (self.a, self.b):
-            conn.x(f"set search_path = {self.schema}; set statement_timeout = '15s'; set timezone = 'UTC';")
-        return self
-
-    def __exit__(self, *exc):
-        for conn in (self.a, self.b):
-            try:
-                conn.x('rollback;')
-            except Exception:
-                pass
-        try:
-            self.main.x(f'drop schema if exists {self.schema} cascade;')
-        finally:
-            for conn in (self.main, self.a, self.b):
-                conn.close()
-
-
-def race(fx, stmt_a, stmt_b):
-    """Delivery A runs inside an open transaction (its locks held); delivery B runs meanwhile on the second connection.
-    A commits once B waits on a lock (or after ~10 s — never a hang). Returns the wait B was in ('' = it never waited)."""
-    fx.a.x('begin;')
-    fx.a.x(stmt_a)
-    pid = fx.b.q('select pg_backend_pid() as pid')[0]['pid']
-    waited = ''
-    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
-        pending = pool.submit(fx.b.x, stmt_b)
-        try:
-            for _ in range(500):
-                if pending.done():
-                    break
-                st = fx.main.q(f'select wait_event_type, wait_event from pg_stat_activity where pid = {pid}')
-                if st and st[0]['wait_event_type'] == 'Lock':
-                    waited = st[0]['wait_event']
-                    break
-                time.sleep(0.02)
-        finally:
-            fx.a.x('commit;')
-        pending.result(timeout=20)
-    return waited
-
-
-def race_result(w, seed, id_a, id_b):
-    """(balance, ledger ids, rows of U, the wait B was in) after the race of two top-ups through `w`'s Upsert."""
-    with RaceFixture() as fx:
-        if seed is not None:
-            fx.main.x(f"insert into subscribers (app_user_id, plan, status, topup_balance) values ({sql_literal(U)}, 'business', 'active', {seed});")
-        waited = race(fx, upsert_sql(w, topup(id_a)), upsert_sql(w, topup(id_b)))
-        subs = fx.main.q(f'select topup_balance from subscribers where app_user_id = {sql_literal(U)}')
-        led = [r['event_id'] for r in fx.main.q('select event_id from rc_event_ledger order by event_id')]
-        return (subs[0]['topup_balance'] if subs else None), led, len(subs), waited
-
-
-with Case('A1 C1 fix round (the race, an existing subscriber): delivery B of the SAME id blocks on delivery A\'s lock; after '
-          'A commits, B\'s update is skipped — +500 ONCE, one ledger row') as c:
-    bal, led, n, waited = race_result(W, 40, 'evt-c1', 'evt-c1')
-    c.check(waited != '', 'premise: B must have WAITED on A\'s lock (no race happened)')
-    c.check((bal, led, n) == (540, ['evt-c1'], 1), f'balance {bal} ledger {led} rows {n} (expected 540, [evt-c1], 1) — B waited on {waited!r}')
-
-with Case('A1 C2 fix round (the race, NO subscriber row yet): B of the same id blocks on A\'s uncommitted row (the unique '
-          'index); after A commits B takes the conflict path and its update is skipped — 500, one row, one ledger row') as c:
-    bal, led, n, waited = race_result(W, None, 'evt-c2', 'evt-c2')
-    c.check(waited != '', 'premise: B must have WAITED on A\'s lock (no race happened)')
-    c.check((bal, led, n) == (500, ['evt-c2'], 1), f'balance {bal} ledger {led} rows {n} (expected 500, [evt-c2], 1) — B waited on {waited!r}')
-
-with Case('A1 C3 fix round (control): two DIFFERENT events of one subscriber racing — both credited (+1000), both recorded, '
-          'no deadlock — the gate blocks only the same id') as c:
-    bal, led, n, waited = race_result(W, 40, 'evt-c3a', 'evt-c3b')
-    c.check((bal, led, n) == (1040, ['evt-c3a', 'evt-c3b'], 1), f'balance {bal} ledger {led} rows {n} — B waited on {waited!r}')
-
-with Case('A1 C4 fix round (non-vacuous): the SAME race over the pre-fix statement (8a9e2a40 — CTE without the gate) credits '
-          'TWICE, on an existing row and on a new one — exactly what C1/C2 rule out') as c:
-    for seed, want in ((40, 1040), (None, 1000)):
-        bal, led, n, waited = race_result(PRE_FIX, seed, 'evt-c4', 'evt-c4')
-        c.check(waited != '' and (bal, led) == (want, ['evt-c4']),
-                f'seed {seed}: pre-fix balance {bal} ledger {led} waited {waited!r} (expected the double credit {want})')
-
-
-# ---------------------------------------------------------------------------------------------------- V: the verifier
-def run_parity(*args):
-    r = subprocess.run([sys.executable, str(PARITY), *args], capture_output=True, text=True)
-    return r.returncode, r.stdout + r.stderr
-
-
-@contextlib.contextmanager
-def canon_copy():
-    d = Path(tempfile.mkdtemp(prefix='a1-parity-'))
-    try:
-        for p in WF.glob('*.json'):
-            shutil.copy(p, d / p.name)
-        yield d
-    finally:
-        shutil.rmtree(d)
-
-
+# ---------------------------------------------------------------------------------------------------- the one-mutation copies
+# (the verifier's V NEG cases at the end; the C race's PRE_FIX is one of them — the canon with upsert_gate_removed)
 def nd(w, name):
     return next(n for n in w['nodes'] if n['name'] == name)
 
@@ -722,6 +412,84 @@ MUTATIONS = [m_gate_writes, m_gate_insert_statement, m_ledger_cte_removed, m_led
              m_gate_disabled, m_if_disabled, m_map_event_reads_json, m_gate_bypassed, m_branches_swapped,
              m_gate_no_always_output, m_gate_fail_closed, m_gate_error_output, m_if_negative_field, m_consolidate_drops_id,
              m_upsert_param_dropped, m_upsert_gate_removed, m_upsert_gate_idless_dropped, m_ledger_no_returning]
+
+
+# ---------------------------------------------------------------------------------------------------- C: the race
+# The pre-fix statement (the A1 commit 8a9e2a40: the ledger CTE recorded the id but did not gate the update) = the canon with
+# this file's own mutation `upsert_gate_removed` applied to a deep copy — no dependency on git history (a rebase or a shallow
+# clone must not break the import).
+PRE_FIX = copy.deepcopy(W)
+m_upsert_gate_removed(PRE_FIX)
+
+
+def upsert_sql(w, body):
+    """The Upsert Subscriber statement `w` holds, bound with the values its own queryReplacement gives for the item Map
+    Event (of the canonical graph) makes of `body` — exactly what the node sends for that delivery."""
+    wh = {'body': body, 'headers': {}, 'params': {}, 'query': {}}
+    mapped = code(W, 'Map Event', item={'json': {}}, named={'Webhook': wh}, strict=True)[0]['json']
+    return bound_sql(w, 'Upsert Subscriber', mapped, {'Webhook': wh})
+
+
+def race_result(w, seed, id_a, id_b):
+    """(balance, ledger ids, rows of U, the wait B was in) after the race of two top-ups through `w`'s Upsert."""
+    with RaceFixture() as fx:
+        if seed is not None:
+            fx.main.x(f"insert into subscribers (app_user_id, plan, status, topup_balance) values ({sql_literal(U)}, 'business', 'active', {seed});")
+        waited = race(fx, upsert_sql(w, topup(id_a)), upsert_sql(w, topup(id_b)))
+        subs = fx.main.q(f'select topup_balance from subscribers where app_user_id = {sql_literal(U)}')
+        led = [r['event_id'] for r in fx.main.q('select event_id from rc_event_ledger order by event_id')]
+        return (subs[0]['topup_balance'] if subs else None), led, len(subs), waited
+
+
+with Case('A1 C1 fix round (the race, an existing subscriber): delivery B of the SAME id blocks on delivery A\'s lock; after '
+          'A commits, B\'s update is skipped — +500 ONCE, one ledger row') as c:
+    bal, led, n, waited = race_result(W, 40, 'evt-c1', 'evt-c1')
+    c.check(waited != '', 'premise: B must have WAITED on A\'s lock (no race happened)')
+    c.check((bal, led, n) == (540, ['evt-c1'], 1), f'balance {bal} ledger {led} rows {n} (expected 540, [evt-c1], 1) — B waited on {waited!r}')
+
+with Case('A1 C2 fix round (the race, NO subscriber row yet): B of the same id blocks on A\'s uncommitted row (the unique '
+          'index); after A commits B takes the conflict path and its update is skipped — 500, one row, one ledger row') as c:
+    bal, led, n, waited = race_result(W, None, 'evt-c2', 'evt-c2')
+    c.check(waited != '', 'premise: B must have WAITED on A\'s lock (no race happened)')
+    c.check((bal, led, n) == (500, ['evt-c2'], 1), f'balance {bal} ledger {led} rows {n} (expected 500, [evt-c2], 1) — B waited on {waited!r}')
+
+with Case('A1 C3 fix round (control): two DIFFERENT events of one subscriber racing — both credited (+1000), both recorded, '
+          'no deadlock — the gate blocks only the same id') as c:
+    bal, led, n, waited = race_result(W, 40, 'evt-c3a', 'evt-c3b')
+    c.check((bal, led, n) == (1040, ['evt-c3a', 'evt-c3b'], 1), f'balance {bal} ledger {led} rows {n} — B waited on {waited!r}')
+
+with Case('A1 C4 premise: PRE_FIX (the canon + the mutation upsert_gate_removed) is the pre-fix Upsert Subscriber — its update is '
+          'no longer gated on the ledger, and nothing else of the graph differs') as c:
+    q_fix, q_pre = node(W, 'Upsert Subscriber')['parameters']['query'], node(PRE_FIX, 'Upsert Subscriber')['parameters']['query']
+    c.check(q_fix != q_pre and 'exists (select 1 from ledger)' in q_fix and 'exists (select 1 from ledger)' not in q_pre,
+            'the mutation must remove exactly the update gate')
+    strip = lambda w: json.dumps([x for x in w['nodes'] if x['name'] != 'Upsert Subscriber'], sort_keys=True)
+    c.check(strip(W) == strip(PRE_FIX) and W['connections'] == PRE_FIX['connections'], 'the mutation touched another node')
+
+with Case('A1 C4 fix round (non-vacuous): the SAME race over the pre-fix statement (8a9e2a40 — CTE without the gate) credits '
+          'TWICE, on an existing row and on a new one — exactly what C1/C2 rule out') as c:
+    for seed, want in ((40, 1040), (None, 1000)):
+        bal, led, n, waited = race_result(PRE_FIX, seed, 'evt-c4', 'evt-c4')
+        c.check(waited != '' and (bal, led) == (want, ['evt-c4']),
+                f'seed {seed}: pre-fix balance {bal} ledger {led} waited {waited!r} (expected the double credit {want})')
+
+
+# ---------------------------------------------------------------------------------------------------- V: the verifier
+def run_parity(*args):
+    r = subprocess.run([sys.executable, str(PARITY), *args], capture_output=True, text=True)
+    return r.returncode, r.stdout + r.stderr
+
+
+@contextlib.contextmanager
+def canon_copy():
+    d = Path(tempfile.mkdtemp(prefix='a1-parity-'))
+    try:
+        for p in WF.glob('*.json'):
+            shutil.copy(p, d / p.name)
+        yield d
+    finally:
+        shutil.rmtree(d)
+
 
 CONTROL_RC, CONTROL_OUT = run_parity()
 with Case('A1 V0: the canonical set passes verify-telegram-parity (exit 0) and the RevenueCat ledger check reports OK') as c:
