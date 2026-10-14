@@ -16,6 +16,8 @@ N8N = Path(__file__).resolve().parents[1]
 ROOT = N8N.parents[1]
 _spec = importlib.util.spec_from_file_location("apply_learning_b", N8N / "apply-learning-b.py")
 LB = importlib.util.module_from_spec(_spec); _spec.loader.exec_module(LB)
+_rspec = importlib.util.spec_from_file_location("report_learning", N8N / "report-learning.py")
+RL = importlib.util.module_from_spec(_rspec); _rspec.loader.exec_module(RL)
 
 LIKE = 'create temp table {0} (like public.{0} including all);\n'
 SETUP = ''.join(LIKE.format(t) for t in ('installs', 'subscribers', 'dialog_counts', 'bot_profiles', 'chat_history_events'))
@@ -89,4 +91,15 @@ with PgSession(SETUP) as pg:
     with Case('the rest of Read Usage is untouched: plan/used/bots columns still answer') as c:
         row = pg.q(bind(Q(GU, 'Read Usage'), [U, INST, 'session']))[0]
         c.check(row['plan'] == 'trial' and row['used'] == 0 and row['bots_registered'] == 2, f'{row}')
+    with Case("report-learning's readiness table agrees with Get Usage and skips a bot with no live row (review #7)") as c:
+        pg.x(f"insert into bot_profiles (profile_id, app_user_id, channel, owner_id, workflow_id, bot_key, deleted_at, deleted_reason) values "
+             f"('p-dead', '{U}', 'whatsapp', '{INST}', 'wDead0000001', 'Bot2', now(), 'trial_expiry');")
+        for _ in range(3): send(pg, 'p-dead', '7799@c.us', 1)
+        c.check(bot(pg, 'Bot2') is None, 'Get Usage lists no bot without a live row')
+        rows = {(r['owner_id'], r['bot_key']): r for r in pg.q(RL.READINESS_SQL)}
+        c.check((INST, 'Bot2') not in rows, f'the report must not print a bot the lock never sees: {sorted(rows)}')
+        for key in ('Bot0', 'Bot1'):
+            g = bot(pg, key); r = rows.get((INST, key))
+            c.check(r is not None and all(r[k] == g[k] for k in ('matches', 'total', 'chats', 'days', 'ready')), f'{key}: report {r} vs gate {g}')
+        c.check((OTHER, 'Bot0') in rows and rows[(OTHER, 'Bot0')]['total'] == 1, 'other installs are listed with their own counts')
 report()

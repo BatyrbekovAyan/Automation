@@ -12,7 +12,8 @@ public static class AutoReadinessCopy
 
     public static string SheetBody(int matches, bool perChat)
     {
-        string core = $"Авто включится, когда панель угадает ваш ответ {AutoReadinessPolicy.MinMatches} раз из последних "
+        // «откроется» — the LOCK lifts; «включится» read as an automatic switch-on, which never happens (review 2026-10-14).
+        string core = $"Авто откроется, когда панель угадает ваш ответ {AutoReadinessPolicy.MinMatches} раз из последних "
                     + $"{AutoReadinessPolicy.Window} — сейчас {matches} из {AutoReadinessPolicy.Window}. "
                     + "Отвечайте через «Вместе»: каждая отправка учит бота.";
         return perChat ? core + " Включить авто-режим в этом чате можно и сейчас." : core;

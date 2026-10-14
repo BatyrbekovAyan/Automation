@@ -294,4 +294,20 @@ public class ConfirmCardLayoutTests
 
     private static ConfirmCardLayout.Geometry Solve(float titlePreferred, float bodyPreferred) =>
         ConfirmCardLayout.Solve(CardHeight, TitleHeight, titlePreferred, BodyY, BodyHeight, bodyPreferred);
+
+    /// <summary>
+    /// Learning B (review 2026-10-14 #5): the «Бот ещё учится» sheet is the fourth confirm card. Its authored body box must
+    /// clear the buttons by the same 24u the bots-page twin was authored with — the house rule says check a new card's
+    /// clearance from its own constants BEFORE trusting the runtime fit (grow-by-overflow preserves an authored overlap).
+    /// </summary>
+    [Test]
+    public void AutoLockSheet_AuthoredBodyBox_ClearsTheButtons()
+    {
+        float bodyBottom = AutoLockSheet.BodyTop + AutoLockSheet.BodyHeight;
+        float buttonTop = AutoLockSheet.CardHeight - (AutoLockSheet.ButtonY + AutoLockSheet.ButtonHeight);
+        Assert.Greater(buttonTop, bodyBottom, "the body box must end above the buttons");
+        Assert.AreEqual(24f, buttonTop - bodyBottom, 0.001f, "the clearance the sheet was authored with (= BotActivationConfirm's)");
+        Assert.AreEqual(BotActivationConfirm.ButtonY, AutoLockSheet.ButtonY, 0.001f, "the same button row as the twin");
+        Assert.AreEqual(BotActivationConfirm.ButtonHeight, AutoLockSheet.ButtonHeight, 0.001f);
+    }
 }

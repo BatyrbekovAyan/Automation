@@ -62,8 +62,9 @@ order by 1;
 
 COLS = ["profile_id", "sends", "card", "edited", "typed", "none", "top1_hits", "with_set", "edit_mean", "sets", "learning_sets", "learning_sets_3moves", "tokens"]
 
-# learning B: the lock's own arithmetic per (install, bot_key), across every install — the same window and thresholds
-# the Get Usage CTE decides with (constants imported, never retyped). Not windowed by --days: the lock is not either.
+# learning B: the lock's own arithmetic per (install, bot_key), across every install — rendered from the SAME fragments
+# the Get Usage CTE is generated from (apply-learning-b.send_filter / readiness_columns), never retyped; like the CTE, only
+# bots with a LIVE row are listed (review 2026-10-14 #7). Not windowed by --days: the lock is not either.
 # This query does NOT go through the %-substitution above — single % in LIKE.
 READINESS_SQL = f"""
 with sends as (
@@ -72,18 +73,15 @@ with sends as (
   from chat_history_events e
   join bot_profiles bp on bp.profile_id = e.profile_id
   where bp.bot_key is not null and bp.owner_id is not null
-    and e.source = 'owner_app' and coalesce(e.origin_set, 0) > 0
-    and e.chat_id not like '%@g.us' and e.chat_id not like '-%'
+    and exists (select 1 from bot_profiles live where live.owner_id = bp.owner_id and live.bot_key = bp.bot_key and live.deleted_at is null)
+    and {LB.send_filter('e')}
+), s as (
+  select * from sends where rn <= {LB.WINDOW}
 )
-select owner_id, bot_key,
-       (count(*) filter (where origin_top1 = 1))::int as matches, count(*)::int as total,
-       count(distinct chat_id)::int as chats,
-       count(distinct (created_at at time zone 'Asia/Almaty')::date)::int as days,
-       (count(*) >= {LB.MIN_TOTAL} and count(*) filter (where origin_top1 = 1) >= {LB.MIN_MATCHES}
-        and count(distinct chat_id) >= {LB.MIN_CHATS}
-        and count(distinct (created_at at time zone 'Asia/Almaty')::date) >= {LB.MIN_DAYS}) as ready
-from sends where rn <= {LB.WINDOW}
-group by owner_id, bot_key
+select s.owner_id, s.bot_key,
+         {LB.readiness_columns('s')}
+from s
+group by s.owner_id, s.bot_key
 """
 READINESS_COLS = ["owner_id", "bot_key", "matches", "total", "chats", "days", "ready"]
 

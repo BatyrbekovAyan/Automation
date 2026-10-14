@@ -39,6 +39,8 @@ public class AutoLockSheetTests
     {
         Assert.AreEqual("Бот ещё учится", AutoReadinessCopy.SheetTitle);
         string body = AutoReadinessCopy.SheetBody(7, perChat: false);
+        StringAssert.Contains("Авто откроется, когда", body);                 // the LOCK lifts — nothing switches itself on
+        StringAssert.DoesNotContain("включится", body);                       // review 2026-10-14 #3: no automatic switch-on promise
         StringAssert.Contains("10 раз из последних 20", body);
         StringAssert.Contains("сейчас 7 из 20", body);
         StringAssert.DoesNotContain("в этом чате", body);

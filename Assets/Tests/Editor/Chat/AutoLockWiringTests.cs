@@ -48,30 +48,67 @@ public class AutoLockWiringTests
         Assert.IsEmpty(users, "only the gate (the lock) and the card (its face) read readiness: " + string.Join(", ", users));
     }
 
+    /// <summary>
+    /// Review 2026-10-14 #6: the «one door» claim, pinned globally — every CommitMode(…, ReplyMode.Auto) statement in the
+    /// client lives inside one of the two gated bodies, AFTER its AutoLockGate call. A new enable path anywhere else fails here.
+    /// (ReconcileFromServer commits a VARIABLE mode — a server truth, not the owner's tap — and never names ReplyMode.Auto.)
+    /// </summary>
+    [Test]
+    public void EveryCommitModeAuto_LivesInsideAGatedBody_AfterTheGateCall()
+    {
+        var allowed = new List<(string file, string method)> { ("Scripts/Main/Bot.cs", "OnAutoPillTapped"), ("Scripts/UI/ReplyModeToggleBinder.cs", "RequestEnableAuto") };
+        var offenders = new List<string>();
+        foreach (string path in Directory.GetFiles(Path.Combine(Application.dataPath, "Scripts"), "*.cs", SearchOption.AllDirectories))
+        {
+            string source = File.ReadAllText(path);
+            string relative = path.Substring(Application.dataPath.Length + 1).Replace('\\', '/');
+            foreach (Match call in Regex.Matches(source, @"CommitMode\s*\("))
+            {
+                int end = source.IndexOf(';', call.Index);
+                string statement = source.Substring(call.Index, (end < 0 ? source.Length : end) - call.Index);
+                if (!statement.Contains("ReplyMode.Auto")) continue;
+                bool inside = false;
+                foreach (var (file, method) in allowed)
+                {
+                    if (file != relative) continue;
+                    var (open, close) = MethodRange(source, method, relative);
+                    int gate = source.IndexOf("AutoLockGate.TryEnable", open, System.StringComparison.Ordinal);
+                    inside |= call.Index > open && call.Index < close && gate >= 0 && gate < call.Index;
+                }
+                if (!inside) offenders.Add($"{relative}@{call.Index}: {statement.Trim()}");
+            }
+        }
+        Assert.IsEmpty(offenders, "an enable of «Авто» outside the gate: " + string.Join(" | ", offenders));
+    }
+
     /// <summary>The method's body: a brace-matched block, or — for an expression-bodied member — its `=> …;` expression.</summary>
     private static string MethodBody(string relativePath, string method)
     {
         string path = Path.Combine(Application.dataPath, relativePath);
         Assert.IsTrue(File.Exists(path), $"{relativePath} moved — update AutoLockWiringTests");
         string source = File.ReadAllText(path);
+        var (open, close) = MethodRange(source, method, relativePath);
+        return source.Substring(open, close - open + 1);
+    }
+
+    /// <summary>[open, close] indices of the method's body in <paramref name="source"/> (the `=>` and the `;` for an expression body).</summary>
+    private static (int open, int close) MethodRange(string source, string method, string relativePath)
+    {
         var decl = Regex.Match(source,
-            @"^[ \t]*(?:(?:public|private|internal|protected|static)[ \t]+)*(?!return\b)[\w<>.]+[ \t]+" + Regex.Escape(method) + @"[ \t]*\(",
+            @"^[ \t]*(?:(?:public|private|internal|protected|static)[ \t]+)+(?!return\b)[\w<>.]+[ \t]+" + Regex.Escape(method) + @"[ \t]*\(",
             RegexOptions.Multiline);
         Assert.IsTrue(decl.Success, $"{method} not found in {relativePath}");
         int open = source.IndexOf('{', decl.Index);
         int arrow = source.IndexOf("=>", decl.Index, System.StringComparison.Ordinal);
         if (arrow >= 0 && (open < 0 || arrow < open))
-        {
-            int end = source.IndexOf(';', arrow);
-            return source.Substring(arrow, end - arrow + 1);
-        }
+            return (arrow, source.IndexOf(';', arrow));
         int depth = 0;
         for (int i = open; i < source.Length; i++)
         {
             if (source[i] == '{') depth++;
-            else if (source[i] == '}' && --depth == 0) return source.Substring(open, i - open + 1);
+            else if (source[i] == '}' && --depth == 0) return (open, i);
         }
         Assert.Fail($"unbalanced braces after {method}");
-        return null;
+        return (open, source.Length - 1);
     }
 }

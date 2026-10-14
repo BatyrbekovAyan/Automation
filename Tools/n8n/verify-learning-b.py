@@ -50,5 +50,7 @@ claude = open(os.path.join(ROOT, "CLAUDE.md"), encoding="utf-8").read()
 expect("требует колонок A" in claude, "CLAUDE.md: the Learning-B bullet must state the A-columns dependency and its blast radius")
 rep = open(os.path.join(HERE, "report-learning.py"), encoding="utf-8").read()
 expect("apply-learning-b" in rep and "readiness" in rep, "report: report-learning.py must import the module's constants and print readiness (Task 2)")
+expect("LB.send_filter(" in rep and "LB.readiness_columns(" in rep and "deleted_at is null" in rep,
+       "report: READINESS_SQL must be rendered from apply-learning-b's fragments and list only bots with a live row (review #7)")
 print("learning B verify:", "OK" if not problems else f"{len(problems)} problem(s)")
 sys.exit(1 if problems else 0)
