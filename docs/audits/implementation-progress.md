@@ -340,3 +340,19 @@ canary → сторы. **Не проверено на проде (нужен ж�
 
 ## Learning A «Фундамент» — реализовано, ждёт go на деплой (2026-10-14; коммиты 126f44c2…HEAD)
 Правило «Границы темы» + eval v1.7 (before/after: ot-a: 4·2·5 → 10·1·0; core-a 83 авто: 71·1·11 → 76·4·3, просевшие ×8 — шум; панель 9·2·2 → 12·1·0), панель «Отказ»/холодный старт, origin_* через meta прокси, suggestion_sets после Respond, CTE sets в Delete Chat Memory, Expire Learning Rows, клиент SendOrigin*/SuggestionPickStats, privacy §3. Staging: e2e-learning 10/10, e2e-suggest 12/12, e2e-auth/e2e-handoff без регрессий; Unity EditMode 3017/3017; n8n harness run_all 32 файла OK.
+
+## Развёртывание 2026-10-14 — learning A «Фундамент» + панель 13.10 («Авто = продолжение подсказок»), по «go» владельца
+Пакет: миграция `sql/2026-09-25-learning-foundation.sql` → 8 workflow (Suggest Replies, Create WA/TG, Edit WA/TG, Wappi Proxy,
+Delete Bot Files, Profile Lifecycle Sweep) через `deploy-canonical.py --only … --apply --yes` → `update-clones.py --apply --yes`
+(живых клонов 0, «13» архивный пропущен) → `verify-deployed.py` diff 0. Владелец подтвердил отдельно, что вместе с learning A
+уезжает и невыложенное изменение 13.10 (панель gpt-5.4-mini + «УСЛОВИЯ», «Правило владельца об условии») — те же канонические файлы.
+Репетиция на стенде с прод-состояния (`bootstrap.py --canon-ref 886eaf82`): миграция первой, dry-run назвал ровно 8, apply —
+каждый опубликован своим PUT с read-back ok, verify-deployed 0, e2e-learning 10/10, e2e-suggest 12/12, lineage/delete PASS.
+Прод: before = 8 DIFF (`docs/audits/2026-10-14-prod-before.json`), миграция `{"success":true}`, пост-проверка одним запросом
+`{"origin_cols":"6","rls":true,"anon_grants":"0","idx":"2"}`, apply 8/8 «published by the PUT … read-back: ok», after = diff 0
+(`docs/audits/2026-10-14-prod-after.json`), точки отката `docs/audits/2026-10-14-deploy-rollback-pointers.txt`, GET-пробы восьми
+вебхуков — «Did you mean to make a POST request?» (зарегистрированы). `.secrets/sql-oneoff.py` печатает полный ответ (план 1a).
+НЕ сделано: публикация `privacy.html` на сайт (чек-лист шаг 5) — `deploy.sh --go` увёз бы и невыложенный коммит 2839245c (esbuild-
+сжатие ассетов; live 404 на текущий `assets/e85b3e936c`), а `tools/check.mjs` на этой машине не поднялся (headless-навигация); клиент
+с меткой ещё не выпущен, так что страница не просрочена — отдельное «да» владельца. Дальше: device pass трёх пунктов learning A,
+первый `report-learning.py --prod --days 3` через 2–3 дня работы бота.
