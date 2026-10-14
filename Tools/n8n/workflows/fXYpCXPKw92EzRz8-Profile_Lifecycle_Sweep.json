@@ -43,7 +43,7 @@
             {
               "id": "cfg-retirements-dry-run",
               "name": "retirementsDryRun",
-              "value": true,
+              "value": false,
               "type": "boolean"
             }
           ]

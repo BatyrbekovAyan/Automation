@@ -55,7 +55,7 @@ sys.path.insert(0, HERE)
 import clone_lineage as cl  # noqa: E402  (branch A's SQL lives with the rest of the bot's line)
 
 PATH = os.path.join(HERE, "workflows", "fXYpCXPKw92EzRz8-Profile_Lifecycle_Sweep.json")
-RETIREMENTS_DRY_RUN = True      # plan §6: true for the first day on prod, then False (one line here, re-run, deploy)
+RETIREMENTS_DRY_RUN = False     # plan §6 step 12: the first day on prod (2026-10-13/14) logged clean → live (owner's «да» 2026-10-14)
 PG_CRED = {"id": "vvRrFiEXzLVqKjOx", "name": "Postgres"}
 ADMIN_CRED = {"id": "__HDR_CRED__", "name": "n8n Admin API"}
 
