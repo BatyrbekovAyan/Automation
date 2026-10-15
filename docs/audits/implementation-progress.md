@@ -400,3 +400,53 @@ canonical 27, diff 0; GET-проба вебхука — «Did you mean to make a
 точка отката в `docs/audits/2026-10-14-deploy-rollback-pointers.txt` (activeVersionId 764345c7-…). Миграций и `update-clones.py` не было.
 Клиентская часть B едет в новой сборке вместе с A; до неё поле `readiness` старый клиент игнорирует.
 
+
+## Часть A «защита платящих» — реализовано, пакет отрепетирован, ждёт go (2026-10-15; коммиты 927e1067..HEAD)
+
+План — `docs/superpowers/plans/2026-10-14-paying-users-protection-and-schedule.md` (A1–A7), спека — `…/specs/2026-10-14-paying-users-protection-and-schedule-design.md`;
+**пакет выкладки — `docs/audits/2026-10-15-paying-users-protection/README.md`** (таблица id → генератор → граф до/после, миграции,
+учётка, чек-лист по шагам, smoke, откат, «что не выкладывается», репетиция, остатки и device-pass). Прод НЕ тронут (только снимок
+`verify-deployed`). Сделано: A1 — RevenueCat Events идемпотентен (`Dedup Gate` + `rc_event_ledger` в транзакции апсерта, `do update`
+только при записи id); A2 — `billing_consolidation.py` + генератор/верификатор, узкий перенос плана при топ-апе первым событием;
+A3 — identity-heal `crVerifyIdent001` (RevenueCat v2 aliases, перенос только В id токена, журнал `identity_heal_log`, отказы 409/502/503)
++ claim.verify переключает `app_user_id` + клиентский триггер с защёлкой 24 ч; A4 — `Live Profiles` в orphan sweep (живая строка ∧
+когда-то авторизован), `crChannelWatch001` «канал отключился» (≤ 6 попыток, маршрут только по списку этого прогона), клиентская метка
+«Канал отключён»; A5 — номер владельца в Notifier по правилу V2 (`OWNER_PHONE_JS`, общий с watch); A6 — «Подписка» = вердикт гейта,
+резерв виден и «заморожен» без тарифа; A7 — пакет, репетиция, документы (CLAUDE.md «Part A», README, стейл-строки), e2e
+`sweep_removes_booked_clone` следует живому режиму ветки A (шаг 12), отработавшие пробы/клоны e2e удаляются ≥ 35 с спустя.
+
+| Проверка (дерево части A) | Результат |
+|---|---|
+| Генераторы `--check` | 21/21 exit 0 (+ `apply-delete-history.py` RETIRED — отказывает по замыслу, `test_legacy_generators`) |
+| Верификаторы | 13/13 + `verify-telegram-parity --self-test` 33/33 + `verify_rag all` + `verify-panel-prompts.js` — все 0; `verify-sql-comments` 98 Postgres-узлов в 30 файлах OK |
+| `tests/run_all.py` | 38 файлов, 1340 случаев, 0 падений (40,5 мин) |
+| Unity EditMode (headless, полный) | 3181/3181 |
+| Миграции на свежем кластере | `pg.sh init` + `migrate` ×2 и порядок прода (схема прода → M1 → M2 → M3 → повтор) — пост-проверка `2 \| 6 \| 8 \| t \| 0 \| f \| 4` каждый раз |
+| Снимок прода «до» | канон 29, diff 11 = ровно пакет (DIFF ×9 + MISSING ×2), клонов 0; прод = канон `927e1067` 27/27 |
+| Репетиция на staging | `--canon-ref 927e1067` → стенд = прод (статусы 29 id совпали со снимком прода) → M1–M3 через Postgres-узел n8n → учётка CLI с id `crRevenueCatApi1` (REST: 400 «id is read-only») → dry-run = ровно 8 + 2 missing (+ SWS) → SWS → импорт + API-включение двух новых → 8 по одному (все «published by the PUT», read-back ok) → `update-clones` 0 к обновлению → `verify-deployed` diff 0 → smoke как ожидалось → первый тик watch без отправок; 0 ошибок insights с момента старта сервера |
+| e2e на развёрнутом стенде | e2e-auth 63/63 (вкл. модельный шаг ×2); e2e-handoff 21/21 (вкл. `notifier_owner_number_by_v2_rule`); e2e-reply 44/44; после e2e `verify-deployed` diff 0; стенд остановлен |
+
+Вывод каждого шага (гейты, снимок прода, офлайн-сверка, миграции, R1–R15, e2e) — `docs/audits/2026-10-15-paying-users-protection/rehearsal.txt`;
+снимок «до» — `…/prod-before.json`; пред/пост-проверка миграций — `…/precheck.sql`, `…/postcheck.sql`.
+
+**Ждёт:** «да» владельца на выкладку (чек-лист пакета, исполняет контроллер); клиентская половина (A3/A4/A6) — новая сборка →
+device-pass (пункты — в пакете, «Остатки и device-pass») → наблюдения A4/A5 на живом боте по отдельному «да»; часть B — отдельно.
+**Отложенные minor** — сводка у контроллера (`.superpowers/sdd/2026-10-14-paying-users-protection-and-schedule/progress.md`, строки
+«minor (deferred)»); закрыты этой задачей: стейл-документы A1/A2/A3/A4/A6 (CLAUDE.md, README, `probe-billing.py`,
+`verify-telegram-parity.py`), e2e `sweep_removes_booked_clone`, цикл insights e2e-auth на стенде. Остаются на финальное ревью:
+A1 — V NEG проверка ловит любой PARITY FAIL по файлу RC (не по метке), комментарий Upsert «на уникальном индексе» (на
+существующей строке — блокировка строки); A2 — нет гонки «перенос без плана против апсерта с планом», `trial_started_at` у
+перенесённого платного плана (никто не читает), перенос `active`-алиаса с истёкшим периодом (принято), список платных тарифов
+сцеплен с Map Event / Count Dialog, `assert`-отказы генератора при `python -O`, DRY `nd()`/`canon_copy()`; A3 — защёлка
+запуска (в памяти) помнит только последнюю пару, защёлка в файле триггера и +72 строки в `Manager.cs` (просится partial), страж «одна точка
+отметки» смотрит только `Manager.cs`, `identity_heal_log` без срока хранения (решение финального ревью), устаревший комментарий
+«A refusal writes nothing» (`build-verify-identity.py:120` + Plan Heal), строки `hint_not_alias` хранят список RevenueCat, а не
+подсказку клиента, клиентские тесты отказа на 200 + `success:false` (сервер отвечает 409); A5 — паритет с Claim Decide закреплён
+16 формами, не генеративно, переименовать внутренний `st` в `OWNER_PHONE_JS`; A4 — молчаливые пропуски (порог/пол) на проде без
+следа (наблюдаемость), DRY (`ChannelHealth` обходит сцену, `Manager.ChannelHealth.cs` повторяет `ProfileClaimFlow.BotFor`), попытки
+тратятся без маршрута, DOWN-ветка пишет `notify_attempts` безусловно (перекрывающиеся прогоны), проба настроек удаляет без
+проверки эха (до части A), вызовы heal до `LoadingPanel.SetActive(false)`; A6 — строка «заморожен…» переносится на 2 строки
+(решение владельца по тексту на device-pass), контракт сцены `ReserveLine` ⊂ `Meters` без стража, видимость блока по строке, а не
+по метке, `started && days <= 0` ×3, `RenderMeters` 53 строки, затравка билдера `false` → `frozen: false`; A7 — проба цены в
+`e2e-test-dialog.py` и уборка `e2e-clone-update.py` по-прежнему удаляют отработавший workflow сразу (шум insights только стенда,
+описан в `staging/README.md`).
