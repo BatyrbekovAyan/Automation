@@ -248,10 +248,13 @@ def main():
         ])
         print("4. created n8n-API credentials bound to the staging key")
     # A3 (2026-10-14): Verify Identity asks RevenueCat for a customer's aliases with the «RevenueCat API» Header-Auth
-    # credential. On staging the host is the mock (derive-staging.py) — the value is a dummy, never a RevenueCat key.
+    # credential. On staging the host is the mock (derive-staging.py) — the value is a dummy, never a RevenueCat key. Its id
+    # is the CANONICAL one (A7, 2026-10-15: the package creates the prod credential with this same fixed id through
+    # `n8n import:credentials`), so the derived Verify Identity keeps the canon's binding byte for byte; a stand bootstrapped
+    # earlier may still carry `stgRevenueCatApi1` — derive-staging.py re-binds by name, either works.
     if "RevenueCat API" not in cred_names():
         stop_server()
-        import_decrypted_creds([{"id": "stgRevenueCatApi1", "name": "RevenueCat API", "type": "httpHeaderAuth",
+        import_decrypted_creds([{"id": "crRevenueCatApi1", "name": "RevenueCat API", "type": "httpHeaderAuth",
                                  "data": {"name": "Authorization", "value": "Bearer stg-mock-not-a-revenuecat-key"}}])
         print("4. created «RevenueCat API» (dummy, the staging RevenueCat host is the mock)")
     # 5. workflows
