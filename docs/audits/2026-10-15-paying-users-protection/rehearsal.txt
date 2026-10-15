@@ -711,3 +711,485 @@ mock pid(s): 48590
 waiting for server to shut down.... done
 server stopped
 mock stopped (kill of each pid; the first combined kill failed: two pids in one word)
+
+=== §F. Повторная репетиция после финального ревью (2026-10-15; канон пакета 9cd33a6c) ===
+Что изменилось после §0–§E (первая репетиция, канон 9caddb6f): I-1 (7aa6f091) — billing_consolidation.TAKE берёт и
+затравку, погашенную свипом (plan 'trial', status 'expired', период NULL) → графы RevenueCat Events и Verify Identity, плюс
+комментарий Upsert Subscriber; M-5 (9cd33a6c) — identity_heal_log.hint (подсказка клиента в обеих строках журнала) → граф Verify
+Identity и миграция M3 (ещё не выложена). I-2 (2303cff7) — только клиент. Остальные 9 графов пакета — те же хэши «после».
+Только staging; прод не трогался.
+
+--- §F.0 Гейты на дереве 9cd33a6c
+rc=0 apply-auth-gate.py :: auth gate: OK
+rc=0 apply-billing-consolidation.py :: billing consolidation: OK
+rc=0 apply-clone-lifecycle.py :: clone lifecycle: OK
+rc=0 apply-history-handoff.py :: history/handoff: OK
+rc=0 apply-learning-a.py :: learning A: OK
+rc=0 apply-learning-b.py :: learning B: OK
+rc=0 apply-outcome-stamps.py :: outcome stamps: OK
+rc=0 apply-reply-mode-v2.py :: reply-mode v2: OK
+rc=0 apply-reply-pipeline-v2.py :: reply pipeline v2: OK
+rc=0 apply-slot-count-fix.py :: OK  Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json
+rc=0 apply-suggest-v2.py :: suggest v2: OK
+rc=0 apply-sweep-clone-deactivate.py :: sweep clone deactivate: OK
+rc=0 build-auth-workflows.py :: auth workflows: up to date
+rc=0 build-channel-watch.py :: channel watch: OK
+rc=0 build-handoff-workflows.py :: handoff workflows: OK
+rc=0 build-price-search.py :: price search: OK
+rc=0 build-test-dialog.py :: test dialog: OK
+rc=0 build-verify-identity.py :: verify identity: OK
+rc=0 clone_lineage.py :: clone_lineage: 11 statements, 0 findings
+rc=0 inject-panel-prompts.py :: 9PTyYcelRQI7bGDb-Suggest_Replies.json: up-to-date
+rc=0 inject-prompts.py (tiktoken venv) :: TwWPW3gIyjZS3foR-Edit_Telegram_Workflow.json: kind=edit up-to-date
+rc=0 verify-auth-gate.py :: ALL AUTH GATE ASSERTS PASSED
+rc=0 verify-billing-consolidation.py :: ALL BILLING CONSOLIDATION ASSERTS PASSED
+rc=0 verify-channel-watch.py :: ALL CHANNEL WATCH ASSERTS PASSED
+rc=0 verify-clone-lifecycle.py :: ALL CLONE LIFECYCLE ASSERTS PASSED
+rc=0 verify-history-handoff.py :: ALL HISTORY/HANDOFF ASSERTS PASSED
+rc=0 verify-learning-a.py :: learning A verify: OK
+rc=0 verify-learning-b.py :: learning B verify: OK
+rc=0 verify-message-batching.py :: ALL BATCHING ASSERTS PASSED
+rc=0 verify-orphan-sweep.py :: ALL ORPHAN SWEEP ASSERTS PASSED
+rc=0 verify-reply-mode.py :: ALL REPLY MODE ASSERTS PASSED
+rc=0 verify-reply-pipeline.py :: ALL REPLY PIPELINE ASSERTS PASSED
+rc=0 verify-telegram-parity.py :: ALL PARITY ASSERTS PASSED
+rc=0 verify-verify-identity.py :: ALL VERIFY IDENTITY ASSERTS PASSED
+rc=0 verify-telegram-parity.py --self-test :: SELF-TEST PASSED: 33/33 cases
+rc=0 verify-sql-comments.py :: OK  98 Postgres node(s) in 30 workflow file(s): no placeholder outside code, no {{ }}, no modifier, no leading =
+rc=0 verify_rag.py all :: VERIFY OK: all
+rc=0 verify-panel-prompts.js :: PASS
+tests/run_all.py (10:11:29Z → 11:10:13Z):
+OK   test_auth_refresh.py: 12 pass, 0 fail
+OK   test_billing_consolidation.py: 55 pass, 0 fail
+OK   test_billing_identity.py: 24 pass, 0 fail
+OK   test_channel_watch.py: 118 pass, 0 fail
+OK   test_claim.py: 22 pass, 0 fail
+OK   test_clone_lineage_sql.py: 50 pass, 0 fail
+OK   test_clone_retirements.py: 21 pass, 0 fail
+OK   test_create_clone.py: 70 pass, 0 fail
+OK   test_create_seed.py: 53 pass, 0 fail
+OK   test_deploy_canonical.py: 28 pass, 0 fail
+OK   test_handoff_notifier.py: 51 pass, 0 fail
+OK   test_harness_selfcheck.py: 2 pass, 0 fail
+OK   test_identity_heal.py: 39 pass, 0 fail
+OK   test_learning_a.py: 5 pass, 0 fail
+OK   test_learning_b.py: 9 pass, 0 fail
+OK   test_legacy_generators.py: 5 pass, 0 fail
+OK   test_memory_context.py: 25 pass, 0 fail
+OK   test_orphan_sweep.py: 43 pass, 0 fail
+OK   test_price_search.py: 36 pass, 0 fail
+OK   test_rc_event_ledger.py: 40 pass, 0 fail
+OK   test_reply_lost_send.py: 21 pass, 0 fail
+OK   test_reply_memory.py: 56 pass, 0 fail
+OK   test_reply_memory_concurrent.py: 9 pass, 0 fail
+OK   test_reply_mode.py: 43 pass, 0 fail
+OK   test_reply_order.py: 44 pass, 0 fail
+OK   test_reply_reconcile.py: 66 pass, 0 fail
+OK   test_retired_delete.py: 13 pass, 0 fail
+OK   test_sql_comment_injection.py: 42 pass, 0 fail
+OK   test_suggest_catalog.py: 24 pass, 0 fail
+OK   test_suggest_lang.py: 11 pass, 0 fail
+OK   test_suggest_price.py: 16 pass, 0 fail
+OK   test_suggest_query.py: 37 pass, 0 fail
+OK   test_test_dialog.py: 17 pass, 0 fail
+OK   test_upload.py: 45 pass, 0 fail
+OK   test_verify_clone_lifecycle.py: 44 pass, 0 fail
+OK   test_verify_deployed.py: 48 pass, 0 fail
+OK   test_verify_parity.py: 52 pass, 0 fail
+OK   test_verify_sql_comments.py: 53 pass, 0 fail
+EXIT=0
+2026-10-15T11:10:13Z
+Unity EditMode (headless): фильтр "ChannelHealth|BotSettings|AuthWiring|Billing" — 198/198; полный — {"status": "completed", "source": "headless", "overall": "Passed", "total": 3184, "passed": 3184, "failed": 0, "skipped": 0, "inconclusive": 0, "green": true, "unityExit": 0}
+
+--- §F.1 Графы «после» (verify-deployed.graph_hash канона 9cd33a6c)
+ZGYr6srzS3rSSXHp-RevenueCat_Events.json   8ce1e0a256a1 -> a3c52f30dcf7   (первая репетиция: -> 1196077677b4)
+crVerifyIdent001-Verify_Identity.json     MISSING      -> b329f4831d9e   (первая репетиция: -> 3af1831f3ca4)
+остальные 9 — как в §A: 36b6a73e9773, d617975779c3, 51becea5ebee, 78ed47e160c0, faeae51618cd, e907de5eae43, 53faf5b0fbe6,
+624c8bd7733f, 64f4c6dfda90
+
+--- §F.2 M3 с колонкой hint на СВЕЖЕМ одноразовом кластере (5434, scratchpad): pg.sh init + migrate ×2, порядок прода ×2, путь обновления с прежнего M3
+### (i) pg.sh init on a FRESH throwaway cluster (port 5434, /private/tmp/claude-501/-Users-ayan-Projects-Automation/8b4ea3fa-858a-4284-96f0-2487af55c852/scratchpad/final-fix/pgdata-ff) — every migration in order
+initdb done -> /private/tmp/claude-501/-Users-ayan-Projects-Automation/8b4ea3fa-858a-4284-96f0-2487af55c852/scratchpad/final-fix/pgdata-ff
+waiting for server to start.... done
+server started
+database choosereply_staging created (owner n8n_staging — the n8n credential user, table owner like prod)
+(… the migrations up to 2026-09 — the same list as §B (i), elided here …)
+apply 2026-10-07-claim-code-attempts.sql
+apply 2026-10-07-retired-clone-deactivate.sql
+apply 2026-10-11-billing-conflicts.sql
+apply 2026-10-11-bot-lineage.sql
+apply 2026-10-12-memory-marks-backfill.sql
+apply 2026-10-14-rc-event-ledger.sql
+apply 2026-10-15-identity-heal-log.sql
+psql:/Users/ayan/Projects/Automation/Tools/n8n/sql/2026-10-15-identity-heal-log.sql:33: NOTICE:  column "hint" of relation "identity_heal_log" already exists, skipping
+apply 2026-10-14-channel-snapshot.sql
+psql:/Users/ayan/Projects/Automation/Tools/n8n/sql/2026-10-14-channel-snapshot.sql:33: NOTICE:  column "notify_attempts" of relation "channel_snapshot" already exists, skipping
+migrations applied to choosereply_staging@127.0.0.1:5434
+init rc=0
+### post-check after init (expect 2 | 6 | 9 | t | 0 | f | 4)
+2 | 6 | 9 | t | 0 | f | 4
+### pg.sh migrate — pass 2 (idempotency)
+apply 2026-10-15-identity-heal-log.sql
+psql:/Users/ayan/Projects/Automation/Tools/n8n/sql/2026-10-15-identity-heal-log.sql:28: NOTICE:  relation "identity_heal_log" already exists, skipping
+psql:/Users/ayan/Projects/Automation/Tools/n8n/sql/2026-10-15-identity-heal-log.sql:29: NOTICE:  relation "identity_heal_log_to_idx" already exists, skipping
+psql:/Users/ayan/Projects/Automation/Tools/n8n/sql/2026-10-15-identity-heal-log.sql:33: NOTICE:  column "hint" of relation "identity_heal_log" already exists, skipping
+migrate#2 rc=0
+### pg.sh migrate — pass 3 (idempotency)
+apply 2026-10-15-identity-heal-log.sql
+psql:/Users/ayan/Projects/Automation/Tools/n8n/sql/2026-10-15-identity-heal-log.sql:28: NOTICE:  relation "identity_heal_log" already exists, skipping
+psql:/Users/ayan/Projects/Automation/Tools/n8n/sql/2026-10-15-identity-heal-log.sql:29: NOTICE:  relation "identity_heal_log_to_idx" already exists, skipping
+psql:/Users/ayan/Projects/Automation/Tools/n8n/sql/2026-10-15-identity-heal-log.sql:33: NOTICE:  column "hint" of relation "identity_heal_log" already exists, skipping
+migrate#3 rc=0
+### post-check after the repeats (expect the same)
+2 | 6 | 9 | t | 0 | f | 4
+### (ii) the PROD order: back to prod's schema (the three new tables dropped), then M1 -> M2 -> M3
+### precheck (expect t | t | t)
+t | t | t
+apply 2026-10-14-rc-event-ledger.sql
+rc=0
+apply 2026-10-14-channel-snapshot.sql
+psql:Tools/n8n/sql/2026-10-14-channel-snapshot.sql:33: NOTICE:  column "notify_attempts" of relation "channel_snapshot" already exists, skipping
+rc=0
+apply 2026-10-15-identity-heal-log.sql
+psql:Tools/n8n/sql/2026-10-15-identity-heal-log.sql:33: NOTICE:  column "hint" of relation "identity_heal_log" already exists, skipping
+rc=0
+### post-check (expect 2 | 6 | 9 | t | 0 | f | 4)
+2 | 6 | 9 | t | 0 | f | 4
+### the same three again (idempotency)
+apply 2026-10-14-rc-event-ledger.sql
+psql:Tools/n8n/sql/2026-10-14-rc-event-ledger.sql:20: NOTICE:  relation "rc_event_ledger" already exists, skipping
+rc=0
+apply 2026-10-14-channel-snapshot.sql
+psql:Tools/n8n/sql/2026-10-14-channel-snapshot.sql:29: NOTICE:  relation "channel_snapshot" already exists, skipping
+psql:Tools/n8n/sql/2026-10-14-channel-snapshot.sql:33: NOTICE:  column "notify_attempts" of relation "channel_snapshot" already exists, skipping
+rc=0
+apply 2026-10-15-identity-heal-log.sql
+psql:Tools/n8n/sql/2026-10-15-identity-heal-log.sql:28: NOTICE:  relation "identity_heal_log" already exists, skipping
+psql:Tools/n8n/sql/2026-10-15-identity-heal-log.sql:29: NOTICE:  relation "identity_heal_log_to_idx" already exists, skipping
+psql:Tools/n8n/sql/2026-10-15-identity-heal-log.sql:33: NOTICE:  column "hint" of relation "identity_heal_log" already exists, skipping
+rc=0
+2 | 6 | 9 | t | 0 | f | 4
+### (iii) the upgrade path: identity_heal_log as the PREVIOUS M3 left it (no hint, one row), the new M3 re-applied
+previous M3 rc=0
+columns before: 8
+psql:Tools/n8n/sql/2026-10-15-identity-heal-log.sql:28: NOTICE:  relation "identity_heal_log" already exists, skipping
+psql:Tools/n8n/sql/2026-10-15-identity-heal-log.sql:29: NOTICE:  relation "identity_heal_log_to_idx" already exists, skipping
+new M3 rc=0
+columns after: id,install_id,to_app_user_id,aliases,consolidated,rekeyed,healed_at,reason,hint
+the old row kept: 1 row(s), hint NULL
+2 | 6 | 9 | t | 0 | f | 4
+### stop the throwaway cluster
+waiting for server to shut down.... done
+server stopped
+
+--- §F.3 RED на настоящем n8n: стенд с каноном ДО исправлений (df5aa5f1), сценарии — из рабочего дерева
+2026-10-15T11:10:47Z
+### RED stand: bootstrap.py --bot wa:stgwa001 --bot tg:stgtg001 --canon-ref df5aa5f1 (the package canon BEFORE the final-review fixes)
+   Deactivating workflow "Support Message".
+   Deactivating workflow "STAGING Eval Runner".
+   Deactivating workflow "STAGING TG stgtg001".
+   Deactivating workflow "STAGING WA stgwa001".
+   Successfully imported 32 workflows.
+5. imported 30 workflows + 2 staging bots; published 30
+2. server up at http://localhost:5678 (pid 16568, log /Users/ayan/.n8n-staging/n8n.log)
+staging ready: http://localhost:5678
+bootstrap rc=
+2026-10-15T11:16:24Z
+### RED: e2e-auth.py --only identity_heal on the pre-fix canon df5aa5f1 (scenarios from the working tree)
+FAIL  identity_heal_consolidates_into_token_id (4.1s) — A3: after a reinstall the app calls VerifyIdentity; RevenueCat (the mock: v2 aliases of the TOKEN's id, asked with the «RevenueCat API» credential) lists [old, u] → the old id's paid month (business/active/its period/SKU, 500 of balance, this month's dialogs) moves INTO the token's id and the old id is retired; this install's live bot_profiles row under the old id follows u, another install's stays; a repeat changes nothing (row versions); each healed verdict  …
+      journal after the heal='cd6d8157-924d-4696-90a6-d973770e4c90|$RCAnonymousID:e2e0e2e0c1b5e5f8b48a6c35d0ef8157|1|1|healed|-' after the repeat='cd6d8157-924d-4696-90a6-d973770e4c90|$RCAnonymousID:e2e0e2e0c1b5e5f8b48a6c35d0ef8157|1|1|healed|-;cd6d8157-924d-4696-90a6-d973770e4c90|$RCAnonymousID:e2e0e2e0c1b5e5f8b48a6c35d0ef8157|0|0|healed|-' (want 'cd6d8157-924d-4696-90a6-d973770e4c90|$RCAnonymousID:e2e0e2e0c1b5e5f8b48a6c35d0ef8157|1|1|healed|$RCAnonymousID:e2e0e2e0c1b5e5f8b48a6c35d0ef8157;cd6d8157-924d-4696-90a6-d …
+PASS  identity_heal_refuses_without_token (4.4s) — A3: VerifyIdentity without a token / with a forged one → 401; with a token that carries NO billing id (billingConflict: another install holds it) or a body naming another recipient → 403 — RevenueCat is never asked, nothing is written
+      no token=401 {'success': False, 'error': 'unauthorized', 'reason': 'unauthorized:missing'} forged=401 no-billing-id token=403 {'success': False, 'error': 'unauthorized', 'reason': 'forbidden:appUserId'} foreign recipient=403 {'success': False, 'error': 'unauthorized', 'reason': 'forbidden:appUserId'} RevenueCat calls=0 row versions unchanged=True journal='' (want none)
+FAIL  identity_heal_ignores_foreign_hint (13.3s) — A3: a hint RevenueCat does NOT list for the token's id → 409 {success:false, reason:hint_not_alias} and nothing written to subscribers / bot_profiles — although RevenueCat lists a real alias — but ONE identity_heal_log row for support (after the answer); a RevenueCat error (500) → 502 rc_unavailable, nothing written, no journal row
+      foreign hint=409 {'success': False, 'reason': 'hint_not_alias'} RevenueCat 500=502 {'success': False, 'reason': 'rc_unavailable'} RevenueCat calls=[('947ea3488be3/aliases', 200), ('947ea3488be3/aliases', 500)] row versions unchanged=True owner=trial|trialing|0|-|- journal after the refusal='78f8b7ed-13a6-4929-8171-81eab364167a|$RCAnonymousID:e2e0e2e0bde1c22124e00e4a8b4164a9|0|0|hint_not_alias|-' after the outage='78f8b7ed-13a6-4929-8171-81eab364167a|$RCAnonymousID:e2e0e2e0bde1c22124e00e4a8b4164a9|0|0|hint_not …
+FAIL  identity_heal_after_sweep_demotion (1.6s) — final review I-1: the token's id is the trial seed the lifecycle sweep already DEMOTED (the imported sweep's own Demote Trialing: trial/expired/NULL — on iOS, StoreKit 1 restores nothing by itself, so the merge and this heal usually come after the 4d17h sweep) → VerifyIdentity still hands the paid alias over: the owner is business/active/<the old period>/SKU with the old balance, the old id retired — not locked out until the next renewal
+      sweep demoted the seed: '$RCAnonymousID:e2e0e2e0674af185c8adf0342964757a|e2e-a3d-d0c12f2f6182|whatsapp|trial_expiry\nUPDATE 1' → owner trial|expired|0|-|-; heal=200 {'success': True, 'aliases': 1, 'consolidated': 1, 'rekeyed': 1, 'truncated': False}; owner → trial|expired|500|-|- (want business|active|500|2026-11-14 16:16:56.255186+05|sub.business.month); alias → business|expired|0|2026-10-15 16:16:56.728014+05|sub.business.month; journal='d2f05a44-3bb6-465e-a991-628501c651bf|$RCAnonymousID:e2e0e2e0e09bd2fd0a …
+1 pass, 3 fail
+2026-10-15T11:17:06Z
+[the details above are cut at 520 chars; full text: Tools/test-output/final-fix/reh/R0-red-e2e.txt] identity_heal_after_sweep_demotion:
+heal=200 {success, consolidated 1, rekeyed 1}, yet owner → trial|expired|500|-|- (want business|active|500|<the old period>|
+sub.business.month) — the paid alias retired without its plan: the I-1 lockout, on the real n8n. The two journal FAILs: every row's
+hint is '-' (the pre-M-5 canon writes none) — the refusal row of identity_heal_ignores_foreign_hint does not name the refused id.
+
+--- §F.4 Стенд = прод → пакет (канон 9cd33a6c), порядок чек-листа
+2026-10-15T11:17:13Z
+### R1 stand = prod: bootstrap.py --bot wa:stgwa001 --bot tg:stgtg001 --canon-ref 927e1067
+2. server up at http://localhost:5678 (pid 18060, log /Users/ayan/.n8n-staging/n8n.log)
+3. API key already present
+   Successfully imported 30 workflows.
+5. imported 28 workflows + 2 staging bots; published 30
+2. server up at http://localhost:5678 (pid 18387, log /Users/ayan/.n8n-staging/n8n.log)
+staging ready: http://localhost:5678
+
+2026-10-15T11:21:44Z
+### R2 emulate the prod state: the two new workflows and «RevenueCat API» absent, the three tables absent
+crVerifyIdent001 deactivate 200
+crChannelWatch001 deactivate 200
+waiting 35 s before deleting (insights rule)
+crVerifyIdent001 delete 200 -> GET 404
+crChannelWatch001 delete 200 -> GET 404
+credential crRevenueCatApi1 RevenueCat API delete 200
+RevenueCat API credentials left: []
+precheck (expect t | t | t):
+t | t | t
+
+2026-10-15T11:22:35Z
+### R3 verify-deployed on the stand = prod (expect canonical 29, diff 11 — the package, statuses as the prod snapshot)
+base http://localhost:5678: canonical 29 (diff 11), clones 2 (behind template 0, of them prompt head behind 0; custom prompts 2, not counted), archived clones 0 (not counted), other 2
+  prompt map = Create/Edit Vertical Prompt as introduced in 126f44c2 (sha256 49abaeb19ea8)
+  DIFF    0DP79STI3pafXO9B 0DP79STI3pafXO9B-Set_Workflow_State.json  active=True names=True graph=False published=False  (stored graph differs; PUBLISHED graph differs)
+  DIFF    2islisFH7jjLoPQM 2islisFH7jjLoPQM-Delete_Orphan_Profiles.json  active=True names=False graph=False published=False  (node set differs; stored graph differs; PUBLISHED graph differs)
+  DIFF    Uz6HBBUpAiUqVysB Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json  active=True names=True graph=False published=False  (stored graph differs; PUBLISHED graph differs)
+  DIFF    XuvOp7TxOImOAmlj XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json  active=True names=True graph=False published=False  (stored graph differs; PUBLISHED graph differs)
+  DIFF    ZGYr6srzS3rSSXHp ZGYr6srzS3rSSXHp-RevenueCat_Events.json  active=True names=False graph=False published=False  (node set differs; stored graph differs; PUBLISHED graph differs)
+  DIFF    crAuthSession001 crAuthSession001-Auth_Session.json  active=True names=True graph=False published=False  (stored graph differs; PUBLISHED graph differs)
+  MISSING crChannelWatch001 crChannelWatch001-Channel_Watch.json  active=None names=None graph=None published=None
+  DIFF    crHandoffNtfy001 crHandoffNtfy001-Handoff_Notifier.json  active=True names=True graph=False published=False  (stored graph differs; PUBLISHED graph differs)
+  MISSING crVerifyIdent001 crVerifyIdent001-Verify_Identity.json  active=None names=None graph=None published=None
+  DIFF    fXYpCXPKw92EzRz8 fXYpCXPKw92EzRz8-Profile_Lifecycle_Sweep.json  active=True names=True graph=False published=False  (stored graph differs; PUBLISHED graph differs)
+  DIFF    lmjYsdNcQA2IE5rl lmjYsdNcQA2IE5rl-Delete_Bot_Files.json  active=True names=True graph=False published=False  (stored graph differs; PUBLISHED graph differs)
+  clone   stgtg40da979c774 'STAGING TG stgtg001' [telegram] active=True nodes=60 graph=1381faffd630 published=1381faffd630 sticky=None AT-CANONICAL  prompt=custom (custom prompt — kept verbatim by update-clones, not counted: no Create/Edit grammar (Business Type line + Additional Instructions marker))
+  clone   stgwab77f282533c 'STAGING WA stgwa001' [whatsapp] active=True nodes=60 graph=b1a6f7240ad6 published=b1a6f7240ad6 sticky=None AT-CANONICAL  prompt=custom (custom prompt — kept verbatim by update-clones, not counted: no Create/Edit grammar (Business Type line + Additional Instructions marker))
+wrote /private/tmp/claude-501/-Users-ayan-Projects-Automation/8b4ea3fa-858a-4284-96f0-2487af55c852/scratchpad/final-fix/reh/stg-before.json
+exit=
+status per canonical id identical to the prod snapshot: True | DIFF/MISSING: ['0DP79STI3pafXO9B', '2islisFH7jjLoPQM', 'Uz6HBBUpAiUqVysB', 'XuvOp7TxOImOAmlj', 'ZGYr6srzS3rSSXHp', 'crAuthSession001', 'crChannelWatch001', 'crHandoffNtfy001', 'crVerifyIdent001', 'fXYpCXPKw92EzRz8', 'lmjYsdNcQA2IE5rl']
+
+2026-10-15T11:22:46Z
+### R4 migrations through n8n's own Postgres node (stg-sql-oneoff = sql-oneoff.py's harness on staging), the package's order — M3 is the final-review file (hint)
+--- docs/audits/2026-10-15-paying-users-protection/precheck.sql
+200 {"no_ledger":true,"no_snapshot":true,"no_heal_log":true}
+--- Tools/n8n/sql/2026-10-14-rc-event-ledger.sql
+200 {"success":true}
+--- Tools/n8n/sql/2026-10-14-channel-snapshot.sql
+200 {"success":true}
+--- Tools/n8n/sql/2026-10-15-identity-heal-log.sql
+200 {"success":true}
+--- docs/audits/2026-10-15-paying-users-protection/postcheck.sql
+200 {"ledger_cols":"2","snapshot_cols":"6","heal_cols":"9","rls":true,"client_grants":"0","seq_client_usage":false,"indexes":"4"}
+2026-10-15T11:25:51Z
+
+2026-10-15T11:25:57Z
+### R5 credential «RevenueCat API» crRevenueCatApi1 — CLI import:credentials while the server RUNS (prod path); dummy value
+written 164 bytes (dummy value)
+server before import: 200
+Successfully imported 1 credential.
+import rc=0
+local-copy-removed
+server after import: 200
+credentials named RevenueCat API now:
+crRevenueCatApi1 | RevenueCat API | httpHeaderAuth
+
+2026-10-15T11:26:11Z
+### R6 the package's step 2c — the README's own heredoc (extracted, list indentation removed), staging values: B = staging n8n, RC = the mock, «Postgres Staging», a fixture owner prefix
+extracted 48 lines; env line: B="$B" RC=https://api.revenuecat.com OWNER_PREFIX=4a7af3f8 PG_ID=vvRrFiEXzLVqKjOx PG_NAME=Postgres python3 - <<'PY'
+{"ok": true, "customer": {"aliases": ["$RCAnonymousID:e2e0ffa1c0ffee00c0ffee00c0ffee00"], "status": 200, "body": null}}
+### 2c on staging — the fixture owner (expect: activate 200 | owner rows 1 | RevenueCat HTTP status 200; deleted 200 -> GET 404)
+activate 200 | owner rows 1 | RevenueCat HTTP status 200
+temp workflow deleted 200 -> GET 404
+### 2c on staging — a prefix with no owner row (expect: owner rows 0 | RevenueCat HTTP status 404 — the key still proven)
+activate 200 | owner rows 0 | RevenueCat HTTP status 404
+temp workflow deleted 200 -> GET 404
+### what the mock saw (RevenueCat calls since the marker: path tail, auth scheme, status)
+  GET /%24RCAnonymousID%3Ae2e0ffa1c0ffee00c0ffee00c0ffee00/aliases {'limit': '1'} auth Bearer -> 200
+  GET /revenuecat/v2/projects/0f8c9529/customers/none/aliases {'limit': '1'} auth Bearer -> 404
+{"ok": true, "customer": null}
+probe workflows left: 0
+2026-10-15T11:27:29Z
+
+2026-10-15T11:27:36Z
+### R7 deploy-canonical dry-run on staging (derived canon), after the credential step — RevenueCat Events must be among the 8, Verify Identity among the 2 missing
+~ 2islisFH7jjLoPQM 'Delete Orphan Profiles' active=True nodes 13 → 14 (+1 -0)
+    rollback pointer: versionId e7450c18-239f-436d-8515-6c0a23dc1d0f (activeVersionId e7450c18-239f-436d-8515-6c0a23dc1d0f)
+~ Uz6HBBUpAiUqVysB 'CreateTelegramWorkflow' active=True nodes 52 → 52 (+0 -0)
+    rollback pointer: versionId 2dda4e8f-4fc0-4207-ae1f-033ac3ebffd3 (activeVersionId 2dda4e8f-4fc0-4207-ae1f-033ac3ebffd3)
+~ XuvOp7TxOImOAmlj 'CreateWhatsappWorkflow' active=True nodes 52 → 52 (+0 -0)
+    rollback pointer: versionId 2cb5f85c-0eea-4203-b7a8-05edfa949a5e (activeVersionId 2cb5f85c-0eea-4203-b7a8-05edfa949a5e)
+~ ZGYr6srzS3rSSXHp 'RevenueCat Events' active=True nodes 13 → 15 (+2 -0)
+    rollback pointer: versionId ed0fdfa7-5c16-44a3-895e-6085e9017ffd (activeVersionId ed0fdfa7-5c16-44a3-895e-6085e9017ffd)
+~ crAuthSession001 'Auth Session' active=True nodes 26 → 26 (+0 -0)
+    rollback pointer: versionId f909253d-d12e-43b4-a7d2-404f88faf9ca (activeVersionId f909253d-d12e-43b4-a7d2-404f88faf9ca)
+MISSING crChannelWatch001 crChannelWatch001-Channel_Watch.json — import it with n8n import:workflow, not here
+~ crHandoffNtfy001 'Handoff Notifier' active=True nodes 10 → 10 (+0 -0)
+    rollback pointer: versionId 55c345a8-7eb0-467d-8687-5148384c8c98 (activeVersionId 55c345a8-7eb0-467d-8687-5148384c8c98)
+MISSING crVerifyIdent001 crVerifyIdent001-Verify_Identity.json — import it with n8n import:workflow, not here
+~ fXYpCXPKw92EzRz8 'Profile Lifecycle Sweep' active=True nodes 41 → 41 (+0 -0)
+    rollback pointer: versionId dc422784-82be-4ec4-8512-b941e74d51df (activeVersionId dc422784-82be-4ec4-8512-b941e74d51df)
+~ lmjYsdNcQA2IE5rl 'Delete Bot Files' active=True nodes 19 → 19 (+0 -0)
+    rollback pointer: versionId b866de81-7d5a-4c87-8f5d-b6037ace2c1f (activeVersionId b866de81-7d5a-4c87-8f5d-b6037ace2c1f)
+{"considered": 27, "missing": 2, "up_to_date": 17, "would_update": 8, "updated": 0, "would_publish": 0, "republished": 0, "inactive_must_run": 0, "failed": 0}
+exit=
+
+### Set Workflow State (a placeholder workflow — skipped above): the same dry-run with --include-placeholders
+~ 0DP79STI3pafXO9B 'Set Workflow State' active=True nodes 20 → 20 (+0 -0)
+    rollback pointer: versionId 279f553f-7423-47db-9301-ee9af029f2fe (activeVersionId 279f553f-7423-47db-9301-ee9af029f2fe)
+{"considered": 1, "missing": 0, "up_to_date": 0, "would_update": 1, "updated": 0, "would_publish": 0, "republished": 0, "inactive_must_run": 0, "failed": 0}
+exit=0
+
+2026-10-15T11:27:54Z
+### R8 Set Workflow State — the two new ids protected BEFORE they are imported/activated
+~ 0DP79STI3pafXO9B 'Set Workflow State' active=True nodes 20 → 20 (+0 -0)
+    rollback pointer: versionId 279f553f-7423-47db-9301-ee9af029f2fe (activeVersionId 279f553f-7423-47db-9301-ee9af029f2fe)
+    published by the PUT (served version = the update) — no publish call, no deactivate window
+    read-back: ok
+{"considered": 1, "missing": 0, "up_to_date": 0, "would_update": 0, "updated": 1, "would_publish": 0, "republished": 0, "inactive_must_run": 0, "failed": 0}
+exit=0
+
+2026-10-15T11:27:55Z
+### R9 import the two NEW workflows (inactive) while the server RUNS — the prod path (n8n import:workflow); staging imports the DERIVED copies of the final canon
+30 workflows + 2 staging bots -> /Users/ayan/Projects/Automation/Tools/n8n/workflows-staging
+n8n base http://localhost:5678; Wappi -> http://127.0.0.1:8765; postgres -> 'Postgres Staging' (stgPostgres000001)
+note: left dangling on purpose (isolation): ['Support Bot']
+--- import crVerifyIdent001-Verify_Identity
+Importing 1 workflows...
+Successfully imported 1 workflow.
+--- import crChannelWatch001-Channel_Watch
+Importing 1 workflows...
+Successfully imported 1 workflow.
+crVerifyIdent001 (200, {'active': False, 'versionId': 'e06cbd3f-a1af-4607-8700-d13b1818ff62', 'activeVersionId': None, 'published=stored': False, 'creds': ['crRevenueCatApi1', 'stgPostgres000001']})
+crChannelWatch001 (200, {'active': False, 'versionId': '7d61b8dd-a809-4922-bf88-b64e52f08cdf', 'activeVersionId': None, 'published=stored': False, 'creds': ['ZowntFGvApDJ7UzQ', 'stgPostgres000001']})
+
+### R9b activate through the API + read-back (the package's step-5 snippet, base = staging)
+crVerifyIdent001 activate 200 | {'active': True, 'versionId': 'e06cbd3f-a1af-4607-8700-d13b1818ff62', 'activeVersionId': 'e06cbd3f-a1af-4607-8700-d13b1818ff62', 'published=stored': True, 'creds': ['crRevenueCatApi1', 'stgPostgres000001']}
+crChannelWatch001 activate 200 | {'active': True, 'versionId': '7d61b8dd-a809-4922-bf88-b64e52f08cdf', 'activeVersionId': '7d61b8dd-a809-4922-bf88-b64e52f08cdf', 'published=stored': True, 'creds': ['ZowntFGvApDJ7UzQ', 'stgPostgres000001']}
+
+2026-10-15T11:28:16Z
+### R9c smoke Verify Identity right after activation
+GET  /webhook/VerifyIdentity -> {"code":404,"message":"This webhook is not registered for GET requests. Did you mean to make a POST request?","stacktrace":"ResponseError: T
+POST /webhook/VerifyIdentity (no token) -> {"success":false,"error":"unauthorized","reason":"unauthorized:missing"} [401]
+
+2026-10-15T11:28:28Z
+### R10 deploy-canonical --only ZGYr6srzS3rSSXHp --apply --yes
+~ ZGYr6srzS3rSSXHp 'RevenueCat Events' active=True nodes 13 → 15 (+2 -0)
+    rollback pointer: versionId ed0fdfa7-5c16-44a3-895e-6085e9017ffd (activeVersionId ed0fdfa7-5c16-44a3-895e-6085e9017ffd)
+    published by the PUT (served version = the update) — no publish call, no deactivate window
+    read-back: ok
+{"considered": 1, "missing": 0, "up_to_date": 0, "would_update": 0, "updated": 1, "would_publish": 0, "republished": 0, "inactive_must_run": 0, "failed": 0}
+exit=0
+2026-10-15T11:28:29Z
+### R10 deploy-canonical --only 2islisFH7jjLoPQM --apply --yes
+~ 2islisFH7jjLoPQM 'Delete Orphan Profiles' active=True nodes 13 → 14 (+1 -0)
+    rollback pointer: versionId e7450c18-239f-436d-8515-6c0a23dc1d0f (activeVersionId e7450c18-239f-436d-8515-6c0a23dc1d0f)
+    published by the PUT (served version = the update) — no publish call, no deactivate window
+    read-back: ok
+{"considered": 1, "missing": 0, "up_to_date": 0, "would_update": 0, "updated": 1, "would_publish": 0, "republished": 0, "inactive_must_run": 0, "failed": 0}
+exit=0
+2026-10-15T11:28:30Z
+### R10 deploy-canonical --only crHandoffNtfy001 --apply --yes
+~ crHandoffNtfy001 'Handoff Notifier' active=True nodes 10 → 10 (+0 -0)
+    rollback pointer: versionId 55c345a8-7eb0-467d-8687-5148384c8c98 (activeVersionId 55c345a8-7eb0-467d-8687-5148384c8c98)
+    published by the PUT (served version = the update) — no publish call, no deactivate window
+    read-back: ok
+{"considered": 1, "missing": 0, "up_to_date": 0, "would_update": 0, "updated": 1, "would_publish": 0, "republished": 0, "inactive_must_run": 0, "failed": 0}
+exit=0
+2026-10-15T11:28:30Z
+### R10 deploy-canonical --only crAuthSession001 --apply --yes
+~ crAuthSession001 'Auth Session' active=True nodes 26 → 26 (+0 -0)
+    rollback pointer: versionId f909253d-d12e-43b4-a7d2-404f88faf9ca (activeVersionId f909253d-d12e-43b4-a7d2-404f88faf9ca)
+    published by the PUT (served version = the update) — no publish call, no deactivate window
+    read-back: ok
+{"considered": 1, "missing": 0, "up_to_date": 0, "would_update": 0, "updated": 1, "would_publish": 0, "republished": 0, "inactive_must_run": 0, "failed": 0}
+exit=0
+2026-10-15T11:28:31Z
+### R10 deploy-canonical --only XuvOp7TxOImOAmlj --apply --yes
+~ XuvOp7TxOImOAmlj 'CreateWhatsappWorkflow' active=True nodes 52 → 52 (+0 -0)
+    rollback pointer: versionId 2cb5f85c-0eea-4203-b7a8-05edfa949a5e (activeVersionId 2cb5f85c-0eea-4203-b7a8-05edfa949a5e)
+    published by the PUT (served version = the update) — no publish call, no deactivate window
+    read-back: ok
+{"considered": 1, "missing": 0, "up_to_date": 0, "would_update": 0, "updated": 1, "would_publish": 0, "republished": 0, "inactive_must_run": 0, "failed": 0}
+exit=0
+2026-10-15T11:28:32Z
+### R10 deploy-canonical --only Uz6HBBUpAiUqVysB --apply --yes
+~ Uz6HBBUpAiUqVysB 'CreateTelegramWorkflow' active=True nodes 52 → 52 (+0 -0)
+    rollback pointer: versionId 2dda4e8f-4fc0-4207-ae1f-033ac3ebffd3 (activeVersionId 2dda4e8f-4fc0-4207-ae1f-033ac3ebffd3)
+    published by the PUT (served version = the update) — no publish call, no deactivate window
+    read-back: ok
+{"considered": 1, "missing": 0, "up_to_date": 0, "would_update": 0, "updated": 1, "would_publish": 0, "republished": 0, "inactive_must_run": 0, "failed": 0}
+exit=0
+2026-10-15T11:28:33Z
+### R10 deploy-canonical --only lmjYsdNcQA2IE5rl --apply --yes
+~ lmjYsdNcQA2IE5rl 'Delete Bot Files' active=True nodes 19 → 19 (+0 -0)
+    rollback pointer: versionId b866de81-7d5a-4c87-8f5d-b6037ace2c1f (activeVersionId b866de81-7d5a-4c87-8f5d-b6037ace2c1f)
+    published by the PUT (served version = the update) — no publish call, no deactivate window
+    read-back: ok
+{"considered": 1, "missing": 0, "up_to_date": 0, "would_update": 0, "updated": 1, "would_publish": 0, "republished": 0, "inactive_must_run": 0, "failed": 0}
+exit=0
+2026-10-15T11:28:34Z
+### R10 deploy-canonical --only fXYpCXPKw92EzRz8 --apply --yes
+~ fXYpCXPKw92EzRz8 'Profile Lifecycle Sweep' active=True nodes 41 → 41 (+0 -0)
+    rollback pointer: versionId dc422784-82be-4ec4-8512-b941e74d51df (activeVersionId dc422784-82be-4ec4-8512-b941e74d51df)
+    published by the PUT (served version = the update) — no publish call, no deactivate window
+    read-back: ok
+{"considered": 1, "missing": 0, "up_to_date": 0, "would_update": 0, "updated": 1, "would_publish": 0, "republished": 0, "inactive_must_run": 0, "failed": 0}
+exit=0
+
+2026-10-15T11:28:44Z
+### R11 update-clones (dry-run): the templates are not in the package
+{"clones": 2, "up_to_date": 2, "would_update": 0, "updated": 0, "failed": 0}
+exit=0
+
+### R12 verify-deployed after the package
+exit=0
+base http://localhost:5678: canonical 29 (diff 0), clones 2 (behind template 0, of them prompt head behind 0; custom prompts 2, not counted), archived clones 0 (not counted), other 2
+  OK      ZGYr6srzS3rSSXHp ZGYr6srzS3rSSXHp-RevenueCat_Events.json  active=True names=True graph=True published=True
+  OK      crVerifyIdent001 crVerifyIdent001-Verify_Identity.json  active=True names=True graph=True published=True
+
+### deploy-canonical dry-run again (expect: nothing to do)
+{"considered": 27, "missing": 0, "up_to_date": 27, "would_update": 0, "updated": 0, "would_publish": 0, "republished": 0, "inactive_must_run": 0, "failed": 0}
+{"considered": 1, "missing": 0, "up_to_date": 1, "would_update": 0, "updated": 0, "would_publish": 0, "republished": 0, "inactive_must_run": 0, "failed": 0}
+
+2026-10-15T11:29:06Z
+### R13 smoke after the package — the README's step-10 requests against staging (no data changed)
+10.1a GET VerifyIdentity -> Did you mean to make a POST request? Did you mean to make a POST request? [404] 
+10.1b GET RevenueCatEvent -> Did you mean to make a POST request? Did you mean to make a POST request? [404] 
+10.2 POST VerifyIdentity {} -> {"success":false,"error":"unauthorized","reason":"unauthorized:missing"} [401]
+10.2b POST VerifyIdentity forged -> {"success":false,"error":"unauthorized","reason":"unauthorized:bad_signature"} [401]
+10.3 POST WappiProxy no token -> {"success":false,"error":"unauthorized"} [401]
+10.4 POST AuthSession nonsense -> {"success":false,"error":"bad_request"} [400]
+10.5 POST SetWorkflowState activate crChannelWatch001 -> {"success":false,"error":"protected_workflow"} [400]
+10.5b POST SetWorkflowState activate crVerifyIdent001 -> {"success":false,"error":"protected_workflow"} [400]
+10.6 POST DeleteBotFiles forged -> {"success":false,"error":"unauthorized","reason":"unauthorized:bad_signature"} [401]
+
+--- §F.5 e2e на развёрнутом стенде (workflows-staging = канон 9cd33a6c, derive-staging.py в R9)
+2026-10-15T11:29:18Z
+### R14 e2e-auth.py --only identity_heal (the deployed final canon)
+PASS  identity_heal_consolidates_into_token_id (3.4s) — A3: after a reinstall the app calls VerifyIdentity; RevenueCat (the mock: v2 aliases of the TOKEN's id, asked with the «RevenueCat API» credential) lists [old, u] → the old id's paid month (business/active/its period/SKU, 500 of balance, this month's dialogs) moves INTO the token's id and the old id is retired; this install's live bot_profiles row under the old id follows u, another install's stays; a repeat changes nothing (row versions); each healed verdict  …
+      journal after the heal='c796f686-13fe-444b-8cea-4d29a3bbe6a8|$RCAnonymousID:e2e0e2e0e474210efe5a7dd249aa8a80|1|1|healed|$RCAnonymousID:e2e0e2e0e474210efe5a7dd249aa8a80' after the repeat='c796f686-13fe-444b-8cea-4d29a3bbe6a8|$RCAnonymousID:e2e0e2e0e474210efe5a7dd249aa8a80|1|1|healed|$RCAnonymousID:e2e0e2e0e474210efe5a7dd249aa8a80;c796f686-13fe-444b-8cea-4d29a3bbe6a8|$RCAnonymousID:e2e0e2e0e474210efe5a7dd249aa8a80|0|0|healed|$RCAnonymousID:e2e0e2e0e474210efe5a7dd249aa8a80' (want 'c796f686-13fe-444b-8cea-4d29a3b …
+PASS  identity_heal_refuses_without_token (3.8s) — A3: VerifyIdentity without a token / with a forged one → 401; with a token that carries NO billing id (billingConflict: another install holds it) or a body naming another recipient → 403 — RevenueCat is never asked, nothing is written
+      no token=401 {'success': False, 'error': 'unauthorized', 'reason': 'unauthorized:missing'} forged=401 no-billing-id token=403 {'success': False, 'error': 'unauthorized', 'reason': 'forbidden:appUserId'} foreign recipient=403 {'success': False, 'error': 'unauthorized', 'reason': 'forbidden:appUserId'} RevenueCat calls=0 row versions unchanged=True journal='' (want none)
+PASS  identity_heal_ignores_foreign_hint (3.5s) — A3: a hint RevenueCat does NOT list for the token's id → 409 {success:false, reason:hint_not_alias} and nothing written to subscribers / bot_profiles — although RevenueCat lists a real alias — but ONE identity_heal_log row for support (after the answer); a RevenueCat error (500) → 502 rc_unavailable, nothing written, no journal row
+      foreign hint=409 {'success': False, 'reason': 'hint_not_alias'} RevenueCat 500=502 {'success': False, 'reason': 'rc_unavailable'} RevenueCat calls=[('aaa8845b94ab/aliases', 200), ('aaa8845b94ab/aliases', 500)] row versions unchanged=True owner=trial|trialing|0|-|- journal after the refusal='42d07d84-29bd-496c-98f5-5e4d4e5b2538|$RCAnonymousID:e2e0e2e0fd5ccdb720deb9bddc7b324a|0|0|hint_not_alias|$RCAnonymousID:e2e0e2e0c7ff3cb7a4e65ba671887a10' after the outage='42d07d84-29bd-496c-98f5-5e4d4e5b2538|$RCAnonymousID …
+PASS  identity_heal_after_sweep_demotion (2.1s) — final review I-1: the token's id is the trial seed the lifecycle sweep already DEMOTED (the imported sweep's own Demote Trialing: trial/expired/NULL — on iOS, StoreKit 1 restores nothing by itself, so the merge and this heal usually come after the 4d17h sweep) → VerifyIdentity still hands the paid alias over: the owner is business/active/<the old period>/SKU with the old balance, the old id retired — not locked out until the next renewal
+      sweep demoted the seed: '$RCAnonymousID:e2e0e2e00e35951c06f92ab6496ec33b|e2e-a3d-ec91cb27adc7|whatsapp|trial_expiry\nUPDATE 1' → owner trial|expired|0|-|-; heal=200 {'success': True, 'aliases': 1, 'consolidated': 1, 'rekeyed': 1, 'truncated': False}; owner → business|active|500|2026-11-14 16:29:34.251288+05|sub.business.month (want business|active|500|2026-11-14 16:29:34.251288+05|sub.business.month); alias → business|expired|0|2026-10-15 16:29:34.872384+05|sub.business.month; journal='40c554ec-b8ef-442c-921a …
+4 pass, 0 fail
+2026-10-15T11:29:47Z
+### R14 e2e-auth.py --only rc_ (the deployed final canon)
+PASS  rc_webhook_replay_credits_once (3.9s) — A1: RevenueCat delivers the SAME top-up event twice (an answer it did not get → its retry) through the DERIVED RevenueCat Events graph behind a temporary webhook: both answered 200, topup_balance +500 exactly ONCE, ONE rc_event_ledger row; the replay ends at If Duplicate? (Map Event and Upsert never run). Fix round: the same id once more PAST the gate (a probe entering at Map Event) reaches Upsert Subscriber and changes nothing (its update is gated on recording the id); …
+      answers=[(200, {'success': True}), (200, {'success': True}), (200, {'success': True}), (200, {'success': True})] balance 0 → after same id twice 500 → same id past the gate 500 → after a new id 1000; ledger after replay='e2e-rcr-b046bb0686-8ce0dc56' after the ungated replay='e2e-rcr-b046bb0686-8ce0dc56' at end='e2e-rcr-b046bb0686-0595f1df,e2e-rcr-b046bb0686-8ce0dc56'; replay ran ['Dedup Gate', 'If Duplicate?', 'Respond 200', 'Webhook']; ungated ran Upsert=True; first ran Upsert=True
+PASS  rc_topup_first_carries_alias_plan (3.6s) — A2: a reinstall's FIRST RevenueCat event is a top-up (NON_RENEWING_PURCHASE carries no plan) delivered under the new id, the old id an alias holding an active business subscription with 500 dialogs: through the DERIVED RevenueCat Events graph the new identity (Create's trial/trialing seed) becomes business/active with the alias's period and SKU and 500 + 500, the alias is retired (expired, 0); RevenueCat never re-keys a bot (the alias's live bot_profiles row of this  …
+      answers=[(200, {'success': True}), (200, {'success': True})] owner trial|trialing|0|-|- → business|active|1000|2026-11-14 16:29:55.955343+05|sub.business.month (alias period 2026-11-14 16:29:55.955343+05) → past the gate business|active|1000|2026-11-14 16:29:55.955343+05|sub.business.month; alias → business|expired|0|2026-10-15 16:29:56.739334+05|sub.business.month; bot_profiles row stays on 'the alias'; Consolidate handed on plan_after='business' balance_after=500 rekeyed_rows='0'; row versions unchanged by  …
+2 pass, 0 fail
+2026-10-15T11:30:33Z
+### R14 e2e-auth.py --only retired_bot_reconnects_after_purchase --no-llm (RevenueCat purchase through the derived Map Event + Upsert)
+PASS  retired_bot_reconnects_after_purchase[wa] (8.2s) — F2: a bot the sweep retired (trial over: row trial_expiry, clone switched off by the V12 branch, trialing → expired) is bought back (RevenueCat INITIAL_PURCHASE through the real mapping + upsert), reconnected on a NEW profile (profile.add) and Created with PreviousProfileId → a new active clone on the new path takes over its chats, memory and price list, the old clone is deleted, the new webhook reaches the new clone, the V12 branch leaves it on; [llm] then,  …
+      {"retired": [false, []], "purchase": [200, "business|active"], "create": [200, {"id": "Ff0bpgQ7Xtb93AaE", "created": true, "adoptedProfiles": ["profile-000009"]}], "new_clone": [200, true, "profile-000010"], "old": [404, "VX4wWcKcODy4xQS4|false|trial_expiry|profile-000010", "replaced|Ff0bpgQ7Xtb93AaE|profile-000009|false|-|0"], "moved": ["0|0|0|0|0|0|0", "2|1|1|1|1|1|1", "Ff0bpgQ7Xtb93AaE|Ff0bpgQ7Xtb93AaE"], "webhook": [1, "suppressed", "1"], "after_sweep": [200, true, "profile-000010"], "llm": "skipped (--no …
+PASS  retired_bot_reconnects_after_purchase[tg] (9.7s) — F2: a bot the sweep retired (trial over: row trial_expiry, clone switched off by the V12 branch, trialing → expired) is bought back (RevenueCat INITIAL_PURCHASE through the real mapping + upsert), reconnected on a NEW profile (profile.add) and Created with PreviousProfileId → a new active clone on the new path takes over its chats, memory and price list, the old clone is deleted, the new webhook reaches the new clone, the V12 branch leaves it on; [llm] then,  …
+      {"retired": [false, []], "purchase": [200, "business|active"], "create": [200, {"id": "C4VZOcq8aZKkgxwi", "created": true, "adoptedProfiles": ["profile-000011"]}], "new_clone": [200, true, "profile-000012"], "old": [404, "U0r0qrNlyoICp4dC|false|trial_expiry|profile-000012", "replaced|C4VZOcq8aZKkgxwi|profile-000011|false|-|0"], "moved": ["0|0|0|0|0|0|0", "2|1|1|1|1|1|1", "C4VZOcq8aZKkgxwi|C4VZOcq8aZKkgxwi"], "webhook": [1, "suppressed", "1"], "after_sweep": [200, true, "profile-000012"], "llm": "skipped (--no …
+2 pass, 0 fail
+2026-10-15T11:31:29Z
+
+--- §F.6 После e2e и остановка стенда
+2026-10-15T11:31:39Z
+### R15 after the e2e: verify-deployed on the stand
+exit=0
+base http://localhost:5678: canonical 29 (diff 0), clones 2 (behind template 0, of them prompt head behind 0; custom prompts 2, not counted), archived clones 0 (not counted), other 2
+n8n.log from line 51955 (this stand's server start, R1) to now: 11 lines
+insights errors since the server start: 0
+other error lines since the server start: 0
+insights errors from the R1 server start (n8n.log line 51899) to the end: 0; in the RED stand window (51869–51898): 0
+mock calls during §F: revenuecat 12, profile/all/get 2, message/send 0
+2026-10-15T11:32:09Z
+### R16 stop the stand
+stopped
+mock pid 15802 stopped
+server stopped
+n8n: 000 | mock: 000 | postgres: pg_ctl: no server running

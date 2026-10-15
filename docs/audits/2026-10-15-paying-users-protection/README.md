@@ -1,8 +1,10 @@
 # Пакет выкладки, часть A «защита платящих» (A1–A6)
 
-**Статус (2026-10-15):** всё в каноне на `main` (части A — коммиты `927e1067..9caddb6f`; канон пакета = `Tools/n8n/workflows` +
-`Tools/n8n/sql` на `9caddb6f`, задача A7 их не меняла), **на проде НЕ выложено**. Пакет
-отрепетирован на staging из прод-состояния (раздел «Репетиция»). Выкладка — **только по явному «да» владельца**; исполняет
+**Статус (2026-10-15):** всё в каноне на `main` (части A — коммиты `927e1067..9caddb6f` + исправления финального ревью
+`7aa6f091` (I-1), `2303cff7` (I-2, клиент), `9cd33a6c` (M-5); канон пакета = `Tools/n8n/workflows` + `Tools/n8n/sql` на `9cd33a6c`),
+**на проде НЕ выложено**. Пакет отрепетирован на staging из прод-состояния (раздел «Репетиция»); финальное ревью после этого
+поменяло два графа — RevenueCat Events (I-1) и Verify Identity (I-1 + M-5) — и миграцию M3 (колонка `hint`), поэтому они
+перерепетированы отдельно (раздел «Повторная репетиция после финального ревью»). Выкладка — **только по явному «да» владельца**; исполняет
 контроллер по чек-листу ниже. Клиентская половина (A3 — триггер identity-heal, A4 — метка «Канал отключён», A6 — «Подписка»)
 едет в новой сборке, не здесь. Часть B (расписание бота) в пакет НЕ входит.
 
@@ -25,7 +27,7 @@
 
 | Workflow | Id | Что | Генератор / владелец | Граф до → после |
 |---|---|---|---|---|
-| RevenueCat Events | `ZGYr6srzS3rSSXHp` | A1: `Dedup Gate → If Duplicate?` + журнал `rc_event_ledger` в транзакции апсерта; A2: узкий перенос плана на alias-пути | без генератора (ручная правка, `verify-telegram-parity.py` `check_rc_event_ledger`); запросы Consolidate/Transfer — `apply-billing-consolidation.py` | `8ce1e0a256a1` → `1196077677b4` |
+| RevenueCat Events | `ZGYr6srzS3rSSXHp` | A1: `Dedup Gate → If Duplicate?` + журнал `rc_event_ledger` в транзакции апсерта; A2: узкий перенос плана на alias-пути — в никогда не платившую затравку без периода, с финального ревью (I-1) и в погашенную свипом (`trial`/`expired`) | без генератора (ручная правка, `verify-telegram-parity.py` `check_rc_event_ledger`); запросы Consolidate/Transfer — `apply-billing-consolidation.py` | `8ce1e0a256a1` → `a3c52f30dcf7` |
 | Delete Orphan Profiles | `2islisFH7jjLoPQM` | A4: `Live Profiles` + защита «живая строка ∧ Wappi когда-то авторизовал» | без генератора (`verify-orphan-sweep.py`) | `4b14cf5348c0` → `d617975779c3` |
 | Handoff Notifier | `crHandoffNtfy001` | A5: номер владельца по правилу V2 (`OWNER_PHONE_JS`) | `build-handoff-workflows.py` | `80eebf0b71f8` → `53faf5b0fbe6` |
 | Auth Session | `crAuthSession001` | A3: `claim.verify` переключает `bot_profiles.app_user_id` на биллинговый id установки | `build-auth-workflows.py` | `32ddd28b0ec6` → `faeae51618cd` |
@@ -34,7 +36,7 @@
 | Create TG | `Uz6HBBUpAiUqVysB` | только +2 id в защищённых списках | `apply-clone-lifecycle.py` | `7463a139ffc5` → `51becea5ebee` |
 | Delete Bot Files | `lmjYsdNcQA2IE5rl` | только +2 id в защищённых списках | `apply-auth-gate.py` + `apply-history-handoff.py` | `52a2799f91be` → `64f4c6dfda90` |
 | Profile Lifecycle Sweep | `fXYpCXPKw92EzRz8` | только +2 id в защищённых списках | `apply-sweep-clone-deactivate.py` | `24b1a5c2f44c` → `624c8bd7733f` |
-| **Verify Identity (новый)** | `crVerifyIdent001` | A3: `/webhook/VerifyIdentity` — identity-heal после переустановки | `build-verify-identity.py` | — → `3af1831f3ca4` |
+| **Verify Identity (новый)** | `crVerifyIdent001` | A3: `/webhook/VerifyIdentity` — identity-heal после переустановки (перенос плана — по тому же правилу I-1; журнал хранит подсказку клиента `hint` — M-5) | `build-verify-identity.py` | — → `b329f4831d9e` |
 | **Channel Watch (новый)** | `crChannelWatch001` | A4: каждые 10 мин, «канал отключился» владельцу через другой его канал | `build-channel-watch.py` | — → `e907de5eae43` |
 
 `deploy-canonical.py` новые workflow не создаёт — они импортируются CLI (`n8n import:workflow`, id сохраняются). Шаблоны ботов
@@ -47,10 +49,10 @@
 |---|---|---|---|
 | M1 | `Tools/n8n/sql/2026-10-14-rc-event-ledger.sql` | `rc_event_ledger` (A1) | до RevenueCat Events: без таблицы CTE апсерта падает → каждое событие 500, RevenueCat повторяет |
 | M2 | `Tools/n8n/sql/2026-10-14-channel-snapshot.sql` | `channel_snapshot` (+ `notify_attempts`) (A4) | до импорта `crChannelWatch001`: без таблицы `Live Rows` падает каждые 10 мин |
-| M3 | `Tools/n8n/sql/2026-10-15-identity-heal-log.sql` | `identity_heal_log` (A3, журнал поддержки) | до импорта `crVerifyIdent001`: без таблицы каждый heal отвечает 503 |
+| M3 | `Tools/n8n/sql/2026-10-15-identity-heal-log.sql` | `identity_heal_log` (A3, журнал поддержки; 9 колонок — с финального ревью и `hint`, подсказка клиента, M-5) | до импорта `crVerifyIdent001`: без таблицы каждый heal отвечает 503 |
 
 Таблицы независимы (нет ссылок друг на друга), порядок между ними не важен — важен «до своих workflow». Ожидание `postcheck.sql`:
-`ledger_cols 2 | snapshot_cols 6 | heal_cols 8 | rls t | client_grants 0 | seq_client_usage f | indexes 4`.
+`ledger_cols 2 | snapshot_cols 6 | heal_cols 9 | rls t | client_grants 0 | seq_client_usage f | indexes 4`.
 
 ### Учётка «RevenueCat API» (A3)
 
@@ -72,13 +74,14 @@ httpHeaderAuth, заголовок `Authorization`, значение `Bearer <se
 ```bash
 MAIN=/Users/ayan/Projects/Automation; SEC="$MAIN/Tools/n8n/.secrets"; B=https://n8n.choosereply.com
 export N8N_API_KEY="$(cat "$SEC/prod-api-key.txt")"     # verify-deployed / deploy-canonical / update-clones читают ключ отсюда; не печатать
-git -C "$MAIN" diff --stat 9caddb6f HEAD -- Tools/n8n/workflows Tools/n8n/sql   # Ожидание: пусто (канон = пакет)
+git -C "$MAIN" diff --stat 9cd33a6c HEAD -- Tools/n8n/workflows Tools/n8n/sql   # Ожидание: пусто (канон = пакет)
 ```
 Если вывод **НЕ пуст** (на `main` уже легла часть B или другая правка канона) — выполнять весь чек-лист из отдельного worktree на
-коммите пакета `113818bc` (снимки, точки отката и журнал писать в `$MAIN/docs/audits/…`, коммитить в основной копии):
+коммите канона пакета `9cd33a6c` (там же `precheck.sql`/`postcheck.sql` с `heal_cols 9`; снимки, точки отката и журнал писать в
+`$MAIN/docs/audits/…`, коммитить в основной копии; текст чек-листа читать с `main`):
 ```bash
-git -C "$MAIN" worktree add "$MAIN-pkgA" 113818bc && cd "$MAIN-pkgA"
-git diff --stat 9caddb6f HEAD -- Tools/n8n/workflows Tools/n8n/sql             # Ожидание: пусто
+git -C "$MAIN" worktree add "$MAIN-pkgA" 9cd33a6c && cd "$MAIN-pkgA"
+git diff --stat 9cd33a6c HEAD -- Tools/n8n/workflows Tools/n8n/sql             # Ожидание: пусто
 # … шаги 0–12 отсюда (sql-oneoff и ключ RevenueCat — по путям "$SEC/…", как ниже) …
 cd "$MAIN" && git worktree remove "$MAIN-pkgA"                                  # после шага 13
 ```
@@ -92,7 +95,8 @@ cd "$MAIN" && git worktree remove "$MAIN-pkgA"                                  
      `2islisFH7jjLoPQM`, `crHandoffNtfy001`, `crAuthSession001`, `XuvOp7TxOImOAmlj`, `Uz6HBBUpAiUqVysB`, `lmjYsdNcQA2IE5rl`,
      `fXYpCXPKw92EzRz8`), `missing 2` (`crVerifyIdent001`, `crChannelWatch001`), `up_to_date 17`, `failed 0`; и
      `python3 Tools/n8n/deploy-canonical.py --base $B --only 0DP79STI3pafXO9B --include-placeholders` → `would_update 1`. Все строки
-     `rollback pointer` → `$MAIN/docs/audits/<date>-deploy-rollback-pointers.txt`.
+     `rollback pointer` → `$MAIN/docs/audits/<date>-deploy-rollback-pointers.txt`. (Исправления финального ревью набор не меняют —
+     RevenueCat Events по-прежнему среди 8, Verify Identity среди 2 missing; повторный dry-run от прод-состояния дал ровно это.)
    - Учётки, на которые ссылаются новые workflow: `vvRrFiEXzLVqKjOx` (Postgres — у каждого Postgres-узла канона) и
      `EuhhqAaV56DpoqAN` (WappiAuthToken — тот же id несут живые канонические Create WA/TG, шаблоны ботов, Wappi Proxy и
      Handoff Notifier; бот-canary «23» 2026-09-24 работал через него); `crRevenueCatApi1` создаётся в шаге 2.
@@ -104,7 +108,7 @@ cd "$MAIN" && git worktree remove "$MAIN-pkgA"                                  
    python3 "$SEC/sql-oneoff.py" "$(cat Tools/n8n/sql/2026-10-14-channel-snapshot.sql)"
    python3 "$SEC/sql-oneoff.py" "$(cat Tools/n8n/sql/2026-10-15-identity-heal-log.sql)"
    python3 "$SEC/sql-oneoff.py" "$(cat docs/audits/2026-10-15-paying-users-protection/postcheck.sql)"
-   # Ожидание: {"ledger_cols":"2","snapshot_cols":"6","heal_cols":"8","rls":true,"client_grants":"0","seq_client_usage":false,"indexes":"4"}
+   # Ожидание: {"ledger_cols":"2","snapshot_cols":"6","heal_cols":"9","rls":true,"client_grants":"0","seq_client_usage":false,"indexes":"4"}
    ```
 2. **Учётка «RevenueCat API» `crRevenueCatApi1`** (значение не печатать нигде). На staging отрепетирован сам CLI
    `n8n import:credentials` при работающем сервере (id сохраняется; REST отвечает 400 «id is read-only»); доставка файла в контейнер
@@ -138,6 +142,69 @@ cd "$MAIN" && git worktree remove "$MAIN-pkgA"                                  
    `crRevenueCatApi1` есть; экспорт зашифрован и печатается только счётчик, файл удалён), `local-copy-removed`.
    НЕ репетировано (запасная форма без копии на диске VPS): `ssh choosereply 'cd ~/choosereply && docker compose exec -T n8n sh -c
    "umask 077; cat > /tmp/rc-cred.json"' < "$SEC/rc-cred-import.json"`, затем импорт и те же удаления/проверки.
+   **2c. Проба учётки — только HTTP-статус** (финальное ревью M-1: права ключа на проде иначе проверил бы лишь первый настоящий
+   heal). Временный workflow `Webhook → Owner (Postgres, только чтение) → RevenueCat (GET v2 aliases с учёткой crRevenueCatApi1) →
+   Status` печатает ТОЛЬКО число найденных строк владельца и HTTP-статус RevenueCat (ни id, ни тела ответа, ни значения ключа;
+   успешные выполнения не сохраняются) и удаляется ≥ 35 с после выполнения (правило insights). Id владельца в репозитории — только
+   префикс (`docs/audits/implementation-progress.md`: `$RCAnonymousID:4a7af3f8…`), полный id проба берёт сама из `subscribers`:
+   ```bash
+   B="$B" RC=https://api.revenuecat.com OWNER_PREFIX=4a7af3f8 PG_ID=vvRrFiEXzLVqKjOx PG_NAME=Postgres python3 - <<'PY'
+   import importlib.util, json, os, re, secrets, time, urllib.error, urllib.request
+   s = importlib.util.spec_from_file_location("uc", "Tools/n8n/update-clones.py"); uc = importlib.util.module_from_spec(s); s.loader.exec_module(uc)
+   B, RC, PREFIX = os.environ["B"], os.environ["RC"].rstrip("/"), os.environ["OWNER_PREFIX"]
+   assert re.fullmatch(r"[0-9a-f]{8,32}", PREFIX), "OWNER_PREFIX: hex only"
+   path = "rc-cred-probe-" + secrets.token_hex(12)
+   owner_sql = ("select app_user_id, count(*) over () as n from subscribers where starts_with(app_user_id, chr(36) || "
+                "'RCAnonymousID:" + PREFIX + "') order by updated_at desc nulls last limit 1")
+   url = "={{ '" + RC + "/v2/projects/0f8c9529/customers/' + encodeURIComponent($json.app_user_id || 'none') + '/aliases?limit=1' }}"
+   status_js = ("const o = $('Owner').first().json || {};\n"
+                "return [{ json: { owner_rows: Number(o.n) || 0, status: Number($input.first().json.statusCode) || null } }];")
+   wf = {"name": "ZZZ TEMP rc-cred-probe (Part A step 2c, auto-delete)",
+         "settings": {"executionOrder": "v1", "saveDataSuccessExecution": "none", "saveManualExecutions": False},
+         "nodes": [
+           {"id": "h", "name": "Hook", "type": "n8n-nodes-base.webhook", "typeVersion": 2, "position": [0, 0],
+            "parameters": {"httpMethod": "POST", "path": path, "responseMode": "lastNode", "options": {}}},
+           {"id": "o", "name": "Owner", "type": "n8n-nodes-base.postgres", "typeVersion": 2.6, "position": [220, 0], "alwaysOutputData": True,
+            "parameters": {"operation": "executeQuery", "query": owner_sql, "options": {}},
+            "credentials": {"postgres": {"id": os.environ["PG_ID"], "name": os.environ["PG_NAME"]}}},
+           {"id": "r", "name": "RevenueCat", "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [440, 0],
+            "alwaysOutputData": True, "onError": "continueRegularOutput",
+            "parameters": {"method": "GET", "url": url, "authentication": "genericCredentialType", "genericAuthType": "httpHeaderAuth",
+                           "options": {"timeout": 10000, "response": {"response": {"fullResponse": True, "neverError": True, "responseFormat": "json"}}}},
+            "credentials": {"httpHeaderAuth": {"id": "crRevenueCatApi1", "name": "RevenueCat API"}}},
+           {"id": "s", "name": "Status", "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [660, 0], "parameters": {"jsCode": status_js}}],
+         "connections": {"Hook": {"main": [[{"node": "Owner", "type": "main", "index": 0}]]},
+                         "Owner": {"main": [[{"node": "RevenueCat", "type": "main", "index": 0}]]},
+                         "RevenueCat": {"main": [[{"node": "Status", "type": "main", "index": 0}]]}}}
+   st, created = uc.call(B, "POST", "/workflows", wf)
+   wid = created.get("id") if st in (200, 201) and isinstance(created, dict) else None
+   if not wid:
+       raise SystemExit(f"probe not created: {st}")
+   try:
+       act, ans = uc.call(B, "POST", f"/workflows/{wid}/activate", {})[0], {}
+       for _ in range(5):
+           time.sleep(1.5)
+           try:
+               with urllib.request.urlopen(urllib.request.Request(f"{B}/webhook/{path}", data=b"{}", method="POST",
+                                                                  headers={"Content-Type": "application/json"}), timeout=30) as r:
+                   ans = json.loads(r.read().decode() or "{}"); break
+           except urllib.error.HTTPError as e:
+               if e.code != 404:
+                   ans = {"probe_http": e.code}; break
+       print("activate", act, "| owner rows", ans.get("owner_rows"), "| RevenueCat HTTP status", ans.get("status"),
+             *(["| probe webhook", ans["probe_http"]] if "probe_http" in ans else []))
+   finally:
+       uc.call(B, "POST", f"/workflows/{wid}/deactivate", {})
+       time.sleep(36)                                   # a ran workflow lives >= 35 s before it is deleted (insights)
+       print("temp workflow deleted", uc.call(B, "DELETE", f"/workflows/{wid}")[0], "-> GET", uc.call(B, "GET", f"/workflows/{wid}")[0])
+   PY
+   ```
+   Ожидание: `activate 200 | owner rows 1 | RevenueCat HTTP status 200`, затем `temp workflow deleted 200 -> GET 404`. Статус `404`
+   (RevenueCat не знает этого клиента в проекте `0f8c9529`) ключ тоже доказывает: авторизация проходит раньше поиска клиента. **`401` /
+   `403` — СТОП** (ключ неверен или без права на customers/aliases): шаги 3+ не выполнять, учётку пересоздать по 2a–2b с верным ключом
+   и повторить 2c; живого вреда нет — учётку пока ничто не использует. Статус пуст (`None`: таймаут/сеть) или нет вывода проб — СТОП,
+   прочитать ошибку исполнения (ошибки сохраняются) и повторить один раз. `owner rows 0` при `404` — ключ исправен, но строки
+   владельца по префиксу нет: доложить, не чинить. Отрепетировано на staging (мок RevenueCat, учётка-заглушка) — «Повторная репетиция».
 3. **Set Workflow State — защита двух новых id ДО их импорта и включения** (до этого шага legacy-вызов без токена — compat-окно
    открыто до 2026-12-31 — мог бы выключить или удалить новые workflow). Путь по решению контроллера (отрепетирован):
    `python3 Tools/n8n/deploy-canonical.py --base $B --only 0DP79STI3pafXO9B --include-placeholders --apply --yes` —
@@ -209,8 +276,8 @@ cd "$MAIN" && git worktree remove "$MAIN-pkgA"                                  
     - 10.5: `{"success":false,"error":"protected_workflow"} [400]` (legacy-вызов без токена → Validate → защищённый id; проверка не
       зависит от action; после закрытия compat-окна `CR_AUTH_COMPAT_UNTIL` — `[401]` до Validate);
     - 10.6: `{"success":false,"error":"unauthorized","reason":"unauthorized:bad_signature"} [401]`.
-    (На staging 2026-10-15 те же ответы, кроме 10.5 — там пробы были `deactivate`/`delete`: Validate отвечает `protected_workflow`
-    до любого действия, для `activate` — та же ветка.)
+    (На staging 2026-10-15 те же ответы; в первой репетиции 10.5 шла с `deactivate`/`delete`, в повторной — ровно эти запросы, 10.5
+    с `activate` на оба новых id: `[400] protected_workflow`.)
 11. **Первый тик Channel Watch и наблюдение** (≤ 10 мин после шага 5). Успешные выполнения Verify Identity и Channel Watch НЕ
     сохраняются (`saveDataSuccessExecution: none`) — поэтому смотрим ошибки (сохраняются все), снимок и логи:
     ```bash
@@ -231,11 +298,19 @@ cd "$MAIN" && git worktree remove "$MAIN-pkgA"                                  
 12. **Логи 15 мин + повтор запроса шага 11:** `ssh choosereply 'cd ~/choosereply && docker compose logs --since 15m n8n | grep -iE
     "error|insights" | tail -20'` → Ожидание: пусто (временные workflow `sql-oneoff` ждут 35 с перед удалением — цикл insights не
     возникает); запрос шага 11 через 15 мин и на следующее утро — снова `[]` ×3. Иначе — СТОП (стоп-правило).
+    **12b. Первое живое событие RevenueCat — по журналу доставок самого RevenueCat** (финальное ревью M-1; событие может прийти
+    позже окна выкладки — на проде ботов 0, покупки и продления пойдут с новой сборкой; тогда пункт закрывается при первом событии
+    записью в журнал): дашборд RevenueCat → проект → **Integrations → Webhooks** → вебхук на
+    `https://n8n.choosereply.com/webhook/RevenueCatEvent` → история отправленных им событий с кодом ответа нашего сервера (подписи
+    интерфейса RevenueCat могут отличаться). Ожидание: у первого события после `DEPLOY_START` — `200`; у повторной доставки того же
+    события — тоже `200` (её отвечает `Dedup Gate` по журналу `rc_event_ledger`, второго начисления нет). Любой не-2xx, таймаут или
+    серия повторов → СТОП: найти исполнение RevenueCat Events по времени события (запрос шага 11 для `ZGYr6srzS3rSSXHp`; ошибки
+    сохраняются) и разобрать до любых правок; RevenueCat сам повторяет не-2xx, и повтор безопасен (журнал).
 13. **Журнал и флаги «DEPLOYED».** `$MAIN/docs/audits/implementation-progress.md` — новый раздел «Развёртывание <date> — часть A
     «защита платящих»» (таблица шагов, снимки до/после, точки отката, smoke; запись «… ждёт go» остаётся историей). Перевести каждую
     отметку «canon, NOT deployed» части A в «DEPLOYED to prod <date>»:
     в основной копии `$MAIN`: `grep -n -E "защита платящих.*canon, (not|NOT) deployed" CLAUDE.md Tools/n8n/README.md` — ровно 7 строк
-    (номера — на `113818bc`; если часть B сдвинула строки — по выводу grep):
+    (номера — на `9cd33a6c`; если часть B сдвинула строки — по выводу grep):
     - `CLAUDE.md:139` — «A5/A6»: номер владельца в Notifier, «(A5 «защита платящих», 2026-10-15 — canon, not deployed)»;
     - `CLAUDE.md:167` — заголовок блока «Part A … — canon, NOT deployed:» (вместе с фразой «…; prod only on the owner's «да»» в том же
       абзаце — заменить ссылками на журнал, снимки и точки отката);
@@ -274,7 +349,8 @@ cd "$MAIN" && git worktree remove "$MAIN-pkgA"                                  
 - **Часть B** (расписание бота: `crSetSchedule001`, миграция `bot-schedule`, шаблоны, Create WA/TG, Delete Bot Files, Set Workflow
   State, Lifecycle Sweep во второй раз) — свой пакет B3 по отдельному «да».
 - **Клиент** (A3 `IdentityHealTrigger`/`IdentityHealLatch` + вызов из `Manager`, A4 `ChannelHealth` + подстрока карточки, A6
-  «Подписка») — новая сборка → `Tools/store/inspect-artifact.sh` → device-pass. Сервер безопасен для старых клиентов: Verify Identity
+  «Подписка», финальное ревью I-2 — проба настроек и опросчики привязки действуют только по `ChannelHealth.Judge` с эхом, `2303cff7`)
+  — новая сборка → `Tools/store/inspect-artifact.sh` → device-pass. Сервер безопасен для старых клиентов: Verify Identity
   зовёт только новая сборка; ответы прочих вебхуков не меняются.
 - Env, шаблоны ботов, клоны, Supabase `documents`, сайт.
 
@@ -283,6 +359,10 @@ cd "$MAIN" && git worktree remove "$MAIN-pkgA"                                  
 Стенд: n8n 2.36.7 с task runners (как прод), Postgres `pg.sh` (5433), Wappi-мок 127.0.0.1:8765; миграции — ещё и на одноразовом
 кластере (5434, scratchpad). Прод не трогался, кроме снимка `verify-deployed` (только GET). Вывод каждого шага — `rehearsal.txt`
 (рядом; сырые журналы — `Tools/test-output/a7/`, gitignored).
+
+Это ПЕРВАЯ репетиция — канон `9caddb6f`, до исправлений финального ревью: хэши «после» RevenueCat Events / Verify Identity тогда
+были `1196077677b4` / `3af1831f3ca4`, пост-проверка — `heal_cols 8`. Финальное ревью поменяло ровно эти два графа и M3; их
+повторная репетиция — следующий раздел и `rehearsal.txt` §F.
 
 | Шаг | Результат |
 |---|---|
@@ -304,6 +384,27 @@ cd "$MAIN" && git worktree remove "$MAIN-pkgA"                                  
 | e2e на развёрнутом стенде | `derive-staging.py` (без импорта; workflows-staging = канон пакета) → **e2e-auth 63/63** (вкл. модельный шаг `retired_bot_reconnects_after_purchase` [wa]/[tg]: «Букет «Нежность» — 18 500 ₸ … к 18:00»; `sweep_removes_booked_clone`, `rc_*`, `identity_heal_*` ×3, `orphan_sweep_spares_live_profile`, `channel_*` ×5), **e2e-handoff 21/21** (вкл. `notifier_owner_number_by_v2_rule`, `bot_knows_owner_agreement_after_auto_resumes` [llm]), **e2e-reply 44/44** |
 | После e2e | `verify-deployed` diff 0, exit 0; 0 строк «Error while saving insights…» с момента старта сервера до конца e2e (две строки ошибок в логе — нарочно пустой файл сценария загрузки); стенд остановлен: `bootstrap.py --stop`, мок, `pg.sh stop` |
 
+### Повторная репетиция после финального ревью (2026-10-15, канон `9cd33a6c`)
+
+Финальное ревью после первой репетиции поменяло графы RevenueCat Events (I-1) и Verify Identity (I-1 + M-5) и миграцию M3
+(`hint`); остальные девять графов — те же хэши. Повторены: гейты, M3 на свежем кластере, RED на настоящем n8n и путь пакета от
+прод-состояния (полный порядок чек-листа — он дёшев; e2e — сценарии двух изменённых графов). Вывод каждого шага —
+`rehearsal.txt` §F; сырые журналы — `Tools/test-output/final-fix/` (gitignored).
+
+| Шаг | Результат |
+|---|---|
+| Гейты на `9cd33a6c` | генераторы `--check` 21/21 + верификаторы 13/13 + `--self-test` 33/33 + `verify_rag` + `verify-panel-prompts.js` + `verify-sql-comments` (98 узлов / 30 файлов) — 38/38 exit 0; `tests/run_all.py` — 38 файлов, 1349 случаев, 0 падений; Unity EditMode полный 3184/3184 |
+| M3 (`hint`) на свежем кластере | `pg.sh init` + `migrate` ×2, порядок прода M1 → M2 → M3 ×2 и обновление с прежнего M3 (таблица без `hint` с одной строкой → новый файл → 9 колонок, строка цела, `hint` NULL) — пост-проверка `2 \| 6 \| 9 \| t \| 0 \| f \| 4` каждый раз |
+| RED на n8n 2.36.7 | стенд с каноном `df5aa5f1` (пакет до исправлений) → e2e `identity_heal`: 1 pass, 3 fail — `identity_heal_after_sweep_demotion`: heal 200 `consolidated 1`, а владелец остаётся `trial/expired` (блокировка I-1); у журнала нет подсказки (M-5) |
+| Стенд = прод | `--canon-ref 927e1067`, два новых workflow, учётка и три таблицы удалены (≥ 35 с после выключения) → `verify-deployed`: канон 29, diff 11, статус каждого id = снимок прода |
+| M1 → M2 → M3 | через Postgres-узел n8n (двойник `sql-oneoff.py`): precheck `t/t/t`, каждая `200 {"success":true}`, пост-проверка `{…"heal_cols":"9"…}` |
+| Учётка + проба 2c | CLI `import:credentials` с id `crRevenueCatApi1` (заглушка) → проба шага 2c — текст README как есть (отступ списка снят): владелец-фикстура `owner rows 1 \| RevenueCat HTTP status 200`, префикс без строки `owner rows 0 \| 404`; мок видел два GET с `Bearer`; оба временных workflow удалены (GET 404), insights — 0 |
+| Dry-run | would_update 8 (в т.ч. RevenueCat Events, точка отката), missing 2 (в т.ч. Verify Identity), up_to_date 17; SWS с `--include-placeholders` — would_update 1 = пакет |
+| Выкладка по чек-листу | SWS → импорт + API-включение двух новых (учётки `crRevenueCatApi1` + Postgres) → smoke VI → 8 по одному: все «published by the PUT», «read-back: ok» → `update-clones` 0 → `verify-deployed` diff 0, exit 0 (RevenueCat Events и Verify Identity `graph=True published=True`) → повторный dry-run: 27 + SWS up to date |
+| Smoke (шаг 10) | все шесть ответов как в «Ожидание» (10.5 — `activate`, оба новых id: `[400] protected_workflow`) |
+| e2e | `identity_heal_*` 4/4 (вкл. `identity_heal_after_sweep_demotion`: владелец → `business/active/500/<период алиаса>/sub.business.month`; журнал с `hint`), `rc_*` 2/2, `retired_bot_reconnects_after_purchase` [wa]/[tg] 2/2 (`--no-llm`) |
+| После | `verify-deployed` diff 0, exit 0; 0 строк ошибок (в т.ч. insights) в журнале n8n с момента старта сервера стенда; `message/send` на мок — 0; стенд остановлен (`bootstrap.py --stop`, мок, `pg.sh stop`) |
+
 ## Остатки и device-pass (несёт сценарий B3)
 
 **Принятые ограничения v1 (решения 2026-10-15):**
@@ -321,6 +422,10 @@ cd "$MAIN" && git worktree remove "$MAIN-pkgA"                                  
 - **A2:** `active`-алиас с истёкшим периодом всё равно переносится (зеркало авторитетно до следующего события RevenueCat).
 - **A6:** в окне до ответа магазина (`EntitlementsKnown = false`) заголовок может на секунды показать «Истекла»/«заморожен» над
   пробными счётчиками при серверном expired — само проходит на `OnEntitlementChanged`.
+- **Клиент (финальное ревью I-2, новая сборка):** проба настроек удаляет профиль и опросчики привязки продвигаются только по
+  `ChannelHealth.Judge` с эхом опрошенного профиля; защитный опрос перед пересозданием профиля по «Получить другой код»
+  (`Manager.CheckWhatsappAuthorized`) по-прежнему читает статус без проверки эха — перекрёстный `false` чужого профиля там
+  позволит пересоздать только что привязанный профиль (остаток, вне объёма исправления).
 
 **Device-pass (в сценарий B3, новая сборка):**
 
@@ -331,10 +436,13 @@ cd "$MAIN" && git worktree remove "$MAIN-pkgA"                                  
 3. «Канал отключён» → переподключить в настройках на тарифе с ОДНИМ каналом → привязка проходит (Count Channels исключает
    строки того же `bot_key` на этом канале), данные бота на месте (линия F1), метка снята.
 4. Переустановка приложения при живой подписке → один вызов `/webhook/VerifyIdentity` → подписка на новом id; строка в
-   `identity_heal_log`; повторный запуск в течение 24 ч — без вызова (защёлка `CrIdentityHeal.*`).
+   `identity_heal_log` (с `hint`); повторный запуск в течение 24 ч — без вызова (защёлка `CrIdentityHeal.*`). Отдельно (I-1): на
+   iOS переустановить, дождаться, пока свип погасит триал новой установки (4 д 17 ч после первого бота: `trial/expired`), затем
+   «Восстановить» — подписка всё равно переезжает, бот отвечает.
 5. Наблюдения на проде по отдельному «да» (шаг 14 чек-листа): уведомление «канал отключился» в «Избранное» Telegram и
    уведомление о заявке Telegram-бота на номер `account.phone`.
 
 **Не проверено (остатки репетиции):** реальный RevenueCat API v2 из n8n прода (на стенде — мок; ключ проверен A3 локально,
-только чтение); права учётки «RevenueCat API» на проде проверятся первым настоящим heal; живой бот на проде (их 0) —
+только чтение) — права учётки «RevenueCat API» на проде проверяет проба шага 2c сразу после импорта (только HTTP-статус), а
+первое живое событие RevenueCat — журнал доставок RevenueCat (шаг 12b); живой бот на проде (их 0) —
 наблюдения A4/A5 ждут новой сборки.
