@@ -9,13 +9,17 @@ lists, the REAL statement on temp tables); this file pins what that behaviour re
 
   (1) a Postgres node `Live Profiles` runs `select profile_id from bot_profiles where deleted_at is null;` — every LIVE
       row, whatever the subscription status — on the canonical Postgres credential (the one the Profile Lifecycle Sweep's
-      nodes use), with alwaysOutputData + continue on error, so an empty answer or a failure still reaches Plan Sweep,
-      which then protects everything (the fail-safe is decided there, in one place);
+      nodes use), with alwaysOutputData + continue on error, so an empty answer (proof: nothing protected) and a failure
+      (a blind run: everything protected) both reach Plan Sweep, which decides in one place;
   (2) it sits between List TG Profiles and Plan Sweep: List TG Profiles feeds ONLY it, it feeds ONLY Plan Sweep, and
       Plan Sweep has no other input — so the delete branch cannot be reached without the live read;
-  (3) Plan Sweep reads the live ids from its input and PROVES the set (every item a row with a non-empty profile id —
-      no row, an error item, a passed-on input or an id-less row is «unproven» and protects EVERY profile), and excludes
-      the protected ones right before a profile becomes a candidate, counting them (stats/platform protectedLive);
+  (3) Plan Sweep reads the live ids from its input: rows that each carry a profile id are the live set; ONE empty item —
+      a successful query with no live row — is proof and protects nothing; anything else (an error item, a passed-on input,
+      an id-less row, no item) is a FAILED read and protects EVERY profile (nothing deleted). It protects — right before a
+      profile becomes a candidate, counting it (stats/platform protectedLive) — only a profile with a live row that Wappi
+      ONCE AUTHORISED (a parseable authorized_at or logouted_at on its list entry): fix round 1 (2026-10-15) — since A1 the
+      proxy registers the row at profile/add, so a never-authorised abandoned-wizard profile has a live row too and must
+      still be swept after the TTL;
   (4) no node is disabled (a disabled node hands its input on untouched — a disabled Live Profiles silently turns the
       sweep into a no-op, a disabled Plan Sweep or re-check into worse);
   (5) the guards that were there stay: a Wappi list without status done aborts the sweep, a non-boolean `authorized` is
@@ -43,10 +47,15 @@ EXPECTED = ("Every Hour", "Sweep Config", "List WA Profiles", "List TG Profiles"
 
 # The rule, as Plan Sweep states it — (3).
 READ_LIVE = "const liveItems = $input.all().map(function (i) { return i.json; });"
-PROVE_LIVE = ("const liveProven = liveItems.length > 0 && liveItems.every(function (r) { return !!r && typeof r.profile_id === "
-              "'string' && r.profile_id.trim() !== ''; });")
-LIVE_SET = "const liveIds = new Set(liveProven ? liveItems.map(function (r) { return r.profile_id.trim(); }) : []);"
-EXCLUDE = "if (!liveProven || liveIds.has(id)) { ps.protectedLive += 1; stats.protectedLive += 1; continue; }"
+IS_ROW = "const isLiveRow = function (r) { return !!r && typeof r.profile_id === 'string' && r.profile_id.trim() !== ''; };"
+EMPTY_READ = ("const liveEmpty = liveItems.length === 1 && !!liveItems[0] && typeof liveItems[0] === 'object' && "
+              "Object.keys(liveItems[0]).length === 0;")
+PROVE_LIVE = "const liveProven = liveEmpty || (liveItems.length > 0 && liveItems.every(isLiveRow));"
+LIVE_SET = "const liveIds = new Set(liveProven && !liveEmpty ? liveItems.map(function (r) { return r.profile_id.trim(); }) : []);"
+AUTH_TS = "const authTs = parseTs(p.authorized_at);"
+LOGOUT_TS = "const logoutTs = parseTs(p.logouted_at);"
+EVER_AUTH = "const everAuthorized = authTs !== null || logoutTs !== null;"
+EXCLUDE = "if (!liveProven || (liveIds.has(id) && everAuthorized)) { ps.protectedLive += 1; stats.protectedLive += 1; continue; }"
 TTL_GATE = "if (ageMs < ttlMs || recentlyActive) { ps.underTtl += 1; continue; }"
 CANDIDATE = "candidates.push({"
 # (5) the guards that were there before A4
@@ -114,9 +123,9 @@ def check(wf, lifecycle):
     need(bool(want_cred) and lv.get("credentials") == want_cred,
          f"{LIVE} must run on the canonical Postgres credential the Profile Lifecycle Sweep uses {want_cred}: {lv.get('credentials')}")
     need(lv.get("alwaysOutputData") is True and lv.get("onError") == "continueRegularOutput",
-         f"{LIVE} must continue on error with output (alwaysOutputData + continueRegularOutput) — an empty answer or a "
-         f"failure reaches Plan Sweep, whose fail-safe protects every profile: alwaysOutputData={lv.get('alwaysOutputData')} "
-         f"onError={lv.get('onError')}")
+         f"{LIVE} must continue on error with output (alwaysOutputData + continueRegularOutput) — an empty answer (proof: "
+         f"nothing protected) and a failure (a blind run: everything protected) must both reach Plan Sweep: "
+         f"alwaysOutputData={lv.get('alwaysOutputData')} onError={lv.get('onError')}")
 
     # (2) the wiring: no way to the delete branch around the live read
     need(targets(wf, "List TG Profiles") == [[LIVE]], f"List TG Profiles must feed ONLY {LIVE}: {targets(wf, 'List TG Profiles')}")
@@ -127,13 +136,21 @@ def check(wf, lifecycle):
 
     # (3) Plan Sweep proves the live set and excludes it right before a profile becomes a candidate
     js = (node(wf, "Plan Sweep").get("parameters") or {}).get("jsCode") or ""
-    need(READ_LIVE in js and LIVE_SET in js, "Plan Sweep must read the live ids from its input (Live Profiles' rows)")
-    need(PROVE_LIVE in js,
-         "Plan Sweep fail-safe: only rows that EACH carry a non-empty profile id prove the live set — no row (an empty answer), "
-         "an error item, a passed-on input or an id-less row must protect EVERY profile")
+    need(READ_LIVE in js and LIVE_SET in js and IS_ROW in js, "Plan Sweep must read the live ids from its input (Live Profiles' rows)")
+    need(IS_ROW in js and PROVE_LIVE in js and "liveProven = true" not in js,
+         "Plan Sweep fail-safe: a FAILED live read (an error item, a passed-on input, a row without an id, no item) must "
+         "protect EVERY profile — only rows that each carry a profile id, or ONE empty item, prove the read")
+    need(EMPTY_READ in js and PROVE_LIVE in js and LIVE_SET in js,
+         "an EMPTY live read (ONE empty item: a successful query with no live row) is proof, not doubt — it must protect "
+         "nothing, the sweep runs as before")
     need(EXCLUDE in js and TTL_GATE in js and CANDIDATE in js
          and js.index(TTL_GATE) < js.index(EXCLUDE) < js.index(CANDIDATE),
-         "Plan Sweep must exclude a live (or unproven) profile right before it becomes a candidate, counting it protectedLive")
+         "Plan Sweep must exclude a protected profile right before it becomes a candidate, counting it protectedLive")
+    need(AUTH_TS in js and LOGOUT_TS in js and EVER_AUTH in js and EXCLUDE in js
+         and js.index(AUTH_TS) < js.index(EVER_AUTH) and js.index(LOGOUT_TS) < js.index(EVER_AUTH) < js.index(EXCLUDE),
+         "only a profile Wappi once authorised (a parseable authorized_at OR logouted_at on its list entry) with a live row is "
+         "protected — a never-authorised profile (an abandoned wizard: the proxy registers its row at profile/add) is swept "
+         "after the TTL as before")
     need("protectedLive: 0" in js and js.count("protectedLive: 0") >= 2,
          "Plan Sweep must report protectedLive in its stats and per platform")
 
@@ -195,19 +212,20 @@ MUTATIONS = (
     ("Live Profiles stops the run on a database error (no continue)", _set(LIVE, "onError", None), "must continue on error with output"),
     ("Live Profiles on another credential", _set(LIVE, "credentials", {"postgres": {"id": "dev0000000000000", "name": "Postgres Dev"}}),
      "canonical Postgres credential"),
-    ("Plan Sweep: the live-row exclusion removed", _replace_plan(EXCLUDE, ""), "right before it becomes a candidate"),
-    ("Plan Sweep: the fail-safe removed (an unproven read protects nothing)",
+    ("Plan Sweep: the protection removed", _replace_plan(EVER_AUTH + "\n    " + EXCLUDE, ""), "right before it becomes a candidate"),
+    ("Plan Sweep: the fail-safe removed (a failed read protects nothing)",
      _replace_plan(PROVE_LIVE + "\n" + LIVE_SET,
-                   "const liveProven = true;\nconst liveIds = new Set(liveItems.filter(function (r) { return r && typeof r.profile_id "
-                   "=== 'string'; }).map(function (r) { return r.profile_id.trim(); }));"),
+                   "const liveProven = true;\nconst liveIds = new Set(liveItems.filter(isLiveRow).map(function (r) { return "
+                   "r.profile_id.trim(); }));"),
      "Plan Sweep fail-safe"),
-    ("Plan Sweep: an empty answer trusted as «no live rows»",
-     _replace_plan(PROVE_LIVE + "\n" + LIVE_SET,
-                   "const liveProven = liveItems.every(function (r) { return !!r && (Object.keys(r).length === 0 || "
-                   "(typeof r.profile_id === 'string' && r.profile_id.trim() !== '')); });\nconst liveIds = new Set(liveProven ? "
-                   "liveItems.filter(function (r) { return typeof r.profile_id === 'string'; }).map(function (r) { return "
-                   "r.profile_id.trim(); }) : []);"),
-     "Plan Sweep fail-safe"),
+    ("Plan Sweep: an empty read treated as a failure (no live row = nothing swept)",
+     _replace_plan(PROVE_LIVE, "const liveProven = liveItems.length > 0 && liveItems.every(isLiveRow);"),
+     "an EMPTY live read"),
+    ("Plan Sweep: the once-authorised term removed (every live row protected)",
+     _replace_plan(EXCLUDE, "if (!liveProven || liveIds.has(id)) { ps.protectedLive += 1; stats.protectedLive += 1; continue; }"),
+     "only a profile Wappi once authorised"),
+    ("Plan Sweep: the logouted_at signal dropped", _replace_plan(EVER_AUTH, "const everAuthorized = authTs !== null;"),
+     "only a profile Wappi once authorised"),
     ("Plan Sweep: the ambiguity rule removed", _replace_plan(AMBIGUITY, "if (false) { stats.skipped.push({"),
      "non-boolean authorized"),
 )
@@ -253,8 +271,9 @@ def main():
     if fails:
         print(f"ORPHAN SWEEP FAILED: {len(fails)} check(s)")
         sys.exit(1)
-    print(f"OK  {FILE} (Live Profiles → Plan Sweep: a live bot_profiles row is never deleted, an unproven live set protects "
-          f"every profile, nothing disabled, the old guards intact; tripwire self-check: {len(MUTATIONS)} mutations rejected)")
+    print(f"OK  {FILE} (Live Profiles → Plan Sweep: a once-authorised profile with a live bot_profiles row is never deleted, a "
+          f"never-authorised one is swept as before; a failed live read protects every profile, an empty one none; nothing "
+          f"disabled, the old guards intact; tripwire self-check: {len(MUTATIONS)} mutations rejected)")
     print("ALL ORPHAN SWEEP ASSERTS PASSED")
 
 

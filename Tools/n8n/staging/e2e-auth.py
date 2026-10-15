@@ -2043,17 +2043,19 @@ ORPHAN_KEEP = ("Sweep Config", "List WA Profiles", "List TG Profiles", "Live Pro
                "Re-check Status", "Confirm Orphan", "Still Unauthorized?", "Delete Profile", "Stamp Result", "Sweep Report")
 
 
-@scenario("orphan_sweep_spares_live_profile", "A4: the orphan sweep (the DERIVED canonical nodes on the real n8n, dry run, TTL ≈ 1 s, two runs so the first-seen ledger ages) reports a mock profile WITHOUT a bot_profiles row as «would delete» and NEVER one with a LIVE row (a logged-out owner's channel): Plan Sweep counts it protectedLive, the live read is proven (liveRead ok); nothing is deleted")
+@scenario("orphan_sweep_spares_live_profile", "A4 (+ fix round 1): the orphan sweep (the DERIVED canonical nodes on the real n8n, dry run, TTL ≈ 1 s, two runs so the first-seen ledger ages) NEVER lists a profile Wappi once authorised that has a LIVE bot_profiles row (a logged-out owner's channel: Plan Sweep counts it protectedLive), but still lists as «would delete» a NEVER-authorised profile with a live row (an abandoned wizard: the proxy registered its row at profile/add) and a profile without a row; the live read is proven (liveRead ok); nothing is deleted")
 def s_orphan_live(ctx):
     o = fresh_owner(ctx, "orph")                 # proxy profile.add → a LIVE bot_profiles row; the mock keeps it unauthorised
-    live = o.profiles[0]
+    paid_out = o.profiles[0]                     # … once authorised, then logged out (both timestamps far older than the TTL)
+    mock_profile(paid_out, authorized=False, authorized_at="2026-01-01T10:00:00+03:00", logouted_at="2026-01-02T10:00:00+03:00")
+    wizard = o.add_profile()                     # a live row too, but never paired: no authorized_at / logouted_at
     orphan = f"e2e-orphan-{ctx['run_id']}"       # a Wappi profile no bot_profiles row names
-    http("POST", f"{MOCK}/__mock/profile", {"profile_id": orphan, "authorized": False, "channel": "whatsapp"})
+    mock_profile(orphan, authorized=False, channel="whatsapp")
 
     def cfg(nodes):
         for a in nodes["Sweep Config"]["parameters"]["assignments"]["assignments"]:
             if a["name"] == "ttlHours":
-                a["value"] = 0.0003              # ≈ 1 s: the second run sees both past the TTL
+                a["value"] = 0.0003              # ≈ 1 s: the second run sees all three past the TTL
             if a["name"] == "dryRun":
                 a["value"] = True                # never a delete call, even against the mock
     wid, since = None, mock_total()
@@ -2064,18 +2066,19 @@ def s_orphan_live(ctx):
         e2 = run_probe(wid, url)
     finally:
         drop_probe(wid)
-        http("POST", f"{MOCK}/__mock/profile", {"profile_id": orphan, "deleted_at": "2026-10-14T00:00:00Z"})   # the hourly sweep skips it
+        mock_profile(orphan, deleted_at="2026-10-14T00:00:00Z")   # the hourly sweep skips it
     s1 = (node_items(e1, "Plan Sweep") or [{}])[0]
     s2 = (node_items(e2, "Plan Sweep") or [{}])[0]
     would = {c.get("profileId") for c in s2.get("wouldDelete") or []}
     deletes, _ = mock_calls(since, "profile/delete")
-    ok = (s1.get("liveRead") == "ok" and s2.get("liveRead") == "ok" and orphan in would and live not in would
+    ok = (s1.get("liveRead") == "ok" and s2.get("liveRead") == "ok" and paid_out not in would and wizard in would and orphan in would
           and int(s2.get("protectedLive") or 0) >= 1 and "Live Profiles" in ran_nodes(e2) and not deletes)
     return ok, (f"run 1 liveRead={s1.get('liveRead')!r}; run 2 liveRead={s2.get('liveRead')!r} liveRows={s2.get('liveRows')} "
-                f"protectedLive={s2.get('protectedLive')} orphan would-delete={orphan in would} live would-delete={live in would} "
-                f"delete calls={len(deletes)}")
+                f"protectedLive={s2.get('protectedLive')} would-delete: once-authorised live={paid_out in would} "
+                f"never-authorised live={wizard in would} rowless={orphan in would}; delete calls={len(deletes)}")
 
 
+# ------------------------------------------------------------------------------------------------------------------ A4 channel watch
 WATCH_ID = "crChannelWatch001"
 WATCH_FILE = f"{WATCH_ID}-Channel_Watch.json"
 WATCH_KEEP = ("List WA Profiles", "List TG Profiles", "Live Rows", "Diff Channel State", "Upsert Snapshot", "Down Alerts?",
