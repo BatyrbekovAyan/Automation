@@ -1927,10 +1927,12 @@ def heal_cleanup(u, old, *pids):
 
 
 def heal_journal(u, want=None, wait=10.0):
-    """identity_heal_log rows for the recipient u (fix round 2): «install|aliases|consolidated|rekeyed|outcome» in write order.
+    """identity_heal_log rows for the recipient u (fix round 2): «install|aliases|consolidated|rekeyed|outcome|hint» in write
+    order — the hint is the client's original id as Validate accepted it, '-' when none (final review M-5).
     A refusal row is written AFTER the answer (Log Refusal) — with `want`, poll until it is there (or the wait ends)."""
     q = (f"select coalesce(string_agg(install_id || '|' || array_to_string(aliases, ',') || '|' || consolidated || '|' || rekeyed "
-         f"|| '|' || coalesce(reason, 'healed'), ';' order by id), '') from identity_heal_log where to_app_user_id = '{u}';")
+         f"|| '|' || coalesce(reason, 'healed') || '|' || coalesce(hint, '-'), ';' order by id), '') "
+         f"from identity_heal_log where to_app_user_id = '{u}';")
     deadline = time.time() + wait
     got = pg(q)
     while want is not None and got != want and time.time() < deadline:
@@ -1971,7 +1973,7 @@ def s_identity_heal(ctx):
         st2, d2 = hook("VerifyIdentity", o.token, body)
         v2 = heal_versions(u, old, mine, other)
         j2 = heal_journal(u)
-        want_j = [f"{o.install_id}|{old}|1|1|healed", f"{o.install_id}|{old}|0|0|healed"]
+        want_j = [f"{o.install_id}|{old}|1|1|healed|{old}", f"{o.install_id}|{old}|0|0|healed|{old}"]
         want_path = f"/revenuecat/v2/projects/{RC_PROJECT}/customers/{urllib.parse.quote(u, safe='')}/aliases"
         want_keyed = ",".join(sorted([f"{mine}={u}", f"{other}={old}"]))
         ok = (st == 200 and d == {"success": True, "aliases": 1, "consolidated": 1, "rekeyed": 1, "truncated": False}
@@ -2027,7 +2029,7 @@ def s_identity_heal_foreign(ctx):
         v0 = heal_versions(u, old, mine, other)
         since = mock_total()
         st, d = hook("VerifyIdentity", o.token, {"appUserId": u, "originalAppUserId": foreign})
-        want_j = f"{o.install_id}|{old}|0|0|hint_not_alias"
+        want_j = f"{o.install_id}|{old}|0|0|hint_not_alias|{foreign}"          # M-5: the id RevenueCat did not confirm
         j1 = heal_journal(u, want=want_j)                              # Log Refusal writes it after the answer
         rc_aliases(u, None, status=500)
         st2, d2 = hook("VerifyIdentity", o.token, {"appUserId": u, "originalAppUserId": old})
@@ -2065,11 +2067,12 @@ def s_identity_heal_after_demotion(ctx):
         before = heal_row(u)
         st, d = hook("VerifyIdentity", o.token, {"appUserId": u, "originalAppUserId": old})
         after, alias_after = heal_row(u), heal_row(old)
-        ok = (before == "trial|expired|0|-|-" and u in demoted
+        journal, want_j = heal_journal(u), f"{o.install_id}|{old}|1|1|healed|{old}"
+        ok = (before == "trial|expired|0|-|-" and u in demoted and journal == want_j
               and st == 200 and d == {"success": True, "aliases": 1, "consolidated": 1, "rekeyed": 1, "truncated": False}
               and after == f"business|active|500|{period}|sub.business.month" and alias_after.split("|")[1:3] == ["expired", "0"])
         return ok, (f"sweep demoted the seed: {demoted!r} → owner {before}; heal={st} {d}; owner → {after} (want "
-                    f"business|active|500|{period}|sub.business.month); alias → {alias_after}")
+                    f"business|active|500|{period}|sub.business.month); alias → {alias_after}; journal={journal!r} (want {want_j!r})")
     finally:
         heal_cleanup(u, old, mine, other)
 

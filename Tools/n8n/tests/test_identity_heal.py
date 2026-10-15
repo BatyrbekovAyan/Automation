@@ -35,7 +35,8 @@ session temp tables of the staging Postgres. No n8n server, no network, never pr
       Trialing: trial/expired/NULL — on iOS the merge, and so the heal, usually comes after the 4d17h sweep) → still a
       never-paid seed: the paid alias is handed over, the paying owner is not locked out
   J   fix round 2 (2026-10-15): the support journal identity_heal_log — a heal writes exactly ONE row INSIDE the Heal
-      statement (install, recipient, the aliases RevenueCat listed, retired / re-keyed counts; a repeat its own zero row);
+      statement (install, recipient, the aliases RevenueCat listed, retired / re-keyed counts, the client's hint — final
+      review M-5; a repeat its own zero row);
       a refusal RevenueCat's list decided (rc_mismatch / hint_not_alias / no_aliases, now 409) writes ONE row with its
       reason AFTER the answer and still zero subscriber / bot rows; an outage (502), the gate (400/401/403) and a DB fault
       (503) write none; a failing journal insert rolls the whole heal back (one transaction)
@@ -245,8 +246,9 @@ def versions(pg):
 
 
 def journal(pg):
-    """identity_heal_log in write order: (install, recipient, aliases, consolidated, rekeyed, reason)."""
-    return [(r['install_id'], r['to_app_user_id'], r['aliases'], r['consolidated'], r['rekeyed'], r['reason'])
+    """identity_heal_log in write order: (install, recipient, aliases, consolidated, rekeyed, reason, hint) — the hint is the
+    client's original id as Validate accepted it (final review M-5; None = none, or the recipient itself)."""
+    return [(r['install_id'], r['to_app_user_id'], r['aliases'], r['consolidated'], r['rekeyed'], r['reason'], r['hint'])
             for r in pg.q(f'select * from {JOURNAL} order by id')]
 
 
@@ -269,8 +271,9 @@ def answer_of(run):
 
 # ---------------------------------------------------------------------------------------------------- H0: the canon
 with Case('A3 H0: the canon holds the generator\'s text (build-verify-identity.py --check exits 0); Heal == '
-          'billing_consolidation.CONSOLIDATE_SQL(HEAL_PARAMS) — clean SQL, exactly three parameters, recipient = the first, '
-          'the re-key compares owner_id with the third (the install), no event plan') as c:
+          'billing_consolidation.CONSOLIDATE_SQL(HEAL_PARAMS) — clean SQL, exactly four parameters (the fourth = the client\'s '
+          'hint for the journal, M-5), recipient = the first, the re-key compares owner_id with the third (the install), no '
+          'event plan') as c:
     r = subprocess.run([sys.executable, str(GEN), '--check'], capture_output=True, text=True)
     c.check(r.returncode == 0 and 'OK' in r.stdout, f'--check exit {r.returncode}: {r.stdout}{r.stderr}')
     b = builder()
@@ -278,12 +281,13 @@ with Case('A3 H0: the canon holds the generator\'s text (build-verify-identity.p
     c.check(q == BC.CONSOLIDATE_SQL(b.HEAL_PARAMS) == b.HEAL_SQL, 'Heal is not the module\'s alias merge rendered with HEAL_PARAMS')
     c.check(guard.check_query(q) == [], f'verify-sql-comments: {guard.check_query(q)}')
     hi = max(int(m.group(0)[1:]) for k, a, z, _ in guard.lex(q) if k == 'code' for m in guard.PLACEHOLDER_TOKEN.finditer(q[a:z]))
-    c.check(hi == 3, f'highest placeholder ${hi}, expected $3')
+    c.check(hi == 4, f'highest placeholder ${hi}, expected $4')
     c.check(re.search(r'b\.owner_id = \$3::text\b', q) and re.search(r'b\.app_user_id <> \$1\b', q) and 'null::text is null' in q,
             'the re-key must compare owner_id with the install parameter and never touch the recipient\'s rows; no event plan')
     c.check(node(canon(), 'Heal')['parameters']['options']['queryReplacement'] ==
-            "={{ [ $('Auth Gate').first().json.crAuth.appUserId, $json.fromIds, $('Auth Gate').first().json.crAuth.installId ] }}",
-            'Heal must read the recipient and the install from the verified token (crAuth)')
+            "={{ [ $('Auth Gate').first().json.crAuth.appUserId, $json.fromIds, $('Auth Gate').first().json.crAuth.installId, "
+            "($('Validate').first().json.hint ?? null) ] }}",
+            'Heal must read the recipient and the install from the verified token (crAuth), the hint from Validate')
 
 
 # ---------------------------------------------------------------------------------------------------- H1/H2: the heal
@@ -306,7 +310,8 @@ with Case('A3 H1 the reinstall heal: RevenueCat lists [OLD, U] → 200 {success,
         c.check(keyed(pg) == {'p-mine': U, 'p-mine-2': U, 'p-other-install': OLD, 'p-retired': OLD, 'p-legacy': OLD, 'p-new': U},
                 f'bot_profiles {keyed(pg)}')
         c.check(len(rc.calls) == 1, f'RevenueCat calls: {rc.calls}')
-        c.check(journal(pg) == [(INST, U, [OLD], 1, 2, None)], f'J: the heal must leave exactly ONE journal row: {journal(pg)}')
+        c.check(journal(pg) == [(INST, U, [OLD], 1, 2, None, OLD)],
+                f'J: the heal must leave exactly ONE journal row, with the client\'s hint: {journal(pg)}')
 
 with Case('A3 H2 a repeat is a no-op: the same call again → success, aliases 1, consolidated 0, rekeyed 0, and EVERY row '
           'version (subscribers, dialog_counts, bot_profiles) unchanged') as c:
@@ -320,7 +325,7 @@ with Case('A3 H2 a repeat is a no-op: the same call again → success, aliases 1
                                                                      'truncated': False}, f'repeat answered {st} {body}')
         c.check(versions(pg) == before, 'the repeat rewrote rows')
         c.check('Heal' in again.trail, f'the repeat must still run the statement (it is the idempotent part): {again.trail}')
-        c.check(journal(pg) == [(INST, U, [OLD], 1, 2, None), (INST, U, [OLD], 0, 0, None)],
+        c.check(journal(pg) == [(INST, U, [OLD], 1, 2, None, OLD), (INST, U, [OLD], 0, 0, None, OLD)],
                 f'J: one journal row per healed verdict — the repeat writes its own row with zeros: {journal(pg)}')
 
 
@@ -385,7 +390,8 @@ with Case('A3 H4/H5 RevenueCat errors (502), no list (502), a list that does not
             rows = journal(pg)[logged:]
             if want_st == 409:
                 listed = [i['id'] for i in (rc.body or {}).get('items', []) if i['id'] != U]
-                c.check(rows == [(INST, U, listed, 0, 0, reason)] and run.trail.index('Log Refusal') > run.trail.index('Respond Refused'),
+                hint = body.get('originalAppUserId') if body.get('originalAppUserId') not in (None, U) else None
+                c.check(rows == [(INST, U, listed, 0, 0, reason, hint)] and run.trail.index('Log Refusal') > run.trail.index('Respond Refused'),
                         f'{label}: J: one refusal row after the answer: {rows} trail={run.trail}')
             else:
                 c.check(rows == [] and 'Log Refusal' not in run.trail, f'{label}: J: an outage writes no journal row: {rows} {run.trail}')
@@ -400,7 +406,8 @@ with Case('A3 H6 a hint RevenueCat does not list → hint_not_alias, ZERO writes
         run = call(pg, mint(), {'appUserId': U, 'originalAppUserId': FOREIGN}, rc)
         c.check(answer_of(run) == (409, {'success': False, 'reason': 'hint_not_alias'}), f'{answer_of(run)} {run.trail}')
         c.check('Heal' not in run.trail and versions(pg) == before, f'a foreign hint wrote rows: {run.trail}')
-        c.check(journal(pg) == [(INST, U, [OLD], 0, 0, 'hint_not_alias')], f'J: the refusal is journaled for support: {journal(pg)}')
+        c.check(journal(pg) == [(INST, U, [OLD], 0, 0, 'hint_not_alias', FOREIGN)],
+                f'J (+ M-5): the refusal is journaled for support WITH the hint RevenueCat did not confirm: {journal(pg)}')
 
 with Case('A3 H7 a malformed hint → 400 before RevenueCat is asked (nothing written); a hint equal to the token\'s id is no '
           'hint (RevenueCat\'s list alone decides); no hint at all heals by RevenueCat\'s list') as c:
@@ -621,6 +628,22 @@ def m_log_before_answer(w):
     w['connections']['Respond Refused'] = {'main': [[]]}
 
 
+def m_heal_hint_from_body(w):
+    o = nd(w, 'Heal')['parameters']['options']
+    o['queryReplacement'] = o['queryReplacement'].replace("$('Validate').first().json.hint", "$('Webhook').first().json.body.originalAppUserId")
+
+
+def m_log_hint_from_body(w):
+    o = nd(w, 'Log Refusal')['parameters']['options']
+    o['queryReplacement'] = o['queryReplacement'].replace("$('Validate').first().json.hint", "$('Webhook').first().json.body.originalAppUserId")
+
+
+def m_journal_hint_dropped(w):
+    p = nd(w, 'Heal')['parameters']
+    p['query'] = p['query'].replace(', rekeyed, hint)', ', rekeyed)').replace(
+        "(select count(*) from rekeyed)::int, nullif($4::text, '')", '(select count(*) from rekeyed)::int')
+
+
 def m_unprotected(w_state):
     v = next(x for x in w_state['nodes'] if x['name'] == 'Validate')['parameters']
     v['jsCode'] = v['jsCode'].replace(",\n  'crVerifyIdent001'", '')
@@ -649,6 +672,10 @@ MUTATIONS = (
     ('Log Refusal reads the body', m_log_refusal_reads_body, 'crAuth'),
     ('Log Refusal disabled', m_disabled('Log Refusal'), 'disabled'),
     ('refusal logged before the answer', m_log_before_answer, 'after the answer'),
+    # final review M-5 (2026-10-15): the journal's hint is Validate's — RC-shaped, never the recipient — never the raw body
+    ('Heal journals the hint from the body', m_heal_hint_from_body, 'hint'),
+    ('Log Refusal journals the hint from the body', m_log_hint_from_body, 'hint'),
+    ('the heal journal drops the hint', m_journal_hint_dropped, 'hint'),
 )
 
 with Case('A3 V0: verify-verify-identity.py passes the committed canon') as c:

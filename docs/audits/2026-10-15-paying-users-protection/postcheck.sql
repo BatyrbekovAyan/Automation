@@ -1,5 +1,6 @@
 -- Пакет A «защита платящих» — пост-проверка трёх миграций одним запросом (только чтение).
--- Ожидание: ledger_cols 2 | snapshot_cols 6 | heal_cols 8 | rls t | client_grants 0 | seq_client_usage f | indexes 4.
+-- Ожидание: ledger_cols 2 | snapshot_cols 6 | heal_cols 9 | rls t | client_grants 0 | seq_client_usage f | indexes 4
+-- (heal_cols 9 с финального ревью 2026-10-15: в identity_heal_log добавлена колонка hint — M-5).
 -- Прод: через Tools/n8n/.secrets/sql-oneoff.py (команда — README пакета, шаг 1).
 select
   (select count(*) from information_schema.columns where table_schema = 'public' and table_name = 'rc_event_ledger')   as ledger_cols,

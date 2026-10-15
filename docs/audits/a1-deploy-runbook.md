@@ -164,14 +164,15 @@ docker compose up -d n8n && docker compose logs --tail 20 n8n
   подписку (план, период, резерв, диалоги месяца) В биллинговый id токена; алиасы списываются как обычный отток (их боты на
   других установках замолкают и убираются через 3 дня — «v1 LIMITATION» в CLAUDE.md). Каждый перенос (строка внутри того же
   запроса, что и перенос) и каждый отказ по списку RevenueCat (`rc_mismatch` / `hint_not_alias` / `no_aliases`, после ответа)
-  оставляет строку в `identity_heal_log`. Запрос поддержки (только чтение, `sql-oneoff.py`):
+  оставляет строку в `identity_heal_log`; в обеих — `hint`: исходный id, который назвал клиент (как его принял Validate: id
+  RevenueCat, не равный получателю; NULL — подсказки не было; финальное ревью M-5). Запрос поддержки (только чтение, `sql-oneoff.py`):
   ```sql
-  select id, healed_at, install_id, to_app_user_id, aliases, consolidated, rekeyed, coalesce(reason, 'healed') as outcome
+  select id, healed_at, install_id, to_app_user_id, aliases, hint, consolidated, rekeyed, coalesce(reason, 'healed') as outcome
   from identity_heal_log order by healed_at desc limit 20;
   -- один владелец: … where to_app_user_id = '<id>' or '<id>' = any(aliases) order by healed_at desc;
   -- только настоящие переносы: … where reason is null and (consolidated > 0 or rekeyed > 0)
   ```
   Чтение: `healed` с `consolidated > 0` — подписка алиасов ушла В `to_app_user_id`, ids из `aliases` списаны; `rekeyed` — боты
   `install_id`, переключённые на новый id; строка `hint_not_alias` / `rc_mismatch` — клиент заявил слияние, которого RevenueCat не
-  подтверждает: ничего не записано, искать сломанный клиент или чужую подсказку. Вернуть подписку на старый телефон нельзя
+  подтверждает: ничего не записано, искать сломанный клиент или чужую подсказку (у `hint_not_alias` неподтверждённый id — в `hint`). Вернуть подписку на старый телефон нельзя
   (heal не двигает зеркало списанного id назад); единственный рычаг — отзыв установки, которая НЕ должна держать подписку (п. 4 выше).

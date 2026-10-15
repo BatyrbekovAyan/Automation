@@ -22,7 +22,8 @@ pins what that behaviour rests on, so a hand edit, a stale re-export or a carele
   (9) fix round 2 (2026-10-15): the support journal — Heal's statement carries the identity_heal_log CTE (one transaction
       with the heal), Respond Refused answers 409 and is followed by `Log Refusal` ONLY (after the answer, continue on
       error, no retry, nothing after it, identity from crAuth, writes identity_heal_log and nothing else); no other node
-      writes the journal.
+      writes the journal; both rows carry the client's hint, and only Validate's (final review M-5: an RC id other than the
+      recipient — never the raw body).
 
     python3 Tools/n8n/verify-verify-identity.py              # the canonical workflows
     python3 Tools/n8n/verify-verify-identity.py --dir DIR    # another set of exports (mutation tests)
@@ -217,10 +218,19 @@ def check(wf, set_state):
 
     # (9) the support journal and the refusal status
     need(B.HEAL_JOURNAL_CTE in hq and re.search(r"\(select id from journal\) as journal_id;\s*$", hq)
-         and re.search(r"\bjournal as \(.*?insert into identity_heal_log \(install_id, to_app_user_id, aliases, consolidated, rekeyed\)\s*"
-                       r"select \$3::text, \$1::text, array\(select app_user_id from alias_ids order by app_user_id\),", hq, re.S),
-         "Heal: the journal CTE (insert into identity_heal_log: the install, the recipient, RevenueCat's aliases, the counts) "
-         "must be part of the heal's own statement — support must SEE every heal, and a heal without its trace may not exist")
+         and re.search(r"\bjournal as \(.*?insert into identity_heal_log \(install_id, to_app_user_id, aliases, consolidated, rekeyed, hint\)\s*"
+                       r"select \$3::text, \$1::text, array\(select app_user_id from alias_ids order by app_user_id\),\s*"
+                       r"\(select count\(\*\) from retired\)::int, \(select count\(\*\) from rekeyed\)::int, nullif\(\$4::text, ''\)", hq, re.S),
+         "Heal: the journal CTE (insert into identity_heal_log: the install, the recipient, RevenueCat's aliases, the counts, "
+         "the client's hint) must be part of the heal's own statement — support must SEE every heal, and a heal without its "
+         "trace may not exist")
+    # final review M-5: the hint the journal stores is Validate's (an RC anonymous id other than the recipient) — the raw
+    # body string never reaches the journal; the hint is the LAST value of both arrays
+    for name in ("Heal", "Log Refusal"):
+        hr = (N[name]["parameters"].get("options") or {}).get("queryReplacement") or ""
+        need(hr.endswith(", " + B.VALIDATED_HINT + " ] }}") and hr.count("$('Validate').first().json.hint") == 1
+             and not re.search(r"\bbody\b", hr),
+             f"{name} must journal the client's hint from Validate ({B.VALIDATED_HINT}), its last value, never from the body: {hr!r}")
     codes = {name: (N[name]["parameters"].get("options") or {}).get("responseCode") for name in REFUSALS}
     need(codes["Respond Refused"] == B.REFUSED_STATUS == 409 and codes["Respond RC Unavailable"] == 502 and codes["Respond 400"] == 400,
          f"refusals must answer status codes monitoring can see — Respond Refused 409 (rc_mismatch / hint_not_alias / "
@@ -231,6 +241,11 @@ def check(wf, set_state):
          and targets(wf, "Log Refusal") in ([], [[]]),
          f"Log Refusal must run after the answer, ONLY after Respond Refused, with nothing after it: Respond Refused → "
          f"{targets(wf, 'Respond Refused')}, into Log Refusal {sources(wf, 'Log Refusal')}, after it {targets(wf, 'Log Refusal')}")
+    need(re.search(r"insert into identity_heal_log \(install_id, to_app_user_id, aliases, consolidated, rekeyed, reason, hint\)\s*"
+                   r"select \$1::text, \$2::text, array\(select jsonb_array_elements_text\(\$3::jsonb\)\), 0, 0, \$4::text, nullif\(\$5::text, ''\)",
+                   lq),
+         "Log Refusal must journal the refusal with the client's hint (the fifth parameter): a hint_not_alias row names the id "
+         "RevenueCat did not confirm (final review M-5)")
     need(lr.get("type") == "n8n-nodes-base.postgres" and lq == B.LOG_REFUSAL_SQL
          and (lr["parameters"].get("options") or {}).get("queryReplacement") == B.LOG_REFUSAL_PARAMS,
          "Log Refusal is stale against build-verify-identity.py (re-run the generator)")
@@ -274,7 +289,7 @@ def main():
         sys.exit(1)
     print(f"OK  {B.WF_FILE} (token-only gate, identity from crAuth, RevenueCat v2 aliases read-only, nothing written without "
           f"RevenueCat's list + Plan Heal's decision, Heal = billing_consolidation.CONSOLIDATE_SQL + its journal CTE, success only on "
-          f"'healed', refusals 409 + journaled after the answer, protected)")
+          f"'healed', refusals 409 + journaled after the answer, the journal carries Validate's hint, protected)")
     print("ALL VERIFY IDENTITY ASSERTS PASSED")
 
 
