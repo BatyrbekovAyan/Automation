@@ -452,3 +452,50 @@ A1 — V NEG проверка ловит любой PARITY FAIL по файлу 
 описан в `staging/README.md`).
 
 **Финальное ревью части A (2026-10-15) — исправления внесены, пакет перерепетирован, по-прежнему ждёт go:** I-1 `7aa6f091` (перенос плана при склейке и в никогда не платившую затравку, которую свип уже погасил: `trial/expired/NULL` — иначе на iOS платящий оставался заблокирован до продления), I-2 `2303cff7` (клиент, новая сборка: проба настроек удаляет профиль и опросчики привязки продвигаются только по `ChannelHealth.Judge` с эхом опрошенного профиля), M-5 `9cd33a6c` (`identity_heal_log.hint` — подсказка клиента в строках журнала; миграция M3 ещё не выложена), M-1 — в пакете проба учётки RevenueCat (шаг 2c, только HTTP-статус) и журнал доставок RevenueCat (шаг 12b). Изменились ровно два графа пакета: RevenueCat Events `1196077677b4` → `a3c52f30dcf7`, Verify Identity `3af1831f3ca4` → `b329f4831d9e` (+ M3: `heal_cols 9`); канон пакета — `9cd33a6c`. Гейты 38/38, `run_all` 1349/0, Unity 3184/3184; повторная репетиция от прод-состояния (RED на `df5aa5f1` → пакет → e2e `identity_heal_*` 4/4, `rc_*` 2/2, `retired_bot_reconnects_after_purchase` 2/2) — `docs/audits/2026-10-15-paying-users-protection/rehearsal.txt` §F.
+
+## Развёртывание 2026-10-15 — часть A «защита платящих» (прод, по явному «да» владельца)
+
+Пакет — `docs/audits/2026-10-15-paying-users-protection/README.md` («Пакет выкладки, часть A»); канон пакета `9cd33a6c` (на HEAD
+`a0d71821` дифф `Tools/n8n/workflows` + `Tools/n8n/sql` пуст). «Да» владельца 2026-10-15 («да, выкладывай и пушь»). Время — UTC
+2026-10-15 13:26–14:22 (Алматы 18:26–19:22); `DEPLOY_START` 13:36:52Z. Клиентская половина (A3 — триггер identity-heal, A4 — метка
+«Канал отключён», A6 — «Подписка», I-2 — эхо-проверки) едет в новой сборке, не здесь. Часть B в пакет не входит.
+
+**Предполётная находка и решение контроллера.** Первый проход шага 0 (только чтение) показал: учётки `EuhhqAaV56DpoqAN`, которую
+чек-лист называл живым id WappiAuthToken, на проде НЕТ — единственная WappiAuthToken прода `ZowntFGvApDJ7UzQ` (`GET /credentials`:
+9 учёток), её несут все живые workflow (PUT публичного API перепривязывает канонический id по имени сам). Шаг 5 ждал после импорта
+Channel Watch = `EuhhqAaV56DpoqAN` («импорт не перепривязал id»); `import:workflow` n8n 2.36.7 заменяет ненайденный id учёткой с тем
+же именем только в проекте импорта (`dist/services/import.service.js` → `replaceInvalidCredentials` → `findByNameAndTypeInProject`),
+а без замены каждый прогон watch падал бы на вызове Wappi — «успех» по букве чек-листа был бы поломкой. Исполнитель остановился ДО
+любых изменений (BLOCKED на шаге 0; снимок, dry-run и точки отката — только чтение). Решение контроллера — вариант 2, правило
+a1-deploy-runbook §2.4: временная копия Channel Watch с id прода, аудит учёток обеих копий, импорт из копий, GET до включения;
+README пакета исправлен (шаги 0, 4, 5, «Уроки выкладки 2026-10-15»). Репетиция этого поймать не могла: учётка WappiAuthToken стенда
+уже несёт `ZowntFGvApDJ7UzQ`, а `derive-staging.py` перепривязывает канон по имени до импорта.
+
+| Шаг | Результат | Доказательство |
+|---|---|---|
+| 0 снимок «до» | 13:26:58Z и повторно 13:35:58Z (после решения): канон 29, diff 11 = DIFF ×9 + MISSING ×2; хэши «до» 9/9 = таблица пакета (сохранённая = опубликованная); 18 OK — те же, что в снимке пакета; клонов 0, архивный «13», other 0; между проходами ничего не изменилось | `docs/audits/2026-10-15-paying-users-protection/prod-before-deploy.json` |
+| 0 dry-run | would_update 8 (ровно ids пакета), missing 2 (`crVerifyIdent001`, `crChannelWatch001`), up_to_date 17, failed 0; Set Workflow State `--include-placeholders` — would_update 1; точки отката сняты до первого apply, повторный dry-run дал те же 9 указателей | `…/rollback-pointers.txt` |
+| 0 бэкап | `~/backups/n8n-2026-10-15-predeploy.tar.gz` (13:36Z, 325 892 Б); ночной архив дня сохранён как `n8n-2026-10-15-0315.tar.gz` | `ls ~/backups` |
+| 1 миграции | precheck `{"no_ledger":true,"no_snapshot":true,"no_heal_log":true}`; M1 → M2 → M3 — каждая `200 {"success":true}`; пост-проверка `{"ledger_cols":"2","snapshot_cols":"6","heal_cols":"9","rls":true,"client_grants":"0","seq_client_usage":false,"indexes":"4"}` | `sql-oneoff` |
+| 2 учётка | `import:credentials` → «Successfully imported 1 credential.», `import rc=0`; копии в контейнере, на хосте и локально удалены (проверено), экспорт по id — `1`; `GET /credentials`: `crRevenueCatApi1` httpHeaderAuth «RevenueCat API». Значение ключа нигде не печаталось (`grep -cF` по логу, отчёту и снимкам — 0) | вывод шагов |
+| 2c проба | `activate 200 \| owner rows 1 \| RevenueCat HTTP status 200`; временный workflow удалён ≥ 35 с спустя (DELETE 200 → GET 404) — ключ v2 работает из n8n прода. Первый запуск упал локально (`B` не экспортирована в дочерний bash → `ValueError` до любого запроса; временного workflow нет — проверено списком) | вывод шагов |
+| 3 Set Workflow State | `--include-placeholders --apply --yes`: опубликован самим PUT (без окна деактивации), read-back ok, updated 1 — оба новых id защищены ДО импорта | вывод инструмента |
+| 4 импорт (§2.4) | копии в scratchpad: у Channel Watch 4 ссылки `EuhhqAaV56DpoqAN` → `ZowntFGvApDJ7UzQ` (имя то же), Verify Identity — как есть; аудит PASS (учётки ровно {`ZowntFGvApDJ7UzQ`, `vvRrFiEXzLVqKjOx`} / {`crRevenueCatApi1`, `vvRrFiEXzLVqKjOx`}, dev-id в тексте нет, копия = канон кроме перепривязки, графы `e907de5eae43` / `b329f4831d9e`, `active false`); импорт ×2 — «Successfully imported 1 workflow.», `import rc=0`, копии удалены; GET до включения — `active False`, учётки ровно ожидаемые | вывод шагов |
+| 5 включение | activate 200 ×2, `active True`, `published=stored True`; учётки VI `crRevenueCatApi1` + `vvRrFiEXzLVqKjOx`, CW `ZowntFGvApDJ7UzQ` + `vvRrFiEXzLVqKjOx` | API |
+| 6 smoke VI | GET → `[404]` «Did you mean to make a POST request?»; POST `{}` без токена → `[401]` `unauthorized:missing` | curl |
+| 7 восемь workflow | по порядку пакета, `--only <id> --apply --yes`: 8/8 «published by the PUT (served version = the update) — no publish call, no deactivate window», «read-back: ok», updated 1, failed 0 | вывод инструмента |
+| 8 `update-clones.py` | клонов 0, архивный «13» пропущен — применять нечего | вывод инструмента |
+| 9 read-back | `verify-deployed` exit 0: канон 29, diff 0; хэши «после» 11/11 = таблица пакета (сохранённая = опубликованная), все активны; клонов 0, other 0 | `…/prod-after.json` |
+| 10 smoke | 10.1a / 10.1b `[404]` «Did you mean…»; 10.2 `[401]` `unauthorized:missing`; 10.3 `[401]` `unauthorized`; 10.4 `[400]` `bad_request`; 10.5 `[400]` `protected_workflow`; 10.6 `[401]` `unauthorized:bad_signature` — всё как в пакете | curl |
+| 11 первый тик | ошибочных выполнений с `DEPLOY_START` — `[]` ×3 (RevenueCat Events, Verify Identity, Channel Watch) и 0 по всему инстансу; `channel_snapshot` rows 0 / up 0 / owed 0. Тики 13:50 и 14:00 прошли — успешные не сохраняются, доказательство — `pg_stat_user_tables` у `channel_snapshot` (PG 17.6): idx_scan 2 → 4, `last_idx_scan` 14:00:03Z (единственный seq scan — наш `count(*)` 13:51:35Z). Пустой снимок верен: проба только чтения (тот же `GET profile/all/get`, только счётчики и булевы) — Wappi перечисляет 0 профилей на ОБЕИХ базах (HTTP 200, `done`), а пол пустого списка watch пропускает базу Telegram при живой строке | `sql-oneoff`, API |
+| 12 логи | 14:21Z: `docker compose logs --since 15m` — ни одной строки error/insights; за всё окно с `DEPLOY_START` 6 строк лога, все штатные (3 × «Received request for unknown webhook … GET» — наши smoke-GET, 3 × «Deregistered all crons» — PUT переопубликовал три расписания); ошибочных выполнений с `DEPLOY_START` — 0 (три workflow и весь инстанс); тики Channel Watch 13:50 / 14:00 / 14:10 / 14:20 (`idx_scan` 8, `last_idx_scan` 14:20:03Z), owed 0; Notifier после переопубликования тикает (`handoff_requests.last_idx_scan` 14:20:20Z); RevenueCat Events, Verify Identity, Channel Watch — active, published = stored | `docker compose logs`, API |
+
+**Наблюдение (не от выкладки).** Единственная живая строка `bot_profiles` — реликт до A1: Telegram, без владельца, без workflow,
+подписчик `expired`, не биллинговый id владельца (канал владельца не занимает). Её профиля у Wappi нет, но пол пустого списка (у
+watch и у ветки liveness Sweep'а — «пустой список при живых строках = невалидный ответ, ничего не делать») держит её живой, пока
+Wappi не перечислит хотя бы один профиль Telegram; тогда liveness её спишет. Безвредно; отдельного действия не требует.
+
+**Откат** — README пакета, «Откат»; указатели — `docs/audits/2026-10-15-paying-users-protection/rollback-pointers.txt`; бэкап —
+`~/backups/n8n-2026-10-15-predeploy.tar.gz`. **Дальше:** 12b — первое живое событие RevenueCat по журналу доставок RevenueCat (200; повтор —
+тоже 200) — придёт с новой сборкой; запрос шага 11 — ещё раз на следующее утро; новая клиентская сборка → `inspect-artifact.sh` →
+device-pass (пункты — в пакете) → наблюдения A4/A5 на живом боте (шаг 14, по отдельному «да»). Push `main` — контроллер.

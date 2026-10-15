@@ -2,7 +2,10 @@
 
 **Статус (2026-10-15):** всё в каноне на `main` (части A — коммиты `927e1067..9caddb6f` + исправления финального ревью
 `7aa6f091` (I-1), `2303cff7` (I-2, клиент), `9cd33a6c` (M-5); канон пакета = `Tools/n8n/workflows` + `Tools/n8n/sql` на `9cd33a6c`),
-**на проде НЕ выложено**. Пакет отрепетирован на staging из прод-состояния (раздел «Репетиция»); финальное ревью после этого
+**выложено на прод 2026-10-15** (по «да» владельца; журнал — `docs/audits/implementation-progress.md`, «Развёртывание 2026-10-15 —
+часть A «защита платящих»»; снимки «до»/«после» — `prod-before-deploy.json` / `prod-after.json`, точки отката — `rollback-pointers.txt`
+рядом с этим файлом; при выкладке исправлен шаг 4 — перепривязка учётки Channel Watch, см. «Уроки выкладки 2026-10-15»).
+Пакет отрепетирован на staging из прод-состояния (раздел «Репетиция»); финальное ревью после этого
 поменяло два графа — RevenueCat Events (I-1) и Verify Identity (I-1 + M-5) — и миграцию M3 (колонка `hint`), поэтому они
 перерепетированы отдельно (раздел «Повторная репетиция после финального ревью»). Выкладка — **только по явному «да» владельца**; исполняет
 контроллер по чек-листу ниже. Клиентская половина (A3 — триггер identity-heal, A4 — метка «Канал отключён», A6 — «Подписка»)
@@ -97,9 +100,13 @@ cd "$MAIN" && git worktree remove "$MAIN-pkgA"                                  
      `python3 Tools/n8n/deploy-canonical.py --base $B --only 0DP79STI3pafXO9B --include-placeholders` → `would_update 1`. Все строки
      `rollback pointer` → `$MAIN/docs/audits/<date>-deploy-rollback-pointers.txt`. (Исправления финального ревью набор не меняют —
      RevenueCat Events по-прежнему среди 8, Verify Identity среди 2 missing; повторный dry-run от прод-состояния дал ровно это.)
-   - Учётки, на которые ссылаются новые workflow: `vvRrFiEXzLVqKjOx` (Postgres — у каждого Postgres-узла канона) и
-     `EuhhqAaV56DpoqAN` (WappiAuthToken — тот же id несут живые канонические Create WA/TG, шаблоны ботов, Wappi Proxy и
-     Handoff Notifier; бот-canary «23» 2026-09-24 работал через него); `crRevenueCatApi1` создаётся в шаге 2.
+   - Учётки, на которые ссылаются новые workflow: `vvRrFiEXzLVqKjOx` (Postgres — у каждого Postgres-узла канона), WappiAuthToken
+     (Channel Watch) и `crRevenueCatApi1` (Verify Identity; создаётся в шаге 2). **WappiAuthToken на проде — `ZowntFGvApDJ7UzQ`**
+     (единственная httpHeaderAuth-учётка с этим именем; её несут все живые workflow). Канон несёт id `EuhhqAaV56DpoqAN`, которого на
+     проде НЕТ: PUT публичного API (`deploy-canonical`) перепривязывает его по имени сам (поэтому живые Create WA/TG, Notifier, Auth
+     Session несут `ZowntFGvApDJ7UzQ`), а новый workflow перед импортом перепривязывается явно — шаг 4 (правило a1-deploy-runbook
+     §2.4). Проверка (только чтение): `uc.call(B, "GET", "/credentials?limit=100")` — id/тип/имя, без значений. (До 2026-10-15 здесь
+     стояло «тот же id несут живые …» — неверно, см. «Уроки выкладки 2026-10-15».)
    - Засечь начало выкладки для наблюдения (шаги 11–12): `export DEPLOY_START="$(date -u +%Y-%m-%dT%H:%M:%SZ)"`.
 1. **Миграции** (каждая — `200` или «No item to return»; затем пост-проверка):
    ```bash
@@ -202,9 +209,11 @@ cd "$MAIN" && git worktree remove "$MAIN-pkgA"                                  
    Ожидание: `activate 200 | owner rows 1 | RevenueCat HTTP status 200`, затем `temp workflow deleted 200 -> GET 404`. Статус `404`
    (RevenueCat не знает этого клиента в проекте `0f8c9529`) ключ тоже доказывает: авторизация проходит раньше поиска клиента. **`401` /
    `403` — СТОП** (ключ неверен или без права на customers/aliases): шаги 3+ не выполнять, учётку пересоздать по 2a–2b с верным ключом
-   и повторить 2c; живого вреда нет — учётку пока ничто не использует. Статус пуст (`None`: таймаут/сеть) или нет вывода проб — СТОП,
-   прочитать ошибку исполнения (ошибки сохраняются) и повторить один раз. `owner rows 0` при `404` — ключ исправен, но строки
-   владельца по префиксу нет: доложить, не чинить. Отрепетировано на staging (мок RevenueCat, учётка-заглушка) — «Повторная репетиция».
+   и повторить 2c; живого вреда нет — учётку пока ничто не использует. Статус пуст (`None`: таймаут/сеть) или нет вывода проб — СТОП
+   и повторить пробу один раз; второй пустой ответ — СТОП, доложить. Ошибку исполнения здесь не прочитать: узел RevenueCat идёт
+   дальше при ошибке (`continueRegularOutput`), выполнение завершается успешно, а успешные не сохраняются
+   (`saveDataSuccessExecution: none`). Heredoc запускать в той же оболочке, где задана `B` (из отдельного скрипта — `export B`).
+   `owner rows 0` при `404` — ключ исправен, но строки владельца по префиксу нет: доложить, не чинить. Отрепетировано на staging (мок RevenueCat, учётка-заглушка) — «Повторная репетиция».
 3. **Set Workflow State — защита двух новых id ДО их импорта и включения** (до этого шага legacy-вызов без токена — compat-окно
    открыто до 2026-12-31 — мог бы выключить или удалить новые workflow). Путь по решению контроллера (отрепетирован):
    `python3 Tools/n8n/deploy-canonical.py --base $B --only 0DP79STI3pafXO9B --include-placeholders --apply --yes` —
@@ -214,18 +223,61 @@ cd "$MAIN" && git worktree remove "$MAIN-pkgA"                                  
    репетируется; заново ВКЛЮЧАЕТ два живых вебхука (Support Message и Set Workflow State; на n8n 2.36.7 activate активного workflow
    снимает его вебхук на миллисекунды); запускать ТОЛЬКО из основной копии `$MAIN` — без `.secrets/client-webhooks-state.json` он
    СОЗДАСТ на проде новые учётки и workflow; затем `--export` и `git diff --stat Tools/n8n/workflows/` — Ожидание: пусто.
-4. **Импорт двух новых workflow** (неактивными). Основной путь — тот же `docker compose cp`:
+4. **Импорт двух новых workflow** (неактивными) — с перепривязкой учётки по правилу a1-deploy-runbook §2.4 (добавлено при выкладке
+   2026-10-15; «Уроки выкладки 2026-10-15»). Канон Channel Watch несёт WappiAuthToken `EuhhqAaV56DpoqAN`, которого на проде нет;
+   `import:workflow` n8n 2.36.7 заменяет ненайденный id учёткой с тем же именем только В ПРОЕКТЕ импорта
+   (`replaceInvalidCredentials` → `findByNameAndTypeInProject`), а если не заменит — каждый прогон упадёт на вызове Wappi. Поэтому
+   импорт идёт из ВРЕМЕННЫХ копий (scratchpad, не канон), где id перепривязан явно, а учётки обеих копий проверены до импорта:
    ```bash
+   # 4a. временные копии + аудит (канон не трогается): CW EuhhqAaV56DpoqAN -> ZowntFGvApDJ7UzQ (имя WappiAuthToken то же), VI как есть
+   IMP=<scratchpad>/import; mkdir -p "$IMP"; IMP="$IMP" python3 - <<'PY'
+   import copy, importlib.util, json, os, sys
+   s = importlib.util.spec_from_file_location("vd", "Tools/n8n/verify-deployed.py"); vd = importlib.util.module_from_spec(s); s.loader.exec_module(vd)
+   DEV, PROD = "EuhhqAaV56DpoqAN", "ZowntFGvApDJ7UzQ"
+   WANT = {"crChannelWatch001-Channel_Watch": {("httpHeaderAuth", PROD, "WappiAuthToken"), ("postgres", "vvRrFiEXzLVqKjOx", "Postgres")},
+           "crVerifyIdent001-Verify_Identity": {("httpHeaderAuth", "crRevenueCatApi1", "RevenueCat API"), ("postgres", "vvRrFiEXzLVqKjOx", "Postgres")}}
+   ok = True
+   for f, want in WANT.items():
+       canon = json.load(open(f"Tools/n8n/workflows/{f}.json")); w = copy.deepcopy(canon)
+       for n in w["nodes"]:
+           for t, ref in (n.get("credentials") or {}).items():
+               if ref.get("id") == DEV:
+                   assert t == "httpHeaderAuth" and ref.get("name") == "WappiAuthToken"; ref["id"] = PROD
+       text = json.dumps(w, ensure_ascii=False, indent=2)
+       refs = {(t, r.get("id"), r.get("name")) for n in w["nodes"] for t, r in (n.get("credentials") or {}).items()}
+       good = refs == want and DEV not in text and vd.graph_hash(w) == vd.graph_hash(canon) and w.get("active") is False
+       ok &= good; open(f"{os.environ['IMP']}/{f}.json", "w").write(text)
+       print(f, sorted(refs), "graph", vd.graph_hash(w), "OK" if good else "FAIL")
+   sys.exit(0 if ok else 1)
+   PY
+   # 4b. импорт ИЗ КОПИЙ (id сохраняются)
    for f in crVerifyIdent001-Verify_Identity crChannelWatch001-Channel_Watch; do
-     scp -q "Tools/n8n/workflows/$f.json" "choosereply:/tmp/$f.json"
+     scp -q "$IMP/$f.json" "choosereply:/tmp/$f.json"
      ssh choosereply "cd ~/choosereply; docker compose cp /tmp/$f.json n8n:/tmp/$f.json \
        && docker compose exec -T -u root n8n chown node:node /tmp/$f.json \
        && docker compose exec -T n8n n8n import:workflow --input=/tmp/$f.json; echo \"import rc=\$?\"; \
        docker compose exec -T -u root n8n rm -f /tmp/$f.json; rm -f /tmp/$f.json"
    done
    ```
-   Ожидание ×2: «Successfully imported 1 workflow.», `import rc=0`. НЕ репетировано (запасная форма потоком):
-   `ssh choosereply "cd ~/choosereply && docker compose exec -T n8n sh -c 'cat > /tmp/$f.json'" < "Tools/n8n/workflows/$f.json"`.
+   Ожидание: аудит 4a — `OK` ×2 (CW `[('httpHeaderAuth', 'ZowntFGvApDJ7UzQ', 'WappiAuthToken'), ('postgres', 'vvRrFiEXzLVqKjOx',
+   'Postgres')]` graph `e907de5eae43`; VI `crRevenueCatApi1` + `vvRrFiEXzLVqKjOx` graph `b329f4831d9e`), иначе — СТОП до импорта;
+   импорт ×2 — «Successfully imported 1 workflow.», `import rc=0` (строка CLI «Error tracking disabled because this release is older
+   than 6 weeks.» — служебная, не ошибка). НЕ репетировано (запасная форма потоком):
+   `ssh choosereply "cd ~/choosereply && docker compose exec -T n8n sh -c 'cat > /tmp/$f.json'" < "$IMP/$f.json"`.
+   **4c. GET до включения** (только чтение): у каждого нового workflow `active False` и учётки РОВНО: Verify Identity —
+   `{crRevenueCatApi1, vvRrFiEXzLVqKjOx}`, Channel Watch — `{ZowntFGvApDJ7UzQ, vvRrFiEXzLVqKjOx}`; любой другой id (в т.ч. уцелевший
+   `EuhhqAaV56DpoqAN`) — НЕ включать, СТОП:
+   ```bash
+   python3 - <<'PY'
+   import importlib.util
+   s = importlib.util.spec_from_file_location("uc", "Tools/n8n/update-clones.py"); uc = importlib.util.module_from_spec(s); s.loader.exec_module(uc)
+   WANT = {"crVerifyIdent001": {"crRevenueCatApi1", "vvRrFiEXzLVqKjOx"}, "crChannelWatch001": {"ZowntFGvApDJ7UzQ", "vvRrFiEXzLVqKjOx"}}
+   for wid, want in WANT.items():
+       st, w = uc.call("https://n8n.choosereply.com", "GET", f"/workflows/{wid}")
+       ids = {r.get("id") for n in w.get("nodes", []) for r in (n.get("credentials") or {}).values()}
+       print(wid, st, "active", w.get("active"), sorted(ids), "OK" if st == 200 and w.get("active") is False and ids == want else "FAIL — do NOT activate")
+   PY
+   ```
 5. **Включение через API** (как триггерные workflow 09-24) + read-back:
    ```bash
    python3 - <<'PY'
@@ -240,7 +292,8 @@ cd "$MAIN" && git worktree remove "$MAIN-pkgA"                                  
    PY
    ```
    Ожидание: `activate 200 | active True | published=stored True`; учётки Verify Identity = `crRevenueCatApi1` + `vvRrFiEXzLVqKjOx`,
-   Channel Watch = `EuhhqAaV56DpoqAN` + `vvRrFiEXzLVqKjOx` (импорт не перепривязал id).
+   Channel Watch = `ZowntFGvApDJ7UzQ` + `vvRrFiEXzLVqKjOx` (id прода после перепривязки шага 4; до 2026-10-15 здесь стояло
+   `EuhhqAaV56DpoqAN` — неверно: такого id на проде нет).
 6. **Smoke Verify Identity** — запросы 10.1a и 10.2 из шага 10 (Ожидание — там же).
 7. **deploy-canonical по одному** (`python3 Tools/n8n/deploy-canonical.py --base $B --only <id> --apply --yes`): `ZGYr6srzS3rSSXHp`
    RevenueCat Events (после M1!) → `2islisFH7jjLoPQM` Delete Orphan Profiles → `crHandoffNtfy001` Handoff Notifier →
@@ -438,11 +491,29 @@ cd "$MAIN" && git worktree remove "$MAIN-pkgA"                                  
 4. Переустановка приложения при живой подписке → один вызов `/webhook/VerifyIdentity` → подписка на новом id; строка в
    `identity_heal_log` (с `hint`); повторный запуск в течение 24 ч — без вызова (защёлка `CrIdentityHeal.*`). Отдельно (I-1): на
    iOS переустановить, дождаться, пока свип погасит триал новой установки (4 д 17 ч после первого бота: `trial/expired`), затем
-   «Восстановить» — подписка всё равно переезжает, бот отвечает.
+   «Восстановить» — подписка всё равно переезжает; бот снова отвечает только после переподключения через F2 «Подключите ботов
+   снова» (канал уже отключён свипом), не сразу после «Восстановить».
 5. Наблюдения на проде по отдельному «да» (шаг 14 чек-листа): уведомление «канал отключился» в «Избранное» Telegram и
    уведомление о заявке Telegram-бота на номер `account.phone`.
 
+**Уроки выкладки 2026-10-15** (журнал — `docs/audits/implementation-progress.md`, «Развёртывание 2026-10-15 — часть A»):
+
+- **Id учётки при импорте нового workflow.** Чек-лист предполагал, что живые workflow несут WappiAuthToken `EuhhqAaV56DpoqAN` и
+  импорт его сохранит; на проде такого id нет — единственная учётка с этим именем `ZowntFGvApDJ7UzQ`. PUT публичного API
+  перепривязывает по имени сам (поэтому `deploy-canonical` этого не замечает: `graph_hash` id учёток не включает), импорт CLI —
+  только в своём проекте. Найдено в предполётной проверке (только чтение), до любых изменений; решение контроллера — правило
+  a1-deploy-runbook §2.4: временная копия с id прода, аудит учёток, импорт из копии, GET до включения (шаг 4). **Репетиция на
+  staging этого поймать не может:** учётка WappiAuthToken стенда уже имеет id `ZowntFGvApDJ7UzQ`, а `derive-staging.py`
+  перепривязывает канон по имени ещё до импорта — проверять id учёток нового workflow нужно на проде, `GET /credentials`
+  (только чтение), в предполётном шаге.
+- **Тик Channel Watch на проде в выполнениях не виден** (успешные не сохраняются): доказательство, что он идёт, — счётчики Postgres
+  `pg_stat_user_tables` у `channel_snapshot` (PG 17: `idx_scan` +2 за тик, `last_idx_scan` = время тика; шаг 11 выкладки —
+  13:50 и 14:00:03Z). На день выкладки Wappi перечислял 0 профилей на ОБЕИХ базах (проба только чтения тем же `GET
+  profile/all/get`), поэтому снимок пуст верно; единственная живая строка `bot_profiles` — реликт до A1 (Telegram, без владельца,
+  без workflow) — пропускается полом пустого списка (так же её не списывает liveness Sweep'а).
+
 **Не проверено (остатки репетиции):** реальный RevenueCat API v2 из n8n прода (на стенде — мок; ключ проверен A3 локально,
-только чтение) — права учётки «RevenueCat API» на проде проверяет проба шага 2c сразу после импорта (только HTTP-статус), а
+только чтение) — права учётки «RevenueCat API» на проде проверяет проба шага 2c сразу после импорта (только HTTP-статус; при
+выкладке 2026-10-15 — `owner rows 1 | RevenueCat HTTP status 200`), а
 первое живое событие RevenueCat — журнал доставок RevenueCat (шаг 12b); живой бот на проде (их 0) —
 наблюдения A4/A5 ждут новой сборки.

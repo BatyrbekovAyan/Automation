@@ -1,0 +1,30 @@
+# Part A «защита платящих» — prod rollback pointers, taken by the read-only dry-runs of README step 0
+# 2026-10-15T13:32:03Z (UTC), before ANY apply; prod = canon 927e1067 (verify-deployed: 9 DIFF + 2 MISSING = the package)
+# rollback of an updated workflow: POST /api/v1/workflows/<id>/activate {"versionId": "<pointer>"} (D1 path) — or the 927e1067 canon via deploy-canonical (README «Откат»)
+# new workflows (crVerifyIdent001, crChannelWatch001): deactivate, wait >= 35 s, DELETE (insights rule)
+
+## deploy-canonical.py --base https://n8n.choosereply.com (dry-run)
+~ 2islisFH7jjLoPQM 'Delete Orphan Profiles' active=True nodes 13 → 14 (+1 -0)
+    rollback pointer: versionId ef9bea65-2eac-4c89-ae52-4034fae9cac8 (activeVersionId ef9bea65-2eac-4c89-ae52-4034fae9cac8)
+~ Uz6HBBUpAiUqVysB 'CreateTelegramWorkflow' active=True nodes 52 → 52 (+0 -0)
+    rollback pointer: versionId a8c3a603-c34f-4943-ac19-4f14b19413fb (activeVersionId a8c3a603-c34f-4943-ac19-4f14b19413fb)
+~ XuvOp7TxOImOAmlj 'CreateWhatsappWorkflow' active=True nodes 52 → 52 (+0 -0)
+    rollback pointer: versionId a0e365a5-d9af-4f62-8b86-1b5a9cde5e6b (activeVersionId a0e365a5-d9af-4f62-8b86-1b5a9cde5e6b)
+~ ZGYr6srzS3rSSXHp 'RevenueCat Events' active=True nodes 13 → 15 (+2 -0)
+    rollback pointer: versionId bbb5fc94-5926-4f7d-bc16-e342c6cdcaa6 (activeVersionId bbb5fc94-5926-4f7d-bc16-e342c6cdcaa6)
+~ crAuthSession001 'Auth Session' active=True nodes 26 → 26 (+0 -0)
+    rollback pointer: versionId 29fab44c-7e0b-438c-84fe-36360d896eaa (activeVersionId 29fab44c-7e0b-438c-84fe-36360d896eaa)
+MISSING crChannelWatch001 crChannelWatch001-Channel_Watch.json — import it with n8n import:workflow, not here
+~ crHandoffNtfy001 'Handoff Notifier' active=True nodes 10 → 10 (+0 -0)
+    rollback pointer: versionId 167561a5-8b1c-41cf-94d6-df8a6aace3eb (activeVersionId 167561a5-8b1c-41cf-94d6-df8a6aace3eb)
+MISSING crVerifyIdent001 crVerifyIdent001-Verify_Identity.json — import it with n8n import:workflow, not here
+~ fXYpCXPKw92EzRz8 'Profile Lifecycle Sweep' active=True nodes 41 → 41 (+0 -0)
+    rollback pointer: versionId 76a9b073-2a0d-4822-8f93-f09adcc6a571 (activeVersionId 76a9b073-2a0d-4822-8f93-f09adcc6a571)
+~ lmjYsdNcQA2IE5rl 'Delete Bot Files' active=True nodes 19 → 19 (+0 -0)
+    rollback pointer: versionId bcf55fed-0f18-4dcc-b086-e9fa5e6b7ed4 (activeVersionId bcf55fed-0f18-4dcc-b086-e9fa5e6b7ed4)
+{"considered": 27, "missing": 2, "up_to_date": 17, "would_update": 8, "updated": 0, "would_publish": 0, "republished": 0, "inactive_must_run": 0, "failed": 0}
+
+## deploy-canonical.py --base https://n8n.choosereply.com --only 0DP79STI3pafXO9B --include-placeholders (dry-run)
+~ 0DP79STI3pafXO9B 'Set Workflow State' active=True nodes 20 → 20 (+0 -0)
+    rollback pointer: versionId 720bfc8f-d28a-47ee-8aff-c5ee0abbb957 (activeVersionId 720bfc8f-d28a-47ee-8aff-c5ee0abbb957)
+{"considered": 1, "missing": 0, "up_to_date": 0, "would_update": 1, "updated": 0, "would_publish": 0, "republished": 0, "inactive_must_run": 0, "failed": 0}
