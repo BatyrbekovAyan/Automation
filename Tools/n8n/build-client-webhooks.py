@@ -88,6 +88,7 @@ PROTECTED_IDS = [
     "crPriceSearch001",  # Price List Search — the bots' / test dialog's reconciling price-list tool (V9, 2026-09-28)
     "crVerifyIdent001",  # Verify Identity — identity-heal after a reinstall (A3 «защита платящих», 2026-10-14)
     "crChannelWatch001",  # Channel Watch — «канал отключился» notices to the owner every 10 min (A4 «защита платящих», 2026-10-14)
+    "crSetSchedule001",  # Set Schedule — the owner's bot schedule, one version-guarded upsert (B1 «расписание бота», 2026-10-14)
 ]
 
 

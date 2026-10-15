@@ -480,8 +480,14 @@ def verify_integrations():
     check(q.startswith("--") and cl.DBF_LINE_HEAD in q and "SELECT profile_id FROM lineage_profiles" in q
           and (dcm.get("options") or {}).get("queryReplacement") == cl.DBF_LINE_PARAMS,
           "T5: Delete Chat Memory must delete by the bot's line (clone_lineage.DBF_LINE_HEAD + DBF_LINE_PARAMS), not by the named ids")
+    # B1 «расписание бота» (2026-10-14): the schedule goes with the bot — every profile of its line, the same statement,
+    # counted as deletedSchedules (Deletion Settled? reads it). Pinned AFTER the T5 line check on purpose: a pre-T5 copy
+    # (named ids, no schedule) must still be reported as the T5 failure it is (tests/test_clone_retirements.py T5 N1).
+    check("DELETE FROM public.bot_schedule b\n  WHERE b.profile_id IN (SELECT profile_id FROM valid)" in q
+          and 'AS "deletedSchedules"' in q,
+          "B1: Delete Bot Files must wipe bot_schedule for every profile of the line (Delete Chat Memory) and count it as deletedSchedules")
     rb = node(load("lmjYsdNcQA2IE5rl-Delete_Bot_Files.json"), "Respond")["parameters"]["responseBody"]
-    for k in ("deletedHistoryEvents", "deletedHandoffs", "deletedReplyEvents", "deletedChatStates"):
+    for k in ("deletedHistoryEvents", "deletedHandoffs", "deletedReplyEvents", "deletedChatStates", "deletedSchedules"):
         check(k in rb, f"Delete Bot Files response must report {k}")
     st = load("0DP79STI3pafXO9B-Set_Workflow_State.json")
     check(any(all(i in n["parameters"].get("jsCode", "") for i in ("'crHandoffReq0001'", "'crHandoffNtfy001'", "'crHandoffsApi001'", "'crTestDialog0001'", "'crHandoffDry0001'")) for n in st["nodes"]),

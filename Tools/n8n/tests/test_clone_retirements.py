@@ -53,7 +53,8 @@ CH = {
 CREATE = {ch: wf(spec['create']) for ch, spec in CH.items()}
 LOCAL = 'http://localhost:5678/api/v1/workflows/'
 TABLES = ('installs', 'subscribers', 'bot_profiles', 'documents', 'uploaded_files', 'clone_retirements', 'n8n_chat_histories',
-          'chat_history_events', 'conversation_outcomes', 'handoff_requests', 'reply_events', 'chat_reply_state', 'reply_mode_flags')
+          'chat_history_events', 'conversation_outcomes', 'handoff_requests', 'reply_events', 'chat_reply_state', 'reply_mode_flags',
+          'bot_schedule')   # B1 (2026-10-14): Delete Chat Memory and the bind touch the schedule too
 SETUP = ''.join('create temp table {0} (like public.{0} including all);\n'.format(t) for t in TABLES) + """
 insert into installs (install_id, secret_hash) values ('inst-A', 'h'), ('inst-B', 'h');
 """
@@ -513,7 +514,7 @@ with Case('T5 L6: the order and the honest answer stay — originals first (a st
             and preds(DBF, 'List Bot Originals') == [('Owned?', 0)], 'Delete Bot Files order')
     counters = {'retiredProfiles': 1, 'bookedClones': 1}
     mem_ok = {k: 0 for k in ('deletedMemoryRows', 'deletedOutcomes', 'deletedReplyFlags', 'deletedHistoryEvents', 'deletedHandoffs',
-                             'deletedReplyEvents', 'deletedChatStates', 'deletedSuggestionSets')}
+                             'deletedReplyEvents', 'deletedChatStates', 'deletedSuggestionSets', 'deletedSchedules')}
     c.check(cond(DBF, 'Deletion Settled?', mem_ok, {'Retire Bot Profiles': counters, 'Delete Bot Chunks': {'deletedChunks': 0}}) is True
             and cond(DBF, 'Deletion Settled?', mem_ok, {'Retire Bot Profiles': {'error': {'message': 'relation "clone_retirements" does not exist'}},
                                                          'Delete Bot Chunks': {'deletedChunks': 0}}) is False

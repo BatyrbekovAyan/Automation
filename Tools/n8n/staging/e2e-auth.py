@@ -1707,6 +1707,68 @@ def s_line_wizard(ctx, ch):
     return ok, f"wizard create={st} {d} (old rows|old file|old clone|booking|new rows)={wiz} | control={stc} {dc} (rows|file)={ctl}"
 
 
+def schedule_row(pid):
+    """B1: enabled|days_mask|start_min|end_min|tz|version of one profile's schedule ('' = no row)."""
+    return pg(f"select enabled || '|' || days_mask || '|' || start_min || '|' || end_min || '|' || tz || '|' || version "
+              f"from bot_schedule where profile_id = '{pid}';")
+
+
+def schedule_body(pids, version, **kw):
+    b = {"profileIds": list(pids), "enabled": True, "daysMask": 31, "startMin": 540, "endMin": 1080, "timeZone": "Asia/Almaty",
+         "version": version}
+    b.update(kw)
+    return b
+
+
+@scenario("set_schedule_applies_and_refuses", "B1: SetSchedule (crSetSchedule001) — one call for both channels of a bot lands both rows (200, applied per profile); a STALE version is not applied (200, applied:false, the server's version reported, the rows untouched); another install's profile is 403 and no token is 401 — nothing written; a malformed body is 400 bad_request with the reason; a zone Postgres does not know (Europe/Nowhere) is 400 bad_timezone")
+def s_set_schedule(ctx):
+    a = fresh_owner(ctx, "sch")
+    tg = a.add_profile("telegram")
+    wa = a.profiles[0]
+    r = {}
+    r["both"] = hook("SetSchedule", a.token, schedule_body([wa, tg], 1000))
+    rows = (schedule_row(wa), schedule_row(tg))
+    r["stale"] = hook("SetSchedule", a.token, schedule_body([wa], 900, daysMask=1, startMin=0, endMin=0))
+    r["foreign"] = hook("SetSchedule", ctx["B"].token, schedule_body([wa], 2000, daysMask=1))
+    r["notoken"] = hook("SetSchedule", None, schedule_body([wa], 2000, daysMask=1))
+    r["malformed"] = hook("SetSchedule", a.token, schedule_body([wa], 2000, daysMask=200))
+    r["badtz"] = hook("SetSchedule", a.token, schedule_body([wa], 2000, timeZone="Europe/Nowhere"))
+    after = (schedule_row(wa), schedule_row(tg))
+    want_row = "true|31|540|1080|Asia/Almaty|1000"
+    st, d = r["both"]
+    got = {x["profileId"]: (x["applied"], x["version"]) for x in (d or {}).get("results", [])} if isinstance(d, dict) else {}
+    ok = (st == 200 and d.get("success") is True and got == {wa: (True, 1000), tg: (True, 1000)} and rows == (want_row, want_row)
+          and r["stale"][0] == 200 and r["stale"][1].get("results") == [{"profileId": wa, "applied": False, "version": 1000}]
+          and r["foreign"][0] == 403 and (r["foreign"][1] or {}).get("reason") == "forbidden:profileIds"
+          and r["notoken"][0] == 401
+          and r["malformed"][0] == 400 and r["malformed"][1] == {"success": False, "error": "bad_request", "reason": "daysMask"}
+          and r["badtz"][0] == 400 and r["badtz"][1] == {"success": False, "error": "bad_timezone"}
+          and after == rows)
+    return ok, {"answers": {k: v for k, v in r.items()}, "rows": rows, "after": after}
+
+
+@for_channels("reconnect_moves_schedule", "B1 + F1/F2: the bot's schedule follows its line — set on the first profile through SetSchedule, a re-pairing (a NEW profile of the same bot key, Create from settings) moves the row onto the new profile (values and version kept) and leaves nothing under the old one")
+def s_line_schedule(ctx, ch):
+    o, p1 = line_owner(ctx, f"sm{ch}", ch)
+    key = f"Bot-sm{ch}-{ctx['run_id']}"
+    try:
+        st1, d1, w1, _ = line_create(o, ch, p1, key)
+        if not w1:
+            return False, f"setup create: {st1} {d1}"
+        sts, ds = hook("SetSchedule", o.token, schedule_body([p1], 4242, daysMask=96, startMin=1320, endMin=360))
+        before = schedule_row(p1)
+        p2 = o.add_profile(LINE_CH[ch]["channel"])
+        st2, d2, w2, _ = line_create(o, ch, p2, key)
+        old, new = schedule_row(p1), schedule_row(p2)
+    finally:
+        drop_clones(*o.profiles)
+    ok = (sts == 200 and isinstance(ds, dict) and ds.get("results") == [{"profileId": p1, "applied": True, "version": 4242}]
+          and before == "true|96|1320|360|Asia/Almaty|4242"
+          and st2 == 200 and w2 and w2 != w1 and isinstance(d2, dict) and d2.get("adoptedProfiles") == [p1]
+          and old == "" and new == before)
+    return ok, {"set": (sts, ds), "before": before, "create#2": (st2, d2), "old": old, "new": new}
+
+
 @scenario("bot_delete_wipes_lineage", "F1 + F2 §1.6 (T5): a two-channel bot whose earlier profiles were left behind by a pre-fix re-pairing (WA and TG) is deleted from the app naming only its CURRENT ids → Delete Bot Files wipes the whole line (memory, history, ledger, chunks of every profile and clone), retires every row as app_delete and books the left-behind clones; the sweep's branch A deletes them. Another install's bot with the same key is untouched")
 def s_line_delete(ctx):
     o, p1 = line_owner(ctx, "dlw", "wa")

@@ -19,7 +19,8 @@ LA = importlib.util.module_from_spec(_spec); _spec.loader.exec_module(LA)
 # the tables Delete Chat Memory touches (as tests/test_retired_delete.py) + the learning journal
 LIKE = 'create temp table {0} (like public.{0} including all);\n'
 SETUP = ''.join(LIKE.format(t) for t in ('installs', 'bot_profiles', 'n8n_chat_histories', 'chat_history_events', 'handoff_requests',
-                                         'reply_events', 'chat_reply_state', 'conversation_outcomes', 'reply_mode_flags', 'suggestion_sets'))
+                                         'reply_events', 'chat_reply_state', 'conversation_outcomes', 'reply_mode_flags', 'suggestion_sets',
+                                         'bot_schedule'))   # B1 (2026-10-14): Delete Chat Memory deletes the schedule too
 INST = 'inst-learning-a'
 DBF = wf('lmjYsdNcQA2IE5rl-Delete_Bot_Files.json')
 SUGGEST = wf('9PTyYcelRQI7bGDb-Suggest_Replies.json')

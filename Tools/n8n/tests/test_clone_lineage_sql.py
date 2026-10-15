@@ -22,6 +22,8 @@ current ids»: every existing deletion path must reach everything after a move, 
   L1–L19  the requirement matrix (session temp tables): F1's nine prototype cases, F2 R1–R5/R8, the refusals of the
           predecessor rule, two predecessors of one chat, the retry, legacy, sentinel, the '-1' rule, protected ids, and
           L19 — a clone booked for deletion is never offered for reuse (no live row ever drives a booked clone);
+  L20     B1 (2026-10-14): the bot's schedule follows its line — the predecessor's row moves (values and version kept),
+          the new profile's own row wins, among two predecessors the freshest; nothing is left under an old id;
   C1–C2   races on TWO real connections over a shared fixture schema (the V6-concurrent pattern): the second bind's
           snapshot predates the first's commit. C1 — two Creates of the same profile: the loser answers bound = false
           (no clone lost, the price lists follow the bound one, the retry reuses the winner). C2 — two new profiles adopt
@@ -57,7 +59,8 @@ CH = {
 DBF_F = 'lmjYsdNcQA2IE5rl-Delete_Bot_Files.json'
 PROXY_F = 'crWappiProxy0001-Wappi_Proxy.json'
 MEMORY_TABLES = ('n8n_chat_histories', 'chat_history_events', 'conversation_outcomes', 'handoff_requests', 'reply_events',
-                 'chat_reply_state', 'reply_mode_flags', 'suggestion_sets')   # learning A (2026-10-13): the panel's shown sets
+                 'chat_reply_state', 'reply_mode_flags', 'suggestion_sets',   # learning A (2026-10-13): the panel's shown sets
+                 'bot_schedule')                                                # B1 (2026-10-14): the bot's schedule
 
 
 def canon(name, pinned=False):
@@ -853,10 +856,54 @@ def race_two_new_profiles(ch):
                     f'adoption claimed by {a.get("adopted_profiles")} / {b.get("adopted_profiles")}')
 
 
+def sched(pg, pid, version, days=31, start=540, end=1080, tz='Asia/Almaty', age=60, enabled=True):
+    """One bot_schedule row (B1), `age` minutes old."""
+    pg.x(f"""insert into bot_schedule (profile_id, enabled, days_mask, start_min, end_min, tz, version, updated_at)
+             values ({L(pid)}, {L(enabled)}, {days}, {start}, {end}, {L(tz)}, {version}, now() - interval '{age} minutes');""")
+
+
+def sched_of(pg, pid):
+    r = pg.q(f"select enabled, days_mask, start_min, end_min, tz, version from bot_schedule where profile_id = {L(pid)}")
+    return r[0] if r else None
+
+
+def schedule_follows_line(ch):
+    """B1 «расписание бота» (2026-10-14, spec §4 B1): bot_schedule is one of clone_lineage.MOVED_TABLES — a reconnect (a NEW
+    profile of the same bot) keeps the owner's working hours, exactly like the other per-profile tables of the line."""
+    P0, P1, P2 = P(ch, 'P0'), P(ch, 'P1'), P(ch, 'P2')
+    WF0, WF1, WF2 = W(ch, 'p0'), W(ch, 'p1'), W(ch, 'new')
+    p1_row = {'enabled': True, 'days_mask': 96, 'start_min': 1320, 'end_min': 360, 'tz': 'Europe/Moscow', 'version': 7}
+    p0_row = {'enabled': False, 'days_mask': 1, 'start_min': 540, 'end_min': 1080, 'tz': 'Asia/Almaty', 'version': 9}
+    own_row = {'enabled': True, 'days_mask': 127, 'start_min': 0, 'end_min': 0, 'tz': 'Asia/Almaty', 'version': 3}
+    for variant, want, moved in (('the predecessor\'s row moves to the new profile, values and version kept', p1_row, 1),
+                                 ('the new profile\'s own row wins, the predecessor\'s goes', own_row, 0),
+                                 ('two predecessors: the freshest row moves, the other goes', p0_row, 1)):
+        with Case(tagged(f'L20 [{ch}] B1: the schedule follows the bot\'s line — {variant}')) as c:
+            with PgSession(SETUP) as pg:
+                row(pg, ch, P1, wfid=WF1, reason='trial_expiry')
+                sched(pg, P1, 7, days=96, start=1320, end=360, tz='Europe/Moscow', age=600)
+                if want is p0_row:
+                    row(pg, ch, P0, wfid=WF0, retired=True)                     # Retire Same Bot Slot long ago (NULL reason)
+                    sched(pg, P0, 9, days=1, enabled=False, age=60)             # updated later than P1's: the freshest
+                proxy_row(pg, ch, P2)
+                register(pg, ch, P2)
+                seed_star(pg, P2)
+                if want is own_row:
+                    sched(pg, P2, 3, days=127, start=0, end=0, age=1)           # the owner set it on the new profile already
+                plan, b, _ = create(pg, ch, P2, WF2, prev=P1)
+                c.check(b.get('bound') is True or HEAD_MODE, f'bind {b}')
+                c.check(sched_of(pg, P2) == want, f'the new profile holds {sched_of(pg, P2)}, expected {want}')
+                left = {p: sched_of(pg, p) for p in (P0, P1) if sched_of(pg, p) is not None}
+                c.check(left == {}, f'a schedule left under an old id: {left}')
+                if not HEAD_MODE:
+                    c.check(b.get('moved_schedules') == moved and b.get('adopted_profiles') == sorted(plan.get('pred_profiles') or []),
+                            f'moved_schedules / adopted {b}')
+
+
 CREATE_MATRIX = (reconnect_after_purchase, same_profile_clone_gone, same_profile_reuse, retire_same_bot_slot, wizard_never_adopts,
                  previous_profile_without_key, refusals, two_predecessors, idempotent_retry, legacy, sentinel, minus_one_rule,
                  protected, shared_clone, concurrent_same_profile, bind_ownership, rebind_clears_mark, booked_clone_never_reused,
-                 race_same_profile, race_two_new_profiles)
+                 race_same_profile, race_two_new_profiles, schedule_follows_line)
 
 
 # ---------------------------------------------------------------- module-only statements (no pre-F1 counterpart)

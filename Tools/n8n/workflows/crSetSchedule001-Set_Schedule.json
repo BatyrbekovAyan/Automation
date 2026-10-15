@@ -1,0 +1,310 @@
+{
+  "id": "crSetSchedule001",
+  "name": "Set Schedule",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "SetSchedule",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "2a105868-ebff-5a4f-9859-82ad28fef5cb",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        300
+      ],
+      "webhookId": "67745e05-3d40-521f-96cb-d65310315c03"
+    },
+    {
+      "parameters": {
+        "jsCode": "// crAuth GATE — generated into every client webhook by Tools/n8n/apply-auth-gate.py from\n// Tools/n8n/auth/gate.js (+ token.js). Edit the sources, re-run the migration; never the copies.\n//\n// Verifies the Bearer capability token WITHOUT a database round-trip (HMAC, see token.js), then\n// checks that every id the request names is owned by the token's install:\n//   RULE.profiles  — body fields whose value(s) must be ⊆ claims.p   (sentinels ''/'-1' pass)\n//   RULE.workflows — body fields whose value(s) must be ⊆ claims.w   (sentinels ''/'-1' pass)\n//   RULE.appUser   — body fields that must EQUAL claims.u; a token WITHOUT a billing identity (u = null: the\n//                    id is held by another install or was not bindable) can name none (R2, 2026-09-27)\n//   RULE.appUserRequired — appUser fields that may not be empty/sentinel in session mode (Create WA/TG: an\n//                    empty AppUserID skipped the channel count and let the dialog quota fail open)\n//   RULE.legacy    — true: a request WITHOUT a token is admitted in `legacy` mode while\n//                    CR_AUTH_COMPAT_UNTIL lies in the future (old clients); false: 401\n// Output: the webhook item re-emitted — json AND binary: a Code node drops whatever it does not return,\n// and a multipart upload's parts (Unity WWWForm files even its text fields there) live in `binary`\n// (R3, 2026-09-27) — with `crAuth` = { ok, mode, reason, installId, appUserId, profiles, workflows,\n// claimPending } so downstream nodes can read the verified identity. The gate sees `body` only, so\n// ids that arrive as multipart parts are checked by the workflow after it decodes them.\n// CRAUTH-TOKEN-BEGIN\nconst crAuth = (() => {\n  const crypto = require('crypto');\n  const b64u = (buf) => Buffer.from(buf).toString('base64').replace(/\\+/g, '-').replace(/\\//g, '_').replace(/=+$/, '');\n  const unb64u = (s) => Buffer.from(String(s).replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((String(s).length + 3) % 4), 'base64');\n  const isIdList = (a) => Array.isArray(a) && a.every((x) => typeof x === 'string' && x.length > 0 && x.length <= 128);\n  function sign(payload, secret) {\n    if (!secret) throw new Error('crAuth: no signing secret');\n    const p = b64u(JSON.stringify(payload));\n    const sig = crypto.createHmac('sha256', secret).update('v1.' + p).digest();\n    return 'v1.' + p + '.' + b64u(sig);\n  }\n  function verify(token, secrets, nowSec) {\n    if (typeof token !== 'string' || !token) return { ok: false, reason: 'missing' };\n    const parts = token.split('.');\n    if (parts.length !== 3 || parts[0] !== 'v1' || !parts[1] || !parts[2]) return { ok: false, reason: 'malformed' };\n    const given = unb64u(parts[2]);\n    let good = false;\n    for (const sec of (secrets || []).filter(Boolean)) {\n      const exp = crypto.createHmac('sha256', sec).update(parts[0] + '.' + parts[1]).digest();\n      if (exp.length === given.length && crypto.timingSafeEqual(exp, given)) { good = true; break; }\n    }\n    if (!good) return { ok: false, reason: 'bad_signature' };\n    let c;\n    try { c = JSON.parse(unb64u(parts[1]).toString('utf8')); } catch (e) { return { ok: false, reason: 'malformed' }; }\n    if (!c || typeof c !== 'object' || typeof c.i !== 'string' || !c.i || !isIdList(c.p) || !isIdList(c.w)) return { ok: false, reason: 'malformed' };\n    if (typeof c.e !== 'number' || !(c.e > nowSec)) return { ok: false, reason: 'expired' };\n    if (c.c !== undefined && !isIdList(c.c)) return { ok: false, reason: 'malformed' };\n    return { ok: true, claims: { i: c.i, u: (typeof c.u === 'string' && c.u) ? c.u : null, p: c.p, w: c.w, c: c.c || [], e: c.e, n: (typeof c.n === 'number') ? c.n : 1 } };\n  }\n  function sha256Hex(s) { return crypto.createHash('sha256').update(String(s)).digest('hex'); }\n  function randomSecret(bytes) { return b64u(crypto.randomBytes(bytes || 32)); }\n  function bearer(headers) {\n    const h = headers || {};\n    const a = String(h.authorization || h.Authorization || '');\n    return a.startsWith('Bearer ') ? a.slice(7).trim() : '';\n  }\n  return { sign, verify, sha256Hex, randomSecret, bearer, b64u, unb64u };\n})();\n// CRAUTH-TOKEN-END\nconst RULE = {\"profiles\": [\"profileIds\"], \"workflows\": [], \"appUser\": [], \"legacy\": false};\nconst inItem = $input.first();\nconst wh = inItem.json;\nconst secrets = [$env.CR_AUTH_SECRET, $env.CR_AUTH_SECRET_PREV];\nconst compatUntil = Date.parse($env.CR_AUTH_COMPAT_UNTIL || '') || 0;\nconst nowMs = Date.now();\nconst token = crAuth.bearer(wh.headers);\nlet mode = 'session', claims = null, deny = null;\nif (!token) {\n  if (RULE.legacy && compatUntil > nowMs) mode = 'legacy';\n  else deny = 'unauthorized:missing';\n} else {\n  const v = crAuth.verify(token, secrets, Math.floor(nowMs / 1000));\n  if (!v.ok) deny = 'unauthorized:' + v.reason; else claims = v.claims;\n}\nconst body = (wh.body && typeof wh.body === 'object') ? wh.body : {};\nconst isSentinel = (x) => x === undefined || x === null || x === '' || x === '-1';\nconst listOf = (v) => (Array.isArray(v) ? v : [v]);\nconst owned = (set, v) => listOf(v).every((x) => isSentinel(x) || (typeof x === 'string' && set.includes(x)));\nif (!deny && mode === 'session') {\n  for (const f of RULE.profiles || []) if (!owned(claims.p, body[f])) { deny = 'forbidden:' + f; break; }\n  if (!deny) for (const f of RULE.workflows || []) if (!owned(claims.w, body[f])) { deny = 'forbidden:' + f; break; }\n  if (!deny) for (const f of RULE.appUser || []) {\n    const v = body[f];\n    if (isSentinel(v)) {\n      if ((RULE.appUserRequired || []).includes(f)) { deny = 'forbidden:' + f; break; }\n      continue;\n    }\n    if (!claims.u || String(v) !== claims.u) { deny = 'forbidden:' + f; break; }\n  }\n}\nreturn [{ json: { ...wh, crAuth: {\n  ok: !deny, mode, reason: deny,\n  installId: claims ? claims.i : null, appUserId: claims ? claims.u : null,\n  profiles: claims ? claims.p : [], workflows: claims ? claims.w : [], claimPending: claims ? (claims.c || []) : [],\n} }, ...(inItem.binary ? { binary: inItem.binary } : {}), pairedItem: { item: 0 } }];\n"
+      },
+      "id": "422a0764-3d40-50ad-8f8f-49b9a49b8cde",
+      "name": "Auth Gate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "25d8ec0d-02bb-54f1-b39e-e54c8bd63c48",
+              "leftValue": "={{ $json.crAuth.ok }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "4375990e-ddaa-5e13-9673-cd8661d9b850",
+      "name": "Authorized?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        440,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { success: false, error: 'unauthorized', reason: $json.crAuth.reason } }}",
+        "options": {
+          "responseCode": "={{ String($json.crAuth.reason || '').startsWith('forbidden') ? 403 : 401 }}"
+        }
+      },
+      "id": "9b5bb182-97b1-55a3-9ecd-27d4c0293e10",
+      "name": "Respond 401",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        660,
+        520
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// SET SCHEDULE / Validate (generated by Tools/n8n/build-set-schedule.py — edit there, never the JSON).\n// The gate already refused a profile id the token does not own. Here the ids are taken again from the body: the sentinels\n// ('-1', '') dropped, the rest re-intersected with the token's profiles (the statement only ever sees the caller's own),\n// de-duplicated (one statement may touch a row once), at most 10 (a bot has two). Every field of the schedule is\n// required, also for a disabled one (re-enabling restores the window the owner set).\nconst wh = $input.first().json || {};\nconst b = (wh.body && typeof wh.body === 'object') ? wh.body : {};\nconst owned = new Set((wh.crAuth && wh.crAuth.profiles) || []);\nconst bad = (reason) => [{ json: { ok: false, error: 'bad_request', reason }, pairedItem: { item: 0 } }];\nif (!Array.isArray(b.profileIds)) return bad('profileIds');\nconst ids = Array.from(new Set(b.profileIds.filter((x) => typeof x === 'string' && x !== '' && x !== '-1' && owned.has(x)))).slice(0, 10);\nif (ids.length === 0) return bad('profileIds');\nif (typeof b.enabled !== 'boolean') return bad('enabled');\nconst within = (v, lo, hi) => Number.isInteger(v) && v >= lo && v <= hi;\nif (!within(b.daysMask, 0, 127)) return bad('daysMask');\nif (!within(b.startMin, 0, 1439)) return bad('startMin');\nif (!within(b.endMin, 0, 1439)) return bad('endMin');\nconst tz = typeof b.timeZone === 'string' ? b.timeZone : '';\nif (tz.length > 64 || !/^[A-Za-z_]+(?:\\/[A-Za-z0-9_+\\-]+)+$|^UTC$/.test(tz)) return bad('timeZone');\nconst v = b.version;\nconst version = (Number.isInteger(v) && v > 0 && v <= Number.MAX_SAFE_INTEGER) ? v\n  : ((typeof v === 'string' && /^[1-9][0-9]*$/.test(v) && v.length <= 16 && Number(v) <= Number.MAX_SAFE_INTEGER) ? Number(v) : 0);\nif (!version) return bad('version');\nreturn [{ json: { ok: true, profileIds: ids, enabled: b.enabled, daysMask: b.daysMask, startMin: b.startMin, endMin: b.endMin,\n                  timeZone: tz, version }, pairedItem: { item: 0 } }];\n"
+      },
+      "id": "05693715-4b7a-5afb-a98d-ffa54c53bc81",
+      "name": "Validate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "a512d888-26d8-5015-9c52-4df66b85e40b",
+              "leftValue": "={{ $json.ok }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "e811af04-e553-5201-8267-4be7dd31745c",
+      "name": "Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        880,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { success: false, error: 'bad_request', reason: $json.reason } }}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "id": "773b332e-77e1-5b43-8299-5dfaf5d0b0c3",
+      "name": "Respond 400",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1100,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- B1 «расписание бота» (2026-10-14): the owner's schedule for every requested profile of the bot, in ONE statement — all\n-- rows or none. A row is written only when the stored version is OLDER than the request's (a delayed retry or a reordered\n-- request never overwrites a newer desire); per profile, in the order of the request, the answer says whether it was\n-- applied and which version the server holds now (the pre-statement row for a stale request: a data-modifying CTE is\n-- invisible to the rest of the same statement). The zone is checked by the table's own trigger (bot_schedule_tz_check):\n-- an unknown one fails the whole statement, which Shape Response answers as bad_timezone.\n-- Parameters, in order: JSON array of the profile ids, enabled, days mask, start minute, end minute, time zone, version.\nwith req as (\n  select t.profile_id, t.n from jsonb_array_elements_text($1::jsonb) with ordinality as t(profile_id, n)\n), up as (\n  insert into bot_schedule (profile_id, enabled, days_mask, start_min, end_min, tz, version, updated_at)\n  select r.profile_id, $2::boolean, $3::int, $4::int, $5::int, $6::text, $7::bigint, now() from req r\n  on conflict (profile_id) do update\n    set enabled = excluded.enabled, days_mask = excluded.days_mask, start_min = excluded.start_min,\n        end_min = excluded.end_min, tz = excluded.tz, version = excluded.version, updated_at = now()\n    where bot_schedule.version < excluded.version\n  returning profile_id, version\n)\nselect r.profile_id as \"profileId\", (up.profile_id is not null) as applied,\n       coalesce(up.version, cur.version, 0)::bigint as version\nfrom req r\nleft join up on up.profile_id = r.profile_id\nleft join bot_schedule cur on cur.profile_id = r.profile_id\norder by r.n;",
+        "options": {
+          "queryReplacement": "={{ [ JSON.stringify($json.profileIds), $json.enabled, $json.daysMask, $json.startMin, $json.endMin, $json.timeZone, $json.version ] }}"
+        }
+      },
+      "id": "b9471d61-e1e9-56cd-a2f5-27fd49c78727",
+      "name": "Upsert Schedule",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1100,
+        100
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "vvRrFiEXzLVqKjOx",
+          "name": "Postgres"
+        }
+      },
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// SET SCHEDULE / Shape Response (generated by Tools/n8n/build-set-schedule.py — edit there, never the JSON).\n// Upsert Schedule continues on error: a database fault reaches here as an item carrying `message` / `error`, never as\n// «the node continued». Success = exactly one row per requested profile, each naming its profile and a boolean\n// `applied`. A zone Postgres does not know is refused by the table's trigger with a message starting with\n// bot_schedule_bad_timezone — the client's mistake (400 bad_timezone); every other fault is the server's (500 db_unavailable).\nconst v = $('Validate').first().json;\nconst rows = $input.all().map((i) => i.json).filter((r) => r && typeof r === 'object');\nconst requested = Array.isArray(v.profileIds) ? v.profileIds : [];\nconst ok = rows.length === requested.length && rows.length > 0\n  && rows.every((r) => r.error === undefined && typeof r.profileId === 'string' && typeof r.applied === 'boolean');\nif (!ok) {\n  const said = rows.map((r) => String(r.message || '') + ' ' + String((r.error && r.error.message) || '')).join(' ');\n  if (said.includes('bot_schedule_bad_timezone')) return [{ json: { success: false, error: 'bad_timezone', _status: 400 }, pairedItem: { item: 0 } }];\n  return [{ json: { success: false, error: 'db_unavailable', _status: 500 }, pairedItem: { item: 0 } }];\n}\nconst results = rows.map((r) => ({ profileId: r.profileId, applied: r.applied === true, version: Number(r.version) || 0 }));\nreturn [{ json: { success: true, results, _status: 200 }, pairedItem: { item: 0 } }];"
+      },
+      "id": "ae700ecf-9e59-5903-8771-15c2ce530f4e",
+      "name": "Shape Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1320,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ Object.fromEntries(Object.entries($json).filter(([k]) => k !== '_status')) }}",
+        "options": {
+          "responseCode": "={{ $json._status || 200 }}"
+        }
+      },
+      "id": "3193ddec-b86c-5ddc-94bd-c6888ec792de",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1540,
+        100
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Auth Gate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Auth Gate": {
+      "main": [
+        [
+          {
+            "node": "Authorized?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Authorized?": {
+      "main": [
+        [
+          {
+            "node": "Validate",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond 401",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate": {
+      "main": [
+        [
+          {
+            "node": "Valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Valid?": {
+      "main": [
+        [
+          {
+            "node": "Upsert Schedule",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond 400",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upsert Schedule": {
+      "main": [
+        [
+          {
+            "node": "Shape Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Shape Response": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataSuccessExecution": "none",
+    "saveDataErrorExecution": "all",
+    "saveManualExecutions": false
+  },
+  "staticData": null,
+  "meta": null,
+  "tags": []
+}

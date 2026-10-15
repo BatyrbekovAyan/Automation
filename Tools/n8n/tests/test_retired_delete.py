@@ -45,7 +45,8 @@ RB = '$RCAnonymousID:' + 'fedcba9876543210' * 2
 LIKE = 'create temp table {0} (like public.{0} including all);\n'
 SETUP = ''.join(LIKE.format(t) for t in ('installs', 'bot_profiles', 'billing_bindings', 'subscribers', 'documents', 'n8n_chat_histories',
                                          'chat_history_events', 'handoff_requests', 'reply_events', 'chat_reply_state',
-                                         'conversation_outcomes', 'reply_mode_flags', 'uploaded_files', 'clone_retirements', 'suggestion_sets'))
+                                         'conversation_outcomes', 'reply_mode_flags', 'uploaded_files', 'clone_retirements', 'suggestion_sets',
+                                         'bot_schedule'))
 CHANNELS = (('whatsapp', 'wa'), ('telegram', 'tg'))
 
 
@@ -111,7 +112,8 @@ insert into documents (content, metadata) values ('price', '{{"{key}": "{wid}", 
 insert into chat_history_events (profile_id, chat_id, message_id, source, body, msg_type, sent_at) values ('{pid}', '77001@c.us', 'm-{pid}', 'client', 'hi', 'chat', now());
 insert into reply_mode_flags (profile_id, chat_id, suppressed, version) values ('{pid}', '*', true, 5);
 insert into conversation_outcomes (session_id, profile_id, chat_id, outcome, last_history_id, last_message_at, outcome_at)
-  values ('{pid}:77001@c.us', '{pid}', '77001@c.us', 'in_dialog', 1, now(), now());""")
+  values ('{pid}:77001@c.us', '{pid}', '77001@c.us', 'in_dialog', 1, now(), now());
+insert into bot_schedule (profile_id, enabled, days_mask, start_min, end_min, tz, version) values ('{pid}', true, 31, 540, 1080, 'Asia/Almaty', 5);""")
 
 
 def counts(pg, pid, wid, key):
@@ -119,7 +121,8 @@ def counts(pg, pid, wid, key):
   (select count(*) from documents where metadata->>'{key}' = '{wid}')::int as chunks,
   (select count(*) from chat_history_events where profile_id = '{pid}')::int as hist,
   (select count(*) from reply_mode_flags where profile_id = '{pid}')::int as flags,
-  (select count(*) from conversation_outcomes where profile_id = '{pid}')::int as outcomes""")[0]
+  (select count(*) from conversation_outcomes where profile_id = '{pid}')::int as outcomes,
+  (select count(*) from bot_schedule where profile_id = '{pid}')::int as schedule""")[0]
 
 
 def retire_by_sweep(pg):
@@ -362,7 +365,8 @@ with Case('V12 M1: Delete Bot Files says success only on real counters; storage 
     bad_mem = {'error': {'message': 'Connection terminated'}}
     c.check(cond(DBF, 'Deletion Settled?', bad_mem, {'Retire Bot Profiles': {'retiredProfiles': 1}, 'Delete Bot Chunks': {'deletedChunks': 0, 'fileIds': []}}) is False
             and cond(DBF, 'Deletion Settled?', {**{k: 0 for k in ('deletedMemoryRows', 'deletedOutcomes', 'deletedReplyFlags', 'deletedHistoryEvents',
-                                                                 'deletedHandoffs', 'deletedReplyEvents', 'deletedChatStates', 'deletedSuggestionSets')}},
+                                                                 'deletedHandoffs', 'deletedReplyEvents', 'deletedChatStates', 'deletedSuggestionSets',
+                                                                 'deletedSchedules')}},
                      {'Retire Bot Profiles': {'error': {'message': 'x'}}, 'Delete Bot Chunks': {'deletedChunks': 0}}) is False,
             'an error item from Delete Chat Memory or Retire must never become success:true')
     for n in ('Delete Bot Chunks', 'Delete Chat Memory', 'Retire Bot Profiles', 'Delete Ownership', 'List Bot Originals'):
@@ -475,5 +479,41 @@ with Case('V12 N1: verify-auth-gate.py rejects copies that route around the data
                              (SWS_F, sws_skip, 'Owned? straight into Validate (no Owner Item)')):
         rc, out = mutate_run(fname, fn)
         c.check(rc != 0 and 'V12' in out, f'{label}: verifier passed ({rc}): {out}')
+
+with Case('B1 N2: a delete that keeps the schedule is caught — verify-history-handoff.py (Delete Chat Memory without the '
+          'bot_schedule CTE, Respond without deletedSchedules) and verify-auth-gate.py (Deletion Settled? without it)') as c:
+    def run_on(tool, fname, fn):
+        d = Path(tempfile.mkdtemp(prefix='b1-del-neg-'))
+        try:
+            for p in (N8N / 'workflows').glob('*.json'):
+                shutil.copy(p, d / p.name)
+            f = d / fname
+            w = json.loads(f.read_text(encoding='utf-8'))
+            before = json.dumps(w, sort_keys=True)
+            fn(w)
+            assert json.dumps(w, sort_keys=True) != before, 'the mutation changed nothing'
+            f.write_text(json.dumps(w, indent=2, ensure_ascii=False) + '\n', encoding='utf-8')
+            r = subprocess.run([sys.executable, str(N8N / tool), '--dir', str(d)], capture_output=True, text=True)
+            return r.returncode, (r.stdout + r.stderr)[-500:]
+        finally:
+            shutil.rmtree(d, ignore_errors=True)
+
+    def dcm_keeps_schedule(w):
+        p = node(w, 'Delete Chat Memory')['parameters']
+        p['query'] = p['query'].replace('DELETE FROM public.bot_schedule', 'SELECT 1 FROM public.bot_schedule', 1)
+
+    def respond_without_counter(w):
+        p = node(w, 'Respond')['parameters']
+        p['responseBody'] = p['responseBody'].replace(', "deletedSchedules": $json.deletedSchedules ?? null', '')
+
+    def verdict_without_counter(w):
+        cnd = node(w, 'Deletion Settled?')['parameters']['conditions']['conditions'][0]
+        cnd['leftValue'] = cnd['leftValue'].replace(" && typeof $json.deletedSchedules === 'number'", '')
+
+    for tool, fn, needle in (('verify-history-handoff.py', dcm_keeps_schedule, 'bot_schedule'),
+                             ('verify-history-handoff.py', respond_without_counter, 'deletedSchedules'),
+                             ('verify-auth-gate.py', verdict_without_counter, 'Deletion Settled?')):
+        rc, out = run_on(tool, DBF_F, fn)
+        c.check(rc != 0 and needle in out, f'{tool} / {fn.__name__}: exit {rc}: {out}')
 
 report()

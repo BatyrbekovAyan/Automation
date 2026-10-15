@@ -55,7 +55,7 @@ CH = {
            'template': '4VN3gsFaC2HUYmcc-Telegram_Bot.json', 'twin': 'WA'},
 }
 MEMORY_TABLES = ('n8n_chat_histories', 'chat_history_events', 'conversation_outcomes', 'handoff_requests', 'reply_events',
-                 'chat_reply_state', 'reply_mode_flags')
+                 'chat_reply_state', 'reply_mode_flags', 'bot_schedule')   # B1 (2026-10-14): the bind moves the schedule too
 PROTECTED = set(CL.PROTECTED)
 
 

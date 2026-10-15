@@ -11,8 +11,9 @@ Delete Bot Files) never carry their own copy:
   CLONE_PLAN_SQL         read-only: own_id (reuse), foreign (refuse), pred_profiles (adopt), replace_ids (replace) — the
                          predecessor rule of plan §1.3, proven in the DATABASE (never by the token's 12-hour lists);
   BIND_WORKFLOW_SQL[ch]  ONE statement: bind + move memory / history / outcomes / handoffs / reply ledger / chat state /
-                         chat flags of the predecessors, chunks + file registry of the replaced clones, the pre-F1 '-1'
-                         rule, mark the predecessors superseded, book the replaced clones — every condition re-checked on
+                         chat flags / shown sets / the schedule of the predecessors, chunks + file registry of the
+                         replaced clones, the pre-F1 '-1' rule, mark the predecessors superseded, book the replaced
+                         clones — every condition re-checked on
                          the rows it writes, on the version a concurrent statement committed (≈ 10 s pass between the
                          plan and the bind: the V6-concurrent lesson). A concurrent bind of the same profile that
                          committed first wins: this one answers bound = false instead of overwriting a binding it never
@@ -51,12 +52,14 @@ CHANNELS = {
                  "file_column": "bot_tg_id"},
 }
 
-# The eight tables Delete Chat Memory clears (Delete Bot Files) — the bind moves EXACTLY these (pinned by the test against
+# The nine tables Delete Chat Memory clears (Delete Bot Files) — the bind moves EXACTLY these (pinned by the test against
 # the canon). dialog_counts are billing usage records keyed by the app user, not chat content: never moved, never deleted.
 # suggestion_sets (learning A, 2026-10-13): the «Вместе» panel's shown sets — the learning journal follows the bot's line
 # like its memory does, so a re-paired bot keeps its shadow score.
+# bot_schedule (B1 «расписание бота», 2026-10-14): the owner's working hours — a reconnect (a new profile of the same bot)
+# keeps them; the new profile's own row wins, among predecessors the freshest.
 MOVED_TABLES = ("n8n_chat_histories", "chat_history_events", "conversation_outcomes", "handoff_requests", "reply_events",
-                "chat_reply_state", "reply_mode_flags", "suggestion_sets")
+                "chat_reply_state", "reply_mode_flags", "suggestion_sets", "bot_schedule")
 
 
 def protected_ids():
@@ -162,10 +165,10 @@ _BIND_TEMPLATE = """-- F1 + F2 (plan 2026-10-11 §1.5): bind the clone to the pr
 --   moved    the replaced clones: the overwritten binding, the plan's own binding (a clone that is gone) and the
 --            predecessors' clones the plan named; never protected, never this clone, never one a live row outside this
 --            bot drives.
---   The predecessors' memory, history, outcomes, handoffs, reply ledger, chat state and chat flags move to the new profile
---   (row ids kept: the memory order and the run watermarks stay right). Where the new profile already holds the same key
---   its row wins; among several predecessors the freshest. The predecessors' '*' rows go: the new one was seeded from the
---   client's current mode. dialog_counts stay (billing records, not chat content).
+--   The predecessors' memory, history, outcomes, handoffs, reply ledger, chat state, chat flags, shown sets and schedule
+--   move to the new profile (row ids kept: the memory order and the run watermarks stay right). Where the new profile
+--   already holds the same key its row wins; among several predecessors the freshest. The predecessors' '*' rows go: the
+--   new one was seeded from the client's current mode. dialog_counts stay (billing records, not chat content).
 --   The moved clones' chunks and file registry go to the new clone — this install's rows and owner-less ones (a compat
 --   upload), so a file's row and its chunks keep naming ONE clone (the V4 evidence of Delete File / Register Upload);
 --   a file row of another install never. Plus the pre-F1 rule: a second channel joining a bot takes the other
@@ -344,6 +347,19 @@ with me as (
   delete from suggestion_sets s using set_r r
   where s.profile_id = r.pid and s.request_key = r.request_key and (r.rn > 1 or r.taken)
   returning 1
+), sch_r as (          -- B1: the bot's schedule (PK profile_id): the new profile's own row wins, among predecessors
+  select s.profile_id as pid,                                                     -- the freshest
+    row_number() over (order by s.updated_at desc nulls last, s.version desc, s.profile_id desc) as rn,
+    exists (select 1 from bot_schedule x where x.profile_id = $1) as taken
+  from bot_schedule s where s.profile_id in (select pid from p)
+), sch_mv as (
+  update bot_schedule s set profile_id = $1 from sch_r r
+  where s.profile_id = r.pid and r.rn = 1 and not r.taken
+  returning 1
+), sch_dup as (
+  delete from bot_schedule s using sch_r r
+  where s.profile_id = r.pid and (r.rn > 1 or r.taken)
+  returning 1
 )
 select exists (select 1 from bind where workflow_id = $2) as bound, $2::text as workflow_id,
   coalesce((select jsonb_agg(a.pid order by a.pid) from (
@@ -362,8 +378,10 @@ select exists (select 1 from bind where workflow_id = $2) as bound, $2::text as 
   (select count(*) from st_mv)::int as moved_states,
   (select count(*) from fl_mv)::int as moved_flags,
   (select count(*) from set_mv)::int as moved_sets,
+  (select count(*) from sch_mv)::int as moved_schedules,
   ((select count(*) from hist_dup) + (select count(*) from outc_dup) + (select count(*) from hand_dup)
-   + (select count(*) from ev_dup) + (select count(*) from st_dup) + (select count(*) from fl_dup) + (select count(*) from set_dup))::int as dropped_rows"""
+   + (select count(*) from ev_dup) + (select count(*) from st_dup) + (select count(*) from fl_dup) + (select count(*) from set_dup)
+   + (select count(*) from sch_dup))::int as dropped_rows"""
 
 
 def bind_workflow_sql(channel):
