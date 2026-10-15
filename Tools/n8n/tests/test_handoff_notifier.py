@@ -16,6 +16,13 @@ alwaysOutputData / continue-on-error / paired-item semantics). Part B evaluates 
 over every shape the Postgres node can emit. Part C holds verify-history-handoff.py's structural tripwire to its
 negative cases and cross-checks them with the driver (a tripwire the driver would not also catch is unproven).
 
+A5 (2026-10-15): the notice goes to the OWNER'S OWN number, resolved by the V2 rule of Auth Session / Claim Decide —
+on Telegram `status.account.phone` (the AUTHORISED account) FIRST, the top-level `phone` (a number someone may have typed
+into auth/phone) only as the fallback; WhatsApp reads the top-level phone; digits only. The rule is ONE constant of the
+generator (`build-handoff-workflows.OWNER_PHONE_JS`; the A4 channel watch embeds the same text). Part A (the `A5 A` cases)
+pins it through the real graph, Part D holds verify-history-handoff's owner-number tripwire to the wrong rules the driver
+also catches, Part E runs the constant next to the REAL Claim Decide over every status shape (one rule, two consumers).
+
     python3 Tools/n8n/tests/test_handoff_notifier.py
 """
 import copy
@@ -23,7 +30,7 @@ import json
 import subprocess
 import tempfile
 
-from harness import N8N, Case, expr, module, report, wf
+from harness import N8N, Case, code, expr, module, report, run_js, wf
 
 NTFY_FILE = 'crHandoffNtfy001-Handoff_Notifier.json'
 W = wf(NTFY_FILE)
@@ -34,6 +41,11 @@ DUE = 'Due Notifications'
 
 P1, P2, P3 = 'prof-wa-0001', 'prof-tg-0002', 'prof-wa-0003'
 OWNER1, OWNER2 = '77010009991', '77010009992'
+# A5: NAMED = a number someone typed into auth/phone (the top-level phone of a tapi status); ACCOUNT_RAW = the AUTHORISED
+# account's phone as tapi may format it (only the digits may come out: ACCOUNT)
+P4, P5, P6, P7 = 'prof-tg-0004', 'prof-tg-0005', 'prof-tg-0006', 'prof-wa-0007'
+NAMED, ACCOUNT_RAW, ACCOUNT = '77010001111', '+7 (701) 000-99-94', '77010009994'
+OWNER5, OWNER6, OWNER7 = '77010009995', '77010009996', '77010009997'
 
 
 def row(id_, pid, chat, reason, channel):
@@ -43,7 +55,15 @@ def row(id_, pid, chat, reason, channel):
 
 OWNER_PHONE = {'byProfile': {
     P1: {'statusCode': 200, 'body': {'authorized': True, 'profile_id': P1, 'phone': OWNER1}},
-    P2: {'statusCode': 200, 'body': {'authorized': True, 'profile_id': P2, 'phone': OWNER2}}},
+    P2: {'statusCode': 200, 'body': {'authorized': True, 'profile_id': P2, 'phone': OWNER2}},
+    # A5: tapi with an authorised account whose phone is NOT the top-level one
+    P4: {'statusCode': 200, 'body': {'authorized': True, 'profile_id': P4, 'phone': NAMED, 'account': {'phone': ACCOUNT_RAW, 'user_id': 1000000000}}},
+    # A5: tapi without an account object (the mock's answer when no account_phone is set) -> the top-level phone
+    P5: {'statusCode': 200, 'body': {'authorized': True, 'profile_id': P5, 'phone': OWNER5}},
+    # A5: tapi with an account that has no phone -> the top-level phone
+    P6: {'statusCode': 200, 'body': {'authorized': True, 'profile_id': P6, 'phone': OWNER6, 'account': {'phone': None, 'user_id': 1000000000}}},
+    # A5: WhatsApp never consults an `account` object (its get/status has none; if one ever appeared it is not the rule)
+    P7: {'statusCode': 200, 'body': {'authorized': True, 'profile_id': P7, 'phone': OWNER7, 'account': {'phone': NAMED}}}},
     # what the staging mock (and a real Wappi for an unknown id) answers: no phone
     'default': {'statusCode': 200, 'body': {'authorized': True, 'profile_id': '', 'phone': None}}}
 SENT = {'default': {'statusCode': 200, 'body': {'status': 'done', 'message_id': 'notice-1'}}}
@@ -59,6 +79,15 @@ SCENARIOS = {
                 'http': {'Owner Phone': OWNER_PHONE, 'Send Notice': SENT}},
     'no_phone': {'pg': {DUE: {'rows': [row(301, P3, '77017770000@c.us', 'escalation', 'whatsapp')]}},
                  'http': {'Owner Phone': OWNER_PHONE, 'Send Notice': SENT}},
+    # A5: the owner's number by the V2 rule
+    'tg_account_first': {'pg': {DUE: {'rows': [row(401, P4, '5123400001', 'order', 'telegram')]}},
+                         'http': {'Owner Phone': OWNER_PHONE, 'Send Notice': SENT}},
+    'tg_top_level_fallback': {'pg': {DUE: {'rows': [row(402, P5, '5123400002', 'question', 'telegram')]}},
+                              'http': {'Owner Phone': OWNER_PHONE, 'Send Notice': SENT}},
+    'tg_account_without_phone': {'pg': {DUE: {'rows': [row(403, P6, '5123400003', 'escalation', 'telegram')]}},
+                                 'http': {'Owner Phone': OWNER_PHONE, 'Send Notice': SENT}},
+    'wa_ignores_account': {'pg': {DUE: {'rows': [row(404, P7, '77015550004@c.us', 'order', 'whatsapp')]}},
+                           'http': {'Owner Phone': OWNER_PHONE, 'Send Notice': SENT}},
 }
 
 
@@ -142,6 +171,18 @@ EXPECT = {
     'two_due': [(201, P1, API, OWNER1, '4567', 'новый заказ', 'sent'), (202, P2, TAPI, OWNER2, '8765', 'вопрос клиента', 'sent')],
     'no_phone': [(301, P3, API, None, '0000', 'клиент ждёт ответа', 'failed')],
 }
+A5_EXPECT = {
+    'tg_account_first': [(401, P4, TAPI, ACCOUNT, '0001', 'новый заказ', 'sent')],
+    'tg_top_level_fallback': [(402, P5, TAPI, OWNER5, '0002', 'вопрос клиента', 'sent')],
+    'tg_account_without_phone': [(403, P6, TAPI, OWNER6, '0003', 'клиент ждёт ответа', 'sent')],
+    'wa_ignores_account': [(404, P7, API, OWNER7, '0004', 'новый заказ', 'sent')],
+}
+A5_TITLES = {
+    'tg_account_first': 'Telegram — the notice goes to status.account.phone (digits only), never to the top-level phone someone typed into auth/phone',
+    'tg_top_level_fallback': 'Telegram without an account object — the top-level phone is the fallback',
+    'tg_account_without_phone': 'Telegram with an account that has no phone — the top-level phone is the fallback',
+    'wa_ignores_account': 'WhatsApp reads the top-level phone only — an account object is never consulted',
+}
 
 # ------------------------------------------------------------------------------------------------------------------
 R = run(W)
@@ -166,6 +207,11 @@ for name in SCENARIOS:
 
 for name, exp in EXPECT.items():
     with Case(f'F3 A [{name}]: a real request still reaches Owner Phone → (Send Notice) → Record Notify, about its own row') as c:
+        for x in delivery_violations(R[name], exp):
+            c.check(False, x)
+
+for name, exp in A5_EXPECT.items():
+    with Case(f'A5 A [{name}]: {A5_TITLES[name]}') as c:
         for x in delivery_violations(R[name], exp):
             c.check(False, x)
 
@@ -251,5 +297,114 @@ with Case('F3 C: verify-history-handoff accepts the canonical notifier and its t
             r = run(bad, {scenario: SCENARIOS[scenario]})[scenario]
             seen = quiet_violations(r) if scenario == 'no_due' else delivery_violations(r, EXPECT[scenario])
             c.check(bool(seen), f'{label}: the driver did not catch it (scenario {scenario})')
+
+# ------------------------------------------------------------------------------------------------------------------
+# A5 D: verify-history-handoff's owner-number tripwire rejects exactly the wrong rules the driver also catches
+def with_compose(w, old, new):
+    """A deep copy of `w` whose Compose Notice code has `old` replaced by `new` (a mutation that does not apply is a test bug)."""
+    bad = copy.deepcopy(w)
+    n = next(n for n in bad['nodes'] if n['name'] == 'Compose Notice')
+    assert old in n['parameters']['jsCode'], f'mutation anchor not found in Compose Notice: {old!r}'
+    n['parameters']['jsCode'] = n['parameters']['jsCode'].replace(old, new, 1)
+    return bad
+
+
+EXPOSED_BY = {   # the verifier's wrong rule -> the scenario whose BEHAVIOUR shows the defect (a tripwire the driver cannot see is unproven)
+    'only the top-level phone (the pre-A5 line)': 'tg_account_first',
+    'the top-level phone first, the account second': 'tg_account_first',
+    'the account first on every channel (WhatsApp included)': 'wa_ignores_account',
+    'the account only, no fallback to the top-level phone': 'tg_top_level_fallback',
+    'Telegram never recognised (the channel is always the WhatsApp one)': 'tg_account_first',
+    'no digit-stripping': 'tg_account_first',
+}
+
+with Case('A5 D: verify-history-handoff accepts the canonical notice composer, and its tripwire rejects every wrong owner-number rule the driver also catches') as c:
+    wrong_rules = getattr(vhh, 'OWNER_PHONE_WRONG', ())
+    try:
+        vhh.check_owner_phone_rule(copy.deepcopy(W))
+    except AttributeError:
+        c.check(False, 'verify-history-handoff.py has no check_owner_phone_rule (the owner-number rule is not pinned)')
+    except AssertionError as e:
+        c.check(False, f'canonical notifier rejected: {e}')
+    c.check(bool(wrong_rules), 'verify-history-handoff.py has no OWNER_PHONE_WRONG (its tripwire is not self-checked)')
+    if wrong_rules:
+        c.check(set(EXPOSED_BY) == {label for label, _, _ in wrong_rules},
+                f'the verifier\'s wrong rules and this test\'s EXPOSED_BY differ: {sorted(set(EXPOSED_BY) ^ {l for l, _, _ in wrong_rules})}')
+    for label, old, new in wrong_rules:
+        bad = with_compose(W, old, new)
+        c.check(bad != W, f'{label}: mutation did not apply')
+        try:
+            vhh.check_owner_phone_rule(bad)
+            c.check(False, f'{label}: the tripwire accepted it')
+        except AssertionError:
+            pass
+        # the driver must see the same defect in behaviour, or the tripwire pins something unproven
+        scenario = EXPOSED_BY.get(label)
+        c.check(scenario is not None, f'{label}: no scenario of this test exposes it (add it to EXPOSED_BY)')
+        if scenario:
+            r = run(bad, {scenario: SCENARIOS[scenario]})[scenario]
+            c.check(bool(delivery_violations(r, A5_EXPECT[scenario])), f'{label}: the driver did not catch it (scenario {scenario})')
+
+# ------------------------------------------------------------------------------------------------------------------
+# A5 E: the rule is ONE constant, embedded in Compose Notice, and it answers exactly like the V2 rule of Claim Decide
+AUTH = wf('crAuthSession001-Auth_Session.json')
+
+
+def v2_phone(channel, status):
+    """What Auth Session's Claim Decide (V2, claim.start on an authorised profile) takes as the number from this get/status body."""
+    named = {'Route': {'op': 'claim.start', 'profileId': 'P', 'channel': channel},
+             'Verify Install': {'install_id': 'inst-A', 'verdict': 'checked'},
+             'Claim Start': {'profile_id': 'P', 'owner_id': 'inst-O'}}
+    out = code(AUTH, 'Claim Decide', {'json': {'statusCode': 200, 'body': dict(status, authorized=True)}}, named=named)[0]['json']
+    return out.get('phone') or ''
+
+
+SHAPES = (   # (label, channel, status body, the digits the owner's number must come out as)
+    ('tg: account.phone differs from the top-level phone', 'telegram', {'phone': NAMED, 'account': {'phone': ACCOUNT_RAW}}, ACCOUNT),
+    ('tg: only the account has a phone', 'telegram', {'account': {'phone': ACCOUNT_RAW}}, ACCOUNT),
+    ('tg: account.phone is a number', 'telegram', {'phone': NAMED, 'account': {'phone': int(ACCOUNT)}}, ACCOUNT),
+    ('tg: no account', 'telegram', {'phone': OWNER5}, OWNER5),
+    ('tg: account is null', 'telegram', {'phone': OWNER5, 'account': None}, OWNER5),
+    ('tg: account is not an object', 'telegram', {'phone': OWNER5, 'account': 'x'}, OWNER5),
+    ('tg: account without a phone', 'telegram', {'phone': OWNER5, 'account': {'user_id': 1}}, OWNER5),
+    ('tg: account.phone is empty', 'telegram', {'phone': OWNER5, 'account': {'phone': ''}}, OWNER5),
+    ('tg: account.phone is null', 'telegram', {'phone': OWNER5, 'account': {'phone': None}}, OWNER5),
+    ('tg: the top-level phone is formatted', 'telegram', {'phone': '+7 701 000-99-95'}, OWNER5),
+    ('tg: account.phone has no digits (no fallback, as V2: the notice then fails as no_phone)', 'telegram', {'phone': OWNER5, 'account': {'phone': 'n/a'}}, ''),
+    ('tg: no number anywhere', 'telegram', {'account': {}}, ''),
+    ('wa: the top-level phone', 'whatsapp', {'phone': OWNER7}, OWNER7),
+    ('wa: an account object is never consulted', 'whatsapp', {'phone': OWNER7, 'account': {'phone': NAMED}}, OWNER7),
+    ('wa: the phone is formatted', 'whatsapp', {'phone': '+7 701 000-99-97'}, OWNER7),
+    ('wa: no phone', 'whatsapp', {'phone': None}, ''),
+)
+
+hw, hw_error = None, None
+try:
+    hw = module('build-handoff-workflows.py')
+except Exception as e:      # an import failure is a failure of THIS case, not a crash of the file
+    hw_error = e
+
+with Case('A5 E: build-handoff-workflows exports OWNER_PHONE_JS and Compose Notice embeds that text (one rule for the notifier and the A4 channel watch)') as c:
+    c.check(hw is not None and hasattr(hw, 'OWNER_PHONE_JS'), f'build-handoff-workflows.py has no OWNER_PHONE_JS (import error: {hw_error!r})')
+    if hw is not None and hasattr(hw, 'OWNER_PHONE_JS'):
+        js = BY['Compose Notice']['parameters']['jsCode']
+        c.check(hw.OWNER_PHONE_JS in js, 'Compose Notice does not embed OWNER_PHONE_JS verbatim')
+        c.check(js.count('function ownerPhone(') == 1, 'Compose Notice must define ownerPhone once')
+
+if hw is not None and hasattr(hw, 'OWNER_PHONE_JS'):
+    for label, channel, status, want in SHAPES:
+        with Case(f'A5 E [{label}]: ownerPhone and Claim Decide (V2) both give {want!r}') as c:
+            wapi = 'tapi' if channel == 'telegram' else 'api'
+            mine = run_js(hw.OWNER_PHONE_JS + '\nreturn [{ json: { phone: ownerPhone($json.wapi, $json.status) } }];',
+                          {'json': {'wapi': wapi, 'status': status}})[0]['json']['phone']
+            c.check(mine == want, f'ownerPhone({wapi!r}, {status}) = {mine!r}, expected {want!r}')
+            v2 = v2_phone(channel, status)
+            c.check(v2 == want, f'Claim Decide ({channel}) takes {v2!r}, expected {want!r} (the V2 rule moved)')
+    with Case('A5 E: ownerPhone never throws on a body that is not an object') as c:
+        for body in (None, 'oops', 7, []):
+            for wapi in ('api', 'tapi'):
+                mine = run_js(hw.OWNER_PHONE_JS + '\nreturn [{ json: { phone: ownerPhone($json.wapi, $json.status) } }];',
+                              {'json': {'wapi': wapi, 'status': body}})[0]['json']['phone']
+                c.check(mine == '', f'ownerPhone({wapi!r}, {body!r}) = {mine!r}, expected ""')
 
 report()

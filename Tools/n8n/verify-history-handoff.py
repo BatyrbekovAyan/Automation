@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Stage-4 (A5/A6) semantic verifier: the ONE history's writers and their sources, the memory rows'
 LangChain shape + provenance marks, no double write, the handoff pause in the gate, the tool wiring
-and its context fields, the notifier's privacy, the app webhook's owner scoping, and the integrations
-(Create webhook types, Dashboard event override, Delete Bot Files wipe, Set Workflow State protection,
-proxy recorder after the response).
+and its context fields, the notifier's privacy and its owner-number rule (2026-10-15: Telegram
+account.phone first), the app webhook's owner scoping, and the integrations (Create webhook types,
+Dashboard event override, Delete Bot Files wipe, Set Workflow State protection, proxy recorder after
+the response).
 
     python3 Tools/n8n/verify-history-handoff.py
     python3 Tools/n8n/verify-history-handoff.py --dir DIR   # another set of exports (mutation tests)
@@ -58,6 +59,17 @@ def hh():
     if _HH is None:
         _HH = _tool("apply-history-handoff.py", "apply_history_handoff")
     return _HH
+
+
+_HW = None
+
+
+def hw():
+    """build-handoff-workflows.py — the generator that owns OWNER_PHONE_JS, the ONE owner-number rule (A5)."""
+    global _HW
+    if _HW is None:
+        _HW = _tool("build-handoff-workflows.py", "build_handoff_workflows")
+    return _HW
 
 
 def node(wf, name):
@@ -121,6 +133,48 @@ def check_notifier_gate(ntf):
     assert effects <= _reachable(ntf, trig), f"notifier: the notice branch is disconnected: {sorted(effects - _reachable(ntf, trig))}"
     around = effects & _reachable(ntf, trig, cut={(NOTIFIER_GATE, 0)})
     assert not around, f"notifier: {sorted(around)} reachable from the schedule without passing {NOTIFIER_GATE}[true] (F3)"
+
+
+# A5 (2026-10-15, «защита платящих»): the notice goes to the owner's OWN number by the V2 rule of Auth Session / Claim Decide —
+# on Telegram (wapi 'tapi') the AUTHORISED account's phone (status.account.phone) FIRST, the top-level phone (which may be a
+# number someone named in auth/phone) only as the fallback; WhatsApp reads the top-level phone; digits only. Until then Compose
+# Notice read the top-level phone on both channels. The rule is ONE constant, build-handoff-workflows.py OWNER_PHONE_JS (the
+# A4 channel watch embeds the same text): the check below demands that text verbatim AND, independently of that constant,
+# the fragments that carry the rule's meaning — so a regenerated-but-wrong rule fails here too.
+OWNER_PHONE_FRAGMENTS = (
+    "const acct = (wapi === 'tapi' && st.account && typeof st.account === 'object') ? st.account.phone : null;",   # Telegram only: the account object's phone
+    "return String(acct || st.phone || '').replace(/\\D/g, '');",                                                  # the account first, the top-level phone the fallback, digits only
+    "const wapi = row.channel === 'telegram' ? 'tapi' : 'api';",                                                   # the bot's channel picks the rule
+    "const phone = ownerPhone(wapi, body);",                                                                       # the number is taken nowhere else
+)
+# the wrong rules the tripwire must reject (label, the code it replaces, the wrong code); tests/test_handoff_notifier.py takes
+# this list and requires the notifier driver to expose every one of them in behaviour (a pin the driver cannot see is unproven)
+OWNER_PHONE_WRONG = (
+    ("only the top-level phone (the pre-A5 line)", "const phone = ownerPhone(wapi, body);",
+     "const phone = String(body.phone || '').replace(/\\D/g, '');"),
+    ("the top-level phone first, the account second", "String(acct || st.phone || '')", "String(st.phone || acct || '')"),
+    ("the account first on every channel (WhatsApp included)", "(wapi === 'tapi' && st.account && typeof st.account === 'object')",
+     "(st.account && typeof st.account === 'object')"),
+    ("the account only, no fallback to the top-level phone", "String(acct || st.phone || '')", "String(acct || '')"),
+    ("Telegram never recognised (the channel is always the WhatsApp one)", "const wapi = row.channel === 'telegram' ? 'tapi' : 'api';",
+     "const wapi = 'api';"),
+    ("no digit-stripping", ".replace(/\\D/g, '');\n}", ";\n}"),
+)
+
+
+def check_owner_phone_rule(ntf):
+    """A5: Compose Notice resolves the owner's number by OWNER_PHONE_JS — Telegram: status.account.phone first, then the
+    top-level phone; WhatsApp: the top-level phone; digits only — and takes it nowhere else. Raises AssertionError
+    (tests/test_handoff_notifier.py holds the behaviour: the real graph, the wrong rules, parity with Claim Decide)."""
+    code = next((n["parameters"].get("jsCode", "") for n in ntf["nodes"] if n["name"] == "Compose Notice"), "")
+    assert code, "notifier: no Compose Notice code (A5)"
+    for frag in OWNER_PHONE_FRAGMENTS:
+        assert frag in code, f"notifier: Compose Notice lacks {frag!r} (A5: the owner's number by the V2 rule — account.phone first on Telegram)"
+    assert "body.phone" not in code, "notifier: Compose Notice reads the top-level phone outside ownerPhone (A5)"
+    assert code.count("function ownerPhone(") == 1, "notifier: Compose Notice must define ownerPhone exactly once (A5)"
+    assert hw().OWNER_PHONE_JS in code, "notifier: Compose Notice does not embed build-handoff-workflows.OWNER_PHONE_JS verbatim (A5: one rule for the notifier and the channel watch)"
+
+
 NO_DOUBLE = "x.message->'additional_kwargs'->>'message_id' = $3"
 
 # R9 + T7: the notifier's one memory/ledger sweep (Settle Lost Sends). R9 settles a lost send_pending as send_unknown and
@@ -248,6 +302,21 @@ def verify_handoff_workflows():
         fail("F3 tripwire accepted the pre-fix notifier (Due Notifications → Owner Phone)")
     except AssertionError:
         pass
+    # A5: the owner's number by the V2 rule; the tripwire itself must reject every wrong rule (first of all: only the top-level phone)
+    try:
+        check_owner_phone_rule(ntf)
+    except AssertionError as e:
+        fail(str(e))
+    for label, old, new in OWNER_PHONE_WRONG:
+        bad = copy.deepcopy(ntf)
+        n = node(bad, "Compose Notice")
+        check(old in n["parameters"]["jsCode"], f"A5 self-check: the anchor of {label!r} is not in Compose Notice (update OWNER_PHONE_WRONG)")
+        n["parameters"]["jsCode"] = n["parameters"]["jsCode"].replace(old, new, 1)
+        try:
+            check_owner_phone_rule(bad)
+            fail(f"A5 tripwire accepted a wrong owner-number rule: {label}")
+        except AssertionError:
+            pass
     # R9: the same schedule settles lost sends (send_pending > 10 min → send_unknown), in a branch with no transport node;
     # T7: and the dead run's memory draft (unknown + mark after the lease, removed before it) — check_lost_send_sweep
     q = node(ntf, "Settle Lost Sends")["parameters"]["query"]

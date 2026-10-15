@@ -19,6 +19,10 @@
                                           F3 (2026-10-08): only a real due request passes `Due Request?` —
                                           a tick with nothing due (or a DB fault) calls no Wappi endpoint and
                                           writes nothing.
+                                          A5 (2026-10-15): the notice goes to the owner's number by the V2 rule of
+                                          Claim Decide — OWNER_PHONE_JS: Telegram status.account.phone first, the
+                                          top-level phone only as the fallback; WhatsApp the top-level phone. That
+                                          constant is the ONE rule: the A4 channel watch imports it.
   crHandoffsApi001-Handoffs.json          /webhook/Handoffs — the app's pending list + take/done
                                           (A1-gated, owner-scoped). `done` clears the chat's pause.
 
@@ -210,20 +214,42 @@ select (select count(*) from swept)::int as settled, (select count(*) from lost_
        (select count(*) from dead_drafts)::int as dropped_drafts;""".replace("__MIN__", str(LOST_SEND_MINUTES)).replace(
     "__UNDELIVERED__", HH.sql_text(HH.UNDELIVERED_MEMORY_PREFIX)).replace("__ULEN__", str(len(HH.UNDELIVERED_MEMORY_PREFIX)))
 
+# A5 (2026-10-15, the «защита платящих» block): the number a message to the OWNER goes to, from Wappi's get/status BODY.
+# ONE rule for every workflow that messages the owner — this notifier embeds it, and the A4 channel watch imports this
+# constant and embeds the same text (`HW.OWNER_PHONE_JS`, a function `ownerPhone(wapi, status)`; wapi = 'tapi' for
+# Telegram, 'api' otherwise; status = the get/status BODY), so the rule cannot drift between the two. It is the V2 rule of
+# Auth Session / Claim Decide (build-auth-workflows.py): on Telegram the AUTHORISED account's phone — `status.account.phone`,
+# the account's own «Избранное» — comes first, because the top-level `phone` of a tapi status may be a number somebody
+# named in `auth/phone`; it is only the fallback. WhatsApp's get/status carries just the top-level phone. Digits only; ''
+# = no usable number (Compose Notice then fails the notice as `no_phone`, retried to the attempt cap). Pinned by
+# tests/test_handoff_notifier.py (A5 A/D/E: the real graph, the wrong rules, parity with Claim Decide) and
+# verify-history-handoff.py check_owner_phone_rule.
+OWNER_PHONE_JS = r"""// OWNER PHONE (A5): the number a message to the owner goes to, from Wappi's get/status BODY — the V2 rule of
+// Claim Decide. Telegram (wapi 'tapi'): the AUTHORISED account's phone (status.account.phone) first; the top-level
+// phone may be a number someone named in auth/phone, so it is only the fallback. WhatsApp: the top-level phone.
+// Digits only; '' = no usable number.
+function ownerPhone(wapi, status) {
+  const st = (status && typeof status === 'object') ? status : {};
+  const acct = (wapi === 'tapi' && st.account && typeof st.account === 'object') ? st.account.phone : null;
+  return String(acct || st.phone || '').replace(/\D/g, '');
+}"""
+
 COMPOSE_NOTICE_JS = r"""// HANDOFF NOTIFIER / Compose Notice (runs PER ITEM — one notice per due request): a self-message
 // on the bot's own channel. No client text, no client number — the owner opens the app for the details.
+__OWNER_PHONE_JS__
 const row = $('Due Notifications').item.json;
 const st = $json || {};
 const body = (st.body && typeof st.body === 'object') ? st.body : st;
-const phone = String(body.phone || '').replace(/\D/g, '');
+const wapi = row.channel === 'telegram' ? 'tapi' : 'api';
+const phone = ownerPhone(wapi, body);
 const chat = String(row.chat_id || '');
 const tail = chat.replace(/\D/g, '').slice(-4) || '…';
 const what = row.reason === 'order' ? 'новый заказ' : (row.reason === 'escalation' ? 'клиент ждёт ответа' : 'вопрос клиента');
 const text = 'Choose Reply: ' + what + ' (чат …' + tail + '). Автоответ в этом чате приостановлен — откройте приложение → Сводка → «Нужен владелец».';
-const base = row.channel === 'telegram' ? 'https://wappi.pro/tapi/' : 'https://wappi.pro/api/';
+const base = wapi === 'tapi' ? 'https://wappi.pro/tapi/' : 'https://wappi.pro/api/';
 return { json: { id: row.id, skip: !phone, error: phone ? '' : 'no_phone', url: base + 'sync/message/send', profileId: row.profile_id,
                  recipient: phone, body: text } };
-"""
+""".replace("__OWNER_PHONE_JS__", OWNER_PHONE_JS)
 
 SETTLE_NOTICE_JS = r"""// HANDOFF NOTIFIER / Settle Notice (runs PER ITEM): sent | failed (+ error). A failure keeps the
 // request; the next sweep retries until the attempt cap.

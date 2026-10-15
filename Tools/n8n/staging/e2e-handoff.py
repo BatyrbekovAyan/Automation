@@ -299,6 +299,43 @@ def notifier(ctx):
     return ok, f"states={states} send_calls={len(calls)} to_self={to_self} no_leak={no_leak} requests_intact={intact} body={bodies[-1][:80] if bodies else None!r}"
 
 
+@scenario("notifier_owner_number_by_v2_rule", "A5 (2026-10-15): the handoff notice goes to the owner's own number by the V2 rule — Telegram: the AUTHORISED account's phone (status.account.phone) even when the top-level phone is another number (one someone typed into auth/phone); with no account the top-level phone; WhatsApp: the top-level phone — one schedule tick, no client text in any notice")
+def notifier_owner_number(ctx):
+    named, account, fallback, wa_phone = "77010001111", "77010009994", "77010002222", "77010003333"
+    # Dedicated profiles of this run alone: the notifier sweeps EVERY profile's due rows, so the mock profiles, the recipients and
+    # the counts below belong to these three rows and to nothing another scenario left behind.
+    bots = {"tg_account": Dedicated(ctx, "na", channel="telegram", suffix=""),
+            "tg_fallback": Dedicated(ctx, "nb", channel="telegram", suffix=""),
+            "wa": Dedicated(ctx, "nc")}
+    want = {"tg_account": account, "tg_fallback": fallback, "wa": wa_phone}
+    # the mock answers tapi get/status with `account.phone` only when account_phone is set (the authorised account); the
+    # top-level phone is the number somebody typed into auth/phone. The account's phone is formatted: only digits may come out.
+    mock("POST", "/__mock/profile", {"profile_id": bots["tg_account"].pid, "authorized": True, "phone": named, "account_phone": "+" + account})
+    mock("POST", "/__mock/profile", {"profile_id": bots["tg_fallback"].pid, "authorized": True, "phone": fallback})
+    mock("POST", "/__mock/profile", {"profile_id": bots["wa"].pid, "authorized": True, "phone": wa_phone})
+    for key, b in bots.items():
+        psql(f"insert into handoff_requests (profile_id, chat_id, source_message_id, reason, summary, data) values "
+             f"('{b.pid}', '{b.chat}', 'on-{key}-{ctx.run_id}', 'order', 'Секретный заказ клиента', '{{\"phone\": \"87011234567\"}}');")
+    since = mock_total()
+    deadline = time.time() + 170            # the schedule fires every 2 minutes
+    states = {}
+    while time.time() < deadline:
+        states = {key: psql(f"select notify_state from handoff_requests where profile_id = '{b.pid}' and source_message_id = 'on-{key}-{ctx.run_id}';")
+                  for key, b in bots.items()}
+        if all(v and v != "pending" for v in states.values()):
+            break
+        time.sleep(5)
+    st, d = mock("GET", f"/__mock/calls?since={since}&path=message/send")
+    sent = {key: [c for c in d["calls"] if (c.get("query") or {}).get("profile_id") == b.pid] for key, b in bots.items()}
+    got = {key: [c["body"].get("recipient") for c in calls] for key, calls in sent.items()}
+    to_owner = all(got[key] == [want[key]] for key in bots)
+    texts = {key: [c["body"].get("body", "") for c in calls] for key, calls in sent.items()}
+    no_leak = all("Секретный" not in x and "87011234567" not in x and bots[key].chat not in x for key, xs in texts.items() for x in xs)
+    prefixed = all(x.startswith("Choose Reply:") for xs in texts.values() for x in xs)
+    ok = all(v == "sent" for v in states.values()) and to_owner and no_leak and prefixed
+    return ok, f"states={states} recipients={got} want={want} no_leak={no_leak} prefixed={prefixed}"
+
+
 def _draft(pid, chat, run, event, text):
     psql(f"insert into n8n_chat_histories (session_id, message) values ('{pid}:{chat}', jsonb_build_object('type', 'ai', 'content', '{text}', "
          f"'additional_kwargs', jsonb_build_object('execution_id', '{run}', 'event_id', '{event}', 'delivery', 'draft'), 'response_metadata', '{{}}'::jsonb));")
