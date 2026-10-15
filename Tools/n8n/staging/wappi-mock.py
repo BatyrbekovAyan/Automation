@@ -25,17 +25,23 @@ Control routes (never exist on the real transport):
     POST /__mock/messages  {profile_id, chat_id, messages:[...]}     replace a chat's history
     POST /__mock/incoming  {profile_id, chat_id, message:{...}}      append one incoming row (returns it)
     GET  /__mock/calls?since=<n>&path=<substr>                        recorded calls
-    POST /__mock/fault     {match:<path substr>, mode:"status"|"timeout"|"accept_then_drop"|"drop",
-                            status:500, times:1, delay:35, profile_id:<optional>}
+    POST /__mock/fault     {match:<path substr>, mode:"status"|"timeout"|"accept_then_drop"|"drop"|"body",
+                            status:500, times:1, delay:35, profile_id:<optional>, body:<json, mode "body">}
                            profile_id scopes the fault to calls FOR that profile (query/body profile_id), so a
                            schedule sweeping every profile (the handoff notifier) cannot hand it to another row.
                            mode "cross" (messages/get): answer with the window of chat `cross_chat` of the same
                            profile — the project-confirmed crossed-response bug; `after: <path substr>` keeps a
                            fault dormant until such a call was recorded (e.g. cross only the RECONCILE fetch,
                            i.e. a messages/get after message/send); `echo: {...}` (message/send) is merged into
-                           the echo row the send appends — e.g. {"id": "<owner row id>"} or {"from_where": ""}
-    POST /__mock/profile   {profile_id, authorized, phone, authorized_at, account_phone}   status fields for get/status
-                           (account_phone: tapi only — the authorised account, returned as account.phone)
+                           the echo row the send appends — e.g. {"id": "<owner row id>"} or {"from_where": ""};
+                           mode "body" (A4) answers `body` with `status` (default 200) instead of the transport's answer —
+                           e.g. an EMPTY profile list {"status": "done", "profiles": null} for the channel watch's floor
+    POST /__mock/profile   {profile_id, authorized, phone, authorized_at, account_phone, channel, deleted_at}   status fields
+                           for get/status AND the profile's entry in profile/all/get — flip `authorized` to take a channel
+                           down / bring it back (A4 channel watch). (account_phone: tapi only — the authorised account,
+                           returned as account.phone.) profile/all/get lists a profile on its own base only once its
+                           `channel` is known (profile/add records it); one without a channel is listed on both; an empty
+                           list is `profiles: null`, as Wappi answers it
     POST /__mock/rc_aliases {customer_id, aliases:[ids] | null, status?, body?}   the RevenueCat customer the mock knows
                            (A3 identity-heal): derive-staging.py rewrites https://api.revenuecat.com/ to <mock>/revenuecat/,
                            and GET /revenuecat/v2/projects/<p>/customers/<id>/aliases answers like RevenueCat v2 (fact-check
@@ -175,6 +181,11 @@ class Handler(BaseHTTPRequestHandler):
             entry["resp"] = {"status": "error", "detail": "injected"}
             _record(entry)
             return self._send(entry["status"], entry["resp"])
+        if fault and fault["mode"] == "body":
+            entry["status"] = int(fault.get("status", 200))
+            entry["resp"] = fault.get("body")
+            _record(entry)
+            return self._send(entry["status"], entry["resp"])
         if fault and fault["mode"] == "timeout":
             _record(entry)
             time.sleep(float(fault.get("delay", 35)))
@@ -248,7 +259,8 @@ class Handler(BaseHTTPRequestHandler):
                 STATE["profiles"][new] = {"channel": channel, "authorized": False}
                 return 200, {"status": "done", "profile_id": new}
             if tail == "profile/all/get":
-                return 200, {"status": "done", "profiles": [dict(profile_id=k, **v) for k, v in STATE["profiles"].items()]}
+                listed = [dict(profile_id=k, **v) for k, v in STATE["profiles"].items() if v.get("channel") in (None, channel)]
+                return 200, {"status": "done", "profiles": listed or None}   # Wappi answers null for an empty list
             if tail == "webhook/url/get":
                 return 200, {"status": "done", "url": ""}
             if tail in ("qr/get", "auth/qr"):
@@ -305,7 +317,8 @@ class Handler(BaseHTTPRequestHandler):
                 rows = [c for c in STATE["calls"][since:] if not sub or sub in c["path"]]
                 return self._send(200, {"total": len(STATE["calls"]), "calls": rows})
             if path == "/__mock/fault" and method == "POST":
-                f = {"match": b["match"], "mode": b.get("mode", "status"), "status": int(b.get("status", 500)),
+                f = {"match": b["match"], "mode": b.get("mode", "status"),
+                     "status": int(b.get("status", 200 if b.get("mode") == "body" else 500)), "body": b.get("body"),
                      "times": int(b.get("times", 1)), "delay": float(b.get("delay", 35)),
                      "profile_id": b.get("profile_id") or "", "after": b.get("after") or "",
                      "cross_chat": b.get("cross_chat") or "", "armed_at": len(STATE["calls"]),

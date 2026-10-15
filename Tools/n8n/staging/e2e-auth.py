@@ -2076,6 +2076,189 @@ def s_orphan_live(ctx):
                 f"delete calls={len(deletes)}")
 
 
+WATCH_ID = "crChannelWatch001"
+WATCH_FILE = f"{WATCH_ID}-Channel_Watch.json"
+WATCH_KEEP = ("List WA Profiles", "List TG Profiles", "Live Rows", "Diff Channel State", "Upsert Snapshot", "Down Alerts?",
+              "Pick Other Channel", "Has Other Channel?", "Owner Phone", "Compose Notice", "Skip?", "Send Notice", "Settle Notice",
+              "Notice Sent?", "Record Notified")
+WATCH_TEXT = {"whatsapp": "Choose Reply: WhatsApp отключился — бот не отвечает. Переподключите канал в приложении.",
+              "telegram": "Choose Reply: Telegram отключился — бот не отвечает. Переподключите канал в приложении."}
+
+
+class WatchProbe:
+    """The DERIVED canonical channel watch (every node but its Schedule Trigger) behind a temporary webhook, run on demand.
+    The REAL watch (active on staging, every 10 min) is paused meanwhile, so no tick of it acts on a scenario's profiles
+    between two probe runs; both are restored on exit (the probe deleted, the real watch re-activated)."""
+
+    def __init__(self, ctx, tag):
+        self.run_id, self.tag, self.wid, self.url, self.was_active = ctx["run_id"], tag, None, None, False
+
+    def __enter__(self):
+        self.was_active = bool((admin_api("GET", f"/workflows/{WATCH_ID}")[1] or {}).get("active"))
+        if self.was_active:
+            admin_api("POST", f"/workflows/{WATCH_ID}/deactivate")
+        self.wid, self.url = probe_workflow(self.run_id, WATCH_FILE, WATCH_KEEP, "List WA Profiles", f"{self.tag}{int(time.time())}")
+        return self
+
+    def run(self):
+        """One watch tick → (the execution, the notices sent in it: [(from profile, path, recipient, text)])."""
+        since = mock_total()
+        ex = run_probe(self.wid, self.url)
+        calls, _ = mock_calls(since, "message/send")
+        return ex, [((c.get("query") or {}).get("profile_id"), c["path"], (c.get("body") or {}).get("recipient"), (c.get("body") or {}).get("body"))
+                    for c in calls if "отключился" in str((c.get("body") or {}).get("body", ""))]
+
+    def __exit__(self, *exc):
+        drop_probe(self.wid)
+        if self.was_active:
+            admin_api("POST", f"/workflows/{WATCH_ID}/activate")
+        return False
+
+
+def snap(*pids):
+    """channel_snapshot of these profiles: {pid: 'authorized|notified'} ('-' = no row)."""
+    return {p: pg(f"select coalesce((select authorized::text || '|' || (notified_at is not null)::text from channel_snapshot "
+                  f"where profile_id = '{p}'), '-');") for p in pids}
+
+
+def drop_snap(*pids):
+    if pids:
+        pg(f"delete from channel_snapshot where profile_id in ({', '.join(repr(p) for p in pids)});")
+
+
+def mock_profile(pid, **fields):
+    http("POST", f"{MOCK}/__mock/profile", dict(profile_id=pid, **fields))
+
+
+def watch_owner(ctx, tag, channels=("whatsapp", "telegram"), authorized=True):
+    """A fresh install with a live bot_profiles row per channel (proxy profile.add → Bind Profile), each authorised in the
+    mock with its own number; Telegram's authorised account carries a DIFFERENT number than the top-level phone (A5)."""
+    o = Owner(tag, ctx["run_id"])
+    pids = {}
+    for i, ch in enumerate(channels):
+        pid = o.add_profile(ch)
+        pids[ch] = pid
+        n = int(hashlib.sha1(pid.encode()).hexdigest(), 16)
+        fields = {"authorized": authorized, "phone": f"7701{n % 10_000_000:07d}"}
+        if ch == "telegram":     # the authorised account's own number differs from the top-level phone (the A5 rule picks it)
+            fields["account_phone"] = f"+7 (702) {n % 1000:03d}-{(n // 1000) % 100:02d}-{i:02d}"
+        mock_profile(pid, **fields)
+    return o, pids
+
+
+def account_digits(pid):
+    st, d = http("GET", f"{MOCK}/__mock/state")
+    raw = ((d or {}).get("profiles") or {}).get(pid, {}).get("account_phone") or ""
+    return re.sub(r"\D", "", raw)
+
+
+def top_phone(pid):
+    st, d = http("GET", f"{MOCK}/__mock/state")
+    return ((d or {}).get("profiles") or {}).get(pid, {}).get("phone") or ""
+
+
+@scenario("channel_down_notifies_other_channel", "A4: the channel watch (the DERIVED canonical nodes on the real n8n + the mock): an owner with WhatsApp + Telegram, both recorded authorised; WhatsApp logs out → EXACTLY ONE notice, sent from the owner's Telegram to the account's own number (A5 rule), the A4 text, notified_at stamped; the next run sends nothing; WhatsApp back → the snapshot says authorised again (notified_at reset), nothing sent")
+def s_watch_down(ctx):
+    o, p = watch_owner(ctx, "cw1")
+    wa, tg = p["whatsapp"], p["telegram"]
+    try:
+        with WatchProbe(ctx, "cw1") as w:
+            _, n1 = w.run()
+            s1 = snap(wa, tg)
+            mock_profile(wa, authorized=False)
+            ex2, n2 = w.run()
+            s2 = snap(wa, tg)
+            _, n3 = w.run()
+            s3 = snap(wa, tg)
+            mock_profile(wa, authorized=True)
+            _, n4 = w.run()
+            s4 = snap(wa, tg)
+    finally:
+        drop_snap(wa, tg)
+    want = [(tg, "/tapi/sync/message/send", account_digits(tg), WATCH_TEXT["whatsapp"])]
+    ok = (n1 == [] and s1 == {wa: "true|false", tg: "true|false"} and n2 == want and s2[wa] == "false|true"
+          and n3 == [] and s3 == s2 and n4 == [] and s4 == {wa: "true|false", tg: "true|false"})
+    return ok, f"run 1 notices={n1} snap={s1}; WA down → notices={n2} (want {want}) snap={s2}; again → {n3} snap={s3}; WA back → {n4} snap={s4}"
+
+
+@scenario("channel_down_single_channel_only_marks", "A4: an owner with ONE channel (WhatsApp) that logs out → the snapshot records it down and the notice stays owed (notified_at null), but NOTHING is sent — there is no other channel to send through (the app marks it); the next run retries (still nothing to send); once the recorded DOWN is older than the retry window (the Handoff Notifier's six attempts ≈ an hour) the watch gives up on it")
+def s_watch_single(ctx):
+    o, p = watch_owner(ctx, "cw2", channels=("whatsapp",))
+    wa = p["whatsapp"]
+    try:
+        with WatchProbe(ctx, "cw2") as w:
+            _, n1 = w.run()
+            s1 = snap(wa)
+            mock_profile(wa, authorized=False)
+            ex2, n2 = w.run()
+            s2 = snap(wa)
+            ex3, n3 = w.run()
+            s3 = snap(wa)
+            pg(f"update channel_snapshot set seen_at = now() - interval '2 hours' where profile_id = '{wa}';")
+            ex4, n4 = w.run()
+    finally:
+        drop_snap(wa)
+    picked = node_items(ex2, "Pick Other Channel")
+    base = lambda ex: (((node_items(ex, "Diff Channel State") or [{}])[0].get("stats") or {}).get("bases") or {}).get("whatsapp") or {}
+    b2, b3, b4 = base(ex2), base(ex3), base(ex4)
+    ok = (n1 == [] and s1 == {wa: "true|false"} and n2 == [] and s2 == {wa: "false|false"} and n3 == [] and s3 == s2
+          and "Down Alerts?" in ran_nodes(ex2) and "Send Notice" not in ran_nodes(ex2)
+          and b2.get("down") == 1 and b3.get("owed") == 1 and "Pick Other Channel" in ran_nodes(ex3)
+          and n4 == [] and b4.get("gaveUp") == 1 and b4.get("owed") == 0 and "Pick Other Channel" not in ran_nodes(ex4))
+    return ok, (f"run 1 snap={s1}; WA down → notices={n2} snap={s2} pick={picked} down={b2.get('down')}; again → {n3} snap={s3} "
+                f"owed={b3.get('owed')}; DOWN aged 2 h → notices={n4} gaveUp={b4.get('gaveUp')} owed={b4.get('owed')} "
+                f"picked={'Pick Other Channel' in ran_nodes(ex4)}")
+
+
+@scenario("channel_recovery_updates_snapshot_without_notice", "A4: a profile first seen ALREADY down (a wizard mid-pairing) is recorded without a notice (nothing owed); its pairing (false → true) updates the snapshot and sends nothing; only a later logout (true → false) owes and sends ONE notice — through the owner's other channel")
+def s_watch_recovery(ctx):
+    o, p = watch_owner(ctx, "cw3")
+    wa, tg = p["whatsapp"], p["telegram"]
+    mock_profile(wa, authorized=False)                       # the wizard has not paired WhatsApp yet
+    try:
+        with WatchProbe(ctx, "cw3") as w:
+            _, n1 = w.run()
+            s1 = snap(wa, tg)
+            mock_profile(wa, authorized=True)                # paired
+            _, n2 = w.run()
+            s2 = snap(wa, tg)
+            mock_profile(wa, authorized=False)               # logged out later
+            _, n3 = w.run()
+            s3 = snap(wa, tg)
+    finally:
+        drop_snap(wa, tg)
+    want = [(tg, "/tapi/sync/message/send", account_digits(tg), WATCH_TEXT["whatsapp"])]
+    ok = (n1 == [] and s1 == {wa: "false|true", tg: "true|false"} and n2 == [] and s2 == {wa: "true|false", tg: "true|false"}
+          and n3 == want and s3[wa] == "false|true")
+    return ok, f"first seen down → notices={n1} snap={s1}; paired → {n2} snap={s2}; logged out → {n3} (want {want}) snap={s3}"
+
+
+@scenario("channel_watch_empty_list_floor", "A4: Wappi answers an EMPTY WhatsApp list (profiles null) while live WhatsApp rows exist → that base is an invalid fetch (empty_list_floor): nothing recorded, nobody told, the Telegram base still read; the next run (a real list) takes the logout and sends ONE notice")
+def s_watch_floor(ctx):
+    o, p = watch_owner(ctx, "cw4")
+    wa, tg = p["whatsapp"], p["telegram"]
+    try:
+        with WatchProbe(ctx, "cw4") as w:
+            _, n1 = w.run()
+            s1 = snap(wa, tg)
+            mock_profile(wa, authorized=False)
+            http("POST", f"{MOCK}/__mock/fault", {"match": "/api/profile/all/get", "mode": "body", "times": 1,
+                                                  "body": {"status": "done", "profiles": None}})
+            ex2, n2 = w.run()
+            s2 = snap(wa, tg)
+            stats = ((node_items(ex2, "Diff Channel State") or [{}])[0].get("stats") or {}).get("bases") or {}
+            _, n3 = w.run()
+            s3 = snap(wa, tg)
+    finally:
+        drop_snap(wa, tg)
+    want = [(tg, "/tapi/sync/message/send", account_digits(tg), WATCH_TEXT["whatsapp"])]
+    wab, tgb = stats.get("whatsapp") or {}, stats.get("telegram") or {}
+    ok = (n1 == [] and s1 == {wa: "true|false", tg: "true|false"} and wab.get("valid") is False
+          and str(wab.get("reason", "")).startswith("empty_list_floor") and tgb.get("valid") is True and n2 == [] and s2 == s1
+          and n3 == want and s3[wa] == "false|true")
+    return ok, f"empty WA list → whatsapp base={ {k: wab.get(k) for k in ('valid', 'reason')} } telegram valid={tgb.get('valid')} notices={n2} snap={s2}; real list → {n3} snap={s3}"
+
+
 def main():
     ap = argparse.ArgumentParser(); ap.add_argument("--only"); ap.add_argument("--compat-closed", action="store_true")
     ap.add_argument("--no-llm", action="store_true", help="skip the model step of retired_bot_reconnects_after_purchase")

@@ -58,6 +58,7 @@ ACTIVE_CANONICAL = ["0DP79STI3pafXO9B", "2htWSV5IHO8E2CgB", "2islisFH7jjLoPQM", 
                     "crTestDialog0001", "crHandoffDry0001",   # stage 7.1: the safe test dialog + its dry handoff target
                     "crPriceSearch001",   # V9 (2026-09-28): the reconciling price-list search (bots' + test dialog's tool)
                     "crVerifyIdent001",   # A3 «защита платящих» (2026-10-14): identity-heal after a reinstall (/webhook/VerifyIdentity)
+                    "crChannelWatch001",  # A4 «защита платящих» (2026-10-14): «канал отключился» notices, every 10 min (e2e pauses it around its probes)
                     "stgEvalRunner001"]   # STAGING-ONLY (stage 6): completions proxy for the eval runner
 
 

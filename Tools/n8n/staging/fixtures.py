@@ -95,6 +95,10 @@ def main():
             psql(f"delete from {tbl} where {col} ~ '^profile-[0-9]{{6}}$' and not ({col} = any (select jsonb_array_elements_text(:'p0'::jsonb)));", live)
         psql("delete from n8n_chat_histories where session_id ~ '^profile-[0-9]{6}:' and not (split_part(session_id, ':', 1) = any (select jsonb_array_elements_text(:'p0'::jsonb)));", live)
         psql("delete from bot_profiles where profile_id ~ '^profile-[0-9]{6}$' and not (profile_id = any (select jsonb_array_elements_text(:'p0'::jsonb)));", live)
+        # A4 (2026-10-14): a re-minted mock id must not inherit an earlier lifetime's channel state (a stale «true» would read
+        # as a DOWN of a brand-new profile) — only once the migration is applied
+        if psql("select to_regclass('public.channel_snapshot') is not null;") == "t":
+            psql("delete from channel_snapshot where profile_id ~ '^profile-[0-9]{6}$' and not (profile_id = any (select jsonb_array_elements_text(:'p0'::jsonb)));", live)
         print(f"swept {len(pids)} stale mock profile(s) (live mock knows {len(a.live)})")
     elif a.cmd == "delete":
         if not (a.app_user_id.startswith("probe-") or FIXTURE_RC.match(a.app_user_id)):
@@ -116,6 +120,10 @@ def main():
         if psql("select to_regclass('public.clone_retirements') is not null;") == "t":
             for pid in a.profile_id:
                 n = int(n or 0) + int(psql("with a as (delete from clone_retirements where profile_id = :'p0' returning 1) select count(*) from a;", pid) or 0)
+        # A4 (2026-10-14): the channel watch's state of a fixture profile (only once the channel-snapshot migration is applied)
+        if psql("select to_regclass('public.channel_snapshot') is not null;") == "t":
+            for pid in a.profile_id:
+                n = int(n or 0) + int(psql("with a as (delete from channel_snapshot where profile_id = :'p0' returning 1) select count(*) from a;", pid) or 0)
         # learning A (2026-10-13): the panel's shown sets of a fixture profile (only once the learning migration is applied)
         if psql("select to_regclass('public.suggestion_sets') is not null;") == "t":
             for pid in a.profile_id:

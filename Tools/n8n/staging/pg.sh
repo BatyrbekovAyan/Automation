@@ -109,6 +109,8 @@ cmd_migrate() {
     "${N8N_DIR}/sql/2026-10-14-rc-event-ledger.sql"
     # A3 fix round 2 (2026-10-15): the identity-heal journal (Heal's CTE + Log Refusal of crVerifyIdent001)
     "${N8N_DIR}/sql/2026-10-15-identity-heal-log.sql"
+    # A4 «защита платящих» (2026-10-14): the channel watch's snapshot (crChannelWatch001 reads it in Live Rows, writes it in Upsert Snapshot)
+    "${N8N_DIR}/sql/2026-10-14-channel-snapshot.sql"
   )
   for f in "${files[@]}"; do
     [ -s "$f" ] || { echo "skip (missing) $f"; continue; }
