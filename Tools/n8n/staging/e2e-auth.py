@@ -2037,6 +2037,45 @@ def s_billing_conflict_log(ctx):
                 f"conflict={d_b2.get('billingConflict')} journal={after!r}")
 
 
+# ------------------------------------------------------------------ A4 «защита платящих» (2026-10-14): live profiles + channel watch
+ORPHAN_FILE = "2islisFH7jjLoPQM-Delete_Orphan_Profiles.json"
+ORPHAN_KEEP = ("Sweep Config", "List WA Profiles", "List TG Profiles", "Live Profiles", "Plan Sweep", "Split Candidates",
+               "Re-check Status", "Confirm Orphan", "Still Unauthorized?", "Delete Profile", "Stamp Result", "Sweep Report")
+
+
+@scenario("orphan_sweep_spares_live_profile", "A4: the orphan sweep (the DERIVED canonical nodes on the real n8n, dry run, TTL ≈ 1 s, two runs so the first-seen ledger ages) reports a mock profile WITHOUT a bot_profiles row as «would delete» and NEVER one with a LIVE row (a logged-out owner's channel): Plan Sweep counts it protectedLive, the live read is proven (liveRead ok); nothing is deleted")
+def s_orphan_live(ctx):
+    o = fresh_owner(ctx, "orph")                 # proxy profile.add → a LIVE bot_profiles row; the mock keeps it unauthorised
+    live = o.profiles[0]
+    orphan = f"e2e-orphan-{ctx['run_id']}"       # a Wappi profile no bot_profiles row names
+    http("POST", f"{MOCK}/__mock/profile", {"profile_id": orphan, "authorized": False, "channel": "whatsapp"})
+
+    def cfg(nodes):
+        for a in nodes["Sweep Config"]["parameters"]["assignments"]["assignments"]:
+            if a["name"] == "ttlHours":
+                a["value"] = 0.0003              # ≈ 1 s: the second run sees both past the TTL
+            if a["name"] == "dryRun":
+                a["value"] = True                # never a delete call, even against the mock
+    wid, since = None, mock_total()
+    try:
+        wid, url = probe_workflow(ctx["run_id"], ORPHAN_FILE, ORPHAN_KEEP, "Sweep Config", f"orph{int(time.time())}", edit=cfg)
+        e1 = run_probe(wid, url)
+        time.sleep(2.5)
+        e2 = run_probe(wid, url)
+    finally:
+        drop_probe(wid)
+        http("POST", f"{MOCK}/__mock/profile", {"profile_id": orphan, "deleted_at": "2026-10-14T00:00:00Z"})   # the hourly sweep skips it
+    s1 = (node_items(e1, "Plan Sweep") or [{}])[0]
+    s2 = (node_items(e2, "Plan Sweep") or [{}])[0]
+    would = {c.get("profileId") for c in s2.get("wouldDelete") or []}
+    deletes, _ = mock_calls(since, "profile/delete")
+    ok = (s1.get("liveRead") == "ok" and s2.get("liveRead") == "ok" and orphan in would and live not in would
+          and int(s2.get("protectedLive") or 0) >= 1 and "Live Profiles" in ran_nodes(e2) and not deletes)
+    return ok, (f"run 1 liveRead={s1.get('liveRead')!r}; run 2 liveRead={s2.get('liveRead')!r} liveRows={s2.get('liveRows')} "
+                f"protectedLive={s2.get('protectedLive')} orphan would-delete={orphan in would} live would-delete={live in would} "
+                f"delete calls={len(deletes)}")
+
+
 def main():
     ap = argparse.ArgumentParser(); ap.add_argument("--only"); ap.add_argument("--compat-closed", action="store_true")
     ap.add_argument("--no-llm", action="store_true", help="skip the model step of retired_bot_reconnects_after_purchase")
