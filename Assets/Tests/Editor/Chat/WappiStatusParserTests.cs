@@ -16,12 +16,15 @@ using NUnit.Framework;
 public class WappiStatusParserTests
 {
     // ── TryGetAuthorized — DESTRUCTIVE-PATH SAFETY ────────────────────────────
-    // CheckWhatsappUnauthorizationOutsideApp deletes the Wappi profile, clears the saved
-    // number and sets isOnWhatsapp=0 when this returns true with authorized==false. The
+    // CheckWhatsappUnauthorizationOutsideApp deleted the Wappi profile, cleared the saved
+    // number and set isOnWhatsapp=0 when this returned true with authorized==false. The
     // 2026-07-27 security re-audit proved empirically (28 adversarial bodies) that a
     // malformed / missing / non-boolean body can NEVER reach that delete — but nothing
-    // guarded the property. These lock it in: a future refactor that makes any of these
-    // return true would silently start deleting authorized users' profiles.
+    // guarded the property. These lock it in. Since the final review of Part A (I-2,
+    // 2026-10-15) the delete (and the pairing pollers' advance) no longer read this parser at
+    // all: they read ChannelHealth.Judge for the profile they asked about (2xx, a BOOLEAN flag,
+    // no other profile's echo — ChannelHealthTests pins both the verdict and the wiring). The
+    // parser still feeds the non-destructive reads (the Create retry, the number field).
 
     [TestCase("{\"authorized\":null}")]
     [TestCase("{\"authorized\":0}")]
@@ -46,7 +49,8 @@ public class WappiStatusParserTests
     {
         Assert.IsTrue(WappiStatusParser.TryGetAuthorized("{\"authorized\":false}", out bool boolFalse));
         Assert.IsFalse(boolFalse);
-        // Documented, deliberately-safer delta: a bool-parseable STRING also counts.
+        // Documented delta of the PARSER: a bool-parseable STRING also counts here. The delete itself
+        // no longer reads the parser (ChannelHealth.Judge: a string flag proves nothing — I-2).
         Assert.IsTrue(WappiStatusParser.TryGetAuthorized("{\"authorized\":\"false\"}", out bool strFalse));
         Assert.IsFalse(strFalse);
         // Pretty-printed must parse too — the shape that used to throw.

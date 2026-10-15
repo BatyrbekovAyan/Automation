@@ -2802,20 +2802,26 @@ public partial class Manager : MonoBehaviour
             // Auth screen is gone (wizard cancelled / settings back) — nothing to advance
             if (!WhatsappAuth.activeInHierarchy) yield break;
 
+            string askedProfileId = whatsappProfileId;
             UnityWebRequest www = null;
-            yield return WappiProxy.Send(WappiProxy.Op.Status, ChatChannel.WhatsApp, new { profile_id = whatsappProfileId }, r => www = r);
+            yield return WappiProxy.Send(WappiProxy.Op.Status, ChatChannel.WhatsApp, new { profile_id = askedProfileId }, r => www = r);
             using var wwwScope = www;
 
             if (www.result == UnityWebRequest.Result.Success)
             {
                 string response = www.downloadHandler.text;
 
-                // WR-03: throw-safe parse (mirrors the Telegram twin in GetTelegramProfileStatus).
+                // WR-03: throw-safe read (mirrors the Telegram twin in GetTelegramProfileStatus).
                 // The old unguarded IndexOf/Substring could throw a negative-length Substring and
                 // kill this POLLING coroutine outright — after which a successful QR/code auth was
                 // never detected and the wizard hung indefinitely. Unparseable body ⇒ not
                 // authorized ⇒ keep polling, exactly as before.
-                if (WappiStatusParser.TryGetAuthorized(response, out bool isAuthorized) && isAuthorized)
+                // Final review I-2 (2026-10-15): advance ONLY on ChannelHealth.Judge for the profile asked — a 2xx with
+                // the boolean authorized:true and no other profile's echo. Wappi crosses concurrent status answers on the
+                // shared proxy token and A4's launch/focus channel check asks status in parallel: a crossed authorized:true
+                // started the trial clock, the claim and a Create for a profile that never paired.
+                if (ChannelHealth.Judge(www.responseCode, response, askedProfileId) == ChannelHealthVerdict.Authorized
+                    && askedProfileId == whatsappProfileId)
                 {
                     authorized = true;
 
@@ -3313,17 +3319,21 @@ public partial class Manager : MonoBehaviour
             // Auth screen is gone (wizard cancelled / settings back) — nothing to advance
             if (!TelegramAuth.activeInHierarchy) yield break;
 
+            string askedProfileId = telegramProfileId;
             UnityWebRequest www = null;
-            yield return WappiProxy.Send(WappiProxy.Op.Status, ChatChannel.Telegram, new { profile_id = telegramProfileId }, r => www = r);
+            yield return WappiProxy.Send(WappiProxy.Op.Status, ChatChannel.Telegram, new { profile_id = askedProfileId }, r => www = r);
             using var wwwScope = www;
 
             if (www.result == UnityWebRequest.Result.Success)
             {
                 string response = www.downloadHandler.text;
 
-                // tapi get/status is pretty-printed with two "phone" keys — parse via the
-                // whitespace/order-agnostic WappiStatusParser instead of substring scanning.
-                if (WappiStatusParser.TryGetAuthorized(response, out bool isAuthorized) && isAuthorized)
+                // tapi get/status is pretty-printed with two "phone" keys — read through the
+                // whitespace/order-agnostic JSON readers instead of substring scanning.
+                // Final review I-2 (2026-10-15): advance ONLY on ChannelHealth.Judge for the profile asked — see the
+                // WhatsApp twin (a crossed authorized:true of another profile must never complete this pairing).
+                if (ChannelHealth.Judge(www.responseCode, response, askedProfileId) == ChannelHealthVerdict.Authorized
+                    && askedProfileId == telegramProfileId)
                 {
                     authorized = true;
 

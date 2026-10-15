@@ -254,8 +254,8 @@ public partial class BotSettings
 
             // WR-03 (same defect class as CheckWhatsappAuthorization — this THIRD site was not in
             // the review). Note the deliberate shape: this path is DESTRUCTIVE (it deletes the
-            // Wappi profile and clears the saved number), so it must fire ONLY on a definitively
-            // parsed authorized:false. A missing/unparseable body leaves the profile untouched —
+            // Wappi profile and clears the saved number), so it must fire ONLY on a definitive
+            // authorized:false. A missing/unparseable body leaves the profile untouched —
             // identical to the old Contains-guard, and the reason this is not folded into a single
             // `!TryGetAuthorized(...) || !isAuthorized` condition.
             if (WappiStatusParser.TryGetAuthorized(response, out bool isAuthorized))
@@ -266,7 +266,14 @@ public partial class BotSettings
                         Manager.IsCreatePending(bot, ChatChannel.WhatsApp)))
                     Manager.Instance.GetCreateWhatsappWorkflow();
 
-                if (!isAuthorized && !Manager.openBot.GetComponent<Bot>().whatsappProfileId.Equals(Bot.UnauthedProfileSentinel))
+                // Final review I-2 (2026-10-15): the delete trusts ONLY ChannelHealth.Judge for the profile it asked about —
+                // a 2xx with the boolean authorized:false and no other profile's echo. Wappi crosses concurrent status
+                // answers on the shared proxy token, and A4's launch/focus channel check asks status in parallel with this
+                // probe: the bare parser read another bot's logged-out answer as this one's and deleted a live pairing.
+                // The bot must still hold that profile, and the delete names it.
+                if (ChannelHealth.Judge(www.responseCode, response, checkedProfileId) == ChannelHealthVerdict.Unauthorized
+                    && bot.whatsappProfileId == checkedProfileId
+                    && !checkedProfileId.Equals(Bot.UnauthedProfileSentinel))
                 {
                     WhatsappNumberField.Value = "";
                     WhatsappNumberField.gameObject.SetActive(false);
@@ -281,7 +288,7 @@ public partial class BotSettings
                     // even though the probe brought screen and prefs back into
                     // agreement.
                     SetChannelRowQuiet(whatsappRow, false);
-                    Manager.Instance.GetDeleteWhatsappProfile(Manager.openBot.GetComponent<Bot>().whatsappProfileId);
+                    Manager.Instance.GetDeleteWhatsappProfile(checkedProfileId);
                 }
             }
         }
@@ -472,8 +479,8 @@ public partial class BotSettings
             // GetDeleteTelegramProfile path has NO field history. Requiring the bot to be a known
             // Telegram bot means a transient / mid-pairing authorized:false (a reconnecting or
             // abandoned-pairing profile whose id was never reset to "-1") cannot silently delete
-            // a live profile. The WhatsApp twin stays byte-identical (proven safe on compact
-            // api/sync JSON) and deliberately does NOT get this extra gate.
+            // a live profile. The WhatsApp twin (proven safe on compact api/sync JSON) deliberately
+            // does NOT get this extra gate; both read the delete's verdict from ChannelHealth.Judge.
             bool parsed = WappiStatusParser.TryGetAuthorized(response, out bool isAuthorized);
             var bot = Manager.openBot.GetComponent<Bot>();
             // F1 (T8): see the WhatsApp twin — a failed Create of this paired profile is repeated on settings open.
@@ -481,10 +488,12 @@ public partial class BotSettings
                     Manager.IsCreatePending(bot, ChatChannel.Telegram)))
                 Manager.Instance.GetCreateTelegramWorkflow();
 
-            if (parsed
-                && !isAuthorized
+            // Final review I-2 (2026-10-15): the delete trusts ONLY ChannelHealth.Judge for the profile it asked about —
+            // see the WhatsApp twin (a crossed answer of another profile must never delete this one).
+            if (ChannelHealth.Judge(www.responseCode, response, checkedProfileId) == ChannelHealthVerdict.Unauthorized
                 && PlayerPrefs.GetInt(Manager.openBot.name + "isOnTelegram", 0) == 1
-                && !Manager.openBot.GetComponent<Bot>().telegramProfileId.Equals(Bot.UnauthedProfileSentinel))
+                && bot.telegramProfileId == checkedProfileId
+                && !checkedProfileId.Equals(Bot.UnauthedProfileSentinel))
             {
                 TelegramNumberField.Value = "";
                 TelegramNumberField.gameObject.SetActive(false);
@@ -494,7 +503,7 @@ public partial class BotSettings
 
                 // Recompute Save — see the WhatsApp twin above.
                 SetChannelRowQuiet(telegramRow, false);
-                Manager.Instance.GetDeleteTelegramProfile(Manager.openBot.GetComponent<Bot>().telegramProfileId);
+                Manager.Instance.GetDeleteTelegramProfile(checkedProfileId);
             }
         }
     }

@@ -333,6 +333,88 @@ public class ChannelHealthTests
         }
     }
 
+    // --- final review I-2 (2026-10-15): the two OLDER status readers act only on an echo-checked verdict ---------------
+    // The launch/focus channel check above asks `status` for every listed profile while the settings-open probe (which
+    // DELETES a logged-out profile) and the pairing pollers (which advance on authorized:true) may be asking too — and Wappi
+    // crosses concurrent answers on the shared proxy token. The bare parser cannot tell another profile's status from this
+    // one's; ChannelHealth.Judge with the asked profile can.
+
+    private const string CrossedLogout = "{\"authorized\":false,\"profile_id\":\"prof-someone-else\"}";
+    private const string CrossedAuthorized = "{\"authorized\":true,\"profile_id\":\"prof-someone-else\"}";
+
+    [Test]
+    public void A_crossed_status_neither_deletes_in_the_settings_probe_nor_advances_a_pairing_poller()
+    {
+        Assert.AreEqual(ChannelHealthVerdict.Keep, ChannelHealth.Judge(200, CrossedLogout, Wa),
+            "another profile's authorized:false must never delete THIS profile in the settings probe");
+        Assert.AreEqual(ChannelHealthVerdict.Keep, ChannelHealth.Judge(200, CrossedAuthorized, Wa),
+            "another profile's authorized:true must never advance THIS pairing (trial clock, claim, Create)");
+        Assert.AreEqual(ChannelHealthVerdict.Keep, ChannelHealth.Judge(200, "{\"authorized\":\"false\",\"profile_id\":\"prof-wa-1\"}", Wa),
+            "a string flag is no proof either (the parser accepts it; the delete must not)");
+        Assert.AreEqual(ChannelHealthVerdict.Unauthorized, ChannelHealth.Judge(200, "{\"authorized\":false,\"profile_id\":\"prof-wa-1\"}", Wa));
+        Assert.AreEqual(ChannelHealthVerdict.Authorized, ChannelHealth.Judge(200, "{\"authorized\":true,\"profile_id\":\"prof-wa-1\"}", Wa));
+        // why the source guards below exist: the bare parser the two readers used would have acted on BOTH crossed bodies
+        Assert.IsTrue(WappiStatusParser.TryGetAuthorized(CrossedLogout, out bool crossedFalse) && !crossedFalse);
+        Assert.IsTrue(WappiStatusParser.TryGetAuthorized(CrossedAuthorized, out bool crossedTrue) && crossedTrue);
+    }
+
+    /// <summary>The <c>if (…)</c> statement that contains <paramref name="needle"/>: its condition and its block.</summary>
+    private static (string condition, string block) GuardOf(string body, string needle, string what)
+    {
+        int at = body.IndexOf(needle, System.StringComparison.Ordinal);
+        Assert.GreaterOrEqual(at, 0, $"{what}: «{needle}» not found");
+        int @if = body.LastIndexOf("if (", at, System.StringComparison.Ordinal);
+        Assert.GreaterOrEqual(@if, 0, $"{what}: «{needle}» is not inside an if");
+        int open = body.IndexOf('{', at);
+        string condition = body.Substring(@if, open - @if);
+        return (condition, Body(body.Substring(open), "{"));
+    }
+
+    [Test]
+    public void The_settings_probe_deletes_only_a_profile_whose_echo_checked_status_says_logged_out()
+    {
+        string auth = Source("Main/BotSettings.Auth.cs");
+        foreach (var (method, channel, delete) in new[]
+                 {
+                     ("private IEnumerator CheckWhatsappUnauthorizationOutsideApp()", "ChatChannel.WhatsApp", "Manager.Instance.GetDeleteWhatsappProfile(checkedProfileId);"),
+                     ("private IEnumerator CheckTelegramUnauthorizationOutsideApp()", "ChatChannel.Telegram", "Manager.Instance.GetDeleteTelegramProfile(checkedProfileId);"),
+                 })
+        {
+            string body = Body(auth, method);
+            var (condition, block) = GuardOf(body, "ChannelHealth.Judge(www.responseCode, response, checkedProfileId) == ChannelHealthVerdict.Unauthorized",
+                $"{method}: the delete's verdict");
+            StringAssert.Contains(delete, block, $"{method}: the delete must sit under the echo-checked verdict and name the profile it asked about");
+            Assert.AreEqual(1, Regex.Matches(body, @"GetDelete(Whatsapp|Telegram)Profile\(").Count, $"{method}: one delete site, the guarded one");
+            Assert.IsFalse(Regex.IsMatch(condition, @"\bisAuthorized\b"),
+                $"{method}: the bare parser's flag must not decide the delete (it reads another profile's crossed answer as this one's): {condition}");
+            StringAssert.Contains("ProfileId == checkedProfileId", condition, $"{method}: the bot must still hold the profile the status was asked for");
+        }
+    }
+
+    [Test]
+    public void The_pairing_pollers_advance_only_on_an_echo_checked_authorization_of_the_profile_they_asked()
+    {
+        string manager = Source("Main/Manager.cs");
+        foreach (var (poller, field, channel) in new[]
+                 {
+                     ("private IEnumerator GetWhatsappProfileStatus()", "whatsappProfileId", "ChatChannel.WhatsApp"),
+                     ("private IEnumerator GetTelegramProfileStatus()", "telegramProfileId", "ChatChannel.Telegram"),
+                 })
+        {
+            string body = Body(manager, poller);
+            int asked = body.IndexOf($"string askedProfileId = {field};", System.StringComparison.Ordinal);
+            int send = body.IndexOf($"WappiProxy.Send(WappiProxy.Op.Status, {channel}, new {{ profile_id = askedProfileId }}", System.StringComparison.Ordinal);
+            Assert.IsTrue(asked >= 0 && send > asked, $"{poller}: the status is asked for a captured profile id, and judged against it");
+            var (condition, block) = GuardOf(body, "ChannelHealth.Judge(www.responseCode, response, askedProfileId) == ChannelHealthVerdict.Authorized",
+                $"{poller}: the advance's verdict");
+            StringAssert.Contains("authorized = true;", block, $"{poller}: the loop ends only under the echo-checked verdict");
+            StringAssert.Contains($"askedProfileId == {field}", condition, $"{poller}: the answer is about the profile still being paired");
+            Assert.IsFalse(Regex.IsMatch(body, @"TryGetAuthorized\("),
+                $"{poller}: the bare parser must not decide the advance (a crossed authorized:true would start the trial clock, the claim and a Create)");
+            Assert.AreEqual(1, Regex.Matches(body, @"authorized = true;").Count, $"{poller}: one advance site, the guarded one");
+        }
+    }
+
     [Test]
     public void The_card_repaints_on_a_change_and_wears_the_copy()
     {
