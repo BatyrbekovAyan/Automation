@@ -13,18 +13,24 @@ generator edit fails:
       continue), Live Rows reads the LIVE rows (no write) and fails the run on a database fault;
   (3) Diff Channel State carries the sweeps' rules: a base only on HTTP 200 + status done + a list (null = empty), the
       empty-list floor, the boolean-only flag, the proportional cap max(2, 50%) on DOWN transitions, and the transitions
-      themselves (DOWN owes a notice, UP resets it, a first sighting is recorded without one, an owed notice retried);
-  (4) Upsert Snapshot is ONE statement that writes only channel_snapshot (the states, the rows without a live
-      bot_profiles row deleted) and hands back the notices owed; it fails the run on a database fault;
+      themselves (DOWN owes a notice, UP resets it, a first sighting is recorded without one, an owed notice retried only
+      while the attempts counted are below the Handoff Notifier's MAX_NOTIFY_ATTEMPTS); it names the profiles THIS run's
+      lists prove authorised (`reachable` — a valid, uncapped base, listed, the boolean true) and nothing else;
+  (4) Upsert Snapshot is ONE statement that writes only channel_snapshot (the states, the notice attempts — counted before
+      the send, never past the cap —, the rows without a live bot_profiles row deleted) and hands back ONLY the notices it
+      counted; it fails the run on a database fault;
   (5) nothing is sent without passing every gate: Down Alerts? (a positive field of Upsert Snapshot's row), Has Other
       Channel? (a different profile than the down one), Skip? false — Send Notice is unreachable with any of those cut;
       Record Notified only after Notice Sent? true;
-  (6) the notice goes through ANOTHER live, authorised channel of the SAME install, never the down one: Pick Other
-      Channel's statement, Owner Phone and Send Notice address the OTHER profile; Compose Notice embeds
-      build-handoff-workflows.OWNER_PHONE_JS verbatim (the A5 rule, one text), requires the other channel to say it is
-      authorised and to echo its own profile id, and its text names only the channel (no client text, no client number);
+  (6) the notice goes through ANOTHER live channel of the SAME install that THIS run's list proves authorised (Diff's
+      reachable ids — never the recorded snapshot), never the down one: Pick Other Channel's statement, Owner Phone and
+      Send Notice address the OTHER profile; Compose Notice embeds build-handoff-workflows.OWNER_PHONE_JS verbatim (the A5
+      rule, one text), requires the other channel to say it is authorised and to echo its own profile id, and sends
+      build-channel-watch.NOTICE_TEXT — checked here against this file's own copy of the FULL text (no client text, no
+      client number);
   (7) crChannelWatch001 is a protected infra id (build-client-webhooks.PROTECTED_IDS + Set Workflow State's list);
-  (8) the migration sql/2026-10-14-channel-snapshot.sql defines the table the statements use, RLS on, client roles revoked.
+  (8) the migration sql/2026-10-14-channel-snapshot.sql defines the table the statements use (notify_attempts included,
+      added idempotently to a cluster that applied the first draft), RLS on, client roles revoked.
 
 MUTATIONS is the tripwire's own list; a normal run applies each one to a copy of a PASSING workflow and fails if the checks
 accept it. The test file runs the behavioural ones through the Diff / the graph as well (a tripwire nothing can see is
@@ -58,6 +64,13 @@ MIGRATION = os.path.join(HERE, "sql", "2026-10-14-channel-snapshot.sql")
 EXPECTED = ("Every 10 Minutes", "List WA Profiles", "List TG Profiles", "Live Rows", "Diff Channel State", "Upsert Snapshot",
             "Down Alerts?", "Pick Other Channel", "Has Other Channel?", "Owner Phone", "Compose Notice", "Skip?", "Send Notice",
             "Settle Notice", "Notice Sent?", "Record Notified")
+# (6) the A4 text — this file's OWN copy of the full text (the generator's NOTICE_TEXT must equal it; a change is deliberate)
+TEXTS = {"whatsapp": "Choose Reply: WhatsApp отключился — бот не отвечает. Переподключите канал в приложении.",
+         "telegram": "Choose Reply: Telegram отключился — бот не отвечает. Переподключите канал в приложении."}
+REACH_TERM = "and b.profile_id in (select jsonb_array_elements_text($4::jsonb))"
+REACH_PARAM = "$('Diff Channel State').first().json.reachable"
+COUNTED_BACK = ("where a.profile_id in (select up.profile_id from up where up.notify_attempts = 1)\n"
+                "   or a.profile_id in (select retry.profile_id from retry);")
 CHAIN = (("Every 10 Minutes", 0, "List WA Profiles"), ("List WA Profiles", 0, "List TG Profiles"), ("List TG Profiles", 0, "Live Rows"),
          ("Live Rows", 0, "Diff Channel State"), ("Diff Channel State", 0, "Upsert Snapshot"), ("Upsert Snapshot", 0, "Down Alerts?"),
          ("Down Alerts?", 0, "Pick Other Channel"), ("Pick Other Channel", 0, "Has Other Channel?"), ("Has Other Channel?", 0, "Owner Phone"),
@@ -77,8 +90,10 @@ DIFF_RULES = {
     "DOWN owes a notice": "} else if (prev === true && cur === false) {",
     "UP resets the debt": "} else if (prev === false && cur === true) {",
     "an owed notice is retried": "} else if (prev === false && cur === false && r.prev_notified !== true) {",
-    "an owed notice is retried only within the Notifier's attempts": "const young = typeof r.prev_age_s === 'number' && r.prev_age_s >= 0 && r.prev_age_s < OWED_RETRY_S;",
-    "past the retry window an owed notice is given up": "planned.push(young ? { kind: 'owed', alert: alert } : { kind: 'gaveUp' });",
+    "an owed notice is retried only while attempts remain": "const left = typeof r.prev_attempts === 'number' && r.prev_attempts >= 0 && r.prev_attempts < MAX_ATTEMPTS;",
+    "past the attempts an owed notice is given up": "planned.push(left ? { kind: 'owed', alert: alert } : { kind: 'gaveUp' });",
+    "only a channel this run's list shows authorised is reachable": "    const cur = p.authorized;\n    if (cur === true) reach.push(r.profile_id);\n",
+    "the reachable ids go to Pick Other Channel": "reachable: JSON.stringify(reachable), stats: stats } }];",
     "a first sighting is recorded without a notice": "planned.push({ kind: 'fresh', write: { profile_id: r.profile_id, channel: ch, authorized: cur, settled: cur === false } });",
     "only an owner can be notified": "const alert = owner ? { profile_id: r.profile_id, channel: ch, owner_id: owner } : null;",
     "an unproven live read writes nothing": "if (!rowsProven) {",
@@ -179,10 +194,13 @@ def check(wf, set_state, migration_sql):
         need(fragment in djs, f"Diff Channel State lost a rule: {label}")
     need(f"const CAP_FLOOR = {B.CAP_FLOOR};" in djs and f"const CAP_SHARE = {B.CAP_SHARE};" in djs and B.CAP_FLOOR == 2 and B.CAP_SHARE == 0.5,
          "the cap must be max(2, 50%) — the liveness branch's numbers")
-    need(f"const OWED_RETRY_S = {B.OWED_RETRY_SECONDS};" in djs and B.OWED_RETRY_SECONDS == HW.MAX_NOTIFY_ATTEMPTS * B.PERIOD_MINUTES * 60
-         and B.PERIOD_MINUTES * 60 == 600 and "floor(extract(epoch from now() - s.seen_at))::int as prev_age_s" in lq,
-         "an owed notice is retried at most the Handoff Notifier's attempts (MAX_NOTIFY_ATTEMPTS × the 10-minute period, by the "
-         "recorded DOWN's age from Live Rows) — never every 10 minutes for the whole outage")
+    need(f"const MAX_ATTEMPTS = {HW.MAX_NOTIFY_ATTEMPTS};" in djs and B.MAX_ATTEMPTS == HW.MAX_NOTIFY_ATTEMPTS
+         and "coalesce(s.notify_attempts, 0) as prev_attempts" in lq and "seen_at" not in re.sub(r"--[^\n]*", "", lq),
+         "an owed notice is retried at most the Handoff Notifier's attempts (MAX_NOTIFY_ATTEMPTS, COUNTED in the snapshot and "
+         "read by Live Rows as prev_attempts — never a clock) — never every 10 minutes for the whole outage")
+    cap_at, push_at = djs.find("if (downs > bs.cap) {"), djs.find("for (const id of reach) reachable.push(id);")
+    need(0 <= cap_at < push_at and djs.count("reachable.push(") == 1 and djs.count("reach.push(") == 1,
+         "a capped or invalid base routes nothing: Diff Channel State may hand its reachable ids on only after the cap passed")
     need("$('List WA Profiles').first().json" in djs and "$('List TG Profiles').first().json" in djs,
          "Diff Channel State must judge both lists")
 
@@ -196,6 +214,14 @@ def check(wf, set_state, migration_sql):
     need(written == {"channel_snapshot"}, f"Upsert Snapshot may write channel_snapshot ONLY: {sorted(written)}")
     need("not exists (select 1 from bot_profiles b where b.profile_id = s.profile_id and b.deleted_at is null)" in uq,
          "Upsert Snapshot must delete the snapshot rows of profiles without a live bot_profiles row")
+    need("notify_attempts = excluded.notify_attempts" in uq
+         and "case when not w.authorized and not w.settled and exists (select 1 from a where a.profile_id = w.profile_id) then 1 else 0 end" in uq
+         and f"and not s.authorized and s.notified_at is null and s.notify_attempts < {HW.MAX_NOTIFY_ATTEMPTS}" in uq
+         and "update channel_snapshot s set notify_attempts = s.notify_attempts + 1" in uq,
+         "Upsert Snapshot must COUNT the attempts — a DOWN handed on is attempt 1, an owed notice one more only while fewer "
+         "than the Handoff Notifier's MAX_NOTIFY_ATTEMPTS were made (a row still down and untold); an UP / a first sighting resets")
+    need(uq.rstrip().endswith(COUNTED_BACK),
+         "Upsert Snapshot must hand back ONLY the notices it counted — never an owed alert past the attempts")
     need("onError" not in up and up.get("alwaysOutputData") is True,
          f"Upsert Snapshot must fail the run on a database fault — no notice without its snapshot: onError={up.get('onError')}")
     need(condition(wf, "Down Alerts?") == B.DOWN_ALERT_EXPR and "$json.alert === true" in (condition(wf, "Down Alerts?") or ""),
@@ -215,9 +241,13 @@ def check(wf, set_state, migration_sql):
     pq = (N["Pick Other Channel"].get("parameters") or {}).get("query") or ""
     need(pq == B.PICK_OTHER_SQL and (N["Pick Other Channel"].get("parameters") or {}).get("options", {}).get("queryReplacement") == B.PICK_OTHER_PARAMS,
          "Pick Other Channel is stale against build-channel-watch.py (re-run the generator)")
-    need("b.owner_id = $3::text" in pq and "b.profile_id <> $1::text" in pq and "join channel_snapshot s on s.profile_id = b.profile_id and s.authorized" in pq
+    need("b.owner_id = $3::text" in pq and "b.profile_id <> $1::text" in pq
          and "where b.deleted_at is null" in pq and "order by (b.channel = 'whatsapp') desc" in pq,
          "Pick Other Channel must pick ANOTHER live, authorised channel of the SAME owner (WhatsApp first) — never the down profile")
+    need(REACH_TERM in pq and "channel_snapshot" not in re.sub(r"--[^\n]*", "", pq)
+         and B.PICK_OTHER_PARAMS == "={{ [ $json.profile_id, $json.channel, $json.owner_id, " + REACH_PARAM + " ] }}",
+         "Pick Other Channel must route only through a channel THIS run's list proves authorised (Diff's reachable ids as its "
+         "fourth parameter) — never through the recorded snapshot, whose stale rows keep a vanished profile «authorised»")
     need(condition(wf, "Has Other Channel?") == B.HAS_OTHER_EXPR and "$json.other_profile_id !== $json.down_profile_id" in (condition(wf, "Has Other Channel?") or ""),
          f"Has Other Channel? must refuse a pick that names the down profile itself: {condition(wf, 'Has Other Channel?')!r}")
     op = N["Owner Phone"].get("parameters") or {}
@@ -232,9 +262,12 @@ def check(wf, set_state, migration_sql):
     need("else if (status.profile_id !== pick.other_profile_id) error = 'status_mismatch';" in cjs
          and "else if (status.authorized !== true) error = 'other_channel_unauthorized';" in cjs,
          "Compose Notice must require the other channel's get/status to echo its profile id and say authorised")
-    need("const text = 'Choose Reply: ' + what + ' отключился — бот не отвечает. Переподключите канал в приложении.';" in cjs
-         and all(t.startswith("Choose Reply: ") for t in B.NOTICE_TEXT.values()),
-         "Compose Notice must send the A4 text: «Choose Reply: {WhatsApp|Telegram} отключился — бот не отвечает. …»")
+    need(B.NOTICE_TEXT == TEXTS and f"const NOTICE_TEXT = {json.dumps(TEXTS, ensure_ascii=False)};" in cjs
+         and "const text = (pick.down_channel === 'whatsapp' || pick.down_channel === 'telegram') ? NOTICE_TEXT[pick.down_channel] : '';" in cjs
+         and "if (!text) error = 'unknown_down_channel';" in cjs and "recipient: phone, body: text } };" in cjs
+         and cjs.count("отключился") == len(TEXTS),
+         "Compose Notice must send the A4 text exactly — build-channel-watch.NOTICE_TEXT embedded once, equal to the full "
+         "«Choose Reply: {WhatsApp|Telegram} отключился — бот не отвечает. Переподключите канал в приложении.», no inline copy")
     need(not re.search(r"\b(chat_id|chatId|client|recipient_name|summary|body\.)\b", re.sub(r"//[^\n]*", "", cjs).replace("reply.body", "")),
          "Compose Notice must carry no client data (spec §1, the A5 rule)")
     for name in ("Owner Phone", "Send Notice"):
@@ -263,11 +296,12 @@ def check(wf, set_state, migration_sql):
     need("create table if not exists public.channel_snapshot (" in m and re.search(r"profile_id\s+text primary key", m)
          and re.search(r"channel\s+text not null check \(channel in \('whatsapp', 'telegram'\)\)", m)
          and re.search(r"authorized\s+boolean not null", m) and re.search(r"seen_at\s+timestamptz not null default now\(\)", m)
-         and re.search(r"notified_at timestamptz\s", m)
+         and re.search(r"notified_at timestamptz,", m) and re.search(r"notify_attempts int not null default 0\s", m)
+         and "alter table public.channel_snapshot add column if not exists notify_attempts int not null default 0;" in m
          and "alter table public.channel_snapshot enable row level security;" in m
          and "revoke all on table public.channel_snapshot from anon, authenticated;" in m,
          "sql/2026-10-14-channel-snapshot.sql must create channel_snapshot (profile_id pk, channel, authorized, seen_at, "
-         "notified_at) with RLS on and the client roles revoked")
+         "notified_at, notify_attempts — the latter also added idempotently) with RLS on and the client roles revoked")
     return fails
 
 
@@ -321,9 +355,27 @@ MUTATIONS = (
     ("the empty-list floor removed", _js("Diff Channel State", "if (base.ok && base.profiles.length === 0 && live > 0) {",
                                          "if (false) {"), "Diff Channel State lost a rule: the empty-list floor"),
     ("the cap removed", _js("Diff Channel State", "if (downs > bs.cap) {", "if (false) {"), "Diff Channel State lost a rule: the cap skips the whole base"),
-    ("owed notices retried for the whole outage (the retry window removed)",
-     _js("Diff Channel State", "const young = typeof r.prev_age_s === 'number' && r.prev_age_s >= 0 && r.prev_age_s < OWED_RETRY_S;",
-         "const young = true;"), "Diff Channel State lost a rule: an owed notice is retried only within the Notifier's attempts"),
+    ("owed notices retried for the whole outage (the attempts cap removed from the Diff)",
+     _js("Diff Channel State", "const left = typeof r.prev_attempts === 'number' && r.prev_attempts >= 0 && r.prev_attempts < MAX_ATTEMPTS;",
+         "const left = true;"), "Diff Channel State lost a rule: an owed notice is retried only while attempts remain"),
+    ("a seventh attempt counted (the attempts cap removed from the statement)",
+     _query("Upsert Snapshot", f"and s.notify_attempts < {HW.MAX_NOTIFY_ATTEMPTS}", "and true"), "Upsert Snapshot must COUNT the attempts"),
+    ("every owed alert handed back, counted or not (the attempts bypassed)",
+     _query("Upsert Snapshot", COUNTED_BACK, "where true;"), "Upsert Snapshot must hand back ONLY the notices it counted"),
+    ("the route through the recorded snapshot (Pick without this run's list)",
+     _query("Pick Other Channel", "\n  " + REACH_TERM, "\n  and b.profile_id in (select profile_id from channel_snapshot where authorized)"),
+     "Pick Other Channel must route only through a channel THIS run's list proves authorised"),
+    ("a channel this run's list shows down offered as a route (reachable without the boolean true)",
+     _js("Diff Channel State", "if (cur === true) reach.push(r.profile_id);", "reach.push(r.profile_id);"),
+     "Diff Channel State lost a rule: only a channel this run's list shows authorised is reachable"),
+    ("a capped base still routes (reachable handed on before the cap)",
+     _js("Diff Channel State", "  if (downs > bs.cap) {", "  for (const id of reach) reachable.push(id);\n  if (downs > bs.cap) {"),
+     "a capped or invalid base routes nothing"),
+    ("the notice text inlined (NOTICE_TEXT bypassed)",
+     _js("Compose Notice", "? NOTICE_TEXT[pick.down_channel] : '';", "? 'Choose Reply: ' + pick.down_channel + ' отключился' : '';"),
+     "Compose Notice must send the A4 text exactly"),
+    ("the notice text altered (a prefix check would pass it)",
+     _js("Compose Notice", "WhatsApp отключился — бот не отвечает.", "WhatsApp отключился."), "Compose Notice must send the A4 text exactly"),
     ("the ambiguity rule removed (a non-boolean flag read as down)",
      _js("Diff Channel State", "if (typeof p.authorized !== 'boolean') {", "if (false) {"), "Diff Channel State lost a rule: the boolean-only flag"),
     ("a base trusted without status done", _js("Diff Channel State", "if (!b || b.status !== 'done') return",
@@ -392,7 +444,8 @@ def main():
         print(f"CHANNEL WATCH FAILED: {len(fails)} check(s)")
         sys.exit(1)
     print(f"OK  {B.WF_FILE} (every 10 min; the sweeps' floor / cap / boolean-only rules; a notice only for a recorded DOWN, "
-          f"through ANOTHER authorised channel of the same install, the A5 owner-number rule, delivered-only stamp; protected; "
+          f"at most {HW.MAX_NOTIFY_ATTEMPTS} counted attempts, through ANOTHER channel of the same install that THIS run's list "
+          f"shows authorised, the A5 owner-number rule, the full A4 text, delivered-only stamp; protected; "
           f"tripwire self-check: {len(MUTATIONS)} mutations rejected)")
     print("ALL CHANNEL WATCH ASSERTS PASSED")
 

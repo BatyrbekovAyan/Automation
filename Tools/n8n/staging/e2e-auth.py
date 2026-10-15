@@ -2124,6 +2124,11 @@ def snap(*pids):
                   f"where profile_id = '{p}'), '-');") for p in pids}
 
 
+def attempts(pid):
+    """channel_snapshot.notify_attempts of this profile as text ('-' = no row)."""
+    return pg(f"select coalesce((select notify_attempts::text from channel_snapshot where profile_id = '{pid}'), '-');")
+
+
 def drop_snap(*pids):
     if pids:
         pg(f"delete from channel_snapshot where profile_id in ({', '.join(repr(p) for p in pids)});")
@@ -2184,33 +2189,69 @@ def s_watch_down(ctx):
     return ok, f"run 1 notices={n1} snap={s1}; WA down → notices={n2} (want {want}) snap={s2}; again → {n3} snap={s3}; WA back → {n4} snap={s4}"
 
 
-@scenario("channel_down_single_channel_only_marks", "A4: an owner with ONE channel (WhatsApp) that logs out → the snapshot records it down and the notice stays owed (notified_at null), but NOTHING is sent — there is no other channel to send through (the app marks it); the next run retries (still nothing to send); once the recorded DOWN is older than the retry window (the Handoff Notifier's six attempts ≈ an hour) the watch gives up on it")
+@scenario("channel_down_single_channel_only_marks", "A4: an owner with ONE channel (WhatsApp) that logs out → the snapshot records it down and the notice stays owed (notified_at null), but NOTHING is sent — there is no other channel to send through (the app marks it); every run that hands the notice on COUNTS an attempt in the snapshot (fix round 2: a counter, not a clock) — the DOWN run is attempt 1, a retry attempt 2, …, the sixth is the last; after it the watch gives up (no pick, the count stays at six)")
 def s_watch_single(ctx):
     o, p = watch_owner(ctx, "cw2", channels=("whatsapp",))
     wa = p["whatsapp"]
     try:
         with WatchProbe(ctx, "cw2") as w:
             _, n1 = w.run()
-            s1 = snap(wa)
+            s1, t1 = snap(wa), attempts(wa)
             mock_profile(wa, authorized=False)
             ex2, n2 = w.run()
-            s2 = snap(wa)
+            s2, t2 = snap(wa), attempts(wa)
             ex3, n3 = w.run()
-            s3 = snap(wa)
-            pg(f"update channel_snapshot set seen_at = now() - interval '2 hours' where profile_id = '{wa}';")
+            s3, t3 = snap(wa), attempts(wa)
+            pg(f"update channel_snapshot set notify_attempts = 5 where profile_id = '{wa}';")   # attempts 3-5, as runs 4-6 count them
             ex4, n4 = w.run()
+            t4 = attempts(wa)
+            ex5, n5 = w.run()
+            s5, t5 = snap(wa), attempts(wa)
     finally:
         drop_snap(wa)
     picked = node_items(ex2, "Pick Other Channel")
     base = lambda ex: (((node_items(ex, "Diff Channel State") or [{}])[0].get("stats") or {}).get("bases") or {}).get("whatsapp") or {}
-    b2, b3, b4 = base(ex2), base(ex3), base(ex4)
-    ok = (n1 == [] and s1 == {wa: "true|false"} and n2 == [] and s2 == {wa: "false|false"} and n3 == [] and s3 == s2
-          and "Down Alerts?" in ran_nodes(ex2) and "Send Notice" not in ran_nodes(ex2)
-          and b2.get("down") == 1 and b3.get("owed") == 1 and "Pick Other Channel" in ran_nodes(ex3)
-          and n4 == [] and b4.get("gaveUp") == 1 and b4.get("owed") == 0 and "Pick Other Channel" not in ran_nodes(ex4))
-    return ok, (f"run 1 snap={s1}; WA down → notices={n2} snap={s2} pick={picked} down={b2.get('down')}; again → {n3} snap={s3} "
-                f"owed={b3.get('owed')}; DOWN aged 2 h → notices={n4} gaveUp={b4.get('gaveUp')} owed={b4.get('owed')} "
-                f"picked={'Pick Other Channel' in ran_nodes(ex4)}")
+    b2, b3, b4, b5 = base(ex2), base(ex3), base(ex4), base(ex5)
+    ok = (n1 == [] and s1 == {wa: "true|false"} and t1 == "0" and n2 == [] and s2 == {wa: "false|false"} and t2 == "1"
+          and "Down Alerts?" in ran_nodes(ex2) and "Send Notice" not in ran_nodes(ex2) and b2.get("down") == 1
+          and n3 == [] and s3 == s2 and t3 == "2" and b3.get("owed") == 1 and "Pick Other Channel" in ran_nodes(ex3)
+          and n4 == [] and t4 == "6" and b4.get("owed") == 1 and "Pick Other Channel" in ran_nodes(ex4)
+          and n5 == [] and s5 == s2 and t5 == "6" and b5.get("gaveUp") == 1 and b5.get("owed") == 0 and "Pick Other Channel" not in ran_nodes(ex5))
+    return ok, (f"run 1 snap={s1} attempts={t1}; WA down → notices={n2} snap={s2} attempts={t2} pick={picked} down={b2.get('down')}; "
+                f"again → {n3} attempts={t3} owed={b3.get('owed')}; from 5 → {n4} attempts={t4} owed={b4.get('owed')}; "
+                f"after the sixth → {n5} attempts={t5} gaveUp={b5.get('gaveUp')} owed={b5.get('owed')} picked={'Pick Other Channel' in ran_nodes(ex5)}")
+
+
+@scenario("channel_down_skips_vanished_route", "A4 fix round 2: an owner with two WhatsApp profiles and a Telegram, all recorded authorised; the SECOND WhatsApp (newer — Pick's first choice by order) vanishes from Wappi's list, its snapshot still saying authorised (the watch never touches a profile Wappi does not list), and the first logs out → the ONE notice goes from the owner's Telegram, never from the vanished WhatsApp: Pick takes only what THIS run listed authorised. Then, with the Telegram gone from the list too, a later logout finds no route: nothing is sent, no status asked, the attempt is counted")
+def s_watch_vanished(ctx):
+    o, p = watch_owner(ctx, "cw5")
+    wa, tg = p["whatsapp"], p["telegram"]
+    wa2 = o.add_profile("whatsapp")
+    mock_profile(wa2, authorized=True, phone="77010005555")
+    try:
+        with WatchProbe(ctx, "cw5") as w:
+            _, n1 = w.run()
+            s1 = snap(wa, wa2, tg)
+            mock_profile(wa2, listed=False)                  # gone from Wappi's list; get/status would still answer
+            mock_profile(wa, authorized=False)
+            ex2, n2 = w.run()
+            s2 = snap(wa, wa2, tg)
+            mock_profile(wa, authorized=True)
+            _, n3 = w.run()
+            mock_profile(tg, listed=False)                   # now nothing but the vanished WhatsApp could carry a notice
+            mock_profile(wa, authorized=False)
+            ex4, n4 = w.run()
+            s4, t4 = snap(wa, wa2, tg), attempts(wa)
+    finally:
+        drop_snap(wa, wa2, tg)
+    reach2 = json.loads(((node_items(ex2, "Diff Channel State") or [{}])[0]).get("reachable") or "[]")
+    want = [(tg, "/tapi/sync/message/send", account_digits(tg), WATCH_TEXT["whatsapp"])]
+    ok = (n1 == [] and s1 == {wa: "true|false", wa2: "true|false", tg: "true|false"} and n2 == want and s2[wa] == "false|true"
+          and s2[wa2] == "true|false" and wa2 not in reach2 and tg in reach2 and n3 == []
+          and n4 == [] and s4[wa] == "false|false" and t4 == "1" and "Pick Other Channel" in ran_nodes(ex4) and "Owner Phone" not in ran_nodes(ex4))
+    return ok, (f"run 1 snap={s1}; WA2 vanished + WA down → notices={n2} (want {want}) snap={s2} wa2 reachable={wa2 in reach2}; "
+                f"WA back → {n3}; TG vanished too + WA down → notices={n4} snap={s4} attempts={t4} "
+                f"status asked={'Owner Phone' in ran_nodes(ex4)}")
 
 
 @scenario("channel_recovery_updates_snapshot_without_notice", "A4: a profile first seen ALREADY down (a wizard mid-pairing) is recorded without a notice (nothing owed); its pairing (false → true) updates the snapshot and sends nothing; only a later logout (true → false) owes and sends ONE notice — through the owner's other channel")

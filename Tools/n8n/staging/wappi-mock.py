@@ -36,12 +36,13 @@ Control routes (never exist on the real transport):
                            the echo row the send appends — e.g. {"id": "<owner row id>"} or {"from_where": ""};
                            mode "body" (A4) answers `body` with `status` (default 200) instead of the transport's answer —
                            e.g. an EMPTY profile list {"status": "done", "profiles": null} for the channel watch's floor
-    POST /__mock/profile   {profile_id, authorized, phone, authorized_at, account_phone, channel, deleted_at}   status fields
-                           for get/status AND the profile's entry in profile/all/get — flip `authorized` to take a channel
-                           down / bring it back (A4 channel watch). (account_phone: tapi only — the authorised account,
-                           returned as account.phone.) profile/all/get lists a profile on its own base only once its
-                           `channel` is known (profile/add records it); one without a channel is listed on both; an empty
-                           list is `profiles: null`, as Wappi answers it
+    POST /__mock/profile   {profile_id, authorized, phone, authorized_at, account_phone, channel, deleted_at, listed}   status
+                           fields for get/status AND the profile's entry in profile/all/get — flip `authorized` to take a
+                           channel down / bring it back (A4 channel watch). (account_phone: tapi only — the authorised
+                           account, returned as account.phone.) profile/all/get lists a profile on its own base only once its
+                           `channel` is known (profile/add records it); one without a channel is listed on both; `listed:
+                           false` drops it from profile/all/get while get/status still answers (A4 fix round 2: a profile Wappi
+                           no longer lists); an empty list is `profiles: null`, as Wappi answers it
     POST /__mock/rc_aliases {customer_id, aliases:[ids] | null, status?, body?}   the RevenueCat customer the mock knows
                            (A3 identity-heal): derive-staging.py rewrites https://api.revenuecat.com/ to <mock>/revenuecat/,
                            and GET /revenuecat/v2/projects/<p>/customers/<id>/aliases answers like RevenueCat v2 (fact-check
@@ -259,7 +260,8 @@ class Handler(BaseHTTPRequestHandler):
                 STATE["profiles"][new] = {"channel": channel, "authorized": False}
                 return 200, {"status": "done", "profile_id": new}
             if tail == "profile/all/get":
-                listed = [dict(profile_id=k, **v) for k, v in STATE["profiles"].items() if v.get("channel") in (None, channel)]
+                listed = [dict(profile_id=k, **v) for k, v in STATE["profiles"].items()
+                          if v.get("channel") in (None, channel) and v.get("listed", True) is not False]
                 return 200, {"status": "done", "profiles": listed or None}   # Wappi answers null for an empty list
             if tail == "webhook/url/get":
                 return 200, {"status": "done", "url": ""}
