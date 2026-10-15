@@ -1881,7 +1881,21 @@ def heal_fixture(ctx, tag):
 def heal_cleanup(u, old, *pids):
     rc_aliases(u, None)
     pg("delete from bot_profiles where profile_id in (" + ", ".join(f"'{x}'" for x in pids) + f"); "
-       f"delete from subscribers where app_user_id = '{old}'; delete from dialog_counts where app_user_id = '{old}';")
+       f"delete from subscribers where app_user_id = '{old}'; delete from dialog_counts where app_user_id = '{old}'; "
+       f"delete from identity_heal_log where to_app_user_id = '{u}';")
+
+
+def heal_journal(u, want=None, wait=10.0):
+    """identity_heal_log rows for the recipient u (fix round 2): «install|aliases|consolidated|rekeyed|outcome» in write order.
+    A refusal row is written AFTER the answer (Log Refusal) — with `want`, poll until it is there (or the wait ends)."""
+    q = (f"select coalesce(string_agg(install_id || '|' || array_to_string(aliases, ',') || '|' || consolidated || '|' || rekeyed "
+         f"|| '|' || coalesce(reason, 'healed'), ';' order by id), '') from identity_heal_log where to_app_user_id = '{u}';")
+    deadline = time.time() + wait
+    got = pg(q)
+    while want is not None and got != want and time.time() < deadline:
+        time.sleep(0.5)
+        got = pg(q)
+    return got
 
 
 def heal_row(uid):
@@ -1897,7 +1911,7 @@ def heal_versions(u, old, *pids):
               f"union all select 'd', app_user_id || chat_id, xmin::text from dialog_counts where app_user_id in ('{u}', '{old}')) x;")
 
 
-@scenario("identity_heal_consolidates_into_token_id", "A3: after a reinstall the app calls VerifyIdentity; RevenueCat (the mock: v2 aliases of the TOKEN's id, asked with the «RevenueCat API» credential) lists [old, u] → the old id's paid month (business/active/its period/SKU, 500 of balance, this month's dialogs) moves INTO the token's id and the old id is retired; this install's live bot_profiles row under the old id follows u, another install's stays; a repeat changes nothing (row versions)")
+@scenario("identity_heal_consolidates_into_token_id", "A3: after a reinstall the app calls VerifyIdentity; RevenueCat (the mock: v2 aliases of the TOKEN's id, asked with the «RevenueCat API» credential) lists [old, u] → the old id's paid month (business/active/its period/SKU, 500 of balance, this month's dialogs) moves INTO the token's id and the old id is retired; this install's live bot_profiles row under the old id follows u, another install's stays; a repeat changes nothing (row versions); each healed verdict leaves ONE identity_heal_log row, written by the Heal statement itself (fix round 2)")
 def s_identity_heal(ctx):
     o, old, mine, other, period = heal_fixture(ctx, "a3h")
     u = o.app_user_id
@@ -1912,8 +1926,11 @@ def s_identity_heal(ctx):
         keyed = pg(f"select string_agg(profile_id || '=' || app_user_id, ',' order by profile_id) from bot_profiles where profile_id in ('{mine}', '{other}');")
         used = pg(f"select count(*) from dialog_counts where app_user_id = '{u}' and date_trunc('month', d) = date_trunc('month', (now() at time zone 'Asia/Almaty')::date);")
         v1 = heal_versions(u, old, mine, other)
+        j1 = heal_journal(u)
         st2, d2 = hook("VerifyIdentity", o.token, body)
         v2 = heal_versions(u, old, mine, other)
+        j2 = heal_journal(u)
+        want_j = [f"{o.install_id}|{old}|1|1|healed", f"{o.install_id}|{old}|0|0|healed"]
         want_path = f"/revenuecat/v2/projects/{RC_PROJECT}/customers/{urllib.parse.quote(u, safe='')}/aliases"
         want_keyed = ",".join(sorted([f"{mine}={u}", f"{other}={old}"]))
         ok = (st == 200 and d == {"success": True, "aliases": 1, "consolidated": 1, "rekeyed": 1, "truncated": False}
@@ -1921,8 +1938,11 @@ def s_identity_heal(ctx):
               and alias_after.split("|")[1:3] == ["expired", "0"] and keyed == want_keyed and used == "2"
               and len(calls) == 1 and calls[0]["method"] == "GET" and calls[0]["path"] == want_path
               and calls[0]["query"] == {"limit": "1000"} and calls[0]["auth_scheme"] == "Bearer"
-              and st2 == 200 and d2 == {"success": True, "aliases": 1, "consolidated": 0, "rekeyed": 0, "truncated": False} and v1 == v2)
-        return ok, (f"answer={st} {d} owner {before} → {after} (alias period {period}); alias → {alias_after}; bot_profiles {keyed} "
+              and st2 == 200 and d2 == {"success": True, "aliases": 1, "consolidated": 0, "rekeyed": 0, "truncated": False} and v1 == v2
+              # fix round 2: support sees every heal — one journal row per healed verdict, written by the Heal statement itself
+              and j1 == want_j[0] and j2 == ";".join(want_j))
+        return ok, (f"journal after the heal={j1!r} after the repeat={j2!r} (want {';'.join(want_j)!r}); "
+                    f"answer={st} {d} owner {before} → {after} (alias period {period}); alias → {alias_after}; bot_profiles {keyed} "
                     f"(want {want_keyed}); this month's dialogs on u={used}; RevenueCat calls={[(c['method'], c['path'], c['query'], c['auth_scheme']) for c in calls]} "
                     f"(want {want_path}); repeat={st2} {d2} row versions unchanged={v1 == v2}")
     finally:
@@ -1945,16 +1965,18 @@ def s_identity_heal_auth(ctx):
         st3, d3 = hook("VerifyIdentity", o.token, {"appUserId": old, "originalAppUserId": u})
         calls, _ = mock_calls(since, "/revenuecat/")
         v1 = heal_versions(u, old, mine, other)
+        time.sleep(1)                                                 # a refusal row would be written after the answer
+        journal = heal_journal(u)
         ok = (st0 == 401 and (d0 or {}).get("success") is False and st1 == 401 and st2 == 403
               and str((d2 or {}).get("reason", "")).startswith("forbidden:appUserId") and st3 == 403 and calls == [] and v0 == v1
-              and x.refresh().get("billingConflict") is True)
+              and x.refresh().get("billingConflict") is True and journal == "")
         return ok, (f"no token={st0} {d0} forged={st1} no-billing-id token={st2} {d2} foreign recipient={st3} {d3} "
-                    f"RevenueCat calls={len(calls)} row versions unchanged={v0 == v1}")
+                    f"RevenueCat calls={len(calls)} row versions unchanged={v0 == v1} journal={journal!r} (want none)")
     finally:
         heal_cleanup(u, old, mine, other)
 
 
-@scenario("identity_heal_ignores_foreign_hint", "A3: a hint RevenueCat does NOT list for the token's id → 200 {success:false, reason:hint_not_alias} and NOTHING written — although RevenueCat lists a real alias; a RevenueCat error (500) → 502 rc_unavailable, nothing written")
+@scenario("identity_heal_ignores_foreign_hint", "A3: a hint RevenueCat does NOT list for the token's id → 409 {success:false, reason:hint_not_alias} and nothing written to subscribers / bot_profiles — although RevenueCat lists a real alias — but ONE identity_heal_log row for support (after the answer); a RevenueCat error (500) → 502 rc_unavailable, nothing written, no journal row")
 def s_identity_heal_foreign(ctx):
     o, old, mine, other, _ = heal_fixture(ctx, "a3f")
     u = o.app_user_id
@@ -1964,14 +1986,21 @@ def s_identity_heal_foreign(ctx):
         v0 = heal_versions(u, old, mine, other)
         since = mock_total()
         st, d = hook("VerifyIdentity", o.token, {"appUserId": u, "originalAppUserId": foreign})
+        want_j = f"{o.install_id}|{old}|0|0|hint_not_alias"
+        j1 = heal_journal(u, want=want_j)                              # Log Refusal writes it after the answer
         rc_aliases(u, None, status=500)
         st2, d2 = hook("VerifyIdentity", o.token, {"appUserId": u, "originalAppUserId": old})
         calls, _ = mock_calls(since, "/revenuecat/")
         v1 = heal_versions(u, old, mine, other)
-        ok = (st == 200 and d == {"success": False, "reason": "hint_not_alias"} and st2 == 502 and d2 == {"success": False, "reason": "rc_unavailable"}
-              and len(calls) == 2 and [c["status"] for c in calls] == [200, 500] and v0 == v1 and heal_row(u) == "trial|trialing|0|-|-")
+        time.sleep(1)
+        j2 = heal_journal(u)
+        ok = (st == 409 and d == {"success": False, "reason": "hint_not_alias"} and st2 == 502 and d2 == {"success": False, "reason": "rc_unavailable"}
+              and len(calls) == 2 and [c["status"] for c in calls] == [200, 500] and v0 == v1 and heal_row(u) == "trial|trialing|0|-|-"
+              # fix round 2: the refusal RevenueCat's list decided is journaled for support (after the answer); the outage is not
+              and j1 == want_j and j2 == want_j)
         return ok, (f"foreign hint={st} {d} RevenueCat 500={st2} {d2} RevenueCat calls={[(c['path'][-20:], c['status']) for c in calls]} "
-                    f"row versions unchanged={v0 == v1} owner={heal_row(u)}")
+                    f"row versions unchanged={v0 == v1} owner={heal_row(u)} journal after the refusal={j1!r} after the outage={j2!r} "
+                    f"(want {want_j!r})")
     finally:
         heal_cleanup(u, old, mine, other)
 

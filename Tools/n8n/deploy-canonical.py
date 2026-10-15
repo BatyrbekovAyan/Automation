@@ -122,7 +122,7 @@ def staging_canon(files):
         for n in x.get("nodes") or []:
             d.remap(n, creds, missing)
         text = json.dumps(x, ensure_ascii=False)
-        for forbidden in (d.CANON_HOST, d.WAPPI, "wappi.pro"):
+        for forbidden in d.FORBIDDEN_HOSTS:          # derive-staging.py's own list (n8n, Wappi, RevenueCat — A3 parity)
             if forbidden in text:
                 sys.exit(f"REFUSED: {os.path.basename(path)} still references {forbidden} after the staging derivation")
         if d.supabase_writers_left(x):

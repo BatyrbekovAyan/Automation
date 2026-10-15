@@ -31,6 +31,11 @@ session temp tables of the staging Postgres. No n8n server, no network, never pr
   H10 a recipient with its own paid plan keeps it (only the balance moves); several aliases → the latest active plan
   H11 the RevenueCat request: GET v2 aliases of the URL-encoded TOKEN id, limit 1000, the «RevenueCat API» credential,
       fullResponse + neverError, 10 s
+  J   fix round 2 (2026-10-15): the support journal identity_heal_log — a heal writes exactly ONE row INSIDE the Heal
+      statement (install, recipient, the aliases RevenueCat listed, retired / re-keyed counts; a repeat its own zero row);
+      a refusal RevenueCat's list decided (rc_mismatch / hint_not_alias / no_aliases, now 409) writes ONE row with its
+      reason AFTER the answer and still zero subscriber / bot rows; an outage (502), the gate (400/401/403) and a DB fault
+      (503) write none; a failing journal insert rolls the whole heal back (one transaction)
   V   verify-verify-identity.py passes the canon and fails each mutation with its specific message
 """
 import copy
@@ -64,8 +69,9 @@ FOREIGN = '$RCAnonymousID:' + '0f0f0f0f1e1e1e1e' * 2  # an id RevenueCat does NO
 INST, OTHER = 'inst-A3', 'inst-B3'
 PLUS30, PLUS10 = "now() + interval '30 days'", "now() + interval '10 days'"
 TODAY = "(now() at time zone 'Asia/Almaty')::date"
-TABLES = ('subscribers', 'dialog_counts', 'bot_profiles')
-SETUP = "set timezone = 'UTC';\n" + "\n".join(f"create temp table {t} (like public.{t} including all);" for t in TABLES)
+TABLES = ('subscribers', 'dialog_counts', 'bot_profiles')          # what a heal changes — «zero writes» is judged on these
+JOURNAL = 'identity_heal_log'                                       # the support trace (sql/2026-10-15-identity-heal-log.sql)
+SETUP = "set timezone = 'UTC';\n" + "\n".join(f"create temp table {t} (like public.{t} including all);" for t in TABLES + (JOURNAL,))
 
 WEBHOOK, CODE, IF, POSTGRES, RESPOND, HTTP = ('n8n-nodes-base.webhook', 'n8n-nodes-base.code', 'n8n-nodes-base.if',
                                               'n8n-nodes-base.postgres', 'n8n-nodes-base.respondToWebhook',
@@ -235,6 +241,12 @@ def versions(pg):
     return {t: pg.q(f"select xmin::text as ver, * from {t} order by 2, 3") for t in TABLES}
 
 
+def journal(pg):
+    """identity_heal_log in write order: (install, recipient, aliases, consolidated, rekeyed, reason)."""
+    return [(r['install_id'], r['to_app_user_id'], r['aliases'], r['consolidated'], r['rekeyed'], r['reason'])
+            for r in pg.q(f'select * from {JOURNAL} order by id')]
+
+
 def reinstall(pg):
     """The owner after a reinstall: the token's id U is Create's trial seed; the old id OLD holds the paid month (business,
     +30 days, SKU, 500 dialogs of balance, 3 dialogs this month); bot_profiles: two live rows of the token's install still
@@ -291,6 +303,7 @@ with Case('A3 H1 the reinstall heal: RevenueCat lists [OLD, U] → 200 {success,
         c.check(keyed(pg) == {'p-mine': U, 'p-mine-2': U, 'p-other-install': OLD, 'p-retired': OLD, 'p-legacy': OLD, 'p-new': U},
                 f'bot_profiles {keyed(pg)}')
         c.check(len(rc.calls) == 1, f'RevenueCat calls: {rc.calls}')
+        c.check(journal(pg) == [(INST, U, [OLD], 1, 2, None)], f'J: the heal must leave exactly ONE journal row: {journal(pg)}')
 
 with Case('A3 H2 a repeat is a no-op: the same call again → success, aliases 1, consolidated 0, rekeyed 0, and EVERY row '
           'version (subscribers, dialog_counts, bot_profiles) unchanged') as c:
@@ -304,6 +317,8 @@ with Case('A3 H2 a repeat is a no-op: the same call again → success, aliases 1
                                                                      'truncated': False}, f'repeat answered {st} {body}')
         c.check(versions(pg) == before, 'the repeat rewrote rows')
         c.check('Heal' in again.trail, f'the repeat must still run the statement (it is the idempotent part): {again.trail}')
+        c.check(journal(pg) == [(INST, U, [OLD], 1, 2, None), (INST, U, [OLD], 0, 0, None)],
+                f'J: one journal row per healed verdict — the repeat writes its own row with zeros: {journal(pg)}')
 
 
 # ---------------------------------------------------------------------------------------------------- H3: only into u
@@ -325,6 +340,7 @@ with Case('A3 H3 consolidation ONLY into the token\'s id: a body naming the old 
                     f'{label}: {st} {b}')
             c.check(rc.calls == [] and 'Heal' not in run.trail, f'{label}: went past the gate: {run.trail}')
         c.check(versions(pg) == before, 'a refused call wrote rows')
+        c.check(journal(pg) == [], f'J: a gate refusal writes no journal row: {journal(pg)}')
         rc = RC(alias_list(OLD, U))
         run = call(pg, mint(), {'appUserId': U, 'originalAppUserId': OLD, 'toAppUserId': OLD, 'installId': OTHER, 'fromIds': [U]}, rc)
         c.check(answer_of(run)[0] == 200 and sub(pg, U)['plan'] == 'business' and sub(pg, OLD)['status'] == 'expired'
@@ -341,25 +357,35 @@ REFUSALS = (
     ('RevenueCat timeout', RC(error='timeout of 10000ms exceeded'), HINTED, 502, 'rc_unavailable'),
     ('200 without a list', RC({'object': 'list'}), HINTED, 502, 'rc_unavailable'),
     ('200 with a non-JSON body', RC('<html>gateway</html>'), HINTED, 502, 'rc_unavailable'),
-    ('a list that does not name the token\'s id', RC(alias_list(OLD, OLD2)), HINTED, 200, 'rc_mismatch'),
-    ('an empty list', RC(alias_list()), HINTED, 200, 'rc_mismatch'),
+    ('a list that does not name the token\'s id', RC(alias_list(OLD, OLD2)), HINTED, 409, 'rc_mismatch'),
+    ('an empty list', RC(alias_list()), HINTED, 409, 'rc_mismatch'),
     # no hint (or the token's own id as the hint): RevenueCat's list alone decides — and it names no other id
-    ('only the token\'s own id, no hint', RC(alias_list(U)), {'appUserId': U}, 200, 'no_aliases'),
-    ('only the token\'s own id, hint = own id', RC(alias_list(U)), {'appUserId': U, 'originalAppUserId': U}, 200, 'no_aliases'),
+    ('only the token\'s own id, no hint', RC(alias_list(U)), {'appUserId': U}, 409, 'no_aliases'),
+    ('only the token\'s own id, hint = own id', RC(alias_list(U)), {'appUserId': U, 'originalAppUserId': U}, 409, 'no_aliases'),
     # a hint RevenueCat does not list wins over «no other id» (the more specific refusal)
-    ('only the token\'s own id, a hint', RC(alias_list(U)), HINTED, 200, 'hint_not_alias'),
+    ('only the token\'s own id, a hint', RC(alias_list(U)), HINTED, 409, 'hint_not_alias'),
 )
 
-with Case('A3 H4/H5 RevenueCat errors, no list, a list that does not describe the token\'s customer, no other id → '
-          '{success:false, reason} and ZERO writes (every row version unchanged); Heal never runs') as c:
+with Case('A3 H4/H5 RevenueCat errors (502), no list (502), a list that does not describe the token\'s customer (409), no '
+          'other id (409) → {success:false, reason} and ZERO subscriber / bot / dialog writes (every row version unchanged); '
+          'Heal never runs. J: a 409 refusal leaves ONE journal row (its reason, RevenueCat\'s ids minus the recipient, counts '
+          '0) after the answer; an outage leaves none') as c:
     with Session(SETUP) as pg:
         reinstall(pg)
         before = versions(pg)
         for label, rc, body, want_st, reason in REFUSALS:
+            logged = len(journal(pg))
             run = call(pg, mint(), body, rc)
             st, b = answer_of(run)
             c.check(st == want_st and b == {'success': False, 'reason': reason}, f'{label}: {st} {b} trail={run.trail} halt={run.halt}')
             c.check('Heal' not in run.trail and len(rc.calls) == 1, f'{label}: trail {run.trail}, RevenueCat calls {len(rc.calls)}')
+            rows = journal(pg)[logged:]
+            if want_st == 409:
+                listed = [i['id'] for i in (rc.body or {}).get('items', []) if i['id'] != U]
+                c.check(rows == [(INST, U, listed, 0, 0, reason)] and run.trail.index('Log Refusal') > run.trail.index('Respond Refused'),
+                        f'{label}: J: one refusal row after the answer: {rows} trail={run.trail}')
+            else:
+                c.check(rows == [] and 'Log Refusal' not in run.trail, f'{label}: J: an outage writes no journal row: {rows} {run.trail}')
         c.check(versions(pg) == before, 'a refused heal wrote rows')
 
 with Case('A3 H6 a hint RevenueCat does not list → hint_not_alias, ZERO writes — even though RevenueCat lists real aliases '
@@ -369,8 +395,9 @@ with Case('A3 H6 a hint RevenueCat does not list → hint_not_alias, ZERO writes
         before = versions(pg)
         rc = RC(alias_list(OLD, U))
         run = call(pg, mint(), {'appUserId': U, 'originalAppUserId': FOREIGN}, rc)
-        c.check(answer_of(run) == (200, {'success': False, 'reason': 'hint_not_alias'}), f'{answer_of(run)} {run.trail}')
+        c.check(answer_of(run) == (409, {'success': False, 'reason': 'hint_not_alias'}), f'{answer_of(run)} {run.trail}')
         c.check('Heal' not in run.trail and versions(pg) == before, f'a foreign hint wrote rows: {run.trail}')
+        c.check(journal(pg) == [(INST, U, [OLD], 0, 0, 'hint_not_alias')], f'J: the refusal is journaled for support: {journal(pg)}')
 
 with Case('A3 H7 a malformed hint → 400 before RevenueCat is asked (nothing written); a hint equal to the token\'s id is no '
           'hint (RevenueCat\'s list alone decides); no hint at all heals by RevenueCat\'s list') as c:
@@ -383,6 +410,7 @@ with Case('A3 H7 a malformed hint → 400 before RevenueCat is asked (nothing wr
             c.check(answer_of(run) == (400, {'success': False, 'error': 'bad_request'}) and rc.calls == [],
                     f'hint {bad!r}: {answer_of(run)} rc={len(rc.calls)}')
         c.check(versions(pg) == before, 'a malformed hint wrote rows')
+        c.check(journal(pg) == [], f'J: a 400 writes no journal row: {journal(pg)}')
         run = call(pg, mint(), {'appUserId': U, 'originalAppUserId': U}, RC(alias_list(OLD, U)))
         c.check(answer_of(run)[1].get('consolidated') == 1, f'a hint equal to the token\'s id must not block the heal: {answer_of(run)}')
     with Session(SETUP) as pg:
@@ -407,6 +435,7 @@ with Case('A3 H8 no token / a forged signature / an expired token → 401 before
             c.check(st == 401 and b.get('success') is False and b.get('error') == 'unauthorized', f'{label}: {st} {b}')
             c.check(rc.calls == [] and run.trail[-1] == 'Respond 401', f'{label}: {run.trail}')
         c.check(versions(pg) == before, 'an unauthenticated call wrote rows')
+        c.check(journal(pg) == [], f'J: a 401 writes no journal row: {journal(pg)}')
 
 
 # ---------------------------------------------------------------------------------------------------- H9: a DB fault
@@ -422,6 +451,17 @@ with Case('A3 H9 Heal fails in the database (a real constraint violation inside 
         run = call(pg, mint(), {'appUserId': U, 'originalAppUserId': OLD}, RC(alias_list(OLD, U)))
         c.check(answer_of(run) == (503, {'success': False, 'reason': 'db_unavailable'}), f'{answer_of(run)} {run.trail} {run.halt}')
         c.check('Heal' in run.trail and versions(pg) == before, 'the failed statement left partial writes')
+        c.check(journal(pg) == [], f'J: a heal that rolled back leaves no journal row: {journal(pg)}')
+
+with Case('A3 J5 the journal is part of the heal\'s transaction: when its insert fails, the WHOLE heal rolls back — 503, no '
+          'subscriber / bot / dialog row changed, no journal row (a heal without its trace cannot exist)') as c:
+    with Session(SETUP) as pg:
+        reinstall(pg)
+        before = versions(pg)
+        pg.x(f"alter table {JOURNAL} add constraint j5_fault check (consolidated < 0) not valid;")   # refuses every new row
+        run = call(pg, mint(), {'appUserId': U, 'originalAppUserId': OLD}, RC(alias_list(OLD, U)))
+        c.check(answer_of(run) == (503, {'success': False, 'reason': 'db_unavailable'}), f'{answer_of(run)} {run.trail} {run.halt}')
+        c.check(versions(pg) == before and journal(pg) == [], f'the heal went through without its journal row: {journal(pg)}')
 
 
 # ---------------------------------------------------------------------------------------------------- H10: A2 semantics
@@ -532,6 +572,27 @@ def m_rc_cred(w):
     nd(w, 'RC Aliases')['credentials'] = {'httpHeaderAuth': {'id': 'EuhhqAaV56DpoqAN', 'name': 'WappiAuthToken'}}
 
 
+def m_journal_removed(w):
+    p = nd(w, 'Heal')['parameters']
+    p['query'] = p['query'].replace(builder().HEAL_JOURNAL_CTE, '').replace(',\n       (select id from journal) as journal_id;', ';')
+
+
+def m_refused_200(w):
+    nd(w, 'Respond Refused')['parameters']['options']['responseCode'] = 200
+
+
+def m_log_refusal_reads_body(w):
+    o = nd(w, 'Log Refusal')['parameters']['options']
+    o['queryReplacement'] = o['queryReplacement'].replace("$('Auth Gate').first().json.crAuth.appUserId",
+                                                          "$('Webhook').first().json.body.appUserId")
+
+
+def m_log_before_answer(w):
+    w['connections']['Heal?']['main'][1] = [{'node': 'Log Refusal', 'type': 'main', 'index': 0}]
+    w['connections']['Log Refusal'] = {'main': [[{'node': 'Respond Refused', 'type': 'main', 'index': 0}]]}
+    w['connections']['Respond Refused'] = {'main': [[]]}
+
+
 def m_unprotected(w_state):
     v = next(x for x in w_state['nodes'] if x['name'] == 'Validate')['parameters']
     v['jsCode'] = v['jsCode'].replace(",\n  'crVerifyIdent001'", '')
@@ -554,6 +615,12 @@ MUTATIONS = (
     ('Aliases OK? disabled', m_disabled('Aliases OK?'), 'disabled'),
     ('hint not checked', m_hint_unchecked, 'hint'),
     ('RevenueCat call on another credential', m_rc_cred, 'RevenueCat API'),
+    # fix round 2 (2026-10-15): the support journal and the refusal status
+    ('journal CTE removed', m_journal_removed, 'journal'),
+    ('refusal answered 200', m_refused_200, '409'),
+    ('Log Refusal reads the body', m_log_refusal_reads_body, 'crAuth'),
+    ('Log Refusal disabled', m_disabled('Log Refusal'), 'disabled'),
+    ('refusal logged before the answer', m_log_before_answer, 'after the answer'),
 )
 
 with Case('A3 V0: verify-verify-identity.py passes the committed canon') as c:

@@ -20,7 +20,13 @@ recipient NOR its alias:
       the very alias merge RevenueCat Events runs — into the token's id, the token's install re-keying ITS live
       bot_profiles rows) → Shape Response (success only on Heal's positive row) → {success, aliases, consolidated, rekeyed}.
       Any refusal, an RevenueCat error, a missing list, a hint RevenueCat does not list → {success:false, reason} and
-      NOTHING is written (Heal is reachable only through Aliases OK? true and Heal? true).
+      NOTHING is written to subscribers / bot_profiles (Heal is reachable only through Aliases OK? true and Heal? true).
+      Fix round 2 (2026-10-15) — support must SEE every identity change (the V3 precedent, billing_conflicts):
+      identity_heal_log (sql/2026-10-15-identity-heal-log.sql) gets ONE row per heal from a CTE of the Heal statement
+      itself (one transaction with the consolidation; rendered AROUND billing_consolidation.py's text, which stays A2's),
+      and ONE row per refusal RevenueCat's list decided (rc_mismatch / hint_not_alias / no_aliases) from `Log Refusal`
+      AFTER the answer (best effort). Status codes let monitoring see refusals: those three answer 409, a RevenueCat
+      error 502, a database fault 503, a malformed request 400, the gate 401/403.
   0DP79STI3pafXO9B-Set_Workflow_State.json  crVerifyIdent001 joins the protected infra ids.
 
 Step 0 fact-check (2026-10-15, read-only, RevenueCat sandbox customers of Block 1's device pass): v2
@@ -118,10 +124,11 @@ const body = $input.first().json.body || {};
 const ids = [...new Set((Array.isArray(body.items) ? body.items : [])
   .map((x) => ((x && typeof x.id === 'string') ? x.id : ''))
   .filter((x) => x.length > 0 && x.length <= 128))];
-const refuse = (reason) => [{ json: { heal: false, reason } }];
+const from = ids.filter((x) => x !== u);
+// a refusal carries RevenueCat's ids minus the recipient for the support journal (Log Refusal, after the answer)
+const refuse = (reason) => [{ json: { heal: false, reason, fromIds: JSON.stringify(from) } }];
 if (!ids.includes(u)) return refuse('rc_mismatch');
 if (hint && !ids.includes(hint)) return refuse('hint_not_alias');
-const from = ids.filter((x) => x !== u);
 if (from.length === 0) return refuse('no_aliases');
 return [{ json: { heal: true, fromIds: JSON.stringify(from), aliases: from.length, truncated: !!body.next_page } }];
 """
@@ -149,17 +156,47 @@ HEAL_HEAD = """-- A3 «защита платящих» (2026-10-14): ЛЕЧЕН�
 -- план активного платного алиаса может переехать (как топ-ап первым событием, A2), но только получателю trialing без
 -- периода. Повтор ничего не переписывает: ноль новых версий строк.
 """
-HEAL_RESULT = """select 'healed'::text as verdict,
+# Fix round 2 (2026-10-15): the heal's own trace — a CTE of THIS statement, appended after the module's chain through the
+# `result` slot (billing_consolidation.py's text is untouched): one transaction with the consolidation it records.
+HEAL_JOURNAL_CTE = """, journal as (
+  -- A3 fix round 2 (2026-10-15): the support journal — ONE row in identity_heal_log per heal, written by THIS statement
+  -- (one transaction with the consolidation it records: a heal without its row, or a row without its heal, cannot exist):
+  -- the install, the recipient, the aliases RevenueCat listed, what this call changed (retired alias rows, re-keyed bot
+  -- rows). A repeat that moved nothing writes its row with zeros.
+  insert into identity_heal_log (install_id, to_app_user_id, aliases, consolidated, rekeyed)
+  select $3::text, $1::text, array(select app_user_id from alias_ids order by app_user_id),
+         (select count(*) from retired)::int, (select count(*) from rekeyed)::int
+  returning id
+)
+"""
+HEAL_RESULT = HEAL_JOURNAL_CTE + """select 'healed'::text as verdict,
        (select count(*) from locked)::int as alias_rows,
        (select count(*) from retired)::int as retired_rows,
        (select count(*) from carried)::int as carried_rows,
        (select topup_balance from credited) as balance_after,
        (select plan from credited) as plan_after,
-       (select count(*) from rekeyed)::int as rekeyed_rows;"""
+       (select count(*) from rekeyed)::int as rekeyed_rows,
+       (select id from journal) as journal_id;"""
 HEAL_PARAMS = {"head": HEAL_HEAD, "to": "$1", "aliases": "$2", "event_plan": "null::text", "install": "$3::text",
                "result": HEAL_RESULT}
 HEAL_SQL = BC.CONSOLIDATE_SQL(HEAL_PARAMS)
 HEAL_REPLACEMENT = "={{ [ " + TOKEN_U + ", $json.fromIds, " + TOKEN_INSTALL + " ] }}"
+
+# Fix round 2: a refusal RevenueCat's list decided leaves ONE journal row AFTER the answer — Respond Refused → Log Refusal
+# (the Log Billing Conflict pattern: never delays or changes the answer, continue on error, no retry, nothing after it).
+# A refusal never writes subscribers / bot_profiles: this statement names identity_heal_log only.
+LOG_REFUSAL_SQL = """-- A3 fix round 2 (2026-10-15): a heal that RevenueCat's own alias list refused (rc_mismatch / hint_not_alias /
+-- no_aliases) leaves ONE row for support, written after the answer. Parameters, in order: the token's install, the token's
+-- billing id, the JSON array of RevenueCat's ids minus the recipient, the reason. Nothing else is written.
+with logged as (
+  insert into identity_heal_log (install_id, to_app_user_id, aliases, consolidated, rekeyed, reason)
+  select $1::text, $2::text, array(select jsonb_array_elements_text($3::jsonb)), 0, 0, $4::text
+  where coalesce($1::text, '') <> '' and coalesce($2::text, '') <> '' and coalesce($4::text, '') <> ''
+  returning id
+)
+select (select count(*) from logged)::int as logged;"""
+LOG_REFUSAL_PARAMS = "={{ [ " + TOKEN_INSTALL + ", " + TOKEN_U + ", ($json.fromIds || '[]'), ($json.reason || '') ] }}"
+REFUSED_STATUS = 409          # RevenueCat's list contradicts the request (rc_mismatch / hint_not_alias / no_aliases)
 
 
 def vid(name):
@@ -195,7 +232,8 @@ def build():
     n.append(own(auth.respond_fixed("Respond RC Unavailable", [1540, 320], {"success": False, "reason": "rc_unavailable"}, 502)))
     n.append(own(auth.code("Plan Heal", PLAN_HEAL_JS, [1540, 0])))
     n.append(own(auth.if_true("Heal?", HEAL_GATE_EXPR, [1760, 0])))
-    n.append(own(auth.respond("Respond Refused", [1980, 220], body="={{ { success: false, reason: $json.reason } }}", code_expr=200)))
+    n.append(own(auth.respond("Respond Refused", [1980, 220], body="={{ { success: false, reason: $json.reason } }}", code_expr=REFUSED_STATUS)))
+    n.append(own(auth.postgres("Log Refusal", LOG_REFUSAL_SQL, LOG_REFUSAL_PARAMS, [2200, 220])))
     n.append(own(auth.postgres("Heal", HEAL_SQL, HEAL_REPLACEMENT, [1980, -100])))
     n.append(own(auth.code("Shape Response", SHAPE_RESPONSE_JS, [2200, -100])))
     n.append(own(auth.respond("Respond", [2420, -100])))
@@ -207,6 +245,7 @@ def build():
     auth.edge(c, "Aliases OK?", "Plan Heal", 0); auth.edge(c, "Aliases OK?", "Respond RC Unavailable", 1)
     auth.edge(c, "Plan Heal", "Heal?")
     auth.edge(c, "Heal?", "Heal", 0); auth.edge(c, "Heal?", "Respond Refused", 1)
+    auth.edge(c, "Respond Refused", "Log Refusal")            # after the answer: the journal never delays it
     auth.edge(c, "Heal", "Shape Response"); auth.edge(c, "Shape Response", "Respond")
     settings = {"executionOrder": "v1", "saveDataSuccessExecution": "none", "saveDataErrorExecution": "all", "saveManualExecutions": False}
     return auth.workflow(WF_ID, WF_NAME, n, c, settings)

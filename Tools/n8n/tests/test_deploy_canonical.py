@@ -448,7 +448,7 @@ def stg_deploy(fake, *args, only=(CREATE_WA,), creds=None):
     return code, out, (json.loads(lines[-1]) if lines else {})
 
 
-PROD_HOSTS = ('n8n.choosereply.com', 'wappi.pro')
+PROD_HOSTS = ('n8n.choosereply.com', 'wappi.pro', 'api.revenuecat.com')   # + RevenueCat (A3 identity-heal, 2026-10-15)
 
 
 def puts(fake):
@@ -520,6 +520,48 @@ with Case('STG NEG a production base never derives and never reads staging state
     fake.add(bound(CANON[CREATE_WA]), active=True)
     code, out, s = deploy(fake, *APPLY, only=(CREATE_WA,))
     c.check(code == 0 and s.get('up_to_date') == 1 and fake.writes() == [], f'exit {code} {s}\n{out[-600:]}')
+
+
+# ---------------------------------------------------------------------------------------------- A3 guard parity (2026-10-15)
+# Verify Identity (crVerifyIdent001) calls RevenueCat's API with the «RevenueCat API» credential. derive-staging.py points
+# that host at the mock and refuses a derived file that still names it; a deploy to a LOCAL base must refuse the same —
+# ONE forbidden-host list (derive-staging.FORBIDDEN_HOSTS) for both tools.
+VERIFY_IDENTITY = 'crVerifyIdent001'
+
+
+def stg_apply_verify_identity():
+    fake = FakeN8n()
+    fake.add(stale(staged(CANON[VERIFY_IDENTITY])), active=True)
+    fake.add(bound(CANON[SWS]), active=True)
+    code, out, s = stg_deploy(fake, *APPLY, only=(VERIFY_IDENTITY,))
+    return fake, code, out, s
+
+
+with Case('STG A3 --apply of Verify Identity on staging: the PUT body calls the RevenueCat MOCK, never the real host, with '
+          'staging\'s «RevenueCat API» credential; read-back ok (the positive control of the guard below)') as c:
+    fake, code, out, s = stg_apply_verify_identity()
+    sent = puts(fake)
+    c.check(code == 0 and counts(s, 'updated', 'failed') == {'updated': 1, 'failed': 0} and len(sent) == 1, f'exit {code} {s}\n{out[-1200:]}')
+    body = sent[0][1] if sent else {'nodes': []}
+    t = json.dumps(body, ensure_ascii=False)
+    c.check(not any(x in t for x in PROD_HOSTS), 'a PUT to staging carries a production host')
+    c.check(DERIVE.MOCK + '/revenuecat/v2/projects/' in t, 'Verify Identity must call the RevenueCat mock on staging')
+    rc_cred = {(n.get('credentials') or {}).get('httpHeaderAuth', {}).get('id') for n in body['nodes']
+               if ((n.get('credentials') or {}).get('httpHeaderAuth') or {}).get('name') == 'RevenueCat API'}
+    c.check(rc_cred == {STG_CREDS['RevenueCat API'][0]}, f'«RevenueCat API» must be bound to staging\'s credential: {rc_cred}')
+
+with Case('STG NEG A3 guard parity: a staging derivation that leaves api.revenuecat.com is refused before any request, as '
+          'derive-staging.py refuses it — one forbidden-host list for both tools') as c:
+    c.check({DERIVE.CANON_HOST, DERIVE.WAPPI, 'wappi.pro', DERIVE.RC_API, 'api.revenuecat.com'} <= set(DERIVE.FORBIDDEN_HOSTS),
+            f'derive-staging.FORBIDDEN_HOSTS must name every production host: {getattr(DERIVE, "FORBIDDEN_HOSTS", None)}')
+    real = DERIVE.derive_file
+    DERIVE.derive_file = lambda text: real(text).replace(DERIVE.MOCK + '/revenuecat/', DERIVE.RC_API + '/')
+    try:
+        fake, code, out, s = stg_apply_verify_identity()
+    finally:
+        DERIVE.derive_file = real
+    c.check(code not in (0, None) and fake.writes() == [] and puts(fake) == [],
+            f'a derivation that kept the real RevenueCat host was deployed to staging: exit {code}, writes {fake.writes()}\n{out[-600:]}')
 
 
 report()

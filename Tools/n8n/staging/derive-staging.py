@@ -50,6 +50,9 @@ CANON_HOST = "https://n8n.choosereply.com"
 LOCAL_HOST = f"http://localhost:{PORT}"
 WAPPI = "https://wappi.pro"
 RC_API = "https://api.revenuecat.com"   # A3 (2026-10-14): Verify Identity's RC Aliases -> the mock's /revenuecat/ routes
+# A production host left in a DERIVED file means a staging run could reach production or a real customer. ONE list, read by
+# this script and by deploy-canonical.py's staging derivation (A3 fix round 2, 2026-10-15: guard parity).
+FORBIDDEN_HOSTS = (CANON_HOST, WAPPI, "wappi.pro", RC_API, "api.revenuecat.com")
 TEMPLATES = {"wa": "4wYitz5ek30SVNlT-WhatsApp_Bot.json", "tg": "4VN3gsFaC2HUYmcc-Telegram_Bot.json"}
 PG_STAGING_NAME = "Postgres Staging"
 # Deliberately ABSENT on staging: the Support Message relay must never reach the owner's real support
@@ -280,7 +283,7 @@ def derive(args, src):
             remap(node, creds, missing)
         wf["active"] = False
         text = json.dumps(wf, ensure_ascii=False)
-        for forbidden in (CANON_HOST, WAPPI, "wappi.pro", RC_API, "api.revenuecat.com"):
+        for forbidden in FORBIDDEN_HOSTS:
             if forbidden in text:
                 sys.exit(f"REFUSED: {f} still references {forbidden} after derivation")
         if supabase_writers_left(wf):

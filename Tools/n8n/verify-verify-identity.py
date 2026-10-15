@@ -18,7 +18,11 @@ pins what that behaviour rests on, so a hand edit, a stale re-export or a carele
   (7) Heal is billing_consolidation.CONSOLIDATE_SQL(HEAL_PARAMS) byte for byte (the alias merge RevenueCat Events runs),
       recipient = the first parameter, the re-key compares owner_id with the install parameter; success is only Heal's
       positive row (verdict 'healed');
-  (8) crVerifyIdent001 is a protected infra id (build-client-webhooks.PROTECTED_IDS and Set Workflow State's list).
+  (8) crVerifyIdent001 is a protected infra id (build-client-webhooks.PROTECTED_IDS and Set Workflow State's list);
+  (9) fix round 2 (2026-10-15): the support journal — Heal's statement carries the identity_heal_log CTE (one transaction
+      with the heal), Respond Refused answers 409 and is followed by `Log Refusal` ONLY (after the answer, continue on
+      error, no retry, nothing after it, identity from crAuth, writes identity_heal_log and nothing else); no other node
+      writes the journal.
 
     python3 Tools/n8n/verify-verify-identity.py              # the canonical workflows
     python3 Tools/n8n/verify-verify-identity.py --dir DIR    # another set of exports (mutation tests)
@@ -44,7 +48,7 @@ B = _module("build_verify_identity", "build-verify-identity.py")
 BC = _module("billing_consolidation", "billing_consolidation.py")
 BCW = _module("build_client_webhooks", "build-client-webhooks.py")
 EXPECTED = ("Webhook", "Auth Gate", "Authorized?", "Respond 401", "Validate", "Valid?", "Respond 400", "RC Aliases", "Aliases OK?",
-            "Respond RC Unavailable", "Plan Heal", "Heal?", "Respond Refused", "Heal", "Shape Response", "Respond")
+            "Respond RC Unavailable", "Plan Heal", "Heal?", "Respond Refused", "Log Refusal", "Heal", "Shape Response", "Respond")
 REFUSALS = ("Respond 401", "Respond 400", "Respond RC Unavailable", "Respond Refused")
 
 
@@ -211,6 +215,36 @@ def check(wf, set_state):
     need(targets(wf, "Heal") == [["Shape Response"]] and targets(wf, "Shape Response") == [["Respond"]],
          f"Heal must feed Shape Response → Respond: {targets(wf, 'Heal')} / {targets(wf, 'Shape Response')}")
 
+    # (9) the support journal and the refusal status
+    need(B.HEAL_JOURNAL_CTE in hq and re.search(r"\(select id from journal\) as journal_id;\s*$", hq)
+         and re.search(r"\bjournal as \(.*?insert into identity_heal_log \(install_id, to_app_user_id, aliases, consolidated, rekeyed\)\s*"
+                       r"select \$3::text, \$1::text, array\(select app_user_id from alias_ids order by app_user_id\),", hq, re.S),
+         "Heal: the journal CTE (insert into identity_heal_log: the install, the recipient, RevenueCat's aliases, the counts) "
+         "must be part of the heal's own statement — support must SEE every heal, and a heal without its trace may not exist")
+    codes = {name: (N[name]["parameters"].get("options") or {}).get("responseCode") for name in REFUSALS}
+    need(codes["Respond Refused"] == B.REFUSED_STATUS == 409 and codes["Respond RC Unavailable"] == 502 and codes["Respond 400"] == 400,
+         f"refusals must answer status codes monitoring can see — Respond Refused 409 (rc_mismatch / hint_not_alias / "
+         f"no_aliases), Respond RC Unavailable 502, Respond 400 400: {codes}")
+    lr = N["Log Refusal"]
+    lq = lr["parameters"].get("query", "")
+    need(targets(wf, "Respond Refused") == [["Log Refusal"]] and sources(wf, "Log Refusal") == [("Respond Refused", 0)]
+         and targets(wf, "Log Refusal") in ([], [[]]),
+         f"Log Refusal must run after the answer, ONLY after Respond Refused, with nothing after it: Respond Refused → "
+         f"{targets(wf, 'Respond Refused')}, into Log Refusal {sources(wf, 'Log Refusal')}, after it {targets(wf, 'Log Refusal')}")
+    need(lr.get("type") == "n8n-nodes-base.postgres" and lq == B.LOG_REFUSAL_SQL
+         and (lr["parameters"].get("options") or {}).get("queryReplacement") == B.LOG_REFUSAL_PARAMS,
+         "Log Refusal is stale against build-verify-identity.py (re-run the generator)")
+    lrep = (lr["parameters"].get("options") or {}).get("queryReplacement") or ""
+    need(lrep.count("$('Auth Gate').first().json.crAuth.") == 2 and "body" not in lrep,
+         f"Log Refusal must journal the install and the recipient from crAuth (the gate's verified token), never the body: {lrep!r}")
+    need(lr.get("onError") == "continueRegularOutput" and not lr.get("retryOnFail") and lr.get("alwaysOutputData") is True,
+         f"Log Refusal must never fail or retry the execution (it runs after the answer): onError={lr.get('onError')} "
+         f"retryOnFail={lr.get('retryOnFail')}")
+    need("insert into identity_heal_log" in lq and not re.search(r"\b(subscribers|bot_profiles|dialog_counts)\b", lq),
+         "Log Refusal may write identity_heal_log ONLY — a refusal never touches subscribers / bot_profiles")
+    writers = sorted(n["name"] for n in wf["nodes"] if "identity_heal_log" in (n.get("parameters") or {}).get("query", ""))
+    need(writers == ["Heal", "Log Refusal"], f"only Heal (its CTE) and Log Refusal may write the journal: {writers}")
+
     # (8) protected infra id
     need(B.WF_ID in BCW.PROTECTED_IDS, f"{B.WF_ID} is missing from build-client-webhooks.PROTECTED_IDS (protected infra ids)")
     vs = [n for n in set_state.get("nodes", []) if "const PROTECTED = new Set([" in (n.get("parameters") or {}).get("jsCode", "")]
@@ -239,7 +273,8 @@ def main():
         print(f"VERIFY IDENTITY FAILED: {len(fails)} check(s)")
         sys.exit(1)
     print(f"OK  {B.WF_FILE} (token-only gate, identity from crAuth, RevenueCat v2 aliases read-only, nothing written without "
-          f"RevenueCat's list + Plan Heal's decision, Heal = billing_consolidation.CONSOLIDATE_SQL, success only on 'healed', protected)")
+          f"RevenueCat's list + Plan Heal's decision, Heal = billing_consolidation.CONSOLIDATE_SQL + its journal CTE, success only on "
+          f"'healed', refusals 409 + journaled after the answer, protected)")
     print("ALL VERIFY IDENTITY ASSERTS PASSED")
 
 

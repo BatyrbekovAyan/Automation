@@ -107,6 +107,8 @@ cmd_migrate() {
     "${N8N_DIR}/sql/2026-09-25-learning-foundation.sql"
     # A1 «защита платящих» (2026-10-14): the RevenueCat webhook's idempotency ledger (read by Dedup Gate, written in Upsert Subscriber)
     "${N8N_DIR}/sql/2026-10-14-rc-event-ledger.sql"
+    # A3 fix round 2 (2026-10-15): the identity-heal journal (Heal's CTE + Log Refusal of crVerifyIdent001)
+    "${N8N_DIR}/sql/2026-10-15-identity-heal-log.sql"
   )
   for f in "${files[@]}"; do
     [ -s "$f" ] || { echo "skip (missing) $f"; continue; }
