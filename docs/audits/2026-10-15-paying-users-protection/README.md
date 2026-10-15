@@ -58,67 +58,107 @@ httpHeaderAuth, заголовок `Authorization`, значение `Bearer <se
 (gitignored; ключ v2 проверен A3 только на чтение). **Id строго `crRevenueCatApi1`** — на него ссылается канон Verify Identity,
 и каждый будущий PUT `deploy-canonical.py` несёт именно его. REST n8n id не принимает (проверено на репетиции — см. ниже),
 поэтому учётка создаётся CLI `n8n import:credentials` из расшифрованного JSON. **Значение никогда не печатается, не попадает
-в чат, документы, логи и git**: файл собирается локально в `.secrets/` (chmod 600), идёт в контейнер потоком stdin, удаляется
-везде сразу после импорта.
+в чат, документы, логи и git**: файл собирается локально в `.secrets/` (chmod 600), идёт на VPS и в контейнер (`docker compose cp`,
+владелец `node`), все три копии удаляются сразу после импорта — и при сбое импорта — с проверкой удаления (шаг 2).
 
 ## Чек-лист выкладки (прод, только после «да» владельца)
 
-Все команды — из корня репо, с явной базой: инструменты по умолчанию смотрят на прод. `<date>` = дата выкладки.
+**Стоп-правило (для каждого шага).** Если вывод шага отличается от «Ожидание», записанного здесь, — **СТОП**: следующий шаг не
+выполнять, на проде ничего не чинить «на ходу». Сохранить вывод; если живое состояние вредно — откат ТОЛЬКО затронутого шага
+(раздел «Откат»); доложить владельцу.
+
+**Где выполнять.** Команды — из корня рабочей копии, в которой канон = пакет. `<date>` = дата выкладки. Во всех вызовах база
+указана явно: инструменты по умолчанию смотрят на прод. Секреты — только из основной копии (`.secrets/` не в git):
+```bash
+MAIN=/Users/ayan/Projects/Automation; SEC="$MAIN/Tools/n8n/.secrets"; B=https://n8n.choosereply.com
+export N8N_API_KEY="$(cat "$SEC/prod-api-key.txt")"     # verify-deployed / deploy-canonical / update-clones читают ключ отсюда; не печатать
+git -C "$MAIN" diff --stat 9caddb6f HEAD -- Tools/n8n/workflows Tools/n8n/sql   # Ожидание: пусто (канон = пакет)
+```
+Если вывод **НЕ пуст** (на `main` уже легла часть B или другая правка канона) — выполнять весь чек-лист из отдельного worktree на
+коммите пакета `113818bc` (снимки, точки отката и журнал писать в `$MAIN/docs/audits/…`, коммитить в основной копии):
+```bash
+git -C "$MAIN" worktree add "$MAIN-pkgA" 113818bc && cd "$MAIN-pkgA"
+git diff --stat 9caddb6f HEAD -- Tools/n8n/workflows Tools/n8n/sql             # Ожидание: пусто
+# … шаги 0–12 отсюда (sql-oneoff и ключ RevenueCat — по путям "$SEC/…", как ниже) …
+cd "$MAIN" && git worktree remove "$MAIN-pkgA"                                  # после шага 13
+```
 
 0. **Предполётное (только чтение).**
-   - `git status` чистый по `Tools/n8n/` и `git diff 9caddb6f HEAD -- Tools/n8n/workflows Tools/n8n/sql` пуст (канон = пакет).
-   - Снимок «до»: `python3 Tools/n8n/verify-deployed.py --base https://n8n.choosereply.com --json docs/audits/<date>-prod-before.json`
-     → канон 29, diff 11, ровно ids и хэши «до» из таблицы; клонов 0. Иначе — **стоп**.
+   - Снимок «до»: `python3 Tools/n8n/verify-deployed.py --base $B --json "$MAIN/docs/audits/<date>-prod-before.json"` →
+     Ожидание: канон 29, diff 11 — ровно ids и хэши «до» из таблицы; клонов 0. Иначе — СТОП.
    - Бэкап (утренний ночной архив того же дня не затирать — как 10-13):
      `ssh choosereply 'cd ~/backups && D=$(date +%F) && { [ ! -f n8n-$D.tar.gz ] || mv n8n-$D.tar.gz n8n-$D-0315.tar.gz; } && ~/choosereply/backup.sh && mv n8n-$D.tar.gz n8n-$D-predeploy.tar.gz && ls -la ~/backups | tail -4'`.
-   - Dry-run + точки отката: `python3 Tools/n8n/deploy-canonical.py --base https://n8n.choosereply.com` → `would_update 8`
-     (`ZGYr6srzS3rSSXHp`, `2islisFH7jjLoPQM`, `crHandoffNtfy001`, `crAuthSession001`, `XuvOp7TxOImOAmlj`, `Uz6HBBUpAiUqVysB`,
-     `lmjYsdNcQA2IE5rl`, `fXYpCXPKw92EzRz8`), `missing 2` (`crVerifyIdent001`, `crChannelWatch001`), `up_to_date 17`, `failed 0`;
-     и `python3 Tools/n8n/deploy-canonical.py --base https://n8n.choosereply.com --only 0DP79STI3pafXO9B --include-placeholders`
-     → `would_update 1`. Все строки `rollback pointer` → `docs/audits/<date>-deploy-rollback-pointers.txt`.
+   - Dry-run + точки отката: `python3 Tools/n8n/deploy-canonical.py --base $B` → Ожидание: `would_update 8` (`ZGYr6srzS3rSSXHp`,
+     `2islisFH7jjLoPQM`, `crHandoffNtfy001`, `crAuthSession001`, `XuvOp7TxOImOAmlj`, `Uz6HBBUpAiUqVysB`, `lmjYsdNcQA2IE5rl`,
+     `fXYpCXPKw92EzRz8`), `missing 2` (`crVerifyIdent001`, `crChannelWatch001`), `up_to_date 17`, `failed 0`; и
+     `python3 Tools/n8n/deploy-canonical.py --base $B --only 0DP79STI3pafXO9B --include-placeholders` → `would_update 1`. Все строки
+     `rollback pointer` → `$MAIN/docs/audits/<date>-deploy-rollback-pointers.txt`.
    - Учётки, на которые ссылаются новые workflow: `vvRrFiEXzLVqKjOx` (Postgres — у каждого Postgres-узла канона) и
      `EuhhqAaV56DpoqAN` (WappiAuthToken — тот же id несут живые канонические Create WA/TG, шаблоны ботов, Wappi Proxy и
-     Handoff Notifier; бот-canary «23» 2026-09-24 работал через него); `crRevenueCatApi1` создаётся в шаге 2. Шаг 5 печатает
-     учётки импортированных workflow — проверка, что импорт не перепривязал id.
+     Handoff Notifier; бот-canary «23» 2026-09-24 работал через него); `crRevenueCatApi1` создаётся в шаге 2.
+   - Засечь начало выкладки для наблюдения (шаги 11–12): `export DEPLOY_START="$(date -u +%Y-%m-%dT%H:%M:%SZ)"`.
 1. **Миграции** (каждая — `200` или «No item to return»; затем пост-проверка):
    ```bash
-   python3 Tools/n8n/.secrets/sql-oneoff.py "$(cat docs/audits/2026-10-15-paying-users-protection/precheck.sql)"   # t | t | t
-   python3 Tools/n8n/.secrets/sql-oneoff.py "$(cat Tools/n8n/sql/2026-10-14-rc-event-ledger.sql)"
-   python3 Tools/n8n/.secrets/sql-oneoff.py "$(cat Tools/n8n/sql/2026-10-14-channel-snapshot.sql)"
-   python3 Tools/n8n/.secrets/sql-oneoff.py "$(cat Tools/n8n/sql/2026-10-15-identity-heal-log.sql)"
-   python3 Tools/n8n/.secrets/sql-oneoff.py "$(cat docs/audits/2026-10-15-paying-users-protection/postcheck.sql)"
-   # → {"ledger_cols":"2","snapshot_cols":"6","heal_cols":"8","rls":true,"client_grants":"0","seq_client_usage":false,"indexes":"4"}
+   python3 "$SEC/sql-oneoff.py" "$(cat docs/audits/2026-10-15-paying-users-protection/precheck.sql)"   # Ожидание: t | t | t
+   python3 "$SEC/sql-oneoff.py" "$(cat Tools/n8n/sql/2026-10-14-rc-event-ledger.sql)"
+   python3 "$SEC/sql-oneoff.py" "$(cat Tools/n8n/sql/2026-10-14-channel-snapshot.sql)"
+   python3 "$SEC/sql-oneoff.py" "$(cat Tools/n8n/sql/2026-10-15-identity-heal-log.sql)"
+   python3 "$SEC/sql-oneoff.py" "$(cat docs/audits/2026-10-15-paying-users-protection/postcheck.sql)"
+   # Ожидание: {"ledger_cols":"2","snapshot_cols":"6","heal_cols":"8","rls":true,"client_grants":"0","seq_client_usage":false,"indexes":"4"}
    ```
-2. **Учётка «RevenueCat API» `crRevenueCatApi1`** (значение не печатать):
+2. **Учётка «RevenueCat API» `crRevenueCatApi1`** (значение не печатать нигде). На staging отрепетирован сам CLI
+   `n8n import:credentials` при работающем сервере (id сохраняется; REST отвечает 400 «id is read-only»); доставка файла в контейнер
+   на staging (без Docker) не репетировалась — основной путь ниже использует `docker compose cp`, которым каждую ночь пользуется
+   `backup.sh` на этом VPS (в обратную сторону):
    ```bash
-   python3 - <<'PY'
+   # 2a. файл локально, 600, значение не выводится
+   SEC="$SEC" python3 - <<'PY'
    import json, os, pathlib
-   s = json.loads(pathlib.Path("Tools/n8n/.secrets/revenuecat-api.json").read_text())
-   out = pathlib.Path("Tools/n8n/.secrets/rc-cred-import.json")
+   sec = pathlib.Path(os.environ["SEC"])
+   s = json.loads((sec / "revenuecat-api.json").read_text())
+   out = sec / "rc-cred-import.json"
    out.write_text(json.dumps([{"id": "crRevenueCatApi1", "name": "RevenueCat API", "type": "httpHeaderAuth",
                                "data": {"name": "Authorization", "value": "Bearer " + s["secretKey"]}}]))
    os.chmod(out, 0o600); print("written", out.stat().st_size, "bytes")
    PY
-   ssh choosereply 'cd ~/choosereply && docker compose exec -T n8n sh -c "umask 077; cat > /tmp/rc-cred.json"' < Tools/n8n/.secrets/rc-cred-import.json
-   ssh choosereply 'cd ~/choosereply && docker compose exec -T n8n n8n import:credentials --input=/tmp/rc-cred.json; docker compose exec -T n8n rm -f /tmp/rc-cred.json'
-   rm -f Tools/n8n/.secrets/rc-cred-import.json
+   # 2b. на VPS → в контейнер (владелец node) → импорт → удалить ВСЕ копии (удаление выполняется и при сбое импорта)
+   scp -q "$SEC/rc-cred-import.json" choosereply:/tmp/rc-cred-import.json
+   ssh choosereply 'cd ~/choosereply; chmod 600 /tmp/rc-cred-import.json
+     docker compose cp /tmp/rc-cred-import.json n8n:/tmp/rc-cred.json \
+       && docker compose exec -T -u root n8n chown node:node /tmp/rc-cred.json \
+       && docker compose exec -T n8n n8n import:credentials --input=/tmp/rc-cred.json
+     echo "import rc=$?"
+     docker compose exec -T -u root n8n rm -f /tmp/rc-cred.json; rm -f /tmp/rc-cred-import.json
+     docker compose exec -T n8n sh -c "test ! -e /tmp/rc-cred.json && echo container-copy-removed"
+     test ! -e /tmp/rc-cred-import.json && echo host-copy-removed
+     docker compose exec -T n8n sh -c "n8n export:credentials --id=crRevenueCatApi1 --output=/tmp/c.json >/dev/null 2>&1; grep -c crRevenueCatApi1 /tmp/c.json; rm -f /tmp/c.json"'
+   rm -f "$SEC/rc-cred-import.json"; test ! -e "$SEC/rc-cred-import.json" && echo local-copy-removed
    ```
-   Ожидание: «Successfully imported 1 credential.»; локальный файл и файл в контейнере удалены.
-3. **Set Workflow State — защита двух новых id ДО их импорта и включения.** До этого шага legacy-вызов (compat-окно открыто до
-   2026-12-31) мог бы выключить или удалить новые workflow через SetWorkflowState. Основной путь (отрепетирован):
-   `python3 Tools/n8n/deploy-canonical.py --base https://n8n.choosereply.com --only 0DP79STI3pafXO9B --include-placeholders --apply --yes`
-   — `__HDR_CRED__` привязывается к учётке `n8n Admin API` живого Set Workflow State, PUT, «published by the PUT», read-back ok.
-   Прецедентный путь (09-24, 10-09, V12; на staging не репетируется — его state-файл несёт прод-id учёток):
-   `python3 Tools/n8n/build-client-webhooks.py --update` (переложит и Support Message без изменений и заново включит оба —
-   на n8n 2.36.7 activate активного workflow снимает вебхук на миллисекунды), затем `--export` + `git diff --stat
-   Tools/n8n/workflows/` — пусто.
-4. **Импорт двух новых workflow** (неактивными; файлы потоком в контейнер):
+   Ожидание: «Successfully imported 1 credential.», `import rc=0`, `container-copy-removed`, `host-copy-removed`, `1` (учётка с id
+   `crRevenueCatApi1` есть; экспорт зашифрован и печатается только счётчик, файл удалён), `local-copy-removed`.
+   НЕ репетировано (запасная форма без копии на диске VPS): `ssh choosereply 'cd ~/choosereply && docker compose exec -T n8n sh -c
+   "umask 077; cat > /tmp/rc-cred.json"' < "$SEC/rc-cred-import.json"`, затем импорт и те же удаления/проверки.
+3. **Set Workflow State — защита двух новых id ДО их импорта и включения** (до этого шага legacy-вызов без токена — compat-окно
+   открыто до 2026-12-31 — мог бы выключить или удалить новые workflow). Путь по решению контроллера (отрепетирован):
+   `python3 Tools/n8n/deploy-canonical.py --base $B --only 0DP79STI3pafXO9B --include-placeholders --apply --yes` —
+   `__HDR_CRED__` привязывается к учётке `n8n Admin API` живого Set Workflow State. Ожидание: «published by the PUT (served version =
+   the update) — no publish call, no deactivate window», «read-back: ok», `updated 1`, `failed 0`.
+   **ТОЛЬКО запасной путь** (если первый отказал): `python3 Tools/n8n/build-client-webhooks.py --update` — на staging не
+   репетируется; заново ВКЛЮЧАЕТ два живых вебхука (Support Message и Set Workflow State; на n8n 2.36.7 activate активного workflow
+   снимает его вебхук на миллисекунды); запускать ТОЛЬКО из основной копии `$MAIN` — без `.secrets/client-webhooks-state.json` он
+   СОЗДАСТ на проде новые учётки и workflow; затем `--export` и `git diff --stat Tools/n8n/workflows/` — Ожидание: пусто.
+4. **Импорт двух новых workflow** (неактивными). Основной путь — тот же `docker compose cp`:
    ```bash
    for f in crVerifyIdent001-Verify_Identity crChannelWatch001-Channel_Watch; do
-     ssh choosereply "cd ~/choosereply && docker compose exec -T n8n sh -c 'cat > /tmp/$f.json'" < Tools/n8n/workflows/$f.json
-     ssh choosereply "cd ~/choosereply && docker compose exec -T n8n n8n import:workflow --input=/tmp/$f.json; docker compose exec -T n8n rm -f /tmp/$f.json"
+     scp -q "Tools/n8n/workflows/$f.json" "choosereply:/tmp/$f.json"
+     ssh choosereply "cd ~/choosereply; docker compose cp /tmp/$f.json n8n:/tmp/$f.json \
+       && docker compose exec -T -u root n8n chown node:node /tmp/$f.json \
+       && docker compose exec -T n8n n8n import:workflow --input=/tmp/$f.json; echo \"import rc=\$?\"; \
+       docker compose exec -T -u root n8n rm -f /tmp/$f.json; rm -f /tmp/$f.json"
    done
    ```
+   Ожидание ×2: «Successfully imported 1 workflow.», `import rc=0`. НЕ репетировано (запасная форма потоком):
+   `ssh choosereply "cd ~/choosereply && docker compose exec -T n8n sh -c 'cat > /tmp/$f.json'" < "Tools/n8n/workflows/$f.json"`.
 5. **Включение через API** (как триггерные workflow 09-24) + read-back:
    ```bash
    python3 - <<'PY'
@@ -134,31 +174,85 @@ httpHeaderAuth, заголовок `Authorization`, значение `Bearer <se
    ```
    Ожидание: `activate 200 | active True | published=stored True`; учётки Verify Identity = `crRevenueCatApi1` + `vvRrFiEXzLVqKjOx`,
    Channel Watch = `EuhhqAaV56DpoqAN` + `vvRrFiEXzLVqKjOx` (импорт не перепривязал id).
-6. **Smoke Verify Identity:** `curl -s https://n8n.choosereply.com/webhook/VerifyIdentity` → `404` «… Did you mean to make a POST
-   request?» (вебхук зарегистрирован, исполнения нет); `curl -s -o /dev/null -w '%{http_code}\n' -X POST -H 'Content-Type: application/json'
-   -d '{}' https://n8n.choosereply.com/webhook/VerifyIdentity` → `401` (гейт только по токену, compat-окно его не открывает).
-7. **deploy-canonical по одному** (`--base https://n8n.choosereply.com --only <id> --apply --yes`; у каждого «published by the PUT …»
-   и «read-back: ok»): `ZGYr6srzS3rSSXHp` RevenueCat Events (после M1!) → `2islisFH7jjLoPQM` Delete Orphan Profiles →
-   `crHandoffNtfy001` Handoff Notifier → `crAuthSession001` Auth Session → `XuvOp7TxOImOAmlj` Create WA → `Uz6HBBUpAiUqVysB`
-   Create TG → `lmjYsdNcQA2IE5rl` Delete Bot Files → `fXYpCXPKw92EzRz8` Profile Lifecycle Sweep (Create/Sweep — инструмент
-   привязывает `__HDR_CRED__` к `n8n Admin API` и отказывает непривязанным).
-8. `python3 Tools/n8n/update-clones.py --base https://n8n.choosereply.com` → клонов 0 (архивный «13» пропущен) — применять нечего.
-9. **Read-back:** `python3 Tools/n8n/verify-deployed.py --base https://n8n.choosereply.com --json docs/audits/<date>-prod-after.json`
-   → exit 0, канон 29, diff 0, хэши «после» = таблица.
-10. **Smoke (без изменения данных):** GET `/webhook/VerifyIdentity` и GET `/webhook/RevenueCatEvent` → «Did you mean to make a POST
-    request?»; POST VerifyIdentity без токена → 401; WappiProxy без токена → 401; AuthSession `{"op":"nonsense"}` → 400;
-    SetWorkflowState без токена на `crChannelWatch001` → 400 `protected_workflow` (новый защищённый id; compat-окно открыто);
-    DeleteBotFiles с поддельным токеном → 401.
-11. **Первый тик Channel Watch** (≤ 10 мин после шага 5): в логах n8n ошибок нет; `sql-oneoff` (только чтение)
-    `select count(*) as rows, count(*) filter (where authorized) as up, count(*) filter (where not authorized and notified_at is null) as owed from channel_snapshot;`
-    → строки = живые профили, которые Wappi перечислил; `owed 0` (первое наблюдение ничего не должно, уведомлений нет).
-12. **Логи 15 мин:** `ssh choosereply 'cd ~/choosereply && docker compose logs --since 15m n8n | grep -iE "error|insights" | tail -20'` → пусто
-    (временные workflow `sql-oneoff` ждут 35 с перед удалением — цикл insights не возникает).
-13. Журнал `implementation-progress.md` «Развёртывание <date> (часть A)» + снимки + точки отката, коммит `deploy(prod): …`.
+6. **Smoke Verify Identity** — запросы 10.1a и 10.2 из шага 10 (Ожидание — там же).
+7. **deploy-canonical по одному** (`python3 Tools/n8n/deploy-canonical.py --base $B --only <id> --apply --yes`): `ZGYr6srzS3rSSXHp`
+   RevenueCat Events (после M1!) → `2islisFH7jjLoPQM` Delete Orphan Profiles → `crHandoffNtfy001` Handoff Notifier →
+   `crAuthSession001` Auth Session → `XuvOp7TxOImOAmlj` Create WA → `Uz6HBBUpAiUqVysB` Create TG → `lmjYsdNcQA2IE5rl` Delete Bot Files
+   → `fXYpCXPKw92EzRz8` Profile Lifecycle Sweep. Ожидание у каждого: «published by the PUT (served version = the update) — no publish
+   call, no deactivate window», «read-back: ok», `{"updated": 1, …, "failed": 0}` (Create/Sweep — инструмент привязывает
+   `__HDR_CRED__` к `n8n Admin API` и отказывает непривязанным).
+8. `python3 Tools/n8n/update-clones.py --base $B` → Ожидание: клонов 0 (архивный «13» пропущен) — применять нечего.
+9. **Read-back:** `python3 Tools/n8n/verify-deployed.py --base $B --json "$MAIN/docs/audits/<date>-prod-after.json"` → Ожидание:
+   exit 0, канон 29, diff 0, хэши «после» = таблица.
+10. **Smoke — шесть проверок без изменения данных** (10.1–10.6; 10.1 — два GET). Ни одна не может ничего изменить даже при нарушенном
+    предусловии: тела без id, а проба Set Workflow State просит `activate` уже ВКЛЮЧЁННОГО защищённого workflow (худшее при сломанной защите —
+    повторная регистрация расписания Channel Watch; `deactivate`/`delete` в smoke не применять никогда).
+    ```bash
+    F='v1.eyJpIjoieCJ9.eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHg'      # поддельный токен (подпись не та)
+    curl -s -w ' [%{http_code}]\n' "$B/webhook/VerifyIdentity"                                                      # 10.1a
+    curl -s -w ' [%{http_code}]\n' "$B/webhook/RevenueCatEvent"                                                     # 10.1b
+    curl -s -w ' [%{http_code}]\n' -X POST -H 'Content-Type: application/json' -d '{}' "$B/webhook/VerifyIdentity"   # 10.2
+    curl -s -w ' [%{http_code}]\n' -X POST -H 'Content-Type: application/json' \
+      -d '{"op":"status","channel":"whatsapp"}' "$B/webhook/WappiProxy"                                             # 10.3
+    curl -s -w ' [%{http_code}]\n' -X POST -H 'Content-Type: application/json' -d '{"op":"nonsense"}' "$B/webhook/AuthSession"   # 10.4
+    curl -s -w ' [%{http_code}]\n' -X POST -H 'Content-Type: application/json' \
+      -d '{"workflowId":"crChannelWatch001","action":"activate"}' "$B/webhook/SetWorkflowState"                    # 10.5
+    curl -s -w ' [%{http_code}]\n' -X POST -H 'Content-Type: application/json' -H "Authorization: Bearer $F" \
+      -d '{}' "$B/webhook/DeleteBotFiles"                                                                            # 10.6
+    ```
+    Ожидание:
+    - 10.1a / 10.1b: `[404]`, тело содержит «This webhook is not registered for GET requests. Did you mean to make a POST request?»
+      (вебхук зарегистрирован; GET исполнения не запускает);
+    - 10.2: `{"success":false,"error":"unauthorized","reason":"unauthorized:missing"} [401]` (гейт только по токену, compat-окно его не открывает);
+    - 10.3: `{"success":false,"error":"unauthorized"} [401]` (у прокси нет legacy-режима);
+    - 10.4: `{"success":false,"error":"bad_request"} [400]`;
+    - 10.5: `{"success":false,"error":"protected_workflow"} [400]` (legacy-вызов без токена → Validate → защищённый id; проверка не
+      зависит от action; после закрытия compat-окна `CR_AUTH_COMPAT_UNTIL` — `[401]` до Validate);
+    - 10.6: `{"success":false,"error":"unauthorized","reason":"unauthorized:bad_signature"} [401]`.
+    (На staging 2026-10-15 те же ответы, кроме 10.5 — там пробы были `deactivate`/`delete`: Validate отвечает `protected_workflow`
+    до любого действия, для `activate` — та же ветка.)
+11. **Первый тик Channel Watch и наблюдение** (≤ 10 мин после шага 5). Успешные выполнения Verify Identity и Channel Watch НЕ
+    сохраняются (`saveDataSuccessExecution: none`) — поэтому смотрим ошибки (сохраняются все), снимок и логи:
+    ```bash
+    python3 - <<'PY'
+    import importlib.util, os
+    s = importlib.util.spec_from_file_location("uc", "Tools/n8n/update-clones.py"); uc = importlib.util.module_from_spec(s); s.loader.exec_module(uc)
+    B, SINCE = "https://n8n.choosereply.com", os.environ["DEPLOY_START"]
+    for wid in ("ZGYr6srzS3rSSXHp", "crVerifyIdent001", "crChannelWatch001"):
+        st, d = uc.call(B, "GET", f"/executions?workflowId={wid}&status=error&limit=50")
+        errs = [(e.get("id"), e.get("startedAt")) for e in (d or {}).get("data", []) if (e.get("startedAt") or "") >= SINCE]
+        print(wid, "GET", st, "| error executions since", SINCE, ":", errs)
+    PY
+    python3 "$SEC/sql-oneoff.py" "select count(*) as rows, count(*) filter (where authorized) as up, count(*) filter (where not authorized and notified_at is null) as owed from channel_snapshot;"
+    ```
+    Ожидание: `GET 200 | error executions since … : []` ×3; снимок: `rows` = живые профили, которые перечислил Wappi, `owed 0`
+    (первое наблюдение ничего не должно — уведомлений нет). Любая ошибка в списке → СТОП: прочитать её
+    (`uc.call(B, "GET", "/executions/<id>?includeData=true")`), до разбора ничего не менять.
+12. **Логи 15 мин + повтор запроса шага 11:** `ssh choosereply 'cd ~/choosereply && docker compose logs --since 15m n8n | grep -iE
+    "error|insights" | tail -20'` → Ожидание: пусто (временные workflow `sql-oneoff` ждут 35 с перед удалением — цикл insights не
+    возникает); запрос шага 11 через 15 мин и на следующее утро — снова `[]` ×3. Иначе — СТОП (стоп-правило).
+13. **Журнал и флаги «DEPLOYED».** `$MAIN/docs/audits/implementation-progress.md` — новый раздел «Развёртывание <date> — часть A
+    «защита платящих»» (таблица шагов, снимки до/после, точки отката, smoke; запись «… ждёт go» остаётся историей). Перевести каждую
+    отметку «canon, NOT deployed» части A в «DEPLOYED to prod <date>»:
+    в основной копии `$MAIN`: `grep -n -E "защита платящих.*canon, (not|NOT) deployed" CLAUDE.md Tools/n8n/README.md` — ровно 7 строк
+    (номера — на `113818bc`; если часть B сдвинула строки — по выводу grep):
+    - `CLAUDE.md:139` — «A5/A6»: номер владельца в Notifier, «(A5 «защита платящих», 2026-10-15 — canon, not deployed)»;
+    - `CLAUDE.md:167` — заголовок блока «Part A … — canon, NOT deployed:» (вместе с фразой «…; prod only on the owner's «да»» в том же
+      абзаце — заменить ссылками на журнал, снимки и точки отката);
+    - `CLAUDE.md:217` — `Delete Orphan Profiles`: «Live-profile protection (A4 …, 2026-10-15 — canon, not deployed)»;
+    - `CLAUDE.md:218` — пункт `Channel Watch` «(… 2026-10-15 — canon, not deployed)»;
+    - `Tools/n8n/README.md:138` — пункт набора «Part A «защита платящих» (… — canon, NOT deployed)»;
+    - `Tools/n8n/README.md:161` — строка RevenueCat Events «A1/A2 «защита платящих» (2026-10-14/15 — canon, NOT deployed; …)»;
+    - `Tools/n8n/README.md:199` — раздел Delete Orphan Profiles «Since A4 … (2026-10-15 — canon, not deployed)»;
+    - и строка «Статус» этого README («на проде НЕ выложено» → «выложено <date>»). `Tools/n8n/staging/README.md` отметки о
+      выкладке не несёт — менять нечего. Отметки «client, new build» (карточка бота, «Подписка», триггер heal) остаются до сборки.
+    Коммит `deploy(prod): …` (точечные пути).
 14. **Наблюдения владельца — каждое по отдельному «да», нужен живой бот (на проде сейчас ботов 0 — после новой сборки):**
     (а) A5: настоящая заявка на Telegram-боте владельца, у которого `get/status` несёт `account.phone` ≠ верхнего `phone`, —
     уведомление приходит в «Избранное» собственного Telegram-аккаунта; (б) A4: разлогинить WhatsApp у бота с WhatsApp + Telegram —
     за ≤ 10 мин одно self-message «Choose Reply: WhatsApp отключился — …» в «Избранное» Telegram, повторная привязка ничего не шлёт.
+
+`unset N8N_API_KEY DEPLOY_START` по окончании.
 
 ## Откат
 

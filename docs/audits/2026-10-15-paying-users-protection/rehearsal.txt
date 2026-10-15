@@ -539,6 +539,13 @@ n8n log errors since the tick:
 49571:Error while saving insights metadata and raw data
 49579:Error while saving insights metadata and raw data
 49664:Activated workflow "Channel Watch" (ID: crChannelWatch001)
+[annotation, A7 fix round 2026-10-15] The label above is wrong: the grep took the last five matching lines of the WHOLE
+n8n.log, not lines «since the tick». The four «Error while saving insights…» lines (49569, 49570, 49571, 49579) belong to the
+OLD server process of an earlier session: it received SIGTERM at n8n.log:49572 when that session stopped the stand (the log
+was last written 06:02Z, before this task) and logged «Stopping n8n...» at 49581; this task's server first starts at 49582
+(R1 bootstrap, 07:41Z). From 49581 to the end of the log (51777 — through every e2e run
+and the final stop) there are 0 such lines (`tail -n +49581 n8n.log | grep -c 'Error while saving insights'` → 0). Line
+49664 is the new process activating Channel Watch at startup.
 
 === §D. e2e на развёрнутом стенде (workflows-staging = канон пакета, derive-staging.py без импорта) ===
 --- e2e-auth.py (полный, с модельным шагом)
