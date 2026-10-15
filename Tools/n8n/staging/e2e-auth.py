@@ -2046,6 +2046,33 @@ def s_identity_heal_foreign(ctx):
         heal_cleanup(u, old, mine, other)
 
 
+def demote_trialing_sql(app_user_id, profile_id, channel="whatsapp", reason="trial_expiry"):
+    """The DERIVED (= imported) Profile Lifecycle Sweep's own `Demote Trialing` statement — trial expiry, 4d17h after the
+    first bot: trialing → expired, the plan ('trial') and the NULL period untouched — bound the way the sweep binds it."""
+    src = json.load(open(os.path.join(N8N_DIR, "workflows-staging", SWEEP_FILE), encoding="utf-8"))
+    q = next(n for n in src["nodes"] if n["name"] == "Demote Trialing")["parameters"]["query"]
+    vals = [app_user_id, profile_id, channel, reason]
+    return re.sub(r"\$([1-4])(?!\d)", lambda m: "'" + vals[int(m.group(1)) - 1].replace("'", "''") + "'", q)
+
+
+@scenario("identity_heal_after_sweep_demotion", "final review I-1: the token's id is the trial seed the lifecycle sweep already DEMOTED (the imported sweep's own Demote Trialing: trial/expired/NULL — on iOS, StoreKit 1 restores nothing by itself, so the merge and this heal usually come after the 4d17h sweep) → VerifyIdentity still hands the paid alias over: the owner is business/active/<the old period>/SKU with the old balance, the old id retired — not locked out until the next renewal")
+def s_identity_heal_after_demotion(ctx):
+    o, old, mine, other, period = heal_fixture(ctx, "a3d")
+    u = o.app_user_id
+    try:
+        rc_aliases(u, [old, u])
+        demoted = pg(demote_trialing_sql(u, mine))
+        before = heal_row(u)
+        st, d = hook("VerifyIdentity", o.token, {"appUserId": u, "originalAppUserId": old})
+        after, alias_after = heal_row(u), heal_row(old)
+        ok = (before == "trial|expired|0|-|-" and u in demoted
+              and st == 200 and d == {"success": True, "aliases": 1, "consolidated": 1, "rekeyed": 1, "truncated": False}
+              and after == f"business|active|500|{period}|sub.business.month" and alias_after.split("|")[1:3] == ["expired", "0"])
+        return ok, (f"sweep demoted the seed: {demoted!r} → owner {before}; heal={st} {d}; owner → {after} (want "
+                    f"business|active|500|{period}|sub.business.month); alias → {alias_after}")
+    finally:
+        heal_cleanup(u, old, mine, other)
+
 @scenario("billing_conflict_is_logged", "V3 (T1): a refresh that answers billingConflict (a second install naming a billing id another install holds) writes ONE billing_conflicts row — claimant, the CURRENT holder, attempts — a repeat bumps attempts, a refresh without a conflict writes nothing, the answer itself is unchanged; once support revokes the holder the id moves on the claimant's next refresh")
 def s_billing_conflict_log(ctx):
     a = fresh_owner(ctx, "v3j")

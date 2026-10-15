@@ -146,15 +146,17 @@ return [{ json: { success: true, aliases: Number(plan.aliases) || 0, consolidate
 # The alias merge of RevenueCat Events (billing_consolidation.py — ONE text for both callers), rendered for the heal:
 # recipient = the first parameter (the token's billing id), aliases = the second (RevenueCat's list minus the recipient),
 # install = the third (the token's install: only ITS live bot_profiles rows follow the recipient). No event — the plan of an
-# active paid alias may be handed over (A2's carry), only to a recipient still trialing without a period.
+# active paid alias may be handed over (A2's carry), only to a never-paid seed without a period (trialing, or trial/expired
+# as the lifecycle sweep's Demote Trialing leaves it — billing_consolidation.TAKE, final review I-1).
 HEAL_HEAD = """-- A3 «защита платящих» (2026-10-14): ЛЕЧЕНИЕ ЗЕРКАЛА после переустановки (вебхук VerifyIdentity, crVerifyIdent001).
 -- Та же цепочка склейки, что Consolidate Aliases в RevenueCat Events (billing_consolidation.py — один текст на оба места),
 -- но её запускает не событие RevenueCat, а клиент, увидевший CustomerInfo.OriginalAppUserId, отличный от своего AppUserId.
 -- Параметры по порядку: биллинг-ID ТОКЕНА (получатель; из crAuth, никогда из тела запроса), JSON-массив алиасов, которые
 -- сам RevenueCat перечислил для этого ID (без получателя; Plan Heal), установка токена (перепривязываются только ЕЁ живые
 -- строки bot_profiles под алиасами — спека §1). Подсказка клиента не бывает ни получателем, ни источником. События нет —
--- план активного платного алиаса может переехать (как топ-ап первым событием, A2), но только получателю trialing без
--- периода. Повтор ничего не переписывает: ноль новых версий строк.
+-- план активного платного алиаса может переехать (как топ-ап первым событием, A2), но только никогда не платившему
+-- получателю без периода: trialing или trial/expired, каким его оставляет свип (на iOS склейка, а с ней и лечение,
+-- обычно приходит позже гашения триала). Повтор ничего не переписывает: ноль новых версий строк.
 """
 # Fix round 2 (2026-10-15): the heal's own trace — a CTE of THIS statement, appended after the module's chain through the
 # `result` slot (billing_consolidation.py's text is untouched): one transaction with the consolidation it records.

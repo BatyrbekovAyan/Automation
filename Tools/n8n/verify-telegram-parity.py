@@ -716,7 +716,8 @@ def check_rc_transfer_carry_gate():
     only against a live instance; this assert is the committed, offline guard.
     The ALIAS path's usage carry (Consolidate Aliases) stays DELIBERATELY ungated -- same
     human; since A2 «защита платящих» (2026-10-15) that path also carries a NARROW snapshot
-    (a plan-less event, an active paid alias, a trialing recipient without a period), which
+    (a plan-less event, an active paid alias, a never-paid recipient without a period --
+    trialing, or trial/expired as the lifecycle sweep leaves it: final review I-1), which
     verify-billing-consolidation.py pins, not this check -- so this check is scoped to
     Transfer Subscriber alone."""
     wf = load(RC_EVENTS)

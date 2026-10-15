@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """A2 «защита платящих» (2026-10-14): a reinstall's first RevenueCat event that carries no plan (a top-up) no longer leaves
 the paying owner on trial — the alias merge hands the plan of an ACTIVE alias of a paid tier over to a recipient that is
-still trialing without a period, in the same upsert that moves the balance; and the merge gains the re-key primitive
+still a never-paid seed without a period (trialing, or — final review I-1, 2026-10-15 — trial/expired as the lifecycle
+sweep's Demote Trialing leaves it: Q15), in the same upsert that moves the balance; and the merge gains the re-key primitive
 (REKEY_CTE) that RevenueCat Events renders with install = NULL (re-keys nothing) and Task A3's identity-heal will render
 with the token's install. Spec docs/superpowers/specs/2026-10-14-paying-users-protection-and-schedule-design.md §2.4, §3 A2.
 
@@ -26,8 +27,8 @@ import sys
 import tempfile
 from pathlib import Path
 
-from harness import N8N, WF, Case, code, module, node, report, sql_literal
-from rc_events_chain import CANON as W, RC_FILE, SETUP, RaceFixture, Session, bound_sql, deliver, ok_answer, race
+from harness import N8N, WF, Case, code, module, node, report, sql_literal, wf
+from rc_events_chain import CANON as W, RC_FILE, SETUP, RaceFixture, Session, bound_sql, deliver, ok_answer, pg_bind, race
 
 BC = module('billing_consolidation.py')
 guard = module('verify-sql-comments.py')
@@ -71,6 +72,18 @@ def transfer(eid, frm, to):
 def seed(pg, uid, plan, status, balance=0, period='null', product=None):
     pg.x(f"insert into subscribers (app_user_id, plan, status, topup_balance, current_period_end, product_id) values "
          f"({sql_literal(uid)}, {sql_literal(plan)}, {sql_literal(status)}, {balance}, {period}, {sql_literal(product)});")
+
+
+SWEEP_FILE = 'fXYpCXPKw92EzRz8-Profile_Lifecycle_Sweep.json'
+
+
+def demote_as_the_sweep(pg, uid):
+    """The trial seed after the lifecycle sweep's trial expiry (4d17h after its first bot): the LIVE Profile Lifecycle
+    Sweep's own `Demote Trialing` statement, bound like the sweep binds it — trialing → expired, the plan ('trial') and
+    the NULL period untouched (final review I-1, 2026-10-15)."""
+    q = node(wf(SWEEP_FILE), 'Demote Trialing')['parameters']['query']
+    rows = pg.q(pg_bind(q, [uid, 'p-sweep', 'whatsapp', 'trial_expiry']))
+    assert len(rows) == 1, f'premise: the sweep must demote {uid}: {rows}'
 
 
 def dialogs(pg, uid, n, days_back=0, tag='c'):
@@ -292,9 +305,13 @@ with Case('A2 Q8 several aliases: the ACTIVE one with the LATEST period is hande
 
 for label, plan, status, period in (('trialing WITH a period (trialing/+5d)', 'trial', 'trialing', "now() + interval '5 days'"),
                                      ('expired (trial/expired/-1d)', 'trial', 'expired', "now() - interval '1 day'"),
-                                     ('in grace (business/grace/+2d)', 'business', 'grace', "now() + interval '2 days'")):
-    with Case(f'A2 Q9 the recipient is {label} → no plan is handed over (only a trialing recipient WITHOUT a period takes '
-              f'one: nothing is ever downgraded or overwritten); the balance moves') as c:
+                                     ('in grace (business/grace/+2d)', 'business', 'grace', "now() + interval '2 days'"),
+                                     # final review I-1: the take widened to the sweep-demoted trial seed ONLY — a plan that
+                                     # was ever paid (or none) and expired without a period is not a never-paid seed
+                                     ('a PAID plan expired without a period (start/expired/NULL)', 'start', 'expired', 'null'),
+                                     ('plan none expired without a period (none/expired/NULL)', 'none', 'expired', 'null')):
+    with Case(f'A2 Q9 the recipient is {label} → no plan is handed over (only a never-paid seed WITHOUT a period takes one — '
+              f'trialing, or trial/expired as the sweep leaves it: nothing is ever downgraded or overwritten); the balance moves') as c:
         with Session(SETUP) as pg:
             seed(pg, OLD, 'business', 'active', 500, PLUS30, 'sub.business.month')
             seed(pg, U, plan, status, 0, period)
@@ -354,6 +371,32 @@ with Case('A2 Q14 the paid usage (I-4) still moves with the money, unchanged: th
         before = versions(pg)
         merge(pg, topup('evt-q14'))
         c.check(versions(pg) == before, 'the replay rewrote a row')
+
+
+with Case('A2 Q15 (final review I-1) the recipient is the trial seed the lifecycle sweep DEMOTED (its own Demote Trialing: '
+          'trial/expired/NULL, 4d17h after the first bot — on iOS the alias merge usually comes LATER: «Восстановить» or a '
+          'purchase on the trial paywall) + an ACTIVE paid alias → it is still a never-paid seed: business/active/<the alias\'s '
+          'period>/sub.business.month is handed over, the balances summed (40 + 500 = 540), the alias retired; through the '
+          'graph a top-up first lands business/active/1040 (+ the top-up\'s 500) — the paying owner is not locked out') as c:
+    with Session(SETUP) as pg:
+        seed(pg, OLD, 'business', 'active', 500, PLUS30, 'sub.business.month')
+        seed(pg, U, 'trial', 'trialing', 40)
+        demote_as_the_sweep(pg, U)
+        c.check(plan_of(pg, U) == ('trial', 'expired', 40, None, None), f'premise: the sweep-demoted seed {sub(pg, U)}')
+        period = sub(pg, OLD)['period']
+        out = merge(pg, topup('evt-q15'))
+        c.check(plan_of(pg, U) == ('business', 'active', 540, period, 'sub.business.month') and out['plan_after'] == 'business',
+                f'recipient {sub(pg, U)} result {out} (alias period {period})')
+        o = sub(pg, OLD)
+        c.check((o['status'], o['bal'], o['clamped']) == ('expired', 0, True), f'alias {o}')
+    with Session(SETUP) as pg:
+        seed(pg, OLD, 'business', 'active', 500, PLUS30, 'sub.business.month')
+        seed(pg, U, 'trial', 'trialing', 40)
+        demote_as_the_sweep(pg, U)
+        period = sub(pg, OLD)['period']
+        r = deliver(pg, topup('evt-q15g'))
+        c.check(ok_answer(r) and plan_of(pg, U) == ('business', 'active', 1040, period, 'sub.business.month'),
+                f'through the graph: {r} / {sub(pg, U)}')
 
 
 # ---------------------------------------------------------------------------------------------------- G: the graph
@@ -548,13 +591,29 @@ m_carry_any_plan = q_sub('carry_any_plan', CONS, "and plan in ('start', 'busines
                          'and $3::text is null')
 m_carry_ignores_event_plan = q_sub('carry_ignores_event_plan', CONS, "and plan in ('start', 'business', 'network') and $3::text is null",
                                    "and plan in ('start', 'business', 'network')")
-m_carry_overwrites_recipient = q_sub('carry_overwrites_recipient', CONS, "    plan = case when subscribers.status = 'trialing' and subscribers.current_period_end is null\n"
-                                           "                     and exists (select 1 from plan_source) then excluded.plan",
+m_carry_overwrites_recipient = q_sub('carry_overwrites_recipient', CONS, f'    plan = case when {BC.TAKE} then excluded.plan',
                                      '    plan = case when exists (select 1 from plan_source) then excluded.plan')
-m_update_ungated = q_sub('update_ungated', CONS, "  where excluded.topup_balance > 0 or (subscribers.status = 'trialing' and subscribers.current_period_end is null\n"
-                               "                     and exists (select 1 from plan_source))\n", '')
+m_update_ungated = q_sub('update_ungated', CONS, f'  where excluded.topup_balance > 0 or ({BC.TAKE})\n', '')
 m_rekey_by_parameter = q_sub('rekey_by_parameter', CONS, 'and b.owner_id = null::text', 'and b.owner_id = $1')
 m_transfer_carry_ungated = q_sub('transfer_carry_ungated', 'Transfer Subscriber', 'from accepted a, dialog_counts dc', 'from to_ids a, dialog_counts dc')
+
+
+def take_everywhere(label, new_take):
+    """A mutation of the take predicate in EVERY place `credited` uses it (four carried columns + the update's WHERE)."""
+    def m(w):
+        p = nd(w, CONS)['parameters']
+        assert p['query'].count(BC.TAKE) == 5, f'mutation anchor: the take predicate {p["query"].count(BC.TAKE)} times, expected 5'
+        p['query'] = p['query'].replace(BC.TAKE, new_take)
+    m.__name__ = 'm_' + label
+    return m
+
+
+# final review I-1: the take is EXACTLY the never-paid seed — an expired PAID plan must never take a snapshot, and the
+# pre-I-1 predicate (trialing only) leaves the paying owner whose seed the sweep demoted on trial/expired: both fail
+m_take_any_expired = take_everywhere('take_any_expired', BC.TAKE.replace(
+    "(subscribers.plan = 'trial' and subscribers.status = 'expired')", "subscribers.status = 'expired'"))
+m_take_trialing_only = take_everywhere('take_trialing_only', BC.TAKE.replace(
+    "(subscribers.status = 'trialing' or (subscribers.plan = 'trial' and subscribers.status = 'expired'))", "subscribers.status = 'trialing'"))
 
 
 def m_consolidate_disabled(w):
@@ -591,6 +650,8 @@ MUTATIONS = [(m_consolidate_hand_edit, 'Consolidate Aliases: query differs from 
              (m_carry_any_plan, '`plan_source` must take only a paid tier'),
              (m_carry_ignores_event_plan, '`plan_source` must apply only when the event carries no plan'),
              (m_carry_overwrites_recipient, '`credited` hands `plan` over outside the take predicate'),
+             (m_take_any_expired, '`credited` hands `plan` over outside the take predicate'),
+             (m_take_trialing_only, '`credited` hands `plan` over outside the take predicate'),
              (m_update_ungated, '`credited` must update only when there is money or a plan to hand over'),
              (m_rekey_by_parameter, 'the re-key must compare owner_id with SQL NULL'),
              (m_transfer_carry_ungated, 'Transfer Subscriber: the usage carry must drive off `accepted`'),

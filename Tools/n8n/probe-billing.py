@@ -227,8 +227,9 @@ There are TWO different mechanisms behind that, and they need different handling
     carries the authoritative ones and this path fires on EVERY event forever) --
     except the NARROW carry of A2 «защита платящих» (2026-10-15, billing_consolidation.py):
     when the event itself carries no plan, from an ACTIVE alias on a paid tier into a
-    recipient that is `trialing` without a period (the event's own fields still land
-    after it in Upsert Subscriber). It sits BEFORE `Upsert Subscriber` on purpose: that node's
+    never-paid recipient without a period -- `trialing`, or `trial`/`expired` as the
+    lifecycle sweep's Demote Trialing leaves it (final review I-1, 2026-10-15) -- (the
+    event's own fields still land after it in Upsert Subscriber). It sits BEFORE `Upsert Subscriber` on purpose: that node's
     `topup_balance + $5` is not retry-idempotent, so a failure after it would let a
     RevenueCat redelivery double-credit the event's own top-up.
   * **TRANSFER (a cross-account move).** RC's payload carries NO app_user_id/

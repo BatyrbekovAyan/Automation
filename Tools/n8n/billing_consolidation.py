@@ -16,8 +16,9 @@ A2 changed the alias merge in two ways (the TRANSFER is unchanged — Task 16/17
       trial/trialing until the next renewal — up to a month of trial limits, and the lifecycle sweep deleting the bots
       created after the reinstall. Now `plan_source` takes the ACTIVE alias row of a PAID tier (start/business/network —
       never `none`, whose base quota is 0) with the latest period (Transfer's `src` order) when the event carries no plan, and `credited` hands it over in its ONE upsert (a row cannot be changed by two
-      CTEs of one statement) — only to a recipient that is trialing without a period (a fresh install's seed: nothing is
-      ever downgraded), and creates a missing recipient row even at a zero balance so the plan is not lost with the alias.
+      CTEs of one statement) — only to a NEVER-PAID seed without a period (TAKE: a fresh install's trialing seed, or that
+      seed as the lifecycle sweep's Demote Trialing leaves it, trial/expired — nothing paid is ever downgraded or
+      overwritten), and creates a missing recipient row even at a zero balance so the plan is not lost with the alias.
       A settled alias set (it rides every event for the life of the account) still writes no row version: the update runs
       only when there is money or a plan to hand over.
   (2) REKEY_CTE — the recipient takes over the live bot_profiles rows of the named install (spec §1: the row's
@@ -41,10 +42,17 @@ import sys
 # <EVENT_PLAN> = the plan the event itself carries (text, NULL = none: the alias's plan may be handed over); <INSTALL> = the
 # install whose live bot_profiles rows follow the recipient (text, NULL = re-key nothing).
 
-# The recipient row may take the alias's plan: it is still a fresh install's seed (trialing, no period) and there IS a plan
-# to hand over. Evaluated on the conflicting row under its lock (`subscribers.` in ON CONFLICT DO UPDATE), never on a snapshot.
-TAKE = ("subscribers.status = 'trialing' and subscribers.current_period_end is null\n"
-        "                     and exists (select 1 from plan_source)")
+# The recipient row may take the alias's plan: it is still a NEVER-PAID seed without a period and there IS a plan
+# to hand over. A never-paid seed is Create's trial/trialing — or, since the final review of Part A (I-1,
+# 2026-10-15), the same seed after the lifecycle sweep's trial expiry: `Demote Trialing` (4d17h after the first
+# bot) leaves it plan 'trial', status 'expired', period NULL, while on iOS (StoreKit 1 restores nothing by itself)
+# RevenueCat's alias merge — and so the heal — usually comes LATER («Восстановить», a purchase on the trial
+# paywall); without this the merge retired the paid alias and the paying owner stayed locked out until his next
+# renewal. A plan that was ever paid (start/business/network) or `none` never matches, nor does anything with a
+# period: nothing paid is ever overwritten. Evaluated on the conflicting row under its lock (`subscribers.` in
+# ON CONFLICT DO UPDATE), never on a snapshot.
+TAKE = ("(subscribers.status = 'trialing' or (subscribers.plan = 'trial' and subscribers.status = 'expired'))\n"
+        "                     and subscribers.current_period_end is null and exists (select 1 from plan_source)")
 
 
 def REKEY_CTE(to, install, from_ids="alias_ids"):
@@ -89,10 +97,11 @@ CONSOLIDATE_BODY = """with alias_ids as (
 ), credited as (
   -- Баланс алиасов (сумма под блокировкой; переезжает только положительная, как и раньше) — получателю всегда;
   -- снимок plan_source — в ТОМ ЖЕ upsert'е (одну строку нельзя менять из двух CTE одного statement'а) и ТОЛЬКО
-  -- получателю, который ещё trialing без периода (свежая установка): ничего не понижает, получатель со своим планом,
-  -- периодом или статусом снимок не берёт, а деньги всё равно переезжают. Строки получателя ещё нет — создаём её
-  -- (план алиаса, если он есть, иначе trial/trialing) даже при нулевом балансе: иначе план, который ниже гасится
-  -- вместе с алиасом, пропал бы. Обновление идёт, ТОЛЬКО когда есть деньги или снимок: settled-набор алиасов (он
+  -- никогда не платившей затравке без периода: trialing свежей установки или она же, погашенная свипом (Demote
+  -- Trialing: trial/expired — склейка на iOS обычно приходит позже, финальное ревью I-1): ничего не понижает,
+  -- получатель с оплаченным планом или периодом снимок не берёт, а деньги всё равно переезжают. Строки получателя
+  -- ещё нет — создаём её (план алиаса, если он есть, иначе trial/trialing) даже при нулевом балансе: иначе план,
+  -- который ниже гасится вместе с алиасом, пропал бы. Обновление идёт, ТОЛЬКО когда есть деньги или снимок: settled-набор алиасов (он
   -- приезжает на каждом событии до конца жизни аккаунта) не плодит версии строк.
   insert into subscribers (app_user_id, plan, status, current_period_end, product_id, topup_balance, trial_started_at, updated_at)
   select <TO>, coalesce(s.plan, 'trial'), coalesce(s.status, 'trialing'), s.current_period_end, s.product_id,
@@ -158,8 +167,9 @@ RC_CONSOLIDATE_HEAD = """-- СКЛЕЙКА ИДЕНТИЧНОСТЕЙ (Task 16, 
 --
 -- Перенос баланса и гашение — на каждом событии. Снимок плана строки-алиаса (A2, CTE plan_source) — ТОЛЬКО из
 -- АКТИВНОЙ строки платного плана, ТОЛЬКО когда событие само плана не несёт (третий параметр пуст: топ-ап первым событием после
--- переустановки, EXPIRATION, BILLING_ISSUE …) и ТОЛЬКО получателю-trialing без периода. Событие с планом едет следом в Upsert Subscriber и кладёт
--- свои авторитетные план/статус/период; получатель со своим планом или периодом не трогается — риска понижения на
+-- переустановки, EXPIRATION, BILLING_ISSUE …) и ТОЛЬКО никогда не платившему получателю без периода (trialing или trial/expired,
+-- как его оставляет свип). Событие с планом едет следом в Upsert Subscriber и кладёт
+-- свои авторитетные план/статус/период; получатель с оплаченным планом или периодом не трогается — риска понижения на
 -- пути, который срабатывает ВЕЧНО, на каждом событии, по-прежнему нет. Перепривязки bot_profiles (CTE rekeyed)
 -- здесь нет по построению: у вебхука RevenueCat нет установки, вместо неё — NULL.
 --

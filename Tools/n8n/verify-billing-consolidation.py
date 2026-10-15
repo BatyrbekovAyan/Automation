@@ -14,7 +14,8 @@ Postgres); this file pins what that behaviour rests on, so a hand edit, a stale 
   (4) the shape the alias merge rests on, read off the DEPLOYED text: `locked` takes the alias rows `for update` and is the
       only source of the sum and of `plan_source`; `plan_source` is status = 'active' of a paid tier only, only when the
       event's plan (the third parameter) is null, latest period first; every carried column of `credited` is gated on the
-      same take predicate (the recipient is trialing without a period AND there is a source) and its update runs only when
+      same take predicate — EXACTLY the never-paid seed without a period (trialing, or trial/expired as the lifecycle
+      sweep's Demote Trialing leaves it — final review I-1) AND there is a source — and its update runs only when
       there is money or a plan to hand over (zero row versions for a settled alias set); `retired` keeps its guard and clamp;
       the re-key CTE compares owner_id with SQL NULL in RevenueCat Events (no parameter can re-key a bot there) and
       touches live rows only; the final select hands the event id on (A1);
@@ -152,7 +153,12 @@ def check(wf):
              "null) — an event with a plan lays its own in Upsert Subscriber")
         need(re.search(r"order by current_period_end desc nulls last, updated_at desc nulls last limit 1\b", fs),
              "Consolidate Aliases: `plan_source` must pick ONE row, the latest period first (Transfer's src order)")
-    take = "subscribers.status = 'trialing' and subscribers.current_period_end is null and exists (select 1 from plan_source)"
+    # the take predicate, flattened — kept HERE on purpose (not imported from the module): EXACTLY the never-paid seed
+    # without a period. Create's trialing seed, or that seed as the lifecycle sweep's Demote Trialing leaves it (plan
+    # 'trial', status 'expired', period NULL — on iOS the alias merge usually comes after it: final review I-1); a plan
+    # that was ever paid, `none`, or anything with a period never takes a snapshot.
+    take = ("(subscribers.status = 'trialing' or (subscribers.plan = 'trial' and subscribers.status = 'expired')) "
+            "and subscribers.current_period_end is null and exists (select 1 from plan_source)")
     if need(credited is not None, "Consolidate Aliases: the CTE `credited` is gone"):
         fc = flat(credited)
         need(re.search(r"\bfrom \(select coalesce\(sum\(topup_balance\), 0\) as total from locked\) x left join plan_source s on true\b", fc),
@@ -209,7 +215,8 @@ def main():
         print(f"BILLING CONSOLIDATION FAILED: {len(fails)} check(s)")
         sys.exit(1)
     print(f"OK  {RC_EVENTS} (Consolidate Aliases / Transfer Subscriber = billing_consolidation.py; plan carried only from an "
-          f"active alias into a trialing recipient without a period; settled = no row version; no re-key from RevenueCat)")
+          f"active alias into a never-paid seed without a period — trialing or sweep-demoted trial/expired; settled = no row "
+          f"version; no re-key from RevenueCat)")
     print("ALL BILLING CONSOLIDATION ASSERTS PASSED")
 
 

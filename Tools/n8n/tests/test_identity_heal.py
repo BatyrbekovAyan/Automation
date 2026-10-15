@@ -31,6 +31,9 @@ session temp tables of the staging Postgres. No n8n server, no network, never pr
   H10 a recipient with its own paid plan keeps it (only the balance moves); several aliases → the latest active plan
   H11 the RevenueCat request: GET v2 aliases of the URL-encoded TOKEN id, limit 1000, the «RevenueCat API» credential,
       fullResponse + neverError, 10 s
+  H12 final review I-1 (2026-10-15): the token's id is the trial seed the lifecycle sweep already DEMOTED (its own Demote
+      Trialing: trial/expired/NULL — on iOS the merge, and so the heal, usually comes after the 4d17h sweep) → still a
+      never-paid seed: the paid alias is handed over, the paying owner is not locked out
   J   fix round 2 (2026-10-15): the support journal identity_heal_log — a heal writes exactly ONE row INSIDE the Heal
       statement (install, recipient, the aliases RevenueCat listed, retired / re-keyed counts; a repeat its own zero row);
       a refusal RevenueCat's list decided (rc_mismatch / hint_not_alias / no_aliases, now 409) writes ONE row with its
@@ -50,8 +53,8 @@ import time
 import urllib.parse
 from pathlib import Path
 
-from harness import N8N, WF, Case, code, module, node, report, run_js, sql_literal
-from rc_events_chain import Halt, Run, Session, _pg_node, engine
+from harness import N8N, WF, Case, code, module, node, report, run_js, sql_literal, wf
+from rc_events_chain import Halt, Run, Session, _pg_node, engine, pg_bind
 
 BC = module('billing_consolidation.py')
 guard = module('verify-sql-comments.py')
@@ -483,6 +486,31 @@ with Case('A3 H10 the recipient keeps its own paid plan (start/active/+10d): onl
         c.check(answer_of(run) == (200, {'success': True, 'aliases': 2, 'consolidated': 2, 'rekeyed': 0, 'truncated': False})
                 and (s['plan'], s['status'], s['bal'], s['product']) == ('business', 'active', 300, 'sub.business.month')
                 and sub(pg, OLD)['status'] == sub(pg, OLD2)['status'] == 'expired', f'{answer_of(run)} {s}')
+
+
+# ---------------------------------------------------------------------------------------------------- H12: final review I-1
+SWEEP_FILE = 'fXYpCXPKw92EzRz8-Profile_Lifecycle_Sweep.json'
+
+with Case('A3 H12 (final review I-1) the token\'s id is the trial seed the lifecycle sweep already DEMOTED — the LIVE sweep\'s own '
+          'Demote Trialing: trial/expired/NULL, 4d17h after the first bot (on iOS, StoreKit 1 restores nothing by itself: the '
+          'merge, and so this heal, usually comes LATER — «Восстановить» or a purchase on the trial paywall) → 200 {success, '
+          'consolidated 1, rekeyed 2}; U becomes business/active/<OLD\'s period>/sub.business.month/500, OLD retired — the '
+          'paying owner is not locked out until his next renewal') as c:
+    with Session(SETUP) as pg:
+        period = reinstall(pg)
+        demote = node(wf(SWEEP_FILE), 'Demote Trialing')['parameters']['query']
+        demoted = pg.q(pg_bind(demote, [U, 'p-sweep', 'whatsapp', 'trial_expiry']))
+        s0 = sub(pg, U)
+        c.check(len(demoted) == 1 and (s0['plan'], s0['status'], s0['period']) == ('trial', 'expired', None),
+                f'premise: the sweep demoted the seed: {demoted} {s0}')
+        run = call(pg, mint(), {'appUserId': U, 'originalAppUserId': OLD}, RC(alias_list(OLD, U)))
+        st, body = answer_of(run)
+        c.check(st == 200 and body == {'success': True, 'aliases': 1, 'consolidated': 1, 'rekeyed': 2, 'truncated': False},
+                f'answer {st} {body} trail={run.trail} halt={run.halt}')
+        s, o = sub(pg, U), sub(pg, OLD)
+        c.check(s and (s['plan'], s['status'], s['bal'], s['period'], s['product']) == ('business', 'active', 500, period, 'sub.business.month'),
+                f'the sweep-demoted recipient must take the paid alias: {s}')
+        c.check(o and (o['status'], o['bal'], o['clamped']) == ('expired', 0, True), f'alias {o}')
 
 
 # ---------------------------------------------------------------------------------------------------- H11: the request
