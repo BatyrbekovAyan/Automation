@@ -356,8 +356,12 @@ public class FontGlyphCoverageTests
         yield return ("SubscriptionPageRows.TrialSubline", SubscriptionPageRows.TrialSubline(3));
         yield return ("SubscriptionPageRows.CountLine", SubscriptionPageRows.CountLine(412, 1000));
         yield return ("SubscriptionPageRows.TopUpRowText", SubscriptionPageRows.TopUpRowText());
-        yield return ("SubscriptionPageRows.ReserveLine", SubscriptionPageRows.ReserveLine(2000));
-        yield return ("SubscriptionPageRows.ReserveLine(1)", SubscriptionPageRows.ReserveLine(1));
+        yield return ("SubscriptionPageRows.ReserveLine", SubscriptionPageRows.ReserveLine(2000, PlanTier.Business, false));
+        yield return ("SubscriptionPageRows.ReserveLine(1)", SubscriptionPageRows.ReserveLine(1, PlanTier.Business, false));
+        // A6: the same line on a plan-less account, in each of its three forms of agreement
+        yield return ("SubscriptionPageRows.ReserveLine(frozen)", SubscriptionPageRows.ReserveLine(2000, PlanTier.None, false));
+        yield return ("SubscriptionPageRows.ReserveLine(frozen,1)", SubscriptionPageRows.ReserveLine(1, PlanTier.None, true));
+        yield return ("SubscriptionPageRows.ReserveLine(frozen,5)", SubscriptionPageRows.ReserveLine(5, PlanTier.None, true));
         yield return ("BotDeletionCopy.RefusedBody(owned_elsewhere)", BotDeletionCopy.RefusedBody(BotServerDeletion.ReasonOwnedElsewhere));
         yield return ("BotDeletionCopy.RefusedBody(unproven)", BotDeletionCopy.RefusedBody(BotServerDeletion.ReasonUnproven));
         yield return ("BotDeletionCopy.WipeRefusedBody(1, elsewhere)", BotDeletionCopy.WipeRefusedBody(1, true));

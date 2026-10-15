@@ -54,6 +54,14 @@ public static class SubscriptionPageRows
     public const string NoPlanTitle = "Без подписки";
     public const string NoSubscriptionSubline = "Подписка не оформлена";
 
+    /// <summary>
+    /// The reserve line's clause for an account that has no plan (spec A6). The balance is paid for and
+    /// survives the lapse; the server keeps it and stops spending it while the account is not active or
+    /// trialing — «заморожен», not the spendable «спишутся после квоты». The participle agrees with
+    /// «Резерв» (masculine singular), so unlike the spendable clause it never takes a plural form.
+    /// </summary>
+    public const string ReserveFrozenClause = "заморожен до возобновления подписки";
+
     public const string DialogsTitle = "Диалоги ИИ";
     public const string BotsTitle = "Боты";
     public const string ChannelsTitle = "Каналы";
@@ -98,30 +106,44 @@ public static class SubscriptionPageRows
     // ── Plan card ────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// A purchase always wins; otherwise a trial with days on the clock is a trial
-    /// (including the pre-auth grace, where the clock has never STARTED — see
-    /// EntitlementPolicy.EffectiveTier), and everything else is spent.
+    /// The card's state — the SAME verdict as <see cref="EntitlementGate.CurrentTier"/> (bar that gate's
+    /// own launch-time grace while the store has not answered yet), because both ask
+    /// <see cref="EntitlementPolicy.EffectiveTier"/>: Active is a purchase, Trial is its Trial and
+    /// Expired is its None. A purchase always wins; otherwise a started clock lives by its own days
+    /// (the server can neither extend nor take a running local trial), and an UNSTARTED clock — the
+    /// pre-auth grace — is a trial exactly as long as the server has not said the account is spent.
     ///
-    /// «Has the clock started» is deliberately NOT a parameter: TrialLedger.DaysLeft()
-    /// already returns the full TrialDays before the first auth, so the day count is the
-    /// only thing this decision needs — and taking the flag anyway would look like it
-    /// mattered when no branch could ever read it.
+    /// Deciding on the day count alone (what this method did until 2026-10-15) was the defect: after a
+    /// reinstall the RevenueCat id survives but <see cref="TrialLedger"/> does not, so
+    /// <see cref="TrialLedger.DaysLeft"/> reports the FULL trial and the card read «Пробный · осталось
+    /// 5 дн.» while the gate was already None and the server knew the account was spent.
     /// </summary>
-    public static SubscriptionState State(PlanTier purchased, int trialDaysLeft)
+    /// <param name="trialStarted"><see cref="TrialLedger.HasStarted"/>.</param>
+    /// <param name="trialDaysLeft"><see cref="TrialLedger.DaysLeft"/> — the full trial before the first auth.</param>
+    /// <param name="serverSaysExpired"><see cref="ServerAccountStatus.Expired"/>.</param>
+    public static SubscriptionState State(PlanTier purchased, bool trialStarted, int trialDaysLeft,
+        bool serverSaysExpired)
     {
         if (purchased != PlanTier.None) return SubscriptionState.Active;
-        return trialDaysLeft > 0 ? SubscriptionState.Trial : SubscriptionState.Expired;
+
+        bool trialSpent = trialStarted && trialDaysLeft <= 0;   // TrialLedger.IsExpired
+        return EntitlementPolicy.EffectiveTier(purchased, trialStarted, trialSpent, serverSaysExpired) == PlanTier.None
+            ? SubscriptionState.Expired
+            : SubscriptionState.Trial;
     }
 
+    /// <param name="trialStarted">See <see cref="State"/>.</param>
+    /// <param name="trialDaysLeft">See <see cref="State"/>.</param>
+    /// <param name="serverSaysExpired">See <see cref="State"/>.</param>
     /// <param name="interval">
     /// <see cref="UsageSnapshot.interval"/> — «month», «year», or null/anything else for
-    /// «period unknown». Optional so the 20-odd existing call sites that have no snapshot to
-    /// hand (and every test written before Task 15a) keep asserting the KNOWN DEFAULT, monthly.
+    /// «period unknown». Optional so the call sites that have no snapshot to hand (and every
+    /// test written before Task 15a) keep asserting the KNOWN DEFAULT, monthly.
     /// </param>
-    public static SubscriptionStatusLine StatusLine(PlanTier purchased, int trialDaysLeft,
-        string periodEndIso, string interval = null)
+    public static SubscriptionStatusLine StatusLine(PlanTier purchased, bool trialStarted, int trialDaysLeft,
+        bool serverSaysExpired, string periodEndIso, string interval = null)
     {
-        SubscriptionState state = State(purchased, trialDaysLeft);
+        SubscriptionState state = State(purchased, trialStarted, trialDaysLeft, serverSaysExpired);
         switch (state)
         {
             case SubscriptionState.Active:
@@ -289,15 +311,35 @@ public static class SubscriptionPageRows
 
     /// <summary>
     /// PlanTier.None has no allowances at all (PlanCatalog.Get(None) is 0 bots / 0 channels /
-    /// 0 dialogs), so a meter block would read «2 из 0» — a limit that is not a limit but a
+    /// 0 dialogs), so the meter ROWS would read «2 из 0» — a limit that is not a limit but a
     /// missing plan. In that state the card's «Подписка не оформлена» and the actions below
-    /// carry the page instead.
+    /// carry the page instead. This is the rows' rule only: the block that holds them also
+    /// hosts the reserve line, see <see cref="MetersBlockVisible"/>.
     /// </summary>
     public static bool MetersVisible(PlanTier effectiveTier) => effectiveTier != PlanTier.None;
 
     /// <summary>
+    /// Whether the Meters BLOCK — the container and the hairline above it — is on screen. The rows
+    /// follow <see cref="MetersVisible"/>; the block also hosts the reserve line, so it stays for as
+    /// long as there is a line to show, independent of the rows' rule (spec A6): an owner whose plan
+    /// lapsed still paid for that reserve, and hiding the block wholesale hid it with the rows.
+    /// </summary>
+    /// <param name="reserveLine">The <see cref="ReserveLine"/> text, or null/empty when there is none.</param>
+    public static bool MetersBlockVisible(PlanTier effectiveTier, string reserveLine)
+        => MetersVisible(effectiveTier) || !string.IsNullOrEmpty(reserveLine);
+
+    /// <summary>
     /// «Резерв: 2 000 диалогов — спишутся после квоты», or <c>null</c> while there is no
     /// reserve — the caller HIDES the label on null rather than printing an empty line.
+    ///
+    /// With no plan (<paramref name="tier"/> None) or when <paramref name="frozen"/> the clause is
+    /// <see cref="ReserveFrozenClause"/> instead — «Резерв: 500 диалогов — заморожен до возобновления
+    /// подписки» (spec A6). The balance survives the lapse but the server spends it only while the
+    /// account is active or trialing, so the spendable wording would be a promise nothing keeps, and
+    /// printing nothing would hide what the owner paid for. On the page the two arguments are one fact
+    /// (the headline reads «Истекла» exactly when <see cref="EntitlementPolicy.EffectiveTier"/> is None);
+    /// a caller that holds only one of them still cannot print the spendable promise for an account
+    /// that has no plan.
     ///
     /// This is the one place a purchased top-up is visible before the quota runs out. The
     /// meter above keeps the BASE quota as its denominator (owner decision 2026-08-26: a
@@ -311,12 +353,14 @@ public static class SubscriptionPageRows
     /// <see cref="RuPlural"/> («1 диалог — спишется» / «2 диалога — спишутся» / «11 диалогов —
     /// спишутся»). A negative wire value is «nothing to show», never «-5 диалогов».
     /// </summary>
-    public static string ReserveLine(int reserve)
+    public static string ReserveLine(int reserve, PlanTier tier, bool frozen)
     {
         if (reserve <= 0) return null;
-        return "Резерв: " + PaywallCopy.Dialogs(reserve)
-             + " — " + RuPlural.Pick(reserve, "спишется", "спишутся", "спишутся")
-             + " после квоты";
+
+        string clause = tier == PlanTier.None || frozen
+            ? ReserveFrozenClause
+            : RuPlural.Pick(reserve, "спишется", "спишутся", "спишутся") + " после квоты";
+        return "Резерв: " + PaywallCopy.Dialogs(reserve) + " — " + clause;
     }
 
     // ── Actions ──────────────────────────────────────────────────────────────

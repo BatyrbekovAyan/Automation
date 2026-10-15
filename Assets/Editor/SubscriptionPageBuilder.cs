@@ -593,14 +593,15 @@ public static class SubscriptionPageBuilder
     /// CancelCaption's type and ink (30u regular, InkTertiary). Seeded with the top-up pack
     /// size so the Editor shows a real line, but INACTIVE like Notice: the runtime is the only
     /// owner of its visibility (ProfileSubPages.RenderMeters shows it exactly while
-    /// UsageSnapshot.topupBalance is positive), so a device can never render a stale «500»
-    /// before the first GetUsage read lands. Meters' VerticalLayoutGroup controls the
-    /// height, so a long count simply wraps and grows the card.
+    /// UsageSnapshot.topupBalance is positive — worded «заморожен до возобновления подписки» on
+    /// a plan-less account, where the rows go and the block stays for this line), so a device
+    /// can never render a stale «500» before the first GetUsage read lands. Meters'
+    /// VerticalLayoutGroup controls the height, so a long count simply wraps and grows the card.
     /// </summary>
     private static TextMeshProUGUI MakeReserveLine(GameObject meters)
     {
         var go = NewChild(meters, ReserveLineName, out _);
-        var tmp = AddText(go, SubscriptionPageRows.ReserveLine(PlanCatalog.TopUpDialogs), 30f, _regular,
+        var tmp = AddText(go, SubscriptionPageRows.ReserveLine(PlanCatalog.TopUpDialogs, PlanTier.Business, false), 30f, _regular,
             ThemeRole.InkTertiary);
         tmp.alignment = TextAlignmentOptions.MidlineLeft;
         go.SetActive(false);

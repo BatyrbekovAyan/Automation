@@ -37,8 +37,9 @@ public partial class ProfileSubPages
     [SerializeField] private ThemedColor subPillInkTheme;
 
     [Header("Subscription page — meters")]
-    // Hidden wholesale at PlanTier.None (see SubscriptionPageRows.MetersVisible): the divider
-    // goes with the block, or the card ends on a hairline with nothing under it.
+    // At PlanTier.None the ROWS are hidden (SubscriptionPageRows.MetersVisible); the block itself
+    // stays only while it hosts the reserve line (MetersBlockVisible). The divider goes with the
+    // block, or the card ends on a hairline with nothing under it.
     [SerializeField] private GameObject subMetersBlock;
     [SerializeField] private GameObject subMetersDivider;
     [SerializeField] private TextMeshProUGUI subDialogsValue;
@@ -47,6 +48,8 @@ public partial class ProfileSubPages
     // The paid top-up reserve, named under the dialogs bar while it is unspent. The bar's
     // denominator never includes it (owner decision 2026-08-26), so this label is the only
     // place a top-up shows before the quota runs out — hidden whenever there is nothing to say.
+    // It is a child of the Meters block but owns its own visibility: on a plan-less account the
+    // rows go and this label stays, worded «заморожен до возобновления подписки» (spec A6).
     [SerializeField] private TextMeshProUGUI subReserveLine;
     [SerializeField] private TextMeshProUGUI subBotsValue;
     [SerializeField] private TextMeshProUGUI subChannelsValue;
@@ -138,8 +141,13 @@ public partial class ProfileSubPages
         PlanTier purchased = BillingService.PurchasedTier;
         UsageSnapshot usage = UsageStore.Current;
 
+        // The headline asks the gate's question (EntitlementGate.CurrentTier → EffectiveTier), so it
+        // takes the gate's two inputs: has the clock ever started, and what did the server say. The day
+        // count alone is the FULL trial on a reinstall that wiped the ledger — «Пробный · осталось 5 дн.»
+        // over an account the server knows is spent (A6, 2026-10-15).
         SubscriptionStatusLine status = SubscriptionPageRows.StatusLine(
-            purchased, TrialLedger.DaysLeft(), usage?.periodEnd, usage?.interval);
+            purchased, TrialLedger.HasStarted, TrialLedger.DaysLeft(), ServerAccountStatus.Expired,
+            usage?.periodEnd, usage?.interval);
 
         if (subPlanTitle != null) subPlanTitle.text = status.Title;
         if (subPlanSubline != null) subPlanSubline.text = status.Subline;
@@ -147,7 +155,8 @@ public partial class ProfileSubPages
         if (subPillBgTheme != null) subPillBgTheme.Configure(status.PillBg);
         if (subPillInkTheme != null) subPillInkTheme.Configure(status.PillInk);
 
-        RenderMeters(usage);
+        // «Истекла» in the headline means a frozen reserve under it: one verdict, two surfaces.
+        RenderMeters(usage, frozenReserve: status.State == SubscriptionState.Expired);
 
         if (subTopUpLabel != null)
         {
@@ -183,17 +192,34 @@ public partial class ProfileSubPages
         SetSubscriptionBusy(_subBusy);
     }
 
-    private void RenderMeters(UsageSnapshot usage)
+    private void RenderMeters(UsageSnapshot usage, bool frozenReserve)
     {
         // Limits follow the EFFECTIVE tier (a live trial has its own caps), and the
         // quota falls back to the catalog whenever the server has not spoken yet.
         PlanTier tier = EntitlementGate.CurrentTier;
         PlanSpec spec = PlanCatalog.Get(tier);
 
-        bool metersVisible = SubscriptionPageRows.MetersVisible(tier);
-        if (subMetersBlock != null) subMetersBlock.SetActive(metersVisible);
-        if (subMetersDivider != null) subMetersDivider.SetActive(metersVisible);
-        if (!metersVisible) return;   // None has no allowances to measure against
+        // The paid reserve is shown whenever there is one, independent of the rows' rule: a plan-less
+        // owner still paid for it, and it lives in the same block as the rows — hiding that block at
+        // PlanTier.None used to take the reserve with it. Null = nothing to say = label hidden; no
+        // snapshot yet is also nothing to say: a «Резерв: 0» would be a statement about a number we do
+        // not have (same rule as the dash in UnknownUsageLine).
+        string reserve = usage == null
+            ? null
+            : SubscriptionPageRows.ReserveLine(usage.topupBalance, tier, frozenReserve);
+        if (subReserveLine != null)
+        {
+            subReserveLine.text = reserve ?? "";
+            subReserveLine.gameObject.SetActive(!string.IsNullOrEmpty(reserve));
+        }
+
+        // The block (and the hairline above it) stays for the line; the ROWS follow MetersVisible.
+        bool rowsVisible = SubscriptionPageRows.MetersVisible(tier);
+        bool blockVisible = SubscriptionPageRows.MetersBlockVisible(tier, reserve);
+        if (subMetersBlock != null) subMetersBlock.SetActive(blockVisible);
+        if (subMetersDivider != null) subMetersDivider.SetActive(blockVisible);
+        SetMeterRowsActive(rowsVisible);
+        if (!rowsVisible) return;   // None has no allowances to measure against
 
         int quota = usage != null && usage.quota > 0 ? usage.quota : spec.DialogQuota;
 
@@ -209,16 +235,6 @@ public partial class ProfileSubPages
             : SubscriptionPageRows.FillFraction(usage.used, quota);
         ApplyQuotaFill(fill);
 
-        // Null = nothing to say = label hidden. No snapshot yet is also nothing to say: a
-        // «Резерв: 0» would be a statement about a number we do not have (same rule as the
-        // dash in UnknownUsageLine).
-        string reserve = usage == null ? null : SubscriptionPageRows.ReserveLine(usage.topupBalance);
-        if (subReserveLine != null)
-        {
-            subReserveLine.text = reserve ?? "";
-            subReserveLine.gameObject.SetActive(!string.IsNullOrEmpty(reserve));
-        }
-
         // Bots and channels are read LOCALLY, not from the snapshot: these are exactly
         // the numbers EntitlementGate enforces against, so reading them anywhere else
         // could show a limit the user does not actually hit (or hide one they do).
@@ -228,6 +244,25 @@ public partial class ProfileSubPages
         if (subChannelsValue != null)
             subChannelsValue.text = SubscriptionPageRows.CountLine(
                 EntitlementGate.ConnectedChannelCount(), spec.MaxChannels);
+    }
+
+    /// <summary>
+    /// Shows or hides the meter ROWS: every child of the Meters block except the reserve line, which
+    /// owns its own visibility. Resolved by position in the block rather than through the value labels'
+    /// parents, so a hand-tuned row (a wrapper, a new meter) is covered without a code change — and the
+    /// block itself is never deactivated while the reserve line has to be on screen.
+    /// </summary>
+    private void SetMeterRowsActive(bool visible)
+    {
+        if (subMetersBlock == null) return;
+
+        Transform block = subMetersBlock.transform;
+        for (int i = 0; i < block.childCount; i++)
+        {
+            Transform row = block.GetChild(i);
+            if (subReserveLine != null && row == subReserveLine.transform) continue;
+            row.gameObject.SetActive(visible);
+        }
     }
 
     /// <summary>
