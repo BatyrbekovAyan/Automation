@@ -67,3 +67,26 @@ python3 Tools/n8n/staging/bootstrap.py --bot wa:stgwa001 --bot tg:stgtg001      
 выключены) и отказывает до первого запроса, если нет «Postgres Staging» или любой названной учётки. Всегда указывайте `--base`:
 по умолчанию инструмент смотрит на прод. Миграции — на отдельном одноразовом кластере: `STAGING_PGDATA=<scratch> STAGING_PGPORT=5434
 pg.sh init` (все миграции по порядку, затем `pg.sh migrate` ещё раз — идемпотентность), затем `pg.sh stop`.
+
+## Часть A «защита платящих» (2026-10-14/15) — что знать о стенде
+- **RevenueCat.** `derive-staging.py` переводит `https://api.revenuecat.com/` на мок (`<мок>/revenuecat/`) и ОТКАЗЫВАЕТ, если
+  производный файл ещё называет `api.revenuecat.com` (`FORBIDDEN_HOSTS` — один список с `deploy-canonical.py`). Мок отвечает
+  v2 `…/customers/<id>/aliases` так, как сценарий задал через `POST /__mock/rc_aliases {customer_id, aliases | null, status?, body?}`
+  (сброс — вместе с остальным моком). Учётка «RevenueCat API» на стенде — заглушка (`Bearer stg-mock-…`); bootstrap создаёт её
+  с id `crRevenueCatApi1` — тем же, что у канона и прода, поэтому производный Verify Identity привязан к ней байт в байт (на стенде,
+  поднятом до 2026-10-15, она может носить старый id `stgRevenueCatApi1` — привязка по имени, работает одинаково).
+- **Wappi-мок.** `profile/all/get` различает каналы (профиль с известным каналом виден только в своей базе; пустой список —
+  `profiles: null`, как у Wappi); режим отказа `body` отдаёт заданный JSON с заданным статусом. `fixtures.py delete` /
+  `sweep-mock-profiles` чистят и `channel_snapshot` — иначе перевыданный id `profile-NNNNNN` унаследует чужое «true».
+- **Channel Watch активен и на стенде** (каждые 10 мин зовёт `profile/all/get`). Сценарии `channel_*` гоняют производные узлы
+  через `WatchProbe`, который на время пробы выключает настоящий watch и включает обратно; сценарии, считающие ВСЕ вызовы мока
+  в доле секунды, изредка (≈1 %) ловят тик — при FAIL такого сценария перезапустить его отдельно.
+- **Insights.** n8n сбрасывает insights раз в 30 с; сброс, где упомянут workflow, удалённый после своего выполнения, падает
+  и повторяется до рестарта («Error while saving insights metadata and raw data» каждые 30 с). `e2e-auth.py` (и наборы,
+  которые берут его помощники: e2e-handoff, e2e-suggest, e2e-test-dialog) поэтому сразу ВЫКЛЮЧАЕТ отработавшие пробы и клоны,
+  а удаляет их одной пачкой в конце прогона, ≥ 35 с после последнего выключения (`defer_delete` / `flush_deferred_deletes`).
+  Остальные места, удаляющие отработавший workflow сразу (проба цены в `e2e-test-dialog.py`, уборка `e2e-clone-update.py`),
+  по-прежнему запускают этот цикл — шум только стенда, лечится рестартом (`bootstrap.py`); на проде — правило ≥ 35 с всегда.
+- **Репетиция пакета A от прод-состояния** — `docs/audits/2026-10-15-paying-users-protection/README.md` (новые workflow
+  импортируются CLI `import:workflow` при работающем сервере и включаются через API, как на проде; учётка — `import:credentials`
+  с фиксированным id).

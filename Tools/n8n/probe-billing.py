@@ -40,9 +40,14 @@ Webhook node; n8n itself rejects a wrong/missing Authorization header with 401/4
 before the workflow ever runs, so there is no app-level auth code to probe here).
 
 Real RevenueCat webhook envelope shape: {"event": {...}}. The Map Event Code node reads
-$json.body.event ?? $json.body, so this script always sends the wrapped form to match
-what RevenueCat actually POSTs (per RevenueCat's webhook docs: event.type,
-event.app_user_id, event.entitlement_ids, event.product_id, event.expiration_at_ms).
+$('Webhook').first().json.body.event ?? ...body (since A1 «защита платящих», 2026-10-14, the
+read-only Dedup Gate sits between the Webhook and Map Event and a Postgres node drops its input
+json, so the payload is read from the trigger by name), so this script always sends the wrapped
+form to match what RevenueCat actually POSTs (per RevenueCat's webhook docs: event.type,
+event.app_user_id, event.entitlement_ids, event.product_id, event.expiration_at_ms). This
+script's events carry no `id`, so they pass that gate as before and leave no rc_event_ledger
+row; RevenueCat's real events do carry one, and a REPEATED id is answered 200 with nothing
+written (the replay case is e2e-auth `rc_webhook_replay_credits_once`, staging only).
 
 ## Part 2 -- channel-slot registration/backstop (Task 8, opt-in)
 
@@ -217,10 +222,13 @@ There are TWO different mechanisms behind that, and they need different handling
     `transferred_to` are absent entirely; RC's own docs say to "search both the
     original_app_user_id and the aliases array"). `Map Event` computes the alias set
     minus the current id, and `If Needs Consolidation?` routes it to
-    `Consolidate Aliases`, which moves the balance and retires the alias rows --
-    deliberately WITHOUT copying their plan/status/period, because the event riding
-    behind it already carries the authoritative ones and this path fires on EVERY
-    event forever. It sits BEFORE `Upsert Subscriber` on purpose: that node's
+    `Consolidate Aliases`, which moves the balance and retires the alias rows. It
+    copies NO plan/status/period in general (the event riding behind it usually
+    carries the authoritative ones and this path fires on EVERY event forever) --
+    except the NARROW carry of A2 «защита платящих» (2026-10-15, billing_consolidation.py):
+    when the event itself carries no plan, from an ACTIVE alias on a paid tier into a
+    recipient that is `trialing` without a period (the event's own fields still land
+    after it in Upsert Subscriber). It sits BEFORE `Upsert Subscriber` on purpose: that node's
     `topup_balance + $5` is not retry-idempotent, so a failure after it would let a
     RevenueCat redelivery double-credit the event's own top-up.
   * **TRANSFER (a cross-account move).** RC's payload carries NO app_user_id/

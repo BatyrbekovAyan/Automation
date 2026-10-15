@@ -714,8 +714,11 @@ def check_rc_transfer_carry_gate():
     Ungated, a refused snapshot's used-rows land on a live trial and exhaust it instantly
     (200 carried onto a 150 quota, reproduced live pre-fix). The probe's T3 catches this
     only against a live instance; this assert is the committed, offline guard.
-    The ALIAS path (Consolidate Aliases) is DELIBERATELY ungated -- same human, no
-    snapshot at all -- so this check is scoped to Transfer Subscriber alone."""
+    The ALIAS path's usage carry (Consolidate Aliases) stays DELIBERATELY ungated -- same
+    human; since A2 «защита платящих» (2026-10-15) that path also carries a NARROW snapshot
+    (a plan-less event, an active paid alias, a trialing recipient without a period), which
+    verify-billing-consolidation.py pins, not this check -- so this check is scoped to
+    Transfer Subscriber alone."""
     wf = load(RC_EVENTS)
     q = sql_code(node(wf["nodes"], "Transfer Subscriber")["parameters"]["query"])
     assert re.search(r"\baccepted as \(", q), \
