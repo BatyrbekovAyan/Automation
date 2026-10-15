@@ -126,13 +126,16 @@ public partial class BotSettings
         Manager.Instance.LoadingPanel.SetActive(true);
 
         bool retryCreate = false;
+        string checkedProfileId = bot.whatsappProfileId;
         UnityWebRequest www = null;
-        yield return WappiProxy.Send(WappiProxy.Op.Status, ChatChannel.WhatsApp, new { profile_id = bot.whatsappProfileId }, r => www = r);
+        yield return WappiProxy.Send(WappiProxy.Op.Status, ChatChannel.WhatsApp, new { profile_id = checkedProfileId }, r => www = r);
         using var wwwScope = www;
 
         if (www.result == UnityWebRequest.Result.Success)
         {
             string response = www.downloadHandler.text;
+            // A4 fix round 2: a status proving authorized:true heals the card's «Канал отключён» here and now (it never marks).
+            ChannelHealth.UnmarkIfAuthorized(Manager.Instance.BotsRoot, ChatChannel.WhatsApp, checkedProfileId, www.responseCode, response);
 
             // WR-03: parse through the throw-safe, whitespace/order-agnostic WappiStatusParser
             // (already adopted by the Telegram twin below). The old scan derived a length from an
@@ -238,13 +241,16 @@ public partial class BotSettings
         // foreground action the user expects to see.
         yield return new WaitForEndOfFrame();
 
+        string checkedProfileId = Manager.openBot.GetComponent<Bot>().whatsappProfileId;
         UnityWebRequest www = null;
-        yield return WappiProxy.Send(WappiProxy.Op.Status, ChatChannel.WhatsApp, new { profile_id = Manager.openBot.GetComponent<Bot>().whatsappProfileId }, r => www = r);
+        yield return WappiProxy.Send(WappiProxy.Op.Status, ChatChannel.WhatsApp, new { profile_id = checkedProfileId }, r => www = r);
         using var wwwScope = www;
 
         if (www.result == UnityWebRequest.Result.Success)
         {
             string response = www.downloadHandler.text;
+            // A4 fix round 2: a status proving authorized:true heals the card's «Канал отключён» here and now (it never marks).
+            ChannelHealth.UnmarkIfAuthorized(Manager.Instance.BotsRoot, ChatChannel.WhatsApp, checkedProfileId, www.responseCode, response);
 
             // WR-03 (same defect class as CheckWhatsappAuthorization — this THIRD site was not in
             // the review). Note the deliberate shape: this path is DESTRUCTIVE (it deletes the
@@ -356,13 +362,16 @@ public partial class BotSettings
         Manager.Instance.LoadingPanel.SetActive(true);
 
         bool retryCreate = false;
+        string checkedProfileId = bot.telegramProfileId;
         UnityWebRequest www = null;
-        yield return WappiProxy.Send(WappiProxy.Op.Status, ChatChannel.Telegram, new { profile_id = bot.telegramProfileId }, r => www = r);
+        yield return WappiProxy.Send(WappiProxy.Op.Status, ChatChannel.Telegram, new { profile_id = checkedProfileId }, r => www = r);
         using var wwwScope = www;
 
         if (www.result == UnityWebRequest.Result.Success)
         {
             string response = www.downloadHandler.text;
+            // A4 fix round 2: a status proving authorized:true heals the card's «Канал отключён» here and now (it never marks).
+            ChannelHealth.UnmarkIfAuthorized(Manager.Instance.BotsRoot, ChatChannel.Telegram, checkedProfileId, www.responseCode, response);
 
             // tapi get/status is pretty-printed with two "phone" keys — parse via the
             // whitespace/order-agnostic WappiStatusParser instead of substring scanning.
@@ -440,13 +449,16 @@ public partial class BotSettings
         // foreground action the user expects to see.
         yield return new WaitForEndOfFrame();
 
+        string checkedProfileId = Manager.openBot.GetComponent<Bot>().telegramProfileId;
         UnityWebRequest www = null;
-        yield return WappiProxy.Send(WappiProxy.Op.Status, ChatChannel.Telegram, new { profile_id = Manager.openBot.GetComponent<Bot>().telegramProfileId }, r => www = r);
+        yield return WappiProxy.Send(WappiProxy.Op.Status, ChatChannel.Telegram, new { profile_id = checkedProfileId }, r => www = r);
         using var wwwScope = www;
 
         if (www.result == UnityWebRequest.Result.Success)
         {
             string response = www.downloadHandler.text;
+            // A4 fix round 2: a status proving authorized:true heals the card's «Канал отключён» here and now (it never marks).
+            ChannelHealth.UnmarkIfAuthorized(Manager.Instance.BotsRoot, ChatChannel.Telegram, checkedProfileId, www.responseCode, response);
 
             // tapi get/status is pretty-printed — the old substring parse THREW here (its
             // ",\"authorized_at\":" guard never matches the pretty ",\n  \"authorized_at\":",

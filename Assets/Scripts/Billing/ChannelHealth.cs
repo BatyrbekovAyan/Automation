@@ -16,14 +16,18 @@ public enum ChannelHealthVerdict
 }
 
 /// <summary>
-/// A4 «защита платящих» (2026-10-14; spec §2.2, §3 A4): a paying owner's WhatsApp/Telegram logs out (a re-paired phone —
-/// an ordinary event) and the bot falls silent while the card still says «connected». At launch and on every return to
-/// the app (at most once a minute) <c>Manager.ChannelHealthRoutine</c> asks the proxy's <c>status</c> op for every profile
-/// the session token lists; a positive <c>authorized:false</c> marks the channel — the card's subline says «Канал отключён ·
-/// переподключите в настройках» and its icon turns gray. NOTHING is deleted, logged out or switched off here: the mark is
-/// removed by <c>authorized:true</c>, by a re-authorisation and with the bot (<c>Bot.DeleteBotLocally</c>); the existing check
-/// on opening the bot's settings stays the reconnect path. The server half (crChannelWatch001) tells the owner through
-/// another channel; the orphan sweep no longer deletes such a profile.
+/// A4 «защита платящих» (2026-10-14; spec §2.2, §3 A4): a paying owner's WhatsApp/Telegram logs out (the phone dropped the
+/// linked device — an ordinary event) and the bot falls silent while the card still says «connected». At launch and on every
+/// return to the app (at most once a minute) <c>Manager.ChannelHealthRoutine</c> asks the proxy's <c>status</c> op for every
+/// profile the session token lists; a positive <c>authorized:false</c> marks the channel — the card's subline says «Канал
+/// отключён · переподключите в настройках» and its icon turns gray. NOTHING is deleted, logged out or switched off here.
+/// The logged-out profile itself is not re-paired: the owner reconnects in the bot's settings, whose status probe on opening
+/// (<c>BotSettings.CheckWhatsappUnauthorizationOutsideApp</c> / its Telegram twin) deletes a profile Wappi reports
+/// <c>authorized:false</c>, and the owner pairs a FRESH profile — the bot's line (F1: Create's Clone Plan + Bind) carries the
+/// bot's data over to it. The mark goes with a status that proves <c>authorized:true</c> (this routine, and since fix round 2
+/// the settings' own status checks — <see cref="UnmarkIfAuthorized"/>), with a confirmed pairing (Manager's auth pollers →
+/// <see cref="UnmarkProfile"/>) and with the bot (<c>Bot.DeleteBotLocally</c>). The server half (crChannelWatch001) tells the
+/// owner through another channel; the orphan sweep no longer deletes such a profile.
 ///
 /// Keys follow the per-bot convention (bot-persistence): <c>{bot}WhatsappUnauthorized</c> / <c>{bot}TelegramUnauthorized</c>
 /// (int: 1 = marked, absent = not), prefixed with the bot GameObject's name. Static Func/Action seams (the IdentityHealLatch
@@ -197,6 +201,18 @@ public static class ChannelHealth
             string held = channel == ChatChannel.Telegram ? bot.telegramProfileId : bot.whatsappProfileId;
             if (string.Equals(held, profileId, StringComparison.Ordinal)) Unmark(bot.name, channel);
         }
+    }
+
+    /// <summary>
+    /// A status answer the bot's settings already read for their own reasons — the check on switching a channel on and the
+    /// probe on opening them (fix round 2, 2026-10-15): the card heals at once instead of at the next launch / return to the
+    /// app. The routine's own verdict decides (<see cref="Judge(long, string, string)"/>: a 2xx with the boolean
+    /// <c>authorized:true</c> naming THIS profile), and it only ever unmarks — those checks act on <c>authorized:false</c>
+    /// themselves (the probe deletes the profile).
+    /// </summary>
+    public static void UnmarkIfAuthorized(Transform botsRoot, ChatChannel channel, string profileId, long status, string body)
+    {
+        if (Judge(status, body, profileId) == ChannelHealthVerdict.Authorized) UnmarkProfile(botsRoot, channel, profileId);
     }
 
     /// <summary>Deletes both channels' marks of a bot that is being deleted (no event: the card goes with it).</summary>

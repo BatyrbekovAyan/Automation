@@ -190,6 +190,45 @@ public class ChannelHealthTests
     }
 
     [Test]
+    public void The_settings_own_status_answers_only_ever_unmark_the_bot_that_holds_the_checked_profile()
+    {
+        var root = new GameObject("A4ChannelHealthRoot");
+        try
+        {
+            var botObject = new GameObject(BotKey);
+            botObject.transform.SetParent(root.transform);
+            var bot = botObject.AddComponent<Bot>();
+            bot.whatsappProfileId = Wa;
+            bot.telegramProfileId = Tg;
+            ChannelHealth.Apply(BotKey, ChatChannel.WhatsApp, ChannelHealthVerdict.Unauthorized);
+            ChannelHealth.Apply(BotKey, ChatChannel.Telegram, ChannelHealthVerdict.Unauthorized);
+
+            ChannelHealth.UnmarkIfAuthorized(root.transform, ChatChannel.WhatsApp, Wa, 200, "{\"authorized\":false,\"profile_id\":\"prof-wa-1\"}");
+            Assert.IsTrue(ChannelHealth.IsMarked(BotKey, ChatChannel.WhatsApp), "authorized:false changes nothing here — the settings act on it themselves");
+            ChannelHealth.UnmarkIfAuthorized(root.transform, ChatChannel.WhatsApp, Wa, 200, "{\"authorized\":true,\"profile_id\":\"other\"}");
+            Assert.IsTrue(ChannelHealth.IsMarked(BotKey, ChatChannel.WhatsApp), "a crossed answer (another profile's status) proves nothing");
+            ChannelHealth.UnmarkIfAuthorized(root.transform, ChatChannel.WhatsApp, Wa, 500, "{\"authorized\":true}");
+            Assert.IsTrue(ChannelHealth.IsMarked(BotKey, ChatChannel.WhatsApp), "a non-2xx proves nothing");
+            ChannelHealth.UnmarkIfAuthorized(root.transform, ChatChannel.WhatsApp, Wa, 200, "{\"authorized\":\"true\"}");
+            Assert.IsTrue(ChannelHealth.IsMarked(BotKey, ChatChannel.WhatsApp), "the flag as a string proves nothing (the routine's strict rule)");
+            ChannelHealth.UnmarkIfAuthorized(root.transform, ChatChannel.WhatsApp, "prof-wa-old", 200, "{\"authorized\":true,\"profile_id\":\"prof-wa-old\"}");
+            Assert.IsTrue(ChannelHealth.IsMarked(BotKey, ChatChannel.WhatsApp), "a profile the bot no longer holds heals nothing");
+            Assert.AreEqual(2, _saves, "nothing above wrote a thing");
+
+            ChannelHealth.UnmarkIfAuthorized(root.transform, ChatChannel.WhatsApp, Wa, 200, "{\"authorized\":true,\"profile_id\":\"prof-wa-1\"}");
+            Assert.IsFalse(ChannelHealth.IsMarked(BotKey, ChatChannel.WhatsApp), "authorized:true for the held profile heals the card at once");
+            Assert.IsTrue(ChannelHealth.IsMarked(BotKey, ChatChannel.Telegram), "the other channel is not touched");
+            ChannelHealth.UnmarkIfAuthorized(root.transform, ChatChannel.Telegram, Tg, 200, "{\"authorized\":true}");
+            Assert.IsFalse(ChannelHealth.IsMarked(BotKey, ChatChannel.Telegram), "no echo: judged as is (the routine's rule)");
+            CollectionAssert.AreEqual(new[] { BotKey, BotKey, BotKey, BotKey }, _events, "two marks, two heals — one event each");
+        }
+        finally
+        {
+            UnityEngine.Object.DestroyImmediate(root);
+        }
+    }
+
+    [Test]
     public void The_copy_is_one_line_in_russian()
         => Assert.AreEqual("Канал отключён · переподключите в настройках", ChannelHealthCopy.UnauthorizedSubline);
 
@@ -268,6 +307,30 @@ public class ChannelHealthTests
         StringAssert.Contains("ChannelHealth.UnmarkProfile(BotsRoot, ChatChannel.Telegram, telegramProfileId);",
             Body(manager, "private IEnumerator GetTelegramProfileStatus()"), "the Telegram one too");
         StringAssert.Contains("ChannelHealth.Clear(transform.name);", Body(Source("Main/Bot.cs"), "public void DeleteBotLocally()"));
+    }
+
+    [Test]
+    public void The_settings_own_status_checks_heal_the_card_with_the_profile_they_asked_about()
+    {
+        // A4 fix round 2: switching a channel on and opening the settings both read the channel's status — an authorised one
+        // must clear «Канал отключён» there and then, not at the next launch / return to the app.
+        string auth = Source("Main/BotSettings.Auth.cs");
+        foreach (var (method, channel) in new[]
+                 {
+                     ("private IEnumerator CheckWhatsappAuthorization()", "ChatChannel.WhatsApp"),
+                     ("private IEnumerator CheckWhatsappUnauthorizationOutsideApp()", "ChatChannel.WhatsApp"),
+                     ("private IEnumerator CheckTelegramAuthorization()", "ChatChannel.Telegram"),
+                     ("private IEnumerator CheckTelegramUnauthorizationOutsideApp()", "ChatChannel.Telegram"),
+                 })
+        {
+            string body = Body(auth, method);
+            StringAssert.Contains($"WappiProxy.Send(WappiProxy.Op.Status, {channel}, new {{ profile_id = checkedProfileId }}", body,
+                $"{method}: the status is asked for the very profile the heal names");
+            int read = body.IndexOf("string response = www.downloadHandler.text;", System.StringComparison.Ordinal);
+            int heal = body.IndexOf($"ChannelHealth.UnmarkIfAuthorized(Manager.Instance.BotsRoot, {channel}, checkedProfileId, www.responseCode, response);",
+                System.StringComparison.Ordinal);
+            Assert.IsTrue(read >= 0 && heal > read, $"{method}: an authorised status must heal the card's «Канал отключён» at once");
+        }
     }
 
     [Test]
