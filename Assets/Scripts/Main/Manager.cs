@@ -727,6 +727,10 @@ public partial class Manager : MonoBehaviour
             Debug.LogError($"[Manager] ProfileClaimFlow.RunAtBoot threw — continuing: {e}");
         }
 
+        // A4: which connected channels Wappi says are logged out — a non-destructive «Канал отключён» mark on the card.
+        // Waits for the session and for the claim loop just started (Manager.ChannelHealth.cs); a return to the app re-checks.
+        StartChannelHealthAtLaunch();
+
         // Sweep profiles orphaned by an app death mid-wizard/mid-re-auth that
         // the quit-time settle (OnApplicationQuit) couldn't reach — on mobile
         // most kills run no code at all, so this launch-time pass stays the
@@ -2840,6 +2844,9 @@ public partial class Manager : MonoBehaviour
                         yield break;
                     }
 
+                    // A4: a re-authorised channel loses its «Канал отключён» mark (the bot holding this profile, if any).
+                    ChannelHealth.UnmarkProfile(BotsRoot, ChatChannel.WhatsApp, whatsappProfileId);
+
                     // Show checkmark inside QR box, then navigate
                     yield return StartCoroutine(ShowAuthSuccess(WhatsappAuth, WhatsappAuthSuccessPanel));
                     whatsappAuthCompleted = true;
@@ -3337,6 +3344,9 @@ public partial class Manager : MonoBehaviour
                         if (TelegramAuthBackButton != null) TelegramAuthBackButton.onClick.Invoke();
                         yield break;
                     }
+
+                    // A4: see the WhatsApp twin — a re-authorised channel loses its mark.
+                    ChannelHealth.UnmarkProfile(BotsRoot, ChatChannel.Telegram, telegramProfileId);
 
                     // Show checkmark inside QR box, then navigate
                     yield return StartCoroutine(ShowAuthSuccess(TelegramAuth, TelegramAuthSuccessPanel));

@@ -109,6 +109,46 @@ public class BotCardModelTests
         Assert.AreEqual(BotSublineKind.Business, BotCardModel.SublineKind(false, false, false, false));
     }
 
+    // ---- A4: a connected channel whose Wappi status said authorized:false (2026-10-14) ----------------
+
+    [Test]
+    public void SublineKind_Unauthorized_RanksBelowConnectingAndRetired_AboveTheSyncStates()
+    {
+        Assert.AreEqual(BotSublineKind.Connecting, BotCardModel.SublineKind(true, true, true, true, true), "an auth in progress owns the card");
+        Assert.AreEqual(BotSublineKind.Retired, BotCardModel.SublineKind(false, true, true, true, true),
+            "the server's verdict about a channel outranks the device's own reading");
+        Assert.AreEqual(BotSublineKind.Unauthorized, BotCardModel.SublineKind(false, false, true, true, true),
+            "a channel that is off outranks a mode that waits for (or failed) its confirmation");
+        Assert.AreEqual(BotSublineKind.SyncPending, BotCardModel.SublineKind(false, false, false, true, true));
+        Assert.AreEqual(BotSublineKind.SyncFailed, BotCardModel.SublineKind(false, false, false, false, true));
+        Assert.AreEqual(BotSublineKind.Business, BotCardModel.SublineKind(false, false, false, false, false));
+    }
+
+    [Test]
+    public void SublineKind_TheFourArgumentForm_IsTheFiveArgumentFormWithoutAMark()
+    {
+        foreach (bool connecting in new[] { false, true })
+        foreach (bool retired in new[] { false, true })
+        foreach (bool pending in new[] { false, true })
+        foreach (bool failed in new[] { false, true })
+            Assert.AreEqual(BotCardModel.SublineKind(connecting, retired, false, pending, failed),
+                BotCardModel.SublineKind(connecting, retired, pending, failed));
+    }
+
+    [Test]
+    public void Icon_Muted_WhenTheChannelIsMarkedUnauthorized_WhateverItsToggle()
+    {
+        Assert.AreEqual(BotChannelIconState.Muted, BotCardModel.IconState("profile1", true, retired: false, unauthorized: true),
+            "the gray icon says WHICH channel «Канал отключён» means");
+        Assert.AreEqual(BotChannelIconState.Muted, BotCardModel.IconState("profile1", false, retired: false, unauthorized: true));
+        Assert.AreEqual(BotChannelIconState.Colored, BotCardModel.IconState("profile1", true, retired: false, unauthorized: false));
+        Assert.AreEqual(BotChannelIconState.Hidden, BotCardModel.IconState(Bot.UnauthedProfileSentinel, true, retired: false, unauthorized: true),
+            "a mark on a channel without a profile shows no icon");
+        Assert.AreEqual(BotChannelIconState.Muted, BotCardModel.IconState(Bot.UnauthedProfileSentinel, true, retired: true, unauthorized: true));
+        Assert.AreEqual(BotCardModel.IconState("profile1", true, retired: true), BotCardModel.IconState("profile1", true, retired: true, unauthorized: false),
+            "the three-argument form is the four-argument form without a mark");
+    }
+
     // ---- T9: «Подключить» in place of «Авто» ------------------------------------
 
     private const string Sentinel = "-1";

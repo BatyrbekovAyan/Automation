@@ -132,6 +132,7 @@ public class Bot : MonoBehaviour
         ReplyModeToggleBinder.OnReplyModeChanged += HandleReplyModeChanged;
         ReplyModeSyncService.OnStateChanged += HandleReplyModeSyncState;
         ProfileRetirement.Changed += HandleRetirementChanged;
+        ChannelHealth.Changed += HandleChannelHealthChanged;   // A4: a status check marked / unmarked one of this bot's channels
         UsageStore.OnUsageChanged += HandleUsageChanged;   // learning B: a fresh Get Usage can flip the capsule's face
 
         // Returning to the Боты tab after Bot Settings: the channel toggles or
@@ -150,6 +151,7 @@ public class Bot : MonoBehaviour
         ReplyModeToggleBinder.OnReplyModeChanged -= HandleReplyModeChanged;
         ReplyModeSyncService.OnStateChanged -= HandleReplyModeSyncState;
         ProfileRetirement.Changed -= HandleRetirementChanged;
+        ChannelHealth.Changed -= HandleChannelHealthChanged;
         UsageStore.OnUsageChanged -= HandleUsageChanged;
         KillSublineBlink();
         KillPillTweens();
@@ -286,6 +288,7 @@ public class Bot : MonoBehaviour
             PlayerPrefs.DeleteKey(transform.name + "ReplyMode");
             PlayerPrefs.DeleteKey(transform.name + BotTestSheet.LastTestKeySuffix);   // R16: the «Проверка бота» verdict
             ProfileRetirement.Clear(transform.name);                                  // M4/F2: the retired set of both channels
+            ChannelHealth.Clear(transform.name);                                      // A4: both channels' «Канал отключён» marks
             foreach (var channel in new[] { ChatChannel.WhatsApp, ChatChannel.Telegram })          // F1: a failed Create to repeat
                 PlayerPrefs.DeleteKey(transform.name + CreateWorkflowResponse.PendingSuffix(channel));
 
@@ -462,6 +465,12 @@ public class Bot : MonoBehaviour
         if (cardStateReady && botKey == transform.name) RefreshCardState(animatePill: false);
     }
 
+    // A4: Manager's channel status check (launch / return to the app) or a re-authorisation changed this bot's mark.
+    private void HandleChannelHealthChanged(string botKey)
+    {
+        if (cardStateReady && botKey == transform.name) RefreshCardState(animatePill: false);
+    }
+
     // learning B: «Учится · N/20» ↔ «Авто» follows the server's verdict, which arrives with Get Usage and no other card event.
     private void HandleUsageChanged()
     {
@@ -586,8 +595,13 @@ public class Bot : MonoBehaviour
 
         bool connecting = Status != null && ColorsClose(Status.color, blue);
         string retiredText = BotCardModel.RetiredSubline(waRetired, tgRetired);
+        // A4: a connected, non-retired channel whose last status check said authorized:false (nothing was deleted)
+        bool waUnauthorized = ChannelHealth.CardShowsUnauthorized(
+            ChannelHealth.IsMarked(transform.name, ChatChannel.WhatsApp), whatsappProfileId, waRetired);
+        bool tgUnauthorized = ChannelHealth.CardShowsUnauthorized(
+            ChannelHealth.IsMarked(transform.name, ChatChannel.Telegram), telegramProfileId, tgRetired);
         var sync = ReplyModeSyncService.Existing;
-        var kind = BotCardModel.SublineKind(connecting, retiredText != null,
+        var kind = BotCardModel.SublineKind(connecting, retiredText != null, waUnauthorized || tgUnauthorized,
             sync != null && sync.IsPending(transform.name), sync != null && sync.HasFailed(transform.name));
 
         PaintSubline(kind, retiredText);
@@ -598,8 +612,8 @@ public class Bot : MonoBehaviour
         }
         else
         {
-            ApplyChannelIcon(waChannelIcon, whatsappProfileId, "isOnWhatsapp", waRetired != null, waIconColored, waIconGray);
-            ApplyChannelIcon(tgChannelIcon, telegramProfileId, "isOnTelegram", tgRetired != null, tgIconColored, tgIconGray);
+            ApplyChannelIcon(waChannelIcon, whatsappProfileId, "isOnWhatsapp", waRetired != null, waUnauthorized, waIconColored, waIconGray);
+            ApplyChannelIcon(tgChannelIcon, telegramProfileId, "isOnTelegram", tgRetired != null, tgUnauthorized, tgIconColored, tgIconGray);
         }
 
         bool anyIcon = (waChannelIcon != null && waChannelIcon.gameObject.activeSelf)
@@ -615,20 +629,22 @@ public class Bot : MonoBehaviour
     }
 
     // Text, ink and blink of one subline state. Connecting and an unconfirmed mode blink in the connecting blue;
-    // a retired channel and a mode that was not saved are destructive ink; the business type is the quiet tertiary.
+    // a retired channel, an unauthorised one (A4) and a mode that was not saved are destructive ink; the business type is
+    // the quiet tertiary.
     private void PaintSubline(BotSublineKind kind, string retiredText)
     {
         BotDesc.text = kind switch
         {
             BotSublineKind.Connecting => BotCardModel.ConnectingText,
             BotSublineKind.Retired => retiredText,
+            BotSublineKind.Unauthorized => ChannelHealthCopy.UnauthorizedSubline,
             BotSublineKind.SyncPending => ReplyModeSyncCopy.Pending,
             BotSublineKind.SyncFailed => ReplyModeSyncCopy.Failed,
             _ => BotCardModel.SublineText(false, BusinessTypeDisplayName()),
         };
         bool blink = kind == BotSublineKind.Connecting || kind == BotSublineKind.SyncPending;
         if (!blink) KillSublineBlink();
-        bool destructive = kind == BotSublineKind.Retired || kind == BotSublineKind.SyncFailed;
+        bool destructive = kind == BotSublineKind.Retired || kind == BotSublineKind.Unauthorized || kind == BotSublineKind.SyncFailed;
         Color ink = blink ? ConnectingInk
                   : destructive ? Theme.Color(ThemeRole.Destructive)
                   : Theme.Color(ThemeRole.InkTertiary);
@@ -637,12 +653,12 @@ public class Bot : MonoBehaviour
         if (blink) EnsureSublineBlink();
     }
 
-    private void ApplyChannelIcon(Image icon, string profileId, string channelKeySuffix, bool retired,
+    private void ApplyChannelIcon(Image icon, string profileId, string channelKeySuffix, bool retired, bool unauthorized,
         Sprite coloredSprite, Sprite graySprite)
     {
         if (icon == null) return;
         var state = BotCardModel.IconState(profileId,
-            PlayerPrefs.GetInt(transform.name + channelKeySuffix, 1) == 1, retired);
+            PlayerPrefs.GetInt(transform.name + channelKeySuffix, 1) == 1, retired, unauthorized);
         SetIconState(icon, state,
             state == BotChannelIconState.Colored ? coloredSprite : graySprite);
     }

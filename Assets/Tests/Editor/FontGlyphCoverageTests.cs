@@ -304,6 +304,7 @@ public class FontGlyphCoverageTests
             typeof(ProfileRetirementCopy), // M4 retired-channel subline of the bot card (2026-10-09)
             typeof(RetiredChannelCopy),    // F2 reconnect screens: banner, row hint, «Подключить», sheet, server wait (2026-10-11)
             typeof(AutoReadinessCopy),     // learning B: capsule «Учится · N/20» + sheet «Бот ещё учится» (2026-10-14)
+            typeof(ChannelHealthCopy),     // A4 «Канал отключён · переподключите в настройках» on the bot card (2026-10-14)
         };
         foreach (var t in constTypes)
             foreach (var f in t.GetFields(BindingFlags.Public | BindingFlags.Static))

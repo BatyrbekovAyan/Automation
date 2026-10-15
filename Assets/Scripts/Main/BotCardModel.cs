@@ -24,6 +24,8 @@ public enum BotSublineKind
     Connecting,
     /// <summary>M4: the server retired a channel — «Отключён · …» / «Канал отключён» / «Удаление не завершено …».</summary>
     Retired,
+    /// <summary>A4: a connected channel's Wappi status said <c>authorized:false</c> — «Канал отключён · переподключите в настройках».</summary>
+    Unauthorized,
     /// <summary>A2: a reply-mode change waits for the server's confirmation.</summary>
     SyncPending,
     /// <summary>A2: the reply-mode change was not saved this launch.</summary>
@@ -67,21 +69,38 @@ public static class BotCardModel
     /// aside the current profile id is the sentinel — the icon stays gray all the same (the plan's card, §5.3); whether
     /// the channel IS retired is <see cref="RetiredChannelPolicy"/>'s call, never this method's.
     /// </summary>
-    public static BotChannelIconState IconState(string profileId, bool channelEnabled, bool retired)
+    public static BotChannelIconState IconState(string profileId, bool channelEnabled, bool retired) =>
+        IconState(profileId, channelEnabled, retired, unauthorized: false);
+
+    /// <summary>
+    /// A4 (2026-10-14): a connected channel the device marked unauthorised is gray too — the bot cannot answer there, and
+    /// on a two-channel card the gray icon says WHICH channel «Канал отключён» means. A mark on a channel without a profile
+    /// changes nothing (no icon).
+    /// </summary>
+    public static BotChannelIconState IconState(string profileId, bool channelEnabled, bool retired, bool unauthorized)
     {
         if (retired) return BotChannelIconState.Muted;
         if (!IsConnected(profileId)) return BotChannelIconState.Hidden;
-        return channelEnabled ? BotChannelIconState.Colored : BotChannelIconState.Muted;
+        return channelEnabled && !unauthorized ? BotChannelIconState.Colored : BotChannelIconState.Muted;
     }
 
     /// <summary>
     /// M4: the subline's state, highest first — connecting (an auth in progress owns the card), a retired channel (the
     /// persistent fact that also explains a mode that cannot be saved), then the A2 sync states, then the business type.
     /// </summary>
-    public static BotSublineKind SublineKind(bool connecting, bool retired, bool syncPending, bool syncFailed)
+    public static BotSublineKind SublineKind(bool connecting, bool retired, bool syncPending, bool syncFailed) =>
+        SublineKind(connecting, retired, unauthorized: false, syncPending, syncFailed);
+
+    /// <summary>
+    /// A4 (2026-10-14): a connected channel the device marked unauthorised (<see cref="ChannelHealth.CardShowsUnauthorized"/>)
+    /// ranks right below a retired one — the server's verdict about a channel outranks the device's own reading — and above
+    /// the A2 sync states (a mode cannot be confirmed through a channel that is off either).
+    /// </summary>
+    public static BotSublineKind SublineKind(bool connecting, bool retired, bool unauthorized, bool syncPending, bool syncFailed)
     {
         if (connecting) return BotSublineKind.Connecting;
         if (retired) return BotSublineKind.Retired;
+        if (unauthorized) return BotSublineKind.Unauthorized;
         if (syncPending) return BotSublineKind.SyncPending;
         return syncFailed ? BotSublineKind.SyncFailed : BotSublineKind.Business;
     }
