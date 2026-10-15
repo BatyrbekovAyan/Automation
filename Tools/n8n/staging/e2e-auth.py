@@ -8,6 +8,7 @@ Scenarios state the CORRECT behaviour: owner A never reads or changes owner B's 
 endpoint; unknown/expired/forged sessions are rejected before any side effect; legitimate flows work.
 """
 import argparse
+import atexit
 import base64
 import copy
 import hashlib
@@ -904,6 +905,37 @@ def admin_api(method, path, body=None):
     return http(method, f"{BASE}/api/v1{path}", body, headers={"X-N8N-API-KEY": SEC.get("apiKey", "")})
 
 
+# Insights hygiene (A7, 2026-10-15). n8n flushes its insights buffer every 30 s; a flush that names a workflow deleted since
+# its last execution fails and is retried FOREVER («Error while saving insights metadata and raw data» every 30 s until the
+# server restarts — the prod rule: delete a temporary workflow ≥ 35 s after its last execution, .secrets/sql-oneoff.py and
+# implementation-progress.md 2026-10-13). A probe or a clone that RAN is therefore switched off at once (its webhook is gone
+# for the rest of the run) and DELETED later, in one batch, ≥ RAN_WORKFLOW_DELETE_DELAY_S after the last switch-off: at
+# the end of main() and, for the suites that import these helpers (e2e-handoff, e2e-suggest, e2e-test-dialog), at exit.
+RAN_WORKFLOW_DELETE_DELAY_S = 35
+_DEFERRED_DELETES = []        # [(workflow id, time.monotonic() of its switch-off)]
+
+
+def defer_delete(wid):
+    """Switch a workflow that may have run off NOW; delete it in flush_deferred_deletes (≥ 35 s later)."""
+    if wid:
+        admin_api("POST", f"/workflows/{wid}/deactivate")
+        _DEFERRED_DELETES.append((wid, time.monotonic()))
+
+
+def flush_deferred_deletes():
+    if not _DEFERRED_DELETES:
+        return
+    wait = RAN_WORKFLOW_DELETE_DELAY_S - (time.monotonic() - max(t for _, t in _DEFERRED_DELETES))
+    if wait > 0:
+        print(f"   waiting {wait:.0f}s before deleting {len(_DEFERRED_DELETES)} workflow(s) that ran (n8n insights flush, ≥ 35 s rule)")
+        time.sleep(wait)
+    while _DEFERRED_DELETES:
+        admin_api("DELETE", f"/workflows/{_DEFERRED_DELETES.pop()[0]}")
+
+
+atexit.register(flush_deferred_deletes)
+
+
 def create_bot_clones(ctx, owner, tag):
     """A «Вместе» bot with BOTH channels through the real Create WA/TG handlers (trial plan: 3 channels)."""
     wa = owner.profiles[0]
@@ -1076,9 +1108,7 @@ def s_sweep_clone(ctx):
         e2 = run_probe(wid, url)
         ran2 = ran_nodes(e2)
     finally:
-        if wid:
-            admin_api("POST", f"/workflows/{wid}/deactivate")
-            admin_api("DELETE", f"/workflows/{wid}")
+        defer_delete(wid)
     exists = [admin_api("GET", f"/workflows/{w}")[0] for w in (wwa, wtg)]
     for w in (wwa, wtg):
         hook("SetWorkflowState", o.token, {"workflowId": w, "action": "delete"})
@@ -1162,11 +1192,12 @@ def registered(path):
 
 
 def drop_clones(*pids, keep=()):
-    """Staging API cleanup: every workflow whose webhook path is one of `pids` (clones and orphans of this scenario)."""
+    """Staging API cleanup: every workflow whose webhook path is one of `pids` (clones and orphans of this scenario) — a
+    clone may have answered a webhook, so it is switched off now and deleted at the end of the run (defer_delete)."""
     for pid in pids:
         for wid, _ in clones_for(pid):
             if wid not in keep:
-                admin_api("DELETE", f"/workflows/{wid}")
+                defer_delete(wid)
 
 
 def seed_line(pid, wid, ch, chat, install, tag, price_row="Букет «Нежность» — 18 500 ₸ (15 роз)",
@@ -1262,9 +1293,7 @@ def probe_workflow(run_id, src_file, keep, entry, tag, edit=None, response_node=
 
 
 def drop_probe(wid):
-    if wid:
-        admin_api("POST", f"/workflows/{wid}/deactivate")
-        admin_api("DELETE", f"/workflows/{wid}")
+    defer_delete(wid)        # switched off now, deleted ≥ 35 s after the run's last switch-off (insights hygiene)
 
 
 SWEEP_FILE = "fXYpCXPKw92EzRz8-Profile_Lifecycle_Sweep.json"
@@ -1273,8 +1302,10 @@ BRANCH_A = ("Sweep Config", "Clone Retirements", "Retirements Dry Run?", "Log Wo
 
 
 def run_branch_a(run_id, dry_run=None):
-    """One run of the sweep's branch A (Clone Retirements → … → Stamp) as canon has it; dry_run=False flips Sweep Config's
-    retirementsDryRun exactly as the generator's flip will on prod (plan §6 step 12). Returns the execution."""
+    """One run of the sweep's branch A (Clone Retirements → … → Stamp). dry_run=None runs Sweep Config as the imported canon
+    carries it — since step 12 (4761117b, on prod 2026-10-14) retirementsDryRun = false, the live mode; True / False pins
+    the flag for this run only (True = the first day's «only log» mode, which the graph still honours). Returns the
+    execution."""
     def flip(nodes):
         for a in nodes["Sweep Config"]["parameters"]["assignments"]["assignments"]:
             if a["name"] == "retirementsDryRun" and dry_run is not None:
@@ -1730,7 +1761,15 @@ def s_line_delete(ctx):
     return ok, json.dumps(res, ensure_ascii=False)
 
 
-@scenario("sweep_removes_booked_clone", "F1 §2.6 A (T5): the sweep's branch A on the real n8n — in canon's dry run (retirementsDryRun true) it only logs; flipped, it DELETEs a booked clone older than 10 minutes (200 → removed_at), stamps an already-gone one (404), never touches a clone a LIVE row drives or a booking younger than 10 minutes, and never calls again what it stamped")
+def canon_retirements_dry_run():
+    """The retirementsDryRun value Sweep Config carries in the imported (derived) canon — what run_branch_a(dry_run=None)
+    runs with. False since step 12 (4761117b): prod deletes booked clones."""
+    src = json.load(open(os.path.join(N8N_DIR, "workflows-staging", SWEEP_FILE), encoding="utf-8"))
+    cfg = next(n for n in src["nodes"] if n["name"] == "Sweep Config")
+    return next((a["value"] for a in cfg["parameters"]["assignments"]["assignments"] if a["name"] == "retirementsDryRun"), None)
+
+
+@scenario("sweep_removes_booked_clone", "F1 §2.6 A (T5) + step 12: the sweep's branch A on the real n8n — canon runs it LIVE (retirementsDryRun false since 4761117b, as prod does): it DELETEs a booked clone older than 10 minutes (200 → removed_at), stamps an already-gone one (404), never touches a clone a LIVE row drives or a booking younger than 10 minutes, and never calls again what it stamped; the first day's dry-run mode (an explicit retirementsDryRun true) still only logs")
 def s_line_branch_a(ctx):
     o, pid = line_owner(ctx, "ba", "wa")
     run = ctx["run_id"]
@@ -1745,12 +1784,13 @@ def s_line_branch_a(ctx):
            f"('{young}', '{pid}', '{o.install_id}', 'replaced', now() - interval '1 minute'), "
            f"('{ghost}', '{pid}', '{o.install_id}', 'discard_failed', now() - interval '11 minutes'), "
            f"('{live}', '{pid}', '{o.install_id}', 'replaced', now() - interval '11 minutes');")
-        e0 = run_branch_a(run)                                            # canon as committed: the first day's dry run
+        e0 = run_branch_a(run, dry_run=True)                              # the first day's dry-run mode: only logs
         res["dry"] = ({w: wf_state(w)[0] for w in (old, young, live)}, {w: booking(w).split("|")[3] for w in (old, ghost)},
                       "Log Would Remove" in ran_nodes(e0), "Delete Retired Clone" in ran_nodes(e0))
-        run_branch_a(run, dry_run=False)
+        res["canon_dry_run"] = canon_retirements_dry_run()               # step 12: canon (= prod) runs branch A live
+        run_branch_a(run)                                                 # canon as committed
         res["live"] = {w: (wf_state(w)[0], booking(w)) for w in (old, young, ghost, live)}
-        e2 = run_branch_a(run, dry_run=False)                             # what it stamped is never picked again
+        e2 = run_branch_a(run)                                            # what it stamped is never picked again
         res["second_run_picks"] = sorted(w for w in (it.get("workflow_id") for it in node_items(e2, "Clone Retirements"))
                                          if w in {old, young, ghost, live})
     finally:
@@ -1758,6 +1798,7 @@ def s_line_branch_a(ctx):
             admin_api("DELETE", f"/workflows/{w}")
         drop_clones(pid)
     ok = (res["dry"] == ({old: 200, young: 200, live: 200}, {old: "false", ghost: "false"}, True, False)
+          and res["canon_dry_run"] is False
           and res["live"][old] == (404, f"replaced|-|{pid}|true|200|0") and res["live"][ghost] == (404, f"discard_failed|-|{pid}|true|404|0")
           and res["live"][young] == (200, f"replaced|-|{pid}|false|-|0") and res["live"][live] == (200, f"replaced|-|{pid}|false|-|0")
           and res["second_run_picks"] == [])
@@ -2339,6 +2380,7 @@ def main():
                 print(f"   cleanup {o.tag}:", fixture(*(["delete", "--app-user-id", o.app_user_id] + [x for p in o.profiles for x in ("--profile-id", p)])))
             except Exception as e:
                 print(f"   cleanup {o.tag} failed:", e)
+        flush_deferred_deletes()
     print(f"\n{passed} pass, {failed} fail")
     sys.exit(1 if failed else 0)
 
