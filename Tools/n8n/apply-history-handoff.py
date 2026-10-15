@@ -33,6 +33,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 WF = os.path.join(HERE, "workflows")
 sys.path.insert(0, HERE)
 import clone_lineage as cl  # noqa: E402  (Delete Chat Memory deletes by the bot's line, T5)
+import bot_schedule as bs  # noqa: E402  (B1: the schedule's window predicate, one home — the mode read's off-hours term)
 PG_CRED = {"id": "vvRrFiEXzLVqKjOx", "name": "Postgres"}
 BOTS = ("4wYitz5ek30SVNlT-WhatsApp_Bot.json", "4VN3gsFaC2HUYmcc-Telegram_Bot.json")
 CREATES = ("XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json", "Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json")
@@ -142,6 +143,8 @@ CLAIM_PARAMS = "={{ (m => [ m.profile_id, m.from, m.id, $execution.id, " + BODY_
 RECORD_SUPPRESSED_SQL = """-- A6: «Вместе» — no generation, but the history and the agent's memory still learn what the client
 -- said, so a later return to «Авто» continues the same conversation (no double write: the memory
 -- node only writes when the agent runs, which it does not on this branch).
+-- B1: a message outside the bot's schedule window takes this branch too; the last parameter (the mode read's off_hours)
+-- is answered back unchanged, for the Outcome stamp.
 with ev as (
   insert into chat_history_events (profile_id, chat_id, message_id, source, body, msg_type, sent_at, execution_id)
   values ($1, $2, $3, 'client', $4, $5, to_timestamp($6::bigint), $7)
@@ -154,9 +157,13 @@ with ev as (
     and not exists (select 1 from n8n_chat_histories x where x.session_id = $1 || ':' || $2 and x.message->'additional_kwargs'->>'message_id' = $3)
   returning 1
 )
-select 'suppressed'::text as outcome, exists(select 1 from ev) as recorded, exists(select 1 from mem) as remembered;""".replace(
+select 'suppressed'::text as outcome, exists(select 1 from ev) as recorded, exists(select 1 from mem) as remembered,
+       $8::boolean as off_hours;""".replace(
     "__ROW__", MEMORY_ROW % ("'human'", "$4", "'client'", "$3"))
-RECORD_SUPPRESSED_PARAMS = "={{ (m => [ m.profile_id, m.from, m.id, " + BODY_TEXT + ", String(m.type || ''), Number(m.time) || Math.floor(Date.now() / 1000), $execution.id ])(" + M + ") }}"
+# B1 (2026-10-14): the eighth value is the mode read's off_hours — Record Suppressed hands it on, the Outcome stamp names a
+# message the SCHEDULE kept from the bot «off_hours» (a «Вместе» chat inside the window keeps «suppressed»).
+RECORD_SUPPRESSED_PARAMS = ("={{ (m => [ m.profile_id, m.from, m.id, " + BODY_TEXT + ", String(m.type || ''), Number(m.time) || Math.floor(Date.now() / 1000), "
+                            "$execution.id, $('Read Reply Mode').first().json.off_hours === true ])(" + M + ") }}")
 
 RECORD_OUTGOING_SQL = """-- A6: what the business side sent. outgoing_message_phone = the owner from the phone (history +
 -- memory, so the bot knows the agreement); outgoing_message_api = fallback history row only — the
@@ -333,6 +340,11 @@ return [{ json: { outcome, historyWatermark: watermark, dropAiHistory: generated
                   humanText: humanText.slice(0, 4000) }, pairedItem: { item: 0 } }];
 """
 
+# B1 «расписание бота» (2026-10-14, spec §4 B1): outside an ENABLED schedule window the bot behaves exactly as in «Вместе» —
+# one more OR term, so it outranks a chat's explicit «Авто» like the handoff pause; no row or a disabled schedule is
+# `false` (the LOCKED «absence ⇒ reply» is unchanged). The same term is answered as `off_hours` for the Outcome stamp.
+# The node stays fail-closed (no onError, like the whole pipeline since stage 3): the migration goes first. The predicate
+# lives in bot_schedule.py; Acquire Send Lease never reads it (decided at message entry only).
 READ_MODE_SQL = """select (
   coalesce(
     (select suppressed from reply_mode_flags
@@ -342,7 +354,10 @@ READ_MODE_SQL = """select (
     false)
   -- A5: a chat with a pending handoff is paused until the owner acts (done / explicit «Авто» for the chat)
   or coalesce((select handoff_paused from chat_reply_state where profile_id = $1 and chat_id = $2), false)
-) as suppressed;"""
+  -- B1: outside the bot's schedule window (an enabled row) the bot behaves as in «Вместе»
+  or __OFF_HOURS__
+) as suppressed,
+__OFF_HOURS__ as off_hours;""".replace("__OFF_HOURS__", bs.OFF_HOURS_SQL())
 
 TOOL_RULE = ("\n\n##create_handoff##\n"
              "Передача владельцу — это ДЕЙСТВИЕ, не фраза. Когда клиент готов к заказу/брони, просит связаться, или вопрос надо передать человеку — "

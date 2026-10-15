@@ -42,6 +42,8 @@ def _cond(w, name, j):
 def _sql(w, pg, name, json_, named, exec_id):
     n = node(w, name)
     params = expr(n['parameters']['options']['queryReplacement'], json_, named, exec_id)
+    if isinstance(params, str):      # the legacy comma form (Read Reply Mode): the node splits it, empty entries dropped
+        params = [p.strip() for p in params.split(',') if p]
     assert isinstance(params, list), f'{name}: queryReplacement did not evaluate to a list: {params!r}'
     rows = pg.q(bind(n['parameters']['query'], params))
     return rows[0] if rows else {}
@@ -58,6 +60,20 @@ class Run:
         self.text = None
         self.cancel = None
         self.agent_ran = False      # False on the media branch: $('AI Agent') then THROWS in n8n (unexecuted node)
+
+    # --- Read Reply Mode → Suppressed? → [Record Suppressed → Outcome] (B1: the schedule is one more term of the read) ---
+    def mode(self):
+        """The mode gate at message entry. A suppressed run («Вместе», a handoff pause, outside the bot's schedule) ends
+        here — Record Suppressed, then the Outcome stamp (its real Code body) — and is never claimed; otherwise the
+        test goes on with claim()."""
+        row = _sql(self.w, self.pg, 'Read Reply Mode', {}, self.named, self.exec_id)
+        self.named['Read Reply Mode'] = row
+        if _cond(self.w, 'Suppressed?', row):
+            self.suppressed_row = _sql(self.w, self.pg, 'Record Suppressed', row, self.named, self.exec_id)
+            self.named['Record Suppressed'] = self.suppressed_row
+            self.stamp = code(self.w, 'Outcome', {'json': self.suppressed_row}, self.named, prev_node='Record Suppressed')[0]['json']
+            self.outcome = self.stamp.get('outcome')
+        return row
 
     # --- claim ---------------------------------------------------------------------------
     def claim(self):

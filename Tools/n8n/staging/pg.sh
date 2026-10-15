@@ -111,6 +111,9 @@ cmd_migrate() {
     "${N8N_DIR}/sql/2026-10-15-identity-heal-log.sql"
     # A4 «защита платящих» (2026-10-14): the channel watch's snapshot (crChannelWatch001 reads it in Live Rows, writes it in Upsert Snapshot)
     "${N8N_DIR}/sql/2026-10-14-channel-snapshot.sql"
+    # B1 «расписание бота» (2026-10-14): the bot's schedule (the templates' Read Reply Mode reads it — fail-closed, so BEFORE
+    # the canon; crSetSchedule001 writes it; Create's bind moves it, Delete Bot Files deletes it)
+    "${N8N_DIR}/sql/2026-10-14-bot-schedule.sql"
   )
   for f in "${files[@]}"; do
     [ -s "$f" ] || { echo "skip (missing) $f"; continue; }

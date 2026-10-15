@@ -9,8 +9,13 @@ node, `Outcome`, onto every terminal branch, so each execution ends with a singl
     { outcome, correlationId: $execution.id, stage: <previous node>, messageId, profileId, chatId,
       channel, transportMessageId (send response id when sent), stampedAt }
 
-outcome ∈ filtered | suppressed | duplicate | superseded | quota_denied | generation_failed | cancelled_owner |
-          cancelled_mode | cancelled_busy | cancelled_fetch | sent | send_failed | send_unknown  (stage 0.5 + stage 3)
+outcome ∈ filtered | suppressed | off_hours | duplicate | superseded | quota_denied | generation_failed | cancelled_owner |
+          cancelled_mode | cancelled_busy | cancelled_fetch | sent | send_failed | send_unknown  (stage 0.5 + stage 3 + B1)
+
+B1 «расписание бота» (2026-10-14): a message the bot's SCHEDULE kept from it (outside an enabled window) takes the
+«Вместе» branch — Read Reply Mode → Suppressed? → Record Suppressed — and Record Suppressed hands the mode read's
+`off_hours` on; the stamp then says `off_hours` instead of `suppressed`. A «Вместе» chat inside the window keeps
+`suppressed`.
 
 Branches stamped: If[false] (from != chatId), Suppressed?[true], Is Latest?[false] (older fragment
 of a burst), If Quota Allows[false], HTTP Request[main] (the Wappi send returned). Nothing on the
@@ -18,7 +23,7 @@ reply path moves; the node is appended LAST so every nodes[i] index the orchestr
 (nodes[0] Webhook, nodes[5] AI Agent) is unchanged.
 
     python3 Tools/n8n/apply-outcome-stamps.py           # patch workflows/ in place (re-runnable)
-    python3 Tools/n8n/apply-outcome-stamps.py --check   # exit 2 if a template lacks the stamp
+    python3 Tools/n8n/apply-outcome-stamps.py --check   # exit 2 if a template lacks the stamp or carries a stale one
 """
 import json
 import os
@@ -48,7 +53,9 @@ try { wh = $('Webhook').first().json || {}; } catch (e) { wh = {}; }
 const m = (wh.body && Array.isArray(wh.body.messages) && wh.body.messages[0]) || {};
 const resp = $input.first() ? ($input.first().json || {}) : {};
 // Stage 3: the record rows (Record Send / Record Cancel) carry the event's final state explicitly.
-const outcome = (typeof resp.outcome === 'string' && resp.outcome) ? resp.outcome : (byPrev[prev] || ('other:' + prev));
+// B1: Record Suppressed hands on the mode read's off_hours — the schedule, not the owner, kept this message from the bot.
+const outcome = resp.off_hours === true ? 'off_hours'
+  : ((typeof resp.outcome === 'string' && resp.outcome) ? resp.outcome : (byPrev[prev] || ('other:' + prev)));
 return [{ json: {
   outcome,
   correlationId: $execution.id,
@@ -108,7 +115,8 @@ def patch(fname, channel):
 
 def check(fname):
     wf = json.load(open(os.path.join(WF, fname), encoding="utf-8"))
-    ok = node_by_name(wf, NODE) is not None
+    stamp = node_by_name(wf, NODE)
+    ok = stamp is not None and stamp["parameters"].get("jsCode") == JS_TEMPLATE.replace("__CHANNEL__", BOTS[fname])
     for src, idx, _ in TERMINALS:
         outs = wf["connections"].get(src, {}).get("main", [])
         ok = ok and idx < len(outs) and any(c["node"] == NODE for c in outs[idx])
@@ -118,7 +126,7 @@ def check(fname):
 def main():
     if "--check" in sys.argv:
         bad = [f for f in BOTS if not check(f)]
-        print("outcome stamps:", "OK" if not bad else f"MISSING in {bad}")
+        print("outcome stamps:", "OK" if not bad else f"MISSING/STALE in {bad}")
         sys.exit(2 if bad else 0)
     for f, ch in BOTS.items():
         print(f"{'patched' if patch(f, ch) else 'already up to date'}  {f}")

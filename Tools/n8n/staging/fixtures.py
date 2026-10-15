@@ -99,6 +99,9 @@ def main():
         # as a DOWN of a brand-new profile) — only once the migration is applied
         if psql("select to_regclass('public.channel_snapshot') is not null;") == "t":
             psql("delete from channel_snapshot where profile_id ~ '^profile-[0-9]{6}$' and not (profile_id = any (select jsonb_array_elements_text(:'p0'::jsonb)));", live)
+        # B1 (2026-10-14): nor an earlier lifetime's schedule (it would keep a brand-new profile silent outside its window)
+        if psql("select to_regclass('public.bot_schedule') is not null;") == "t":
+            psql("delete from bot_schedule where profile_id ~ '^profile-[0-9]{6}$' and not (profile_id = any (select jsonb_array_elements_text(:'p0'::jsonb)));", live)
         print(f"swept {len(pids)} stale mock profile(s) (live mock knows {len(a.live)})")
     elif a.cmd == "delete":
         if not (a.app_user_id.startswith("probe-") or FIXTURE_RC.match(a.app_user_id)):
@@ -128,6 +131,11 @@ def main():
         if psql("select to_regclass('public.suggestion_sets') is not null;") == "t":
             for pid in a.profile_id:
                 n = int(n or 0) + int(psql("with a as (delete from suggestion_sets where profile_id = :'p0' returning 1) select count(*) from a;", pid) or 0)
+        # B1 (2026-10-14): a fixture profile's schedule (only once the bot-schedule migration is applied) — a schedule left on
+        # the shared staging bots would keep every later scenario silent outside its window
+        if psql("select to_regclass('public.bot_schedule') is not null;") == "t":
+            for pid in a.profile_id:
+                n = int(n or 0) + int(psql("with a as (delete from bot_schedule where profile_id = :'p0' returning 1) select count(*) from a;", pid) or 0)
         print(f"deleted rows: {n}")
 
 

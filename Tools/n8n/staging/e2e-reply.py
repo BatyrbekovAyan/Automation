@@ -2,7 +2,8 @@
 """STAGING scenarios for audit stage 3 (A3 context change, A4 once-only processing, A7 honest send
 states) — real n8n runs of the migrated bot templates against the private Postgres and the Wappi MOCK.
 Every scenario states the CORRECT behaviour and reads the ledger (reply_events / chat_reply_state), the
-Outcome stamp and the mock's recorded transport calls.
+Outcome stamp and the mock's recorded transport calls. B1 (2026-10-14): the bot's schedule decided at message
+entry — off_hours_suppressed_recorded / in_hours_replies (each scenario's Bot starts with no schedule row).
 
     python3 Tools/n8n/staging/e2e-reply.py                  # all (WA + TG)
     python3 Tools/n8n/staging/e2e-reply.py --only owner     # substring filter
@@ -83,6 +84,31 @@ def ask_text(ch):
     return n["parameters"]["assignments"]["assignments"][0]["value"].lstrip("=")
 
 
+def schedule_minute(tz="Asia/Almaty"):
+    """B1: the bot's wall-clock minute of the day now, by the staging database's clock (the one the mode read uses)."""
+    return int(psql(f"select (extract(hour from now() at time zone '{tz}') * 60 + extract(minute from now() at time zone '{tz}'))::int;"))
+
+
+def set_schedule(pid, inside, tz="Asia/Almaty"):
+    """B1: an ENABLED schedule (every day) whose window holds the bot's wall time now — two hours either side — or starts
+    two hours ahead, so «now» is outside; across midnight whenever the clock says so. Returns (start, end)."""
+    m = schedule_minute(tz)
+    start, end = ((m - 120) % 1440, (m + 120) % 1440) if inside else ((m + 120) % 1440, (m + 180) % 1440)
+    psql(f"insert into bot_schedule (profile_id, enabled, days_mask, start_min, end_min, tz, version, updated_at) "
+         f"values ('{pid}', true, 127, {start}, {end}, '{tz}', 1, now()) on conflict (profile_id) do update set enabled = true, "
+         f"days_mask = 127, start_min = excluded.start_min, end_min = excluded.end_min, tz = excluded.tz, updated_at = now();")
+    return start, end
+
+
+def clear_schedule(pid):
+    """B1: no schedule (a leftover would keep every later scenario on the shared staging bot silent outside its window)."""
+    psql(f"do $$ begin if to_regclass('public.bot_schedule') is not null then delete from bot_schedule where profile_id = '{pid}'; end if; end $$;")
+
+
+def dialog_rows(app_user_id):
+    return int(psql(f"select count(*) from dialog_counts where app_user_id = '{app_user_id}';") or 0)
+
+
 class Bot:
     """One scenario's bot + chat on one channel; the run-scoped chat id keeps scenarios independent."""
 
@@ -94,6 +120,7 @@ class Bot:
         self.chat = f"chat-{tag}-{ctx.run_id}{suffix}"
         ctx.bot(self.pid, self.channel)
         fixture("set-mode", "--profile-id", self.pid, "--suppressed", "false")
+        clear_schedule(self.pid)
         self.since_exec = max([int(e["id"]) for e in latest_executions(self.wf_id, 0, 50)] or [0])
         self.since_calls = mock_total()
 
@@ -527,6 +554,54 @@ V9_CATALOG = ("\n\nProducts:\nProduct1: Фильтр масляный Toyota 909
               "Services:\n")
 V9_ROW = "Фильтр масляный 90915-YZZE1 — 3900 тг, оригинал"
 V9_QUESTION = "Camry 2019, фильтр масляный 90915-YZZE1 сколько?"
+
+
+@for_channels("off_hours_suppressed_recorded", "B1: outside the bot's schedule window (Asia/Almaty, an enabled row) the message is handled exactly as in «Вместе» — the stamp says off_hours, the client's history row and memory human row are written, nothing is sent, the event is not claimed, Count Dialog never runs and no dialog is counted")
+def off_hours_recorded(ctx, ch):
+    b = Bot(ctx, ch, "offh")
+    t = int(time.time())
+    mid = f"offh-{ctx.run_id}"
+    body = "Здравствуйте, вы сейчас работаете?"
+    b.history([{"id": mid, "body": body, "time": t, "fromMe": False, "type": "chat"}])
+    dialogs = dialog_rows(ctx.app_user_id)
+    try:
+        window = set_schedule(b.pid, inside=False)
+        b.post(mid, body, t)
+        ex = b.settle(1, 60)
+    finally:
+        clear_schedule(b.pid)
+    e = ex[0] if ex else {}
+    data = e.get("data") or {}
+    mode = node_output(data, "Read Reply Mode") or {}
+    hist = psql(f"select source || '|' || body from chat_history_events where profile_id = '{b.pid}' and chat_id = '{b.chat}' and message_id = '{mid}';")
+    mem = psql(f"select message->>'type' || '|' || (message->'additional_kwargs'->>'source') || '|' || (message->>'content') from n8n_chat_histories "
+               f"where session_id = '{b.pid}:{b.chat}' and message->'additional_kwargs'->>'message_id' = '{mid}';")
+    ok = (e.get("outcome") == "off_hours" and mode.get("suppressed") is True and mode.get("off_hours") is True
+          and ran(data, "Record Suppressed") and not ran(data, "Count Dialog") and not ran(data, "Claim Event") and not ran(data, "AI Agent")
+          and len(b.sends()) == 0 and hist == f"client|{body}" and mem == f"human|client|{body}"
+          and ledger(b.pid, b.chat, mid) == "" and dialog_rows(ctx.app_user_id) == dialogs)
+    return ok, {"window": window, "outcome": e.get("outcome"), "mode": mode, "history": hist, "memory": mem, "sends": len(b.sends()),
+                "ran": {n: ran(data, n) for n in ("Record Suppressed", "Count Dialog", "Claim Event", "AI Agent")},
+                "ledger": ledger(b.pid, b.chat, mid), "dialogs": (dialogs, dialog_rows(ctx.app_user_id))}
+
+
+@for_channels("in_hours_replies", "B1: inside the bot's schedule window the bot answers as usual — the mode read says off_hours false, one send, outcome sent, the dialog counted")
+def in_hours_replies(ctx, ch):
+    b, mid, t = simple_trigger(ctx, ch, "inh")
+    dialogs = dialog_rows(ctx.app_user_id)
+    try:
+        window = set_schedule(b.pid, inside=True)
+        b.post(mid, "Сколько стоит букет?", t)
+        ex = b.settle(1)
+    finally:
+        clear_schedule(b.pid)
+    e = ex[0] if ex else {}
+    mode = node_output(e.get("data") or {}, "Read Reply Mode") or {}
+    led = ledger(b.pid, b.chat, mid)
+    ok = (e.get("outcome") == "sent" and mode.get("suppressed") is False and mode.get("off_hours") is False and len(b.sends()) == 1
+          and led.startswith("sent|") and dialog_rows(ctx.app_user_id) == dialogs + 1)
+    return ok, {"window": window, "outcome": e.get("outcome"), "mode": mode, "sends": len(b.sends()), "ledger": led,
+                "dialogs": (dialogs, dialog_rows(ctx.app_user_id))}
 
 
 @for_channels("price_conflict_reaches_the_agent_marked [llm]", "V9: the clone's price-list tool runs the Price List Search sub-workflow with the clone's PUBLISHED prompt — a price-list row at 3900 against its catalog's 3200 reaches the agent with «[Сверка с каталогом: … Цены расходятся.]», and the reply does not pick 3900 alone")

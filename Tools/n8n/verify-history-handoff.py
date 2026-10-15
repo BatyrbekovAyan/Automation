@@ -4,7 +4,9 @@ LangChain shape + provenance marks, no double write, the handoff pause in the ga
 and its context fields, the notifier's privacy and its owner-number rule (2026-10-15: Telegram
 account.phone first), the app webhook's owner scoping, and the integrations (Create webhook types,
 Dashboard event override, Delete Bot Files wipe, Set Workflow State protection, proxy recorder after
-the response).
+the response). B1 «расписание бота» (2026-10-14): the schedule is one more term of the mode gate —
+check_schedule_gate (the term and its absence rule, Read Reply Mode fail-closed and enabled, off_hours
+handed on and stamped, the lease never reading it), self-checked on every run.
 
     python3 Tools/n8n/verify-history-handoff.py
     python3 Tools/n8n/verify-history-handoff.py --dir DIR   # another set of exports (mutation tests)
@@ -177,6 +179,89 @@ def check_owner_phone_rule(ntf):
 
 NO_DOUBLE = "x.message->'additional_kwargs'->>'message_id' = $3"
 
+_BS = None
+
+
+def bs():
+    """bot_schedule.py — the ONE home of the schedule's window predicate (B1): the mode read composes its OFF_HOURS_SQL."""
+    global _BS
+    if _BS is None:
+        _BS = _tool("bot_schedule.py", "bot_schedule")
+    return _BS
+
+
+# B1 «расписание бота» (2026-10-14, spec §4 B1): outside an ENABLED schedule window the bot behaves exactly as in «Вместе».
+# The decision is ONE more OR term of Read Reply Mode (+ the same term as `off_hours`), so it outranks a chat's explicit
+# «Авто» and costs nothing (no claim, no quota); no row / a disabled schedule is `false` (the LOCKED «absence ⇒ reply»).
+# Read Reply Mode stays fail-closed (no onError — a failed read stops the run, it never reads as «reply»); none of the
+# gate's nodes may be disabled (n8n hands a disabled node's input on: a disabled Read Reply Mode would answer every
+# message, a disabled Record Suppressed would lose the client's message); Acquire Send Lease never reads the schedule (a
+# window that closes during the generation never cancels an answer already paid for).
+SCHEDULE_GATE_NODES = ("Read Reply Mode", "Suppressed?", "Record Suppressed", "Outcome")
+OFF_HOURS_PASSTHROUGH = "$('Read Reply Mode').first().json.off_hours === true"
+OFF_HOURS_STAMP = "const outcome = resp.off_hours === true ? 'off_hours'"
+
+
+def check_schedule_gate(wf, f):
+    """B1: see above. Raises AssertionError naming the file and the rule (tests/test_reply_schedule.py holds the scratch
+    negatives and the behaviour on real SQL)."""
+    names = {n["name"]: n for n in wf["nodes"]}
+    for name in SCHEDULE_GATE_NODES:
+        assert name in names, f"{f}: missing node {name!r} (the mode gate)"
+        assert not names[name].get("disabled"), f"{f}: {name} is disabled — n8n hands its input on, the schedule gate stops gating (B1)"
+    off = bs().OFF_HOURS_SQL()
+    rm = names["Read Reply Mode"]
+    q = rm["parameters"].get("query", "")
+    assert "  or " + off + "\n) as suppressed," in q and q.rstrip().endswith("\n" + off + " as off_hours;") and q.count(off) == 2, \
+        f"{f}: Read Reply Mode lacks the schedule term (bot_schedule.OFF_HOURS_SQL, an enabled row only, absence → false) in its suppressed OR and as off_hours (B1)"
+    assert "coalesce(\n    (select suppressed from reply_mode_flags" in q and "or coalesce((select handoff_paused from chat_reply_state" in q, \
+        f"{f}: Read Reply Mode lost the «Вместе» / handoff terms next to the schedule (B1)"
+    assert rm.get("onError") is None and not rm.get("alwaysOutputData"), \
+        f"{f}: Read Reply Mode must stay fail-closed — no onError / alwaysOutputData (got onError={rm.get('onError')!r}): a failed read must stop the run, never read as «reply» (B1)"
+    edges = lambda src, i=0: [e["node"] for e in ((wf["connections"].get(src, {}).get("main") or [[]])[i] or [])]
+    assert edges("Read Reply Mode") == ["Suppressed?"] and edges("Suppressed?") == ["Record Suppressed"] and edges("Record Suppressed") == ["Outcome"], \
+        f"{f}: the mode gate must be Read Reply Mode → Suppressed?[true] → Record Suppressed → Outcome (B1)"
+    rs = names["Record Suppressed"]["parameters"]
+    assert rs.get("query", "").rstrip().endswith("$8::boolean as off_hours;") \
+        and (rs.get("options") or {}).get("queryReplacement", "").endswith(", " + OFF_HOURS_PASSTHROUGH + " ])($('Webhook').first().json.body.messages[0]) }}"), \
+        f"{f}: Record Suppressed must hand the mode read's off_hours on (its last value, answered back) for the stamp (B1)"
+    assert OFF_HOURS_STAMP in names["Outcome"]["parameters"].get("jsCode", ""), \
+        f"{f}: Outcome must stamp off_hours when Record Suppressed hands it on (B1: «вне графика»)"
+    lease = names.get("Acquire Send Lease")
+    assert lease is not None and "bot_schedule" not in lease["parameters"].get("query", ""), \
+        f"{f}: Acquire Send Lease reads bot_schedule — the lease never reads the schedule (B1: decided at message entry only)"
+
+
+def _gate_tripwires(wf, f):
+    """The schedule-gate checks must reject what they exist to catch — on copies, on every run."""
+    off = bs().OFF_HOURS_SQL()
+
+    def q(name, old, new):
+        def m(w):
+            p = next(n for n in w["nodes"] if n["name"] == name)["parameters"]
+            assert old in p["query"], f"tripwire anchor not found in {name}"
+            p["query"] = p["query"].replace(old, new)
+        return m
+
+    def key(name, k, v):
+        def m(w):
+            next(n for n in w["nodes"] if n["name"] == name)[k] = v
+        return m
+
+    wrong = (("the term removed", q("Read Reply Mode", off, "false")),
+             ("absence read as closed", q("Read Reply Mode", " and s.enabled), false)", " and s.enabled), true)")),
+             ("fail-open read", key("Read Reply Mode", "onError", "continueRegularOutput")),
+             ("a disabled read", key("Read Reply Mode", "disabled", True)),
+             ("the lease reads the schedule", q("Acquire Send Lease", "as suppressed\n), cur as (", "or " + off + " as suppressed\n), cur as (")))
+    for label, mutate in wrong:
+        bad = copy.deepcopy(wf)
+        mutate(bad)
+        try:
+            check_schedule_gate(bad, f)
+        except AssertionError:
+            continue
+        fail(f"B1 tripwire accepted a broken schedule gate ({label}) in {f}")
+
 # R9 + T7: the notifier's one memory/ledger sweep (Settle Lost Sends). R9 settles a lost send_pending as send_unknown and
 # never makes an event re-claimable; T7 (follow-ups 2026-10-11) settles the dead run's memory DRAFT in the same statement
 # — only drafts (delivery 'draft', no writer's source, an ai row), only through the draft's OWN event row, marked unknown
@@ -249,6 +334,12 @@ def verify_bot(f):
     q = node(wf, "Read Reply Mode")["parameters"]["query"]
     check("or coalesce((select handoff_paused from chat_reply_state" in q and "coalesce(\n    (select suppressed from reply_mode_flags" in q,
           f"{f}: Read Reply Mode must OR the handoff pause while keeping absence → reply")
+    # B1: the schedule is one more term of the same gate (and the tripwire proves the checks still bite)
+    try:
+        check_schedule_gate(wf, f)
+    except AssertionError as e:
+        fail(str(e))
+    _gate_tripwires(wf, f)
     # routing + binding
     for name, frag in (("Is Incoming?", "wh_type === 'incoming_message'"), ("Is Outgoing?", "'outgoing_message_phone', 'outgoing_message_api'"),
                        ("Outgoing Bound?", "split('/').pop() === String($json.body.messages[0].profile_id)")):

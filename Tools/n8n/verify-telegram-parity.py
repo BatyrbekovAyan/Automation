@@ -194,6 +194,32 @@ def check_telegram_bot():
     print(f"OK  {f}")
 
 
+# B1 «расписание бота» (2026-10-14): the schedule rides INSIDE the existing mode gate — Read Reply Mode's statement (one more
+# OR term + off_hours) and Record Suppressed's pass-through — so no node is added to either template, and the gate is the
+# same text in both: a channel whose gate drifted would answer outside the owner's hours on one messenger only.
+GATE_SAME_PARAMETERS = ("Read Reply Mode", "Record Suppressed")
+GATE_BEHAVIOUR_KEYS = ("type", "typeVersion", "onError", "alwaysOutputData", "disabled", "retryOnFail", "credentials")
+
+
+def check_reply_mode_gate():
+    wa, tg = load(WA_BOT), load(TG_BOT)
+    for f, wf in ((WA_BOT, wa), (TG_BOT, tg)):
+        names = [n["name"] for n in wf["nodes"]]
+        assert len(names) == len(TG_BOT_NODE_NAMES) and set(names) == TG_BOT_NODE_NAMES, \
+            f"{f}: node set changed (B1 adds no node — the schedule is a term of Read Reply Mode): " \
+            f"extra={sorted(set(names) - TG_BOT_NODE_NAMES)} missing={sorted(TG_BOT_NODE_NAMES - set(names))} count={len(names)}"
+        q = sql_code(node(wf["nodes"], "Read Reply Mode")["parameters"]["query"])
+        assert "from bot_schedule s where s.profile_id = $1 and s.enabled), false)" in q and " as off_hours;" in q, \
+            f"{f}: Read Reply Mode lacks the schedule term / the off_hours column (B1)"
+        assert node(wf["nodes"], "Read Reply Mode").get("onError") is None, f"{f}: Read Reply Mode must stay fail-closed (no onError)"
+    for name in GATE_SAME_PARAMETERS:
+        a, b = node(wa["nodes"], name), node(tg["nodes"], name)
+        assert a["parameters"] == b["parameters"], f"{name} differs between the WhatsApp and the Telegram template (B1: one gate)"
+        assert {k: a.get(k) for k in GATE_BEHAVIOUR_KEYS} == {k: b.get(k) for k in GATE_BEHAVIOUR_KEYS}, \
+            f"{name}: behaviour keys differ between the templates: WA {[a.get(k) for k in GATE_BEHAVIOUR_KEYS]} TG {[b.get(k) for k in GATE_BEHAVIOUR_KEYS]}"
+    print("OK  reply mode gate (B1: the schedule term, WA == TG, no node added)")
+
+
 def check_bind_orchestrator(f, channel, jsonb_key, opposite_key, opposite_field):
     """The pre-F1 `Restamp RAG Chunks` rule — a second channel joining a bot takes the chunks the other channel uploaded
     while this one was unauthed (this channel's key = '-1', the other's = its clone) — lives INSIDE `Bind Workflow Id`
@@ -1135,6 +1161,7 @@ def checks():
     """Every check, in order. main() runs ALL of them — one red check must never hide the ones after it."""
     return [
         ("telegram bot template", check_telegram_bot),
+        ("reply mode gate", check_reply_mode_gate),
         ("bind TG", lambda: check_bind_orchestrator(CREATE_TG, "telegram", "{botTgId}", "botWaId", "WhatsappWorkflowId")),
         ("bind WA", lambda: check_bind_orchestrator(CREATE_WA, "whatsapp", "{botWaId}", "botTgId", "TelegramWorkflowId")),
         ("canonical export WA", lambda: check_canonical_export_invariant(CREATE_WA)),
