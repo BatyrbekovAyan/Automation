@@ -8,8 +8,9 @@ Reply Mode v2: one version-guarded upsert for every profile of the bot, a per-pr
 Replayed exactly as the canonical graph runs it — the REAL Auth Gate (token.js + gate.js, synthetic secret), the REAL
 Validate and Shape Response Code bodies, the REAL queryReplacement expression (n8n's own engine) and the REAL statement —
 against a session temp table of the staging Postgres that carries the REAL zone trigger of the migration
-(sql/2026-10-14-bot-schedule.sql: public.bot_schedule_tz_check, attached to the temp copy because LIKE does not copy
-triggers). Every scenario runs for a WhatsApp-shaped and a Telegram-shaped profile.
+(sql/2026-10-14-bot-schedule.sql: its own `create trigger` statement, re-targeted at the temp copy because LIKE does not
+copy triggers, over public.bot_schedule_tz_check). Every scenario runs for a WhatsApp-shaped and a Telegram-shaped
+profile.
 
   S1  a fresh write applies; the row holds the request; a NEWER version applies over it
   S2  a stale (older) and a replayed (same) version are not applied — the report names the server's version, the row stays
@@ -22,12 +23,15 @@ triggers). Every scenario runs for a WhatsApp-shaped and a Telegram-shaped profi
   S7  the gate: token only (no token → 401 even inside the compat window), another install's profile → 403
       forbidden:profileIds before anything runs
   S8  crSetSchedule001 is a protected infra id in build-client-webhooks.PROTECTED_IDS and in the four dependents
+  S9  the trigger fires only when a zone is WRITTEN (insert, or an update that names tz): a version bump and the bind's
+      profile_id move never re-validate the stored zone; an update naming tz is refused
   V   verify-set-schedule.py passes the canon and rejects scratch copies that open the gate, skip a check, drop the version
       guard, write past a refusal, answer a fault as success, or disable a node.
 
     python3 Tools/n8n/tests/test_set_schedule.py
 """
 import json
+import re
 import shutil
 import subprocess
 import sys
@@ -41,9 +45,19 @@ FILE = 'crSetSchedule001-Set_Schedule.json'
 VERIFY = N8N / 'verify-set-schedule.py'
 SS = wf(FILE)
 B = module('build-set-schedule.py')
-SETUP = """create temp table bot_schedule (like public.bot_schedule including all);
-create trigger bot_schedule_tz_check before insert or update on bot_schedule
-  for each row execute function public.bot_schedule_tz_check();"""
+MIGRATION = N8N / 'sql' / '2026-10-14-bot-schedule.sql'
+
+
+def migration_trigger():
+    """The migration's OWN create trigger statement, re-targeted at the session's temp copy (LIKE copies no trigger) —
+    so the event clause under test is the file's, never a copy typed here."""
+    sql = MIGRATION.read_text(encoding='utf-8')
+    found = re.findall(r'^create trigger bot_schedule_tz_check\b.*?;', sql, re.M | re.S)
+    assert len(found) == 1 and found[0].count(' on public.bot_schedule\n') == 1, f'the migration\'s create trigger: {found}'
+    return found[0].replace(' on public.bot_schedule\n', ' on pg_temp.bot_schedule\n')
+
+
+SETUP = "create temp table bot_schedule (like public.bot_schedule including all);\n" + migration_trigger()
 PROFILES = {'WA': ('wa-sched-1', 'wa-sched-2'), 'TG': ('tg-sched-1', 'tg-sched-2')}
 RA = '$RCAnonymousID:' + '0123456789abcdef' * 2
 
@@ -212,6 +226,25 @@ for ch, (P1, P2) in PROFILES.items():
             c.check(st == 403 and d.get('reason') == 'forbidden:profileIds' and not ran and n_rows(pg) == 0, f'{st} {d}')
             st, d, ran = call(pg, [P1], body([P1], 1), tok='v1.e30.forged')
             c.check(st == 401 and not ran, f'forged: {st} {d}')
+
+    with Case(f'B1 S9 [{ch}] the trigger fires only when a zone is WRITTEN (insert, or an update naming tz): a stored zone '
+              'the trigger would refuse (seeded with the trigger off) takes a version bump and the bind\'s profile_id move '
+              'without a refusal; an update naming tz is refused') as c:
+        with PgSession(SETUP) as pg:
+            pg.x('alter table pg_temp.bot_schedule disable trigger bot_schedule_tz_check;')
+            pg.x(f"insert into bot_schedule (profile_id, enabled, days_mask, start_min, end_min, tz, version, updated_at) "
+                 f"values ('{P1}', true, 31, 540, 1080, 'Europe/Nowhere', 5, now());")
+            pg.x('alter table pg_temp.bot_schedule enable trigger bot_schedule_tz_check;')
+            bump = run_statement(pg, f"with u as (update bot_schedule set version = version + 1, updated_at = now() "
+                                     f"where profile_id = '{P1}' returning version) select version from u")
+            moved = run_statement(pg, f"with u as (update bot_schedule set profile_id = '{P2}' where profile_id = '{P1}' "
+                                      f"returning profile_id) select profile_id from u")
+            named = run_statement(pg, f"with u as (update bot_schedule set tz = tz where profile_id = '{P2}' returning tz) select tz from u")
+            c.check(bump == [{'version': 6}], f'a version bump must not re-validate the stored zone: {bump}')
+            c.check(moved == [{'profile_id': P2}], f'the bind\'s profile_id move must not re-validate it: {moved}')
+            c.check(len(named) == 1 and B.TZ_MARKER in str(named[0].get('message')), f'an update naming tz must be refused: {named}')
+            c.check(row(pg, P2) == {'enabled': True, 'days_mask': 31, 'start_min': 540, 'end_min': 1080, 'tz': 'Europe/Nowhere', 'version': 6}
+                    and row(pg, P1) is None, f'the row after the three writes: {row(pg, P2)} / {row(pg, P1)}')
 
 with Case('B1 S8: crSetSchedule001 is a protected infra id — build-client-webhooks.PROTECTED_IDS, clone_lineage.PROTECTED and the '
           'four dependents regenerated from it') as c:

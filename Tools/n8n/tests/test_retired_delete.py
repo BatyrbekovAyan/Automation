@@ -143,9 +143,10 @@ def dbf_body(wa_pid='-1', tg_pid='-1', wa_wid='-1', tg_wid='-1'):
     return {'botWaId': wa_wid, 'botTgId': tg_wid, 'waProfileId': wa_pid, 'tgProfileId': tg_pid, 'appUserId': RA}
 
 
-def run_dbf_deletes(pg, gate_item, storage=(200,)):
+def run_dbf_deletes(pg, gate_item, storage=(200,), rows=None):
     """Owned?(0) onwards: originals listing + split + storage results + settle, then the three deleting statements. The
-    deleting nodes read the bot's line (T5) with parameters taken from the gate's item (`$('Auth Gate')`)."""
+    deleting nodes read the bot's line (T5) with parameters taken from the gate's item (`$('Auth Gate')`). `rows` (a
+    dict), when given, receives the deleting statements' own rows: retire / chunks / mem."""
     webhook = {k: v for k, v in gate_item.items() if k != 'crAuth'}
     named = {'Webhook': webhook, 'Auth Gate': gate_item}
     listed = pg.q(bind(Q(DBF, 'List Bot Originals'), P(DBF, 'List Bot Originals', gate_item, named)))[0]
@@ -158,6 +159,8 @@ def run_dbf_deletes(pg, gate_item, storage=(200,)):
     retire = pg.q(bind(Q(DBF, 'Retire Bot Profiles'), P(DBF, 'Retire Bot Profiles', settled, named)))[0]
     chunks = pg.q(bind(Q(DBF, 'Delete Bot Chunks'), P(DBF, 'Delete Bot Chunks', retire, named)))[0]
     mem = pg.q(bind(Q(DBF, 'Delete Chat Memory'), P(DBF, 'Delete Chat Memory', chunks, named)))[0]
+    if rows is not None:
+        rows.update(retire=retire, chunks=chunks, mem=mem)
     ok = cond(DBF, 'Deletion Settled?', mem, {'Retire Bot Profiles': retire, 'Delete Bot Chunks': chunks})
     return listed, split, settled, ok
 
@@ -187,13 +190,18 @@ for channel, short in CHANNELS:
             c.check(own.get('allowed') is True and cond(DBF, 'Owned?', own) is True, f'Delete Ownership {own}')
             c.check(edges(DBF, 'Owned?') == [E('List Bot Originals')] and edges(DBF, 'Owned?', 1) == [E('Respond Owner Refused')],
                     f'Owned? {edges(DBF, "Owned?")} / {edges(DBF, "Owned?", 1)}')
-            listed, split, settled, ok = run_dbf_deletes(pg, g)
+            rows = {}
+            listed, split, settled, ok = run_dbf_deletes(pg, g, rows=rows)
             c.check(listed.get('fileIds') == [f'f-{pid}'] and settled['originals']['ok'] is True and settled.get('body') == body,
                     f'originals: listed {listed} split {split} settled {settled.get("originals")}')
             c.check(ok is True, 'Deletion Settled? must pass on numeric counters')
             mine, theirs = counts(pg, pid, wid, key), counts(pg, f'{short}-N', f'wfClone{short}N0001', key)
             c.check(all(v == 0 for v in mine.values()), f'the bot\'s rows must be gone: {mine}')
             c.check(all(v == 1 for v in theirs.values()), f'the neighbour\'s rows must stay: {theirs}')
+            # B1: the answer counts what the statement deleted — a statement that deletes the schedule but counts another
+            # CTE (or none) under deletedSchedules must fail here, not only in the row counts above
+            c.check((rows.get('mem') or {}).get('deletedSchedules') == 1,
+                    f'Delete Chat Memory must count the one deleted schedule as deletedSchedules: {rows.get("mem")}')
 
 with Case('V12 D2: Set Workflow State — delete/deactivate of the owner\'s retired clone go to Delete Ownership and pass; activate never does') as c:
     with PgSession(SETUP) as pg:

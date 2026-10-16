@@ -28,8 +28,10 @@ create table if not exists public.bot_schedule (
 );
 -- TABLE-END
 
--- The zone is checked when a row is written: an unknown name is refused with a recognisable message (Set Schedule
--- answers it as 400 bad_timezone). Not security definer: it only reads the catalog view.
+-- The zone is checked when one is WRITTEN — an insert, or an update that names tz (Set Schedule's upsert does both) —
+-- never by an update that leaves it alone (the bind's profile_id move, a version bump): a tz can enter only through
+-- those two, and pg_timezone_names reads every zone file per call. An unknown name is refused with a recognisable
+-- message (Set Schedule answers it as 400 bad_timezone). Not security definer: it only reads the catalog view.
 create or replace function public.bot_schedule_tz_check() returns trigger
 language plpgsql as $fn$
 begin
@@ -40,7 +42,7 @@ begin
 end
 $fn$;
 drop trigger if exists bot_schedule_tz_check on public.bot_schedule;
-create trigger bot_schedule_tz_check before insert or update on public.bot_schedule
+create trigger bot_schedule_tz_check before insert or update of tz on public.bot_schedule
   for each row execute function public.bot_schedule_tz_check();
 
 -- RLS default-deny (no policies) + no client-key grants, as sql/2026-08-21-billing-rls.sql: only the server-side Postgres

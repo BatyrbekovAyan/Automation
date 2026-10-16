@@ -200,8 +200,8 @@ def check(wf_dir):
     need("create or replace function public.bot_schedule_tz_check()" in m and "pg_catalog.pg_timezone_names" in m
          and f"raise exception '{B.TZ_MARKER}: %'" in m and "security definer" not in m
          and "drop trigger if exists bot_schedule_tz_check on public.bot_schedule;" in m
-         and "before insert or update on public.bot_schedule" in m,
-         "(8) the zone trigger (bot_schedule_tz_check, before insert or update, pg_timezone_names, the bad-timezone message, "
+         and "before insert or update of tz on public.bot_schedule" in m,
+         "(8) the zone trigger (bot_schedule_tz_check, before insert or update of tz, pg_timezone_names, the bad-timezone message, "
          "not security definer, re-runnable) is missing or changed")
     need("alter table public.bot_schedule enable row level security;" in m
          and "revoke all on table public.bot_schedule from anon, authenticated;" in m,

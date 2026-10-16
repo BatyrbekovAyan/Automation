@@ -15,7 +15,9 @@ outcome ∈ filtered | suppressed | off_hours | duplicate | superseded | quota_d
 B1 «расписание бота» (2026-10-14): a message the bot's SCHEDULE kept from it (outside an enabled window) takes the
 «Вместе» branch — Read Reply Mode → Suppressed? → Record Suppressed — and Record Suppressed hands the mode read's
 `off_hours` on; the stamp then says `off_hours` instead of `suppressed`. A «Вместе» chat inside the window keeps
-`suppressed`.
+`suppressed`. Only on a RECORDED suppression (Record Suppressed's own row, outcome 'suppressed'): the node continues
+on error, and a failure outside the query runner hands its INPUT on (the R8 behaviour) — the mode read's row, off_hours
+true but no outcome — which keeps the pre-B1 label `other:Record Suppressed` (the message was never recorded).
 
 Branches stamped: If[false] (from != chatId), Suppressed?[true], Is Latest?[false] (older fragment
 of a burst), If Quota Allows[false], HTTP Request[main] (the Wappi send returned). Nothing on the
@@ -54,7 +56,8 @@ const m = (wh.body && Array.isArray(wh.body.messages) && wh.body.messages[0]) ||
 const resp = $input.first() ? ($input.first().json || {}) : {};
 // Stage 3: the record rows (Record Send / Record Cancel) carry the event's final state explicitly.
 // B1: Record Suppressed hands on the mode read's off_hours — the schedule, not the owner, kept this message from the bot.
-const outcome = resp.off_hours === true ? 'off_hours'
+// Only its OWN row counts (outcome 'suppressed'): a failure outside the query runner hands the mode read's row on.
+const outcome = (resp.outcome === 'suppressed' && resp.off_hours === true) ? 'off_hours'
   : ((typeof resp.outcome === 'string' && resp.outcome) ? resp.outcome : (byPrev[prev] || ('other:' + prev)));
 return [{ json: {
   outcome,

@@ -12,18 +12,21 @@ What runs — real node bodies and statements from the canonical JSONs, real SQL
 Postgres (migration sql/2026-10-14-bot-schedule.sql applied by pg.sh migrate); no n8n server, no network, never prod:
   W   every case of Tools/n8n/fixtures/schedule-cases.json (the contract the client's ScheduleModel shares) through
       bot_schedule.WINDOW_SQL at the case's fixed instant; a disabled case is also run with NO row at all (a bot without
-      a schedule — `no_row_reads_as_disabled` names that point);
+      a schedule — `no_row_reads_as_disabled` names that point); W3: the table has teeth — a predicate whose window
+      comparison takes the end minute in fails the end cases (same-day and across midnight, a non-zero end);
   R   the same cases through the CANONICAL Read Reply Mode of both templates — its own text, the clock fixed (the
       canon's `now() at time zone s.tz` → the case's instant): suppressed = off_hours = «the window is closed»;
   G   the mode gate through reply_chain.Run.mode() on the real clock: outside → suppressed + off_hours, Record
       Suppressed writes the client's history row and the memory human row, the Outcome stamp says off_hours, nothing
       is claimed, the quota branch is unreachable, dialog_counts untouched; inside → the ordinary reply; no row /
       disabled → as today; «Вместе» inside the window keeps its label; the schedule outranks a chat's «Авто»;
+      G5: the stamp says off_hours ONLY for a RECORDED suppression — a Record Suppressed that n8n failed outside the
+      query runner hands its input on (R8: the mode read's row, off_hours true, no outcome) and keeps the old label;
   L   the lease never reads the schedule — its statement names no bot_schedule, and a window that closes between the
       mode read and the lease does not cancel the reply;
   V   verify-history-handoff.py and verify-telegram-parity.py reject scratch copies that drop the term, flip the absence
-      rule, give Read Reply Mode an onError, disable a node of the gate, drop the off_hours stamp or put the schedule
-      into the lease.
+      rule, give Read Reply Mode an onError, disable a node of the gate, drop the off_hours stamp or its
+      recorded-suppression guard, or put the schedule into the lease.
 
     python3 Tools/n8n/tests/test_reply_schedule.py
 """
@@ -34,7 +37,7 @@ import sys
 import tempfile
 from pathlib import Path
 
-from harness import N8N, WF, Case, PgSession, bind, module, node, report, sql_literal as L, wf
+from harness import N8N, WF, Case, PgSession, bind, code, module, node, report, sql_literal as L, wf
 from reply_chain import CHATS, SETUP as CHAIN_SETUP, TEMPLATES, Run, history, ledger, memory, msg
 
 CASES = json.loads((N8N / 'fixtures' / 'schedule-cases.json').read_text(encoding='utf-8'))
@@ -144,6 +147,35 @@ with Case('B1 W2: the clock is a placeholder — WINDOW_SQL takes any timestamp 
         c.check('NOW_MARK' in w and 'now()' not in w and 'bot_schedule' not in w, w)
         c.check(BS.OFF_HOURS_SQL() == BS.OFF_HOURS_SQL(CANON_CLOCK) and CANON_CLOCK in BS.OFF_HOURS_SQL(), 'the canon clock')
 
+END_CASES = ('end_minute_is_outside', 'overnight_end_minute_is_outside')
+
+with Case('B1 W3: the table pins the end minute as EXCLUSIVE for a non-zero end, same-day and across midnight — a predicate '
+          'whose window comparison takes the end minute in opens both end cases (each closed ONLY by that comparison: '
+          'its deciding day\'s bit is on)') as c:
+    c.check(BS is not None, f'{BS_ERR!r}')
+    if BS is not None:
+        byname = {x['name']: x for x in CASES}
+        c.check(all(n in byname for n in END_CASES), f'missing end cases: {[n for n in END_CASES if n not in byname]}')
+        with PgSession(SETUP) as pg:
+            caught = {}
+            for n in END_CASES:
+                case = byname.get(n)
+                if case is None:
+                    continue
+                canon = BS.WINDOW_SQL(fixed_clock(case))
+                t = '(' + fixed_clock(case) + ')'
+                m = '(extract(hour from ' + t + ')::int * 60 + extract(minute from ' + t + ')::int)'
+                inclusive = canon.replace(m + ' < s.end_min)', m + ' <= s.end_min)')
+                c.check(inclusive.count(m + ' <= s.end_min)') == 2, f'{n}: the end comparisons were not found in WINDOW_SQL')
+                pg.x('delete from bot_schedule;')
+                put_schedule(pg, 'p-' + n, case)
+                got = pg.q(f"select ({canon}) as canon, ({inclusive}) as inclusive from bot_schedule s")[0]
+                caught[n] = got
+                c.check(case['enabled'] and case['endMin'] > 0 and case['expectOpen'] is False, f'{n}: not an enabled, non-zero-end, closed case: {case}')
+                c.check(got['canon'] is False and got['inclusive'] is True,
+                        f'{n}: the canonical window {got["canon"]} (want closed), end-inclusive {got["inclusive"]} (want open — '
+                        'otherwise something other than the end comparison closes the case)')
+
 # ------------------------------------------------------------------------------------------------ R: the canonical mode read
 for ch, T in TEMPLATES.items():
     P, C = CHATS[ch]
@@ -236,6 +268,26 @@ for ch, T in TEMPLATES.items():
             c.check(rd == {'suppressed': True, 'off_hours': True} and d.outcome == 'off_hours', f'chat «Авто» outside the window: {rd} → {d.outcome}')
             c.check(rh == {'suppressed': True, 'off_hours': False} and h.outcome == 'suppressed', f'handoff pause inside: {rh} → {h.outcome}')
 
+    with Case(f'B1 G5 [{ch}] the stamp says off_hours ONLY for a RECORDED suppression: a Record Suppressed that n8n failed '
+              'outside the query runner hands its INPUT on (R8: the mode read\'s row, off_hours true, no outcome) and keeps the '
+              'pre-B1 label other:Record Suppressed; so does its error item; the recorded row says off_hours') as c:
+        with PgSession(SETUP) as pg:
+            s, e = window_around_now(pg, inside=False)
+            put_schedule(pg, P, start=s, end=e)
+            run = Run(T, pg, msg(ch, 'G5', 100, 'Вы сегодня открыты?'), 'exec-G5')
+            row = run.mode()
+
+            def stamp(item):
+                return code(T, 'Outcome', {'json': item}, run.named, prev_node='Record Suppressed')[0]['json'].get('outcome')
+
+            passed_on = stamp(dict(row))
+            error_item = stamp({'message': 'Connection terminated unexpectedly', 'error': {'message': 'Connection terminated unexpectedly'}})
+            c.check(row == {'suppressed': True, 'off_hours': True}, f'premise: the mode read outside the window {row}')
+            c.check(run.outcome == 'off_hours' and run.suppressed_row.get('outcome') == 'suppressed',
+                    f'the recorded suppression {run.suppressed_row} → {run.outcome}')
+            c.check(passed_on == 'other:Record Suppressed', f'the passed-on mode-read row was stamped {passed_on!r} — the message was never recorded')
+            c.check(error_item == 'other:Record Suppressed', f'the error item was stamped {error_item!r}')
+
 # ------------------------------------------------------------------------------------------------ L: the lease never reads it
 for ch, T in TEMPLATES.items():
     P, C = CHATS[ch]
@@ -299,9 +351,17 @@ def m_lease_reads_schedule(w):
     p['query'] = p['query'].replace("as suppressed\n), cur as (", "or " + BS.OFF_HOURS_SQL() + " as suppressed\n), cur as (", 1)
 
 
+STAMP_GUARD = "(resp.outcome === 'suppressed' && resp.off_hours === true) ? 'off_hours'"
+
+
 def m_stamp_dropped(w):
     p = nd(w, 'Outcome')['parameters']
-    p['jsCode'] = p['jsCode'].replace("resp.off_hours === true ? 'off_hours'", "false ? 'off_hours'")
+    p['jsCode'] = p['jsCode'].replace(STAMP_GUARD, "false ? 'off_hours'")
+
+
+def m_stamp_unguarded(w):
+    p = nd(w, 'Outcome')['parameters']
+    p['jsCode'] = p['jsCode'].replace(STAMP_GUARD, "resp.off_hours === true ? 'off_hours'")
 
 
 def m_passthrough_dropped(w):
@@ -319,6 +379,7 @@ HH_MUTATIONS = (
     ('Outcome disabled', m_disabled('Outcome'), 'disabled'),
     ('the lease reads the schedule', m_lease_reads_schedule, 'lease'),
     ('the off_hours stamp dropped from Outcome', m_stamp_dropped, 'off_hours'),
+    ('the off_hours stamp without the recorded-suppression guard', m_stamp_unguarded, 'off_hours'),
     ('Record Suppressed does not carry off_hours', m_passthrough_dropped, 'off_hours'),
 )
 

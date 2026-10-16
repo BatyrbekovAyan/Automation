@@ -14,7 +14,7 @@
   {"name": "overnight_midnight_belongs_to_start_day", "tz": "Asia/Almaty", "nowIso": "2026-10-12T19:00:00Z", "daysMask": 1, "startMin": 1320, "endMin": 360, "enabled": true, "expectOpen": true},
   {"name": "overnight_morning_half_counts_start_day", "tz": "Asia/Almaty", "nowIso": "2026-10-12T21:00:00Z", "daysMask": 1, "startMin": 1320, "endMin": 360, "enabled": true, "expectOpen": true},
   {"name": "overnight_morning_half_start_day_off", "tz": "Asia/Almaty", "nowIso": "2026-10-12T21:00:00Z", "daysMask": 2, "startMin": 1320, "endMin": 360, "enabled": true, "expectOpen": false},
-  {"name": "overnight_end_minute_is_outside", "tz": "Asia/Almaty", "nowIso": "2026-10-13T01:00:00Z", "daysMask": 1, "startMin": 1320, "endMin": 360, "enabled": true, "expectOpen": false},
+  {"name": "overnight_end_minute_is_outside", "tz": "Asia/Almaty", "nowIso": "2026-10-13T01:00:00Z", "daysMask": 3, "startMin": 1320, "endMin": 360, "enabled": true, "expectOpen": false},
   {"name": "overnight_daytime_gap_is_outside", "tz": "Asia/Almaty", "nowIso": "2026-10-13T07:00:00Z", "daysMask": 127, "startMin": 1320, "endMin": 360, "enabled": true, "expectOpen": false},
   {"name": "overnight_sunday_into_monday", "tz": "Asia/Almaty", "nowIso": "2026-10-18T20:00:00Z", "daysMask": 64, "startMin": 1320, "endMin": 360, "enabled": true, "expectOpen": true},
   {"name": "window_from_midnight_is_its_own_day", "tz": "Asia/Almaty", "nowIso": "2026-10-12T19:00:00Z", "daysMask": 2, "startMin": 0, "endMin": 360, "enabled": true, "expectOpen": true},

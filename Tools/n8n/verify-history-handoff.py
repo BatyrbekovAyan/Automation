@@ -199,7 +199,9 @@ def bs():
 # window that closes during the generation never cancels an answer already paid for).
 SCHEDULE_GATE_NODES = ("Read Reply Mode", "Suppressed?", "Record Suppressed", "Outcome")
 OFF_HOURS_PASSTHROUGH = "$('Read Reply Mode').first().json.off_hours === true"
-OFF_HOURS_STAMP = "const outcome = resp.off_hours === true ? 'off_hours'"
+# the stamp names off_hours only on Record Suppressed's OWN row: a failure outside the query runner hands the mode read's
+# row on (R8), off_hours true but never recorded — that keeps the old label
+OFF_HOURS_STAMP = "const outcome = (resp.outcome === 'suppressed' && resp.off_hours === true) ? 'off_hours'"
 
 
 def check_schedule_gate(wf, f):
@@ -226,7 +228,7 @@ def check_schedule_gate(wf, f):
         and (rs.get("options") or {}).get("queryReplacement", "").endswith(", " + OFF_HOURS_PASSTHROUGH + " ])($('Webhook').first().json.body.messages[0]) }}"), \
         f"{f}: Record Suppressed must hand the mode read's off_hours on (its last value, answered back) for the stamp (B1)"
     assert OFF_HOURS_STAMP in names["Outcome"]["parameters"].get("jsCode", ""), \
-        f"{f}: Outcome must stamp off_hours when Record Suppressed hands it on (B1: «вне графика»)"
+        f"{f}: Outcome must stamp off_hours only on a RECORDED suppression (Record Suppressed's own row hands it on — B1: «вне графика»)"
     lease = names.get("Acquire Send Lease")
     assert lease is not None and "bot_schedule" not in lease["parameters"].get("query", ""), \
         f"{f}: Acquire Send Lease reads bot_schedule — the lease never reads the schedule (B1: decided at message entry only)"
@@ -248,10 +250,19 @@ def _gate_tripwires(wf, f):
             next(n for n in w["nodes"] if n["name"] == name)[k] = v
         return m
 
+    def js(name, old, new):
+        def m(w):
+            p = next(n for n in w["nodes"] if n["name"] == name)["parameters"]
+            assert old in p["jsCode"], f"tripwire anchor not found in {name}"
+            p["jsCode"] = p["jsCode"].replace(old, new)
+        return m
+
     wrong = (("the term removed", q("Read Reply Mode", off, "false")),
              ("absence read as closed", q("Read Reply Mode", " and s.enabled), false)", " and s.enabled), true)")),
              ("fail-open read", key("Read Reply Mode", "onError", "continueRegularOutput")),
              ("a disabled read", key("Read Reply Mode", "disabled", True)),
+             ("a stamp without the recorded-suppression guard",
+              js("Outcome", "(resp.outcome === 'suppressed' && resp.off_hours === true) ? 'off_hours'", "resp.off_hours === true ? 'off_hours'")),
              ("the lease reads the schedule", q("Acquire Send Lease", "as suppressed\n), cur as (", "or " + off + " as suppressed\n), cur as (")))
     for label, mutate in wrong:
         bad = copy.deepcopy(wf)
@@ -484,7 +495,7 @@ def verify_integrations():
     # counted as deletedSchedules (Deletion Settled? reads it). Pinned AFTER the T5 line check on purpose: a pre-T5 copy
     # (named ids, no schedule) must still be reported as the T5 failure it is (tests/test_clone_retirements.py T5 N1).
     check("DELETE FROM public.bot_schedule b\n  WHERE b.profile_id IN (SELECT profile_id FROM valid)" in q
-          and 'AS "deletedSchedules"' in q,
+          and re.search(r'\(SELECT count\(\*\)::int FROM schedule\)\s+AS "deletedSchedules"', q),
           "B1: Delete Bot Files must wipe bot_schedule for every profile of the line (Delete Chat Memory) and count it as deletedSchedules")
     rb = node(load("lmjYsdNcQA2IE5rl-Delete_Bot_Files.json"), "Respond")["parameters"]["responseBody"]
     for k in ("deletedHistoryEvents", "deletedHandoffs", "deletedReplyEvents", "deletedChatStates", "deletedSchedules"):
