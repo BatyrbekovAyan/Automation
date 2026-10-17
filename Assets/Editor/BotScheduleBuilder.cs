@@ -113,10 +113,10 @@ public static class BotScheduleBuilder
                                       ScheduleCopy.EndPlaceholder, ref modified);
             var days = EnsureRow(content, DaysGoName, ChipHeight, ChipGap, ref modified);
             var chips = EnsureDayChips(days, fontSource, listWidth, ref modified);
-            var error = EnsureNote(content, ErrorGoName, ScheduleCopy.Invalid, ThemeRole.Destructive, fontSource, ErrorHeight,
-                                   active: false, ref modified);
-            var hint = EnsureNote(content, HintGoName, ScheduleCopy.Hint, ThemeRole.InkTertiary, fontSource,
-                                  MeasuredHeight(fontSource, ScheduleCopy.Hint, listWidth), active: true, ref modified);
+            var error = EnsureNote(content, ErrorGoName, ScheduleCopy.Invalid, ThemeRole.Destructive, fontSource, active: false, ref modified);
+            modified |= SetHeight((RectTransform)error.transform, ErrorHeight);
+            var hint = EnsureNote(content, HintGoName, ScheduleCopy.Hint, ThemeRole.InkTertiary, fontSource, active: true, ref modified);
+            modified |= SetHeight((RectTransform)hint.transform, MeasuredHeight(hint, listWidth));
 
             modified |= PlaceBefore(anchor, header.transform, toggle.transform, hours, days, error.transform, hint.transform);
             modified |= EnsureKeyboardScroll(general);
@@ -315,7 +315,7 @@ public static class BotScheduleBuilder
     }
 
     private static TextMeshProUGUI EnsureNote(RectTransform content, string name, string text, ThemeRole role, TextMeshProUGUI fontSource,
-                                              float height, bool active, ref bool modified)
+                                              bool active, ref bool modified)
     {
         var rt = content.Find(name) as RectTransform;
         if (rt == null)
@@ -328,7 +328,6 @@ public static class BotScheduleBuilder
             modified = true;
         }
         var tmp = rt.GetComponent<TextMeshProUGUI>();
-        modified |= SetHeight(rt, height);
         modified |= ConfigureText(tmp, text, NoteSize, FontWeight.Regular, TextAlignmentOptions.TopLeft, Theme.Dark.Resolve(role),
                                   fontSource, wrap: true);
         modified |= BindTheme(rt.GetComponent<ThemedColor>(), role, tmp);
@@ -340,23 +339,15 @@ public static class BotScheduleBuilder
         return tmp;
     }
 
-    // The hint wraps in the list's width; its box is its measured height (the static SF Pro atlas measures headless).
-    private static float MeasuredHeight(TextMeshProUGUI fontSource, string text, float width)
+    // The hint wraps in the list's width; its box is its measured height (the static SF Pro atlas measures headless). Measured
+    // on the label itself, inside the loaded prefab — no probe object, so a menu run never touches the open scene.
+    private static float MeasuredHeight(TextMeshProUGUI label, float width)
     {
-        var probe = new GameObject("ScheduleHintProbe", typeof(RectTransform), typeof(TextMeshProUGUI)).GetComponent<TextMeshProUGUI>();
-        try
-        {
-            ConfigureText(probe, text, NoteSize, FontWeight.Regular, TextAlignmentOptions.TopLeft, Color.white, fontSource, wrap: true);
-            float measured = probe.GetPreferredValues(text, width, 0f).y;
-            // At least one line; a never-laid-out TMP can report ~1/10 of the truth (ConfirmCardFitter's finding).
-            bool sane = measured >= NoteSize && measured < 400f;
-            Debug.Log($"{Tag} hint measured {measured:0.##} u at width {width} ({(sane ? "used" : "fallback 2 lines")})");
-            return sane ? Mathf.Ceil(measured) : Mathf.Ceil(NoteSize * 2.5f);
-        }
-        finally
-        {
-            Object.DestroyImmediate(probe.gameObject);
-        }
+        float measured = label.GetPreferredValues(label.text, width, 0f).y;
+        // At least one line; a never-laid-out TMP can report ~1/10 of the truth (ConfirmCardFitter's finding).
+        bool sane = measured >= NoteSize && measured < 400f;
+        Debug.Log($"{Tag} hint measured {measured:0.##} u at width {width} ({(sane ? "used" : "fallback 2 lines")})");
+        return sane ? Mathf.Ceil(measured) : Mathf.Ceil(NoteSize * 2.5f);
     }
 
     private static bool PlaceBefore(Transform anchor, params Transform[] block)

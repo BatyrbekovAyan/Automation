@@ -358,8 +358,15 @@ public class ScheduleSyncServiceTests
         foreach (var create in new[] { "private IEnumerator CreateWhatsappWorkflowFromEdit()", "private IEnumerator CreateTelegramWorkflowFromEdit()" })
             Assert.IsTrue(MethodBody(manager, create).Contains("ScheduleSyncService.DesireSavedForNewChannel(bot.name)"),
                 $"{create}: a channel added from the settings must get the bot's schedule");
+        // The wizard's second channel can finish its Create AFTER the owner saved a schedule on the new bot (its settings
+        // open once the first channel is live): that channel must get it too — a no-op while nothing was saved.
         foreach (var create in new[] { "private IEnumerator CreateWhatsappWorkflowFromStart(", "private IEnumerator CreateTelegramWorkflowFromStart(" })
-            Assert.IsFalse(MethodBody(manager, create).Contains("ScheduleSyncService"), $"{create}: a brand-new bot has no schedule yet");
+        {
+            string body = MethodBody(manager, create);
+            int seed = body.IndexOf("SeedReplyModeDefaultForProfile(bot.name, startedBot.", StringComparison.Ordinal);
+            int queued = body.IndexOf("ScheduleSyncService.DesireSavedForNewChannel(bot.name)", StringComparison.Ordinal);
+            Assert.IsTrue(seed >= 0 && queued > seed, $"{create}: the new channel gets the saved schedule after its profile id is stored");
+        }
     }
 
     [Test]

@@ -3847,6 +3847,7 @@ public partial class Manager : MonoBehaviour
                 PlayerPrefs.SetString(bot.name + "WhatsappProfileId", startedBot.whatsappProfileId);
                 PendingProfileLedger.MarkWhatsappClaimed();
                 SeedReplyModeDefaultForProfile(bot.name, startedBot.whatsappProfileId);   // WR-02: '*' row for a channel authed after a Вместе default
+                ScheduleSyncService.DesireSavedForNewChannel(bot.name);   // B2: a schedule saved before this channel's Create finished
             }
         }
 
@@ -4062,6 +4063,7 @@ public partial class Manager : MonoBehaviour
                 PlayerPrefs.SetString(bot.name + "TelegramProfileId", startedBot.telegramProfileId);
                 PendingProfileLedger.MarkTelegramClaimed();
                 SeedReplyModeDefaultForProfile(bot.name, startedBot.telegramProfileId);   // WR-02: '*' row for a channel authed after a Вместе default
+                ScheduleSyncService.DesireSavedForNewChannel(bot.name);   // B2: a schedule saved before this channel's Create finished
             }
         }
 

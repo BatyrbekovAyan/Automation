@@ -31,21 +31,30 @@ namespace Automation.BotSettingsUI
         /// Use this when code needs to force the toggle off/on without
         /// triggering auth/EnableSave side effects, yet still wants the
         /// control to reflect the new state on screen.
+        ///
+        /// Safe in every state: a row whose GameObject is inactive is repainted
+        /// too (the row has no OnEnable repaint, so a revert behind a hidden tab
+        /// must paint now), an in-flight tap animation is cut so it cannot finish
+        /// on the old value, and before Awake only the value is taken — Awake
+        /// records the thumb's authored OFF position, and painting earlier would
+        /// record the wrong one for good.
         /// </summary>
         public void SetIsOnQuiet(bool on)
         {
             if (toggle != null) toggle.SetIsOnWithoutNotify(on);
-            ApplyImmediate(on);
+            if (initialized) ApplyImmediate(on);
         }
 
         private Vector2 thumbOffAnchored;
         private Vector2 thumbOnAnchored;
+        private bool initialized;
 
         private void Awake()
         {
             thumbOffAnchored = thumb.anchoredPosition;
             thumbOnAnchored = thumbOffAnchored + new Vector2(thumbOffsetX, 0f);
             toggle.onValueChanged.AddListener(AnimateTo);
+            initialized = true;
             ApplyImmediate(toggle.isOn);
         }
 
@@ -60,6 +69,8 @@ namespace Automation.BotSettingsUI
 
         private void ApplyImmediate(bool on)
         {
+            thumb.DOKill();
+            trackImage.DOKill();
             thumb.anchoredPosition = on ? thumbOnAnchored : thumbOffAnchored;
             trackImage.color = on ? onColor : offColor;
         }

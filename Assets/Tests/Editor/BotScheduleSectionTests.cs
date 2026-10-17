@@ -1,4 +1,7 @@
+using System.Collections;
+using System.IO;
 using System.Linq;
+using System.Reflection;
 using Automation.BotSettingsUI;
 using NUnit.Framework;
 using TMPro;
@@ -135,5 +138,142 @@ public class BotScheduleSectionTests
             Object.DestroyImmediate(go);
             Object.DestroyImmediate(light);
         }
+    }
+
+    // ── the toggle's painted state (review round 2) ──────────────────────────────────────────────────────
+
+    private static readonly MethodInfo ToggleRowAwake =
+        typeof(ToggleRow).GetMethod("Awake", BindingFlags.Instance | BindingFlags.NonPublic);
+
+    private sealed class Painted
+    {
+        public RectTransform Thumb;
+        public Image Track;
+        public Color On, Off;
+        public float Offset;
+    }
+
+    private static Painted PaintOf(ToggleRow row)
+    {
+        var so = new SerializedObject(row);
+        return new Painted
+        {
+            Thumb = (RectTransform)row.transform.Find("Toggle/Thumb"),
+            Track = row.transform.Find("Toggle/Track").GetComponent<Image>(),
+            On = so.FindProperty("onColor").colorValue,
+            Off = so.FindProperty("offColor").colorValue,
+            Offset = so.FindProperty("thumbOffsetX").floatValue,
+        };
+    }
+
+    [Test]
+    public void Revert_WithTheGeneralTabHidden_RepaintsTheScheduleToggle()
+    {
+        var root = PrefabUtility.LoadPrefabContents(PrefabPath);
+        try
+        {
+            var settings = root.GetComponent<BotSettings>();
+            var row = settings.ScheduleRow;
+            Assert.IsNotNull(ToggleRowAwake, "ToggleRow.Awake renamed — update this test");
+            ToggleRowAwake.Invoke(row, null);                 // settings opened on «Основное»: the row ran Awake
+            var paint = PaintOf(row);
+            Vector2 off = paint.Thumb.anchoredPosition;
+
+            row.SetIsOnQuiet(true);                           // the owner switched the schedule on
+            Assert.AreEqual(off + new Vector2(paint.Offset, 0f), paint.Thumb.anchoredPosition);
+
+            var general = settings.BotNameField.GetComponentInParent<ScrollRect>(true).gameObject;
+            general.SetActive(false);                         // …opened «Бизнес»: the Основное tab is hidden
+            settings.ApplySchedule(BotSchedule.Default);      // …and went Back: CloseSettings reverts to the saved «off»
+
+            Assert.IsFalse(row.Toggle.isOn);
+            Assert.AreEqual(off, paint.Thumb.anchoredPosition,
+                "the thumb must follow the reverted value while its tab is hidden — ToggleRow has no OnEnable repaint, so a " +
+                "stale thumb would show the switch opposite to the saved (and server) state on the next open");
+            Assert.AreEqual(paint.Off, paint.Track.color);
+        }
+        finally
+        {
+            PrefabUtility.UnloadPrefabContents(root);
+        }
+    }
+
+    [Test]
+    public void SetIsOnQuiet_BeforeTheRowEverRan_LeavesThePaintToAwake()
+    {
+        // A never-opened settings screen (LoadBots, the wizard, a retirement mark at boot) has rows that never ran Awake:
+        // painting then would record the thumb's ON position as its OFF baseline for good.
+        var root = PrefabUtility.LoadPrefabContents(PrefabPath);
+        try
+        {
+            var row = root.GetComponent<BotSettings>().ScheduleRow;
+            var paint = PaintOf(row);
+            Vector2 authoredOff = paint.Thumb.anchoredPosition;
+
+            row.SetIsOnQuiet(true);
+            Assert.IsTrue(row.Toggle.isOn, "the value is taken at once");
+            Assert.AreEqual(authoredOff, paint.Thumb.anchoredPosition, "…but nothing is painted before Awake records the baseline");
+
+            ToggleRowAwake.Invoke(row, null);
+            Assert.AreEqual(authoredOff + new Vector2(paint.Offset, 0f), paint.Thumb.anchoredPosition, "Awake paints the value it finds");
+            Assert.AreEqual(paint.On, paint.Track.color);
+
+            row.SetIsOnQuiet(false);
+            Assert.AreEqual(authoredOff, paint.Thumb.anchoredPosition, "the baseline is the authored OFF position");
+            Assert.AreEqual(paint.Off, paint.Track.color);
+        }
+        finally
+        {
+            PrefabUtility.UnloadPrefabContents(root);
+        }
+    }
+
+    // ── a valid time is shown in its canonical form once the field lets go (review round 2) ──────────────────
+
+    [TestCase("9:00", "09:00")]
+    [TestCase(" 21:30 ", "21:30")]
+    [TestCase("0:05", "00:05")]
+    [TestCase("09:00", "09:00")]
+    [TestCase("25:00", "25:00")]   // invalid: left as typed, the error line explains it
+    [TestCase("9", "9")]
+    public void ABlurredTime_IsWrittenBackCanonical_OnlyWhenItParses(string typed, string shown)
+    {
+        var root = PrefabUtility.LoadPrefabContents(PrefabPath);
+        try
+        {
+            var settings = root.GetComponent<BotSettings>();
+            var field = settings.ScheduleStartField;
+            field.Value = typed;
+            var normalize = typeof(BotSettings).GetMethod("NormalizeTimeWhenReleased", BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.IsNotNull(normalize, "the blur's deferred write-back is gone");
+            var routine = (IEnumerator)normalize.Invoke(settings, new object[] { field });
+            for (int frame = 0; frame < 120 && routine.MoveNext(); frame++) { }
+            Assert.AreEqual(shown, field.Value);
+        }
+        finally
+        {
+            PrefabUtility.UnloadPrefabContents(root);
+        }
+    }
+
+    [Test]
+    public void TheWriteBack_WaitsForTheFieldToLetGo_AndNeverTouchesAFocusedOne()
+    {
+        string src = File.ReadAllText(Path.Combine(Application.dataPath, "Scripts/Main/BotSettings.Schedule.cs"));
+        int blur = src.IndexOf("private void OnScheduleTimeBlurred(EditableField field)", System.StringComparison.Ordinal);
+        Assert.GreaterOrEqual(blur, 0);
+        string blurBody = src.Substring(blur, src.IndexOf("\n    }", blur, System.StringComparison.Ordinal) - blur);
+        Assert.IsTrue(blurBody.Contains("StartCoroutine(NormalizeTimeWhenReleased(field))"), "the blur defers the write-back");
+        Assert.IsFalse(blurBody.Contains(".Value ="), "never a write in the blur itself — the TMP can still be focused on a field switch");
+
+        int routine = src.IndexOf("private IEnumerator NormalizeTimeWhenReleased(", System.StringComparison.Ordinal);
+        Assert.GreaterOrEqual(routine, 0);
+        string body = src.Substring(routine);
+        int wait = body.IndexOf("InputField.isFocused", System.StringComparison.Ordinal);
+        int frame = body.IndexOf("yield return null;", System.StringComparison.Ordinal);
+        int guard = body.IndexOf("if (field.IsFocused", System.StringComparison.Ordinal);
+        int write = body.IndexOf("field.Value = ", System.StringComparison.Ordinal);
+        Assert.IsTrue(wait >= 0 && frame > 0 && guard > frame && write > guard,
+            "wait out the TMP focus, one more frame, re-check both focus flags, only then write (the Prompts-tab rule)");
     }
 }

@@ -1,3 +1,4 @@
+using System.Collections;
 using Automation.BotSettingsUI;
 using TMPro;
 using UnityEngine;
@@ -11,9 +12,10 @@ using UnityEngine;
 /// (<see cref="ApplySchedule"/> — LoadBots, the wizard, the revert in CloseSettings), the dirty check reads
 /// <see cref="EditedSchedule"/>, SaveSettings persists it. A time is validated when its field loses focus
 /// (ScheduleModel.TryParseHhMm): a wrong one shows ScheduleCopy.Invalid and keeps Save disabled through
-/// BotSettingsDirtyPolicy.CanSave — the one verdict, no second gate — and fixing it while typing clears the line at once.
-/// The fields are only ever WRITTEN while blurred (<see cref="WriteTime"/> force-blurs a focused one first): a write
-/// into a focused field round-trips through the shared iOS keyboard buffer.
+/// BotSettingsDirtyPolicy.CanSave — the one verdict, no second gate — and fixing it while typing clears the line at once;
+/// a valid one is shown back in its canonical form («9:00» → «09:00») once the field has let go
+/// (<see cref="NormalizeTimeWhenReleased"/>). The fields are only ever WRITTEN while blurred (<see cref="WriteTime"/>
+/// force-blurs a focused one first): a write into a focused field round-trips through the shared iOS keyboard buffer.
 /// </summary>
 public partial class BotSettings
 {
@@ -44,15 +46,14 @@ public partial class BotSettings
         ParsedOrInvalid(scheduleEndField));
 
     /// <summary>
-    /// Shows a stored schedule (hydration in LoadBots / the wizard, the revert in CloseSettings) without raising any edit:
-    /// an awake row moves its thumb at once (ToggleRow.SetIsOnQuiet — it needs the off position Awake records); a row
-    /// that has never been active only gets the value, which its Awake then paints.
+    /// Shows a stored schedule (hydration in LoadBots / the wizard, the revert in CloseSettings) without raising any edit.
+    /// ToggleRow.SetIsOnQuiet repaints in every state — also behind a hidden tab (the revert after a switch to «Бизнес»),
+    /// and before the row's Awake it only takes the value, which Awake then paints.
     /// </summary>
     public void ApplySchedule(BotSchedule schedule)
     {
         if (!HasScheduleUi) return;
-        if (scheduleRow.gameObject.activeInHierarchy) scheduleRow.SetIsOnQuiet(schedule.Enabled);
-        else scheduleRow.Toggle.SetIsOnWithoutNotify(schedule.Enabled);
+        scheduleRow.SetIsOnQuiet(schedule.Enabled);
         WriteTime(scheduleStartField, schedule.StartMin);
         WriteTime(scheduleEndField, schedule.EndMin);
         scheduleDaysMask = schedule.DaysMask;
@@ -68,7 +69,7 @@ public partial class BotSettings
         foreach (var field in new[] { scheduleStartField, scheduleEndField })
         {
             WireDirtyOnEdit(field);
-            field.Blurred += _ => OnScheduleTimeBlurred();
+            field.Blurred += OnScheduleTimeBlurred;
             if (field.InputField != null) field.InputField.onValueChanged.AddListener(_ => OnScheduleTimeTyped());
         }
         foreach (var chip in scheduleDayChips)
@@ -77,11 +78,28 @@ public partial class BotSettings
         RefreshScheduleError();
     }
 
-    // Validation on blur: a half-typed time is not an error yet.
-    private void OnScheduleTimeBlurred()
+    // Validation on blur: a half-typed time is not an error yet. A valid one is written back canonical — later, once the
+    // field's TMP has let go: on a direct switch to the other field this fires while the TMP may still be focused.
+    private void OnScheduleTimeBlurred(EditableField field)
     {
         scheduleTimeErrorShown = !ScheduleTimesParse();
         RefreshScheduleError();
+        if (isActiveAndEnabled) StartCoroutine(NormalizeTimeWhenReleased(field));
+    }
+
+    // The Prompts-tab rule: never write into a focused field. Wait out the TMP's focus (it lags the wrapper's blur by a few
+    // frames), one more frame, re-check both flags — a field the owner went back into is left alone — and only then show
+    // a time that parses in its canonical form. An invalid one stays as typed: the error line explains it.
+    private IEnumerator NormalizeTimeWhenReleased(EditableField field)
+    {
+        float giveUpAt = Time.unscaledTime + 1f;
+        while (field.InputField != null && field.InputField.isFocused && Time.unscaledTime < giveUpAt)
+            yield return null;
+        yield return null;
+        if (field.IsFocused || field.InputField == null || field.InputField.isFocused) yield break;
+        if (!ScheduleModel.TryParseHhMm(field.Value, out int minutes)) yield break;
+        string canonical = ScheduleModel.FormatHhMm(minutes);
+        if (field.Value != canonical) field.Value = canonical;
     }
 
     // A shown error goes away the moment the value becomes right; a new one waits for the blur.
