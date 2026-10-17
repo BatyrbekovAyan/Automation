@@ -489,7 +489,8 @@ with Case('V12 N1: verify-auth-gate.py rejects copies that route around the data
         c.check(rc != 0 and 'V12' in out, f'{label}: verifier passed ({rc}): {out}')
 
 with Case('B1 N2: a delete that keeps the schedule is caught — verify-history-handoff.py (Delete Chat Memory without the '
-          'bot_schedule CTE, Respond without deletedSchedules) and verify-auth-gate.py (Deletion Settled? without it)') as c:
+          'bot_schedule CTE, deletedSchedules counting another CTE, Respond without deletedSchedules) and verify-auth-gate.py '
+          '(Deletion Settled? without it)') as c:
     def run_on(tool, fname, fn):
         d = Path(tempfile.mkdtemp(prefix='b1-del-neg-'))
         try:
@@ -510,6 +511,13 @@ with Case('B1 N2: a delete that keeps the schedule is caught — verify-history-
         p = node(w, 'Delete Chat Memory')['parameters']
         p['query'] = p['query'].replace('DELETE FROM public.bot_schedule', 'SELECT 1 FROM public.bot_schedule', 1)
 
+    def dcm_counts_another_cte(w):
+        # the schedule CTE still deletes, but deletedSchedules counts the learning-A `sets` CTE — the row counts of
+        # D1/D4 cannot see this, only the verifier's `(SELECT count(*)::int FROM schedule) AS "deletedSchedules"` pin can
+        p = node(w, 'Delete Chat Memory')['parameters']
+        assert p['query'].count('FROM schedule)') == 1, 'the deletedSchedules count is not where this mutation expects it'
+        p['query'] = p['query'].replace('FROM schedule)', 'FROM sets)', 1)
+
     def respond_without_counter(w):
         p = node(w, 'Respond')['parameters']
         p['responseBody'] = p['responseBody'].replace(', "deletedSchedules": $json.deletedSchedules ?? null', '')
@@ -519,6 +527,7 @@ with Case('B1 N2: a delete that keeps the schedule is caught — verify-history-
         cnd['leftValue'] = cnd['leftValue'].replace(" && typeof $json.deletedSchedules === 'number'", '')
 
     for tool, fn, needle in (('verify-history-handoff.py', dcm_keeps_schedule, 'bot_schedule'),
+                             ('verify-history-handoff.py', dcm_counts_another_cte, 'deletedSchedules'),
                              ('verify-history-handoff.py', respond_without_counter, 'deletedSchedules'),
                              ('verify-auth-gate.py', verdict_without_counter, 'Deletion Settled?')):
         rc, out = run_on(tool, DBF_F, fn)
