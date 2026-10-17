@@ -24,8 +24,12 @@ public static class ScheduleCopy
     public const string SyncPending = "Расписание ещё не дошло до сервера";
     /// <summary>...or every attempt of this launch failed — the network (retried on return to the app).</summary>
     public const string SyncFailed = "Не удалось сохранить расписание — проверьте интернет";
-    /// <summary>Fix round 4: ...or the server refused it (400/401/403) — not the network, so never «проверьте интернет».</summary>
-    public const string SyncRejected = "Сервер не принял расписание — попробуйте сохранить снова";
+    /// <summary>
+    /// Fix rounds 4–5: ...or the server refused it (400/401/403) — not the network, so never «проверьте интернет»; and the
+    /// retry is automatic (a return to the app, opening the settings), so the line says what happens next instead of asking
+    /// for a Save the owner cannot make (it stays disabled until an edit).
+    /// </summary>
+    public const string SyncRejected = "Сервер не принял расписание — повторим при следующем открытии настроек";
 
     // Monday first: index = the ScheduleModel day bit.
     private static readonly string[] Days = { "Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс" };

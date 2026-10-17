@@ -18,8 +18,8 @@ using UnityEngine.UI;
 ///   ScheduleDaysRow           seven DayChip pills Пн–Вс (the chip owns its colours — no ThemedColor on it)
 ///   ScheduleError             the one error line (Destructive, hidden until a value is wrong)
 ///   ScheduleSyncStatus        the delivery line (fix rounds 3–4, I-1: «Расписание ещё не дошло до сервера» / «Не удалось
-///                             сохранить расписание — проверьте интернет» / «Сервер не принял расписание — попробуйте
-///                             сохранить снова»), hidden; NO ThemedColor — BotSettings paints it by state (InkSecondary /
+///                             сохранить расписание — проверьте интернет» / «Сервер не принял расписание — повторим при
+///                             следующем открытии настроек»), hidden; NO ThemedColor — BotSettings paints it by state (InkSecondary /
 ///                             Destructive), a ThemedColor would be a second owner
 ///   ScheduleHint              «Вне часов бот не отвечает сам — подсказки в «Вместе» работают»
 ///

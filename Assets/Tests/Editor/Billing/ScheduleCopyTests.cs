@@ -59,7 +59,7 @@ public class ScheduleCopyTests
     {
         Assert.AreEqual("Расписание ещё не дошло до сервера", ScheduleCopy.SyncStatus(ScheduleDelivery.Pending));
         Assert.AreEqual("Не удалось сохранить расписание — проверьте интернет", ScheduleCopy.SyncStatus(ScheduleDelivery.Failed));
-        Assert.AreEqual("Сервер не принял расписание — попробуйте сохранить снова", ScheduleCopy.SyncStatus(ScheduleDelivery.Rejected),
+        Assert.AreEqual("Сервер не принял расписание — повторим при следующем открытии настроек", ScheduleCopy.SyncStatus(ScheduleDelivery.Rejected),
             "a refusal (400/401/403) is not the network — never «проверьте интернет»");
         Assert.IsFalse(ScheduleCopy.SyncStatus(ScheduleDelivery.Rejected).Contains("интернет"));
         Assert.IsNull(ScheduleCopy.SyncStatus(ScheduleDelivery.Confirmed), "a confirmed schedule needs no line");
