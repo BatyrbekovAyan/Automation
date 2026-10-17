@@ -193,6 +193,9 @@ public class Bot : MonoBehaviour
                     {
                         Manager.openBotSettings.RefreshUploadedFiles();
                         Manager.openBotSettings.RefreshPromptSuggestions();
+                        // B2 fix round 3 (I-1): an undelivered schedule is re-armed and its delivery line painted —
+                        // same dependency on the pairing above.
+                        Manager.openBotSettings.OnScheduleSettingsOpened();
                     }
 
                     // Each BotSettings prefab has its own SwipeBack child. Resolve

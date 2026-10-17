@@ -416,4 +416,119 @@ public class ScheduleSyncServiceTests
         Assert.IsTrue(MethodBody(svc, "public void ForgetBot").Contains("_held.Remove("), "forgetting a bot also drops its hold");
         Assert.IsTrue(MethodBody(svc, "public void Release").Contains("Kick()"), "a release sends the kept bot's desire");
     }
+
+    // ── fix round 3 (I-1): an undelivered schedule is surfaced and re-armed ──────────────────────────────────
+
+    [Test]
+    public void StateOf_SaysWhereTheDeliveryStands()
+    {
+        var m = M();
+        Assert.AreEqual(ScheduleDelivery.Confirmed, ScheduleSyncQueue.StateOf(m, "Bot0"), "no desire — nothing owed");
+        long v = ScheduleSyncQueue.Desire(m, "Bot0", Weekdays, "Asia/Almaty", 1000);
+        var e = ScheduleSyncQueue.Find(m, "Bot0");
+        Assert.AreEqual(ScheduleDelivery.Pending, ScheduleSyncQueue.StateOf(m, "Bot0"), "queued, not answered yet");
+        ScheduleSyncQueue.ApplyResult(e, v, ScheduleSyncQueue.BatchStatus.Transient, new[] { "wa" }, null, 2000);
+        Assert.AreEqual(ScheduleDelivery.Pending, ScheduleSyncQueue.StateOf(m, "Bot0"), "waiting out a backoff is still on its way");
+        ScheduleSyncQueue.ApplyResult(e, v, ScheduleSyncQueue.BatchStatus.Rejected, new[] { "wa" }, null, 3000);
+        Assert.AreEqual(ScheduleDelivery.Failed, ScheduleSyncQueue.StateOf(m, "Bot0"), "refused");
+        ScheduleSyncQueue.Rearm(m, "Bot0", 4000);
+        ScheduleSyncQueue.ApplyResult(e, v, ScheduleSyncQueue.BatchStatus.Answered, new[] { "wa" }, Rows(("wa", true, v)), 5000);
+        Assert.AreEqual(ScheduleDelivery.Confirmed, ScheduleSyncQueue.StateOf(m, "Bot0"), "the server holds it");
+        Assert.AreEqual(ScheduleDelivery.Confirmed, ScheduleSyncQueue.StateOf(m, "Bot1"), "another bot owes nothing");
+        Assert.AreEqual(ScheduleDelivery.Confirmed, ScheduleSyncQueue.StateOf(null, "Bot0"));
+
+        ScheduleSyncQueue.Desire(m, "Bot2", Weekdays, "Asia/Almaty", 6000);
+        ScheduleSyncQueue.OnNothingToSend(ScheduleSyncQueue.Find(m, "Bot2"));
+        Assert.AreEqual(ScheduleDelivery.Confirmed, ScheduleSyncQueue.StateOf(m, "Bot2"),
+            "a bot with no live channel has nothing to receive it — the next settings Create sends it");
+    }
+
+    [Test]
+    public void Rearm_RetriesAPendingOrFailedDesireNow_WithItsVersion_ASettledOneIsUntouched()
+    {
+        var m = M();
+        long failed = ScheduleSyncQueue.Desire(m, "Bot0", Weekdays, "Asia/Almaty", 1000);
+        var refused = ScheduleSyncQueue.Find(m, "Bot0");
+        ScheduleSyncQueue.ApplyResult(refused, failed, ScheduleSyncQueue.BatchStatus.Rejected, new[] { "wa" }, null, 1500);
+        long backoff = ScheduleSyncQueue.Desire(m, "Bot1", Night, "Asia/Almaty", 1000);
+        var waiting = ScheduleSyncQueue.Find(m, "Bot1");
+        for (int i = 0; i < 4; i++)
+            ScheduleSyncQueue.ApplyResult(waiting, backoff, ScheduleSyncQueue.BatchStatus.Transient, new[] { "tg" }, null, 1500);
+        long done = ScheduleSyncQueue.Desire(m, "Bot2", Weekdays, "Asia/Almaty", 1000);
+        var settled = ScheduleSyncQueue.Find(m, "Bot2");
+        ScheduleSyncQueue.ApplyResult(settled, done, ScheduleSyncQueue.BatchStatus.Answered, new[] { "wa2" }, Rows(("wa2", true, done)), 1500);
+
+        Assert.IsTrue(ScheduleSyncQueue.Rearm(m, "Bot0", 9000), "the settings of a bot whose schedule was refused");
+        Assert.IsTrue(refused.IsPending && refused.attempts == 0 && refused.nextAttemptAtMs == 9000 && refused.version == failed,
+            "due now, from attempt 0, with the version it was minted with");
+        Assert.AreEqual(4, waiting.attempts, "another bot's desire is left alone");
+        Assert.IsFalse(ScheduleSyncQueue.Rearm(m, "Bot2", 9000), "a settled desire is not re-sent");
+        Assert.AreEqual(ScheduleSyncQueue.StateDone, settled.state);
+        Assert.IsFalse(ScheduleSyncQueue.Rearm(m, "Nobody", 9000));
+
+        Assert.IsTrue(ScheduleSyncQueue.Rearm(m, null, 12_000), "a return to the app re-arms every bot");
+        Assert.IsTrue(waiting.IsPending && waiting.attempts == 0 && waiting.nextAttemptAtMs == 12_000 && waiting.version == backoff,
+            "a desire waiting out a five-minute backoff is tried at once");
+        Assert.AreEqual(ScheduleSyncQueue.StateDone, settled.state);
+        Assert.AreEqual(2, ScheduleSyncQueue.Due(m, 12_000).Count);
+    }
+
+    [Test]
+    public void ReturningToTheApp_ReArmsAtMostOnceAMinute_AndAClockThatWentBackNeverBlocks()
+    {
+        Assert.IsTrue(ScheduleSyncQueue.ShouldRearmOnFocus(true, 100_000, 0), "the first return");
+        Assert.IsFalse(ScheduleSyncQueue.ShouldRearmOnFocus(true, 100_000 + ScheduleSyncQueue.FocusRearmGapMs - 1, 100_000));
+        Assert.IsTrue(ScheduleSyncQueue.ShouldRearmOnFocus(true, 100_000 + ScheduleSyncQueue.FocusRearmGapMs, 100_000));
+        Assert.IsFalse(ScheduleSyncQueue.ShouldRearmOnFocus(false, 999_999_999, 0), "losing focus re-arms nothing");
+        Assert.IsTrue(ScheduleSyncQueue.ShouldRearmOnFocus(true, 50_000, 100_000), "the device clock moved back");
+        Assert.AreEqual(60_000, ScheduleSyncQueue.FocusRearmGapMs);
+    }
+
+    [Test]
+    public void AnUndeliveredDesire_IsReArmed_OnReturnToTheApp_AtMostOnceAMinute()
+    {
+        string svc = Src("Scripts/Main/ScheduleSyncService.cs");
+        string focus = MethodBody(svc, "private void OnApplicationFocus(bool hasFocus)");
+        int policy = focus.IndexOf("ScheduleSyncQueue.ShouldRearmOnFocus(hasFocus, now, _lastFocusRearmMs)", StringComparison.Ordinal);
+        int stamp = focus.IndexOf("_lastFocusRearmMs = now;", StringComparison.Ordinal);
+        int rearm = focus.IndexOf("RearmAndKick(null, now)", StringComparison.Ordinal);
+        Assert.IsTrue(policy >= 0 && stamp > policy && rearm > stamp, "ask the once-a-minute policy, stamp, then re-arm every bot");
+        Assert.IsTrue(MethodBody(svc, "public void Rearm(string botId)").Contains("RearmAndKick(botId, NowMs())"),
+            "the settings-open entry re-arms that bot only");
+        string kick = MethodBody(svc, "private void RearmAndKick(string botId, long nowMs)");
+        int pure = kick.IndexOf("ScheduleSyncQueue.Rearm(_model, botId, nowMs)", StringComparison.Ordinal);
+        int changed = kick.IndexOf("Changed(botId)", StringComparison.Ordinal);
+        int loop = kick.IndexOf("Kick()", StringComparison.Ordinal);
+        Assert.IsTrue(pure >= 0 && changed > pure && loop > changed, "re-arm, persist + announce, then start delivering");
+    }
+
+    [Test]
+    public void EveryChangeOfADesire_IsAnnounced_AndTheStateIsReadable()
+    {
+        string svc = Src("Scripts/Main/ScheduleSyncService.cs");
+        Assert.IsTrue(svc.Contains("public static event Action<string> OnStateChanged;"), "the section repaints off one event");
+        string changed = MethodBody(svc, "private void Changed(string botId)");
+        Assert.IsTrue(changed.Contains("Persist();") && changed.Contains("OnStateChanged?.Invoke(botId);"));
+        foreach (var method in new[] { "public long Desire(", "public void ForgetBot(", "public void ForgetAll(" })
+            Assert.IsTrue(MethodBody(svc, method).Contains("Changed("), $"{method} changes a desire — it must announce it");
+        string send = MethodBody(svc, "private IEnumerator Send(");
+        Assert.IsFalse(Regex.IsMatch(send, @"\bPersist\(\);"), "every exit of a send changes the desire's state — none may persist it silently");
+        Assert.AreEqual(3, Regex.Matches(send, @"Changed\(entry\.botId\);").Count, "no session, nothing to send, the server's answer");
+        Assert.IsTrue(Regex.IsMatch(svc, @"public ScheduleDelivery StateOf\(string botId\)\s*=>\s*ScheduleSyncQueue\.StateOf\(_model, botId\);"),
+            "the section reads the pure queue's verdict");
+        Assert.IsTrue(svc.Contains("public bool IsPending(string botId)") && svc.Contains("public bool HasFailed(string botId)"));
+    }
+
+    // ── fix round 3 (M5): the zone a Save sends is the resolved one ──────────────────────────────────────────
+
+    [Test]
+    public void ASave_SendsTheResolvedZone_NeverTheRawStoredId()
+    {
+        // The server's Validate refuses a zone that is not IANA-shaped (400 bad_request — a Rejected desire, never retried
+        // this launch) and its trigger one Postgres cannot resolve: the client sends what ScheduleModel.ResolveZone makes
+        // of the stored {bot}TimeZone (an IANA shape, else Asia/Almaty) — the zone the panel and the «Сводка» marker use.
+        string desire = MethodBody(Src("Scripts/Main/ScheduleSyncService.cs"), "public static void DesireSaved(string botName)");
+        Assert.IsTrue(desire.Contains("ScheduleModel.ResolveZone(BusinessTimeZone.ForBot(botName))"), "the resolved zone");
+        Assert.IsFalse(Regex.IsMatch(desire, @",\s*BusinessTimeZone\.ForBot\(botName\)\s*\)"), "never the raw stored id");
+    }
 }

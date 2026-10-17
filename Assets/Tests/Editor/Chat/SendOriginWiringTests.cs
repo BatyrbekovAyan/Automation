@@ -26,7 +26,8 @@ public class SendOriginWiringTests
     {
         Assert.IsTrue(MethodBody("Scripts/Chat/SuggestionsController.cs", "OnResult").Contains("SendOriginTracker.SetShown("), "a rendered set must be snapshotted");
         Assert.IsTrue(MethodBody("Scripts/Chat/SuggestionsController.cs", "StartFreshRound").Contains("SendOriginTracker.Clear("), "a fresh round starts a new turn");
-        Assert.IsTrue(MethodBody("Scripts/Chat/SuggestionsController.cs", "HandleToggle").Contains("SendOriginTracker.Clear("), "toggle-OFF hides the set — it can no longer explain a send");
+        Assert.IsTrue(MethodBody("Scripts/Chat/SuggestionsController.cs", "HandleToggle").Contains("TurnPanelOff()"), "toggle-OFF goes through the shared off path");
+        Assert.IsTrue(MethodBody("Scripts/Chat/SuggestionsController.cs", "TurnPanelOff").Contains("SendOriginTracker.Clear("), "toggle-OFF hides the set — it can no longer explain a send");
         Assert.IsTrue(MethodBody("Scripts/Chat/SuggestionsController.cs", "HandleReplyModeServerNewer").Contains("SendOriginTracker.Clear("), "a server-side switch to «Авто» hides the set too");
     }
 

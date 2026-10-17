@@ -19,6 +19,10 @@ using UnityEngine.Networking;
 /// V12 mirror: while Manager.DeleteBotOnServer runs, the bot is HELD (<see cref="Hold"/>; a request already on the wire
 /// is drained first through <see cref="IsSending"/>), so no schedule send can land after Delete Bot Files removed the
 /// bot's rows; <see cref="Release"/> when the server keeps the bot, <see cref="ForgetBot"/> once it goes.
+/// Fix round 3 (I-1): every change of a desire is announced (<see cref="OnStateChanged"/>) and readable
+/// (<see cref="StateOf"/>) — the settings section shows a schedule that is still on its way or failed — and an
+/// undelivered desire is re-armed on a return to the app (at most once a minute) and when the bot's settings open
+/// (<see cref="Rearm"/>), not only on the next launch.
 /// </summary>
 public class ScheduleSyncService : MonoBehaviour
 {
@@ -28,11 +32,15 @@ public class ScheduleSyncService : MonoBehaviour
     private static ScheduleSyncService instance;
     private static bool sendGateOpen;
 
+    /// <summary>(botId) — a bot's desire was queued, answered, failed, re-armed or forgotten: repaint. null = every bot.</summary>
+    public static event Action<string> OnStateChanged;
+
     private ScheduleSyncQueue.Model _model;
     private bool _looping;
     private float _bootedAt;
     private readonly HashSet<string> _held = new HashSet<string>();   // bots whose server deletion is in flight (V12)
     private string _sendingBot;                                         // the bot whose request is on the wire right now
+    private long _lastFocusRearmMs;                                     // I-1: the last return-to-the-app re-arm
 
     public static ScheduleSyncService Instance
     {
@@ -85,7 +93,7 @@ public class ScheduleSyncService : MonoBehaviour
         DontDestroyOnLoad(gameObject);
         _bootedAt = Time.realtimeSinceStartup;
         _model = ScheduleSyncQueue.Deserialize(PlayerPrefs.GetString(StoreKey, ""), NowMs());
-        Persist();
+        Changed(null);   // a section painted before the service existed read «no service» as «confirmed»
         Kick();
     }
 
@@ -97,12 +105,52 @@ public class ScheduleSyncService : MonoBehaviour
         PlayerPrefs.Save();
     }
 
+    // Every change of a desire's state is persisted AND announced — the settings section repaints off the event.
+    private void Changed(string botId)
+    {
+        Persist();
+        OnStateChanged?.Invoke(botId);
+    }
+
+    /// <summary>Where the bot's schedule delivery stands (the settings section's line).</summary>
+    public ScheduleDelivery StateOf(string botId) => ScheduleSyncQueue.StateOf(_model, botId);
+
+    public bool IsPending(string botId) => StateOf(botId) == ScheduleDelivery.Pending;
+    public bool HasFailed(string botId) => StateOf(botId) == ScheduleDelivery.Failed;
+
+    /// <summary>
+    /// I-1: back in the app — a desire a dead network parked (or a refusal since fixed) is tried again, at most once a
+    /// minute (<see cref="ScheduleSyncQueue.ShouldRearmOnFocus"/>, the AuthClient.OnApplicationFocus pattern). The boot
+    /// gate still holds a cold start's first send.
+    /// </summary>
+    private void OnApplicationFocus(bool hasFocus)
+    {
+        long now = NowMs();
+        if (!ScheduleSyncQueue.ShouldRearmOnFocus(hasFocus, now, _lastFocusRearmMs)) return;
+        _lastFocusRearmMs = now;
+        RearmAndKick(null, now);
+    }
+
+    /// <summary>I-1: the bot's settings opened — its undelivered schedule is tried again now; a settled one is untouched.</summary>
+    public void Rearm(string botId)
+    {
+        if (string.IsNullOrEmpty(botId)) return;
+        RearmAndKick(botId, NowMs());
+    }
+
+    private void RearmAndKick(string botId, long nowMs)
+    {
+        if (!ScheduleSyncQueue.Rearm(_model, botId, nowMs)) return;
+        Changed(botId);
+        Kick();
+    }
+
     /// <summary>Record the bot's schedule as its one desire and start delivering it. Returns the minted version.</summary>
     public long Desire(string botId, BotSchedule schedule, string timeZone)
     {
         if (string.IsNullOrEmpty(botId)) return 0;
         long version = ScheduleSyncQueue.Desire(_model, botId, schedule, timeZone, NowMs());
-        Persist();
+        Changed(botId);
         Kick();
         return version;
     }
@@ -112,7 +160,7 @@ public class ScheduleSyncService : MonoBehaviour
     {
         ScheduleSyncQueue.ForgetBot(_model, botId);
         _held.Remove(botId ?? "");
-        Persist();
+        Changed(botId);
     }
 
     /// <summary>
@@ -138,7 +186,7 @@ public class ScheduleSyncService : MonoBehaviour
     public void ForgetAll()
     {
         ScheduleSyncQueue.ForgetAll(_model);
-        Persist();
+        Changed(null);
     }
 
     private void Kick()
@@ -183,14 +231,14 @@ public class ScheduleSyncService : MonoBehaviour
         if (auth == null || auth.Claims == null)
         {
             ScheduleSyncQueue.OnSendFailed(entry, NowMs());       // no session yet: nothing can be authorised
-            Persist();
+            Changed(entry.botId);
             yield break;
         }
         var ids = ScheduleSyncQueue.Sendable(CurrentProfileIds(entry.botId), auth.Owns);
         if (ids.Count == 0)
         {
             ScheduleSyncQueue.OnNothingToSend(entry);             // no live channel: the next Save / settings Create re-arms it
-            Persist();
+            Changed(entry.botId);
             yield break;
         }
 
@@ -219,7 +267,7 @@ public class ScheduleSyncService : MonoBehaviour
         else if (status == ScheduleSyncQueue.BatchStatus.Transient)
             Debug.LogWarning($"[ScheduleSync] transient failure [{www.responseCode}] {www.error} — will retry");
         ScheduleSyncQueue.ApplyResult(entry, sentVersion, status, ids, rows, NowMs());
-        Persist();
+        Changed(entry.botId);
     }
 
     // The bot's channels as stored NOW — the keys LoadBots reads, so a channel re-paired since the Save is followed.

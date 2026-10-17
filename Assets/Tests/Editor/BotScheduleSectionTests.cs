@@ -69,7 +69,9 @@ public class BotScheduleSectionTests
         Transform days = s.ScheduleDayChips[0].transform.parent;
         var hint = content.Cast<Transform>().First(t => t.GetComponent<TextMeshProUGUI>() != null
                                                         && t.GetComponent<TextMeshProUGUI>().text == ScheduleCopy.Hint);
-        var order = new[] { header, s.ScheduleRow.transform, hours, days, s.ScheduleError.transform, hint, delete };
+        var status = content.Find("ScheduleSyncStatus");
+        Assert.IsNotNull(status, "the delivery line (fix round 3) — run Tools/BotSettings/Add Schedule Section");
+        var order = new[] { header, s.ScheduleRow.transform, hours, days, s.ScheduleError.transform, status, hint, delete };
         foreach (var t in order) Assert.AreSame(content, t.parent, $"{t.name} must be a direct child of the tab's list");
         for (int i = 1; i < order.Length; i++)
             Assert.AreEqual(order[i - 1].GetSiblingIndex() + 1, order[i].GetSiblingIndex(),
@@ -235,7 +237,13 @@ public class BotScheduleSectionTests
     [TestCase("0:05", "00:05")]
     [TestCase("09:00", "09:00")]
     [TestCase("25:00", "25:00")]   // invalid: left as typed, the error line explains it
-    [TestCase("9", "9")]
+    [TestCase("9", "09:00")]       // fix round 3 (M3): a bare hour, a dot, a dash, a space, three or four digits
+    [TestCase("21.30", "21:30")]
+    [TestCase("9-30", "09:30")]
+    [TestCase("9 30", "09:30")]
+    [TestCase("930", "09:30")]
+    [TestCase("2130", "21:30")]
+    [TestCase("9.5", "9.5")]       // still invalid: one minute digit is ambiguous
     public void ABlurredTime_IsWrittenBackCanonical_OnlyWhenItParses(string typed, string shown)
     {
         var root = PrefabUtility.LoadPrefabContents(PrefabPath);
@@ -275,5 +283,97 @@ public class BotScheduleSectionTests
         int write = body.IndexOf("field.Value = ", System.StringComparison.Ordinal);
         Assert.IsTrue(wait >= 0 && frame > 0 && guard > frame && write > guard,
             "wait out the TMP focus, one more frame, re-check both focus flags, only then write (the Prompts-tab rule)");
+    }
+
+    // ── the delivery line (fix round 3, I-1): a schedule that has not reached the server says so ─────────────────
+
+    private static TextMeshProUGUI SyncStatusOf(BotSettings settings)
+    {
+        var field = typeof(BotSettings).GetField("scheduleSyncStatus", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.IsNotNull(field, "BotSettings.scheduleSyncStatus is gone");
+        return field.GetValue(settings) as TextMeshProUGUI;
+    }
+
+    [Test]
+    public void TheDeliveryLine_IsWired_Hidden_AndOwnsItsColour()
+    {
+        var status = SyncStatusOf(Settings());
+        Assert.IsNotNull(status, "Run Tools/BotSettings/Add Schedule Section — the delivery line is not wired");
+        Assert.AreEqual("ScheduleSyncStatus", status.name);
+        Assert.IsFalse(status.gameObject.activeSelf, "hidden until a schedule is on its way or failed");
+        Assert.IsNull(status.GetComponent<ThemedColor>(), "two colours by state — the section owns them; a ThemedColor would be a second owner");
+        Assert.IsFalse(status.raycastTarget);
+        Assert.AreEqual(TextWrappingModes.Normal, status.textWrappingMode);
+        Assert.GreaterOrEqual(((RectTransform)status.transform).sizeDelta.y, 40f, "at least the error line's one-line box");
+    }
+
+    [TestCase(ScheduleDelivery.Pending, ScheduleCopy.SyncPending, ThemeRole.InkSecondary)]
+    [TestCase(ScheduleDelivery.Failed, ScheduleCopy.SyncFailed, ThemeRole.Destructive)]
+    public void TheDeliveryLine_SaysWhereTheScheduleIs_InItsStatesColour(ScheduleDelivery state, string text, ThemeRole role)
+    {
+        var light = ScriptableObject.CreateInstance<ThemeAsset>();
+        Theme.OverrideForTests(light, light, ThemeMode.Light);
+        var root = PrefabUtility.LoadPrefabContents(PrefabPath);
+        try
+        {
+            var settings = root.GetComponent<BotSettings>();
+            var status = settings.ScheduleSyncStatus;
+            Assert.IsNotNull(status);
+            settings.ApplyScheduleSyncState(state);
+            Assert.IsTrue(status.gameObject.activeSelf, $"{state}: the line is shown");
+            Assert.AreEqual(text, status.text);
+            Assert.AreEqual(Theme.Color(role), status.color);
+            settings.ApplyScheduleSyncState(ScheduleDelivery.Confirmed);
+            Assert.IsFalse(status.gameObject.activeSelf, "the server holds it — the line goes");
+        }
+        finally
+        {
+            PrefabUtility.UnloadPrefabContents(root);
+            Object.DestroyImmediate(light);
+        }
+    }
+
+    [Test]
+    public void TheDeliveryLine_FollowsTheService_AndOpeningTheSettingsReArmsTheBot()
+    {
+        string schedule = Src("Scripts/Main/BotSettings.Schedule.cs");
+        Assert.IsTrue(MethodBody(schedule, "private void BindScheduleSync()").Contains("ScheduleSyncService.OnStateChanged += HandleScheduleSyncState"));
+        Assert.IsTrue(MethodBody(schedule, "private void UnbindScheduleSync()").Contains("ScheduleSyncService.OnStateChanged -= HandleScheduleSyncState"));
+        Assert.IsTrue(MethodBody(schedule, "private void BindScheduleSync()").Contains("Theme.Changed += RefreshScheduleSync")
+                      && MethodBody(schedule, "private void UnbindScheduleSync()").Contains("Theme.Changed -= RefreshScheduleSync"),
+            "the line's colour is owned here — it repaints with the theme");
+        Assert.IsTrue(MethodBody(schedule, "private void HandleScheduleSyncState(string botId)").Contains("RefreshScheduleSync()"));
+        string refresh = MethodBody(schedule, "private void RefreshScheduleSync()");
+        Assert.IsTrue(refresh.Contains(".StateOf(") && refresh.Contains("ApplyScheduleSyncState("), "the line shows the service's verdict");
+
+        string settings = Src("Scripts/Main/BotSettings.cs");
+        Assert.IsTrue(MethodBody(settings, "public void OnEnable()").Contains("BindScheduleSync()"));
+        Assert.IsTrue(MethodBody(settings, "public void OnDisable()").Contains("UnbindScheduleSync()"));
+
+        string opened = MethodBody(schedule, "public void OnScheduleSettingsOpened()");
+        int rearm = opened.IndexOf("ScheduleSyncService.Existing?.Rearm(", System.StringComparison.Ordinal);
+        int paint = opened.IndexOf("RefreshScheduleSync()", System.StringComparison.Ordinal);
+        Assert.IsTrue(rearm >= 0 && paint > rearm, "re-arm the bot's undelivered schedule, then show where it stands");
+        string open = MethodBody(Src("Scripts/Main/Bot.cs"), "private void OpenSettings()");
+        int pair = open.IndexOf("Manager.openBotSettings = ", System.StringComparison.Ordinal);
+        int hook = open.IndexOf("Manager.openBotSettings.OnScheduleSettingsOpened()", System.StringComparison.Ordinal);
+        Assert.IsTrue(pair >= 0 && hook > pair, "after the pairing — BotSettings.OnEnable ran before Manager.openBot named its bot");
+    }
+
+    private static string Src(string relative) => File.ReadAllText(Path.Combine(Application.dataPath, relative));
+
+    private static string MethodBody(string source, string signature)
+    {
+        int at = source.IndexOf(signature, System.StringComparison.Ordinal);
+        Assert.GreaterOrEqual(at, 0, $"{signature} not found");
+        int open = source.IndexOf('{', at);
+        int depth = 0;
+        for (int i = open; i < source.Length; i++)
+        {
+            if (source[i] == '{') depth++;
+            else if (source[i] == '}' && --depth == 0) return source.Substring(open, i - open + 1);
+        }
+        Assert.Fail($"{signature}: unbalanced braces");
+        return null;
     }
 }

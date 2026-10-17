@@ -345,6 +345,7 @@ public partial class BotSettings : MonoBehaviour
         EnsureTestRow();    // stage 7: the «Проверить бота» row is runtime-added, never authored into the prefab
         BindReconnectEvents();
         RefreshReconnectUi();   // F2 (T9): banner + row hints of a retired channel, runtime-added like the test row
+        BindScheduleSync();     // B2 fix round 3 (I-1): the schedule's delivery line follows the sync service
     }
     
     // Mirrors the bot's current name onto the header. Called on enable, after
@@ -368,6 +369,7 @@ public partial class BotSettings : MonoBehaviour
         ResetPromptMutationState();
         UnbindReconnectEvents();
         ResetReconnectNotices();   // the server wait that set them died with the screen
+        UnbindScheduleSync();
     }
 
     // Returns the vertical ScrollRect under the currently-active tab root, if

@@ -144,6 +144,25 @@ public class ScheduleModelTests
     [TestCase("0:05", 5)]
     [TestCase("23:59", 1439)]
     [TestCase(" 21:30 ", 1290)]
+    // Fix round 3 (M3): the separators a phone keyboard offers first, and the forms people type without one.
+    [TestCase("9.00", 540)]
+    [TestCase("21.30", 1290)]
+    [TestCase("09-00", 540)]
+    [TestCase("9-30", 570)]
+    [TestCase("9 00", 540)]
+    [TestCase("21 30", 1290)]
+    [TestCase("900", 540)]
+    [TestCase("930", 570)]
+    [TestCase("0900", 540)]
+    [TestCase("2130", 1290)]
+    [TestCase("0000", 0)]
+    [TestCase("2359", 1439)]
+    [TestCase("9", 540)]
+    [TestCase("21", 1260)]
+    [TestCase("0", 0)]
+    [TestCase("00", 0)]
+    [TestCase("23", 1380)]
+    [TestCase(" 9.30 ", 570)]
     public void TryParseHhMm_Accepts(string text, int minutes)
     {
         Assert.IsTrue(ScheduleModel.TryParseHhMm(text, out int parsed), text);
@@ -155,18 +174,33 @@ public class ScheduleModelTests
     [TestCase("   ")]
     [TestCase("24:00")]
     [TestCase("12:60")]
-    [TestCase("9")]
-    [TestCase("900")]
     [TestCase("09:0")]
     [TestCase("09:000")]
     [TestCase("009:00")]
     [TestCase(":30")]
-    [TestCase("09-00")]
-    [TestCase("9.00")]
     [TestCase("+9:00")]
     [TestCase("ab:cd")]
     [TestCase("١٢:٠٠")]   // Arabic-Indic digits: «a digit» to char.IsDigit, never to the server
     [TestCase("09:00 утра")]
+    // Fix round 3 (M3): lenient, not loose — one separator, two minute digits, 00:00–23:59, ASCII digits only.
+    [TestCase("24")]
+    [TestCase("25")]
+    [TestCase("2400")]
+    [TestCase("960")]
+    [TestCase("12345")]
+    [TestCase("9.5")]
+    [TestCase("9:")]
+    [TestCase("9.")]
+    [TestCase("-9")]
+    [TestCase("9 :00")]
+    [TestCase("9  00")]
+    [TestCase("9:00:00")]
+    [TestCase("9.00.")]
+    [TestCase("9,00")]
+    [TestCase("9h00")]
+    [TestCase("9:00am")]
+    [TestCase("１２:００")]   // full-width digits
+    [TestCase("٩")]
     public void TryParseHhMm_Refuses(string text)
     {
         Assert.IsFalse(ScheduleModel.TryParseHhMm(text, out _), $"'{text}' must not parse");

@@ -3,7 +3,8 @@ using System.Collections.Generic;
 /// <summary>
 /// Part B «расписание бота»: every user-facing string of the schedule — RU only, glyphs the static SF Pro atlases draw
 /// (pinned by FontGlyphCoverageTests: no «−», «№», «✕», «→»). Tools/BotSettings/Add Schedule Section authors the
-/// section's static labels from here; at runtime only the error line and the «Сводка» row marker are written.
+/// section's static labels from here; at runtime only the error line, the delivery line and the «Сводка» row marker are
+/// written.
 /// </summary>
 public static class ScheduleCopy
 {
@@ -19,6 +20,10 @@ public static class ScheduleCopy
     public const string NoDays = "Выберите хотя бы один день";
     /// <summary>The «Сводка» row marker — the <see cref="HandoffCopy.RequestMarker"/> shape.</summary>
     public const string OffHoursRowPrefix = "Вне графика · ";
+    /// <summary>Fix round 3 (I-1): the delivery line — the saved schedule has not reached the server yet.</summary>
+    public const string SyncPending = "Расписание ещё не дошло до сервера";
+    /// <summary>...or the server refused it / every attempt of this launch failed (retried on return to the app).</summary>
+    public const string SyncFailed = "Не удалось сохранить расписание — проверьте интернет";
 
     // Monday first: index = the ScheduleModel day bit.
     private static readonly string[] Days = { "Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс" };
@@ -36,6 +41,14 @@ public static class ScheduleCopy
         if (timeInvalid) return Invalid;
         return enabled && daysMask == 0 ? NoDays : null;
     }
+
+    /// <summary>The section's delivery line for a state; null hides it (the server holds the schedule, or none is owed).</summary>
+    public static string SyncStatus(ScheduleDelivery state) => state switch
+    {
+        ScheduleDelivery.Pending => SyncPending,
+        ScheduleDelivery.Failed => SyncFailed,
+        _ => null,
+    };
 
     /// <summary>
     /// The «Сводка» row marker over the already composed summary (<see cref="HandoffCopy.RowSummary"/>): «Вне графика ·»

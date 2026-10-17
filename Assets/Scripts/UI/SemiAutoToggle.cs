@@ -18,6 +18,12 @@ using UnityEngine.UI;
 /// applies per chat too: enabling auto for the chat (desired semi = false)
 /// routes through the shared confirm popup with chat-scoped copy; disabling is
 /// instant. Rebuilt + wired by ChatsTopBarRestyleBuilder.
+///
+/// B2 fix round 3 (D1): a chip lit ONLY by a fallback (the bot's schedule is
+/// closed, or the quota is spent — the chat's own mode is not «Вместе») raises
+/// <see cref="OnDismissed"/> instead: no learning gate, no confirm — nothing is
+/// being enabled (the server would not answer this client now anyway), and the
+/// controller writes nothing; it only hides the panel for this chat-open.
 /// </summary>
 public class SemiAutoToggle : MonoBehaviour
 {
@@ -31,11 +37,15 @@ public class SemiAutoToggle : MonoBehaviour
     /// <summary>Fires the desired semi-auto state on tap (after the confirm gate).</summary>
     public event Action<bool> OnToggled;
 
+    /// <summary>D1: a tap on a chip lit only by a fallback — hide the panel for this chat-open, record nothing.</summary>
+    public event Action OnDismissed;
+
     private const string EnableTitle = "Включить авто-режим в этом чате?";
     private const string EnableBody =
         "Бот будет сам отвечать этому клиенту. Выключить можно в любой момент — этой же кнопкой.";
 
     private bool _on;   // true = semi-auto on for this chat (the «Авто» chip reads unlit)
+    private bool _fallbackOnly;   // D1: lit by a fallback alone — the chat's stored mode is «Авто»
 
     private void Awake()
     {
@@ -73,13 +83,21 @@ public class SemiAutoToggle : MonoBehaviour
         group.alpha = pending ? ReplyModeToggleBinder.PendingAlpha : 1f;
     }
 
-    /// <summary>Sets the visual state. <paramref name="on"/> = semi-auto (chip unlit).</summary>
-    public void SetLit(bool on)
+    /// <summary>
+    /// Sets the visual state. <paramref name="on"/> = semi-auto (chip unlit). <paramref name="fallbackOnly"/> (D1): the
+    /// lit state comes from a fallback alone. Every paint states it — the default is «the chat's own mode», so a caller
+    /// that forgets it gets today's tap (the owner's decision), never a silent no-op.
+    /// </summary>
+    public void SetLit(bool on, bool fallbackOnly = false)
     {
         bool animate = _on != on && gameObject.activeInHierarchy;   // animate only a real, visible change
         _on = on;
+        _fallbackOnly = on && fallbackOnly;
         ApplyVisuals(on, animate);
     }
+
+    /// <summary>D1: restate the flag without a repaint (a live re-evaluation that did not flip the chip).</summary>
+    public void SetFallbackOnly(bool fallbackOnly) => _fallbackOnly = _on && fallbackOnly;
 
     private void RepaintForTheme() => ApplyVisuals(_on, animate: false);
 
@@ -93,6 +111,14 @@ public class SemiAutoToggle : MonoBehaviour
         if (desiredSemi)
         {
             OnToggled?.Invoke(true);   // turning auto OFF for this chat — safe, instant
+            return;
+        }
+
+        // D1: lit only by a fallback — the chat already IS «Авто»; the panel is up because the bot's window is closed or
+        // the quota is spent. The tap hides it for this chat-open: no gate, no confirm, nothing written.
+        if (_fallbackOnly)
+        {
+            OnDismissed?.Invoke();
             return;
         }
 

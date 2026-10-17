@@ -70,20 +70,38 @@ public static class ScheduleModel
 
     // ── HH:MM ─────────────────────────────────────────────────────────────────────────────────────────────
 
+    // What may stand between the hours and the minutes: the colon, and what a phone keyboard offers first instead.
+    private static readonly char[] TimeSeparators = { ':', '.', '-', ' ' };
+
     /// <summary>
-    /// «H:MM» or «HH:MM», 00:00–23:59, surrounding blanks ignored. ASCII digits only — char.IsDigit would let an
-    /// Arabic-Indic «١٢:٠٠» through, which int.Parse then reads differently on every device.
+    /// The time the owner typed, 00:00–23:59, surrounding blanks ignored (fix round 3, M3 — lenient, not loose):
+    /// one or two hour digits, ONE of «:», «.», «-», a space, and exactly two minute digits («9:00», «21.30», «9-30»,
+    /// «9 30»); three or four digits with no separator, the last two being the minutes («900», «2130»); or a bare hour
+    /// («9», «21» → 21:00). Refused: one minute digit («9.5» — 9:05 or 9:50?), two separators, any other character.
+    /// ASCII digits only — char.IsDigit would let an Arabic-Indic «١٢:٠٠» through, which int.Parse then reads differently
+    /// on every device. The blur write-back shows a parsed value canonical («HH:MM»).
     /// </summary>
     public static bool TryParseHhMm(string s, out int minutes)
     {
         minutes = 0;
         if (s == null) return false;
         string t = s.Trim();
-        int colon = t.IndexOf(':');
-        if (colon < 1 || colon > 2 || t.Length != colon + 3) return false;
-        if (!AsciiDigits(t, 0, colon) || !AsciiDigits(t, colon + 1, 2)) return false;
-        int hours = int.Parse(t.Substring(0, colon), NumberStyles.None, CultureInfo.InvariantCulture);
-        int mins = int.Parse(t.Substring(colon + 1, 2), NumberStyles.None, CultureInfo.InvariantCulture);
+        int hours, mins;
+        int separator = t.IndexOfAny(TimeSeparators);
+        if (separator >= 0)
+        {
+            if (separator < 1 || separator > 2 || t.Length != separator + 3) return false;
+            if (!AsciiDigits(t, 0, separator) || !AsciiDigits(t, separator + 1, 2)) return false;
+            hours = DigitsValue(t, 0, separator);
+            mins = DigitsValue(t, separator + 1, 2);
+        }
+        else
+        {
+            if (t.Length < 1 || t.Length > 4 || !AsciiDigits(t, 0, t.Length)) return false;
+            bool bareHour = t.Length <= 2;
+            hours = DigitsValue(t, 0, bareHour ? t.Length : t.Length - 2);
+            mins = bareHour ? 0 : DigitsValue(t, t.Length - 2, 2);
+        }
         if (hours > 23 || mins > 59) return false;
         minutes = hours * 60 + mins;
         return true;
@@ -104,6 +122,15 @@ public static class ScheduleModel
         for (int i = from; i < from + count; i++)
             if (s[i] < '0' || s[i] > '9') return false;
         return true;
+    }
+
+    // The value of ASCII digits already checked by AsciiDigits — culture-free by construction.
+    private static int DigitsValue(string s, int from, int count)
+    {
+        int value = 0;
+        for (int i = from; i < from + count; i++)
+            value = value * 10 + (s[i] - '0');
+        return value;
     }
 
     // ── the window ────────────────────────────────────────────────────────────────────────────────────────

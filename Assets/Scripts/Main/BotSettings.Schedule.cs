@@ -13,9 +13,15 @@ using UnityEngine;
 /// <see cref="EditedSchedule"/>, SaveSettings persists it. A time is validated when its field loses focus
 /// (ScheduleModel.TryParseHhMm): a wrong one shows ScheduleCopy.Invalid and keeps Save disabled through
 /// BotSettingsDirtyPolicy.CanSave — the one verdict, no second gate — and fixing it while typing clears the line at once;
-/// a valid one is shown back in its canonical form («9:00» → «09:00») once the field has let go
-/// (<see cref="NormalizeTimeWhenReleased"/>). The fields are only ever WRITTEN while blurred (<see cref="WriteTime"/>
-/// force-blurs a focused one first): a write into a focused field round-trips through the shared iOS keyboard buffer.
+/// a valid one is shown back in its canonical form («9:00», «21.30», «930», «9» → «09:00», «21:30», «09:30», «09:00»)
+/// once the field has let go (<see cref="NormalizeTimeWhenReleased"/>). The fields are only ever WRITTEN while blurred
+/// (<see cref="WriteTime"/> force-blurs a focused one first): a write into a focused field round-trips through the shared
+/// iOS keyboard buffer.
+///
+/// Fix round 3 (I-1): one delivery line says where the SAVED schedule stands on its way to the server
+/// (ScheduleSyncService.StateOf → ScheduleCopy.SyncStatus): pending, failed, or hidden once the server holds it. It
+/// repaints on ScheduleSyncService.OnStateChanged and on Theme.Changed (its colour is owned here — no ThemedColor), and
+/// opening the bot's settings re-arms an undelivered schedule first (<see cref="OnScheduleSettingsOpened"/>).
 /// </summary>
 public partial class BotSettings
 {
@@ -24,6 +30,7 @@ public partial class BotSettings
     [SerializeField] private EditableField scheduleEndField;
     [SerializeField] private DayChip[] scheduleDayChips = new DayChip[0];
     [SerializeField] private TextMeshProUGUI scheduleError;
+    [SerializeField] private TextMeshProUGUI scheduleSyncStatus;
 
     private int scheduleDaysMask = ScheduleModel.AllDays;
     private bool scheduleTimeErrorShown;
@@ -33,6 +40,7 @@ public partial class BotSettings
     public EditableField ScheduleEndField => scheduleEndField;
     public DayChip[] ScheduleDayChips => scheduleDayChips;
     public TextMeshProUGUI ScheduleError => scheduleError;
+    public TextMeshProUGUI ScheduleSyncStatus => scheduleSyncStatus;
 
     /// <summary>False on a prefab that predates the builder — the snapshot then mirrors the saved schedule.</summary>
     public bool HasScheduleUi => scheduleRow != null && scheduleRow.Toggle != null
@@ -139,6 +147,62 @@ public partial class BotSettings
         if (message != null) scheduleError.text = message;
         if (scheduleError.gameObject.activeSelf != (message != null)) scheduleError.gameObject.SetActive(message != null);
     }
+
+    // ── the delivery line (fix round 3, I-1) ──────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// The settings just opened on this bot: an undelivered schedule (waiting out a backoff, parked, refused) is tried
+    /// again now, and the line shows where it stands. Called by Bot.OpenSettings once Manager.openBot names this screen's
+    /// bot — OnEnable runs before that pairing.
+    /// </summary>
+    public void OnScheduleSettingsOpened()
+    {
+        string bot = ScheduleBotId;
+        if (bot != null) ScheduleSyncService.Existing?.Rearm(bot);
+        RefreshScheduleSync();
+    }
+
+    /// <summary>Paints the delivery line for a state: hidden when confirmed, the copy and its role's colour otherwise.</summary>
+    public void ApplyScheduleSyncState(ScheduleDelivery state)
+    {
+        if (scheduleSyncStatus == null) return;
+        string message = ScheduleCopy.SyncStatus(state);
+        if (message != null)
+        {
+            scheduleSyncStatus.text = message;
+            scheduleSyncStatus.color = Theme.Color(state == ScheduleDelivery.Failed ? ThemeRole.Destructive : ThemeRole.InkSecondary);
+        }
+        if (scheduleSyncStatus.gameObject.activeSelf != (message != null)) scheduleSyncStatus.gameObject.SetActive(message != null);
+    }
+
+    private void BindScheduleSync()
+    {
+        ScheduleSyncService.OnStateChanged += HandleScheduleSyncState;
+        Theme.Changed += RefreshScheduleSync;
+        RefreshScheduleSync();
+    }
+
+    private void UnbindScheduleSync()
+    {
+        ScheduleSyncService.OnStateChanged -= HandleScheduleSyncState;
+        Theme.Changed -= RefreshScheduleSync;
+    }
+
+    // null = every bot (a launch, the full wipe, a re-arm on return to the app).
+    private void HandleScheduleSyncState(string botId)
+    {
+        if (botId == null || botId == ScheduleBotId) RefreshScheduleSync();
+    }
+
+    private void RefreshScheduleSync()
+    {
+        string bot = ScheduleBotId;
+        var service = ScheduleSyncService.Existing;
+        ApplyScheduleSyncState(bot != null && service != null ? service.StateOf(bot) : ScheduleDelivery.Confirmed);
+    }
+
+    // This screen's bot while it is the open one (Bot.OpenSettings pairs them); null otherwise — the line then hides.
+    private string ScheduleBotId => Manager.openBotSettings == this && Manager.openBot != null ? Manager.openBot.name : null;
 
     private static int ParsedOrInvalid(EditableField field)
         => field != null && ScheduleModel.TryParseHhMm(field.Value, out int minutes) ? minutes : ScheduleModel.InvalidMinute;

@@ -16,6 +16,11 @@ using Newtonsoft.Json.Linq;
 /// (<see cref="Sendable"/>) — a channel re-paired since the Save is followed, a retired one (absent from the token) is
 /// never sent, and a bot with no live channel settles until the next Save or settings Create re-arms it.
 ///
+/// Fix round 3 (I-1): where a bot's delivery stands is readable (<see cref="StateOf"/> — the settings section shows a
+/// pending or failed schedule), and an undelivered desire is re-armed (<see cref="Rearm"/>) on a return to the app
+/// (<see cref="ShouldRearmOnFocus"/>, at most once a minute) and whenever the bot's settings open — not only on the next
+/// launch, which on a phone that is never restarted can be weeks away.
+///
 /// No Unity types: EditMode-tested (ScheduleSyncServiceTests). The service owns PlayerPrefs (<c>CrSchedule.Queue</c>).
 /// </summary>
 public static class ScheduleSyncQueue
@@ -27,6 +32,8 @@ public static class ScheduleSyncQueue
     public const int MaxAttemptsPerLaunch = 8;
     /// <summary>The server's Validate keeps at most ten ids (a bot has two).</summary>
     public const int MaxProfilesPerRequest = 10;
+    /// <summary>A return to the app re-arms undelivered desires at most once in this long (AuthClient's resume rule).</summary>
+    public const long FocusRearmGapMs = 60_000;
 
     [Serializable]
     public class Entry
@@ -125,6 +132,41 @@ public static class ScheduleSyncQueue
     public static void OnNothingToSend(Entry e) => e.state = StateDone;
 
     /// <summary>
+    /// Where the bot's schedule delivery stands, as the settings section shows it: no desire, or a settled one (applied,
+    /// superseded by a newer server row, or nothing was deliverable) is confirmed; a desire still on its way — the boot
+    /// gate, a backoff, a held deletion — is pending; one refused, or parked after its attempts, has failed.
+    /// </summary>
+    public static ScheduleDelivery StateOf(Model m, string botId)
+    {
+        var e = m != null ? Find(m, botId) : null;
+        if (e == null || e.state == StateDone) return ScheduleDelivery.Confirmed;
+        return e.state == StateFailed ? ScheduleDelivery.Failed : ScheduleDelivery.Pending;
+    }
+
+    /// <summary>
+    /// Try an undelivered desire again NOW — what a new launch does (<see cref="Deserialize"/>): a pending one (waiting
+    /// out a backoff) and a failed one (refused, or parked after its attempts) restart from attempt 0, due at once, with
+    /// the version they were minted with; a settled one is untouched. <paramref name="botId"/> null = every bot.
+    /// True when anything was re-armed.
+    /// </summary>
+    public static bool Rearm(Model m, string botId, long nowMs)
+    {
+        bool any = false;
+        foreach (var e in m.entries)
+        {
+            if (botId != null && e.botId != botId) continue;
+            if (e.state != StatePending && e.state != StateFailed) continue;
+            Arm(e, nowMs);
+            any = true;
+        }
+        return any;
+    }
+
+    /// <summary>A return to the app re-arms once a minute at most; a clock moved back never blocks it.</summary>
+    public static bool ShouldRearmOnFocus(bool hasFocus, long nowMs, long lastRearmMs)
+        => hasFocus && (nowMs - lastRearmMs >= FocusRearmGapMs || nowMs < lastRearmMs);
+
+    /// <summary>
     /// Apply one answer to the desire it was sent for. Only a desire still carrying the SENT version is touched — a Save
     /// made while the request was in flight is newer, untried, and stays due. Answered: settled once every sent profile
     /// is reported (applied, or superseded by a newer server row); a profile the server did not report is retried.
@@ -201,8 +243,7 @@ public static class ScheduleSyncQueue
         m ??= new Model();
         m.entries ??= new List<Entry>();
         m.entries.RemoveAll(e => e == null || string.IsNullOrEmpty(e.botId));
-        foreach (var e in m.entries)
-            if (e.state == StatePending || e.state == StateFailed) Arm(e, nowMs);
+        Rearm(m, null, nowMs);
         return m;
     }
 
@@ -220,6 +261,17 @@ public static class ScheduleSyncQueue
             if (r.ProfileId == profileId) return r;
         return null;
     }
+}
+
+/// <summary>Where a bot's schedule delivery stands (<see cref="ScheduleSyncQueue.StateOf"/>; ScheduleCopy.SyncStatus says it).</summary>
+public enum ScheduleDelivery
+{
+    /// <summary>Nothing owed: the server holds the saved schedule (or a newer one), or the bot has nothing to receive it.</summary>
+    Confirmed,
+    /// <summary>A desire is still on its way: the boot gate, a backoff, a held deletion.</summary>
+    Pending,
+    /// <summary>Refused, or parked after its attempts — re-armed by a return to the app, the bot's settings, a new launch.</summary>
+    Failed,
 }
 
 /// <summary>Pure reader of the Set Schedule answer (build-set-schedule.py Shape Response).</summary>

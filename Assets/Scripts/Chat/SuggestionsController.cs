@@ -40,6 +40,12 @@ public class SuggestionsController : MonoBehaviour
     private long _requestSeq;          // monotonic; newest wins (A6)
     private bool _semiAutoOn;
 
+    // B2 fix round 3 (D1 / M1): the open chat's mode = its stored choice OR a fallback the owner has not hidden for this
+    // chat-open (FallbackRecheckPolicy.Effective), re-read on every live batch and once a minute while the chat is open.
+    private bool _chatResolved;        // RestoreForActiveChat resolved the open chat (false after a bot switch / a close)
+    private bool _fallbackDismissed;   // the owner hid the panel while a fallback held — for THIS chat-open, nothing written
+    private float _fallbackCheckedAt = -1f;
+
     // Keyboard-slot tenancy. Chassis = sketch-003 A (the panel is a tenant of the keyboard's slot);
     // interaction model = sketch-005 E. _slotState is the INTENT — the panel view can be
     // active-but-covered while the native keyboard slides over it — and it is the ONLY place that
@@ -158,7 +164,11 @@ public class SuggestionsController : MonoBehaviour
             ChatManager.Instance.OnChatSelected += HandleChatSelected;        // fires while this may be INACTIVE (Pitfall 3)
             ChatManager.Instance.OnActiveBotChanged += HandleBotChanged;
         }
-        if (_toggle != null) _toggle.OnToggled += HandleToggle;
+        if (_toggle != null)
+        {
+            _toggle.OnToggled += HandleToggle;
+            _toggle.OnDismissed += DismissFallbackForThisOpen;   // D1: a fallback-only chip hides, writes nothing
+        }
         ReplyModeSyncService.OnStateChanged += HandleReplyModeSyncState;
         ReplyModeSyncService.OnServerNewer += HandleReplyModeServerNewer;
         if (_panel != null)
@@ -226,7 +236,11 @@ public class SuggestionsController : MonoBehaviour
             ChatManager.Instance.OnChatSelected -= HandleChatSelected;
             ChatManager.Instance.OnActiveBotChanged -= HandleBotChanged;
         }
-        if (_toggle != null) _toggle.OnToggled -= HandleToggle;
+        if (_toggle != null)
+        {
+            _toggle.OnToggled -= HandleToggle;
+            _toggle.OnDismissed -= DismissFallbackForThisOpen;
+        }
         ReplyModeSyncService.OnStateChanged -= HandleReplyModeSyncState;
         ReplyModeSyncService.OnServerNewer -= HandleReplyModeServerNewer;
         if (_panel != null)
@@ -284,6 +298,7 @@ public class SuggestionsController : MonoBehaviour
         _pendingShow = false;
         _pendingOpenRequest = false;     // a parked open request must not fire into the next chat
         _chatOpenSettledAt = -1f;        // the next chat opens with the clock unset — never pre-settled
+        _chatResolved = false;           // M1: no re-evaluation until the next chat open resolves its chat
         _draggingSlot = false;
         _pullDown.Reset();               // a pull-down cut short by the chat closing
         _threadPressActive = false;      // a press in flight when the chat closed must not
@@ -305,6 +320,8 @@ public class SuggestionsController : MonoBehaviour
     private void ResetForNoOpenChat()
     {
         _semiAutoOn = false;
+        _chatResolved = false;                               // M1: never re-evaluate against the previous bot's sticky chat id
+        _fallbackDismissed = false;
         _requestSeq++;                                        // supersede any in-flight request
         _debounce.Cancel();                                  // bot switch: drop a window pending from the previous bot's chat (BATCH-03)
         _pendingIncomingText = null;
@@ -334,9 +351,11 @@ public class SuggestionsController : MonoBehaviour
         // stamp and would let the show through mid-slide — the exact diagonal this gate removes.
         _chatOpenSettledAt = -1f;
         StartFreshRound();       // rounds are per-question, never per-app — a chat open starts at round 1
-        _semiAutoOn = EffectiveSemiAuto(
-            SemiAutoStore.IsOn(ChatManager.Instance.CurrentBotId, ChatManager.Instance.CurrentChatId));
-        if (_toggle != null) _toggle.SetLit(_semiAutoOn);     // default OFF → other chats stay manual (SEMI-03)
+        _fallbackDismissed = false;   // D1: a hidden fallback panel stays hidden for ONE chat-open
+        _semiAutoOn = ResolveSemiAutoForOpenChat(out bool fallbackOnly);
+        _chatResolved = true;
+        _fallbackCheckedAt = Time.unscaledTime;
+        if (_toggle != null) _toggle.SetLit(_semiAutoOn, fallbackOnly);     // default OFF → other chats stay manual (SEMI-03)
         // SUP-02 heal: re-assert only an EXPLICIT per-chat override (tri-state 1/2) — covers a lost
         // «Вместе» (true) AND a lost «back to Авто» (false) write. Inherited chats (raw 0) push
         // NOTHING: they rely on the '*' bot-default row alone; writing the collapsed boolean here
@@ -366,27 +385,35 @@ public class SuggestionsController : MonoBehaviour
         else HidePanel();
     }
 
-    // The chat's EFFECTIVE reply mode: its stored choice, OR the account-level quota fallback
-    // (final-review I-1, owner decision 2026-08-26). Once the monthly quota and the whole reserve
-    // are spent the server stops auto-replying — Count Dialog's false branch simply dead-ends —
-    // so an «Авто» chat would sit in silence while the «Боты» meter promises «бот отвечает в
-    // режиме «Вместе»». The panel is what makes that promise true.
+    // The chat's EFFECTIVE reply mode: its stored choice (SemiAutoStore — the chat's override or the bot default), OR a
+    // fallback the owner has not hidden for this chat-open (FallbackRecheckPolicy.Effective). Two fallbacks:
+    //  • the quota (final-review I-1, owner decision 2026-08-26) — once the monthly quota and the whole reserve are spent
+    //    the server stops auto-replying (Count Dialog's false branch dead-ends), so an «Авто» chat would sit in silence
+    //    while the «Боты» meter promises «бот отвечает в режиме «Вместе»»; the panel is what makes that promise true;
+    //  • the schedule (B2 «расписание бота») — outside the open bot's saved window the server answers exactly as in
+    //    «Вместе» (and outranks a chat's explicit «Авто»), so without the panel the chat would sit in silence too.
     //
-    // Deliberately applied HERE and not in HandleToggle: this is the one place the chat's mode is
-    // RESOLVED, and resolving it is all the override does. Nothing is written — not SemiAutoStore,
-    // not ReplyModeToggleBinder, not the server's Set_Reply_Mode row (that push is driven by
-    // TryGetOverride's explicit tri-state, which this cannot reach) — because the owner's chosen
-    // mode has to come back untouched the moment the quota resets or a top-up lands. An owner who
-    // then taps the toggle off dismisses the fallback — an override that could not be dismissed
-    // would be a dead control — but that tap goes through HandleToggle's normal path, which writes
-    // a PERSISTENT per-chat override (SemiAutoStore + the server row): it survives the quota reset
-    // and detaches this chat from the bot default from then on, exactly the WR-01 semantics.
-    //
-    // B2 «расписание бота»: the same holds outside the open bot's schedule — the server answers exactly as in
-    // «Вместе» there (and outranks a chat's explicit «Авто»), so without the panel the chat would sit in silence.
-    // Resolved at chat open, like the quota term; nothing is written either.
-    private static bool EffectiveSemiAuto(bool storedOn)
-        => storedOn || QuotaFallbackPolicy.ShouldFallBackToSemi(UsageStore.Current) || IsOffHoursForOpenBot();
+    // Resolving is all a fallback does. Nothing is written — not SemiAutoStore, not ReplyModeToggleBinder, not the
+    // server's Set_Reply_Mode row (that push is driven by TryGetOverride's explicit tri-state, which this cannot reach) —
+    // because the owner's chosen mode has to come back untouched the moment the quota resets, a top-up lands or the
+    // window opens. A tap on a chip lit by a fallback alone is no decision either (D1, owner ruling 2026-10-17): it hides
+    // the panel for this chat-open and writes nothing (SuggestionToggleTapPolicy) — it used to write a PERSISTENT
+    // per-chat «Авто» that outlived the night / the quota reset and detached the chat from the bot default for good. And
+    // the inputs are re-read while the chat stays open (M1, RecheckFallback): on every live batch and once a minute, so a
+    // night message in an open «Авто» chat gets its panel and a night panel goes away when the window opens.
+    private bool ResolveSemiAutoForOpenChat(out bool fallbackOnly)
+    {
+        var cm = ChatManager.Instance;
+        bool storedOn = SemiAutoStore.IsOn(cm.CurrentBotId, cm.CurrentChatId);
+        bool fallbackOn = FallbackSemiAutoForOpenBot();
+        _fallbackDismissed = FallbackRecheckPolicy.KeepDismissal(_fallbackDismissed, fallbackOn);
+        bool on = FallbackRecheckPolicy.Effective(storedOn, fallbackOn, _fallbackDismissed);
+        fallbackOnly = on && !storedOn;
+        return on;
+    }
+
+    private static bool FallbackSemiAutoForOpenBot()
+        => QuotaFallbackPolicy.ShouldFallBackToSemi(UsageStore.Current) || IsOffHoursForOpenBot();
 
     private static bool IsOffHoursForOpenBot()
     {
@@ -451,9 +478,18 @@ public class SuggestionsController : MonoBehaviour
 
     private void HandleToggle(bool desiredOn)
     {
-        if (ChatManager.Instance == null) return;
+        var cm = ChatManager.Instance;
+        if (cm == null) return;
+        // D1: a chip lit only by a fallback is not the chat's mode — its tap hides the panel for this chat-open (or brings
+        // a hidden one back) and writes NOTHING. SemiAutoToggle routes the hide past the gate + confirm itself
+        // (OnDismissed); every tap that reaches this point asks the same rule before anything is recorded.
+        switch (SuggestionToggleTapPolicy.Decide(desiredOn, SemiAutoStore.IsOn(cm.CurrentBotId, cm.CurrentChatId), FallbackSemiAutoForOpenBot()))
+        {
+            case SuggestionToggleTap.HideOnly: DismissFallbackForThisOpen(); return;
+            case SuggestionToggleTap.ShowOnly: RestoreFallbackForThisOpen(); return;
+        }
         _semiAutoOn = desiredOn;
-        SemiAutoStore.Set(ChatManager.Instance.CurrentBotId, ChatManager.Instance.CurrentChatId, desiredOn);   // persist
+        SemiAutoStore.Set(cm.CurrentBotId, cm.CurrentChatId, desiredOn);   // persist
         PushReplyModeForActiveChat(desiredOn);                 // SUP-02: mirror the per-chat override (ON and OFF) to the server
         if (_toggle != null) _toggle.SetLit(desiredOn);
         if (_slotKey != null) _slotKey.SetVisible(desiredOn);
@@ -465,14 +501,78 @@ public class SuggestionsController : MonoBehaviour
         }
         else
         {
-            _requestSeq++;                                     // supersede any in-flight request — no late render
-            _debounce.Cancel();                                // toggle-OFF: a stale window must not survive to fire after a later toggle-ON (BATCH-03)
-            _pendingIncomingText = null;
-            _pendingShow = false;
-            _pendingOpenRequest = false;                       // toggle-OFF also kills a parked open request
-            HidePanel();                                       // D-11: off = hide; composer untouched
-            if (!(SendOriginTracker.Current?.HasPick ?? false)) SendOriginTracker.Clear();   // learning A: a hidden set cannot explain a send; a tapped card can
+            // The owner just turned the panel off here: a fallback that still holds must not raise it again at the next
+            // re-evaluation (M1) — it stays hidden for this chat-open, as before M1; the next open shows it.
+            _fallbackDismissed = true;
+            TurnPanelOff();
         }
+    }
+
+    // The panel goes away for the open chat: supersede what is in flight, drop the debounce window and every parked
+    // show / request, hide (D-11: the composer is untouched). The one off path — a toggle-off, a fallback dismissal (D1),
+    // a fallback that ended (M1).
+    private void TurnPanelOff()
+    {
+        _requestSeq++;                                     // supersede any in-flight request — no late render
+        _debounce.Cancel();                                // a stale window must not survive to fire after a later turn-on (BATCH-03)
+        _pendingIncomingText = null;
+        _pendingShow = false;
+        _pendingOpenRequest = false;                       // ...nor a parked open request
+        HidePanel();                                       // D-11: off = hide; composer untouched
+        if (!(SendOriginTracker.Current?.HasPick ?? false)) SendOriginTracker.Clear();   // learning A: a hidden set cannot explain a send; a tapped card can
+    }
+
+    // D1: hide a fallback-only panel for this chat-open — the off half of a tap minus every write: the chat keeps its
+    // stored mode, and the next chat-open (or the next fallback — FallbackRecheckPolicy.KeepDismissal) shows it again.
+    private void DismissFallbackForThisOpen()
+    {
+        _fallbackDismissed = true;
+        _semiAutoOn = false;
+        if (_toggle != null) _toggle.SetLit(false);
+        if (_slotKey != null) _slotKey.SetVisible(false);
+        TurnPanelOff();
+    }
+
+    // D1: the owner taps a hidden fallback panel back while the fallback still holds — it returns, still unrecorded: the
+    // fallback is what lights it (an explicit «Вместе» written here would outlive the night / the quota reset).
+    private void RestoreFallbackForThisOpen()
+    {
+        _fallbackDismissed = false;
+        _semiAutoOn = true;
+        if (_toggle != null) _toggle.SetLit(true, fallbackOnly: true);
+        if (_slotKey != null) _slotKey.SetVisible(true);
+        ShowPanel(claimSlotFromKeyboard: false);
+        StartFreshRound();
+        IssueRequest(null, null);
+    }
+
+    // M1: re-resolve the open chat's mode while it stays open — the bot's window closes and opens, the quota runs out or a
+    // top-up lands, with no chat open in between. A flip runs the server reconcile's show / hide path; a show also parks
+    // the chat-open request (skeleton first), so a panel that appears with no new message gets its set — and when a live
+    // batch brought one, its armed debounce owns the request (SuggestionOpenRequestPolicy). Writes nothing. Skipped
+    // while a drag or a keyboard handoff is in flight (the next frame retries — the clock is not stamped).
+    private void RecheckFallback()
+    {
+        if (!_chatResolved || ChatManager.Instance == null || _draggingSlot || _yieldingToKeyboard) return;
+        _fallbackCheckedAt = Time.unscaledTime;
+        bool wasOn = _semiAutoOn;
+        bool on = ResolveSemiAutoForOpenChat(out bool fallbackOnly);
+        if (on == wasOn)
+        {
+            if (_toggle != null) _toggle.SetFallbackOnly(fallbackOnly);   // the reason can change without a flip
+            return;
+        }
+        _semiAutoOn = on;
+        if (_toggle != null) _toggle.SetLit(on, fallbackOnly);
+        if (_slotKey != null) _slotKey.SetVisible(on);
+        if (on)
+        {
+            StartFreshRound();
+            ShowPanel(claimSlotFromKeyboard: false);
+            if (_panel != null) _panel.ShowSkeleton();
+            _pendingOpenRequest = true;
+        }
+        else TurnPanelOff();
     }
 
     // --- Server sync of the per-chat override (SUP-02, client half) ---
@@ -521,8 +621,8 @@ public class SuggestionsController : MonoBehaviour
         if (cm == null || chatId == ReplyModeSyncQueue.BotDefaultChat) return;         // '*' rows reconcile through the binder
         SemiAutoStore.Set(botId, chatId, suppressed);                                  // the server's choice is now the override
         if (botId != cm.CurrentBotId || chatId != cm.CurrentChatId) return;
-        _semiAutoOn = EffectiveSemiAuto(suppressed);
-        if (_toggle != null) _toggle.SetLit(_semiAutoOn);
+        _semiAutoOn = ResolveSemiAutoForOpenChat(out bool fallbackOnly);   // reads the override just written
+        if (_toggle != null) _toggle.SetLit(_semiAutoOn, fallbackOnly);
         if (_slotKey != null) _slotKey.SetVisible(_semiAutoOn);
         if (_semiAutoOn) ShowPanel(claimSlotFromKeyboard: false);
         else { HidePanel(); if (!(SendOriginTracker.Current?.HasPick ?? false)) SendOriginTracker.Clear(); }   // learning A
@@ -696,6 +796,7 @@ public class SuggestionsController : MonoBehaviour
 
     private void HandleLive(List<MessageViewModel> msgs)
     {
+        RecheckFallback();                                     // M1: the window may have closed since the chat opened
         if (!_semiAutoOn) return;                              // SEMI-03
         var fold = FoldLiveBatch(_pendingIncomingText, msgs);
         _pendingIncomingText = fold.Pending;
@@ -1304,6 +1405,7 @@ public class SuggestionsController : MonoBehaviour
         // Before every early return below — the clock must keep running through a drag or a
         // mis-wired keyboardMover, or a parked chat-open show would never become eligible.
         TrackChatOpenSettle();
+        if (FallbackRecheckPolicy.IsDue(Time.unscaledTime, _fallbackCheckedAt)) RecheckFallback();   // M1: the minute tick
         if (_semiAutoOn) PumpThreadTap();   // model E rule 5; «Авто» has no panel to raise
         if (_keyboardMover == null) return;
 

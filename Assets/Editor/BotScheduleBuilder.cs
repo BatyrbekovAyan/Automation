@@ -17,9 +17,12 @@ using UnityEngine.UI;
 ///                             DeferredDismissInputField, no scrim)
 ///   ScheduleDaysRow           seven DayChip pills Пн–Вс (the chip owns its colours — no ThemedColor on it)
 ///   ScheduleError             the one error line (Destructive, hidden until a value is wrong)
+///   ScheduleSyncStatus        the delivery line (fix round 3, I-1: «Расписание ещё не дошло до сервера» / «Не удалось
+///                             сохранить расписание — проверьте интернет»), hidden; NO ThemedColor — BotSettings paints it
+///                             by state (InkSecondary / Destructive), a ThemedColor would be a second owner
 ///   ScheduleHint              «Вне часов бот не отвечает сам — подсказки в «Вместе» работают»
 ///
-/// plus FormKeyboardScroll on the Основное tab (the fields sit low enough for the keyboard to cover them) and the five
+/// plus FormKeyboardScroll on the Основное tab (the fields sit low enough for the keyboard to cover them) and the six
 /// serialized refs on BotSettings. Every clone source is resolved through BotSettings' serialized refs, never a node
 /// name; every object this tool creates is found again by its own name, and every value is compared before it is
 /// written — a second run changes nothing and saves nothing. It deletes nothing. Never confuse it with the destructive
@@ -37,6 +40,7 @@ public static class BotScheduleBuilder
     private const string EndGoName = "Field_До";
     private const string DaysGoName = "ScheduleDaysRow";
     private const string ErrorGoName = "ScheduleError";
+    private const string SyncStatusGoName = "ScheduleSyncStatus";
     private const string HintGoName = "ScheduleHint";
     private const string DeleteGoName = "DeleteBotButton";
 
@@ -116,11 +120,13 @@ public static class BotScheduleBuilder
             var error = EnsureNote(content, ErrorGoName, ScheduleCopy.Invalid, ThemeRole.Destructive, fontSource, active: false, ref modified);
             modified |= SetHeight((RectTransform)error.transform, ErrorHeight);
             var hint = EnsureNote(content, HintGoName, ScheduleCopy.Hint, ThemeRole.InkTertiary, fontSource, active: true, ref modified);
-            modified |= SetHeight((RectTransform)hint.transform, MeasuredHeight(hint, listWidth));
+            modified |= SetHeight((RectTransform)hint.transform, MeasuredHeight(hint, listWidth, hint.text, "hint"));
+            var status = EnsureSyncStatus(content, fontSource, ref modified);
+            modified |= SetHeight((RectTransform)status.transform, SyncStatusHeight(hint, listWidth));
 
-            modified |= PlaceBefore(anchor, header.transform, toggle.transform, hours, days, error.transform, hint.transform);
+            modified |= PlaceBefore(anchor, header.transform, toggle.transform, hours, days, error.transform, status.transform, hint.transform);
             modified |= EnsureKeyboardScroll(general);
-            modified |= StampRefs(so, toggle, start, end, chips, error);
+            modified |= StampRefs(so, toggle, start, end, chips, error, status);
 
             if (modified)
             {
@@ -339,14 +345,46 @@ public static class BotScheduleBuilder
         return tmp;
     }
 
-    // The hint wraps in the list's width; its box is its measured height (the static SF Pro atlas measures headless). Measured
-    // on the label itself, inside the loaded prefab — no probe object, so a menu run never touches the open scene.
-    private static float MeasuredHeight(TextMeshProUGUI label, float width)
+    // The delivery line: a note WITHOUT a ThemedColor — its colour follows the delivery state and is painted by
+    // BotSettings.ApplyScheduleSyncState (a ThemedColor would repaint a failed line grey on every theme change). Authored
+    // hidden, with the pending copy in the app's default (dark) theme so the prefab reads right in the editor.
+    private static TextMeshProUGUI EnsureSyncStatus(RectTransform content, TextMeshProUGUI fontSource, ref bool modified)
     {
-        float measured = label.GetPreferredValues(label.text, width, 0f).y;
+        var rt = content.Find(SyncStatusGoName) as RectTransform;
+        if (rt == null)
+        {
+            var go = new GameObject(SyncStatusGoName, typeof(RectTransform), typeof(TextMeshProUGUI));
+            go.layer = content.gameObject.layer;
+            rt = (RectTransform)go.transform;
+            rt.SetParent(content, false);
+            go.SetActive(false);
+            modified = true;
+        }
+        var tmp = rt.GetComponent<TextMeshProUGUI>();
+        modified |= ConfigureText(tmp, ScheduleCopy.SyncPending, NoteSize, FontWeight.Regular, TextAlignmentOptions.TopLeft,
+                                  Theme.Dark.Resolve(ThemeRole.InkSecondary), fontSource, wrap: true);
+        if (rt.gameObject.activeSelf)
+        {
+            rt.gameObject.SetActive(false);
+            modified = true;
+        }
+        return tmp;
+    }
+
+    // One box for both states — the taller of the two copies, never under the error line's one-line box. Measured on the
+    // hint: the same font, size and wrapping, and an ACTIVE label (the line itself is authored hidden).
+    private static float SyncStatusHeight(TextMeshProUGUI hint, float width)
+        => Mathf.Max(ErrorHeight, MeasuredHeight(hint, width, ScheduleCopy.SyncPending, "delivery line (pending)"),
+                     MeasuredHeight(hint, width, ScheduleCopy.SyncFailed, "delivery line (failed)"));
+
+    // A note wraps in the list's width; its box is its measured height (the static SF Pro atlas measures headless). Measured
+    // on a label inside the loaded prefab — no probe object, so a menu run never touches the open scene.
+    private static float MeasuredHeight(TextMeshProUGUI label, float width, string text, string what)
+    {
+        float measured = label.GetPreferredValues(text, width, 0f).y;
         // At least one line; a never-laid-out TMP can report ~1/10 of the truth (ConfirmCardFitter's finding).
         bool sane = measured >= NoteSize && measured < 400f;
-        Debug.Log($"{Tag} hint measured {measured:0.##} u at width {width} ({(sane ? "used" : "fallback 2 lines")})");
+        Debug.Log($"{Tag} {what} measured {measured:0.##} u at width {width} ({(sane ? "used" : "fallback 2 lines")})");
         return sane ? Mathf.Ceil(measured) : Mathf.Ceil(NoteSize * 2.5f);
     }
 
@@ -373,12 +411,13 @@ public static class BotScheduleBuilder
     }
 
     private static bool StampRefs(SerializedObject so, ToggleRow toggle, EditableField start, EditableField end, DayChip[] chips,
-                                  TextMeshProUGUI error)
+                                  TextMeshProUGUI error, TextMeshProUGUI status)
     {
         bool modified = SetRef(so, "scheduleRow", toggle);
         modified |= SetRef(so, "scheduleStartField", start);
         modified |= SetRef(so, "scheduleEndField", end);
         modified |= SetRef(so, "scheduleError", error);
+        modified |= SetRef(so, "scheduleSyncStatus", status);
         var array = so.FindProperty("scheduleDayChips");
         if (array.arraySize != chips.Length)
         {

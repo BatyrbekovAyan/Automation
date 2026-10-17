@@ -43,6 +43,7 @@ public class ScheduleCopyTests
         {
             ScheduleCopy.SectionTitle, ScheduleCopy.ToggleLabel, ScheduleCopy.FromLabel, ScheduleCopy.ToLabel,
             ScheduleCopy.Hint, ScheduleCopy.Invalid, ScheduleCopy.NoDays, ScheduleCopy.OffHoursRowPrefix,
+            ScheduleCopy.SyncPending, ScheduleCopy.SyncFailed,
         }.Concat(ScheduleCopy.DayNames);
         foreach (var s in strings)
         {
@@ -51,6 +52,14 @@ public class ScheduleCopyTests
             foreach (char forbidden in new[] { '−', '№', '✕', '→', '⇒' })
                 Assert.IsFalse(s.Contains(forbidden), $"'{s}' carries U+{(int)forbidden:X4}, which the SF Pro atlases cannot draw");
         }
+    }
+
+    [Test]
+    public void TheDeliveryLine_SaysPendingOrFailed_AndHidesOnceTheServerHoldsIt()
+    {
+        Assert.AreEqual("Расписание ещё не дошло до сервера", ScheduleCopy.SyncStatus(ScheduleDelivery.Pending));
+        Assert.AreEqual("Не удалось сохранить расписание — проверьте интернет", ScheduleCopy.SyncStatus(ScheduleDelivery.Failed));
+        Assert.IsNull(ScheduleCopy.SyncStatus(ScheduleDelivery.Confirmed), "a confirmed schedule needs no line");
     }
 
     [Test]
