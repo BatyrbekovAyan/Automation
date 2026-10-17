@@ -1,0 +1,47 @@
+using System.Collections.Generic;
+
+/// <summary>
+/// Part B «расписание бота»: every user-facing string of the schedule — RU only, glyphs the static SF Pro atlases draw
+/// (pinned by FontGlyphCoverageTests: no «−», «№», «✕», «→»). Tools/BotSettings/Add Schedule Section authors the
+/// section's static labels from here; at runtime only the error line and the «Сводка» row marker are written.
+/// </summary>
+public static class ScheduleCopy
+{
+    public const string SectionTitle = "РАСПИСАНИЕ РАБОТЫ";
+    public const string ToggleLabel = "Отвечать по расписанию";
+    public const string FromLabel = "С";
+    public const string ToLabel = "До";
+    /// <summary>Teaches the format AND the default window (09:00–21:00).</summary>
+    public const string StartPlaceholder = "09:00";
+    public const string EndPlaceholder = "21:00";
+    public const string Hint = "Вне часов бот не отвечает сам — подсказки в «Вместе» работают";
+    public const string Invalid = "Укажите время в формате ЧЧ:ММ, например 09:00";
+    public const string NoDays = "Выберите хотя бы один день";
+    /// <summary>The «Сводка» row marker — the <see cref="HandoffCopy.RequestMarker"/> shape.</summary>
+    public const string OffHoursRowPrefix = "Вне графика · ";
+
+    // Monday first: index = the ScheduleModel day bit.
+    private static readonly string[] Days = { "Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс" };
+
+    public static IReadOnlyList<string> DayNames => Days;
+
+    public static string DayName(int day) => day >= 0 && day < Days.Length ? Days[day] : "";
+
+    /// <summary>
+    /// The section's one error line: a time typed wrong (shown once the field lost focus) outranks an enabled schedule
+    /// with no day left; null hides the line.
+    /// </summary>
+    public static string ErrorFor(bool timeInvalid, bool enabled, int daysMask)
+    {
+        if (timeInvalid) return Invalid;
+        return enabled && daysMask == 0 ? NoDays : null;
+    }
+
+    /// <summary>
+    /// The «Сводка» row marker over the already composed summary (<see cref="HandoffCopy.RowSummary"/>): «Вне графика ·»
+    /// when the row's last message fell outside its bot's schedule — unless the row is a REAL request, whose «Заявка ·»
+    /// outranks it (one marker per row).
+    /// </summary>
+    public static string WithOffHoursMark(string summary, bool isRequest, bool offHours)
+        => offHours && !isRequest ? OffHoursRowPrefix + (summary ?? "") : summary ?? "";
+}

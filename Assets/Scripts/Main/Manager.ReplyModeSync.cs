@@ -100,6 +100,7 @@ public partial class Manager
     {
         yield return AuthClient.Instance.EnsureSession();
         ReplyModeSyncService.OpenSendGate();
+        ScheduleSyncService.OpenSendGate();   // B2: the schedule's queue waits at the same gate
     }
 
     // --- Bot-default flip hook (ReplyModeToggleBinder.OnReplyModeChanged) -----

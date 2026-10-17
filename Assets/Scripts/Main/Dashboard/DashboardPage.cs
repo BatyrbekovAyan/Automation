@@ -379,7 +379,9 @@ public class DashboardPage : MonoBehaviour
 
         string display = ChatDisplayName(r.chatId);
         if (name) name.text = display;
-        if (summary) summary.text = HandoffCopy.RowSummary(r);   // a REAL request is marked, a verdict is not (A5)
+        // A REAL request is marked «Заявка ·» (A5); a verdict whose last message fell outside its bot's schedule «Вне графика ·»
+        // (B2) — the request's marker outranks it.
+        if (summary) summary.text = ScheduleCopy.WithOffHoursMark(HandoffCopy.RowSummary(r), r.IsEvent, IsOffHoursRow(r, map));
         if (pill) pill.color = DashboardStatusInfo.BgColor(r.Status);
         if (pillLabel) { pillLabel.text = DashboardStatusInfo.Label(r.Status);
                          pillLabel.color = DashboardStatusInfo.FgColor(r.Status); }
@@ -408,6 +410,16 @@ public class DashboardPage : MonoBehaviour
 
         var btn = go.GetComponent<Button>();
         if (btn) { btn.onClick.RemoveAllListeners(); btn.onClick.AddListener(() => OpenChat(r)); }
+    }
+
+    // B2: the row's bot has an ENABLED schedule and the row's last message fell outside its window — judged on the device by
+    // the bot's CURRENT schedule in the bot's zone (an approximation: the schedule in force back then is not kept).
+    private static bool IsOffHoursRow(DashboardOutcome r, Dictionary<string, DashboardProfileRef> map)
+    {
+        if (r == null || string.IsNullOrEmpty(r.profileId) || !map.TryGetValue(r.profileId, out var pref)) return false;
+        var schedule = BotScheduleStore.Read(pref.botName);
+        return ScheduleModel.IsOffHoursRow(r.lastMessageAt, schedule.Enabled, schedule.DaysMask, schedule.StartMin,
+                                           schedule.EndMin, BusinessTimeZone.ForBot(pref.botName));
     }
 
     public void OpenChat(DashboardOutcome r)

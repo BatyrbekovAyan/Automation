@@ -618,6 +618,7 @@ public partial class Manager : MonoBehaviour
                 recreatedBotSettings.BusinessField.Value = PlayerPrefs.GetString(recreatedBot.name + "Business", "");
                 recreatedBotSettings.PromptField.Value = PlayerPrefs.GetString(recreatedBot.name + "Prompt", "");
                 LoadContactFields(recreatedBotSettings, recreatedBot.name);
+                recreatedBotSettings.ApplySchedule(BotScheduleStore.Read(recreatedBot.name));
 
                 int ProductsNumber = PlayerPrefs.GetInt(recreatedBot.name + "ProductsNumber", 0);
                 for (int p = 0; p < ProductsNumber; p++)
@@ -1067,6 +1068,19 @@ public partial class Manager : MonoBehaviour
             PlayerPrefs.SetString(openBot.name + global::BotSettings.ContactKeys[c], contactFieldsToSave[c].Value);
         }
 
+        // B2: the schedule — written only when it CHANGED (so BotScheduleStore.HasSaved means «the owner set one») and
+        // only when valid (Save is disabled otherwise; this guard keeps a programmatic call from persisting -1).
+        bool scheduleChanged = false;
+        if (openBotSettings.HasScheduleUi)
+        {
+            var editedSchedule = openBotSettings.EditedSchedule;
+            if (editedSchedule.IsValid && editedSchedule != BotScheduleStore.Read(openBot.name))
+            {
+                BotScheduleStore.Write(openBot.name, editedSchedule);
+                scheduleChanged = true;
+            }
+        }
+
 
         // Both lists go through BotSettingsListSlots, which is also what the
         // dirty check reads — one definition of "which rows get saved and
@@ -1083,6 +1097,9 @@ public partial class Manager : MonoBehaviour
 
 
         PlayerPrefs.Save(); // Ensure changes are written to disk
+
+        // B2: a changed schedule goes to the server through its persisted queue (every live channel of the bot).
+        if (scheduleChanged) ScheduleSyncService.DesireSaved(openBot.name);
 
         // Prefs now reflect current UI; re-run the dirty check to flip save off.
         EnableSave();
@@ -1110,6 +1127,7 @@ public partial class Manager : MonoBehaviour
         openBotSettings.PromptField.Value = PlayerPrefs.GetString(openBot.name + "Prompt", "");
         openBotSettings.RefreshPromptSuggestions();
         LoadContactFields(openBotSettings, openBot.name);
+        openBotSettings.ApplySchedule(BotScheduleStore.Read(openBot.name));
 
 
         for (int p = 0; p < openBotSettings.ProductsParent.transform.childCount; p++)
@@ -1229,7 +1247,7 @@ public partial class Manager : MonoBehaviour
         // a missing open bot is normal here, not an error.
         if (openBot == null || openBotSettings == null) return;
 
-        SetBotSettingsSaveInteractable(IsBotSettingsDirty());
+        SetBotSettingsSaveInteractable(CanSaveBotSettings());
 
         // A card destroyed this frame still counts in childCount until the end
         // of the frame, so run the SAME verdict again once the hierarchy has
@@ -1245,11 +1263,12 @@ public partial class Manager : MonoBehaviour
         yield return new WaitForEndOfFrame();
         _dirtyRecheck = null;
         if (openBot == null || openBotSettings == null) yield break;
-        SetBotSettingsSaveInteractable(IsBotSettingsDirty());
+        SetBotSettingsSaveInteractable(CanSaveBotSettings());
     }
 
-    public bool IsBotSettingsDirty() =>
-        BotSettingsDirtyPolicy.IsDirty(BuildEditedSettingsSnapshot(),
+    // The Save button's verdict: dirty AND savable — an invalid schedule keeps Save disabled (B2).
+    public bool CanSaveBotSettings() =>
+        BotSettingsDirtyPolicy.CanSave(BuildEditedSettingsSnapshot(),
                                        ReadSavedSettings(openBot.name));
 
     // The live screen. Values are normalized to what SaveSettings would
@@ -1288,6 +1307,11 @@ public partial class Manager : MonoBehaviour
         // to save.
         snapshot.Products = BotSettingsListSlots.Persistable(ReadProductCards(openBotSettings.ProductsParent));
         snapshot.Services = BotSettingsListSlots.Persistable(ReadServiceCards(openBotSettings.ServicesParent));
+
+        // B2: a prefab without the schedule section mirrors the saved value, so it never reads as a change.
+        snapshot.Schedule = openBotSettings.HasScheduleUi
+            ? openBotSettings.EditedSchedule
+            : BotScheduleStore.Read(openBot.name);
 
         return snapshot;
     }
@@ -1342,6 +1366,7 @@ public partial class Manager : MonoBehaviour
 
         snapshot.Products = BotSettingsListSlots.Read(botName, "Product", "ProductsNumber");
         snapshot.Services = BotSettingsListSlots.Read(botName, "Service", "ServicesNumber");
+        snapshot.Schedule = BotScheduleStore.Read(botName);
 
         return snapshot;
     }
@@ -1886,6 +1911,7 @@ public partial class Manager : MonoBehaviour
         newBotSettings.TelegramNumberField.Value = useTelegram ? TelegramNumberInput.text : "";
         newBotSettings.WhatsappNumberField.gameObject.SetActive(useWhatsapp && !string.IsNullOrEmpty(WhatsappNumberInput.text));
         newBotSettings.TelegramNumberField.gameObject.SetActive(useTelegram && !string.IsNullOrEmpty(TelegramNumberInput.text));
+        newBotSettings.ApplySchedule(BotScheduleStore.Read(newBot.name));   // B2: no keys yet → the section's defaults
 
         // Step 4: Create workflows
         if (useWhatsapp)
@@ -3916,6 +3942,7 @@ public partial class Manager : MonoBehaviour
                 // F2: the retired set goes only for a profile the server says it adopted.
                 ProfileRetirement.AfterCreate(bot, ChatChannel.WhatsApp, result.AdoptedProfiles);
                 SeedReplyModeDefaultForProfile(bot.name, bot.whatsappProfileId);   // WR-02: '*' row for a channel authed after a Вместе default
+                ScheduleSyncService.DesireSavedForNewChannel(bot.name);          // B2: the new channel gets the bot's schedule
 
                 // The CreateWhatsappWorkflow webhook ACTIVATES the clone before it responds. Honor the
                 // channel toggle — the only activation gate since the capsule↔ReplyMode unification (a
@@ -4130,6 +4157,7 @@ public partial class Manager : MonoBehaviour
                 // F2: the retired set goes only for a profile the server says it adopted.
                 ProfileRetirement.AfterCreate(bot, ChatChannel.Telegram, result.AdoptedProfiles);
                 SeedReplyModeDefaultForProfile(bot.name, bot.telegramProfileId);   // WR-02: '*' row for a channel authed after a Вместе default
+                ScheduleSyncService.DesireSavedForNewChannel(bot.name);          // B2: the new channel gets the bot's schedule
 
                 // The CreateTelegramWorkflow webhook ACTIVATES the clone before it responds. Honor the
                 // channel toggle — the only activation gate since the capsule↔ReplyMode unification (a

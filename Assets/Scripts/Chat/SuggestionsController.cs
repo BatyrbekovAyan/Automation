@@ -381,8 +381,20 @@ public class SuggestionsController : MonoBehaviour
     // would be a dead control — but that tap goes through HandleToggle's normal path, which writes
     // a PERSISTENT per-chat override (SemiAutoStore + the server row): it survives the quota reset
     // and detaches this chat from the bot default from then on, exactly the WR-01 semantics.
+    //
+    // B2 «расписание бота»: the same holds outside the open bot's schedule — the server answers exactly as in
+    // «Вместе» there (and outranks a chat's explicit «Авто»), so without the panel the chat would sit in silence.
+    // Resolved at chat open, like the quota term; nothing is written either.
     private static bool EffectiveSemiAuto(bool storedOn)
-        => storedOn || QuotaFallbackPolicy.ShouldFallBackToSemi(UsageStore.Current);
+        => storedOn || QuotaFallbackPolicy.ShouldFallBackToSemi(UsageStore.Current) || IsOffHoursForOpenBot();
+
+    private static bool IsOffHoursForOpenBot()
+    {
+        string botId = ChatManager.Instance != null ? ChatManager.Instance.CurrentBotId : null;
+        if (string.IsNullOrEmpty(botId)) return false;
+        return ScheduleFallbackPolicy.ShouldFallBackToSemi(BotScheduleStore.Read(botId), System.DateTimeOffset.UtcNow,
+                                                           BusinessTimeZone.ForBot(botId));
+    }
 
     // Side-effect-free probe for the policy decision: does the F9 cache hold a set for the open
     // chat's CURRENT tail? (TryRenderCached below is the acting half — probe + render.)

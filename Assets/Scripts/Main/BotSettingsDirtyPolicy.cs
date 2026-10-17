@@ -53,6 +53,27 @@ namespace Automation.BotSettingsUI
 
         public List<BotSettingsListItem> Products = new List<BotSettingsListItem>();
         public List<BotSettingsListItem> Services = new List<BotSettingsListItem>();
+
+        /// <summary>
+        /// Part B: the «РАСПИСАНИЕ РАБОТЫ» section. On the edited side an unparsable «С» / «До» is
+        /// <see cref="ScheduleModel.InvalidMinute"/> — a change that <see cref="BotSettingsDirtyPolicy.CanSave"/> refuses.
+        /// </summary>
+        public bool ScheduleEnabled;
+        public int ScheduleDaysMask;
+        public int ScheduleStartMin;
+        public int ScheduleEndMin;
+
+        public BotSchedule Schedule
+        {
+            get => new BotSchedule(ScheduleEnabled, ScheduleDaysMask, ScheduleStartMin, ScheduleEndMin);
+            set
+            {
+                ScheduleEnabled = value.Enabled;
+                ScheduleDaysMask = value.DaysMask;
+                ScheduleStartMin = value.StartMin;
+                ScheduleEndMin = value.EndMin;
+            }
+        }
     }
 
     /// <summary>
@@ -69,6 +90,14 @@ namespace Automation.BotSettingsUI
     /// </summary>
     public static class BotSettingsDirtyPolicy
     {
+        /// <summary>
+        /// The Save button's verdict: something differs from what is persisted AND the edited values may be persisted —
+        /// an invalid schedule (a time that does not parse, an enabled schedule with no day) keeps Save disabled
+        /// through this same verdict rather than a second gate (Part B).
+        /// </summary>
+        public static bool CanSave(BotSettingsSnapshot edited, BotSettingsSnapshot saved)
+            => IsDirty(edited, saved) && edited.Schedule.IsValid;
+
         public static bool IsDirty(BotSettingsSnapshot edited, BotSettingsSnapshot saved)
         {
             if (edited == null || saved == null) return false;
@@ -83,6 +112,7 @@ namespace Automation.BotSettingsUI
             if (Differs(edited.Business, saved.Business)) return true;
             if (Differs(edited.Prompt, saved.Prompt)) return true;
             if (ContactsChanged(edited.Contacts, saved.Contacts)) return true;
+            if (edited.Schedule != saved.Schedule) return true;
 
             return ListChanged(edited.Products, saved.Products)
                 || ListChanged(edited.Services, saved.Services);

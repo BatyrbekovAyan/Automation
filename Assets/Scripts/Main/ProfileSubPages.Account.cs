@@ -122,6 +122,7 @@ public partial class ProfileSubPages
         //    lives in memory too and re-persists itself on its next write: empty it
         //    first, or a new Bot0 would inherit the old bots' pending choices (R5).
         ReplyModeSyncService.Existing?.ForgetAll();
+        ScheduleSyncService.Existing?.ForgetAll();   // B2: the schedule's queue re-persists itself the same way
         // V3 (owner decision 2026-10-06): the install's server identity SURVIVES the wipe — the RevenueCat id lives in
         // the SDK's own storage and comes back on the next refresh; a fresh install naming it would be refused (one
         // install per billing id) and the subscription would be stuck in billingConflict until support revokes.

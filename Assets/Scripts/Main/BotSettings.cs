@@ -478,6 +478,7 @@ public partial class BotSettings : MonoBehaviour
             TelegramToggle.onValueChanged.AddListener(TelegramChannelToggleChanged);
 
         WirePromptSuggestions();
+        WireSchedule();
     }
 
     //////////////////////////////////////// PRODUCTS / SERVICES ////////////////////////////////////////

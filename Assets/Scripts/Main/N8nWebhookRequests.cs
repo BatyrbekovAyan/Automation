@@ -106,3 +106,40 @@ public static class VerifyIdentityRequest
         public string originalAppUserId;
     }
 }
+
+// POST {n8nBaseUrl}/webhook/SetSchedule — Part B «расписание бота» (crSetSchedule001, build-set-schedule.py). Token-gated:
+// every profileIds entry must be one of the token's profiles (403 forbidden:profileIds otherwise) — the client never sends
+// a sentinel or an id the token does not list (ScheduleSyncQueue.Sendable). Every field is required, also for a disabled
+// schedule (re-enabling restores the window). version: a positive integer, strictly increasing per bot
+// (ScheduleSyncQueue.NextVersion) — the server writes a row only over an OLDER version and answers
+// { success: true, results: [{ profileId, applied, version }] }; applied:false = it already holds a NEWER one.
+// Refusals: 400 bad_request (+ reason) / bad_timezone, 401 / 403 from the gate, 500 db_unavailable.
+public static class SetScheduleRequest
+{
+    public const string Path = "/webhook/SetSchedule";
+
+    public static string ComposeBody(System.Collections.Generic.IReadOnlyList<string> profileIds, bool enabled, int daysMask,
+                                     int startMin, int endMin, string timeZone, long version) =>
+        JsonConvert.SerializeObject(new BodyShape
+        {
+            profileIds = profileIds != null ? System.Linq.Enumerable.ToArray(profileIds) : new string[0],
+            enabled = enabled,
+            daysMask = daysMask,
+            startMin = startMin,
+            endMin = endMin,
+            timeZone = timeZone,
+            version = version,
+        });
+
+    [System.Serializable]
+    private class BodyShape
+    {
+        public string[] profileIds;
+        public bool enabled;
+        public int daysMask;
+        public int startMin;
+        public int endMin;
+        public string timeZone;
+        public long version;
+    }
+}

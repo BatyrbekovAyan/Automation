@@ -305,6 +305,7 @@ public class FontGlyphCoverageTests
             typeof(RetiredChannelCopy),    // F2 reconnect screens: banner, row hint, «Подключить», sheet, server wait (2026-10-11)
             typeof(AutoReadinessCopy),     // learning B: capsule «Учится · N/20» + sheet «Бот ещё учится» (2026-10-14)
             typeof(ChannelHealthCopy),     // A4 «Канал отключён · переподключите в настройках» on the bot card (2026-10-14)
+            typeof(ScheduleCopy),          // B2 «РАСПИСАНИЕ РАБОТЫ» section + «Вне графика ·» row marker (2026-10-17)
         };
         foreach (var t in constTypes)
             foreach (var f in t.GetFields(BindingFlags.Public | BindingFlags.Static))
@@ -384,6 +385,10 @@ public class FontGlyphCoverageTests
         yield return ("AutoReadinessCopy.SheetBody(bot)", AutoReadinessCopy.SheetBody(7, perChat: false));
         yield return ("AutoReadinessCopy.SheetBody(chat)", AutoReadinessCopy.SheetBody(7, perChat: true));
         yield return ("AutoReadinessCopy.PillText", AutoReadinessCopy.PillText(7));
+        // B2: the day chips (an array, not a const) and the window format's en dash
+        for (int day = 0; day < ScheduleCopy.DayNames.Count; day++)
+            yield return ($"ScheduleCopy.DayName({day})", ScheduleCopy.DayName(day));
+        yield return ("ScheduleModel.FormatWindow", ScheduleModel.FormatWindow(540, 1260));
 
         foreach (OutcomeStatus s in Enum.GetValues(typeof(OutcomeStatus)))
             yield return ($"DashboardStatusInfo.Label({s})", DashboardStatusInfo.Label(s));

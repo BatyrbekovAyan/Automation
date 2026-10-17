@@ -289,6 +289,8 @@ public class Bot : MonoBehaviour
             PlayerPrefs.DeleteKey(transform.name + BotTestSheet.LastTestKeySuffix);   // R16: the «Проверка бота» verdict
             ProfileRetirement.Clear(transform.name);                                  // M4/F2: the retired set of both channels
             ChannelHealth.Clear(transform.name);                                      // A4: both channels' «Канал отключён» marks
+            BotScheduleStore.Clear(transform.name);                                   // B2: the schedule's four keys
+            BusinessTimeZone.Clear(transform.name);                                   // B2: {bot}TimeZone leaked on every per-bot delete
             foreach (var channel in new[] { ChatChannel.WhatsApp, ChatChannel.Telegram })          // F1: a failed Create to repeat
                 PlayerPrefs.DeleteKey(transform.name + CreateWorkflowResponse.PendingSuffix(channel));
 
@@ -356,6 +358,8 @@ public class Bot : MonoBehaviour
         // resumed send would recreate the reply_mode_flags rows the server-side delete removed. (V12: the queue held
         // this bot while Manager.DeleteBotOnServer ran; forgetting it also drops the hold.)
         ReplyModeSyncService.Existing?.ForgetBot(transform.name);
+        // B2: same for the schedule's queued desire (a late send would recreate the bot_schedule rows Delete Bot Files removed).
+        ScheduleSyncService.Existing?.ForgetBot(transform.name);
 
         Destroy(Manager.BotSettingsParentStatic.transform.GetChild(transform.GetSiblingIndex()).gameObject);
 

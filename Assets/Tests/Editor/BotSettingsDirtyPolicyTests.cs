@@ -42,6 +42,7 @@ public class BotSettingsDirtyPolicyTests
 
         foreach (var contactKey in BotSettings.ContactKeys)
             PlayerPrefs.DeleteKey(TestBot + contactKey);
+        BotScheduleStore.Clear(TestBot);
 
         for (int i = 0; i < 16; i++)
         {
@@ -88,6 +89,7 @@ public class BotSettingsDirtyPolicyTests
         Contacts = (string[])source.Contacts.Clone(),
         Products = new List<BotSettingsListItem>(source.Products),
         Services = new List<BotSettingsListItem>(source.Services),
+        Schedule = source.Schedule,
     };
 
     [Test]
@@ -503,6 +505,76 @@ public class BotSettingsDirtyPolicyTests
         Assert.IsTrue(BotSettingsDirtyPolicy.ListChanged(new List<BotSettingsListItem>(), saved));
         Assert.IsTrue(BotSettingsDirtyPolicy.ListChanged(null, saved));
         Assert.IsFalse(BotSettingsDirtyPolicy.ListChanged(null, null));
+    }
+
+    // ── Part B: the «РАСПИСАНИЕ РАБОТЫ» section ──────────────────────────
+
+    private static BotSettingsSnapshot WithSchedule(BotSchedule schedule)
+    {
+        var snapshot = Baseline();
+        snapshot.Schedule = schedule;
+        return snapshot;
+    }
+
+    [Test]
+    public void EveryScheduleValue_Dirties_AndRevertingCleans()
+    {
+        var saved = WithSchedule(new BotSchedule(true, 31, 540, 1080));
+        var mutations = new Dictionary<string, BotSchedule>
+        {
+            { "enabled", new BotSchedule(false, 31, 540, 1080) },
+            { "days", new BotSchedule(true, 63, 540, 1080) },
+            { "start", new BotSchedule(true, 31, 600, 1080) },
+            { "end", new BotSchedule(true, 31, 540, 1200) },
+        };
+        foreach (var mutation in mutations)
+        {
+            var edited = Clone(saved);
+            edited.Schedule = mutation.Value;
+            Assert.IsTrue(BotSettingsDirtyPolicy.IsDirty(edited, saved), $"schedule {mutation.Key} does not light Save");
+            Assert.IsTrue(BotSettingsDirtyPolicy.CanSave(edited, saved), $"a valid {mutation.Key} change may be saved");
+            edited.Schedule = saved.Schedule;
+            Assert.IsFalse(BotSettingsDirtyPolicy.IsDirty(edited, saved), $"schedule {mutation.Key} reverted must read clean");
+        }
+    }
+
+    [Test]
+    public void AnInvalidSchedule_KeepsSaveDisabled_ThroughTheOneVerdict()
+    {
+        var saved = WithSchedule(BotSchedule.Default);
+        var badTime = Clone(saved);
+        badTime.Schedule = new BotSchedule(false, 127, ScheduleModel.InvalidMinute, 1260);   // «25:00» typed into «С»
+        Assert.IsTrue(BotSettingsDirtyPolicy.IsDirty(badTime, saved), "the edit is a change…");
+        Assert.IsFalse(BotSettingsDirtyPolicy.CanSave(badTime, saved), "…that may not be saved");
+
+        var noDay = Clone(saved);
+        noDay.Schedule = new BotSchedule(true, 0, 540, 1260);
+        Assert.IsFalse(BotSettingsDirtyPolicy.CanSave(noDay, saved), "an enabled schedule needs at least one day");
+
+        var otherEditWhileInvalid = Clone(badTime);
+        otherEditWhileInvalid.Name = "Другое";
+        Assert.IsFalse(BotSettingsDirtyPolicy.CanSave(otherEditWhileInvalid, saved),
+            "an invalid schedule blocks the whole Save — it would persist a broken window");
+
+        Assert.IsFalse(BotSettingsDirtyPolicy.CanSave(Clone(saved), saved), "nothing changed → nothing to save");
+        Assert.IsFalse(BotSettingsDirtyPolicy.CanSave(null, saved));
+    }
+
+    [Test]
+    public void ScheduleKeys_WrittenToPrefs_ReadBackClean()
+    {
+        var unsaved = Manager.ReadSavedSettings(TestBot);
+        Assert.AreEqual(BotSchedule.Default, unsaved.Schedule, "a bot that never saved a schedule reads the UI default");
+
+        var schedule = new BotSchedule(true, 96, 1320, 360);
+        BotScheduleStore.Write(TestBot, schedule);
+        var saved = Manager.ReadSavedSettings(TestBot);
+        Assert.AreEqual(schedule, saved.Schedule);
+
+        var edited = Clone(saved);
+        Assert.IsFalse(BotSettingsDirtyPolicy.IsDirty(edited, saved), "a screen matching the just-written keys reads clean");
+        edited.Schedule = new BotSchedule(true, 96, 1320, 420);
+        Assert.IsTrue(BotSettingsDirtyPolicy.IsDirty(edited, saved));
     }
 
     [Test]

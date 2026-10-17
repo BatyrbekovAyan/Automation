@@ -20,4 +20,7 @@ public static class BusinessTimeZone
         string z = UnityEngine.PlayerPrefs.GetString(botName + "TimeZone", "");
         return string.IsNullOrWhiteSpace(z) ? null : z;
     }
+
+    /// <summary>Bot.DeleteBotLocally: the stamp used to outlive its bot (Part B — the schedule is judged in this zone).</summary>
+    public static void Clear(string botName) => UnityEngine.PlayerPrefs.DeleteKey(botName + "TimeZone");
 }

@@ -173,6 +173,28 @@ public class BusinessContactFieldsTests
         }
     }
 
+    // Part B «расписание бота»: «С» / «До» are clones of the bot-name card made by
+    // Tools/BotSettings/Add Schedule Section, so they must inherit the same keyboard
+    // contract — Default keypad (a keypad switch restarts the iOS IME), no
+    // SingleLine, autocorrect off, the deferred-dismiss input, no scrim.
+    [Test]
+    public void ScheduleFields_KeepTheKeyboardInvariants()
+    {
+        var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(PrefabPath);
+        var settings = prefab.GetComponent<BotSettings>();
+        foreach (var field in new[] { settings.ScheduleStartField, settings.ScheduleEndField })
+        {
+            Assert.IsNotNull(field, "Schedule field not wired. Run Tools/BotSettings/Add Schedule Section.");
+            var input = field.InputField;
+            Assert.IsInstanceOf<DeferredDismissInputField>(input, $"{field.name}: keyboard smooth-switch needs DeferredDismissInputField");
+            Assert.AreEqual(TouchScreenKeyboardType.Default, input.keyboardType, $"{field.name}: the keypad map gives a time field Default");
+            Assert.AreNotEqual(TMPro.TMP_InputField.LineType.SingleLine, input.lineType, $"{field.name} is SingleLine");
+            Assert.AreEqual(TMPro.TMP_InputField.InputType.Standard, input.inputType, $"{field.name} has autocorrection enabled");
+            Assert.IsNull(new SerializedObject(field).FindProperty("scrim").objectReferenceValue, $"{field.name} is wired to a scrim");
+        }
+        Assert.AreNotSame(settings.ScheduleStartField, settings.ScheduleEndField);
+    }
+
     // Cloning a card copies the source's placeholder, so without an explicit
     // pass every contact field showed the bot-name hint («Ассистент»).
     [Test]
