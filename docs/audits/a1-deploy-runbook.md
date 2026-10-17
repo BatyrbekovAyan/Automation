@@ -176,3 +176,11 @@ docker compose up -d n8n && docker compose logs --tail 20 n8n
   `install_id`, переключённые на новый id; строка `hint_not_alias` / `rc_mismatch` — клиент заявил слияние, которого RevenueCat не
   подтверждает: ничего не записано, искать сломанный клиент или чужую подсказку (у `hint_not_alias` неподтверждённый id — в `hint`). Вернуть подписку на старый телефон нельзя
   (heal не двигает зеркало списанного id назад); единственный рычаг — отзыв установки, которая НЕ должна держать подписку (п. 4 выше).
+- **Расписание бота (часть B «расписание бота», `crSetSchedule001`; пакет `docs/audits/2026-10-17-bot-schedule/README.md`).**
+  Тот же класс, что у версии Set Reply Mode (ревью B1): держатель действующего токена (своя установка или укравший её секрет)
+  может записать `{enabled:true, daysMask:0}` с максимальной версией (`Number.MAX_SAFE_INTEGER`) — бот этого профиля молчит
+  всегда, а приложение строку уже не перезапишет (каждая его следующая версия ниже или вне диапазона → 400 `bad_request`;
+  приложение, увидевшее такую версию в ответе, для этого бота расписание больше не отправит). Снять её может только Delete
+  Bot Files (удаление бота) или поддержка, через `sql-oneoff.py`: (только чтение) `select profile_id, enabled, days_mask,
+  start_min, end_min, tz, version, updated_at from public.bot_schedule where profile_id = '<profile>';` → `delete from
+  public.bot_schedule where profile_id = '<profile>';` (нет строки = нет расписания: бот отвечает как раньше).

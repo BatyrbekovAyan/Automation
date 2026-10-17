@@ -499,3 +499,40 @@ Wappi не перечислит хотя бы один профиль Telegram; 
 `~/backups/n8n-2026-10-15-predeploy.tar.gz`. **Дальше:** 12b — первое живое событие RevenueCat по журналу доставок RevenueCat (200; повтор —
 тоже 200) — придёт с новой сборкой; запрос шага 11 — ещё раз на следующее утро; новая клиентская сборка → `inspect-artifact.sh` →
 device-pass (пункты — в пакете) → наблюдения A4/A5 на живом боте (шаг 14, по отдельному «да»). Push `main` — контроллер.
+
+## Часть B «расписание бота» — реализовано, пакет отрепетирован, ждёт «да» (2026-10-17; коммиты 7345bd95..HEAD)
+
+План — `docs/superpowers/plans/2026-10-14-paying-users-protection-and-schedule.md` (B1–B3), спека — `…/specs/2026-10-14-paying-users-protection-and-schedule-design.md` (§4 B1, §1);
+**пакет выкладки — `docs/audits/2026-10-17-bot-schedule/README.md`** (таблица id → генератор → граф до/после, миграция и проба
+tzdata, чек-лист по шагам, smoke с явными телами, наблюдение, откат, «что не выкладывается», остатки, репетиция), device-pass обеих
+частей — `…/device-pass.md`. Прод НЕ тронут (только снимок `verify-deployed` и GET-пробы: список учёток, текст изменения 13.10).
+Сделано: B1 (сервер, `7345bd95`, `60bec485`, исправления ревью `d34a3f81`) — таблица `bot_schedule` + триггер зоны
+(`sql/2026-10-14-bot-schedule.sql`), предикат окна в одном месте (`bot_schedule.py`) + общая таблица случаев
+(`fixtures/schedule-cases.json`, её же читает клиент), «окно закрыто» = «Вместе» в `Read Reply Mode` обоих шаблонов (fail-closed,
+решение только на входе сообщения), `Outcome` `off_hours` только на записанном подавлении, вебхук `crSetSchedule001` «Set
+Schedule» (только по токену, апсерт с охраной версии), перенос по линии бота (`moved_schedules`) и удаление в Delete Bot Files
+(`deletedSchedules`); решение ревью B1 `38e1bac7` — «вне графика» в «Сводке» клиентской пометкой; B2 (клиент, `2eb39797`,
+`40816971`, `03751265`, `1b549b9e`) — секция «Расписание работы» (аддитивный билдер), `ScheduleModel` как клиентский близнец
+окна, синк `ScheduleSyncService` с удержанием на время удаления бота (V12), панель вне часов у «Авто»-бота, пометка «Вне графика ·»
+в «Сводке», `ToggleRow.SetIsOnQuiet` безопасен в любом состоянии; B3 — пакет, репетиция, device-pass, документы (CLAUDE.md
+«Part B», `Tools/n8n/README.md` 29 → 30), минорные ревью: негатив N2 для пина `deletedSchedules`, формулировка плана (триггер
+`update of tz`, `off_hours` только на записанном подавлении), заметка поддержки о максимальной версии (`a1-deploy-runbook.md` §5);
+стейл-отметка «Авто = продолжение подсказок» → «DEPLOYED to prod 2026-10-14» (проверено на проде только чтением: канон `3321a788`
+обслуживается 29/29, Suggest Replies и Create/Edit WA/TG несут текст 13.10 в сохранённой и опубликованной версиях).
+
+| Проверка | Результат |
+|---|---|
+| Генераторы `--check` | 22/22 exit 0 (+ `apply-delete-history.py` RETIRED — отказывает по замыслу) |
+| Верификаторы | 15/15 + `verify-telegram-parity --self-test` 33/33 + `verify_rag all` + `verify-panel-prompts.js` — все 0; `verify-sql-comments` 99 Postgres-узлов в 31 файле |
+| `tests/run_all.py` | 40 файлов, 1436 случаев, 0 падений (44 мин; `test_reply_schedule` 43/0, `test_set_schedule` 37/0, `test_retired_delete` 14/0 с новым негативом N2) |
+| Unity EditMode (headless, полный) | 3329/3329 на `1b549b9e` (B2; B3 клиент не трогал — не перезапускался) |
+| Снимок прода «до» | канон 30, diff 8 = ровно пакет (DIFF ×7 + MISSING ×1), клонов 0; прод = канон `3321a788` 29/29 |
+| Репетиция на staging | `--canon-ref 3321a788` → стенд = прод (статусы 30 id совпали со снимком) → проба tzdata `05:00:00` → миграция через Postgres-узел n8n (+ повтор: идемпотентна) → SWS → импорт `crSetSchedule001` из проверенной копии + GET до включения → включение → шесть по одному (активные «published by the PUT», шаблоны сохранены) → `update-clones` (2 клона стенда: три узла, промпт сохранён) → `verify-deployed` diff 0 → smoke → 0 ошибок |
+| e2e на развёрнутом стенде | `derive-staging.py` без импорта → e2e-reply **48/48** (вкл. `off_hours_suppressed_recorded` ×WA/TG — первый прогон после исправлений ревью B1: outcome `off_hours`, история `client`, память `human`, отправок 0, Count Dialog не запускался; `in_hours_replies` ×WA/TG), e2e-auth **67/67** (вкл. `set_schedule_applies_and_refuses`, `reconnect_moves_schedule` ×WA/TG, модельный шаг `retired_bot_reconnects_after_purchase` ×WA/TG), e2e-handoff **21/21**; после — `verify-deployed` diff 0; возврат рабочего канона (`bootstrap.py` без `--canon-ref`) → `verify-deployed` exit 0 |
+
+Вывод каждого шага — `docs/audits/2026-10-17-bot-schedule/rehearsal.txt`; снимок «до» — `…/prod-before.json`; пред-/пост-проверка
+и проба tzdata — `…/precheck.sql`, `…/postcheck.sql`, `…/tzprobe.sql`.
+
+**Ждёт:** финальное ревью блока B (контроллер) → «да» владельца на выкладку (чек-лист пакета; первым шагом — проба tzdata прода)
+→ новая сборка (клиент A + B) → device-pass (`device-pass.md`) → наблюдения на живом боте по отдельному «да»; push — по согласию.
+Открытое из части A (не блокирует B): 12b (первое живое событие RevenueCat) и повтор запроса шага 11 — в день выкладки B.
