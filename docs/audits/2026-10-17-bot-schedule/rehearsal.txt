@@ -1,0 +1,1067 @@
+B3 — репетиция пакета выкладки части B «расписание бота» на staging (2026-10-17)
+
+Только staging: n8n 2.36.7 (task runners) http://localhost:5678, Postgres pg.sh (5433), Wappi-мок 127.0.0.1:8765.
+Прод: ОДИН read-only снимок verify-deployed + GET-пробы (список учёток — id/тип/имя; текст изменения 13.10 — только булевы),
+больше ничего. Инструменты — те же, что пойдут на прод (deploy-canonical.py, update-clones.py, verify-deployed.py); миграция —
+файл как есть, через Postgres-узел n8n (staging-двойник .secrets/sql-oneoff.py: тот же харнес, удаление через 35 с; отличаются
+база, файл ключа и учётка «Postgres Staging»). Команды шагов 3a / 9 / 10 — текст README пакета с base = staging.
+Сырые журналы шагов: Tools/test-output/b3/ (gitignored). Время — UTC.
+
+[annotation, written when the README was finalised] Two kinds of label in the raw step headers below are mine, not tool
+output, and are kept as they were written: (1) the step numbers follow a DRAFT numbering of the checklist — R7b «step 4a»,
+R7d «step 4c», R8 «step 5», R8b «step 6», R12 «step 10», R13 «step 11» are, in the final README, steps 3a, 3c, 4, 5, 9 and
+10 (R12 ran equivalent commands; R12b ran the final README block of step 9 VERBATIM); (2) R4's header expectation
+«up_to_date 22» was the task inputs' guess — the tool's own count, 21 (= 28 considered − 6 would_update − 1 missing), is
+what the README expects.
+
+=== §A. Прод сейчас: снимок «до» (read-only), GET-пробы и офлайн-сверка канона 3321a788 со снимком ===
+2026-10-17T01:14:05Z
+$ python3 Tools/n8n/verify-deployed.py --base https://n8n.choosereply.com --json docs/audits/2026-10-17-bot-schedule/prod-before.json
+base https://n8n.choosereply.com: canonical 30 (diff 8), clones 0 (behind template 0, of them prompt head behind 0; custom prompts 0, not counted), archived clones 1 (not counted), other 0
+  prompt map = Create/Edit Vertical Prompt as introduced in 126f44c2 (sha256 49abaeb19ea8)
+  DIFF    0DP79STI3pafXO9B 0DP79STI3pafXO9B-Set_Workflow_State.json  active=True names=True graph=False published=False  (stored graph differs; PUBLISHED graph differs)
+  OK      2htWSV5IHO8E2CgB 2htWSV5IHO8E2CgB-Dashboard_Outcomes.json  active=True names=True graph=True published=True
+  OK      2islisFH7jjLoPQM 2islisFH7jjLoPQM-Delete_Orphan_Profiles.json  active=True names=True graph=True published=True
+  OK      3qax5J9u2qsT9Vao 3qax5J9u2qsT9Vao-Edit_Whatsapp_Workflow.json  active=True names=True graph=True published=True
+  DIFF    4VN3gsFaC2HUYmcc 4VN3gsFaC2HUYmcc-Telegram_Bot.json  active=False names=True graph=False published=None  (stored graph differs)
+  DIFF    4wYitz5ek30SVNlT 4wYitz5ek30SVNlT-WhatsApp_Bot.json  active=False names=True graph=False published=None  (stored graph differs)
+  OK      9PTyYcelRQI7bGDb 9PTyYcelRQI7bGDb-Suggest_Replies.json  active=True names=True graph=True published=True
+  OK      KoTuIlk4LMrlvnWI KoTuIlk4LMrlvnWI-Upload_File.json  active=True names=True graph=True published=True
+  OK      SCLcpn6DMDG3Z4VN SCLcpn6DMDG3Z4VN-Set_Reply_Mode.json  active=True names=True graph=True published=True
+  OK      TwWPW3gIyjZS3foR TwWPW3gIyjZS3foR-Edit_Telegram_Workflow.json  active=True names=True graph=True published=True
+  DIFF    Uz6HBBUpAiUqVysB Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json  active=True names=True graph=False published=False  (stored graph differs; PUBLISHED graph differs)
+  DIFF    XuvOp7TxOImOAmlj XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json  active=True names=True graph=False published=False  (stored graph differs; PUBLISHED graph differs)
+  OK      ZGYr6srzS3rSSXHp ZGYr6srzS3rSSXHp-RevenueCat_Events.json  active=True names=True graph=True published=True
+  OK      ZTqpumOpL1rNDOp6 ZTqpumOpL1rNDOp6-Delete_File.json  active=True names=True graph=True published=True
+  OK      crAuthSession001 crAuthSession001-Auth_Session.json  active=True names=True graph=True published=True
+  OK      crChannelWatch001 crChannelWatch001-Channel_Watch.json  active=True names=True graph=True published=True
+  OK      crHandoffDry0001 crHandoffDry0001-Handoff_Request_Dry.json  active=True names=True graph=True published=True
+  OK      crHandoffNtfy001 crHandoffNtfy001-Handoff_Notifier.json  active=True names=True graph=True published=True
+  OK      crHandoffReq0001 crHandoffReq0001-Handoff_Request.json  active=True names=True graph=True published=True
+  OK      crHandoffsApi001 crHandoffsApi001-Handoffs.json  active=True names=True graph=True published=True
+  OK      crPriceSearch001 crPriceSearch001-Price_List_Search.json  active=True names=True graph=True published=True
+  MISSING crSetSchedule001 crSetSchedule001-Set_Schedule.json  active=None names=None graph=None published=None
+  OK      crTestDialog0001 crTestDialog0001-Test_Dialog.json  active=True names=True graph=True published=True
+  OK      crVerifyIdent001 crVerifyIdent001-Verify_Identity.json  active=True names=True graph=True published=True
+  OK      crWappiProxy0001 crWappiProxy0001-Wappi_Proxy.json  active=True names=True graph=True published=True
+  DIFF    fXYpCXPKw92EzRz8 fXYpCXPKw92EzRz8-Profile_Lifecycle_Sweep.json  active=True names=True graph=False published=False  (stored graph differs; PUBLISHED graph differs)
+  OK      hHwvfOvTCS42pXnq hHwvfOvTCS42pXnq-Landing_Lead.json  active=True names=True graph=True published=True
+  OK      jtbssfzXbOxwTK4k jtbssfzXbOxwTK4k-Get_Usage.json  active=True names=True graph=True published=True
+  DIFF    lmjYsdNcQA2IE5rl lmjYsdNcQA2IE5rl-Delete_Bot_Files.json  active=True names=True graph=False published=False  (stored graph differs; PUBLISHED graph differs)
+  OK      olmqWMfcFpCEcpiE olmqWMfcFpCEcpiE-Support_Message.json  active=True names=True graph=True published=True
+  archived tqGXmiT6aJu7vUIG '13' [whatsapp] graph=19b0e4675a8b — retired by the owner, not counted
+wrote docs/audits/2026-10-17-bot-schedule/prod-before.json
+exit=2   (2 = something differs — here exactly the package)
+
+--- GET-only probes (2026-10-17, prod, read-only; nothing printed but ids / types / names / booleans)
+credentials (GET /credentials?limit=100 -> 200, 10 rows; the new workflow's only credential is postgres vvRrFiEXzLVqKjOx):
+   crRevenueCatApi1 | httpHeaderAuth | RevenueCat API
+   jGvQStWZQ3KHkrO7 | httpHeaderAuth | n8n Admin API
+   VJkldzm5hNSnzsnm | telegramApi | Support Bot
+   zqEakONO3UZyeqBq | httpHeaderAuth | RevenueCat Webhook
+   vvRrFiEXzLVqKjOx | postgres | Postgres
+   vrywn6AxQMlvbbzC | supabaseApi | Supabase
+   WNHwKWlO2E9OClkA | openAiApi | OpenAi account
+   ZowntFGvApDJ7UzQ | httpHeaderAuth | WappiAuthToken
+   nAmEcPrSbxIVDPFd | httpHeaderAuth | n8nAPIKey
+   hG8UUsDx8EHS1xbB | n8nApi | n8n account
+the 13.10 change («Авто» = продолжение подсказок, 7387ac36 — an ancestor of 3321a788) on prod, stored AND published:
+9PTyYcelRQI7bGDb GET 200 | needle 'PANEL-CONDITIONS' | in stored True | in published True
+9PTyYcelRQI7bGDb GET 200 | needle 'gpt-5.4-mini' | in stored True | in published True
+XuvOp7TxOImOAmlj GET 200 | needle 'Правило владельца об условии' | in stored True | in published True
+Uz6HBBUpAiUqVysB GET 200 | needle 'Правило владельца об условии' | in stored True | in published True
+3qax5J9u2qsT9Vao GET 200 | needle 'Правило владельца об условии' | in stored True | in published True
+TwWPW3gIyjZS3foR GET 200 | needle 'Правило владельца об условии' | in stored True | in published True
+(the canon before 7387ac36 carries neither needle: PANEL-CONDITIONS 0, «Правило владельца об условии» 0)
+
+--- canon at a ref vs the snapshot: verify-deployed.graph_hash of `git archive <ref> Tools/n8n/workflows` against the snapshot's
+    graph_hash_live / graph_hash_published; package = worktree graph != ref graph (offline, no network)
+snapshot https://n8n.choosereply.com: 30 canonical rows, statuses ['DIFF', 'MISSING', 'OK']
+  crSetSchedule001-Set_Schedule.json: not in canon 3321a788 (prod status MISSING)
+canon at 3321a788 vs prod snapshot: 29 equal, 0 differ (of 29 canon files at the ref)
+package (worktree graph != 3321a788 graph): 8
+  0DP79STI3pafXO9B-Set_Workflow_State.json  36b6a73e9773 -> dcce761854bd
+  4VN3gsFaC2HUYmcc-Telegram_Bot.json  f22a7b12c69f -> 2433180b00c9
+  4wYitz5ek30SVNlT-WhatsApp_Bot.json  013bce231127 -> 60aa43640382
+  Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json  51becea5ebee -> 76df037a5cb0
+  XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json  78ed47e160c0 -> b4a695f6aecf
+  crSetSchedule001-Set_Schedule.json  MISSING -> cfd76ff12bb7
+  fXYpCXPKw92EzRz8-Profile_Lifecycle_Sweep.json  624c8bd7733f -> 35be6f37abeb
+  lmjYsdNcQA2IE5rl-Delete_Bot_Files.json  64f4c6dfda90 -> ab64a6555282
+
+=== §B. Репетиция на основном стенде (порядок чек-листа пакета) ===
+2026-10-17T01:15:40Z
+### R1 bootstrap.py --bot wa:stgwa001 --bot tg:stgtg001 --canon-ref 3321a788
+2. server up at http://localhost:5678 (pid 33828, log /Users/ayan/.n8n-staging/n8n.log)
+3. API key already present
+   canon: 3321a788 (git archive -> /var/folders/65/d93rj7qn5csdsm10l1l8t4jm0000gn/T/canon-ref-nhma1qz0/Tools/n8n/workflows)
+   staging isolation: KoTuIlk4LMrlvnWI-Upload_File.json: ['Supabase Vector Store (+3 sub-nodes)', 'Store Original File']
+   staging isolation: ZTqpumOpL1rNDOp6-Delete_File.json: ['Delete Stored Original']
+   staging price search: crPriceSearch001-Price_List_Search.json: ['Search Price Lists (+1 sub-nodes)']
+   staging isolation: lmjYsdNcQA2IE5rl-Delete_Bot_Files.json: ['Delete Stored Original']
+   30 workflows + 2 staging bots -> /Users/ayan/Projects/Automation/Tools/n8n/workflows-staging
+   n8n base http://localhost:5678; Wappi -> http://127.0.0.1:8765; postgres -> 'Postgres Staging' (stgPostgres000001)
+   note: left dangling on purpose (isolation): ['Support Bot']
+   Skipping invalid workflow file: /Users/ayan/Projects/Automation/Tools/n8n/workflows-staging/_manifest.json
+5. imported 30 workflows + 2 staging bots; published 31
+2. server up at http://localhost:5678 (pid 34127, log /Users/ayan/.n8n-staging/n8n.log)
+staging ready: http://localhost:5678
+exit=0
+2026-10-17T01:17:59Z
+
+2026-10-17T01:18:17Z
+### R2 emulate the prod state: crSetSchedule001 absent, bot_schedule (table + trigger function) absent
+crSetSchedule001 present on the stand: 200 active True
+crSetSchedule001 deactivate 200
+waiting 36 s before deleting (insights rule)
+crSetSchedule001 delete 200 -> GET 404
+drop the table + function (prod has neither):
+dropped
+precheck (expect t | t):
+t|t
+2026-10-17T01:18:56Z
+
+2026-10-17T01:19:03Z
+### R3 verify-deployed on the stand = prod (expect canonical 30, diff 8 — the package, statuses as the prod snapshot)
+base http://localhost:5678: canonical 30 (diff 8), clones 2 (behind template 2, of them prompt head behind 0; custom prompts 2, not counted), archived clones 0 (not counted), other 2
+  prompt map = Create/Edit Vertical Prompt as introduced in 126f44c2 (sha256 49abaeb19ea8)
+  DIFF    0DP79STI3pafXO9B 0DP79STI3pafXO9B-Set_Workflow_State.json  active=True names=True graph=False published=False  (stored graph differs; PUBLISHED graph differs)
+  OK      2htWSV5IHO8E2CgB 2htWSV5IHO8E2CgB-Dashboard_Outcomes.json  active=True names=True graph=True published=True
+  OK      2islisFH7jjLoPQM 2islisFH7jjLoPQM-Delete_Orphan_Profiles.json  active=True names=True graph=True published=True
+  OK      3qax5J9u2qsT9Vao 3qax5J9u2qsT9Vao-Edit_Whatsapp_Workflow.json  active=True names=True graph=True published=True
+  DIFF    4VN3gsFaC2HUYmcc 4VN3gsFaC2HUYmcc-Telegram_Bot.json  active=False names=True graph=False published=None  (stored graph differs)
+  DIFF    4wYitz5ek30SVNlT 4wYitz5ek30SVNlT-WhatsApp_Bot.json  active=False names=True graph=False published=None  (stored graph differs)
+  OK      9PTyYcelRQI7bGDb 9PTyYcelRQI7bGDb-Suggest_Replies.json  active=True names=True graph=True published=True
+  OK      KoTuIlk4LMrlvnWI KoTuIlk4LMrlvnWI-Upload_File.json  active=True names=True graph=True published=True
+  OK      SCLcpn6DMDG3Z4VN SCLcpn6DMDG3Z4VN-Set_Reply_Mode.json  active=True names=True graph=True published=True
+  OK      TwWPW3gIyjZS3foR TwWPW3gIyjZS3foR-Edit_Telegram_Workflow.json  active=True names=True graph=True published=True
+  DIFF    Uz6HBBUpAiUqVysB Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json  active=True names=True graph=False published=False  (stored graph differs; PUBLISHED graph differs)
+  DIFF    XuvOp7TxOImOAmlj XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json  active=True names=True graph=False published=False  (stored graph differs; PUBLISHED graph differs)
+  OK      ZGYr6srzS3rSSXHp ZGYr6srzS3rSSXHp-RevenueCat_Events.json  active=True names=True graph=True published=True
+  OK      ZTqpumOpL1rNDOp6 ZTqpumOpL1rNDOp6-Delete_File.json  active=True names=True graph=True published=True
+  OK      crAuthSession001 crAuthSession001-Auth_Session.json  active=True names=True graph=True published=True
+  OK      crChannelWatch001 crChannelWatch001-Channel_Watch.json  active=True names=True graph=True published=True
+  OK      crHandoffDry0001 crHandoffDry0001-Handoff_Request_Dry.json  active=True names=True graph=True published=True
+  OK      crHandoffNtfy001 crHandoffNtfy001-Handoff_Notifier.json  active=True names=True graph=True published=True
+  OK      crHandoffReq0001 crHandoffReq0001-Handoff_Request.json  active=True names=True graph=True published=True
+  OK      crHandoffsApi001 crHandoffsApi001-Handoffs.json  active=True names=True graph=True published=True
+  OK      crPriceSearch001 crPriceSearch001-Price_List_Search.json  active=True names=True graph=True published=True
+  MISSING crSetSchedule001 crSetSchedule001-Set_Schedule.json  active=None names=None graph=None published=None
+  OK      crTestDialog0001 crTestDialog0001-Test_Dialog.json  active=True names=True graph=True published=True
+  OK      crVerifyIdent001 crVerifyIdent001-Verify_Identity.json  active=True names=True graph=True published=True
+  OK      crWappiProxy0001 crWappiProxy0001-Wappi_Proxy.json  active=True names=True graph=True published=True
+  DIFF    fXYpCXPKw92EzRz8 fXYpCXPKw92EzRz8-Profile_Lifecycle_Sweep.json  active=True names=True graph=False published=False  (stored graph differs; PUBLISHED graph differs)
+  OK      hHwvfOvTCS42pXnq hHwvfOvTCS42pXnq-Landing_Lead.json  active=True names=True graph=True published=True
+  OK      jtbssfzXbOxwTK4k jtbssfzXbOxwTK4k-Get_Usage.json  active=True names=True graph=True published=True
+  DIFF    lmjYsdNcQA2IE5rl lmjYsdNcQA2IE5rl-Delete_Bot_Files.json  active=True names=True graph=False published=False  (stored graph differs; PUBLISHED graph differs)
+  OK      olmqWMfcFpCEcpiE olmqWMfcFpCEcpiE-Support_Message.json  active=True names=True graph=True published=True
+  clone   stgtg40da979c774 'STAGING TG stgtg001' [telegram] active=True nodes=60 graph=1381faffd630 published=1381faffd630 sticky=None BEHIND  prompt=custom (custom prompt — kept verbatim by update-clones, not counted: no Create/Edit grammar (Business Type line + Additional Instructions marker))
+  clone   stgwab77f282533c 'STAGING WA stgwa001' [whatsapp] active=True nodes=60 graph=b1a6f7240ad6 published=b1a6f7240ad6 sticky=None BEHIND  prompt=custom (custom prompt — kept verbatim by update-clones, not counted: no Create/Edit grammar (Business Type line + Additional Instructions marker))
+wrote Tools/test-output/b3/stg-before.json
+exit=2
+status per id, stand vs prod snapshot: IDENTICAL (30 ids)
+
+2026-10-17T01:19:13Z
+### R4 deploy-canonical dry-run on staging (derived canon) — expect would_update 6, missing 1 (crSetSchedule001), up_to_date 22, failed 0
+= 2htWSV5IHO8E2CgB 'Dashboard Outcomes' up to date (stored and published)
+= 2islisFH7jjLoPQM 'Delete Orphan Profiles' up to date (stored and published)
+= 3qax5J9u2qsT9Vao 'Edit Whatsapp Workflow' up to date (stored and published)
+~ 4VN3gsFaC2HUYmcc 'Telegram Bot' active=False nodes 60 → 60 (+0 -0)
+    rollback pointer: versionId f90c75b9-1875-414e-ac21-89756ef1f3bc (activeVersionId None)
+~ 4wYitz5ek30SVNlT 'WhatsApp Bot' active=False nodes 60 → 60 (+0 -0)
+    rollback pointer: versionId 2fd3ca33-a86f-4e22-a047-c7441147c572 (activeVersionId None)
+= 9PTyYcelRQI7bGDb 'Suggest Replies' up to date (stored and published)
+= KoTuIlk4LMrlvnWI 'Upload File' up to date (stored and published)
+= SCLcpn6DMDG3Z4VN 'Set Reply Mode' up to date (stored and published)
+= TwWPW3gIyjZS3foR 'Edit Telegram Workflow' up to date (stored and published)
+~ Uz6HBBUpAiUqVysB 'CreateTelegramWorkflow' active=True nodes 52 → 52 (+0 -0)
+    rollback pointer: versionId ac499b7e-7aa4-451e-ade5-14f64a99a2f9 (activeVersionId ac499b7e-7aa4-451e-ade5-14f64a99a2f9)
+~ XuvOp7TxOImOAmlj 'CreateWhatsappWorkflow' active=True nodes 52 → 52 (+0 -0)
+    rollback pointer: versionId 10b08c23-9484-4a62-ae46-773b62b36e99 (activeVersionId 10b08c23-9484-4a62-ae46-773b62b36e99)
+= ZGYr6srzS3rSSXHp 'RevenueCat Events' up to date (stored and published)
+= ZTqpumOpL1rNDOp6 'Delete File' up to date (stored and published)
+= crAuthSession001 'Auth Session' up to date (stored and published)
+= crChannelWatch001 'Channel Watch' up to date (stored and published)
+= crHandoffDry0001 'Handoff Request (dry)' up to date (stored and published)
+= crHandoffNtfy001 'Handoff Notifier' up to date (stored and published)
+= crHandoffReq0001 'Handoff Request' up to date (stored and published)
+= crHandoffsApi001 'Handoffs' up to date (stored and published)
+= crPriceSearch001 'Price List Search' up to date (stored and published)
+MISSING crSetSchedule001 crSetSchedule001-Set_Schedule.json — import it with n8n import:workflow, not here
+= crTestDialog0001 'Test Dialog' up to date (stored and published)
+= crVerifyIdent001 'Verify Identity' up to date (stored and published)
+= crWappiProxy0001 'Wappi Proxy' up to date (stored and published)
+~ fXYpCXPKw92EzRz8 'Profile Lifecycle Sweep' active=True nodes 41 → 41 (+0 -0)
+    rollback pointer: versionId 04a31dfc-56ba-4e60-adf6-9b4c02871e86 (activeVersionId 04a31dfc-56ba-4e60-adf6-9b4c02871e86)
+= hHwvfOvTCS42pXnq 'Landing Lead' up to date (stored and published)
+= jtbssfzXbOxwTK4k 'Get Usage' up to date (stored and published)
+~ lmjYsdNcQA2IE5rl 'Delete Bot Files' active=True nodes 19 → 19 (+0 -0)
+    rollback pointer: versionId 9c2b37b4-0eb3-4f7f-9ed6-464bc25d877f (activeVersionId 9c2b37b4-0eb3-4f7f-9ed6-464bc25d877f)
+{"considered": 28, "missing": 1, "up_to_date": 21, "would_update": 6, "updated": 0, "would_publish": 0, "republished": 0, "inactive_must_run": 0, "failed": 0}
+exit=0
+
+### Set Workflow State (a placeholder workflow — skipped above): the same dry-run with --include-placeholders
+~ 0DP79STI3pafXO9B 'Set Workflow State' active=True nodes 20 → 20 (+0 -0)
+    rollback pointer: versionId 911bfdbd-aad5-4791-b2c6-6ee41244ae2b (activeVersionId 911bfdbd-aad5-4791-b2c6-6ee41244ae2b)
+{"considered": 1, "missing": 0, "up_to_date": 0, "would_update": 1, "updated": 0, "would_publish": 0, "republished": 0, "inactive_must_run": 0, "failed": 0}
+exit=0
+
+2026-10-17T01:20:11Z
+### R5 step 1 through n8n's own Postgres node (stg-sql-oneoff = sql-oneoff.py's harness on staging), the package's order
+--- docs/audits/2026-10-17-bot-schedule/precheck.sql
+200 {"no_schedule":true,"no_tz_fn":true}
+--- docs/audits/2026-10-17-bot-schedule/tzprobe.sql
+200 {"almaty_offset":"05:00:00","almaty_known":true,"moscow_offset":"03:00:00"}
+--- Tools/n8n/sql/2026-10-14-bot-schedule.sql
+200 {"success":true}
+--- docs/audits/2026-10-17-bot-schedule/postcheck.sql
+200 {"schedule_cols":"8","rls":true,"client_grants":"0","tz_trigger":true,"triggers":"1","tz_fn":true,"rows":"0"}
+--- Tools/n8n/sql/2026-10-14-bot-schedule.sql
+200 {"success":true}
+--- docs/audits/2026-10-17-bot-schedule/postcheck.sql
+200 {"schedule_cols":"8","rls":true,"client_grants":"0","tz_trigger":true,"triggers":"1","tz_fn":true,"rows":"0"}
+2026-10-17T01:23:53Z
+
+### R5b trigger definition + a rolled-back refusal probe (psql on the stand)
+CREATE TRIGGER bot_schedule_tz_check BEFORE INSERT OR UPDATE OF tz ON public.bot_schedule FOR EACH ROW EXECUTE FUNCTION bot_schedule_tz_check()
+BEGIN
+INSERT 0 1
+valid zone inserted: 1
+SAVEPOINT
+ERROR:  bot_schedule_bad_timezone: Europe/Nowhere
+CONTEXT:  PL/pgSQL function bot_schedule_tz_check() line 4 at RAISE
+ROLLBACK
+ROLLBACK
+rows after rollback: 0
+
+2026-10-17T01:24:05Z
+### R6 Set Workflow State — crSetSchedule001 protected BEFORE it is imported/activated
+~ 0DP79STI3pafXO9B 'Set Workflow State' active=True nodes 20 → 20 (+0 -0)
+    rollback pointer: versionId 911bfdbd-aad5-4791-b2c6-6ee41244ae2b (activeVersionId 911bfdbd-aad5-4791-b2c6-6ee41244ae2b)
+    published by the PUT (served version = the update) — no publish call, no deactivate window
+    read-back: ok
+{"considered": 1, "missing": 0, "up_to_date": 0, "would_update": 0, "updated": 1, "would_publish": 0, "republished": 0, "inactive_must_run": 0, "failed": 0}
+exit=0
+
+2026-10-17T01:24:24Z
+### R7a derive-staging.py (no import) — the derived copy of the package canon
+staging isolation: KoTuIlk4LMrlvnWI-Upload_File.json: ['Supabase Vector Store (+3 sub-nodes)', 'Store Original File']
+staging isolation: ZTqpumOpL1rNDOp6-Delete_File.json: ['Delete Stored Original']
+staging price search: crPriceSearch001-Price_List_Search.json: ['Search Price Lists (+1 sub-nodes)']
+staging isolation: lmjYsdNcQA2IE5rl-Delete_Bot_Files.json: ['Delete Stored Original']
+31 workflows + 2 staging bots -> /Users/ayan/Projects/Automation/Tools/n8n/workflows-staging
+n8n base http://localhost:5678; Wappi -> http://127.0.0.1:8765; postgres -> 'Postgres Staging' (stgPostgres000001)
+note: left dangling on purpose (isolation): ['Support Bot']
+exit=0
+
+2026-10-17T01:24:32Z
+### R7b the package's step 4a (temp copy + audit) with staging values: SRC = workflows-staging (the derived copy), PG = «Postgres Staging»
+crSetSchedule001-Set_Schedule.json [('postgres', 'stgPostgres000001', 'Postgres Staging')] graph cfd76ff12bb7 id crSetSchedule001 active False OK
+exit=0
+### R7b' the same step 4a OFFLINE with the PROD values (SRC = the canon, PG = vvRrFiEXzLVqKjOx «Postgres»): what the executor sees on the day
+crSetSchedule001-Set_Schedule.json [('postgres', 'vvRrFiEXzLVqKjOx', 'Postgres')] graph cfd76ff12bb7 id crSetSchedule001 active False OK
+exit=0
+
+2026-10-17T01:24:50Z
+### R7c import crSetSchedule001 (inactive) while the server RUNS — the prod path is docker compose exec -T n8n n8n import:workflow; staging imports the audited derived copy
+server before import: 200
+Importing 1 workflows...
+Successfully imported 1 workflow.
+import rc=0
+server after import: 200
+### R7d step 4c: GET before activation — active False, credentials exactly {PG}
+crSetSchedule001 200 active False ['stgPostgres000001'] OK
+
+2026-10-17T01:25:01Z
+### R8 step 5: activate through the API + read-back (base = staging)
+crSetSchedule001 activate 200 | active True | published=stored True | creds ['stgPostgres000001']
+### R8b step 6: smoke Set Schedule right after activation (explicit bodies, nothing written)
+GET  /webhook/SetSchedule -> {"code":404,"message":"This webhook is not registered for GET requests. Did you mean to make a POST request?","stacktrace":"ResponseError: This webhook is not registered for GET requests. Did you mean to make a POST request?\n    at LiveWebhooks.findWebhook (/Users/ayan/.n8n-staging/app/node_modules/n8n/src/webhooks/live-webhooks.ts:283:10)\n    at LiveWebhooks.executeWebhook (/Users/ayan/.n8n-staging/app/node_modules/n8n/src/webhooks/live-webhooks.ts:98:19)\n    at WebhookRequestHandler.handleRequest (/Users/ayan/.n8n-staging/app/node_modules/n8n/src/webhooks/webhook-request-handler.ts:66:21)\n    at /Users/ayan/.n8n-staging/app/node_modules/n8n/src/webhooks/webhook-request-handler.ts:302:3"} [404]
+POST /webhook/SetSchedule {} (no token) -> {"success":false,"error":"unauthorized","reason":"unauthorized:missing"} [401]
+
+2026-10-17T01:25:12Z
+### R9 deploy-canonical --only XuvOp7TxOImOAmlj --apply --yes
+~ XuvOp7TxOImOAmlj 'CreateWhatsappWorkflow' active=True nodes 52 → 52 (+0 -0)
+    rollback pointer: versionId 10b08c23-9484-4a62-ae46-773b62b36e99 (activeVersionId 10b08c23-9484-4a62-ae46-773b62b36e99)
+    published by the PUT (served version = the update) — no publish call, no deactivate window
+    read-back: ok
+{"considered": 1, "missing": 0, "up_to_date": 0, "would_update": 0, "updated": 1, "would_publish": 0, "republished": 0, "inactive_must_run": 0, "failed": 0}
+exit=0
+
+2026-10-17T01:25:13Z
+### R9 deploy-canonical --only Uz6HBBUpAiUqVysB --apply --yes
+~ Uz6HBBUpAiUqVysB 'CreateTelegramWorkflow' active=True nodes 52 → 52 (+0 -0)
+    rollback pointer: versionId ac499b7e-7aa4-451e-ade5-14f64a99a2f9 (activeVersionId ac499b7e-7aa4-451e-ade5-14f64a99a2f9)
+    published by the PUT (served version = the update) — no publish call, no deactivate window
+    read-back: ok
+{"considered": 1, "missing": 0, "up_to_date": 0, "would_update": 0, "updated": 1, "would_publish": 0, "republished": 0, "inactive_must_run": 0, "failed": 0}
+exit=0
+
+2026-10-17T01:25:13Z
+### R9 deploy-canonical --only lmjYsdNcQA2IE5rl --apply --yes
+~ lmjYsdNcQA2IE5rl 'Delete Bot Files' active=True nodes 19 → 19 (+0 -0)
+    rollback pointer: versionId 9c2b37b4-0eb3-4f7f-9ed6-464bc25d877f (activeVersionId 9c2b37b4-0eb3-4f7f-9ed6-464bc25d877f)
+    published by the PUT (served version = the update) — no publish call, no deactivate window
+    read-back: ok
+{"considered": 1, "missing": 0, "up_to_date": 0, "would_update": 0, "updated": 1, "would_publish": 0, "republished": 0, "inactive_must_run": 0, "failed": 0}
+exit=0
+
+2026-10-17T01:25:14Z
+### R9 deploy-canonical --only fXYpCXPKw92EzRz8 --apply --yes
+~ fXYpCXPKw92EzRz8 'Profile Lifecycle Sweep' active=True nodes 41 → 41 (+0 -0)
+    rollback pointer: versionId 04a31dfc-56ba-4e60-adf6-9b4c02871e86 (activeVersionId 04a31dfc-56ba-4e60-adf6-9b4c02871e86)
+    published by the PUT (served version = the update) — no publish call, no deactivate window
+    read-back: ok
+{"considered": 1, "missing": 0, "up_to_date": 0, "would_update": 0, "updated": 1, "would_publish": 0, "republished": 0, "inactive_must_run": 0, "failed": 0}
+exit=0
+
+2026-10-17T01:25:14Z
+### R9 deploy-canonical --only 4wYitz5ek30SVNlT --apply --yes
+~ 4wYitz5ek30SVNlT 'WhatsApp Bot' active=False nodes 60 → 60 (+0 -0)
+    rollback pointer: versionId 2fd3ca33-a86f-4e22-a047-c7441147c572 (activeVersionId None)
+    read-back: ok
+{"considered": 1, "missing": 0, "up_to_date": 0, "would_update": 0, "updated": 1, "would_publish": 0, "republished": 0, "inactive_must_run": 0, "failed": 0}
+exit=0
+
+2026-10-17T01:25:15Z
+### R9 deploy-canonical --only 4VN3gsFaC2HUYmcc --apply --yes
+~ 4VN3gsFaC2HUYmcc 'Telegram Bot' active=False nodes 60 → 60 (+0 -0)
+    rollback pointer: versionId f90c75b9-1875-414e-ac21-89756ef1f3bc (activeVersionId None)
+    read-back: ok
+{"considered": 1, "missing": 0, "up_to_date": 0, "would_update": 0, "updated": 1, "would_publish": 0, "republished": 0, "inactive_must_run": 0, "failed": 0}
+exit=0
+
+2026-10-17T01:25:21Z
+### R10a update-clones (dry-run) — the stand's 2 staging clones are BEHIND the new template (prod: 0 clones, nothing to do)
+base http://localhost:5678 · mode dry-run · template stamps {'whatsapp': '4943da220c3f', 'telegram': 'e9532e7b4139'}
+prompt map applied: Create/Edit Vertical Prompt as introduced in 126f44c2 (sha256 49abaeb19ea8) — deploy the matching Create/Edit BEFORE this run, or the next owner save would put an older head back
+~ stgtg40da979c774 'STAGING TG stgtg001' [telegram] active=True → +0 -0 ~3 conn=same
+    add: []
+    remove: []
+    change: ['Outcome', 'Read Reply Mode', 'Record Suppressed']
+    prompt: custom — kept verbatim (no Create/Edit grammar (Business Type line + Additional Instructions marker); replace only with --set-vertical stgtg40da979c774=<vertical id>)
+    keep: path='stgtg001' label line + owner tail, creds=['httpHeaderAuth', 'openAiApi', 'postgres']
+~ stgwab77f282533c 'STAGING WA stgwa001' [whatsapp] active=True → +0 -0 ~3 conn=same
+    add: []
+    remove: []
+    change: ['Outcome', 'Read Reply Mode', 'Record Suppressed']
+    prompt: custom — kept verbatim (no Create/Edit grammar (Business Type line + Additional Instructions marker); replace only with --set-vertical stgwab77f282533c=<vertical id>)
+    keep: path='stgwa001' label line + owner tail, creds=['httpHeaderAuth', 'openAiApi', 'postgres']
+{"clones": 2, "up_to_date": 0, "would_update": 2, "updated": 0, "failed": 0}
+exit=0
+
+2026-10-17T01:25:27Z
+### R10b update-clones --apply --yes
+base http://localhost:5678 · mode APPLY · template stamps {'whatsapp': '4943da220c3f', 'telegram': 'e9532e7b4139'}
+prompt map applied: Create/Edit Vertical Prompt as introduced in 126f44c2 (sha256 49abaeb19ea8) — deploy the matching Create/Edit BEFORE this run, or the next owner save would put an older head back
+~ stgtg40da979c774 'STAGING TG stgtg001' [telegram] active=True → +0 -0 ~3 conn=same
+    add: []
+    remove: []
+    change: ['Outcome', 'Read Reply Mode', 'Record Suppressed']
+    prompt: custom — kept verbatim (no Create/Edit grammar (Business Type line + Additional Instructions marker); replace only with --set-vertical stgtg40da979c774=<vertical id>)
+    keep: path='stgtg001' label line + owner tail, creds=['httpHeaderAuth', 'openAiApi', 'postgres']
+    rollback pointer: versionId b1138008-9c94-40ba-96e4-c73fdf6cd9a5 (activeVersionId b1138008-9c94-40ba-96e4-c73fdf6cd9a5) before the update
+    published by the PUT (served version = the update) — no deactivate/activate window
+    read-back: ok
+~ stgwab77f282533c 'STAGING WA stgwa001' [whatsapp] active=True → +0 -0 ~3 conn=same
+    add: []
+    remove: []
+    change: ['Outcome', 'Read Reply Mode', 'Record Suppressed']
+    prompt: custom — kept verbatim (no Create/Edit grammar (Business Type line + Additional Instructions marker); replace only with --set-vertical stgwab77f282533c=<vertical id>)
+    keep: path='stgwa001' label line + owner tail, creds=['httpHeaderAuth', 'openAiApi', 'postgres']
+    rollback pointer: versionId 09282c20-3c68-422e-9f9c-bfbb4d894f8e (activeVersionId 09282c20-3c68-422e-9f9c-bfbb4d894f8e) before the update
+    published by the PUT (served version = the update) — no deactivate/activate window
+    read-back: ok
+{"clones": 2, "up_to_date": 0, "would_update": 0, "updated": 2, "failed": 0}
+exit=0
+
+2026-10-17T01:25:29Z
+### R10c update-clones (dry-run again) — expect nothing to do
+base http://localhost:5678 · mode dry-run · template stamps {'whatsapp': '4943da220c3f', 'telegram': 'e9532e7b4139'}
+prompt map applied: Create/Edit Vertical Prompt as introduced in 126f44c2 (sha256 49abaeb19ea8) — deploy the matching Create/Edit BEFORE this run, or the next owner save would put an older head back
+= stgtg40da979c774 'STAGING TG stgtg001' [telegram] up to date (e9532e7b4139, graph-verified, prompt custom); prompt: custom — kept verbatim (no Create/Edit grammar (Business Type line + Additional Instructions marker); replace only with --set-vertical stgtg40da979c774=<vertical id>)
+= stgwab77f282533c 'STAGING WA stgwa001' [whatsapp] up to date (4943da220c3f, graph-verified, prompt custom); prompt: custom — kept verbatim (no Create/Edit grammar (Business Type line + Additional Instructions marker); replace only with --set-vertical stgwab77f282533c=<vertical id>)
+{"clones": 2, "up_to_date": 2, "would_update": 0, "updated": 0, "failed": 0}
+exit=0
+
+2026-10-17T01:25:42Z
+### R11 verify-deployed after the package (expect exit 0, canonical 30, diff 0)
+base http://localhost:5678: canonical 30 (diff 0), clones 2 (behind template 0, of them prompt head behind 0; custom prompts 2, not counted), archived clones 0 (not counted), other 2
+  prompt map = Create/Edit Vertical Prompt as introduced in 126f44c2 (sha256 49abaeb19ea8)
+  OK      0DP79STI3pafXO9B 0DP79STI3pafXO9B-Set_Workflow_State.json  active=True names=True graph=True published=True
+  OK      2htWSV5IHO8E2CgB 2htWSV5IHO8E2CgB-Dashboard_Outcomes.json  active=True names=True graph=True published=True
+  OK      2islisFH7jjLoPQM 2islisFH7jjLoPQM-Delete_Orphan_Profiles.json  active=True names=True graph=True published=True
+  OK      3qax5J9u2qsT9Vao 3qax5J9u2qsT9Vao-Edit_Whatsapp_Workflow.json  active=True names=True graph=True published=True
+  OK      4VN3gsFaC2HUYmcc 4VN3gsFaC2HUYmcc-Telegram_Bot.json  active=False names=True graph=True published=None
+  OK      4wYitz5ek30SVNlT 4wYitz5ek30SVNlT-WhatsApp_Bot.json  active=False names=True graph=True published=None
+  OK      9PTyYcelRQI7bGDb 9PTyYcelRQI7bGDb-Suggest_Replies.json  active=True names=True graph=True published=True
+  OK      KoTuIlk4LMrlvnWI KoTuIlk4LMrlvnWI-Upload_File.json  active=True names=True graph=True published=True
+  OK      SCLcpn6DMDG3Z4VN SCLcpn6DMDG3Z4VN-Set_Reply_Mode.json  active=True names=True graph=True published=True
+  OK      TwWPW3gIyjZS3foR TwWPW3gIyjZS3foR-Edit_Telegram_Workflow.json  active=True names=True graph=True published=True
+  OK      Uz6HBBUpAiUqVysB Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json  active=True names=True graph=True published=True
+  OK      XuvOp7TxOImOAmlj XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json  active=True names=True graph=True published=True
+  OK      ZGYr6srzS3rSSXHp ZGYr6srzS3rSSXHp-RevenueCat_Events.json  active=True names=True graph=True published=True
+  OK      ZTqpumOpL1rNDOp6 ZTqpumOpL1rNDOp6-Delete_File.json  active=True names=True graph=True published=True
+  OK      crAuthSession001 crAuthSession001-Auth_Session.json  active=True names=True graph=True published=True
+  OK      crChannelWatch001 crChannelWatch001-Channel_Watch.json  active=True names=True graph=True published=True
+  OK      crHandoffDry0001 crHandoffDry0001-Handoff_Request_Dry.json  active=True names=True graph=True published=True
+  OK      crHandoffNtfy001 crHandoffNtfy001-Handoff_Notifier.json  active=True names=True graph=True published=True
+  OK      crHandoffReq0001 crHandoffReq0001-Handoff_Request.json  active=True names=True graph=True published=True
+  OK      crHandoffsApi001 crHandoffsApi001-Handoffs.json  active=True names=True graph=True published=True
+  OK      crPriceSearch001 crPriceSearch001-Price_List_Search.json  active=True names=True graph=True published=True
+  OK      crSetSchedule001 crSetSchedule001-Set_Schedule.json  active=True names=True graph=True published=True
+  OK      crTestDialog0001 crTestDialog0001-Test_Dialog.json  active=True names=True graph=True published=True
+  OK      crVerifyIdent001 crVerifyIdent001-Verify_Identity.json  active=True names=True graph=True published=True
+  OK      crWappiProxy0001 crWappiProxy0001-Wappi_Proxy.json  active=True names=True graph=True published=True
+  OK      fXYpCXPKw92EzRz8 fXYpCXPKw92EzRz8-Profile_Lifecycle_Sweep.json  active=True names=True graph=True published=True
+  OK      hHwvfOvTCS42pXnq hHwvfOvTCS42pXnq-Landing_Lead.json  active=True names=True graph=True published=True
+  OK      jtbssfzXbOxwTK4k jtbssfzXbOxwTK4k-Get_Usage.json  active=True names=True graph=True published=True
+  OK      lmjYsdNcQA2IE5rl lmjYsdNcQA2IE5rl-Delete_Bot_Files.json  active=True names=True graph=True published=True
+  OK      olmqWMfcFpCEcpiE olmqWMfcFpCEcpiE-Support_Message.json  active=True names=True graph=True published=True
+  clone   stgtg40da979c774 'STAGING TG stgtg001' [telegram] active=True nodes=60 graph=e9532e7b4139 published=e9532e7b4139 sticky=e9532e7b4139 AT-CANONICAL  prompt=custom (custom prompt — kept verbatim by update-clones, not counted: no Create/Edit grammar (Business Type line + Additional Instructions marker))
+  clone   stgwab77f282533c 'STAGING WA stgwa001' [whatsapp] active=True nodes=60 graph=4943da220c3f published=4943da220c3f sticky=4943da220c3f AT-CANONICAL  prompt=custom (custom prompt — kept verbatim by update-clones, not counted: no Create/Edit grammar (Business Type line + Additional Instructions marker))
+wrote Tools/test-output/b3/stg-after.json
+exit=0
+package ids: prod «before» (live/published) -> stand «after» (live/published) == canon
+  0DP79STI3pafXO9B  36b6a73e9773/36b6a73e9773 -> dcce761854bd/dcce761854bd  canon dcce761854bd  OK
+  4VN3gsFaC2HUYmcc  f22a7b12c69f/None -> fcd3e263d926/None  canon fcd3e263d926  OK
+  4wYitz5ek30SVNlT  013bce231127/None -> 79e8bc207459/None  canon 79e8bc207459  OK
+  Uz6HBBUpAiUqVysB  51becea5ebee/51becea5ebee -> 4449f98dba25/4449f98dba25  canon 4449f98dba25  OK
+  XuvOp7TxOImOAmlj  78ed47e160c0/78ed47e160c0 -> 67b03cc4466a/67b03cc4466a  canon 67b03cc4466a  OK
+  crSetSchedule001  None/None -> cfd76ff12bb7/cfd76ff12bb7  canon cfd76ff12bb7  OK
+  fXYpCXPKw92EzRz8  624c8bd7733f/624c8bd7733f -> 192950031ab3/192950031ab3  canon 192950031ab3  OK
+  lmjYsdNcQA2IE5rl  64f4c6dfda90/64f4c6dfda90 -> cf598d2a5e80/cf598d2a5e80  canon cf598d2a5e80  OK
+
+### deploy-canonical dry-run again (expect: nothing to do)
+{"considered": 28, "missing": 0, "up_to_date": 28, "would_update": 0, "updated": 0, "would_publish": 0, "republished": 0, "inactive_must_run": 0, "failed": 0}
+{"considered": 1, "missing": 0, "up_to_date": 1, "would_update": 0, "updated": 0, "would_publish": 0, "republished": 0, "inactive_must_run": 0, "failed": 0}
+
+2026-10-17T01:26:36Z
+### R12 smoke after the package (the README's step 10 text, base = staging; no data changed)
+10.1 GET /webhook/SetSchedule -> Did you mean to make a POST request? [404]
+10.1 GET /webhook/CreateWhatsappWorkflow -> Did you mean to make a POST request? [404]
+10.1 GET /webhook/CreateTelegramWorkflow -> Did you mean to make a POST request? [404]
+10.1 GET /webhook/DeleteBotFiles -> Did you mean to make a POST request? [404]
+10.2 POST SetSchedule {} (no token) -> {"success":false,"error":"unauthorized","reason":"unauthorized:missing"} [401]
+10.3 POST SetSchedule {} (forged token) -> {"success":false,"error":"unauthorized","reason":"unauthorized:bad_signature"} [401]
+10.4 POST SetWorkflowState activate crSetSchedule001 (no token) -> {"success":false,"error":"protected_workflow"} [400]
+10.5 POST DeleteBotFiles {} (forged token) -> {"success":false,"error":"unauthorized","reason":"unauthorized:bad_signature"} [401]
+schedule rows after the smoke:
+0
+
+2026-10-17T01:50:06Z
+### R12b the README's step 9 block VERBATIM (extracted from README.md, list indentation removed), B = staging, TMPDIR = scratchpad
+SetSchedule: [404] Did you mean to make a POST request?
+CreateWhatsappWorkflow: [404] Did you mean to make a POST request?
+CreateTelegramWorkflow: [404] Did you mean to make a POST request?
+DeleteBotFiles: [404] Did you mean to make a POST request?
+{"success":false,"error":"unauthorized","reason":"unauthorized:missing"} [401]
+{"success":false,"error":"unauthorized","reason":"unauthorized:bad_signature"} [401]
+{"success":false,"error":"protected_workflow"} [400]
+{"success":false,"error":"unauthorized","reason":"unauthorized:bad_signature"} [401]
+schedule rows after: 0
+
+2026-10-17T01:26:49Z
+### R13 watch (the README's step 11 query, base = staging, DEPLOY_START = the R5 start)
+crSetSchedule001 GET 200 | error executions since 2026-10-17T01:20:00Z : []
+0DP79STI3pafXO9B GET 200 | error executions since 2026-10-17T01:20:00Z : []
+XuvOp7TxOImOAmlj GET 200 | error executions since 2026-10-17T01:20:00Z : []
+Uz6HBBUpAiUqVysB GET 200 | error executions since 2026-10-17T01:20:00Z : []
+lmjYsdNcQA2IE5rl GET 200 | error executions since 2026-10-17T01:20:00Z : []
+fXYpCXPKw92EzRz8 GET 200 | error executions since 2026-10-17T01:20:00Z : []
+whole instance: error executions since 2026-10-17T01:20:00Z : []
+n8n log since the server start (line 53297): 'Error while saving insights' lines = 0
+n8n log since the server start: error-ish lines:
+Error: aborted
+[note] The «Error: aborted» line above is not from this server: n8n.log:53291-53310 is the PREVIOUS process, SIGTERMed by
+bootstrap.py's own restart while it was still starting («Start Active Workflows: Received SIGTERM. Shutting down…» → its
+SQLite pool closed under a pending query → «aborted»; «Issue on initial workflow activation try of "Dashboard Outcomes"»
+is the same dying process). The current server starts at «Initializing n8n process», n8n.log:53312: since then 0 lines
+matching error/exception/issue, 0 «Error while saving insights».
+
+=== §C. e2e на развёрнутом стенде (workflows-staging = канон пакета, derive-staging.py без импорта) ===
+2026-10-17T01:27:14Z
+### D0 derive-staging.py (no import): workflows-staging = the package canon (e2e read derived nodes from disk)
+31 workflows + 2 staging bots -> /Users/ayan/Projects/Automation/Tools/n8n/workflows-staging
+n8n base http://localhost:5678; Wappi -> http://127.0.0.1:8765; postgres -> 'Postgres Staging' (stgPostgres000001)
+note: left dangling on purpose (isolation): ['Support Bot']
+
+2026-10-17T01:27:23Z
+--- e2e-reply.py (full, WA + TG)
+PASS  dup_parallel_once[wa] (30s) — A4: the same event delivered twice IN PARALLEL → one send, one 'duplicate' stamp, ledger = sent
+      sends=1 outcomes=['duplicate', 'sent'] ledger=sent|sent-000001|-
+PASS  dup_parallel_once[tg] (28s) — A4: the same event delivered twice IN PARALLEL → one send, one 'duplicate' stamp, ledger = sent
+      sends=1 outcomes=['duplicate', 'sent'] ledger=sent|sent-000001|-
+PASS  dup_sequential_once[wa] (28s) — A4: the same event re-delivered 1 s later (first run still in flight) → one send, second refused before any side effect
+      sends=1 outcomes=['sent', 'duplicate'] dup_side_effects=False ledger=sent|sent-000001|-
+PASS  dup_sequential_once[tg] (28s) — A4: the same event re-delivered 1 s later (first run still in flight) → one send, second refused before any side effect
+      sends=1 outcomes=['sent', 'duplicate'] dup_side_effects=False ledger=sent|sent-000001|-
+PASS  restart_stale_claim_reclaims[wa] (30s) — A4: a claim older than 10 min (n8n died mid-flight) is re-claimed on re-delivery and replied; a 1-min-old claim is a duplicate
+      stale: sends=1 outcome=sent ledger=sent|sent-000001|-; recent: outcome=duplicate total_sends=1
+PASS  restart_stale_claim_reclaims[tg] (30s) — A4: a claim older than 10 min (n8n died mid-flight) is re-claimed on re-delivery and replied; a 1-min-old claim is a duplicate
+      stale: sends=1 outcome=sent ledger=sent|sent-000001|-; recent: outcome=duplicate total_sends=1
+PASS  two_chats_parallel_independent[wa] (28s) — A4: two DIFFERENT chats at the same moment → two sends (the lease is per chat, never per bot)
+      sends=2 recipients=['chat-c1-4ec9f6fde8d7@c.us', 'chat-c2-4ec9f6fde8d7@c.us'] outcomes=['sent', 'sent']
+PASS  two_chats_parallel_independent[tg] (30s) — A4: two DIFFERENT chats at the same moment → two sends (the lease is per chat, never per bot)
+      sends=2 recipients=['chat-c1-4ec9f6fde8d7', 'chat-c2-4ec9f6fde8d7'] outcomes=['sent', 'sent']
+PASS  newer_incoming_during_llm_supersedes[wa] (28s) — A3: a NEWER client message while the answer is being generated → the stale text is cancelled before the send, its AI memory dropped
+      sends=0 outcome=superseded ledger=superseded|-|- ai_memory_rows=0 last=Outcome
+PASS  newer_incoming_during_llm_supersedes[tg] (28s) — A3: a NEWER client message while the answer is being generated → the stale text is cancelled before the send, its AI memory dropped
+      sends=0 outcome=superseded ledger=superseded|-|- ai_memory_rows=0 last=Outcome
+PASS  owner_reply_before_send_cancels[wa] (28s) — A3: the OWNER answers while the bot is composing → no auto-send, cancelled_owner, memory dropped
+      sends=0 outcome=cancelled_owner ledger=cancelled_owner|-|- ai_memory_rows=0 last=Outcome
+PASS  owner_reply_before_send_cancels[tg] (28s) — A3: the OWNER answers while the bot is composing → no auto-send, cancelled_owner, memory dropped
+      sends=0 outcome=cancelled_owner ledger=cancelled_owner|-|- ai_memory_rows=0 last=Outcome
+PASS  auto_off_mid_flight_cancels[wa] (28s) — A3: «Вместе» switched on while the answer is being generated → the lease re-reads the mode, no send, cancelled_mode
+      sends=0 outcome=cancelled_mode ledger=cancelled_mode|-|- ai_memory_rows=0 last=Outcome
+PASS  auto_off_mid_flight_cancels[tg] (28s) — A3: «Вместе» switched on while the answer is being generated → the lease re-reads the mode, no send, cancelled_mode
+      sends=0 outcome=cancelled_mode ledger=cancelled_mode|-|- ai_memory_rows=0 last=Outcome
+PASS  typing_failure_still_sends[wa] (30s) — A7: the typing indicator fails (HTTP 500) → the reply is still sent
+      sends=1 outcome=sent typing_statuses=[500] ai_marks=[('true', 'sent', 'sent-000001')]
+PASS  typing_failure_still_sends[tg] (27s) — A7: the typing indicator fails (HTTP 500) → the reply is still sent
+      sends=1 outcome=sent typing_statuses=[500] ai_marks=[('true', 'sent', 'sent-000001')]
+PASS  expired_lock_does_not_block[wa] (28s) — A4: a lease left behind by a dead run (expired) does not block the next reply; the lock is released after the send
+      sends=1 outcome=sent chat_state(gen|lock)=1|-
+PASS  expired_lock_does_not_block[tg] (28s) — A4: a lease left behind by a dead run (expired) does not block the next reply; the lock is released after the send
+      sends=1 outcome=sent chat_state(gen|lock)=1|-
+PASS  live_lock_blocks_send[wa] (28s) — A4: a LIVE lease held by another run of the same chat → this run does not send (cancelled_busy), nothing is resent later
+      sends=0 outcome=cancelled_busy ledger=cancelled_busy|-|-
+PASS  live_lock_blocks_send[tg] (28s) — A4: a LIVE lease held by another run of the same chat → this run does not send (cancelled_busy), nothing is resent later
+      sends=0 outcome=cancelled_busy ledger=cancelled_busy|-|-
+PASS  accept_then_drop_reconciles_sent[wa] (32s) — A7: the transport accepts the message but the HTTP answer is lost → reconciled as sent from the echo, NO resend
+      send_calls=1 outcome=sent ledger=sent|sent-000001|- reconciled=True ai_marks=[('true', 'sent', 'sent-000001')]
+PASS  accept_then_drop_reconciles_sent[tg] (32s) — A7: the transport accepts the message but the HTTP answer is lost → reconciled as sent from the echo, NO resend
+      send_calls=1 outcome=sent ledger=sent|sent-000001|- reconciled=True ai_marks=[('true', 'sent', 'sent-000001')]
+PASS  send_500_is_send_failed[wa] (28s) — A7: the transport answers HTTP 500 → send_failed recorded with the error, exactly one attempt
+      send_calls=1 outcome=send_failed ledger=send_failed|-|http 500 {"status":"error","detail":"injected"} memory ai/human=0/1
+PASS  send_500_is_send_failed[tg] (28s) — A7: the transport answers HTTP 500 → send_failed recorded with the error, exactly one attempt
+      send_calls=1 outcome=send_failed ledger=send_failed|-|http 500 {"status":"error","detail":"injected"} memory ai/human=0/1
+PASS  send_timeout_reconciles_from_echo[wa] (60s) — A7: the transport answers after our 30-s timeout (message really went out) → send_unknown → echo found → sent, no resend
+      send_calls=1 settle=send_unknown outcome=sent ledger=sent|sent-000001|-
+PASS  send_timeout_reconciles_from_echo[tg] (62s) — A7: the transport answers after our 30-s timeout (message really went out) → send_unknown → echo found → sent, no resend
+      send_calls=1 settle=send_unknown outcome=sent ledger=sent|sent-000001|-
+PASS  dropped_without_echo_stays_send_unknown[wa] (32s) — A7: the connection dies before the transport processed anything → no echo → the state STAYS send_unknown (visible in the ledger), no resend; T6: the memory row carries «[доставка не подтверждена] »
+      send_calls=1 outcome=send_unknown ledger=send_unknown|-|socket hang up reconciled=False ai_memory_rows=1 ai_marks=[('true', 'unknown', '-')] ai_contents=['[доставка не подтверждена] Не знаю: в доступных данных нет п']
+PASS  dropped_without_echo_stays_send_unknown[tg] (32s) — A7: the connection dies before the transport processed anything → no echo → the state STAYS send_unknown (visible in the ledger), no resend; T6: the memory row carries «[доставка не подтверждена] »
+      send_calls=1 outcome=send_unknown ledger=send_unknown|-|socket hang up reconciled=False ai_memory_rows=1 ai_marks=[('true', 'unknown', '-')] ai_contents=['[доставка не подтверждена] Не знаю: в доступных данных нет ц']
+PASS  reordered_webhooks_one_reply[wa] (29s) — R6: two client messages whose webhooks arrive in REVERSE order (the older one claimed last, inside the newer one's debounce) → exactly one reply, by the newer message's run
+      sends=1 ledger A=superseded|-|- B=sent|sent-000001|- outcomes=['sent', 'superseded']
+PASS  reordered_webhooks_one_reply[tg] (31s) — R6: two client messages whose webhooks arrive in REVERSE order (the older one claimed last, inside the newer one's debounce) → exactly one reply, by the newer message's run
+      sends=1 ledger A=superseded|-|- B=sent|sent-000001|- outcomes=['sent', 'superseded']
+PASS  crossed_reconcile_stays_send_unknown[wa] (13s) — R10: the send's answer is lost and the reconcile fetch comes back CROSSED (the neighbour chat's window, with the same canned text) → send_unknown, never the neighbour's id
+      send_calls=1 outcome=send_unknown ledger=send_unknown|-|socket hang up | reconcile: window without the trigger reconciled=False foreignFetched=2 ai_history_rows=0
+PASS  crossed_reconcile_stays_send_unknown[tg] (13s) — R10: the send's answer is lost and the reconcile fetch comes back CROSSED (the neighbour chat's window, with the same canned text) → send_unknown, never the neighbour's id
+      send_calls=1 outcome=send_unknown ledger=send_unknown|-|socket hang up | reconcile: window without the trigger reconciled=False foreignFetched=2 ai_history_rows=0
+PASS  same_second_peer_after_final_fetch[wa] (50s) — V5: a SAME-second message claimed after A's Final Fetch → A's lease refuses, A re-reads once; Wappi lists B first → exactly one reply, by B; A's draft leaves memory
+      {'sends': 1, 'ledger_A': 'superseded|-|-', 'ledger_B': 'sent|sent-000001|-', 'A_final_checks': 2, 'A_rechecked': True, 'outcomes': ['superseded', 'sent'], 'ai_memory_rows': 1}
+PASS  same_second_peer_after_final_fetch[tg] (49s) — V5: a SAME-second message claimed after A's Final Fetch → A's lease refuses, A re-reads once; Wappi lists B first → exactly one reply, by B; A's draft leaves memory
+      {'sends': 1, 'ledger_A': 'superseded|-|-', 'ledger_B': 'sent|sent-000001|-', 'A_final_checks': 2, 'A_rechecked': True, 'outcomes': ['superseded', 'sent'], 'ai_memory_rows': 1}
+PASS  same_second_peer_wappi_lists_older[wa] (39s) — V5: the same race, but the re-read lists A first → exactly one reply, by A after its re-read (the send after the loop reaches the right chat and profile)
+      {'sends': 1, 'ledger_A': 'sent|sent-000001|-', 'ledger_B': 'superseded|-|-', 'A_final_checks': 2, 'A_rechecked': True, 'outcomes': ['sent', 'superseded'], 'recipient': 'chat-ssq-4ec9f6fde8d7@c.us', 'profile_id': 'stgwa001'}
+PASS  same_second_peer_wappi_lists_older[tg] (39s) — V5: the same race, but the re-read lists A first → exactly one reply, by A after its re-read (the send after the loop reaches the right chat and profile)
+      {'sends': 1, 'ledger_A': 'sent|sent-000001|-', 'ledger_B': 'superseded|-|-', 'A_final_checks': 2, 'A_rechecked': True, 'outcomes': ['sent', 'superseded'], 'recipient': 'chat-ssq-4ec9f6fde8d7', 'profile_id': 'stgtg001'}
+PASS  unmarked_echo_stays_send_unknown[wa] (13s) — V7: the answer is lost and the only row with our text carries NO API mark (no from_where, no task id — isFromAPI alone proves nothing) → send_unknown, never adopted
+      send_calls=1 outcome=send_unknown ledger=send_unknown|-|socket hang up | reconcile: unattributed outgoing row sent-000001 (no api mark) reconcile_error=socket hang up | reconcile: unattributed outgoing row sent-000001 (no api mark)
+PASS  unmarked_echo_stays_send_unknown[tg] (13s) — V7: the answer is lost and the only row with our text carries NO API mark (no from_where, no task id — isFromAPI alone proves nothing) → send_unknown, never adopted
+      send_calls=1 outcome=send_unknown ledger=send_unknown|-|socket hang up | reconcile: unattributed outgoing row sent-000001 (no api mark) reconcile_error=socket hang up | reconcile: unattributed outgoing row sent-000001 (no api mark)
+PASS  owner_app_same_text_stays_send_unknown[wa] (14s) — V7: the answer is lost and the only same-text row is the OWNER's app send (owner_app in the one history, API-marked like ours) → send_unknown; the owner row keeps its source, last_sent stays empty
+      outcome=send_unknown ledger=send_unknown|-|socket hang up | reconcile: row oapown-4ec9f6fde8d7 is recorded as owner_app owner_row_source=owner_app last_sent=- reconcile_error=socket hang up | reconcile: row oapown-4ec9f6fde8d7 is recorded as owner_app
+PASS  owner_app_same_text_stays_send_unknown[tg] (14s) — V7: the answer is lost and the only same-text row is the OWNER's app send (owner_app in the one history, API-marked like ours) → send_unknown; the owner row keeps its source, last_sent stays empty
+      outcome=send_unknown ledger=send_unknown|-|socket hang up | reconcile: row oapown-4ec9f6fde8d7 is recorded as owner_app owner_row_source=owner_app last_sent=- reconcile_error=socket hang up | reconcile: row oapown-4ec9f6fde8d7 is recorded as owner_app
+PASS  media_message_gets_the_ru_ask_for_text[wa] (9s) — a photo/document/sticker never reaches the model: the canned ask is Russian (+ Kazakh line), sent once, through the same send chain (stage 6, 2026-09-22)
+      {'executions': [('43002', 'success', 'sent', 'Outcome')], 'sends': 1, 'body': 'Напишите, пожалуйста, текстом, что вас интересует — фото, файлы и стикеры я не в', 'ledger': 'sent|sent-000001|-'}
+PASS  media_message_gets_the_ru_ask_for_text[tg] (9s) — a photo/document/sticker never reaches the model: the canned ask is Russian (+ Kazakh line), sent once, through the same send chain (stage 6, 2026-09-22)
+      {'executions': [('43003', 'success', 'sent', 'Outcome')], 'sends': 1, 'body': 'Напишите, пожалуйста, текстом, что вас интересует — фото, файлы и стикеры я не в', 'ledger': 'sent|sent-000001|-'}
+PASS  off_hours_suppressed_recorded[wa] (4s) — B1: outside the bot's schedule window (Asia/Almaty, an enabled row) the message is handled exactly as in «Вместе» — the stamp says off_hours, the client's history row and memory human row are written, nothing is sent, the event is not claimed, Count Dialog never runs and no dialog is counted
+      {'window': (527, 587), 'outcome': 'off_hours', 'mode': {'suppressed': True, 'off_hours': True}, 'history': 'client|Здравствуйте, вы сейчас работаете?', 'memory': 'human|client|Здравствуйте, вы сейчас работаете?', 'sends': 0, 'ran': {'Record Suppressed': True, 'Count Dialog': False, 'Claim Event': False, 'AI Agent': False}, 'ledger': '', 'dialogs': (44, 44)}
+PASS  off_hours_suppressed_recorded[tg] (4s) — B1: outside the bot's schedule window (Asia/Almaty, an enabled row) the message is handled exactly as in «Вместе» — the stamp says off_hours, the client's history row and memory human row are written, nothing is sent, the event is not claimed, Count Dialog never runs and no dialog is counted
+      {'window': (527, 587), 'outcome': 'off_hours', 'mode': {'suppressed': True, 'off_hours': True}, 'history': 'client|Здравствуйте, вы сейчас работаете?', 'memory': 'human|client|Здравствуйте, вы сейчас работаете?', 'sends': 0, 'ran': {'Record Suppressed': True, 'Count Dialog': False, 'Claim Event': False, 'AI Agent': False}, 'ledger': '', 'dialogs': (44, 44)}
+PASS  in_hours_replies[wa] (30s) — B1: inside the bot's schedule window the bot answers as usual — the mode read says off_hours false, one send, outcome sent, the dialog counted
+      {'window': (287, 527), 'outcome': 'sent', 'mode': {'suppressed': False, 'off_hours': False}, 'sends': 1, 'ledger': 'sent|sent-000001|-', 'dialogs': (44, 45)}
+PASS  in_hours_replies[tg] (28s) — B1: inside the bot's schedule window the bot answers as usual — the mode read says off_hours false, one send, outcome sent, the dialog counted
+      {'window': (288, 528), 'outcome': 'sent', 'mode': {'suppressed': False, 'off_hours': False}, 'sends': 1, 'ledger': 'sent|sent-000001|-', 'dialogs': (45, 46)}
+   restore: OK (active=True, versionId==activeVersionId: True)
+PASS  price_conflict_reaches_the_agent_marked [llm][wa] (32s) — V9: the clone's price-list tool runs the Price List Search sub-workflow with the clone's PUBLISHED prompt — a price-list row at 3900 against its catalog's 3200 reaches the agent with «[Сверка с каталогом: … Цены расходятся.]», and the reply does not pick 3900 alone
+      {'premise_published_catalog': True, 'tool_calls': 1, 'marked': True, 'documents': ['Фильтр масляный 90915-YZZE1 — 3900 тг, оригинал\n[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1» — 3200 тг, в прайсе — 3900 тг. Ц'], 'sends': 1, 'reply': 'Фильтр масляный 90915-YZZE1 — 3900 тг, оригинал.  \nВ каталоге есть расхождение: 3200 тг и 3900 тг.', 'picked_3900_alone': False}
+   restore: OK (active=True, versionId==activeVersionId: True)
+PASS  price_conflict_reaches_the_agent_marked [llm][tg] (32s) — V9: the clone's price-list tool runs the Price List Search sub-workflow with the clone's PUBLISHED prompt — a price-list row at 3900 against its catalog's 3200 reaches the agent with «[Сверка с каталогом: … Цены расходятся.]», and the reply does not pick 3900 alone
+      {'premise_published_catalog': True, 'tool_calls': 1, 'marked': True, 'documents': ['Фильтр масляный 90915-YZZE1 — 3900 тг, оригинал\n[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1» — 3200 тг, в прайсе — 3900 тг. Ц'], 'sends': 1, 'reply': 'Фильтр масляный Toyota 90915-YZZE1: 3200 тг по каталогу, но в прайсе указано 3900 тг.', 'picked_3900_alone': False}
+   cleanup: deleted rows: 51
+
+48 pass, 0 fail
+exit=0
+2026-10-17T01:49:45Z
+
+2026-10-17T01:50:14Z
+--- e2e-auth.py (full, with the model step)
+   pre-run: swept 0 stale mock profile(s) (live mock knows 0)
+PASS  session_bootstrap_and_refresh (0.2s) — bootstrap mints an install; refresh with the secret returns a token; a wrong secret is 401
+      refresh ok=True wrong-secret=401/install_revoked unknown-install=401/install_revoked
+PASS  session_bad_request_is_400 (0.1s) — a malformed AuthSession body answers 400, never a token
+      400 {'success': False, 'error': 'bad_request'} / 400
+PASS  proxy_requires_token (0.2s) — WappiProxy without / with a forged / with an expired token → 401 and NO transport call
+      none=401 forged=401 garbage=401 transport_calls=0
+PASS  proxy_profile_add_binds_owner (0.6s) — profile.add creates the Wappi profile, binds it to the install and returns a token carrying it
+      profile=profile-000004 token_profiles=['profile-000003', 'profile-000004'] owner_bound=True
+PASS  proxy_owner_isolation (0.7s) — owner B cannot read/act on owner A's profile through ANY proxy op (403, no transport call)
+      {'chats.filter': 403, 'messages.get': 403, 'message.send': 403, 'profile.delete': 403, 'profile.logout': 403, 'status': 403, 'qr': 403, 'media.download': 403, 'chat.delete': 403, 'message.mark_read': 403} transport_calls=0
+PASS  proxy_legit_ops_pass_through (0.3s) — the owner's own ops reach the transport with the server credential and get Wappi's body back
+      status=200 send=200 get=200 bad_param=400 calls=3 all_authed=True
+PASS  proxy_unknown_op_rejected (0.1s) — an op outside the allow-list is refused without a transport call
+      unknown=400 channel_mismatch=400 calls=0
+PASS  hooks_reject_foreign_ids (0.7s) — gated webhooks refuse owner B's ids on owner A's token (and refuse no token) before any side effect
+      {"setreplymode_foreign": 403, "setreplymode_own": 200, "setreplymode_notoken": 200, "dashboard_foreign": 403, "getusage_foreign": 403, "getusage_own": 200, "setworkflowstate_foreign": 403, "deletebotfiles_foreign": 403, "support_notoken": 200}  (token-less expected 200: compat open)
+PASS  claim_by_code_transfers_ownership (0.8s) — a legacy/other-install profile: claim.start sends a code to the bot's OWN chat; claim.verify binds it to the claiming install — A3: and the row's app_user_id follows the claimant's billing id (a wrong code moves nothing)
+      recipient_is_own_phone=True second_start_reuses_code=True wrong_code=403 verify=200 now_owned_by_A=True B_lost_it=True app_user_id B's=True after a wrong code B's=True after the code A's=True
+PASS  claim_reauth_then_code_binds (1.8s) — V2: an UNAUTHORISED legacy profile: claim.start → reauth; a pairing alone binds NOTHING (claim.status); claim.start then sends ONE code into the paired account's own chat and claim.verify binds it
+      qr_allowed=200 chats_refused=403 pairing_alone_owned=False/pending start=200/code sends=1 to=77009998877 verify=200 owned=True
+PASS  claim_reauth_independent_reconnect_not_transferred (4.4s) — V2: the claimant requests a QR, the OWNER reconnects the owner-less profile independently → the claimant gets nothing (claim.status), its claim.start sends the code into the OWNER's chat, a wrong code is 403 and the row stays owner-less — WhatsApp and Telegram
+      {"whatsapp": {"start": [200, "reauth"], "qr": 200, "status_owned": false, "start2": [200, "code"], "sends": [["/api/sync/message/send", "77001119900"]], "wrong_code": [403, "claim_code_rejected"], "owner": "-"}, "telegram": {"start": [200, "reauth"], "qr": 200, "status_owned": false, "start2": [200, "code"], "sends": [["/tapi/sync/message/send", "77001119911"]], "wrong_code": [403, "claim_code_rejected"], "owner": "-"}}
+PASS  claim_code_send_failure_is_reported (1.5s) — V2: a code the transport refuses is reported (502 code_send_failed) and cleared — the retry sends a NEW code (never «reused») and that code binds; a Telegram code goes to the authorised account (account.phone), not the top-level phone
+      {"whatsapp": {"failed": [502, "code_send_failed"], "retry": [200, "code", false], "sends": ["77002220000"], "verify": 200, "owned": true}, "telegram": {"failed": [502, "code_send_failed"], "retry": [200, "code", false], "sends": ["77002220001"], "verify": 200, "owned": true}}
+PASS  claim_reauth_owned_profile_not_transferred (2.4s) — R1: a stranger's pending claim on an OWNED profile + the owner's own later re-pairing → the stranger gets nothing, claim.status sends no code, the owner keeps the profile
+      stranger start=200/code owner_qr=200 stranger status=200 got_it=False codes_sent_by_status=0 owner_keeps=True (codes in chat total 1)
+PASS  claim_stale_capability_cannot_pair (1.3s) — R1: once another install takes over a pending claim, the first claimant's token capability no longer starts a pairing (403 claim_not_pending, no transport call)
+      L start=200 takeover=200 L qr=403 {'success': False, 'error': 'claim_not_pending'} transport_calls=0
+PASS  claim_unauthenticated_writes_nothing (1.0s) — R1: a claim.* call with a wrong secret is refused (401) before Claim Start — no row inserted, a pending claim untouched
+      wrong-secret=401/install_revoked ghost=401 rows_for_new_id=0 pending_unchanged=True
+PASS  replymode_reordered_versions_keep_newest (0.7s) — SetReplyMode v2: a later request with an OLDER version is not applied; the reply reports the server's newer value
+      first=200/True stale=200/False report=[{'profileId': 'profile-000024', 'applied': False, 'suppressed': True, 'version': 200}] row='true|200'
+PASS  replymode_bot_default_covers_both_channels_atomically (0.7s) — SetReplyMode v2: a bot-default write for WA+TG travels as ONE request and both rows land (all-or-nothing); a stale follow-up for one of them is refused per profile
+      both=200/True rows=2 stale=200/False report=[False, False]
+PASS  replymode_legacy_body_still_writes (0.2s) — SetReplyMode v2: a legacy body (no version) is applied with a server-assigned version and reads success + written
+      http=200 legacy=True allApplied=True written=1 row='f'
+PASS  replymode_invalid_is_400 (0.0s) — SetReplyMode v2: a malformed body answers 400 (was 200 + success:false)
+      http=400 body={'success': False, 'error': 'bad_request'}
+PASS  create_seeds_reply_mode_before_activation (1.6s) — CreateWhatsappWorkflow with ReplyMode=semi: the '*' row exists after create, the clone id is bound to the profile, the token learns it, and SetWorkflowState can delete it
+      create=200 id=OqlWD9VKEItpIakm row='true|150' bound=True token_has_wf=True delete=200 {'success': True}
+PASS  create_slot_count_excludes_own_profile_and_retires_refused (1.7s) — 2026-09-24 hotfix: on a 1-channel plan the FIRST channel is accepted (the A1-registered row of the profile being created is not counted) and a refused second profile is deleted at Wappi AND retired in bot_profiles
+      first=200 id=49k8362cHaAfhniK second=200 refused=True wappi_deletes=1 row2='channel_limit|true' row1_alive_bound=True
+PASS  refresh_db_outage_keeps_install (0.4s) — R11: a refresh while the database fails answers 503 db_unavailable (never the 401 that makes the client discard its install); the SAME credentials refresh fine once it is back
+      outage=503 {'success': False, 'error': 'db_unavailable'} after=200 same_install=True profiles_kept=True
+PASS  billing_id_first_bind (2.9s) — R2/V3: a second install naming a billing id another install holds — WITH a live bot or WITHOUT one (a paying owner before the first bot) — gets NO billing identity + billingConflict on bootstrap AND refresh; its GetUsage/profile.add on that id are refused; the bootstrap itself binds nothing; the id follows only once the holder is revoked
+      WITH bot: second appUserId=None conflict=True usage_own=200 usage_second=403 profile.add_second=409 {'success': False, 'error': 'no_billing_identity', 'detail': None} holders=True after_revoke=True/False | NO bot (V3): bootstrap_binds=None/None second=None/True usage_second=403 profile.add_second=409/tg 409 holder_refresh=True/False usage_holder=200 holders=True after_revoke=True/False
+PASS  create_rejects_empty_appuserid_in_session (0.8s) — R2: CreateWhatsappWorkflow/CreateTelegramWorkflow with an EMPTY AppUserID in session mode are refused before any write (the empty id skipped Count Channels and let the quota fail open)
+      wa=200 {'success': False, 'error': 'unauthorized', 'reason': 'forbidden:AppUserID'} tg=200 {'success': False, 'error': 'unauthorized', 'reason': 'forbidden:AppUserID'} clones_bound=0
+PASS  create_seed_failure_keeps_clone_inactive (8.7s) — R8 + R8-deletefail: a «Вместе» create whose reply-mode seed fails (a real Postgres failure on staging, scoped to this profile) answers reply_mode_not_saved and never CREATES a clone (the execution reads no template and runs no Create Workflow, so nothing is active, bound, hooked or left to delete); the retry once the DB is back creates exactly ONE live clone with the '*' row — WhatsApp and Telegram
+      {"wa": {"failed_create": [200, {"success": false, "error": "reply_mode_not_saved"}], "wappi_webhook_calls": 0, "bound": "-", "clones_after_failure": [], "failed_execution": {"Seed Reply Mode": true, "Get Sample Workflow": false, "Create Workflow": false, "Respond Reply Mode Not Saved": true}, "retry": [200, "2ubRlM1vR318hlrc"], "clones_after_retry": [["2ubRlM1vR318hlrc", true]], "row": "true|151", "cleanup_delete": 200}, "tg": {"failed_create": [200, {"success": false, "error": "reply_mode_not_saved"}], "wappi_webhook_calls": 0, "bound": "-", "clones_after_failure": [], "failed_execution": {"Seed Reply Mode": true, "Get Sample Workflow": false, "Create Workflow": false, "Respond Reply Mode Not Saved": true}, "retry": [200, "oxji5Z4ncRBPxv4N"], "clones_after_retry": [["oxji5Z4ncRBPxv4N", true]], "row": "true|151", "cleanup_delete": 200}}
+PASS  sql_comment_values_run_nothing (3.5s) — V1: a value whose newline would end an SQL comment stays a literal on the real n8n Postgres node — Delete File (session token and token-less), Suggest Replies, AuthSession bootstrap, Create WhatsApp and Create Telegram each run their statement WITH the value (row proof) and no extra statement (no marker table)
+      {"delete_session": {"http": 200, "deletedChunks": 1, "marker": false}, "delete_tokenless": {"http": 200, "deletedChunks": 1, "marker": false}, "suggest_tokenless": {"http": 200, "body": {"v": 1, "requestSeq": 1, "suggestions": [], "error": "generation_failed"}, "count_after": "101", "marker": false}, "bootstrap": {"http": 200, "install": true, "app_user_id": "-", "marker": false}, "create_wa_tokenless": {"http": 200, "id": null, "bot_key_written": true, "marker": false}, "create_tg_tokenless": {"http": 200, "id": null, "bot_key_written": true, "marker": false}}
+PASS  upload_price_list_multipart (4.9s) — R3: a real .txt price list sent the way WWWForm sends it passes the gate with its file, is registered FIRST, reaches extraction (a staging `documents` row with the text + the bot's ids); a foreign workflow id, a non-GUID fileId or another install's fileId is 403 before any write; an unreadable PDF is 422, an empty file writes nothing, an own repeat keeps one registry row. V4: another bot's owner-less file (WhatsApp) and another bot's unregistered chunks (Telegram) are neither taken nor deleted by a session (403, row and chunk untouched); the caller's own compat-window file and its own upload are deleted (200)
+      own=200 {'success': True, 'fileId': '5475c86b-a228-472d-9f40-766522d54f91'} registry='32b87dee-04e3-4b99-917a-f43d9ced8c68|wfup0a16392d0b|-|products|price.txt|1' extracted_doc='true|wfup0a16392d0b|-1|5475c86b-a228-472d-9f40-766522d54f91' foreign_wf=403 pathlike_fileid=403 foreign_fileid=403 refused_rows=0 foreign_row_kept=True corrupt_pdf=422 {'success': False, 'error': 'unreadable_file'} empty_file=500 own_repeat=200 legacy=200 legacy_registry='-' | V4 owner-less foreign: upload=403 delete=403 {'success': False, 'error': 'forbidden', 'fileId': '8b38b0c6-bcfe-42a3-b682-5bde5000cda4'} owner|chunks|live='-|1|true'; unregistered foreign tg: upload=403 delete=403 rows|chunks='0|1'; own compat delete=200 {'success': True, 'fileId': 'f09c93ef-3bd9-4940-91cc-377e835b0f69', 'deletedChunks': 1}; own upload delete=200 {'success': True, 'fileId': '5475c86b-a228-472d-9f40-766522d54f91', 'deletedChunks': 2}; own chunks left|rows marked='0|2'
+PASS  retired_bot_owner_can_delete (3.6s) — V12: the owner of a bot the sweep retired (trial over: its rows deleted, its token lists nothing) deletes its memory, history and files (200, real counters) and both clones (200; a repeat is 200 — idempotent); activating the retired clone and another install naming the same ids are 403 (reason owned_elsewhere) — WhatsApp and Telegram
+      token after retire=[]/[] foreign dbf=403 {'success': False, 'error': 'forbidden', 'reason': 'owned_elsewhere'} foreign sws=403 activate retired=403 rows before=('1|1|1|1', '1|1|1|1') own dbf=200 {'success': True, 'deletedChunks': 2, 'deletedFiles': 1, 'retiredProfiles': 2, 'deletedMemoryRows': 2, 'deletedOutcomes': 0, 'deletedReplyFlags': 2, 'deletedHistoryEvents': 2, 'deletedHandoffs': 0, 'deletedReplyEvents': 0, 'deletedChatStates': 0, 'deletedSuggestionSets': 0, 'deletedSchedules': 0} rows after=('0|0|0|0', '0|0|0|0') deletes=[200, 200, 200] GET=[404, 404]
+PASS  claim_on_retired_profile_is_refused (3.6s) — M4: claim.start / claim.status / claim.verify on a bot profile the sweep retired (trial over) → 410 profile_retired, retiredReason for its owner only (another install: the same 410 without it), Wappi is never asked, no pending claim, no token; the owner's V12 delete of that same bot then goes through (profile.delete answers a FINAL code the client steps over — not in the token, 403; DeleteBotFiles and SetWorkflowState delete = 200, the clones gone) — WhatsApp and Telegram
+      token after retire=[] answers={"own whatsapp claim.start": [410, "profile_retired", "trial_expiry", false], "own whatsapp claim.status": [410, "profile_retired", "trial_expiry", false], "own whatsapp claim.verify": [410, "profile_retired", "trial_expiry", false], "foreign whatsapp claim.start": [410, "profile_retired", null, false], "own telegram claim.start": [410, "profile_retired", "trial_expiry", false], "own telegram claim.status": [410, "profile_retired", "trial_expiry", false], "own telegram claim.verify": [410, "profile_retired", "trial_expiry", false], "foreign telegram claim.start": [410, "profile_retired", null, false]} wappi calls for the retired ids=[] claims written=0 | V12 delete: unlink=[403, 403] dbf=200 {'success': True, 'deletedChunks': 0, 'deletedFiles': 0, 'retiredProfiles': 2, 'deletedMemoryRows': 0, 'deletedOutcomes': 0, 'deletedReplyFlags': 2, 'deletedHistoryEvents': 0, 'deletedHandoffs': 0, 'deletedReplyEvents': 0, 'deletedChatStates': 0, 'deletedSuggestionSets': 0, 'deletedSchedules': 0} sws=[200, 200] GET=[404, 404]
+PASS  stale_token_cannot_unlink_a_claimed_profile (3.1s) — V12 / M5: a token issued while install A owned a profile still lists it after install B took the profile over — A's profile.delete / profile.logout (proxy), DeleteBotFiles and SetWorkflowState(delete) are all refused (403) and the transport is never called; B's own profile.delete passes — WhatsApp and Telegram
+      {'whatsapp delete': 403, 'whatsapp logout': 403, 'telegram delete': 403, 'telegram logout': 403, 'dbf': 403, 'sws': 403, 'b delete': 200} transport calls for A's stale token: 0
+PASS  sweep_deactivates_retired_clone (3.2s) — V12: the sweep's clone branch (the derived canonical nodes, run on the real n8n) deactivates the clone of a bot IT retired (trial_expiry), stamps it and never calls it again; a liveness-retired bot's clone stays ACTIVE; nothing is deleted — WhatsApp and Telegram
+      active before=(True, True) after run 1 (wa, tg, stamp)=(False, True, 'EFOssHUrCiPzEGRU') run 2 called deactivate=False still exist=[200, 200]
+PASS  reauth_same_profile_reuses_bound_clone[wa] (2.3s) — F1 (a1): the channel saved off (SetWorkflowState deactivate), then a Create for the SAME profile → the SAME clone id (created:false), activated again, no template read, no second clone
+      first=mM4zZXLpdo9BwJEF deactivate=200 state_before=(200, False, 'profile-000047') second=200 {'id': 'mM4zZXLpdo9BwJEF', 'created': False, 'adoptedProfiles': []} ran_template=False ran_create=False ran_activate=True state_after=(200, True, 'profile-000047') clones=[('mM4zZXLpdo9BwJEF', True)] row=mM4zZXLpdo9BwJEF|true|-|-
+PASS  reauth_same_profile_reuses_bound_clone[tg] (2.2s) — F1 (a1): the channel saved off (SetWorkflowState deactivate), then a Create for the SAME profile → the SAME clone id (created:false), activated again, no template read, no second clone
+      first=vlcobJ6RSA5Dr9am deactivate=200 state_before=(200, False, 'profile-000048') second=200 {'id': 'vlcobJ6RSA5Dr9am', 'created': False, 'adoptedProfiles': []} ran_template=False ran_create=False ran_activate=True state_after=(200, True, 'profile-000048') clones=[('vlcobJ6RSA5Dr9am', True)] row=vlcobJ6RSA5Dr9am|true|-|-
+PASS  reuse_active_clone_skips_reactivation[wa] (3.7s) — F1 (a1) + platform: on n8n 2.36.7 activating an ACTIVE workflow is NOT a no-op (200, but its webhook is unregistered for a moment); so a Create for the same profile whose clone is ACTIVE reuses it WITHOUT activating it — the webhook answers throughout, same id, no second clone
+      platform: re-activate=200 ×1 webhook gaps during it=3/256 | create#2=200 {'id': 'mYLF5JmuybI98CpK', 'created': False, 'adoptedProfiles': []} ran_activate=False webhook answered 227/227 probes during Create#2 clones=[('mYLF5JmuybI98CpK', True)]
+PASS  reuse_active_clone_skips_reactivation[tg] (3.6s) — F1 (a1) + platform: on n8n 2.36.7 activating an ACTIVE workflow is NOT a no-op (200, but its webhook is unregistered for a moment); so a Create for the same profile whose clone is ACTIVE reuses it WITHOUT activating it — the webhook answers throughout, same id, no second clone
+      platform: re-activate=200 ×1 webhook gaps during it=2/263 | create#2=200 {'id': 'IdL4aqYq3Cz7knZ5', 'created': False, 'adoptedProfiles': []} ran_activate=False webhook answered 232/232 probes during Create#2 clones=[('IdL4aqYq3Cz7knZ5', True)]
+PASS  reauth_new_profile_replaces_prior_and_moves_data[wa] (4.9s) — F1 (a2/a3) + F2: a NEW profile of the same bot (re-pairing: same bot key) → a new clone; the predecessor's memory, history, «Сводка», handoffs, ledger, chat state, chat flags, price-list chunks and file registry move to it; the prior clone is booked and deleted (GET 404), the sweep's branch A stamps it; a repeat Create is idempotent
+      w1=6p6kqHOSUMz2AUYw create#2=200 {'id': 'fOUtxpiBTvIRLbpv', 'created': True, 'adoptedProfiles': ['profile-000051']} rows p1|p2|file=('0|0|0|0|0|0|0', '2|1|1|1|1|1|1', 'fOUtxpiBTvIRLbpv|fOUtxpiBTvIRLbpv') old clone GET|row|booking=(404, '6p6kqHOSUMz2AUYw|false|replaced|profile-000052', 'replaced|fOUtxpiBTvIRLbpv|profile-000051|false|-|0') new clone=(200, True, 'profile-000052') repeat=200 {'id': 'fOUtxpiBTvIRLbpv', 'created': False, 'adoptedProfiles': ['profile-000051']} rows|clones after repeat=('2|1|1|1|1|1|1', [('fOUtxpiBTvIRLbpv', True)]) branch A=replaced|fOUtxpiBTvIRLbpv|profile-000051|true|404|0
+PASS  reauth_new_profile_replaces_prior_and_moves_data[tg] (4.9s) — F1 (a2/a3) + F2: a NEW profile of the same bot (re-pairing: same bot key) → a new clone; the predecessor's memory, history, «Сводка», handoffs, ledger, chat state, chat flags, price-list chunks and file registry move to it; the prior clone is booked and deleted (GET 404), the sweep's branch A stamps it; a repeat Create is idempotent
+      w1=kMCx3ARQDpah3Ktr create#2=200 {'id': 't6rfBx8Qsew57Ksp', 'created': True, 'adoptedProfiles': ['profile-000053']} rows p1|p2|file=('0|0|0|0|0|0|0', '2|1|1|1|1|1|1', 't6rfBx8Qsew57Ksp|t6rfBx8Qsew57Ksp') old clone GET|row|booking=(404, 'kMCx3ARQDpah3Ktr|false|replaced|profile-000054', 'replaced|t6rfBx8Qsew57Ksp|profile-000053|false|-|0') new clone=(200, True, 'profile-000054') repeat=200 {'id': 't6rfBx8Qsew57Ksp', 'created': False, 'adoptedProfiles': ['profile-000053']} rows|clones after repeat=('2|1|1|1|1|1|1', [('t6rfBx8Qsew57Ksp', True)]) branch A=replaced|t6rfBx8Qsew57Ksp|profile-000053|true|404|0
+PASS  retired_bot_reconnects_after_purchase[wa] (42.5s) — F2: a bot the sweep retired (trial over: row trial_expiry, clone switched off by the V12 branch, trialing → expired) is bought back (RevenueCat INITIAL_PURCHASE through the real mapping + upsert), reconnected on a NEW profile (profile.add) and Created with PreviousProfileId → a new active clone on the new path takes over its chats, memory and price list, the old clone is deleted, the new webhook reaches the new clone, the V12 branch leaves it on; [llm] then, in «Авто», the bot answers with the price from the moved price list and the time agreed in the moved dialog
+      {"retired": [false, []], "purchase": [200, "business|active"], "create": [200, {"id": "9CpZk1ZEovSjEFEC", "created": true, "adoptedProfiles": ["profile-000055"]}], "new_clone": [200, true, "profile-000056"], "old": [404, "4508V3BumnECRVfr|false|trial_expiry|profile-000056", "replaced|9CpZk1ZEovSjEFEC|profile-000055|false|-|0"], "moved": ["0|0|0|0|0|0|0", "2|1|1|1|1|1|1", "9CpZk1ZEovSjEFEC|9CpZk1ZEovSjEFEC"], "webhook": [1, "suppressed", "1"], "after_sweep": [200, true, "profile-000056"], "llm": {"outcome": "sent", "price_tool_saw_row": true, "reply": "Букет «Нежность» — 18 500 ₸.\n\nПо времени в пятницу у вас было указано к 18:00, точное время доставки флорист подтвердит."}}
+PASS  retired_bot_reconnects_after_purchase[tg] (39.8s) — F2: a bot the sweep retired (trial over: row trial_expiry, clone switched off by the V12 branch, trialing → expired) is bought back (RevenueCat INITIAL_PURCHASE through the real mapping + upsert), reconnected on a NEW profile (profile.add) and Created with PreviousProfileId → a new active clone on the new path takes over its chats, memory and price list, the old clone is deleted, the new webhook reaches the new clone, the V12 branch leaves it on; [llm] then, in «Авто», the bot answers with the price from the moved price list and the time agreed in the moved dialog
+      {"retired": [false, []], "purchase": [200, "business|active"], "create": [200, {"id": "DLTc78TY7w7w84Bx", "created": true, "adoptedProfiles": ["profile-000058"]}], "new_clone": [200, true, "profile-000059"], "old": [404, "ZfInqTFRSOEKUxf2|false|trial_expiry|profile-000059", "replaced|DLTc78TY7w7w84Bx|profile-000058|false|-|0"], "moved": ["0|0|0|0|0|0|0", "2|1|1|1|1|1|1", "DLTc78TY7w7w84Bx|DLTc78TY7w7w84Bx"], "webhook": [1, "suppressed", "1"], "after_sweep": [200, true, "profile-000059"], "llm": {"outcome": "sent", "price_tool_saw_row": true, "reply": "Букет «Нежность» — 18 500 ₸.\n\nПо времени в пятницу: к 18:00, точное время подтвердит флорист."}}
+PASS  activation_conflict_discards_new_clone[wa] (1.5s) — F1 (б): an orphan workflow already serves the profile's webhook path → the new clone's activation is refused; Create answers create_failed WITHOUT an id and deletes the clone it made (no second workflow on the path, nothing bound)
+      create=200 {'success': False, 'error': 'create_failed'} ran_discard=True workflows on the path=[('MryK2e4zfGJmC26Q', True)] (orphan MryK2e4zfGJmC26Q) row=-|true|-|-
+PASS  activation_conflict_discards_new_clone[tg] (1.6s) — F1 (б): an orphan workflow already serves the profile's webhook path → the new clone's activation is refused; Create answers create_failed WITHOUT an id and deletes the clone it made (no second workflow on the path, nothing bound)
+      create=200 {'success': False, 'error': 'create_failed'} ran_discard=True workflows on the path=[('rxklAkBHKyp8UKV7', True)] (orphan rxklAkBHKyp8UKV7) row=-|true|-|-
+PASS  bind_failure_answers_no_id[wa] (4.6s) — F1 (б) / R8 trick: Bind Workflow Id fails on the real Postgres (a CHECK scoped to this profile) → create_failed WITHOUT an id, the new clone deleted, nothing bound; the retry once the DB is back creates exactly ONE live clone
+      failed create=200 {'success': False, 'error': 'create_failed'} ran_bind=True ran_discard=True clones=[] row=-|true|-|- | retry=200 b0snHMdsRwKTnab5 clones=[('b0snHMdsRwKTnab5', True)]
+PASS  bind_failure_answers_no_id[tg] (4.6s) — F1 (б) / R8 trick: Bind Workflow Id fails on the real Postgres (a CHECK scoped to this profile) → create_failed WITHOUT an id, the new clone deleted, nothing bound; the retry once the DB is back creates exactly ONE live clone
+      failed create=200 {'success': False, 'error': 'create_failed'} ran_bind=True ran_discard=True clones=[] row=-|true|-|- | retry=200 AC49gRVRZqWz9oKq clones=[('AC49gRVRZqWz9oKq', True)]
+PASS  legacy_create_on_owned_profile_refused[wa] (2.0s) — F1 Q3: a token-less (legacy, compat window) Create naming a profile an install OWNS → profile_owned WITHOUT an id; no clone created, the owner's clone and binding untouched
+      owner's clone=4hGSnloIecJNe3gf legacy create=200 {'success': False, 'error': 'profile_owned'} ran_template=False clones=[('4hGSnloIecJNe3gf', True)] row=4hGSnloIecJNe3gf|true|-|- owner_kept=True | observed (compat-window residual, not this block's): the owner's '*' reply mode true/1792201990353 -> false/1792201991070
+PASS  legacy_create_on_owned_profile_refused[tg] (2.1s) — F1 Q3: a token-less (legacy, compat window) Create naming a profile an install OWNS → profile_owned WITHOUT an id; no clone created, the owner's clone and binding untouched
+      owner's clone=uHDioTsTiRsCQH3I legacy create=200 {'success': False, 'error': 'profile_owned'} ran_template=False clones=[('uHDioTsTiRsCQH3I', True)] row=uHDioTsTiRsCQH3I|true|-|- owner_kept=True | observed (compat-window residual, not this block's): the owner's '*' reply mode true/1792201992399 -> false/1792201993108
+PASS  foreign_install_same_bot_key_untouched[wa] (5.4s) — F1 §1.3: install B names its own profile with the SAME bot key as A's bot (and even A's profile as PreviousProfileId) → B gets its own clone, adopts nothing; A's clone, rows, memory and price list stay A's. Control: A's own re-pairing adopts A's line and leaves B's bot alone
+      B create=200 {'id': '1n6m1t6ry9TeE99k', 'created': True, 'adoptedProfiles': []} A seen after B (A rows|A file|A clone|A row|B rows)=('2|1|1|1|1|1|1', 'xIpzZnYUJ5pHd7kD|xIpzZnYUJ5pHd7kD', (200, True, 'profile-000067'), 'xIpzZnYUJ5pHd7kD|true|-|-', '0|0|0|0|0|0|0') | A control=200 {'id': 'bb3IlbVOQRoTjz66', 'created': True, 'adoptedProfiles': ['profile-000067']} (A new rows|A file|old A clone GET|B rows|B file|B clone|B row)=('2|1|1|1|1|1|1', 'bb3IlbVOQRoTjz66|bb3IlbVOQRoTjz66', 404, '2|1|1|1|1|1|1', '1n6m1t6ry9TeE99k|1n6m1t6ry9TeE99k', (200, True, 'profile-000068'), '1n6m1t6ry9TeE99k|true|-|-')
+PASS  foreign_install_same_bot_key_untouched[tg] (5.2s) — F1 §1.3: install B names its own profile with the SAME bot key as A's bot (and even A's profile as PreviousProfileId) → B gets its own clone, adopts nothing; A's clone, rows, memory and price list stay A's. Control: A's own re-pairing adopts A's line and leaves B's bot alone
+      B create=200 {'id': '1R7sZrl3790iENfj', 'created': True, 'adoptedProfiles': []} A seen after B (A rows|A file|A clone|A row|B rows)=('2|1|1|1|1|1|1', 'XR1aVQrwDOXvIG2F|XR1aVQrwDOXvIG2F', (200, True, 'profile-000070'), 'XR1aVQrwDOXvIG2F|true|-|-', '0|0|0|0|0|0|0') | A control=200 {'id': 'tylC32zw7X6yxEqd', 'created': True, 'adoptedProfiles': ['profile-000070']} (A new rows|A file|old A clone GET|B rows|B file|B clone|B row)=('2|1|1|1|1|1|1', 'tylC32zw7X6yxEqd|tylC32zw7X6yxEqd', 404, '2|1|1|1|1|1|1', '1R7sZrl3790iENfj|1R7sZrl3790iENfj', (200, True, 'profile-000071'), '1R7sZrl3790iENfj|true|-|-')
+PASS  wizard_create_never_adopts[wa] (5.6s) — F1 + F2 §1.3: a wizard Create (CreateOrigin=start: a NEW bot in a reused slot) never adopts — not by the same bot key, not even with the old profile named as PreviousProfileId; the old bot's data and clone stay where they were. Control: the same shape from settings (CreateOrigin=edit) adopts
+      wizard create=200 {'id': 'cRyLIGi5px91ElaK', 'created': True, 'adoptedProfiles': []} (old rows|old file|old clone|booking|new rows)=('2|1|1|1|1|1|1', 'l4KQey3V5IW5OXJK|l4KQey3V5IW5OXJK', (200, True, 'profile-000073'), '', '0|0|0|0|0|0|0') | control=200 {'id': '2MlyX7EAsMXDLZ7X', 'created': True, 'adoptedProfiles': ['profile-000075']} (rows|file)=('2|1|1|1|1|1|1', '2MlyX7EAsMXDLZ7X|2MlyX7EAsMXDLZ7X')
+PASS  wizard_create_never_adopts[tg] (5.7s) — F1 + F2 §1.3: a wizard Create (CreateOrigin=start: a NEW bot in a reused slot) never adopts — not by the same bot key, not even with the old profile named as PreviousProfileId; the old bot's data and clone stay where they were. Control: the same shape from settings (CreateOrigin=edit) adopts
+      wizard create=200 {'id': 'aB7Z7p2EOcmiDegY', 'created': True, 'adoptedProfiles': []} (old rows|old file|old clone|booking|new rows)=('2|1|1|1|1|1|1', 'sgbkp86ZTezbtPQd|sgbkp86ZTezbtPQd', (200, True, 'profile-000077'), '', '0|0|0|0|0|0|0') | control=200 {'id': 'cMAZdp2JVcqy8ezc', 'created': True, 'adoptedProfiles': ['profile-000079']} (rows|file)=('2|1|1|1|1|1|1', 'cMAZdp2JVcqy8ezc|cMAZdp2JVcqy8ezc')
+PASS  set_schedule_applies_and_refuses (1.5s) — B1: SetSchedule (crSetSchedule001) — one call for both channels of a bot lands both rows (200, applied per profile); a STALE version is not applied (200, applied:false, the server's version reported, the rows untouched); another install's profile is 403 and no token is 401 — nothing written; a malformed body is 400 bad_request with the reason; a zone Postgres does not know (Europe/Nowhere) is 400 bad_timezone
+      {'answers': {'both': (200, {'success': True, 'results': [{'profileId': 'profile-000081', 'applied': True, 'version': 1000}, {'profileId': 'profile-000082', 'applied': True, 'version': 1000}]}), 'stale': (200, {'success': True, 'results': [{'profileId': 'profile-000081', 'applied': False, 'version': 1000}]}), 'foreign': (403, {'success': False, 'error': 'unauthorized', 'reason': 'forbidden:profileIds'}), 'notoken': (401, {'success': False, 'error': 'unauthorized', 'reason': 'unauthorized:missing'}), 'malformed': (400, {'success': False, 'error': 'bad_request', 'reason': 'daysMask'}), 'badtz': (400, {'success': False, 'error': 'bad_timezone'})}, 'rows': ('true|31|540|1080|Asia/Almaty|1000', 'true|31|540|1080|Asia/Almaty|1000'), 'after': ('true|31|540|1080|Asia/Almaty|1000', 'true|31|540|1080|Asia/Almaty|1000')}
+PASS  reconnect_moves_schedule[wa] (2.7s) — B1 + F1/F2: the bot's schedule follows its line — set on the first profile through SetSchedule, a re-pairing (a NEW profile of the same bot key, Create from settings) moves the row onto the new profile (values and version kept) and leaves nothing under the old one
+      {'set': (200, {'success': True, 'results': [{'profileId': 'profile-000083', 'applied': True, 'version': 4242}]}), 'before': 'true|96|1320|360|Asia/Almaty|4242', 'create#2': (200, {'id': 'JKuzG3iChdNk0v8w', 'created': True, 'adoptedProfiles': ['profile-000083']}), 'old': '', 'new': 'true|96|1320|360|Asia/Almaty|4242'}
+PASS  reconnect_moves_schedule[tg] (2.8s) — B1 + F1/F2: the bot's schedule follows its line — set on the first profile through SetSchedule, a re-pairing (a NEW profile of the same bot key, Create from settings) moves the row onto the new profile (values and version kept) and leaves nothing under the old one
+      {'set': (200, {'success': True, 'results': [{'profileId': 'profile-000085', 'applied': True, 'version': 4242}]}), 'before': 'true|96|1320|360|Asia/Almaty|4242', 'create#2': (200, {'id': 'ppy3WfgqhO1gVvYT', 'created': True, 'adoptedProfiles': ['profile-000085']}), 'old': '', 'new': 'true|96|1320|360|Asia/Almaty|4242'}
+PASS  bot_delete_wipes_lineage (10.6s) — F1 + F2 §1.6 (T5): a two-channel bot whose earlier profiles were left behind by a pre-fix re-pairing (WA and TG) is deleted from the app naming only its CURRENT ids → Delete Bot Files wipes the whole line (memory, history, ledger, chunks of every profile and clone), retires every row as app_delete and books the left-behind clones; the sweep's branch A deletes them. Another install's bot with the same key is untouched
+      {"setup": ["iJY7QcZzdModLJNg", "QTKL3qqeLoSXQsYL", "tIrpIxWhysPqQhvd", "PLvU5CfBJgDHAkNw", "JGh083nmK4uHkcZW"], "dbf": [200, {"success": true, "deletedChunks": 4, "retiredProfiles": 4}], "left": {"profile-000087": "0|0|0|0|0|0|0", "profile-000089": "0|0|0|0|0|0|0", "profile-000090": "0|0|0|0|0|0|0", "profile-000091": "0|0|0|0|0|0|0"}, "chunks_left": "0", "rows": {"profile-000087": "iJY7QcZzdModLJNg|false|app_delete|-", "profile-000089": "QTKL3qqeLoSXQsYL|false|app_delete|-", "profile-000090": "tIrpIxWhysPqQhvd|false|app_delete|-", "profile-000091": "PLvU5CfBJgDHAkNw|false|app_delete|-"}, "bookings": {"iJY7QcZzdModLJNg": "bot_deleted|-|profile-000087|false|-|0", "QTKL3qqeLoSXQsYL": "bot_deleted|-|profile-000089|false|-|0", "tIrpIxWhysPqQhvd": "bot_deleted|-|profile-000090|false|-|0", "PLvU5CfBJgDHAkNw": "bot_deleted|-|profile-000091|false|-|0"}, "foreign": ["2|1|1|1|1|1|1", "JGh083nmK4uHkcZW|JGh083nmK4uHkcZW", [200, true, "profile-000088"], "JGh083nmK4uHkcZW|true|-|-", ""], "client_deletes": [200, 200], "after_branch_a": {"iJY7QcZzdModLJNg": [404, ["true", "200"]], "QTKL3qqeLoSXQsYL": [404, ["true", "404"]], "tIrpIxWhysPqQhvd": [404, ["true", "200"]], "PLvU5CfBJgDHAkNw": [404, ["true", "404"]]}}
+PASS  sweep_removes_booked_clone (4.7s) — F1 §2.6 A (T5) + step 12: the sweep's branch A on the real n8n — canon runs it LIVE (retirementsDryRun false since 4761117b, as prod does): it DELETEs a booked clone older than 10 minutes (200 → removed_at), stamps an already-gone one (404), never touches a clone a LIVE row drives or a booking younger than 10 minutes, and never calls again what it stamped; the first day's dry-run mode (an explicit retirementsDryRun true) still only logs
+      {"dry": [{"8irdaFJ8Too6otBR": 200, "dI3CVo94krfUpyAo": 200, "eGpud9zIwPeBonic": 200}, {"8irdaFJ8Too6otBR": "false", "gone0a16392d0b00": "false"}, true, false], "canon_dry_run": false, "live": {"8irdaFJ8Too6otBR": [404, "replaced|-|profile-000092|true|200|0"], "dI3CVo94krfUpyAo": [200, "replaced|-|profile-000092|false|-|0"], "gone0a16392d0b00": [404, "discard_failed|-|profile-000092|true|404|0"], "eGpud9zIwPeBonic": [200, "replaced|-|profile-000092|false|-|0"]}, "second_run_picks": []}
+PASS  rc_webhook_replay_credits_once (2.1s) — A1: RevenueCat delivers the SAME top-up event twice (an answer it did not get → its retry) through the DERIVED RevenueCat Events graph behind a temporary webhook: both answered 200, topup_balance +500 exactly ONCE, ONE rc_event_ledger row; the replay ends at If Duplicate? (Map Event and Upsert never run). Fix round: the same id once more PAST the gate (a probe entering at Map Event) reaches Upsert Subscriber and changes nothing (its update is gated on recording the id); a second top-up with its own id credits again
+      answers=[(200, {'success': True}), (200, {'success': True}), (200, {'success': True}), (200, {'success': True})] balance 0 → after same id twice 500 → same id past the gate 500 → after a new id 1000; ledger after replay='e2e-rcr-0a16392d0b-fd08de30' after the ungated replay='e2e-rcr-0a16392d0b-fd08de30' at end='e2e-rcr-0a16392d0b-7b68a1a4,e2e-rcr-0a16392d0b-fd08de30'; replay ran ['Dedup Gate', 'If Duplicate?', 'Respond 200', 'Webhook']; ungated ran Upsert=True; first ran Upsert=True
+PASS  rc_topup_first_carries_alias_plan (2.0s) — A2: a reinstall's FIRST RevenueCat event is a top-up (NON_RENEWING_PURCHASE carries no plan) delivered under the new id, the old id an alias holding an active business subscription with 500 dialogs: through the DERIVED RevenueCat Events graph the new identity (Create's trial/trialing seed) becomes business/active with the alias's period and SKU and 500 + 500, the alias is retired (expired, 0); RevenueCat never re-keys a bot (the alias's live bot_profiles row of this very install stays put); the same alias set once more PAST the gate rewrites nothing
+      answers=[(200, {'success': True}), (200, {'success': True})] owner trial|trialing|0|-|- → business|active|1000|2026-11-16 06:54:00.714726+05|sub.business.month (alias period 2026-11-16 06:54:00.714726+05) → past the gate business|active|1000|2026-11-16 06:54:00.714726+05|sub.business.month; alias → business|expired|0|2026-10-17 06:54:01.131905+05|sub.business.month; bot_profiles row stays on 'the alias'; Consolidate handed on plan_after='business' balance_after=500 rekeyed_rows='0'; row versions unchanged by the replay=True
+PASS  identity_heal_consolidates_into_token_id (1.8s) — A3: after a reinstall the app calls VerifyIdentity; RevenueCat (the mock: v2 aliases of the TOKEN's id, asked with the «RevenueCat API» credential) lists [old, u] → the old id's paid month (business/active/its period/SKU, 500 of balance, this month's dialogs) moves INTO the token's id and the old id is retired; this install's live bot_profiles row under the old id follows u, another install's stays; a repeat changes nothing (row versions); each healed verdict leaves ONE identity_heal_log row, written by the Heal statement itself (fix round 2)
+      journal after the heal='da8b5498-a27a-41d0-8fba-3a8a1153cc6c|$RCAnonymousID:e2e0e2e0ff6bf827779537cc9181309c|1|1|healed|$RCAnonymousID:e2e0e2e0ff6bf827779537cc9181309c' after the repeat='da8b5498-a27a-41d0-8fba-3a8a1153cc6c|$RCAnonymousID:e2e0e2e0ff6bf827779537cc9181309c|1|1|healed|$RCAnonymousID:e2e0e2e0ff6bf827779537cc9181309c;da8b5498-a27a-41d0-8fba-3a8a1153cc6c|$RCAnonymousID:e2e0e2e0ff6bf827779537cc9181309c|0|0|healed|$RCAnonymousID:e2e0e2e0ff6bf827779537cc9181309c' (want 'da8b5498-a27a-41d0-8fba-3a8a1153cc6c|$RCAnonymousID:e2e0e2e0ff6bf827779537cc9181309c|1|1|healed|$RCAnonymousID:e2e0e2e0ff6bf827779537cc9181309c;da8b5498-a27a-41d0-8fba-3a8a1153cc6c|$RCAnonymousID:e2e0e2e0ff6bf827779537cc9181309c|0|0|healed|$RCAnonymousID:e2e0e2e0ff6bf827779537cc9181309c'); answer=200 {'success': True, 'aliases': 1, 'consolidated': 1, 'rekeyed': 1, 'truncated': False} owner trial|trialing|0|-|- → business|active|500|2026-11-16 06:54:02.730012+05|sub.business.month (alias period 2026-11-16 06:54:02.730012+05); alias → business|expired|0|2026-10-17 06:54:03.024548+05|sub.business.month; bot_profiles e2e-a3h-30f48786a2ed=$RCAnonymousID:e2e0e2e0ff6bf827779537cc9181309c,e2e-a3h-9f4e6df9a7e2=$RCAnonymousID:e2e0e2e048c95c8270b9188a08b9890d (want e2e-a3h-30f48786a2ed=$RCAnonymousID:e2e0e2e0ff6bf827779537cc9181309c,e2e-a3h-9f4e6df9a7e2=$RCAnonymousID:e2e0e2e048c95c8270b9188a08b9890d); this month's dialogs on u=2; RevenueCat calls=[('GET', '/revenuecat/v2/projects/0f8c9529/customers/%24RCAnonymousID%3Ae2e0e2e048c95c8270b9188a08b9890d/aliases', {'limit': '1000'}, 'Bearer')] (want /revenuecat/v2/projects/0f8c9529/customers/%24RCAnonymousID%3Ae2e0e2e048c95c8270b9188a08b9890d/aliases); repeat=200 {'success': True, 'aliases': 1, 'consolidated': 0, 'rekeyed': 0, 'truncated': False} row versions unchanged=True
+PASS  identity_heal_refuses_without_token (2.7s) — A3: VerifyIdentity without a token / with a forged one → 401; with a token that carries NO billing id (billingConflict: another install holds it) or a body naming another recipient → 403 — RevenueCat is never asked, nothing is written
+      no token=401 {'success': False, 'error': 'unauthorized', 'reason': 'unauthorized:missing'} forged=401 no-billing-id token=403 {'success': False, 'error': 'unauthorized', 'reason': 'forbidden:appUserId'} foreign recipient=403 {'success': False, 'error': 'unauthorized', 'reason': 'forbidden:appUserId'} RevenueCat calls=0 row versions unchanged=True journal='' (want none)
+PASS  identity_heal_ignores_foreign_hint (2.5s) — A3: a hint RevenueCat does NOT list for the token's id → 409 {success:false, reason:hint_not_alias} and nothing written to subscribers / bot_profiles — although RevenueCat lists a real alias — but ONE identity_heal_log row for support (after the answer); a RevenueCat error (500) → 502 rc_unavailable, nothing written, no journal row
+      foreign hint=409 {'success': False, 'reason': 'hint_not_alias'} RevenueCat 500=502 {'success': False, 'reason': 'rc_unavailable'} RevenueCat calls=[('1b095ed77474/aliases', 200), ('1b095ed77474/aliases', 500)] row versions unchanged=True owner=trial|trialing|0|-|- journal after the refusal='25c92afb-b8d1-43f5-83c3-371509e83dfd|$RCAnonymousID:e2e0e2e09ae35e7f3aa899e240a57580|0|0|hint_not_alias|$RCAnonymousID:e2e0e2e094656b337e9aa61362e7dafb' after the outage='25c92afb-b8d1-43f5-83c3-371509e83dfd|$RCAnonymousID:e2e0e2e09ae35e7f3aa899e240a57580|0|0|hint_not_alias|$RCAnonymousID:e2e0e2e094656b337e9aa61362e7dafb' (want '25c92afb-b8d1-43f5-83c3-371509e83dfd|$RCAnonymousID:e2e0e2e09ae35e7f3aa899e240a57580|0|0|hint_not_alias|$RCAnonymousID:e2e0e2e094656b337e9aa61362e7dafb')
+PASS  identity_heal_after_sweep_demotion (1.3s) — final review I-1: the token's id is the trial seed the lifecycle sweep already DEMOTED (the imported sweep's own Demote Trialing: trial/expired/NULL — on iOS, StoreKit 1 restores nothing by itself, so the merge and this heal usually come after the 4d17h sweep) → VerifyIdentity still hands the paid alias over: the owner is business/active/<the old period>/SKU with the old balance, the old id retired — not locked out until the next renewal
+      sweep demoted the seed: '$RCAnonymousID:e2e0e2e09fbe17de777d8bc6e6cd3b98|e2e-a3d-46d3c67e5dc2|whatsapp|trial_expiry\nUPDATE 1' → owner trial|expired|0|-|-; heal=200 {'success': True, 'aliases': 1, 'consolidated': 1, 'rekeyed': 1, 'truncated': False}; owner → business|active|500|2026-11-16 06:54:09.636036+05|sub.business.month (want business|active|500|2026-11-16 06:54:09.636036+05|sub.business.month); alias → business|expired|0|2026-10-17 06:54:10.015446+05|sub.business.month; journal='35f70215-2aac-4242-b36c-dadd1ca09a44|$RCAnonymousID:e2e0e2e005b02dcbb92e93555296aba0|1|1|healed|$RCAnonymousID:e2e0e2e005b02dcbb92e93555296aba0' (want '35f70215-2aac-4242-b36c-dadd1ca09a44|$RCAnonymousID:e2e0e2e005b02dcbb92e93555296aba0|1|1|healed|$RCAnonymousID:e2e0e2e005b02dcbb92e93555296aba0')
+PASS  billing_conflict_is_logged (5.5s) — V3 (T1): a refresh that answers billingConflict (a second install naming a billing id another install holds) writes ONE billing_conflicts row — claimant, the CURRENT holder, attempts — a repeat bumps attempts, a refresh without a conflict writes nothing, the answer itself is unchanged; once support revokes the holder the id moves on the claimant's next refresh
+      journal after bootstrap+refresh='b320029a-fc77-4918-be8c-39a1aa8493f0|81e78be6-00d9-420c-944b-5429c26846d8|1' conflict answer=True/None after repeat='b320029a-fc77-4918-be8c-39a1aa8493f0|81e78be6-00d9-420c-944b-5429c26846d8|2' holder's refresh logged=0 after revoke: id=True conflict=False journal='b320029a-fc77-4918-be8c-39a1aa8493f0|81e78be6-00d9-420c-944b-5429c26846d8|2'
+PASS  orphan_sweep_spares_live_profile (4.5s) — A4 (+ fix round 1): the orphan sweep (the DERIVED canonical nodes on the real n8n, dry run, TTL ≈ 1 s, two runs so the first-seen ledger ages) NEVER lists a profile Wappi once authorised that has a LIVE bot_profiles row (a logged-out owner's channel: Plan Sweep counts it protectedLive), but still lists as «would delete» a NEVER-authorised profile with a live row (an abandoned wizard: the proxy registered its row at profile/add) and a profile without a row; the live read is proven (liveRead ok); nothing is deleted
+      run 1 liveRead='ok'; run 2 liveRead='ok' liveRows=66 protectedLive=1 would-delete: once-authorised live=False never-authorised live=True rowless=True; delete calls=0
+PASS  channel_down_notifies_other_channel (4.4s) — A4: the channel watch (the DERIVED canonical nodes on the real n8n + the mock): an owner with WhatsApp + Telegram, both recorded authorised; WhatsApp logs out → EXACTLY ONE notice, sent from the owner's Telegram to the account's own number (A5 rule), the A4 text, notified_at stamped; the next run sends nothing; WhatsApp back → the snapshot says authorised again (notified_at reset), nothing sent
+      run 1 notices=[] snap={'profile-000096': 'true|false', 'profile-000097': 'true|false'}; WA down → notices=[('profile-000097', '/tapi/sync/message/send', '77023643001', 'Choose Reply: WhatsApp отключился — бот не отвечает. Переподключите канал в приложении.')] (want [('profile-000097', '/tapi/sync/message/send', '77023643001', 'Choose Reply: WhatsApp отключился — бот не отвечает. Переподключите канал в приложении.')]) snap={'profile-000096': 'false|true', 'profile-000097': 'true|false'}; again → [] snap={'profile-000096': 'false|true', 'profile-000097': 'true|false'}; WA back → [] snap={'profile-000096': 'true|false', 'profile-000097': 'true|false'}
+PASS  channel_down_single_channel_only_marks (5.2s) — A4: an owner with ONE channel (WhatsApp) that logs out → the snapshot records it down and the notice stays owed (notified_at null), but NOTHING is sent — there is no other channel to send through (the app marks it); every run that hands the notice on COUNTS an attempt in the snapshot (fix round 2: a counter, not a clock) — the DOWN run is attempt 1, a retry attempt 2, …, the sixth is the last; after it the watch gives up (no pick, the count stays at six)
+      run 1 snap={'profile-000099': 'true|false'} attempts=0; WA down → notices=[] snap={'profile-000099': 'false|false'} attempts=1 pick=[{}] down=1; again → [] attempts=2 owed=1; from 5 → [] attempts=6 owed=1; after the sixth → [] attempts=6 gaveUp=1 owed=0 picked=False
+PASS  channel_down_skips_vanished_route (4.7s) — A4 fix round 2: an owner with two WhatsApp profiles and a Telegram, all recorded authorised; the SECOND WhatsApp (newer — Pick's first choice by order) vanishes from Wappi's list, its snapshot still saying authorised (the watch never touches a profile Wappi does not list), and the first logs out → the ONE notice goes from the owner's Telegram, never from the vanished WhatsApp: Pick takes only what THIS run listed authorised. Then, with the Telegram gone from the list too, a later logout finds no route: nothing is sent, no status asked, the attempt is counted
+      run 1 snap={'profile-000100': 'true|false', 'profile-000102': 'true|false', 'profile-000101': 'true|false'}; WA2 vanished + WA down → notices=[('profile-000101', '/tapi/sync/message/send', '77029471901', 'Choose Reply: WhatsApp отключился — бот не отвечает. Переподключите канал в приложении.')] (want [('profile-000101', '/tapi/sync/message/send', '77029471901', 'Choose Reply: WhatsApp отключился — бот не отвечает. Переподключите канал в приложении.')]) snap={'profile-000100': 'false|true', 'profile-000102': 'true|false', 'profile-000101': 'true|false'} wa2 reachable=False; WA back → []; TG vanished too + WA down → notices=[] snap={'profile-000100': 'false|false', 'profile-000102': 'true|false', 'profile-000101': 'true|false'} attempts=1 status asked=False
+PASS  channel_recovery_updates_snapshot_without_notice (3.6s) — A4: a profile first seen ALREADY down (a wizard mid-pairing) is recorded without a notice (nothing owed); its pairing (false → true) updates the snapshot and sends nothing; only a later logout (true → false) owes and sends ONE notice — through the owner's other channel
+      first seen down → notices=[] snap={'profile-000104': 'false|true', 'profile-000105': 'true|false'}; paired → [] snap={'profile-000104': 'true|false', 'profile-000105': 'true|false'}; logged out → [('profile-000105', '/tapi/sync/message/send', '77025082001', 'Choose Reply: WhatsApp отключился — бот не отвечает. Переподключите канал в приложении.')] (want [('profile-000105', '/tapi/sync/message/send', '77025082001', 'Choose Reply: WhatsApp отключился — бот не отвечает. Переподключите канал в приложении.')]) snap={'profile-000104': 'false|true', 'profile-000105': 'true|false'}
+PASS  channel_watch_empty_list_floor (3.5s) — A4: Wappi answers an EMPTY WhatsApp list (profiles null) while live WhatsApp rows exist → that base is an invalid fetch (empty_list_floor): nothing recorded, nobody told, the Telegram base still read; the next run (a real list) takes the logout and sends ONE notice
+      empty WA list → whatsapp base={'valid': False, 'reason': 'empty_list_floor: Wappi listed no whatsapp profile while 52 live row(s) exist — base skipped this run'} telegram valid=True notices=[] snap={'profile-000107': 'true|false', 'profile-000108': 'true|false'}; real list → [('profile-000108', '/tapi/sync/message/send', '77024351901', 'Choose Reply: WhatsApp отключился — бот не отвечает. Переподключите канал в приложении.')] snap={'profile-000107': 'false|true', 'profile-000108': 'true|false'}
+   cleanup A: deleted rows: 10
+   cleanup B: deleted rows: 2
+   cleanup v2xwh: deleted rows: 6
+   cleanup v2xte: deleted rows: 6
+   cleanup v2swh: deleted rows: 6
+   cleanup v2ste: deleted rows: 6
+   cleanup r1o: deleted rows: 4
+   cleanup r1x: deleted rows: 4
+   cleanup r1l: deleted rows: 6
+   cleanup r1s: deleted rows: 4
+   cleanup r1u: deleted rows: 6
+   cleanup rmv: deleted rows: 4
+   cleanup rmb: deleted rows: 6
+   cleanup cs: deleted rows: 4
+   cleanup C: deleted rows: 5
+   cleanup r2a: deleted rows: 5
+   cleanup r2b: deleted rows: 0
+   cleanup v3c: deleted rows: 3
+   cleanup v3x: deleted rows: 0
+   cleanup r2e: deleted rows: 6
+   cleanup r8wa: deleted rows: 4
+   cleanup r8tg: deleted rows: 4
+   cleanup v1: deleted rows: 6
+   cleanup up: deleted rows: 4
+   cleanup upv: deleted rows: 4
+   cleanup rd: deleted rows: 6
+   cleanup rdx: deleted rows: 2
+   cleanup m4: deleted rows: 6
+   cleanup m4x: deleted rows: 2
+   cleanup st: deleted rows: 6
+   cleanup stb: deleted rows: 2
+   cleanup sw: deleted rows: 4
+   cleanup rswa: deleted rows: 4
+   cleanup rstg: deleted rows: 4
+   cleanup rawa: deleted rows: 4
+   cleanup ratg: deleted rows: 4
+   cleanup rpwa: deleted rows: 6
+   cleanup rptg: deleted rows: 6
+   cleanup rcwa: deleted rows: 7
+   cleanup rctg: deleted rows: 7
+   cleanup acwa: deleted rows: 4
+   cleanup actg: deleted rows: 4
+   cleanup bfwa: deleted rows: 4
+   cleanup bftg: deleted rows: 4
+   cleanup lgwa: deleted rows: 4
+   cleanup lgtg: deleted rows: 4
+   cleanup fawa: deleted rows: 6
+   cleanup fbwa: deleted rows: 4
+   cleanup fatg: deleted rows: 6
+   cleanup fbtg: deleted rows: 4
+   cleanup wzwa: deleted rows: 9
+   cleanup wztg: deleted rows: 9
+   cleanup sch: deleted rows: 8
+   cleanup smwa: deleted rows: 7
+   cleanup smtg: deleted rows: 7
+   cleanup dlw: deleted rows: 10
+   cleanup dlx: deleted rows: 4
+   cleanup ba: deleted rows: 8
+   cleanup rcr: deleted rows: 2
+   cleanup a2t: deleted rows: 2
+   cleanup a3h: deleted rows: 4
+   cleanup a3n: deleted rows: 3
+   cleanup a3x: deleted rows: 0
+   cleanup a3f: deleted rows: 2
+   cleanup a3d: deleted rows: 4
+   cleanup v3j: deleted rows: 5
+   cleanup v3k: deleted rows: 0
+   cleanup orph: deleted rows: 6
+   cleanup cw1: deleted rows: 6
+   cleanup cw2: deleted rows: 4
+   cleanup cw5: deleted rows: 6
+   cleanup cw3: deleted rows: 6
+   cleanup cw4: deleted rows: 4
+
+67 pass, 0 fail
+exit=0
+2026-10-17T01:58:17Z
+
+2026-10-17T01:58:24Z
+--- e2e-handoff.py (full)
+PASS  outgoing_phone_recorded[wa] (6s) — A6: a message the owner sent from the PHONE lands in the one history (owner_phone) and in the agent's memory once, even when re-delivered; T6: the memory row opens with «Владелец: »
+      first=('recorded_owner_phone', 'owner_phone:Да, завтра в 15:00 ждём вас', 'ai/owner_phone:Владелец: Да, завтра в 15:00 ждём вас') redelivery=outgoing_known memory_rows=1
+PASS  outgoing_phone_recorded[tg] (6s) — A6: a message the owner sent from the PHONE lands in the one history (owner_phone) and in the agent's memory once, even when re-delivered; T6: the memory row opens with «Владелец: »
+      first=('recorded_owner_phone', 'owner_phone:Да, завтра в 15:00 ждём вас', 'ai/owner_phone:Владелец: Да, завтра в 15:00 ждём вас') redelivery=outgoing_known memory_rows=1
+PASS  outgoing_api_history_only (3s) — A6: an API-sent message (unknown writer) is a history row only — never a memory row (the AI's / the app's own writers own memory)
+      outcome=recorded_outgoing_api history=outgoing_api:Текст через API memory_rows=0
+PASS  outgoing_foreign_profile_filtered (3s) — A1/A6: an outgoing event naming ANOTHER profile is filtered before any write
+      outcome=filtered history=''
+PASS  suppressed_incoming_recorded[wa] (4s) — A6: in «Вместе» the client's message is still recorded (history + memory human row), once, with no generation
+      outcomes=['suppressed', 'suppressed'] history=client:Можно завтра к 15? memory=human/client:Можно завтра к 15? sends=0
+PASS  suppressed_incoming_recorded[tg] (3s) — A6: in «Вместе» the client's message is still recorded (history + memory human row), once, with no generation
+      outcomes=['suppressed', 'suppressed'] history=client:Можно завтра к 15? memory=human/client:Можно завтра к 15? sends=0
+PASS  auto_reply_records_client_and_ai_rows (28s) — A6: a normal auto-reply leaves exactly client + ai history rows and the memory node's own human + ai rows (no doubles)
+      outcome=sent history_sources=client,ai memory=human/agent,ai/agent sends=1
+PASS  bot_knows_owner_agreement_after_auto_resumes [llm] (32s) — A6 acceptance: owner agreed by phone during «Вместе»; after the explicit return to «Авто» the bot answers with that agreement
+      outcome=sent reply='Завтра в 15:00, спросить Марину.' memory=human/client:Здравствуйте, можно к вам завтра подъеха | ai/owner_phone:Владелец: Да, конечно. Завтра в 15:00 ва | human/agent:Напомните, во сколько мне подойти и кого | ai/agent:Завтра в 15:00, спросить Марину.
+PASS  handoff_tool_creates_request_once_and_pauses [llm] (62s) — A5 acceptance: the agent CREATES the request through the tool (once, even on re-delivery), the chat is paused, and only the owner's explicit «Авто» resumes it
+      request=11582:open:order:failed:87011234567 reply='Передал владельцу, он свяжется' paused=t once=True paused_incoming=suppressed setmode=200 unpaused=True closed=11582:done:order:failed:87011234567 resumed=sent
+PASS  notifier_delivers_self_message_and_survives_failure (88s) — A5 acceptance: the owner notice is a self-message on the bot's channel (no client text); a failed delivery keeps the request and is retried
+      states=failed/1,sent/1 send_calls=2 to_self=True no_leak=True requests_intact=True body='Choose Reply: вопрос клиента (чат …4511). Автоответ в этом чате приостановлен — '
+PASS  notifier_owner_number_by_v2_rule (124s) — A5 (2026-10-15): the handoff notice goes to the owner's own number by the V2 rule — Telegram: the AUTHORISED account's phone (status.account.phone) even when the top-level phone is another number (one someone typed into auth/phone); with no account the top-level phone; WhatsApp: the top-level phone — one schedule tick, no client text in any notice
+      states={'tg_account': 'sent', 'tg_fallback': 'sent', 'wa': 'sent'} recipients={'tg_account': ['77010009994'], 'tg_fallback': ['77010002222'], 'wa': ['77010003333']} want={'tg_account': '77010009994', 'tg_fallback': '77010002222', 'wa': '77010003333'} no_leak=True prefixed=True
+PASS  lost_send_settled_by_notifier (117s) — R9: a reply left send_pending > 10 min (its run died between the lease and Record Send) becomes send_unknown on the notifier's schedule — no transport call; a live one is untouched; T7: the lost run's memory draft becomes unknown + «[доставка не подтверждена] », a dead claim's draft is removed, a live run's draft stays — WhatsApp and Telegram, one schedule tick
+      {"wa": {"lost": "send_unknown|dead-run-wa|run_lost: no send result recorded within 10 min (execution dead-run-wa)", "live": "send_pending", "send_calls_for_profile": 0, "memory": "dead-run-wa/unknown/[доставка не подтверждена] Букет — 25 000 ₸. | live-run-wa/draft/Доставка — 1000 ₸."}, "tg": {"lost": "send_unknown|dead-run-tg|run_lost: no send result recorded within 10 min (execution dead-run-tg)", "live": "send_pending", "send_calls_for_profile": 0, "memory": "dead-run-tg/unknown/[доставка не подтверждена] Букет — 25 000 ₸. | live-run-tg/draft/Доставка — 1000 ₸."}}
+PASS  handoffs_webhook_owner_scoped_list_take_done (2s) — A5: the app's list/take/done are token-only and owner-scoped; done lifts the chat's pause
+      {"notoken": 401, "foreign": 403, "list": [200, 1, "open", true], "take": [200, ["taken"]], "done": [200, [], "f", "done"]}
+PASS  stale_or_replayed_auto_keeps_newer_handoff[wa] (2s) — R4: through the real SetReplyMode webhook, a replay of the owner's applied «Авто» and an older «Авто» leave a NEWER request open and the chat paused; a new explicit «Авто» resumes it
+      {"first": [200, [true]], "replay": [200, [false]], "after_replay": ["t", "11589:open:question:pending:-"], "older": [200, [false]], "after_older": ["t", "11589:open:question:pending:-"], "new": [200, [true]], "after_new": ["f", "11589:done:question:pending:-"]}
+PASS  stale_or_replayed_auto_keeps_newer_handoff[tg] (2s) — R4: through the real SetReplyMode webhook, a replay of the owner's applied «Авто» and an older «Авто» leave a NEWER request open and the chat paused; a new explicit «Авто» resumes it
+      {"first": [200, [true]], "replay": [200, [false]], "after_replay": ["t", "11590:open:question:pending:-"], "older": [200, [false]], "after_older": ["t", "11590:open:question:pending:-"], "new": [200, [true]], "after_new": ["f", "11590:done:question:pending:-"]}
+PASS  fast_clock_queued_auto_keeps_newer_handoff[wa] (2s) — R4-clock: through the real SetReplyMode webhook, an «Авто» decided 4 min BEFORE a request on a phone 5 min fast (queued, delivered after it) leaves the request open and the chat paused; an immediate «Авто» from the same phone resumes it
+      {"queued": [200, [true]], "after_queued": ["t", "11591:open:question:pending:-"], "immediate": [200, [true]], "after_immediate": ["f", "11591:done:question:pending:-"]}
+PASS  fast_clock_queued_auto_keeps_newer_handoff[tg] (2s) — R4-clock: through the real SetReplyMode webhook, an «Авто» decided 4 min BEFORE a request on a phone 5 min fast (queued, delivered after it) leaves the request open and the chat paused; an immediate «Авто» from the same phone resumes it
+      {"queued": [200, [true]], "after_queued": ["t", "11592:open:question:pending:-"], "immediate": [200, [true]], "after_immediate": ["f", "11592:done:question:pending:-"]}
+PASS  dashboard_shows_open_handoff_as_event (3s) — A5/A6: «Сводка» reports an open request as a REAL event (source=event) that outranks the classifier
+      http=200 row={'profileId': 'stgwa001', 'chatId': '770102791@c.us', 'outcome': 'order_collected', 'summary': 'Заказ: 25 роз', 'outcomeAt': 1792202792213, 'lastMessageAt': 1792202792213, 'source': 'event', 'handoffId': 11593, 'handoffStatus': 'open', 'handoffReason': 'order'}
+PASS  proxy_send_records_owner_app_row[wa] (6s) — A6: a message the owner sends from the APP (proxy) lands as owner_app in history and as a marked memory row, after the response; T6: the memory row opens with «Владелец: »
+      http=200 body={'status': 'done', 'message_id': 'sent-000001', 'time': 1792202795} history=owner_app:Спасибо, ждём вас memory=ai/owner_app:Владелец: Спасибо, ждём вас
+PASS  proxy_send_records_owner_app_row[tg] (6s) — A6: a message the owner sends from the APP (proxy) lands as owner_app in history and as a marked memory row, after the response; T6: the memory row opens with «Владелец: »
+      http=200 body={'status': 'done', 'message_id': 'sent-000001', 'time': 1792202800} history=owner_app:Спасибо, ждём вас memory=ai/owner_app:Владелец: Спасибо, ждём вас
+PASS  delete_bot_wipes_history_and_requests (2s) — stage 4.7: deleting the bot wipes its history, requests, event ledger and chat state (billing counters untouched)
+      http=200 left=0/0/0/0 resp_counts={'deletedChunks': 0, 'deletedFiles': 0, 'deletedMemoryRows': 14, 'deletedOutcomes': 5, 'deletedReplyFlags': 4, 'deletedHistoryEvents': 16, 'deletedHandoffs': 5, 'deletedReplyEvents': 5, 'deletedChatStates': 6, 'deletedSuggestionSets': 0, 'deletedSchedules': 0}
+   cleanup: deleted rows: 13
+   cleanup: 11 owner fixture(s)
+
+21 pass, 0 fail
+exit=0
+2026-10-17T02:07:06Z
+
+2026-10-17T02:07:14Z
+### after all e2e: verify-deployed on the stand (expect exit 0, canonical 30, diff 0)
+base http://localhost:5678: canonical 30 (diff 0), clones 2 (behind template 0, of them prompt head behind 0; custom prompts 2, not counted), archived clones 0 (not counted), other 2
+  prompt map = Create/Edit Vertical Prompt as introduced in 126f44c2 (sha256 49abaeb19ea8)
+  clone   stgtg40da979c774 'STAGING TG stgtg001' [telegram] active=True nodes=60 graph=e9532e7b4139 published=e9532e7b4139 sticky=e9532e7b4139 AT-CANONICAL  prompt=custom (custom prompt — kept verbatim by update-clones, not counted: no Create/Edit grammar (Business Type line + Additional Instructions marker))
+  clone   stgwab77f282533c 'STAGING WA stgwa001' [whatsapp] active=True nodes=60 graph=4943da220c3f published=4943da220c3f sticky=4943da220c3f AT-CANONICAL  prompt=custom (custom prompt — kept verbatim by update-clones, not counted: no Create/Edit grammar (Business Type line + Additional Instructions marker))
+exit=0
+n8n log since the server start (line 53312): 'Error while saving insights' = 0; lines matching error/exception: 2
+   1 Error: options.allowEmptyFiles is false, file size should be greater than 0
+   1 Error in handling webhook request POST /webhook/UploadFile: There was a problem executing the workflow
+bot_schedule rows left on the stand: 0
+
+=== §D. Гейты на дереве пакета (HEAD) ===
+canon status before: 0 changed paths
+--- generators --check
+  OK   apply-auth-gate.py --check | auth gate: OK
+  OK   apply-billing-consolidation.py --check | billing consolidation: OK
+  OK   apply-clone-lifecycle.py --check | clone lifecycle: OK
+  OK   apply-history-handoff.py --check | history/handoff: OK
+  OK   apply-learning-a.py --check | learning A: OK
+  OK   apply-learning-b.py --check | learning B: OK
+  OK   apply-outcome-stamps.py --check | outcome stamps: OK
+  OK   apply-reply-mode-v2.py --check | reply-mode v2: OK
+  OK   apply-reply-pipeline-v2.py --check | reply pipeline v2: OK
+  OK   apply-slot-count-fix.py --check | OK  Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json
+  OK   apply-suggest-v2.py --check | suggest v2: OK
+  OK   apply-sweep-clone-deactivate.py --check | sweep clone deactivate: OK
+  OK   build-auth-workflows.py --check | auth workflows: up to date
+  OK   build-channel-watch.py --check | channel watch: OK
+  OK   build-handoff-workflows.py --check | handoff workflows: OK
+  OK   build-price-search.py --check | price search: OK
+  OK   build-set-schedule.py --check | set schedule: OK
+  OK   build-test-dialog.py --check | test dialog: OK
+  OK   build-verify-identity.py --check | verify identity: OK
+  OK   inject-panel-prompts.py --check | 9PTyYcelRQI7bGDb-Suggest_Replies.json: up-to-date
+  OK   clone_lineage.py --check | clone_lineage: 11 statements, 0 findings
+  OK   inject-prompts.py --check (tiktoken venv) | TwWPW3gIyjZS3foR-Edit_Telegram_Workflow.json: kind=edit up-to-date
+  info apply-delete-history.py --check (RETIRED, refuses by design): exit 1 | RETIRED: apply-delete-history.py --deploy/--check are superseded (they would restore the 2026-09-01 Delete Chat Memory a
+--- verifiers
+  OK   verify-auth-gate.py | ALL AUTH GATE ASSERTS PASSED
+  OK   verify-billing-consolidation.py | ALL BILLING CONSOLIDATION ASSERTS PASSED
+  OK   verify-channel-watch.py | ALL CHANNEL WATCH ASSERTS PASSED
+  OK   verify-clone-lifecycle.py | ALL CLONE LIFECYCLE ASSERTS PASSED
+  OK   verify-history-handoff.py | ALL HISTORY/HANDOFF ASSERTS PASSED
+  OK   verify-learning-a.py | learning A verify: OK
+  OK   verify-learning-b.py | learning B verify: OK
+  OK   verify-message-batching.py | ALL BATCHING ASSERTS PASSED
+  OK   verify-orphan-sweep.py | ALL ORPHAN SWEEP ASSERTS PASSED
+  OK   verify-reply-mode.py | ALL REPLY MODE ASSERTS PASSED
+  OK   verify-reply-pipeline.py | ALL REPLY PIPELINE ASSERTS PASSED
+  OK   verify-set-schedule.py | ALL SET SCHEDULE ASSERTS PASSED
+  OK   verify-sql-comments.py | OK  99 Postgres node(s) in 31 workflow file(s): no placeholder outside code, no {{ }}, no modifier, no leading =
+  OK   verify-telegram-parity.py | ALL PARITY ASSERTS PASSED
+  OK   verify-verify-identity.py | ALL VERIFY IDENTITY ASSERTS PASSED
+  OK   verify-telegram-parity.py --self-test | SELF-TEST PASSED: 33/33 cases
+  OK   verify_rag.py all | VERIFY OK: all
+  OK   node verify-panel-prompts.js | PASS
+canon status after: 0 changed paths; unchanged by the gates: yes
+GATES: 40 ok, 0 failed
+
+### the same gates again after the last documentation edits (CLAUDE.md / READMEs / journal — verify-learning-b reads CLAUDE.md)
+canon status before: 0 changed paths
+--- generators --check
+  OK   apply-auth-gate.py --check | auth gate: OK
+  OK   apply-billing-consolidation.py --check | billing consolidation: OK
+  OK   apply-clone-lifecycle.py --check | clone lifecycle: OK
+  OK   apply-history-handoff.py --check | history/handoff: OK
+  OK   apply-learning-a.py --check | learning A: OK
+  OK   apply-learning-b.py --check | learning B: OK
+  OK   apply-outcome-stamps.py --check | outcome stamps: OK
+  OK   apply-reply-mode-v2.py --check | reply-mode v2: OK
+  OK   apply-reply-pipeline-v2.py --check | reply pipeline v2: OK
+  OK   apply-slot-count-fix.py --check | OK  Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json
+  OK   apply-suggest-v2.py --check | suggest v2: OK
+  OK   apply-sweep-clone-deactivate.py --check | sweep clone deactivate: OK
+  OK   build-auth-workflows.py --check | auth workflows: up to date
+  OK   build-channel-watch.py --check | channel watch: OK
+  OK   build-handoff-workflows.py --check | handoff workflows: OK
+  OK   build-price-search.py --check | price search: OK
+  OK   build-set-schedule.py --check | set schedule: OK
+  OK   build-test-dialog.py --check | test dialog: OK
+  OK   build-verify-identity.py --check | verify identity: OK
+  OK   inject-panel-prompts.py --check | 9PTyYcelRQI7bGDb-Suggest_Replies.json: up-to-date
+  OK   clone_lineage.py --check | clone_lineage: 11 statements, 0 findings
+  OK   inject-prompts.py --check (tiktoken venv) | TwWPW3gIyjZS3foR-Edit_Telegram_Workflow.json: kind=edit up-to-date
+  info apply-delete-history.py --check (RETIRED, refuses by design): exit 1 | RETIRED: apply-delete-history.py --deploy/--check are superseded (they would restore the 2026-09-01 Delete Chat Memory a
+--- verifiers
+  OK   verify-auth-gate.py | ALL AUTH GATE ASSERTS PASSED
+  OK   verify-billing-consolidation.py | ALL BILLING CONSOLIDATION ASSERTS PASSED
+  OK   verify-channel-watch.py | ALL CHANNEL WATCH ASSERTS PASSED
+  OK   verify-clone-lifecycle.py | ALL CLONE LIFECYCLE ASSERTS PASSED
+  OK   verify-history-handoff.py | ALL HISTORY/HANDOFF ASSERTS PASSED
+  OK   verify-learning-a.py | learning A verify: OK
+  OK   verify-learning-b.py | learning B verify: OK
+  OK   verify-message-batching.py | ALL BATCHING ASSERTS PASSED
+  OK   verify-orphan-sweep.py | ALL ORPHAN SWEEP ASSERTS PASSED
+  OK   verify-reply-mode.py | ALL REPLY MODE ASSERTS PASSED
+  OK   verify-reply-pipeline.py | ALL REPLY PIPELINE ASSERTS PASSED
+  OK   verify-set-schedule.py | ALL SET SCHEDULE ASSERTS PASSED
+  OK   verify-sql-comments.py | OK  99 Postgres node(s) in 31 workflow file(s): no placeholder outside code, no {{ }}, no modifier, no leading =
+  OK   verify-telegram-parity.py | ALL PARITY ASSERTS PASSED
+  OK   verify-verify-identity.py | ALL VERIFY IDENTITY ASSERTS PASSED
+  OK   verify-telegram-parity.py --self-test | SELF-TEST PASSED: 33/33 cases
+  OK   verify_rag.py all | VERIFY OK: all
+  OK   node verify-panel-prompts.js | PASS
+canon status after: 0 changed paths; unchanged by the gates: yes
+GATES: 40 ok, 0 failed
+
+N2 teeth: Delete Chat Memory's deletedSchedules counts the `sets` CTE (FROM schedule) -> FROM sets)), schedule CTE still deletes
+  real verifier on the mutant: exit 1 | HISTORY/HANDOFF FAIL: B1: Delete Bot Files must wipe bot_schedule for every profile of the line (Delete Chat Memory) and count it as deletedSchedules
+  the same verifier with ONLY that regex replaced by True, on the mutant: exit 0 | ALL HISTORY/HANDOFF ASSERTS PASSED
+  real verifier on the canon: exit 0 | ALL HISTORY/HANDOFF ASSERTS PASSED
+
+2026-10-17T01:50:43Z
+### tests/test_retired_delete.py (with the new N2 negative: deletedSchedules counting another CTE)
+PASS V12 D1 (whatsapp): the owner of a bot the sweep retired deletes its files and memory; a neighbour is untouched
+PASS V12 D1 (telegram): the owner of a bot the sweep retired deletes its files and memory; a neighbour is untouched
+PASS V12 D2: Set Workflow State — delete/deactivate of the owner's retired clone go to Delete Ownership and pass; activate never does
+PASS V12 D3: Delete Ownership refuses what the caller cannot prove it owns; reasons say why
+PASS V12 M5: a STALE token whose profile another install has since claimed deletes nothing (files, workflow, Wappi profile)
+PASS V12 proxy: profile.delete / profile.logout are decided by the database (own live or retired row), other ops are not
+PASS V12 D4 (whatsapp): a live bot (session) and a token-less legacy call in the compat window still delete
+PASS V12 D4 (telegram): a live bot (session) and a token-less legacy call in the compat window still delete
+PASS V12 M1: Delete Bot Files says success only on real counters; storage first, its failure is 503 and nothing else ran
+PASS V12 D5: Set Workflow State delete is idempotent (200/404 = gone) and reports a real failure (502)
+PASS V12 S1: the sweep deactivates the clone of a profile IT retired, once; never liveness/app_delete, a live workflow or a protected id
+PASS V12 deploy: deploy-canonical binds the n8n Admin API credential from the live Set Workflow State, and refuses without it
+PASS V12 N1: verify-auth-gate.py rejects copies that route around the database ownership
+PASS B1 N2: a delete that keeps the schedule is caught — verify-history-handoff.py (Delete Chat Memory without the bot_schedule CTE, deletedSchedules counting another CTE, Respond without deletedSchedules) and verify-auth-gate.py (Deletion Settled? without i
+14 pass, 0 fail
+
+2026-10-17T02:09:42Z
+### tests/run_all.py (every Tools/n8n/tests/test_*.py, staging Postgres; committed tree HEAD 6a9d495c)
+OK   test_auth_refresh.py: 12 pass, 0 fail
+OK   test_billing_consolidation.py: 55 pass, 0 fail
+OK   test_billing_identity.py: 24 pass, 0 fail
+OK   test_channel_watch.py: 118 pass, 0 fail
+OK   test_claim.py: 22 pass, 0 fail
+OK   test_clone_lineage_sql.py: 56 pass, 0 fail
+OK   test_clone_retirements.py: 21 pass, 0 fail
+OK   test_create_clone.py: 70 pass, 0 fail
+OK   test_create_seed.py: 53 pass, 0 fail
+OK   test_deploy_canonical.py: 28 pass, 0 fail
+OK   test_handoff_notifier.py: 51 pass, 0 fail
+OK   test_harness_selfcheck.py: 2 pass, 0 fail
+OK   test_identity_heal.py: 39 pass, 0 fail
+OK   test_learning_a.py: 5 pass, 0 fail
+OK   test_learning_b.py: 9 pass, 0 fail
+OK   test_legacy_generators.py: 5 pass, 0 fail
+OK   test_memory_context.py: 25 pass, 0 fail
+OK   test_orphan_sweep.py: 43 pass, 0 fail
+OK   test_price_search.py: 36 pass, 0 fail
+OK   test_rc_event_ledger.py: 40 pass, 0 fail
+OK   test_reply_lost_send.py: 21 pass, 0 fail
+OK   test_reply_memory.py: 56 pass, 0 fail
+OK   test_reply_memory_concurrent.py: 9 pass, 0 fail
+OK   test_reply_mode.py: 43 pass, 0 fail
+OK   test_reply_order.py: 44 pass, 0 fail
+OK   test_reply_reconcile.py: 66 pass, 0 fail
+OK   test_reply_schedule.py: 43 pass, 0 fail
+OK   test_retired_delete.py: 14 pass, 0 fail
+OK   test_set_schedule.py: 37 pass, 0 fail
+OK   test_sql_comment_injection.py: 42 pass, 0 fail
+OK   test_suggest_catalog.py: 24 pass, 0 fail
+OK   test_suggest_lang.py: 11 pass, 0 fail
+OK   test_suggest_price.py: 16 pass, 0 fail
+OK   test_suggest_query.py: 37 pass, 0 fail
+OK   test_test_dialog.py: 17 pass, 0 fail
+OK   test_upload.py: 45 pass, 0 fail
+OK   test_verify_clone_lifecycle.py: 44 pass, 0 fail
+OK   test_verify_deployed.py: 48 pass, 0 fail
+OK   test_verify_parity.py: 52 pass, 0 fail
+OK   test_verify_sql_comments.py: 53 pass, 0 fail
+exit=0
+2026-10-17T02:53:34Z
+
+=== §E. Возврат рабочего канона на стенде и остановка ===
+2026-10-17T02:07:24Z
+### E1 restore the working canon on the stand: bootstrap.py --bot wa:stgwa001 --bot tg:stgtg001 (no --canon-ref)
+2. server up at http://localhost:5678 (pid 67097, log /Users/ayan/.n8n-staging/n8n.log)
+3. API key already present
+   staging isolation: KoTuIlk4LMrlvnWI-Upload_File.json: ['Supabase Vector Store (+3 sub-nodes)', 'Store Original File']
+   staging isolation: ZTqpumOpL1rNDOp6-Delete_File.json: ['Delete Stored Original']
+   staging price search: crPriceSearch001-Price_List_Search.json: ['Search Price Lists (+1 sub-nodes)']
+   staging isolation: lmjYsdNcQA2IE5rl-Delete_Bot_Files.json: ['Delete Stored Original']
+   31 workflows + 2 staging bots -> /Users/ayan/Projects/Automation/Tools/n8n/workflows-staging
+   n8n base http://localhost:5678; Wappi -> http://127.0.0.1:8765; postgres -> 'Postgres Staging' (stgPostgres000001)
+   note: left dangling on purpose (isolation): ['Support Bot']
+5. imported 31 workflows + 2 staging bots; published 31
+2. server up at http://localhost:5678 (pid 67391, log /Users/ayan/.n8n-staging/n8n.log)
+staging ready: http://localhost:5678
+exit=0
+2026-10-17T02:09:29Z
+### E2 verify-deployed on the restored stand (expect exit 0)
+base http://localhost:5678: canonical 30 (diff 0), clones 2 (behind template 0, of them prompt head behind 0; custom prompts 2, not counted), archived clones 0 (not counted), other 2
+  prompt map = Create/Edit Vertical Prompt as introduced in 126f44c2 (sha256 49abaeb19ea8)
+  clone   stgtg40da979c774 'STAGING TG stgtg001' [telegram] active=True nodes=60 graph=e9532e7b4139 published=e9532e7b4139 sticky=None AT-CANONICAL  prompt=custom (custom prompt — kept verbatim by update-clones, not counted: no Create/Edit grammar (Business Type line + Additional Instructions marker))
+  clone   stgwab77f282533c 'STAGING WA stgwa001' [whatsapp] active=True nodes=60 graph=4943da220c3f published=4943da220c3f sticky=None AT-CANONICAL  prompt=custom (custom prompt — kept verbatim by update-clones, not counted: no Create/Edit grammar (Business Type line + Additional Instructions marker))
+exit=0
+2026-10-17T02:53:59Z
+### E3 stop the stand: n8n (bootstrap.py --stop) and the Wappi mock (started by this task, pid 33787); Postgres left running — it was already up when the task began
+stopped
+mock 33787 stopped
+n8n after stop: 000
+mock after stop: 000
+pg_ctl: server is running (PID: 4095)
+n8n log from line 53312 to the end (all three server processes of this task): 'Error while saving insights' = 0
