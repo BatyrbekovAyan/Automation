@@ -19,9 +19,11 @@ using UnityEngine;
 /// iOS keyboard buffer.
 ///
 /// Fix round 3 (I-1): one delivery line says where the SAVED schedule stands on its way to the server
-/// (ScheduleSyncService.StateOf → ScheduleCopy.SyncStatus): pending, failed, or hidden once the server holds it. It
-/// repaints on ScheduleSyncService.OnStateChanged and on Theme.Changed (its colour is owned here — no ThemedColor), and
-/// opening the bot's settings re-arms an undelivered schedule first (<see cref="OnScheduleSettingsOpened"/>).
+/// (ScheduleSyncService.StateOf → ScheduleCopy.SyncStatus): pending, failed (the network), rejected (the server), or
+/// hidden once the server holds it. It repaints on ScheduleSyncService.OnStateChanged and on Theme.Changed (its colour is
+/// owned here — no ThemedColor), and opening the bot's settings re-arms an undelivered schedule first
+/// (<see cref="OnScheduleSettingsOpened"/>). Round 4: a pending desire shows only after ScheduleDeliveryLine's 2-s grace —
+/// a normal Save never flashes the line — and the section looks again by itself when the grace runs out.
 /// </summary>
 public partial class BotSettings
 {
@@ -34,6 +36,7 @@ public partial class BotSettings
 
     private int scheduleDaysMask = ScheduleModel.AllDays;
     private bool scheduleTimeErrorShown;
+    private Coroutine scheduleSyncGraceRoutine;   // the pending grace's re-check; dies with the screen (reset in OnDisable)
 
     public ToggleRow ScheduleRow => scheduleRow;
     public EditableField ScheduleStartField => scheduleStartField;
@@ -170,7 +173,7 @@ public partial class BotSettings
         if (message != null)
         {
             scheduleSyncStatus.text = message;
-            scheduleSyncStatus.color = Theme.Color(state == ScheduleDelivery.Failed ? ThemeRole.Destructive : ThemeRole.InkSecondary);
+            scheduleSyncStatus.color = Theme.Color(state == ScheduleDelivery.Pending ? ThemeRole.InkSecondary : ThemeRole.Destructive);
         }
         if (scheduleSyncStatus.gameObject.activeSelf != (message != null)) scheduleSyncStatus.gameObject.SetActive(message != null);
     }
@@ -186,6 +189,7 @@ public partial class BotSettings
     {
         ScheduleSyncService.OnStateChanged -= HandleScheduleSyncState;
         Theme.Changed -= RefreshScheduleSync;
+        scheduleSyncGraceRoutine = null;   // the coroutine died with the screen; a stale handle would block the next one
     }
 
     // null = every bot (a launch, the full wipe, a re-arm on return to the app).
@@ -198,7 +202,25 @@ public partial class BotSettings
     {
         string bot = ScheduleBotId;
         var service = ScheduleSyncService.Existing;
-        ApplyScheduleSyncState(bot != null && service != null ? service.StateOf(bot) : ScheduleDelivery.Confirmed);
+        var state = bot != null && service != null ? service.StateOf(bot) : ScheduleDelivery.Confirmed;
+        long since = bot != null && service != null ? service.PendingSinceMs(bot) : 0;
+        long now = System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        ApplyScheduleSyncState(ScheduleDeliveryLine.Shown(state, since, now));
+        ScheduleGraceRecheck(ScheduleDeliveryLine.RecheckInMs(state, since, now));
+    }
+
+    // A desire still pending when its grace runs out must then be shown — no state change announces that moment.
+    private void ScheduleGraceRecheck(long waitMs)
+    {
+        if (scheduleSyncGraceRoutine != null) StopCoroutine(scheduleSyncGraceRoutine);
+        scheduleSyncGraceRoutine = waitMs > 0 && isActiveAndEnabled ? StartCoroutine(RefreshScheduleSyncAfter(waitMs / 1000f)) : null;
+    }
+
+    private IEnumerator RefreshScheduleSyncAfter(float seconds)
+    {
+        yield return new WaitForSecondsRealtime(seconds);
+        scheduleSyncGraceRoutine = null;
+        RefreshScheduleSync();
     }
 
     // This screen's bot while it is the open one (Bot.OpenSettings pairs them); null otherwise — the line then hides.

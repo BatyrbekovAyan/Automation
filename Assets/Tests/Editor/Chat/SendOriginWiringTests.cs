@@ -52,18 +52,40 @@ public class SendOriginWiringTests
         Assert.IsTrue(retry.Contains("retryOrigin"), "a retry must carry the origin saved at the first attempt (it is never re-resolved: the snapshot was consumed)");
     }
 
+    /// <summary>
+    /// The helper must find the DECLARATION, never a call site: a line like «else TurnPanelOff();» has the declaration's
+    /// shape (a word, a space, the name, a parenthesis) and used to match whenever it came first in the file.
+    /// </summary>
+    [Test]
+    public void TheSourceHelper_FindsTheDeclaration_NotACallSiteAboveIt()
+    {
+        // A block follows the call site: matched there, the brace scan would return «{ Other(); }» instead.
+        const string source =
+            "    private void HandleToggle(bool on)\n    {\n        if (on) Show();\n        else TurnPanelOff();\n" +
+            "        if (on)\n        {\n            Other();\n        }\n    }\n\n" +
+            "    private void TurnPanelOff()\n    {\n        HidePanel();\n    }\n";
+        string body = MethodBodyIn(source, "TurnPanelOff", "synthetic");
+        Assert.IsTrue(body.Contains("HidePanel();") && !body.Contains("Other();"), $"resolved a call site instead of the declaration: {body}");
+    }
+
     // ---- source helpers (SendPathWiringTests) --------------------------------------------
 
     private static string MethodBody(string relativePath, string method)
     {
         string path = Path.Combine(Application.dataPath, relativePath);
         Assert.IsTrue(File.Exists(path), $"{relativePath} moved — update SendOriginWiringTests");
-        string source = File.ReadAllText(path);
+        return MethodBodyIn(File.ReadAllText(path), method, relativePath);
+    }
+
+    // A declaration line: optional modifiers, a return type that is not a statement keyword (else/return/new/throw/await/
+    // yield would make a CALL look like one), the name, «(».
+    private static string MethodBodyIn(string source, string method, string where)
+    {
         var decl = Regex.Match(source,
-            @"^[ \t]*(?:(?:public|private|internal|protected|static)[ \t]+)*(?!return\b)[\w<>.]+[ \t]+" +
+            @"^[ \t]*(?:(?:public|private|internal|protected|static)[ \t]+)*(?!(?:return|else|new|throw|await|yield)\b)[\w<>.]+[ \t]+" +
             Regex.Escape(method) + @"[ \t]*\(",
             RegexOptions.Multiline);
-        Assert.IsTrue(decl.Success, $"{method} not found in {relativePath}");
+        Assert.IsTrue(decl.Success, $"{method} not found in {where}");
         int open = source.IndexOf('{', decl.Index);
         int depth = 0;
         for (int i = open; i < source.Length; i++)

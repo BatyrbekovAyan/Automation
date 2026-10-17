@@ -43,7 +43,8 @@ public class SuggestionsController : MonoBehaviour
     // B2 fix round 3 (D1 / M1): the open chat's mode = its stored choice OR a fallback the owner has not hidden for this
     // chat-open (FallbackRecheckPolicy.Effective), re-read on every live batch and once a minute while the chat is open.
     private bool _chatResolved;        // RestoreForActiveChat resolved the open chat (false after a bot switch / a close)
-    private bool _fallbackDismissed;   // the owner hid the panel while a fallback held — for THIS chat-open, nothing written
+    private bool _fallbackDismissed;   // the owner hid the panel while a fallback held — for THIS chat-open
+    private bool _dismissedWithoutWrite;   // round 4: that hide was a no-write HideOnly — the only one ShowOnly may undo
     private float _fallbackCheckedAt = -1f;
 
     // Keyboard-slot tenancy. Chassis = sketch-003 A (the panel is a tenant of the keyboard's slot);
@@ -322,6 +323,7 @@ public class SuggestionsController : MonoBehaviour
         _semiAutoOn = false;
         _chatResolved = false;                               // M1: never re-evaluate against the previous bot's sticky chat id
         _fallbackDismissed = false;
+        _dismissedWithoutWrite = false;
         _requestSeq++;                                        // supersede any in-flight request
         _debounce.Cancel();                                  // bot switch: drop a window pending from the previous bot's chat (BATCH-03)
         _pendingIncomingText = null;
@@ -352,6 +354,7 @@ public class SuggestionsController : MonoBehaviour
         _chatOpenSettledAt = -1f;
         StartFreshRound();       // rounds are per-question, never per-app — a chat open starts at round 1
         _fallbackDismissed = false;   // D1: a hidden fallback panel stays hidden for ONE chat-open
+        _dismissedWithoutWrite = false;
         _semiAutoOn = ResolveSemiAutoForOpenChat(out bool fallbackOnly);
         _chatResolved = true;
         _fallbackCheckedAt = Time.unscaledTime;
@@ -407,6 +410,7 @@ public class SuggestionsController : MonoBehaviour
         bool storedOn = SemiAutoStore.IsOn(cm.CurrentBotId, cm.CurrentChatId);
         bool fallbackOn = FallbackSemiAutoForOpenBot();
         _fallbackDismissed = FallbackRecheckPolicy.KeepDismissal(_fallbackDismissed, fallbackOn);
+        if (!_fallbackDismissed) _dismissedWithoutWrite = false;   // the latch goes with the dismissal it belongs to
         bool on = FallbackRecheckPolicy.Effective(storedOn, fallbackOn, _fallbackDismissed);
         fallbackOnly = on && !storedOn;
         return on;
@@ -480,10 +484,12 @@ public class SuggestionsController : MonoBehaviour
     {
         var cm = ChatManager.Instance;
         if (cm == null) return;
-        // D1: a chip lit only by a fallback is not the chat's mode — its tap hides the panel for this chat-open (or brings
-        // a hidden one back) and writes NOTHING. SemiAutoToggle routes the hide past the gate + confirm itself
-        // (OnDismissed); every tap that reaches this point asks the same rule before anything is recorded.
-        switch (SuggestionToggleTapPolicy.Decide(desiredOn, SemiAutoStore.IsOn(cm.CurrentBotId, cm.CurrentChatId), FallbackSemiAutoForOpenBot()))
+        // D1: a chip lit only by a fallback is not the chat's mode — its tap hides the panel for this chat-open and writes
+        // NOTHING; the tap back undoes exactly that hide (round 4: only a NO-WRITE dismissal — after a written «Авто», or
+        // with nothing dismissed, the tap is the owner's «Вместе» and is written). SemiAutoToggle routes the hide past the
+        // gate + confirm itself (OnDismissed); every tap that reaches this point asks the same rule before anything is recorded.
+        bool storedOn = SemiAutoStore.IsOn(cm.CurrentBotId, cm.CurrentChatId);
+        switch (SuggestionToggleTapPolicy.Decide(desiredOn, storedOn, FallbackSemiAutoForOpenBot(), _dismissedWithoutWrite))
         {
             case SuggestionToggleTap.HideOnly: DismissFallbackForThisOpen(); return;
             case SuggestionToggleTap.ShowOnly: RestoreFallbackForThisOpen(); return;
@@ -491,6 +497,10 @@ public class SuggestionsController : MonoBehaviour
         _semiAutoOn = desiredOn;
         SemiAutoStore.Set(cm.CurrentBotId, cm.CurrentChatId, desiredOn);   // persist
         PushReplyModeForActiveChat(desiredOn);                 // SUP-02: mirror the per-chat override (ON and OFF) to the server
+        // A Write is the owner's decision: no silent undo can follow it. An off-tap hides a fallback that still holds for
+        // this chat-open (M1 must not raise it a minute later, as before M1); an on-tap shows the panel for good.
+        _fallbackDismissed = !desiredOn;
+        _dismissedWithoutWrite = false;
         if (_toggle != null) _toggle.SetLit(desiredOn);
         if (_slotKey != null) _slotKey.SetVisible(desiredOn);
         if (desiredOn)
@@ -499,13 +509,7 @@ public class SuggestionsController : MonoBehaviour
             StartFreshRound();                                 // explicit turn-on = round 1
             IssueRequest(null, null);                          // first set on turn-on
         }
-        else
-        {
-            // The owner just turned the panel off here: a fallback that still holds must not raise it again at the next
-            // re-evaluation (M1) — it stays hidden for this chat-open, as before M1; the next open shows it.
-            _fallbackDismissed = true;
-            TurnPanelOff();
-        }
+        else TurnPanelOff();
     }
 
     // The panel goes away for the open chat: supersede what is in flight, drop the debounce window and every parked
@@ -527,17 +531,20 @@ public class SuggestionsController : MonoBehaviour
     private void DismissFallbackForThisOpen()
     {
         _fallbackDismissed = true;
+        _dismissedWithoutWrite = true;   // the one hide a tap back may undo without a write
         _semiAutoOn = false;
         if (_toggle != null) _toggle.SetLit(false);
         if (_slotKey != null) _slotKey.SetVisible(false);
         TurnPanelOff();
     }
 
-    // D1: the owner taps a hidden fallback panel back while the fallback still holds — it returns, still unrecorded: the
-    // fallback is what lights it (an explicit «Вместе» written here would outlive the night / the quota reset).
+    // D1: a tap brings back a fallback panel hidden by a NO-WRITE dismissal, while the fallback still holds — it returns,
+    // still unrecorded: the fallback is what lights it (an explicit «Вместе» written here would outlive the night / the
+    // quota reset). Reached only through SuggestionToggleTapPolicy's ShowOnly, which requires that no-write hide.
     private void RestoreFallbackForThisOpen()
     {
         _fallbackDismissed = false;
+        _dismissedWithoutWrite = false;
         _semiAutoOn = true;
         if (_toggle != null) _toggle.SetLit(true, fallbackOnly: true);
         if (_slotKey != null) _slotKey.SetVisible(true);

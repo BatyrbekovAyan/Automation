@@ -116,7 +116,16 @@ public class ScheduleSyncService : MonoBehaviour
     public ScheduleDelivery StateOf(string botId) => ScheduleSyncQueue.StateOf(_model, botId);
 
     public bool IsPending(string botId) => StateOf(botId) == ScheduleDelivery.Pending;
-    public bool HasFailed(string botId) => StateOf(botId) == ScheduleDelivery.Failed;
+
+    /// <summary>The desire did not get through — the network failed every attempt of the launch, or the server refused it.</summary>
+    public bool HasFailed(string botId)
+    {
+        var state = StateOf(botId);
+        return state == ScheduleDelivery.Failed || state == ScheduleDelivery.Rejected;
+    }
+
+    /// <summary>When the bot's undelivered streak began — the section's pending grace (ScheduleDeliveryLine).</summary>
+    public long PendingSinceMs(string botId) => ScheduleSyncQueue.PendingSinceMs(_model, botId);
 
     /// <summary>
     /// I-1: back in the app — a desire a dead network parked (or a refusal since fixed) is tried again, at most once a

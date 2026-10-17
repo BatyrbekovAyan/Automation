@@ -43,7 +43,7 @@ public class ScheduleCopyTests
         {
             ScheduleCopy.SectionTitle, ScheduleCopy.ToggleLabel, ScheduleCopy.FromLabel, ScheduleCopy.ToLabel,
             ScheduleCopy.Hint, ScheduleCopy.Invalid, ScheduleCopy.NoDays, ScheduleCopy.OffHoursRowPrefix,
-            ScheduleCopy.SyncPending, ScheduleCopy.SyncFailed,
+            ScheduleCopy.SyncPending, ScheduleCopy.SyncFailed, ScheduleCopy.SyncRejected,
         }.Concat(ScheduleCopy.DayNames);
         foreach (var s in strings)
         {
@@ -59,6 +59,9 @@ public class ScheduleCopyTests
     {
         Assert.AreEqual("Расписание ещё не дошло до сервера", ScheduleCopy.SyncStatus(ScheduleDelivery.Pending));
         Assert.AreEqual("Не удалось сохранить расписание — проверьте интернет", ScheduleCopy.SyncStatus(ScheduleDelivery.Failed));
+        Assert.AreEqual("Сервер не принял расписание — попробуйте сохранить снова", ScheduleCopy.SyncStatus(ScheduleDelivery.Rejected),
+            "a refusal (400/401/403) is not the network — never «проверьте интернет»");
+        Assert.IsFalse(ScheduleCopy.SyncStatus(ScheduleDelivery.Rejected).Contains("интернет"));
         Assert.IsNull(ScheduleCopy.SyncStatus(ScheduleDelivery.Confirmed), "a confirmed schedule needs no line");
     }
 

@@ -17,9 +17,10 @@ using UnityEngine.UI;
 ///                             DeferredDismissInputField, no scrim)
 ///   ScheduleDaysRow           seven DayChip pills Пн–Вс (the chip owns its colours — no ThemedColor on it)
 ///   ScheduleError             the one error line (Destructive, hidden until a value is wrong)
-///   ScheduleSyncStatus        the delivery line (fix round 3, I-1: «Расписание ещё не дошло до сервера» / «Не удалось
-///                             сохранить расписание — проверьте интернет»), hidden; NO ThemedColor — BotSettings paints it
-///                             by state (InkSecondary / Destructive), a ThemedColor would be a second owner
+///   ScheduleSyncStatus        the delivery line (fix rounds 3–4, I-1: «Расписание ещё не дошло до сервера» / «Не удалось
+///                             сохранить расписание — проверьте интернет» / «Сервер не принял расписание — попробуйте
+///                             сохранить снова»), hidden; NO ThemedColor — BotSettings paints it by state (InkSecondary /
+///                             Destructive), a ThemedColor would be a second owner
 ///   ScheduleHint              «Вне часов бот не отвечает сам — подсказки в «Вместе» работают»
 ///
 /// plus FormKeyboardScroll on the Основное tab (the fields sit low enough for the keyboard to cover them) and the six
@@ -371,11 +372,12 @@ public static class BotScheduleBuilder
         return tmp;
     }
 
-    // One box for both states — the taller of the two copies, never under the error line's one-line box. Measured on the
+    // One box for every state — the tallest of the copies, never under the error line's one-line box. Measured on the
     // hint: the same font, size and wrapping, and an ACTIVE label (the line itself is authored hidden).
     private static float SyncStatusHeight(TextMeshProUGUI hint, float width)
         => Mathf.Max(ErrorHeight, MeasuredHeight(hint, width, ScheduleCopy.SyncPending, "delivery line (pending)"),
-                     MeasuredHeight(hint, width, ScheduleCopy.SyncFailed, "delivery line (failed)"));
+                     MeasuredHeight(hint, width, ScheduleCopy.SyncFailed, "delivery line (failed)"),
+                     MeasuredHeight(hint, width, ScheduleCopy.SyncRejected, "delivery line (rejected)"));
 
     // A note wraps in the list's width; its box is its measured height (the static SF Pro atlas measures headless). Measured
     // on a label inside the loaded prefab — no probe object, so a menu run never touches the open scene.

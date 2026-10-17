@@ -309,6 +309,7 @@ public class BotScheduleSectionTests
 
     [TestCase(ScheduleDelivery.Pending, ScheduleCopy.SyncPending, ThemeRole.InkSecondary)]
     [TestCase(ScheduleDelivery.Failed, ScheduleCopy.SyncFailed, ThemeRole.Destructive)]
+    [TestCase(ScheduleDelivery.Rejected, ScheduleCopy.SyncRejected, ThemeRole.Destructive)]
     public void TheDeliveryLine_SaysWhereTheScheduleIs_InItsStatesColour(ScheduleDelivery state, string text, ThemeRole role)
     {
         var light = ScriptableObject.CreateInstance<ThemeAsset>();
@@ -345,6 +346,12 @@ public class BotScheduleSectionTests
         Assert.IsTrue(MethodBody(schedule, "private void HandleScheduleSyncState(string botId)").Contains("RefreshScheduleSync()"));
         string refresh = MethodBody(schedule, "private void RefreshScheduleSync()");
         Assert.IsTrue(refresh.Contains(".StateOf(") && refresh.Contains("ApplyScheduleSyncState("), "the line shows the service's verdict");
+        Assert.IsTrue(refresh.Contains("ApplyScheduleSyncState(ScheduleDeliveryLine.Shown("),
+            "…through the pending grace (round 4) — a normal Save shows no line");
+        Assert.IsTrue(refresh.Contains("ScheduleDeliveryLine.RecheckInMs(") && refresh.Contains("ScheduleGraceRecheck("),
+            "a desire still pending when the grace ends must then be shown — the section looks again by itself");
+        Assert.IsTrue(MethodBody(schedule, "private void UnbindScheduleSync()").Contains("scheduleSyncGraceRoutine = null"),
+            "the grace coroutine dies with the screen — its latch resets in OnDisable (the BotSettings coroutine rule)");
 
         string settings = Src("Scripts/Main/BotSettings.cs");
         Assert.IsTrue(MethodBody(settings, "public void OnEnable()").Contains("BindScheduleSync()"));

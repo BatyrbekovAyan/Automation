@@ -1,11 +1,11 @@
-/// <summary>What a tap on the open chat's «Авто» chip does (B2 fix round 3, D1).</summary>
+/// <summary>What a tap on the open chat's «Авто» chip does (B2 fix rounds 3–4, D1).</summary>
 public enum SuggestionToggleTap
 {
     /// <summary>The owner's decision about the chat: persist its new mode and push it to the server (today's path).</summary>
     Write,
     /// <summary>The panel is up only because of a fallback — hide it for this chat-open, write nothing.</summary>
     HideOnly,
-    /// <summary>Undo that dismissal while the fallback still holds — the panel comes back, still nothing written.</summary>
+    /// <summary>Undo exactly that no-write dismissal while the fallback still holds — the panel comes back, nothing written.</summary>
     ShowOnly,
 }
 
@@ -16,18 +16,23 @@ public enum SuggestionToggleTap
 /// owner's chosen mode must come back untouched the moment it ends. So a tap on a chip lit by a fallback alone is not a
 /// decision about the chat — it hides the panel for this chat-open and records nothing (no SemiAutoStore write, no
 /// server desire); before this rule it wrote a sticky per-chat «Авто» that outlived the night and the quota reset.
-/// Tapping a hidden fallback panel back, while the fallback still holds, records nothing either: an explicit «Вместе»
-/// written there would keep the bot silent with this client once the window opens. A chip lit by the stored «Вместе»,
-/// and every tap outside a fallback, keep today's behaviour.
+///
+/// Round 4: the tap back may skip the write ONLY when it undoes that no-write hide (<c>dismissedWithoutWrite</c>, a
+/// this-chat-open latch the controller sets on HideOnly and clears on chat open and on every Write). Every other «on»
+/// tap is the owner's «Вместе» and is written: after an off-tap that WROTE «Авто» (a chip lit by the stored «Вместе»,
+/// past the confirm), or in the seconds before the minute tick notices the window closing — a silent show there left a
+/// per-chat «Авто» on the phone and the server, and the bot answered a client the owner had switched back to «Вместе»
+/// once the fallback ended.
 /// </summary>
 public static class SuggestionToggleTapPolicy
 {
-    /// <param name="desiredOn">The tap's direction: true = show the panel («Вместе»), false = hide it («Авто»).</param>
+    /// <param name="wantOn">The tap's direction: true = show the panel («Вместе»), false = hide it («Авто»).</param>
     /// <param name="storedOn">SemiAutoStore's effective value for the open chat (its override, else the bot default).</param>
     /// <param name="fallbackOn">The quota is spent, or the open bot's schedule is closed right now.</param>
-    public static SuggestionToggleTap Decide(bool desiredOn, bool storedOn, bool fallbackOn)
+    /// <param name="dismissedWithoutWrite">The panel is down because of a HideOnly in this chat-open — nothing was written.</param>
+    public static SuggestionToggleTap Decide(bool wantOn, bool storedOn, bool fallbackOn, bool dismissedWithoutWrite)
     {
-        if (storedOn || !fallbackOn) return SuggestionToggleTap.Write;
-        return desiredOn ? SuggestionToggleTap.ShowOnly : SuggestionToggleTap.HideOnly;
+        if (!wantOn) return !storedOn && fallbackOn ? SuggestionToggleTap.HideOnly : SuggestionToggleTap.Write;
+        return fallbackOn && dismissedWithoutWrite ? SuggestionToggleTap.ShowOnly : SuggestionToggleTap.Write;
     }
 }

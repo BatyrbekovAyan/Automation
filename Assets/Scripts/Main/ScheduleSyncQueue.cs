@@ -27,7 +27,8 @@ public static class ScheduleSyncQueue
 {
     public const string StatePending = "pending";
     public const string StateDone = "done";        // answered (applied or superseded) — or nothing was deliverable
-    public const string StateFailed = "failed";    // refused / attempts exhausted THIS launch; re-armed on the next one
+    public const string StateFailed = "failed";    // every attempt of THIS launch failed (no answer, 5xx) — the network
+    public const string StateRejected = "rejected"; // the server refused it (400/401/403) — never «check the internet»
 
     public const int MaxAttemptsPerLaunch = 8;
     /// <summary>The server's Validate keeps at most ten ids (a bot has two).</summary>
@@ -50,6 +51,8 @@ public static class ScheduleSyncQueue
         public long serverVersion;
         public int attempts;
         public long nextAttemptAtMs;
+        /// <summary>When the undelivered streak began (the first Save the server does not have yet) — the line's grace.</summary>
+        public long pendingSinceMs;
         public string state = StatePending;
 
         [JsonIgnore] public bool IsPending => state == StatePending;
@@ -81,8 +84,12 @@ public static class ScheduleSyncQueue
         var e = Find(m, botId);
         if (e == null)
         {
-            e = new Entry { botId = botId };
+            e = new Entry { botId = botId, pendingSinceMs = nowMs };
             m.entries.Add(e);
+        }
+        else if (!e.IsPending)
+        {
+            e.pendingSinceMs = nowMs;   // a new streak; a second Save while the first is still undelivered continues it
         }
         e.version = NextVersion(nowMs, Math.Max(e.version, e.serverVersion));
         e.enabled = schedule.Enabled;
@@ -134,20 +141,29 @@ public static class ScheduleSyncQueue
     /// <summary>
     /// Where the bot's schedule delivery stands, as the settings section shows it: no desire, or a settled one (applied,
     /// superseded by a newer server row, or nothing was deliverable) is confirmed; a desire still on its way — the boot
-    /// gate, a backoff, a held deletion — is pending; one refused, or parked after its attempts, has failed.
+    /// gate, a backoff, a held deletion — is pending; one the server refused is rejected; one parked after every attempt
+    /// of the launch has failed.
     /// </summary>
     public static ScheduleDelivery StateOf(Model m, string botId)
     {
         var e = m != null ? Find(m, botId) : null;
         if (e == null || e.state == StateDone) return ScheduleDelivery.Confirmed;
+        if (e.state == StateRejected) return ScheduleDelivery.Rejected;
         return e.state == StateFailed ? ScheduleDelivery.Failed : ScheduleDelivery.Pending;
+    }
+
+    /// <summary>When the bot's undelivered streak began (0 = no desire) — ScheduleDeliveryLine's grace starts there.</summary>
+    public static long PendingSinceMs(Model m, string botId)
+    {
+        var e = m != null ? Find(m, botId) : null;
+        return e != null ? e.pendingSinceMs : 0;
     }
 
     /// <summary>
     /// Try an undelivered desire again NOW — what a new launch does (<see cref="Deserialize"/>): a pending one (waiting
-    /// out a backoff) and a failed one (refused, or parked after its attempts) restart from attempt 0, due at once, with
-    /// the version they were minted with; a settled one is untouched. <paramref name="botId"/> null = every bot.
-    /// True when anything was re-armed.
+    /// out a backoff), a refused one and a failed one (parked after its attempts) restart from attempt 0, due at once,
+    /// with the version they were minted with and their streak's start kept; a settled one is untouched.
+    /// <paramref name="botId"/> null = every bot. True when anything was re-armed.
     /// </summary>
     public static bool Rearm(Model m, string botId, long nowMs)
     {
@@ -155,7 +171,7 @@ public static class ScheduleSyncQueue
         foreach (var e in m.entries)
         {
             if (botId != null && e.botId != botId) continue;
-            if (e.state != StatePending && e.state != StateFailed) continue;
+            if (e.state != StatePending && e.state != StateFailed && e.state != StateRejected) continue;
             Arm(e, nowMs);
             any = true;
         }
@@ -177,7 +193,7 @@ public static class ScheduleSyncQueue
         if (e == null || e.version != sentVersion) return;
         if (status == BatchStatus.Rejected)
         {
-            e.state = StateFailed;
+            e.state = StateRejected;
             return;
         }
         if (status == BatchStatus.Transient)
@@ -270,8 +286,32 @@ public enum ScheduleDelivery
     Confirmed,
     /// <summary>A desire is still on its way: the boot gate, a backoff, a held deletion.</summary>
     Pending,
-    /// <summary>Refused, or parked after its attempts — re-armed by a return to the app, the bot's settings, a new launch.</summary>
+    /// <summary>Every attempt of the launch failed (no answer, 5xx) — re-armed by a return to the app, the settings, a launch.</summary>
     Failed,
+    /// <summary>The server refused it (400/401/403) — re-armed the same way; never a network message.</summary>
+    Rejected,
+}
+
+/// <summary>
+/// Fix round 4: the delivery line's grace. A normal Save is answered in 1–3 s, so showing «ещё не дошло до сервера» at
+/// once would flash on every Save and shift «Удалить бота» below it. A pending desire is shown only once its streak
+/// (<see cref="ScheduleSyncQueue.PendingSinceMs"/>) is <see cref="PendingGraceMs"/> old; a refusal or a failure is shown
+/// at once; a clock that went back never hides the line.
+/// </summary>
+public static class ScheduleDeliveryLine
+{
+    public const long PendingGraceMs = 2_000;
+
+    /// <summary>The state the line shows now — Confirmed (hidden) while a pending desire is inside its grace.</summary>
+    public static ScheduleDelivery Shown(ScheduleDelivery state, long pendingSinceMs, long nowMs)
+        => InGrace(state, pendingSinceMs, nowMs) ? ScheduleDelivery.Confirmed : state;
+
+    /// <summary>How long until the line must be looked at again (the grace runs out); 0 = nothing to wait for.</summary>
+    public static long RecheckInMs(ScheduleDelivery state, long pendingSinceMs, long nowMs)
+        => InGrace(state, pendingSinceMs, nowMs) ? PendingGraceMs - (nowMs - pendingSinceMs) : 0;
+
+    private static bool InGrace(ScheduleDelivery state, long pendingSinceMs, long nowMs)
+        => state == ScheduleDelivery.Pending && nowMs >= pendingSinceMs && nowMs - pendingSinceMs < PendingGraceMs;
 }
 
 /// <summary>Pure reader of the Set Schedule answer (build-set-schedule.py Shape Response).</summary>

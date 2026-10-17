@@ -117,7 +117,7 @@ public class ScheduleSyncServiceTests
         long v = ScheduleSyncQueue.Desire(m, "Bot0", Weekdays, "Asia/Almaty", 1000);
         var e = ScheduleSyncQueue.Find(m, "Bot0");
         ScheduleSyncQueue.ApplyResult(e, v, ScheduleSyncQueue.BatchStatus.Rejected, new[] { "wa" }, null, 2000);
-        Assert.AreEqual(ScheduleSyncQueue.StateFailed, e.state);
+        Assert.AreEqual(ScheduleSyncQueue.StateRejected, e.state, "the server's word, told apart from a network failure");
         Assert.AreEqual(0, ScheduleSyncQueue.Due(m, long.MaxValue).Count, "a refusal is never retried in the same launch");
         Assert.IsFalse(ScheduleSyncQueue.AnyPending(m));
 
@@ -430,7 +430,11 @@ public class ScheduleSyncServiceTests
         ScheduleSyncQueue.ApplyResult(e, v, ScheduleSyncQueue.BatchStatus.Transient, new[] { "wa" }, null, 2000);
         Assert.AreEqual(ScheduleDelivery.Pending, ScheduleSyncQueue.StateOf(m, "Bot0"), "waiting out a backoff is still on its way");
         ScheduleSyncQueue.ApplyResult(e, v, ScheduleSyncQueue.BatchStatus.Rejected, new[] { "wa" }, null, 3000);
-        Assert.AreEqual(ScheduleDelivery.Failed, ScheduleSyncQueue.StateOf(m, "Bot0"), "refused");
+        Assert.AreEqual(ScheduleDelivery.Rejected, ScheduleSyncQueue.StateOf(m, "Bot0"), "refused by the server (400/401/403)");
+        ScheduleSyncQueue.Rearm(m, "Bot0", 3500);
+        for (int i = 0; i < ScheduleSyncQueue.MaxAttemptsPerLaunch; i++)
+            ScheduleSyncQueue.ApplyResult(e, v, ScheduleSyncQueue.BatchStatus.Transient, new[] { "wa" }, null, 3600);
+        Assert.AreEqual(ScheduleDelivery.Failed, ScheduleSyncQueue.StateOf(m, "Bot0"), "every attempt of the launch failed — the network");
         ScheduleSyncQueue.Rearm(m, "Bot0", 4000);
         ScheduleSyncQueue.ApplyResult(e, v, ScheduleSyncQueue.BatchStatus.Answered, new[] { "wa" }, Rows(("wa", true, v)), 5000);
         Assert.AreEqual(ScheduleDelivery.Confirmed, ScheduleSyncQueue.StateOf(m, "Bot0"), "the server holds it");
@@ -471,6 +475,70 @@ public class ScheduleSyncServiceTests
             "a desire waiting out a five-minute backoff is tried at once");
         Assert.AreEqual(ScheduleSyncQueue.StateDone, settled.state);
         Assert.AreEqual(2, ScheduleSyncQueue.Due(m, 12_000).Count);
+    }
+
+    [Test]
+    public void ARefusal_IsReArmedLikeAFailure_AndKeepsItsVersion()
+    {
+        var m = M();
+        long v = ScheduleSyncQueue.Desire(m, "Bot0", Weekdays, "Asia/Almaty", 1000);
+        var e = ScheduleSyncQueue.Find(m, "Bot0");
+        ScheduleSyncQueue.ApplyResult(e, v, ScheduleSyncQueue.BatchStatus.Rejected, new[] { "wa" }, null, 2000);
+        Assert.IsFalse(ScheduleSyncQueue.AnyPending(m), "a refusal waits for a re-arm, not for a backoff");
+        Assert.IsTrue(ScheduleSyncQueue.Rearm(m, "Bot0", 9000), "the settings opened / a return to the app");
+        Assert.IsTrue(e.IsPending && e.attempts == 0 && e.nextAttemptAtMs == 9000 && e.version == v);
+        ScheduleSyncQueue.ApplyResult(e, v, ScheduleSyncQueue.BatchStatus.Rejected, new[] { "wa" }, null, 9500);
+        var reloaded = ScheduleSyncQueue.Deserialize(ScheduleSyncQueue.Serialize(m), 20_000);
+        Assert.IsTrue(ScheduleSyncQueue.Find(reloaded, "Bot0").IsPending, "a launch re-arms a refusal too");
+    }
+
+    // ── fix round 4: the pending line waits out a normal Save ────────────────────────────────────────────
+
+    [Test]
+    public void PendingSince_IsWhenTheUndeliveredStreakBegan()
+    {
+        var m = M();
+        ScheduleSyncQueue.Desire(m, "Bot0", Weekdays, "Asia/Almaty", 1000);
+        Assert.AreEqual(1000, ScheduleSyncQueue.PendingSinceMs(m, "Bot0"), "a first desire starts waiting when it is made");
+        ScheduleSyncQueue.Desire(m, "Bot0", Night, "Asia/Almaty", 1500);
+        Assert.AreEqual(1000, ScheduleSyncQueue.PendingSinceMs(m, "Bot0"),
+            "a second Save before the first was delivered continues the same streak — the server still has neither");
+        var e = ScheduleSyncQueue.Find(m, "Bot0");
+        ScheduleSyncQueue.ApplyResult(e, e.version, ScheduleSyncQueue.BatchStatus.Transient, new[] { "wa" }, null, 2000);
+        ScheduleSyncQueue.Rearm(m, "Bot0", 3000);
+        Assert.AreEqual(1000, ScheduleSyncQueue.PendingSinceMs(m, "Bot0"), "a backoff or a re-arm is not a new start");
+
+        ScheduleSyncQueue.ApplyResult(e, e.version, ScheduleSyncQueue.BatchStatus.Answered, new[] { "wa" }, Rows(("wa", true, e.version)), 4000);
+        ScheduleSyncQueue.Desire(m, "Bot0", Weekdays, "Asia/Almaty", 5000);
+        Assert.AreEqual(5000, ScheduleSyncQueue.PendingSinceMs(m, "Bot0"), "after a delivery the next Save starts a new grace");
+        ScheduleSyncQueue.ApplyResult(e, e.version, ScheduleSyncQueue.BatchStatus.Rejected, new[] { "wa" }, null, 6000);
+        ScheduleSyncQueue.Desire(m, "Bot0", Night, "Asia/Almaty", 7000);
+        Assert.AreEqual(7000, ScheduleSyncQueue.PendingSinceMs(m, "Bot0"), "…and so does a Save after a refusal or a failure");
+
+        var reloaded = ScheduleSyncQueue.Deserialize(ScheduleSyncQueue.Serialize(m), 50_000);
+        Assert.AreEqual(7000, ScheduleSyncQueue.PendingSinceMs(reloaded, "Bot0"), "persisted: a desire pending since yesterday shows at once on launch");
+        Assert.AreEqual(0, ScheduleSyncQueue.PendingSinceMs(m, "Nobody"));
+    }
+
+    [Test]
+    public void TheDeliveryLine_HidesAPendingDesireForTwoSeconds_AndShowsAFailureAtOnce()
+    {
+        const long since = 10_000;
+        Assert.AreEqual(2_000, ScheduleDeliveryLine.PendingGraceMs);
+        Assert.AreEqual(ScheduleDelivery.Confirmed, ScheduleDeliveryLine.Shown(ScheduleDelivery.Pending, since, since),
+            "a normal Save is answered in 1–3 s — no flash of «ещё не дошло», no jump of «Удалить бота»");
+        Assert.AreEqual(ScheduleDelivery.Confirmed, ScheduleDeliveryLine.Shown(ScheduleDelivery.Pending, since, since + 1_999));
+        Assert.AreEqual(1_500, ScheduleDeliveryLine.RecheckInMs(ScheduleDelivery.Pending, since, since + 500), "look again when the grace ends");
+        Assert.AreEqual(ScheduleDelivery.Pending, ScheduleDeliveryLine.Shown(ScheduleDelivery.Pending, since, since + 2_000), "still waiting after 2 s — say so");
+        Assert.AreEqual(0, ScheduleDeliveryLine.RecheckInMs(ScheduleDelivery.Pending, since, since + 2_000));
+        Assert.AreEqual(ScheduleDelivery.Pending, ScheduleDeliveryLine.Shown(ScheduleDelivery.Pending, since, since - 1),
+            "a clock that went back never hides the line");
+        Assert.AreEqual(0, ScheduleDeliveryLine.RecheckInMs(ScheduleDelivery.Pending, since, since - 1));
+        foreach (var shownAtOnce in new[] { ScheduleDelivery.Failed, ScheduleDelivery.Rejected, ScheduleDelivery.Confirmed })
+        {
+            Assert.AreEqual(shownAtOnce, ScheduleDeliveryLine.Shown(shownAtOnce, since, since), $"{shownAtOnce} has no grace");
+            Assert.AreEqual(0, ScheduleDeliveryLine.RecheckInMs(shownAtOnce, since, since));
+        }
     }
 
     [Test]
@@ -517,6 +585,8 @@ public class ScheduleSyncServiceTests
         Assert.IsTrue(Regex.IsMatch(svc, @"public ScheduleDelivery StateOf\(string botId\)\s*=>\s*ScheduleSyncQueue\.StateOf\(_model, botId\);"),
             "the section reads the pure queue's verdict");
         Assert.IsTrue(svc.Contains("public bool IsPending(string botId)") && svc.Contains("public bool HasFailed(string botId)"));
+        Assert.IsTrue(Regex.IsMatch(svc, @"public long PendingSinceMs\(string botId\)\s*=>\s*ScheduleSyncQueue\.PendingSinceMs\(_model, botId\);"),
+            "the section's grace reads when the desire started waiting");
     }
 
     // ── fix round 3 (M5): the zone a Save sends is the resolved one ──────────────────────────────────────────

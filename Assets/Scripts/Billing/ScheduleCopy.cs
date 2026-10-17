@@ -22,8 +22,10 @@ public static class ScheduleCopy
     public const string OffHoursRowPrefix = "Вне графика · ";
     /// <summary>Fix round 3 (I-1): the delivery line — the saved schedule has not reached the server yet.</summary>
     public const string SyncPending = "Расписание ещё не дошло до сервера";
-    /// <summary>...or the server refused it / every attempt of this launch failed (retried on return to the app).</summary>
+    /// <summary>...or every attempt of this launch failed — the network (retried on return to the app).</summary>
     public const string SyncFailed = "Не удалось сохранить расписание — проверьте интернет";
+    /// <summary>Fix round 4: ...or the server refused it (400/401/403) — not the network, so never «проверьте интернет».</summary>
+    public const string SyncRejected = "Сервер не принял расписание — попробуйте сохранить снова";
 
     // Monday first: index = the ScheduleModel day bit.
     private static readonly string[] Days = { "Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс" };
@@ -47,6 +49,7 @@ public static class ScheduleCopy
     {
         ScheduleDelivery.Pending => SyncPending,
         ScheduleDelivery.Failed => SyncFailed,
+        ScheduleDelivery.Rejected => SyncRejected,
         _ => null,
     };
 

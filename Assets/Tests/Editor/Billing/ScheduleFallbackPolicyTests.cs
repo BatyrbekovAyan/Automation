@@ -87,6 +87,19 @@ public class ScheduleFallbackPolicyTests
         Assert.IsTrue(decide >= 0 && store > decide && push > decide, "every tap asks the policy BEFORE anything is written");
         Assert.IsTrue(toggle.Contains("SuggestionToggleTap.HideOnly") && toggle.Contains("SuggestionToggleTap.ShowOnly"),
             "both no-write outcomes are handled");
+        Assert.IsTrue(Regex.IsMatch(toggle, @"SuggestionToggleTapPolicy\.Decide\([^;]*_dismissedWithoutWrite\)"),
+            "round 4: only a NO-WRITE dismissal may be undone without a write — the policy is told which kind is pending");
+        int writeAt = toggle.IndexOf("SemiAutoStore.Set(", StringComparison.Ordinal);
+        Assert.IsTrue(toggle.IndexOf("_dismissedWithoutWrite = false", writeAt, StringComparison.Ordinal) > writeAt,
+            "every Write clears the latch — a tap back after a written «Авто» is the owner's «Вместе»");
+        Assert.IsTrue(MethodBody(controller, "private void DismissFallbackForThisOpen()").Contains("_dismissedWithoutWrite = true"),
+            "the no-write HideOnly is the one thing that sets it");
+        Assert.IsTrue(MethodBody(controller, "private void RestoreFallbackForThisOpen()").Contains("_dismissedWithoutWrite = false"));
+        Assert.IsTrue(MethodBody(controller, "private void RestoreForActiveChat()").Contains("_dismissedWithoutWrite = false"),
+            "a chat open starts without one");
+        Assert.IsTrue(MethodBody(controller, "private void ResetForNoOpenChat()").Contains("_dismissedWithoutWrite = false"));
+        Assert.IsTrue(MethodBody(controller, "private bool ResolveSemiAutoForOpenChat(").Contains("_dismissedWithoutWrite = false"),
+            "the latch goes with the dismissal it belongs to — a fallback that ended takes both");
         foreach (var method in new[] { "private void DismissFallbackForThisOpen()", "private void RestoreFallbackForThisOpen()" })
         {
             string body = MethodBody(controller, method);
