@@ -3552,11 +3552,14 @@ public partial class Manager : MonoBehaviour
         }
 
         ReplyModeSyncService.Existing?.Hold(botId);
+        ScheduleSyncService.Existing?.Hold(botId);   // B2: Delete Bot Files removes the bot_schedule rows too
         if (showLoading) LoadingPanel.SetActive(true);
         // The hold stops the NEXT send; a batch already on the wire must land before the server wipes its rows
         // (bounded by twice the send's own timeout: a refresh retry is one more request).
-        float drainUntil = Time.realtimeSinceStartup + 2 * ReplyModeSyncService.RequestTimeoutSeconds;
-        while (ReplyModeSyncService.Existing != null && ReplyModeSyncService.Existing.IsSending(botId)
+        float drainUntil = Time.realtimeSinceStartup
+                           + 2 * Mathf.Max(ReplyModeSyncService.RequestTimeoutSeconds, ScheduleSyncService.RequestTimeoutSeconds);
+        while (((ReplyModeSyncService.Existing != null && ReplyModeSyncService.Existing.IsSending(botId))
+                || (ScheduleSyncService.Existing != null && ScheduleSyncService.Existing.IsSending(botId)))
                && Time.realtimeSinceStartup < drainUntil)
             yield return null;
         BotServerDeletion.Outcome? stop = null;
@@ -3601,6 +3604,7 @@ public partial class Manager : MonoBehaviour
         if (!outcome.RemovesBot)
         {
             ReplyModeSyncService.Existing?.Release(botId);
+            ScheduleSyncService.Existing?.Release(botId);
             Debug.LogWarning($"[DeleteBotOnServer] {botId}: {outcome.Verdict} ({outcome.Reason}) — the bot stays on the phone");
         }
         done?.Invoke(outcome);

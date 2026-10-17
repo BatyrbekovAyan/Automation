@@ -16,6 +16,9 @@ using UnityEngine.Networking;
 /// gate as the reply-mode queue (<see cref="ReplyModeSendGate"/>, opened by Manager after billing + the session op).
 /// The profile ids are resolved at SEND time from the bot's stored channels and the session token
 /// (<see cref="ScheduleSyncQueue.Sendable"/>) — a re-paired channel is followed, a retired one is never sent.
+/// V12 mirror: while Manager.DeleteBotOnServer runs, the bot is HELD (<see cref="Hold"/>; a request already on the wire
+/// is drained first through <see cref="IsSending"/>), so no schedule send can land after Delete Bot Files removed the
+/// bot's rows; <see cref="Release"/> when the server keeps the bot, <see cref="ForgetBot"/> once it goes.
 /// </summary>
 public class ScheduleSyncService : MonoBehaviour
 {
@@ -28,6 +31,8 @@ public class ScheduleSyncService : MonoBehaviour
     private ScheduleSyncQueue.Model _model;
     private bool _looping;
     private float _bootedAt;
+    private readonly HashSet<string> _held = new HashSet<string>();   // bots whose server deletion is in flight (V12)
+    private string _sendingBot;                                         // the bot whose request is on the wire right now
 
     public static ScheduleSyncService Instance
     {
@@ -106,7 +111,27 @@ public class ScheduleSyncService : MonoBehaviour
     public void ForgetBot(string botId)
     {
         ScheduleSyncQueue.ForgetBot(_model, botId);
+        _held.Remove(botId ?? "");
         Persist();
+    }
+
+    /// <summary>
+    /// V12: the bot's server deletion is in flight — send nothing for it meanwhile. The desire is NOT forgotten yet: if
+    /// the server keeps the bot, <see cref="Release"/> delivers it after all. In memory only (a restart mid-deletion
+    /// leaves the bot on the phone, unheld).
+    /// </summary>
+    public void Hold(string botId)
+    {
+        if (!string.IsNullOrEmpty(botId)) _held.Add(botId);
+    }
+
+    /// <summary>V12: a request for this bot is on the wire (a hold stops the NEXT send, not one already sent).</summary>
+    public bool IsSending(string botId) => _sendingBot != null && _sendingBot == botId;
+
+    /// <summary>V12: the server kept the bot (retry / refused) — its queued desire goes out again.</summary>
+    public void Release(string botId)
+    {
+        if (_held.Remove(botId ?? "")) Kick();
     }
 
     /// <summary>The full local wipe: the in-memory queue would otherwise re-persist itself after PlayerPrefs.DeleteAll.</summary>
@@ -130,10 +155,10 @@ public class ScheduleSyncService : MonoBehaviour
                 yield return null;                                 // no send before billing + session (or the safety timeout)
             while (true)
             {
-                var due = ScheduleSyncQueue.Due(_model, NowMs());
+                var due = ScheduleSyncQueue.Due(_model, NowMs(), _held);    // V12: a bot being deleted sends nothing
                 if (due.Count == 0)
                 {
-                    if (!ScheduleSyncQueue.AnyPending(_model)) yield break;   // drained: the next Desire re-kicks
+                    if (!ScheduleSyncQueue.AnyPending(_model, _held)) yield break;   // drained: a Desire / Release re-kicks
                     yield return new WaitForSecondsRealtime(1f);             // waiting for a backoff to elapse
                     continue;
                 }
@@ -151,6 +176,9 @@ public class ScheduleSyncService : MonoBehaviour
     {
         yield return AuthClient.Instance.EnsureSession();         // the token's profile list decides what may travel
         if (!_model.entries.Contains(entry)) yield break;         // forgotten meanwhile (bot deleted / full wipe)
+        // V12: held while the session op ran — nothing yields from here to the request, so a hold either stops this send
+        // or finds it on the wire (IsSending) and waits for it. Release re-kicks the untouched desire.
+        if (_held.Contains(entry.botId)) yield break;
         var auth = AuthClient.Existing;
         if (auth == null || auth.Claims == null)
         {
@@ -171,9 +199,17 @@ public class ScheduleSyncService : MonoBehaviour
         BotSchedule sent = entry.Schedule;
         string zone = entry.timeZone;
         UnityWebRequest www = null;
-        yield return AuthorizedRequest.Send(() => AuthorizedRequest.JsonPost($"{Manager.n8nBaseUrl}{SetScheduleRequest.Path}",
-                SetScheduleRequest.ComposeBody(ids, sent.Enabled, sent.DaysMask, sent.StartMin, sent.EndMin, zone, sentVersion),
-                RequestTimeoutSeconds), r => www = r);
+        _sendingBot = entry.botId;
+        try
+        {
+            yield return AuthorizedRequest.Send(() => AuthorizedRequest.JsonPost($"{Manager.n8nBaseUrl}{SetScheduleRequest.Path}",
+                    SetScheduleRequest.ComposeBody(ids, sent.Enabled, sent.DaysMask, sent.StartMin, sent.EndMin, zone, sentVersion),
+                    RequestTimeoutSeconds), r => www = r);
+        }
+        finally
+        {
+            _sendingBot = null;
+        }
         using var scope = www;
 
         string body = www.downloadHandler?.text;

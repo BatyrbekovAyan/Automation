@@ -87,20 +87,28 @@ public static class ScheduleSyncQueue
         return e.version;
     }
 
-    public static List<Entry> Due(Model m, long nowMs)
+    /// <summary>
+    /// The desires to send now. <paramref name="held"/>: bots whose server deletion is in flight (V12) — none of their
+    /// desires leaves (a send landing after Delete Bot Files would recreate the bot_schedule rows it removed); they stay
+    /// pending, untouched, until the service releases the bot (the server kept it) or forgets it (it went).
+    /// </summary>
+    public static List<Entry> Due(Model m, long nowMs, ICollection<string> held = null)
     {
         var due = new List<Entry>();
         foreach (var e in m.entries)
-            if (e.IsPending && e.nextAttemptAtMs <= nowMs) due.Add(e);
+            if (e.IsPending && e.nextAttemptAtMs <= nowMs && !IsHeld(held, e.botId)) due.Add(e);
         return due;
     }
 
-    public static bool AnyPending(Model m)
+    /// <summary>Whether anything is left to deliver — a held bot's desire waits for its release, not for a backoff.</summary>
+    public static bool AnyPending(Model m, ICollection<string> held = null)
     {
         foreach (var e in m.entries)
-            if (e.IsPending) return true;
+            if (e.IsPending && !IsHeld(held, e.botId)) return true;
         return false;
     }
+
+    private static bool IsHeld(ICollection<string> held, string botId) => held != null && held.Contains(botId);
 
     /// <summary>2 s, 5 s, 15 s, 60 s, then every 5 min — the reply-mode schedule, bounded per launch.</summary>
     public static long BackoffMs(int attemptsSoFar) => ReplyModeSyncQueue.BackoffMs(attemptsSoFar);

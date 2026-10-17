@@ -175,6 +175,28 @@ public class ScheduleSyncServiceTests
     }
 
     [Test]
+    public void AHeldBot_SendsNothing_UntilReleased_OtherBotsAreUnaffected()
+    {
+        var m = M();
+        ScheduleSyncQueue.Desire(m, "Bot0", Weekdays, "Asia/Almaty", 1000);
+        ScheduleSyncQueue.Desire(m, "Bot1", Night, "Asia/Almaty", 1000);
+        var held = new HashSet<string> { "Bot0" };   // Manager.DeleteBotOnServer is deleting Bot0
+        CollectionAssert.AreEqual(new[] { "Bot1" }, ScheduleSyncQueue.Due(m, 5000, held).Select(e => e.botId).ToArray(),
+            "a held bot's desire never leaves — it would land after Delete Bot Files and recreate its bot_schedule rows");
+        var bot0 = ScheduleSyncQueue.Find(m, "Bot0");
+        Assert.IsTrue(bot0.IsPending && bot0.attempts == 0, "held, not failed: untouched until the server's verdict");
+
+        held.Add("Bot1");
+        Assert.IsFalse(ScheduleSyncQueue.AnyPending(m, held), "only held desires left: the loop rests until a Release re-kicks it");
+        Assert.IsTrue(ScheduleSyncQueue.AnyPending(m), "…they are still owed");
+
+        held.Remove("Bot0");                         // the server kept Bot0 (retry / refused): Release
+        CollectionAssert.AreEqual(new[] { "Bot0" }, ScheduleSyncQueue.Due(m, 5000, held).Select(e => e.botId).ToArray(),
+            "a released bot's desire goes out after all");
+        Assert.AreEqual(Weekdays, ScheduleSyncQueue.Due(m, 5000, held)[0].Schedule, "with the values the owner saved");
+    }
+
+    [Test]
     public void Sendable_OnlyRealProfilesTheTokenLists_Deduplicated_AtMostTen()
     {
         var owned = new HashSet<string> { "wa", "tg", "x" };
@@ -352,5 +374,39 @@ public class ScheduleSyncServiceTests
         int forget = wipe.IndexOf("ScheduleSyncService.Existing?.ForgetAll()", StringComparison.Ordinal);
         int deleteAll = wipe.IndexOf("PlayerPrefs.DeleteAll()", StringComparison.Ordinal);
         Assert.IsTrue(forget >= 0 && forget < deleteAll, "the in-memory queue re-persists itself — empty it before the wipe");
+    }
+
+    [Test]
+    public void ServerDeletion_HoldsTheQueue_DrainsIt_AndReleasesItWhenTheBotStays()
+    {
+        // The V12 mirror: Delete Bot Files removes the bot's bot_schedule rows, so a schedule send must never land after it —
+        // held from before the first server call (a request already on the wire drained first), released when the server
+        // keeps the bot, forgotten by the local wipe once it goes (DeletedBots_AndTheFullWipe_LeaveNothingBehind).
+        string server = MethodBody(Src("Scripts/Main/Manager.cs"), "public IEnumerator DeleteBotOnServer");
+        int hold = server.IndexOf("ScheduleSyncService.Existing?.Hold(botId)", StringComparison.Ordinal);
+        int firstCall = server.IndexOf("WappiProxy.Send(", StringComparison.Ordinal);
+        Assert.IsTrue(hold >= 0 && hold < firstCall, "the schedule queue is held before the first server call");
+        int drain = server.IndexOf("ScheduleSyncService.Existing.IsSending(botId)", StringComparison.Ordinal);
+        Assert.IsTrue(drain > hold && drain < firstCall, "a request already on the wire lands before the server wipes the rows");
+        int keep = server.IndexOf("if (!outcome.RemovesBot)", StringComparison.Ordinal);
+        int release = server.IndexOf("ScheduleSyncService.Existing?.Release(botId)", StringComparison.Ordinal);
+        Assert.IsTrue(keep >= 0 && release > keep, "a bot the server keeps gets its schedule queue back");
+        Assert.IsFalse(server.Contains("ScheduleSyncService.Existing?.ForgetBot("), "never forgotten before the verdict");
+
+        string svc = Src("Scripts/Main/ScheduleSyncService.cs");
+        string loop = MethodBody(svc, "private IEnumerator Loop");
+        Assert.IsTrue(loop.Contains("ScheduleSyncQueue.Due(_model, NowMs(), _held)") && loop.Contains("ScheduleSyncQueue.AnyPending(_model, _held)"),
+            "a held bot's desire is never picked up, and does not keep the loop spinning");
+        string send = MethodBody(svc, "private IEnumerator Send(");
+        int recheck = send.IndexOf("if (_held.Contains(entry.botId)) yield break;", StringComparison.Ordinal);
+        int marked = send.IndexOf("_sendingBot = entry.botId;", StringComparison.Ordinal);
+        int request = send.IndexOf("AuthorizedRequest.Send(", StringComparison.Ordinal);
+        Assert.IsTrue(recheck >= 0 && marked > recheck && request > marked,
+            "re-checked after the session wait, then marked as on the wire right before the request");
+        Assert.IsFalse(send.Substring(recheck, marked - recheck).Contains("yield return"),
+            "nothing suspends between the re-check and the mark — a hold either stops the send or finds it on the wire");
+        Assert.IsTrue(Regex.IsMatch(send, @"finally\s*\{\s*_sendingBot = null;\s*\}"), "the mark is cleared however the request ends");
+        Assert.IsTrue(MethodBody(svc, "public void ForgetBot").Contains("_held.Remove("), "forgetting a bot also drops its hold");
+        Assert.IsTrue(MethodBody(svc, "public void Release").Contains("Kick()"), "a release sends the kept bot's desire");
     }
 }
