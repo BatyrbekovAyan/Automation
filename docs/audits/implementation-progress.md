@@ -536,3 +536,40 @@ Schedule» (только по токену, апсерт с охраной ве�
 **Ждёт:** финальное ревью блока B (контроллер) → «да» владельца на выкладку (чек-лист пакета; первым шагом — проба tzdata прода)
 → новая сборка (клиент A + B) → device-pass (`device-pass.md`) → наблюдения на живом боте по отдельному «да»; push — по согласию.
 Открытое из части A (не блокирует B): 12b (первое живое событие RevenueCat) и повтор запроса шага 11 — в день выкладки B.
+
+## Развёртывание 2026-10-19 — часть B «расписание бота» (прод, по явному «да» владельца)
+
+Пакет — `docs/audits/2026-10-17-bot-schedule/README.md` («Пакет выкладки, часть B»); канон пакета `d34a3f81` (на HEAD
+`28058a8f` дифф `Tools/n8n/workflows` + `Tools/n8n/sql` пуст — выполнено из основной копии, без worktree). «Да» владельца
+2026-10-19. Время — UTC 2026-10-19 09:03–09:12 (Алматы 14:03–14:12); `DEPLOY_START` 09:04:52Z. Чек-лист выполнен дословно, без
+остановок: вывод каждого шага совпал с «Ожидание». Клиентская половина (секция «Расписание работы», синк, панель вне часов,
+«Вне графика ·» в «Сводке») едет в новой сборке вместе с клиентом части A, не здесь.
+
+| Шаг | Результат | Доказательство |
+|---|---|---|
+| 0 снимок «до» | 09:03:36Z: канон 30, diff 8 = DIFF ×7 + MISSING ×1 (`crSetSchedule001`); хэши «до» 7/7 = таблица пакета (у пяти активных сохранённая = опубликованная, у двух шаблонов `published=None` — неактивны); клонов 0, архивный «13», other 0; по всем 30 id поля status / active / хэши совпали со снимком пакета 2026-10-17 поле в поле | `docs/audits/2026-10-17-bot-schedule/prod-before-deploy.json` |
+| 0 бэкап | `~/backups/n8n-2026-10-19-predeploy.tar.gz` (09:04Z, 349 365 Б); ночной архив дня сохранён как `n8n-2026-10-19-0315.tar.gz` | `ls ~/backups` |
+| 0 dry-run | would_update 6 (`4VN3gsFaC2HUYmcc`, `4wYitz5ek30SVNlT`, `Uz6HBBUpAiUqVysB`, `XuvOp7TxOImOAmlj`, `fXYpCXPKw92EzRz8`, `lmjYsdNcQA2IE5rl`), missing 1 (`crSetSchedule001`), up_to_date 21, failed 0; Set Workflow State `--include-placeholders` — would_update 1; 7 точек отката сняты до первого apply (у шаблонов `activeVersionId None`) | `…/rollback-pointers.txt` |
+| 0 учётка | `GET /credentials` → `200 [('vvRrFiEXzLVqKjOx', 'postgres', 'Postgres')]` | API |
+| 1 tzdata + миграция | пред-проверка `200 {"no_schedule":true,"no_tz_fn":true}`; проба tzdata `200 {"almaty_offset":"05:00:00","almaty_known":true,"moscow_offset":"03:00:00"}` (tzdata прода ≥ 2024a); миграция `200 {"success":true}`; пост-проверка `200 {"schedule_cols":"8","rls":true,"client_grants":"0","tz_trigger":true,"triggers":"1","tz_fn":true,"rows":"0"}` | `sql-oneoff` |
+| 2 Set Workflow State | `--include-placeholders --apply --yes`: «published by the PUT (served version = the update) — no publish call, no deactivate window», read-back ok, updated 1, failed 0 — новый id защищён ДО импорта | вывод инструмента |
+| 3 импорт (§2.4) | аудит 3a — `crSetSchedule001-Set_Schedule.json [('postgres', 'vvRrFiEXzLVqKjOx', 'Postgres')] graph cfd76ff12bb7 id crSetSchedule001 active False OK` (копия = канон); импорт из копии — «Successfully imported 1 workflow.», `import rc=0`, копии на VPS и в контейнере удалены (проверено `ls`); GET до включения — `crSetSchedule001 200 active False ['vvRrFiEXzLVqKjOx'] OK` | вывод шагов |
+| 4 включение | `crSetSchedule001 activate 200 \| active True \| published=stored True \| creds ['vvRrFiEXzLVqKjOx']` | API |
+| 5 smoke Set Schedule | GET → `[404]` «Did you mean to make a POST request?»; POST `{}` без токена → `[401]` `unauthorized:missing` | curl |
+| 6 шесть workflow | по порядку пакета, `--only <id> --apply --yes`: Create WA, Create TG, Delete Bot Files, Profile Lifecycle Sweep — «published by the PUT … no deactivate window», «read-back: ok», updated 1, failed 0; шаблоны WhatsApp / Telegram — «read-back: ok» без «published» (неактивны по контракту), updated 1, failed 0 | вывод инструмента |
+| 7 `update-clones.py` | dry-run: клонов 0, архивный «13» пропущен — применять нечего (`--apply` не запускался) | вывод инструмента |
+| 8 read-back | `verify-deployed` exit 0: канон 30, diff 0; хэши «после» 8/8 = таблица пакета (`dcce761854bd`, `b4a695f6aecf`, `76df037a5cb0`, `ab64a6555282`, `35be6f37abeb`, `60aa43640382`, `2433180b00c9`, `cfd76ff12bb7`; у активных сохранённая = опубликованная; шаблоны неактивны); клонов 0, other 0 | `…/prod-after.json` |
+| 9 smoke | 9.1 `[404]` «Did you mean…» ×4 (SetSchedule, CreateWhatsappWorkflow, CreateTelegramWorkflow, DeleteBotFiles); 9.2 `[401]` `unauthorized:missing`; 9.3 `[401]` `unauthorized:bad_signature`; 9.4 `[400]` `protected_workflow`; 9.5 `[401]` `unauthorized:bad_signature` — всё как в пакете | curl |
+| 10 наблюдение | 09:10Z: ошибочных выполнений с `DEPLOY_START` — `[]` ×6 (`crSetSchedule001`, Set Workflow State, Create WA/TG, Delete Bot Files, Sweep) и 0 по всему инстансу; лог n8n с 09:04Z — 6 строк, все штатные (5 × «Received request for unknown webhook … GET» — наши smoke-GET, 1 × «Deregistered all crons» — PUT Sweep'а переопубликовал расписание), ни одной error / insights | API, `docker compose logs` |
+
+**Открытое из части A (шаг 11 её пакета, не блокирует B; только чтение):** ошибочные выполнения с `DEPLOY_START` части A
+(2026-10-15T13:36:52Z) — RevenueCat Events `[]`, Verify Identity `[]`, Channel Watch — одно: `21783` 2026-10-17T00:20:00Z, узел
+`Live Rows`, «The DNS server returned an error, perhaps the server is offline» (сбой DNS базы на один тик; по замыслу A4 ошибка
+базы роняет прогон — fail-closed, следующий тик штатный); по всему инстансу за то же окно — только оно. Все три workflow active,
+published = stored. Ничего не менялось. 12b (первое живое событие RevenueCat) — по-прежнему ждёт новой сборки.
+
+**Откат** — README пакета, «Откат»; указатели — `docs/audits/2026-10-17-bot-schedule/rollback-pointers.txt`; бэкап —
+`~/backups/n8n-2026-10-19-predeploy.tar.gz`. Миграция остаётся при любом откате (таблицу читают шаблоны — fail-closed).
+**Дальше:** повтор запроса шага 10 после ближайшего тика Profile Lifecycle Sweep (прежние — 01:00 / 07:00 UTC, следующий ≈ 13:00
+UTC) и на следующее утро; новая клиентская сборка (A + B) → `inspect-artifact.sh` → `device-pass.md` → наблюдения на живом боте
+(шаг 12 пакета, по отдельному «да»). Push `main` — контроллер.

@@ -1,0 +1,26 @@
+# Part B «расписание бота» — prod rollback pointers, taken by the read-only dry-runs of README step 0
+# 2026-10-19T09:04:22Z (UTC), before ANY apply; prod = canon 3321a788 (verify-deployed: 7 DIFF + 1 MISSING = the package)
+# rollback of an updated ACTIVE workflow: POST /api/v1/workflows/<id>/activate {"versionId": "<pointer>"} (D1 path) — or the 3321a788 canon via deploy-canonical (README «Откат»)
+# the two templates (4wYitz5ek30SVNlT, 4VN3gsFaC2HUYmcc, activeVersionId None) are rolled back ONLY by the 3321a788 canon — never POST /activate with their pointer
+# new workflow (crSetSchedule001): deactivate, wait >= 35 s, DELETE (insights rule)
+
+## deploy-canonical.py --base https://n8n.choosereply.com (dry-run)
+~ 4VN3gsFaC2HUYmcc 'Telegram Bot' active=False nodes 60 → 60 (+0 -0)
+    rollback pointer: versionId 48c6d854-c4f9-4ad6-81e5-179c57630de9 (activeVersionId None)
+~ 4wYitz5ek30SVNlT 'WhatsApp Bot' active=False nodes 60 → 60 (+0 -0)
+    rollback pointer: versionId a1e59bec-226c-45b0-b15f-45619a278e57 (activeVersionId None)
+~ Uz6HBBUpAiUqVysB 'CreateTelegramWorkflow' active=True nodes 52 → 52 (+0 -0)
+    rollback pointer: versionId 435c5cac-cf4f-4f9b-a4b1-bbe29717e657 (activeVersionId 435c5cac-cf4f-4f9b-a4b1-bbe29717e657)
+~ XuvOp7TxOImOAmlj 'CreateWhatsappWorkflow' active=True nodes 52 → 52 (+0 -0)
+    rollback pointer: versionId 4361d7a0-45e1-4f72-9a12-5525c50d6cda (activeVersionId 4361d7a0-45e1-4f72-9a12-5525c50d6cda)
+MISSING crSetSchedule001 crSetSchedule001-Set_Schedule.json — import it with n8n import:workflow, not here
+~ fXYpCXPKw92EzRz8 'Profile Lifecycle Sweep' active=True nodes 41 → 41 (+0 -0)
+    rollback pointer: versionId 184387ee-7013-4da5-bdc1-444870579912 (activeVersionId 184387ee-7013-4da5-bdc1-444870579912)
+~ lmjYsdNcQA2IE5rl 'Delete Bot Files' active=True nodes 19 → 19 (+0 -0)
+    rollback pointer: versionId a3b66612-b9a3-4536-8290-c94171fc1368 (activeVersionId a3b66612-b9a3-4536-8290-c94171fc1368)
+{"considered": 28, "missing": 1, "up_to_date": 21, "would_update": 6, "updated": 0, "would_publish": 0, "republished": 0, "inactive_must_run": 0, "failed": 0}
+
+## deploy-canonical.py --base https://n8n.choosereply.com --only 0DP79STI3pafXO9B --include-placeholders (dry-run)
+~ 0DP79STI3pafXO9B 'Set Workflow State' active=True nodes 20 → 20 (+0 -0)
+    rollback pointer: versionId d3c3f899-2738-4f14-bee7-7f92ae890f8a (activeVersionId d3c3f899-2738-4f14-bee7-7f92ae890f8a)
+{"considered": 1, "missing": 0, "up_to_date": 0, "would_update": 1, "updated": 0, "would_publish": 0, "republished": 0, "inactive_must_run": 0, "failed": 0}
