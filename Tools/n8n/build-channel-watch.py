@@ -22,9 +22,9 @@ a live bot_profiles row); this workflow tells the owner:
       take the notice from a channel that works —, WhatsApp first; never the down one) → Has Other Channel? → Owner Phone
       (get/status of THAT channel) → Compose Notice (the owner's number by build-handoff-workflows.OWNER_PHONE_JS — the A5
       rule, imported, never copied; the text is NOTICE_TEXT, embedded; the other channel must say authorised and echo its
-      own profile id) → Skip? → Send Notice (a self-message: «Choose Reply: {WhatsApp|Telegram} отключился — бот не
-      отвечает. Переподключите канал в приложении.») → Settle Notice → Notice Sent? → Record Notified (notified_at; a
-      failed send leaves it null — retried next run while attempts remain).
+      own profile id) → Skip? → Send Notice (a self-message: «Choose Reply: {WhatsApp|Telegram} отключился —
+      сотрудник не отвечает. Переподключите канал в приложении.») → Settle Notice → Notice Sent? → Record Notified
+      (notified_at; a failed send leaves it null — retried next run while attempts remain).
   0DP79STI3pafXO9B-Set_Workflow_State.json  crChannelWatch001 joins the protected infra ids.
 
 The table: sql/2026-10-14-channel-snapshot.sql (apply BEFORE importing this workflow). The return of a channel sends no
@@ -72,9 +72,10 @@ CAP_SHARE = 0.5             # … and its 50 %
 MAX_ATTEMPTS = HW.MAX_NOTIFY_ATTEMPTS
 WA_BASE, TG_BASE = "https://wappi.pro/api/", "https://wappi.pro/tapi/"
 # The A4 text — Compose Notice embeds THIS map (one place, never an inline copy); verify-channel-watch.py holds its own copy
-# of the full text, so a change here is a deliberate change in two places.
-NOTICE_TEXT = {"whatsapp": "Choose Reply: WhatsApp отключился — бот не отвечает. Переподключите канал в приложении.",
-               "telegram": "Choose Reply: Telegram отключился — бот не отвечает. Переподключите канал в приложении."}
+# of the full text, so a change here is a deliberate change in two places. «сотрудник», not «бот»: the owner's naming
+# decision of 2026-10-21 (docs/design/2026-10-21-naming-sotrudnik-vybrat.md).
+NOTICE_TEXT = {"whatsapp": "Choose Reply: WhatsApp отключился — сотрудник не отвечает. Переподключите канал в приложении.",
+               "telegram": "Choose Reply: Telegram отключился — сотрудник не отвечает. Переподключите канал в приложении."}
 BATCH = {"batch": {"batchSize": 1, "batchInterval": 300}}     # one Wappi call at a time — Wappi crosses concurrent answers
 
 # ---------------------------------------------------------------------------------------------------------------------
