@@ -4,11 +4,11 @@
 
 Every 10 minutes it lists the Wappi profiles of both bases and compares each LIVE bot_profiles row's `authorized` flag
 with channel_snapshot: true -> false (DOWN) records the state and owes ONE notice — a self-message through ANOTHER live
-channel of the same install that THIS run's list shows authorised («Choose Reply: WhatsApp отключился — сотрудник не
-отвечает. Переподключите канал в приложении.», no client text, no client number) — false -> true (UP) only records, a first
-sighting records without a notice; an owed notice is retried while the channel stays down, at most the Handoff Notifier's
-six attempts, COUNTED in the snapshot before each send (fix round 2: a counter, not a clock); an owner without another
-channel gets no message.
+channel of the same install that THIS run's list shows authorised («Choose Reply: WhatsApp отключился — ИИ-сотрудник
+не отвечает. Переподключите канал в приложении.», no client text, no client number) — false -> true (UP) only records, a
+first sighting records without a notice; an owed notice is retried while the channel stays down, at most the Handoff
+Notifier's six attempts, COUNTED in the snapshot before each send (fix round 2: a counter, not a clock); an owner without
+another channel gets no message.
 
 What runs here — no n8n server, no network, never production:
   A  Diff Channel State: the REAL code over fixture lists (harness.run_js) — the transitions, the boolean-only flag, the
@@ -47,8 +47,8 @@ HW = module('build-handoff-workflows.py')
 
 O, P2 = 'inst-owner-o', 'inst-owner-p'
 API, TAPI = 'https://wappi.pro/api/', 'https://wappi.pro/tapi/'
-WA_TEXT = 'Choose Reply: WhatsApp отключился — сотрудник не отвечает. Переподключите канал в приложении.'
-TG_TEXT = 'Choose Reply: Telegram отключился — сотрудник не отвечает. Переподключите канал в приложении.'
+WA_TEXT = 'Choose Reply: WhatsApp отключился — ИИ-сотрудник не отвечает. Переподключите канал в приложении.'
+TG_TEXT = 'Choose Reply: Telegram отключился — ИИ-сотрудник не отвечает. Переподключите канал в приложении.'
 
 
 def lst(*profiles, status=200, wstatus='done'):

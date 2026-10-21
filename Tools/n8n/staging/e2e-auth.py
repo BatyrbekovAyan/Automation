@@ -2217,8 +2217,8 @@ WATCH_FILE = f"{WATCH_ID}-Channel_Watch.json"
 WATCH_KEEP = ("List WA Profiles", "List TG Profiles", "Live Rows", "Diff Channel State", "Upsert Snapshot", "Down Alerts?",
               "Pick Other Channel", "Has Other Channel?", "Owner Phone", "Compose Notice", "Skip?", "Send Notice", "Settle Notice",
               "Notice Sent?", "Record Notified")
-WATCH_TEXT = {"whatsapp": "Choose Reply: WhatsApp отключился — сотрудник не отвечает. Переподключите канал в приложении.",
-              "telegram": "Choose Reply: Telegram отключился — сотрудник не отвечает. Переподключите канал в приложении."}
+WATCH_TEXT = {"whatsapp": "Choose Reply: WhatsApp отключился — ИИ-сотрудник не отвечает. Переподключите канал в приложении.",
+              "telegram": "Choose Reply: Telegram отключился — ИИ-сотрудник не отвечает. Переподключите канал в приложении."}
 
 
 class WatchProbe:

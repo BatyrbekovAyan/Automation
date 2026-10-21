@@ -65,8 +65,8 @@ EXPECTED = ("Every 10 Minutes", "List WA Profiles", "List TG Profiles", "Live Ro
             "Down Alerts?", "Pick Other Channel", "Has Other Channel?", "Owner Phone", "Compose Notice", "Skip?", "Send Notice",
             "Settle Notice", "Notice Sent?", "Record Notified")
 # (6) the A4 text — this file's OWN copy of the full text (the generator's NOTICE_TEXT must equal it; a change is deliberate)
-TEXTS = {"whatsapp": "Choose Reply: WhatsApp отключился — сотрудник не отвечает. Переподключите канал в приложении.",
-         "telegram": "Choose Reply: Telegram отключился — сотрудник не отвечает. Переподключите канал в приложении."}
+TEXTS = {"whatsapp": "Choose Reply: WhatsApp отключился — ИИ-сотрудник не отвечает. Переподключите канал в приложении.",
+         "telegram": "Choose Reply: Telegram отключился — ИИ-сотрудник не отвечает. Переподключите канал в приложении."}
 REACH_TERM = "and b.profile_id in (select jsonb_array_elements_text($4::jsonb))"
 REACH_PARAM = "$('Diff Channel State').first().json.reachable"
 COUNTED_BACK = ("where a.profile_id in (select up.profile_id from up where up.notify_attempts = 1)\n"
@@ -267,7 +267,7 @@ def check(wf, set_state, migration_sql):
          and "if (!text) error = 'unknown_down_channel';" in cjs and "recipient: phone, body: text } };" in cjs
          and cjs.count("отключился") == len(TEXTS),
          "Compose Notice must send the A4 text exactly — build-channel-watch.NOTICE_TEXT embedded once, equal to the full "
-         "«Choose Reply: {WhatsApp|Telegram} отключился — сотрудник не отвечает. Переподключите канал в приложении.», no inline copy")
+         "«Choose Reply: {WhatsApp|Telegram} отключился — ИИ-сотрудник не отвечает. Переподключите канал в приложении.», no inline copy")
     need(not re.search(r"\b(chat_id|chatId|client|recipient_name|summary|body\.)\b", re.sub(r"//[^\n]*", "", cjs).replace("reply.body", "")),
          "Compose Notice must carry no client data (spec §1, the A5 rule)")
     for name in ("Owner Phone", "Send Notice"):
@@ -375,7 +375,7 @@ MUTATIONS = (
      _js("Compose Notice", "? NOTICE_TEXT[pick.down_channel] : '';", "? 'Choose Reply: ' + pick.down_channel + ' отключился' : '';"),
      "Compose Notice must send the A4 text exactly"),
     ("the notice text altered (a prefix check would pass it)",
-     _js("Compose Notice", "WhatsApp отключился — сотрудник не отвечает.", "WhatsApp отключился."), "Compose Notice must send the A4 text exactly"),
+     _js("Compose Notice", "WhatsApp отключился — ИИ-сотрудник не отвечает.", "WhatsApp отключился."), "Compose Notice must send the A4 text exactly"),
     ("the ambiguity rule removed (a non-boolean flag read as down)",
      _js("Diff Channel State", "if (typeof p.authorized !== 'boolean') {", "if (false) {"), "Diff Channel State lost a rule: the boolean-only flag"),
     ("a base trusted without status done", _js("Diff Channel State", "if (!b || b.status !== 'done') return",
