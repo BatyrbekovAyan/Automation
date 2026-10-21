@@ -15,7 +15,7 @@ public static class ScheduleCopy
     /// <summary>Teaches the format AND the default window (09:00–21:00).</summary>
     public const string StartPlaceholder = "09:00";
     public const string EndPlaceholder = "21:00";
-    public const string Hint = "Вне часов бот не отвечает сам — подсказки в «Вместе» работают";
+    public const string Hint = "Вне часов сотрудник не отвечает сам — работает режим «Выбрать»";
     public const string Invalid = "Укажите время в формате ЧЧ:ММ, например 09:00";
     public const string NoDays = "Выберите хотя бы один день";
     /// <summary>The «Сводка» row marker — the <see cref="HandoffCopy.RequestMarker"/> shape.</summary>

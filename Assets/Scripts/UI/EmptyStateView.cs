@@ -301,9 +301,9 @@ public class EmptyStateView : MonoBehaviour
         {
             case EmptyStateReason.NoBotsExist:
                 // if (iconImage != null) iconImage.sprite = iconNoBots;
-                if (titleLabel != null) titleLabel.text = "Создайте первого бота";
+                if (titleLabel != null) titleLabel.text = "Добавьте первого сотрудника";
                 if (bodyLabel != null) bodyLabel.text = "ИИ-ассистент, который отвечает вашим клиентам в WhatsApp круглосуточно.";
-                if (primaryButtonLabel != null) primaryButtonLabel.text = "Создать бота";
+                if (primaryButtonLabel != null) primaryButtonLabel.text = "Добавить сотрудника";
                 if (primaryButton != null)
                 {
                     primaryButton.onClick.RemoveAllListeners();
@@ -314,7 +314,7 @@ public class EmptyStateView : MonoBehaviour
             case EmptyStateReason.BotHasNoWhatsApp:
                 // if (iconImage != null) iconImage.sprite = iconNoWhatsApp;
                 if (titleLabel != null) titleLabel.text = "WhatsApp не подключён";
-                if (bodyLabel != null) bodyLabel.text = "Подключите WhatsApp к этому боту, чтобы видеть его чаты.";
+                if (bodyLabel != null) bodyLabel.text = "Подключите WhatsApp к этому сотруднику, чтобы видеть его чаты.";
                 if (primaryButtonLabel != null) primaryButtonLabel.text = "Подключить WhatsApp";
                 if (primaryButton != null)
                 {
@@ -326,7 +326,7 @@ public class EmptyStateView : MonoBehaviour
             case EmptyStateReason.BotHasNoTelegram:
                 // if (iconImage != null) iconImage.sprite = iconNoWhatsApp;
                 if (titleLabel != null) titleLabel.text = "Telegram не подключён";
-                if (bodyLabel != null) bodyLabel.text = "Подключите Telegram к этому боту, чтобы видеть его чаты.";
+                if (bodyLabel != null) bodyLabel.text = "Подключите Telegram к этому сотруднику, чтобы видеть его чаты.";
                 if (primaryButtonLabel != null) primaryButtonLabel.text = "Подключить Telegram";
                 if (primaryButton != null)
                 {

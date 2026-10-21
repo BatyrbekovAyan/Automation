@@ -307,7 +307,7 @@ public static class BotSettingsUploadedFilesBuilder
     {
         var (popup, confirm, cancel, bodyTmp) = BuildPopupCard(prefabRoot, PopupGoName,
             title: "Удалить прайс-лист?",
-            body: "Бот перестанет использовать этот файл в ответах. Это действие необратимо.",
+            body: "Сотрудник перестанет использовать этот файл в ответах. Это действие необратимо.",
             confirmLabel: "Удалить",
             confirmBg: new Color(0.92f, 0.27f, 0.27f)); // destructive red
 

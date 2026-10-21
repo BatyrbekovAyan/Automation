@@ -37,7 +37,7 @@ public class AutoLockSheetTests
     [Test]
     public void Copy_NamesTheProgressAndTheThreshold_NoForbiddenGlyphs()
     {
-        Assert.AreEqual("Бот ещё учится", AutoReadinessCopy.SheetTitle);
+        Assert.AreEqual("Сотрудник ещё учится", AutoReadinessCopy.SheetTitle);
         string body = AutoReadinessCopy.SheetBody(7, perChat: false);
         StringAssert.Contains("Авто откроется, когда", body);                 // the LOCK lifts — nothing switches itself on
         StringAssert.DoesNotContain("включится", body);                       // review 2026-10-14 #3: no automatic switch-on promise

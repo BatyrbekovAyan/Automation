@@ -29,7 +29,7 @@ public class ScheduleCopyTests
         Assert.AreEqual("РАСПИСАНИЕ РАБОТЫ", ScheduleCopy.SectionTitle);
         Assert.AreEqual("С", ScheduleCopy.FromLabel);
         Assert.AreEqual("До", ScheduleCopy.ToLabel);
-        Assert.AreEqual("Вне часов бот не отвечает сам — подсказки в «Вместе» работают", ScheduleCopy.Hint);
+        Assert.AreEqual("Вне часов сотрудник не отвечает сам — работает режим «Выбрать»", ScheduleCopy.Hint);
         Assert.AreEqual("Вне графика · ", ScheduleCopy.OffHoursRowPrefix);
         Assert.IsTrue(ScheduleModel.TryParseHhMm(ScheduleCopy.StartPlaceholder, out int start) && start == BotSchedule.Default.StartMin,
             "the placeholder teaches the format AND the default");

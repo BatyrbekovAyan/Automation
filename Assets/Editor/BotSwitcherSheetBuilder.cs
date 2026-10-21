@@ -446,7 +446,7 @@ public static class BotSwitcherSheetBuilder
             typeof(RectTransform), typeof(TextMeshProUGUI));
         nameGO.transform.SetParent(stack.transform, false);
         var nameText = nameGO.GetComponent<TextMeshProUGUI>();
-        nameText.text = "Бот";
+        nameText.text = "Сотрудник";
         nameText.fontSize = NameFontSize;
         nameText.fontStyle = FontStyles.Bold;
         nameText.color = NameColor;

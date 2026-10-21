@@ -28,7 +28,7 @@ public static class EntitlementPolicy
     /// bots in place while the allowance shrinks — the remainder must never count backwards.
     ///
     /// <see cref="CanCreateBot"/> is expressed in terms of this so the «+ бот» card's
-    /// «Ещё N ботов в тарифе» / «Лимит ботов тарифа» state IS the gate's own predicate: the
+    /// «Ещё N сотрудников в тарифе» / «Лимит сотрудников тарифа» state IS the gate's own predicate: the
     /// card can never advertise a slot the gate would refuse, or vice versa.
     /// </summary>
     public static int RemainingBots(PlanTier tier, int existingBots)

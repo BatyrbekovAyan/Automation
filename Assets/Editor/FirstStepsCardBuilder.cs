@@ -67,12 +67,12 @@ public static class FirstStepsCardBuilder
     private const string ProgressSeedText = "0 из 4";
     private static readonly string[] RowSeedLabels =
     {
-        "Создать бота",
+        "Добавить сотрудника",
         "Подключить мессенджер",
         "Загрузить прайс-лист",
-        "Получить первый ответ бота",
+        "Получить первый ответ сотрудника",
     };
-    private const string HintText = "Попросите знакомого написать вам — и посмотрите, как бот ответит";
+    private const string HintText = "Попросите знакомого написать вам — и посмотрите, как ответит сотрудник";
 
     private static TMP_FontAsset _regular, _semibold, _bold;
     private static Sprite _chevron, _check;

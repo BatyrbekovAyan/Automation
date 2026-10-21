@@ -124,7 +124,7 @@ public static class HandoffCopy
 public static class ReplyOutcomeCopy
 {
     public const string Sent = "Отправлено";
-    public const string Suppressed = "Не отправлено: режим «Вместе»";
+    public const string Suppressed = "Не отправлено: режим «Выбрать»";
     public const string QuotaDenied = "Не отправлено: лимит диалогов";
     public const string SendFailed = "Ошибка отправки";
     public const string SendUnknown = "Отправка не подтверждена";

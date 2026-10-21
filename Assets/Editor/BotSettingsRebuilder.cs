@@ -563,7 +563,7 @@ public static class BotSettingsRebuilder
     {
         AddSectionHeader(tab, "ИНФОРМАЦИЯ");
         var refs = new GeneralTabRefs();
-        refs.botName = CreateEditableField(tab, "Имя бота", scrim, multiline: false);
+        refs.botName = CreateEditableField(tab, "Имя сотрудника", scrim, multiline: false);
 
         // Skeleton dropdown (replaced with preserved one if present).
         var ddGo = NewChild(tab, "BusinessTypeDropdown", out RectTransform ddRt);
@@ -612,7 +612,7 @@ public static class BotSettingsRebuilder
         rt.sizeDelta = Sv(0, 56);
 
         var labelGo = NewChild(go, "Label", out RectTransform labelRt);
-        var tmp = AddStyledText(labelGo, "Удалить бота", Sz(17), FontWeight.Bold, Color.white);
+        var tmp = AddStyledText(labelGo, "Удалить сотрудника", Sz(17), FontWeight.Bold, Color.white);
         tmp.alignment = TextAlignmentOptions.Center;
         StretchFill(labelRt);
 

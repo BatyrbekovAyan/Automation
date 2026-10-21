@@ -778,7 +778,7 @@ public static class SuggestionsPanelBuilder
         button.transition = Selectable.Transition.None;
         button.targetGraphic = go.GetComponent<Image>();
 
-        TextMeshProUGUI faintVmeste = BuildSwitchLabel("FaintVmeste", go.transform, "Вместе", -SwitchSlideX, FontStyles.Normal, SwitchFaintAuto);
+        TextMeshProUGUI faintVmeste = BuildSwitchLabel("FaintVmeste", go.transform, "Выбрать", -SwitchSlideX, FontStyles.Normal, SwitchFaintAuto);
         TextMeshProUGUI faintAvto   = BuildSwitchLabel("FaintAvto",   go.transform, "Авто",    SwitchSlideX, FontStyles.Normal, SwitchFaintAuto);
 
         GameObject thumbGo = ImageGo("Thumb", go.transform, Color.white);

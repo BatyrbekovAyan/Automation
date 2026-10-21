@@ -32,7 +32,7 @@ public class BillingGateRowsTests
 
     [Test]
     public void Bot_limit_title()
-        => Assert.AreEqual("Лимит ботов вашего тарифа", BillingGateRows.Title(PaywallTrigger.BotLimit));
+        => Assert.AreEqual("Лимит сотрудников вашего тарифа", BillingGateRows.Title(PaywallTrigger.BotLimit));
 
     [Test]
     public void Channel_limit_title()
@@ -42,24 +42,24 @@ public class BillingGateRowsTests
 
     [Test]
     public void Bot_limit_on_start_names_the_tier_and_its_single_bot()
-        => Assert.AreEqual("В тарифе «Старт» — 1 бот. Повысьте тариф, чтобы добавить ещё.",
+        => Assert.AreEqual("В тарифе «Старт» — 1 сотрудник. Повысьте тариф, чтобы добавить ещё.",
             BillingGateRows.Body(PaywallTrigger.BotLimit, PlanTier.Start));
 
     [Test]
     public void Bot_limit_on_business_takes_the_few_form()
-        => Assert.AreEqual("В тарифе «Бизнес» — 3 бота. Повысьте тариф, чтобы добавить ещё.",
+        => Assert.AreEqual("В тарифе «Бизнес» — 3 сотрудника. Повысьте тариф, чтобы добавить ещё.",
             BillingGateRows.Body(PaywallTrigger.BotLimit, PlanTier.Business));
 
     [Test]
     public void Bot_limit_on_network_takes_the_many_form()
-        => Assert.AreEqual("В тарифе «Сеть» — 5 ботов. Повысьте тариф, чтобы добавить ещё.",
+        => Assert.AreEqual("В тарифе «Сеть» — 5 сотрудников. Повысьте тариф, чтобы добавить ещё.",
             BillingGateRows.Body(PaywallTrigger.BotLimit, PlanTier.Network));
 
     [Test]
     public void Bot_limit_on_trial_says_period_not_tariff()
     {
         // «В тарифе «Пробный»» would be a lie — the trial is not a tariff the owner chose.
-        Assert.AreEqual("В пробном периоде — 3 бота. Повысьте тариф, чтобы добавить ещё.",
+        Assert.AreEqual("В пробном периоде — 3 сотрудника. Повысьте тариф, чтобы добавить ещё.",
             BillingGateRows.Body(PaywallTrigger.BotLimit, PlanTier.Trial));
     }
 
@@ -92,7 +92,7 @@ public class BillingGateRowsTests
     {
         // PlanCatalog.Get(None) is 0/0, so the tier sentence would read «— 0 ботов»,
         // which sounds like a broken plan rather than «you don't have one».
-        Assert.AreEqual("Подписка не оформлена. Оформите тариф, чтобы добавить бота.",
+        Assert.AreEqual("Подписка не оформлена. Оформите тариф, чтобы добавить сотрудника.",
             BillingGateRows.Body(PaywallTrigger.BotLimit, PlanTier.None));
     }
 

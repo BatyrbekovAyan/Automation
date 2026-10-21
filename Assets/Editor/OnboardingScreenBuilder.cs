@@ -171,7 +171,7 @@ public static class OnboardingScreenBuilder
 
         // ── Slides ───────────────────────────────────────────────────────────
         var slide0Cta = BuildSlide(contentGo, 0,
-            "Бот отвечает клиентам за вас",
+            "Сотрудник отвечает клиентам",
             "Круглосуточно, в WhatsApp и Telegram — на вашем обычном номере",
             "Далее", BuildValueHero);
 
@@ -182,8 +182,8 @@ public static class OnboardingScreenBuilder
 
         var createBotButton = BuildSlide(contentGo, 2,
             "Работает там, где ваши клиенты",
-            "Подключите WhatsApp, Telegram или оба сразу — канал выберете при создании бота",
-            "Создать бота", BuildChannelsHero);
+            "Подключите WhatsApp, Telegram или оба сразу — канал выберете при добавлении сотрудника",
+            "Добавить сотрудника", BuildChannelsHero);
 
         // ── Shared pinned dot row (rendered above the pager) ─────────────────
         var dots = BuildDotsRow(screen, out _);
@@ -328,7 +328,7 @@ public static class OnboardingScreenBuilder
         SetAnchors(whoRt, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0f, 1f));
         whoRt.offsetMin = new Vector2(22f, -46f);
         whoRt.offsetMax = new Vector2(-22f, -12f);
-        var whoTmp = AddText(whoGo, "Бот-ассистент", 24f, _semibold, Primary);
+        var whoTmp = AddText(whoGo, "Сотрудник", 24f, _semibold, Primary);
         whoTmp.alignment = TextAlignmentOptions.TopLeft;
         var outBody = NewChild(outBubble, "Body", out var outBodyRt);
         SetAnchors(outBodyRt, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0f, 1f));
@@ -373,9 +373,9 @@ public static class OnboardingScreenBuilder
         SetPreferredSize(hero, 680f, 356f);
 
         BuildModeCard(hero, "AutoCard", 0f, true,
-            "Авто", "Бот отвечает сам — вы видите каждый диалог");
+            "Авто", "Сотрудник отвечает сам — вы видите каждый диалог");
         BuildModeCard(hero, "TogetherCard", -176f, false,
-            "Вместе", "Бот предлагает варианты — отправляете вы");
+            "Выбрать", "Сотрудник предлагает варианты — отправляете вы");
 
         return hero;
     }

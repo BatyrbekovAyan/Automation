@@ -1,6 +1,6 @@
 ---
 name: sketch-findings-automation
-description: Validated UI design decisions from sketch explorations for this app — currently the LOCKED suggestions-panel («Вместе») spec: P cards, keyboard-slot chassis, and the 005-E interaction model (focus-only keyboard, panel-default slot, 3-detent handle, destination-glyph key), with Unity reference-unit sizes, theme-token mapping, and the rejected-directions record. Load whenever building, restyling, or discussing the messages-page suggestions panel UI.
+description: Validated UI design decisions from sketch explorations for this app — currently the LOCKED suggestions-panel («Выбрать» mode, formerly «Вместе») spec: P cards, keyboard-slot chassis, and the 005-E interaction model (focus-only keyboard, panel-default slot, 3-detent handle, destination-glyph key), with Unity reference-unit sizes, theme-token mapping, and the rejected-directions record. Load whenever building, restyling, or discussing the messages-page suggestions panel UI.
 ---
 
 <context>
@@ -21,7 +21,7 @@ UI follows the app's token system (`ThemeRole` / `Theme_Light` / `Theme_Dark`) �
 hardcoded palette anywhere, so screens survive the upcoming «Чернильный» dark flip.
 Surfaces are calm (Surface + hairline/Border strokes); green (`PositiveInk`/`PositiveBg`)
 is reserved for the "recommended/positive" semantic; identity colors (WhatsApp green,
-Telegram blue, iOS-blue «Вместе» switch) never theme. Type and spacing follow the
+Telegram blue, iOS-blue «Выбрать» switch) never theme. Type and spacing follow the
 calibrated scale in `unity-ui-builder` (body 38–42u, 4dp-grid ×3 spacing).
 </design_direction>
 

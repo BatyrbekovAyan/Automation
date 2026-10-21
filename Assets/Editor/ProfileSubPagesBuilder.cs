@@ -338,14 +338,14 @@ public static class ProfileSubPagesBuilder
         var dataCard = MakeCard(parts.content.gameObject, "DataCard");
         MakeInfoRow(dataCard, PsIcon("PS_Smartphone"), IconBlueGray,
             "Хранятся на этом устройстве",
-            "Боты, чаты и настройки не привязаны к облачному аккаунту — они живут только в этом приложении.");
+            "Сотрудники, чаты и настройки не привязаны к облачному аккаунту — они живут только в этом приложении.");
 
         // «Опасная зона»
         MakeCaption(parts.content.gameObject, "Опасная зона");
         var deleteButton = MakeBigButton(parts.content.gameObject, "DeleteAllButton",
             "Удалить все данные", DangerFill, DangerInk, PsIcon("PS_Trash"));
         MakeFinePrint(parts.content.gameObject,
-            "Удалит всех ботов, историю и настройки на этом устройстве.\nДействие нельзя отменить.", center: true);
+            "Удалит всех сотрудников, историю и настройки на этом устройстве.\nДействие нельзя отменить.", center: true);
 
         so.FindProperty("accountAvatarInitial").objectReferenceValue = initialTmp;
         so.FindProperty("accountName").objectReferenceValue = nameTmp;
@@ -378,7 +378,7 @@ public static class ProfileSubPagesBuilder
         var dataCard = MakeCard(parts.content.gameObject, "DataCard");
         MakeInfoRow(dataCard, PsIcon("PS_Smartphone"), IconBlue,
             "На этом устройстве",
-            "Боты и их настройки, история чатов, кэш фото и видео.");
+            "Сотрудники и их настройки, история чатов, кэш фото и видео.");
         MakeDivider(dataCard);
         MakeInfoRow(dataCard, PsIcon("PS_Cloud"), IconBlueGray,
             "Обрабатываются на серверах",

@@ -561,15 +561,15 @@ public class PaywallController : MonoBehaviour
 
     private void Render()
     {
-        if (headerTitle != null)
-            headerTitle.text = _receiptVariant ? PaywallCopy.ReceiptTitle() : PaywallRows.HeaderTitle;
-        if (headerSubline != null)
-            headerSubline.text = _receiptVariant ? PaywallRows.ReceiptSubline : PaywallRows.HeaderSubline;
+        PaywallHeader header = PaywallRows.Header(_receiptVariant, _trialStarted);
+        if (headerTitle != null) headerTitle.text = PaywallRows.HeaderTitleFor(header);
+        if (headerSubline != null) headerSubline.text = PaywallRows.HeaderSublineFor(header);
 
         if (receiptBlock != null)
         {
-            receiptBlock.SetActive(_receiptVariant);
-            if (_receiptVariant) RenderReceipt();
+            bool showReceipt = header == PaywallHeader.Receipt;
+            receiptBlock.SetActive(showReceipt);
+            if (showReceipt) RenderReceipt();
         }
 
         if (monthLabel != null) monthLabel.text = PaywallRows.PeriodMonth;

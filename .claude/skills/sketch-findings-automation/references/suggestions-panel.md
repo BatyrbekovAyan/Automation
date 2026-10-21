@@ -1,4 +1,4 @@
-# Suggestions Panel («Вместе» mode, messages page) — LOCKED DESIGN
+# Suggestions Panel («Выбрать» mode — formerly «Вместе», renamed 2026-10-21; messages page) — LOCKED DESIGN
 
 Winner **P** of sketch 002 (6 rounds, locked 2026-08-07). Replaces the mint 2×2 grid
 currently produced by `SuggestionsPanelBuilder`. Interactive reference:

@@ -63,7 +63,7 @@ public static class SubscriptionPageRows
     public const string ReserveFrozenClause = "заморожен до возобновления подписки";
 
     public const string DialogsTitle = "Диалоги ИИ";
-    public const string BotsTitle = "Боты";
+    public const string BotsTitle = "Сотрудники";
     public const string ChannelsTitle = "Каналы";
 
     public const string ChangePlanRow = "Изменить тариф";

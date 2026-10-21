@@ -316,7 +316,7 @@ public static class DashboardPageBuilder
         hlg.childControlWidth = true;
         hlg.childControlHeight = true;
 
-        chipHost = MakeChip(row, "Все боты");
+        chipHost = MakeChip(row, "Все сотрудники");
         chipHost.SetActive(false);   // inactive template; controller clones it
         chipsRow = row.transform;
     }
@@ -558,7 +558,7 @@ public static class DashboardPageBuilder
         name.textWrappingMode = TextWrappingModes.NoWrap;
         name.overflowMode = TextOverflowModes.Ellipsis;
 
-        MakeStretchText(row, "BotTag", "Бот", 30f, _regular, Muted, textLeft, textRight, -124f, -86f);
+        MakeStretchText(row, "BotTag", "Сотрудник", 30f, _regular, Muted, textLeft, textRight, -124f, -86f);
 
         var summary = MakeStretchText(row, "Summary", "Сводка диалога", 36f, _regular, Muted, textLeft, textRight, -170f, -126f);
         summary.textWrappingMode = TextWrappingModes.NoWrap;
@@ -653,7 +653,7 @@ public static class DashboardPageBuilder
         SetPreferredSize(hero, 300f, 300f);
         AddIconImage(hero, _hero, Color.white);   // hero tint MUST be white
 
-        var title = AddText(NewChild(stack, "Title", out _), "Бот пока не вёл диалогов", 44f, _semibold, Ink);
+        var title = AddText(NewChild(stack, "Title", out _), "Сотрудник пока не вёл диалогов", 44f, _semibold, Ink);
         title.alignment = TextAlignmentOptions.Center;
 
         empty.SetActive(false);

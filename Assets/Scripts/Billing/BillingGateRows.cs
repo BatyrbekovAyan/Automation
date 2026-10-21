@@ -34,7 +34,7 @@ public static class BillingGateRows
 
     // ── Fixed copy ───────────────────────────────────────────────────────────
 
-    public const string BotLimitTitle = "Лимит ботов вашего тарифа";
+    public const string BotLimitTitle = "Лимит сотрудников вашего тарифа";
     public const string ChannelLimitTitle = "Лимит каналов вашего тарифа";
 
     /// <summary>«Оформите тариф, чтобы …» — the <see cref="PlanTier.None"/> lead-in.</summary>
@@ -53,10 +53,10 @@ public static class BillingGateRows
     /// upgrading buys. Three shapes, because the three states are genuinely different
     /// sentences rather than one sentence with a variable in it:
     ///
-    ///  • a bought tier  — «В тарифе «Старт» — 1 бот. Повысьте тариф, чтобы добавить ещё.»
-    ///  • the trial      — «В пробном периоде — 3 бота. …» (it is not a tariff the owner chose)
-    ///  • <see cref="PlanTier.None"/> — «Подписка не оформлена. Оформите тариф, чтобы добавить бота.»
-    ///    The catalog reports 0/0 there, so the tier shape would read «— 0 ботов», which
+    ///  • a bought tier  — «В тарифе «Старт» — 1 сотрудник. Повысьте тариф, чтобы добавить ещё.»
+    ///  • the trial      — «В пробном периоде — 3 сотрудника. …» (it is not a tariff the owner chose)
+    ///  • <see cref="PlanTier.None"/> — «Подписка не оформлена. Оформите тариф, чтобы добавить сотрудника.»
+    ///    The catalog reports 0/0 there, so the tier shape would read «— 0 сотрудников», which
     ///    sounds like a broken plan rather than the absence of one.
     /// </summary>
     public static string Body(PaywallTrigger trigger, PlanTier tier)
@@ -65,7 +65,7 @@ public static class BillingGateRows
 
         if (tier == PlanTier.None)
             return NoSubscriptionLead + " Оформите тариф, чтобы "
-                 + (channel ? "подключить канал." : "добавить бота.");
+                 + (channel ? "подключить канал." : "добавить сотрудника.");
 
         PlanSpec spec = PlanCatalog.Get(tier);
         string allowance = channel

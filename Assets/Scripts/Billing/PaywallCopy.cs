@@ -53,7 +53,7 @@ public static class PaywallCopy
     public static string DialogsPerMonth(int n) => Dialogs(n) + " ИИ/мес";
 
     public static string Bots(int n)
-        => Number(n) + " " + RuPlural.Pick(n, "бот", "бота", "ботов");
+        => Number(n) + " " + RuPlural.Pick(n, "сотрудник", "сотрудника", "сотрудников");
 
     public static string Channels(int n)
         => Number(n) + " " + RuPlural.Pick(n, "канал", "канала", "каналов");
@@ -86,8 +86,8 @@ public static class PaywallCopy
     public static string TrialPill(int daysLeft)
         => "Пробный · " + daysLeft.ToString(System.Globalization.CultureInfo.InvariantCulture) + " дн.";
 
-    /// <summary>Value-receipt header (PaywallTrigger.TrialExpired): «Ваш бот за 5 дней».</summary>
+    /// <summary>Value-receipt header (PaywallTrigger.TrialExpired): «Ваш сотрудник за 5 дней».</summary>
     public static string ReceiptTitle()
-        => "Ваш бот за " + PlanCatalog.TrialDays.ToString(System.Globalization.CultureInfo.InvariantCulture)
+        => "Ваш сотрудник за " + PlanCatalog.TrialDays.ToString(System.Globalization.CultureInfo.InvariantCulture)
          + " " + RuPlural.Pick(PlanCatalog.TrialDays, "день", "дня", "дней");
 }

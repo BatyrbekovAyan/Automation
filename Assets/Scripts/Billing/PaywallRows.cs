@@ -1,6 +1,9 @@
 /// <summary>Which price column the paywall is showing.</summary>
 public enum PaywallPeriod { Month, Year }
 
+/// <summary>Which header the paywall opens with — see <see cref="PaywallRows.Header"/>.</summary>
+public enum PaywallHeader { Browse, Receipt, TrialUsed }
+
 /// <summary>
 /// The second, secondary-styled paywall button. Since 2026-09-13 it carries the free-trial
 /// offer («Попробовать 5 дней бесплатно») and shows only while that offer exists — the
@@ -19,8 +22,8 @@ public struct PaywallTierRow
     public PlanTier Tier;
     public string Title;            // «Бизнес»
     public string PriceText;        // «19 900 ₸/мес» / «199 000 ₸/год»
-    public string CountsLine;       // «3 бота · 3 канала · 1 000 диалогов ИИ/мес»
-    public bool ShowCrossBotLine;   // «Сводка по всем ботам» — Бизнес/Сеть only
+    public string CountsLine;       // «3 сотрудника · 3 канала · 1 000 диалогов ИИ/мес»
+    public bool ShowCrossBotLine;   // «Сводка по всем сотрудникам» — Бизнес/Сеть only
     public bool IsHighlighted;      // ★Популярный + accent ring
 }
 
@@ -46,8 +49,37 @@ public static class PaywallRows
     public const string HeaderSubline = "Платите только за масштаб";
     public const string ReceiptSubline = "Итоги пробного периода";
 
+    /// <summary>
+    /// The «Итоги пробного периода» header belongs to an install that RAN the trial. The same trigger also fires when
+    /// only the server knows the account's trial is used (a reinstall, «Удалить все данные» — the install, and with it
+    /// the billing id, survives): this install's receipt is then all zeros and reads as «subscribe to create your first
+    /// employee» (owner's report 2026-10-21), so the paywall says plainly that the trial is already used.
+    /// </summary>
+    public const string TrialUsedTitle = "Пробный период уже использован";
+    public const string TrialUsedSubline = "Выберите тариф, чтобы продолжить";
+
+    /// <summary>Which header the paywall opens with: the receipt only where this install's trial clock ran.</summary>
+    public static PaywallHeader Header(bool trialExpiredTrigger, bool trialStarted)
+        => !trialExpiredTrigger ? PaywallHeader.Browse
+         : trialStarted ? PaywallHeader.Receipt
+         : PaywallHeader.TrialUsed;
+
+    public static string HeaderTitleFor(PaywallHeader header) => header switch
+    {
+        PaywallHeader.Receipt => PaywallCopy.ReceiptTitle(),
+        PaywallHeader.TrialUsed => TrialUsedTitle,
+        _ => HeaderTitle,
+    };
+
+    public static string HeaderSublineFor(PaywallHeader header) => header switch
+    {
+        PaywallHeader.Receipt => ReceiptSubline,
+        PaywallHeader.TrialUsed => TrialUsedSubline,
+        _ => HeaderSubline,
+    };
+
     public const string PopularBadge = "Популярный";
-    public const string CrossBotLine = "Сводка по всем ботам";
+    public const string CrossBotLine = "Сводка по всем сотрудникам";
     public const string AllPlansOverline = "ВО ВСЕХ ТАРИФАХ";
     public const string RestoreLabel = "Восстановить покупки";
 
@@ -115,7 +147,7 @@ public static class PaywallRows
         "Умный ИИ последнего поколения",
         "Понимает голосовые сообщения",
         "Прайс-листы без лимита — файлы и фото",
-        "Режимы «Авто» и «Вместе»",
+        "Режимы «Авто» и «Выбрать»",
         "Сводка: итоги диалогов и заказы",
         "Докупка диалогов в любой момент",
     };

@@ -50,6 +50,19 @@ public class PaywallCtaWiringTests
             "an early Close() inside the purchase path is the same trap under another name");
     }
 
+    /// <summary>
+    /// The header and the receipt block follow <see cref="PaywallRows.Header"/>: a receipt of THIS install's trial
+    /// must not appear when only the server knows the trial was used (owner's report 2026-10-21).
+    /// </summary>
+    [Test]
+    public void Render_takes_the_header_from_the_seam()
+    {
+        string body = MethodBody(Controller, "Render");
+        StringAssert.Contains("PaywallRows.Header(", body, "the header kind is the pure seam's verdict, pinned by PaywallRowsTests");
+        StringAssert.DoesNotContain("receiptBlock.SetActive(_receiptVariant)", body,
+            "the receipt shows only for the Receipt header — the TrialExpired trigger alone is not enough");
+    }
+
     // ---- source helpers -----------------------------------------------------------------
 
     private static string MethodBody(string relativePath, string method)

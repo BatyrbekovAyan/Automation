@@ -4,17 +4,17 @@
 /// </summary>
 public static class ProfileClaimCopy
 {
-    public const string TitleCode = "Подтвердите бота";
+    public const string TitleCode = "Подтвердите сотрудника";
     public const string TitleReauth = "Подключите канал заново";
-    public const string TitleOwned = "Бот подтверждён";
+    public const string TitleOwned = "Сотрудник подтверждён";
 
     /// <summary>{0} = bot name, {1} = channel name.</summary>
     public const string BodyCodeFormat =
-        "Мы отправили 6-значный код в чат «Избранное» ({1}) аккаунта бота «{0}». Введите его, чтобы " +
-        "привязать бота к этой установке.";
+        "Мы отправили 6-значный код в чат «Избранное» ({1}) аккаунта сотрудника «{0}». Введите его, чтобы " +
+        "привязать сотрудника к этой установке.";
 
     public const string BodyReauthFormat =
-        "Бот «{0}» ещё не подтверждён на этом устройстве: откройте его настройки и подключите {1} заново. " +
+        "Сотрудник «{0}» ещё не подтверждён на этом устройстве: откройте его настройки и подключите {1} заново. " +
         "После подключения введите код, который придёт в чат «Избранное».";
 
     public const string BodyTransportDown = "Сервер недоступен. Попробуйте позже.";

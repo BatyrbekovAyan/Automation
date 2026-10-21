@@ -42,7 +42,7 @@ public class SemiAutoToggle : MonoBehaviour
 
     private const string EnableTitle = "Включить авто-режим в этом чате?";
     private const string EnableBody =
-        "Бот будет сам отвечать этому клиенту. Выключить можно в любой момент — этой же кнопкой.";
+        "Сотрудник будет сам отвечать этому клиенту. Выключить можно в любой момент — этой же кнопкой.";
 
     private bool _on;   // true = semi-auto on for this chat (the «Авто» chip reads unlit)
     private bool _fallbackOnly;   // D1: lit by a fallback alone — the chat's stored mode is «Авто»

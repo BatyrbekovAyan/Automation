@@ -16,7 +16,7 @@ public class RetiredChannelCopyTests
         foreach (string reason in new[] { "trial_expiry", "churn_grace", "liveness" })
             StringAssert.EndsWith("Настройки, прайс-листы и переписка сохранены — после оплаты подключите канал снова.",
                 RetiredChannelCopy.BannerBody(reason), "the promise F2 keeps: the data is moved to the new connection");
-        Assert.AreEqual("Бот отключён", RetiredChannelCopy.BannerTitle);
+        Assert.AreEqual("Сотрудник отключён", RetiredChannelCopy.BannerTitle);
         Assert.AreEqual("Выбрать тариф", RetiredChannelCopy.BannerCta);
     }
 
@@ -49,11 +49,11 @@ public class RetiredChannelCopyTests
     {
         Assert.AreEqual("Отключён · нажмите, чтобы подключить снова", RetiredChannelCopy.RowHint);
         Assert.AreEqual("Подключить", RetiredChannelCopy.ConnectPill);
-        Assert.AreEqual("Бот отключён", RetiredChannelCopy.EmptyTitle);
-        Assert.AreEqual("Подключите канал снова в настройках бота", RetiredChannelCopy.EmptyBody);
+        Assert.AreEqual("Сотрудник отключён", RetiredChannelCopy.EmptyTitle);
+        Assert.AreEqual("Подключите канал снова в настройках сотрудника", RetiredChannelCopy.EmptyBody);
         Assert.AreEqual("Подтверждаем оплату…", RetiredChannelCopy.Settling);
         Assert.AreEqual("Оплата ещё не дошла до сервера. Попробуйте через минуту.", RetiredChannelCopy.SettleTimedOut);
-        Assert.AreEqual("Подключите ботов снова", RetiredChannelCopy.SheetTitle);
+        Assert.AreEqual("Подключите сотрудников снова", RetiredChannelCopy.SheetTitle);
         Assert.AreEqual("Тариф активен. Настройки, прайс-листы и переписка на месте — осталось заново подключить WhatsApp или Telegram.",
             RetiredChannelCopy.SheetBody);
         Assert.AreEqual("Позже", RetiredChannelCopy.SheetLater);

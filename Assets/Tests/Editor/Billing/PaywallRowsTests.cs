@@ -72,9 +72,9 @@ public class PaywallRowsTests
     public void Counts_lines_carry_bots_channels_and_dialogs()
     {
         var rows = PaywallRows.Build(PaywallPeriod.Month);
-        Assert.AreEqual("1 бот · 1 канал · 300 диалогов ИИ/мес", rows[0].CountsLine);
-        Assert.AreEqual("3 бота · 3 канала · 1\u00A0000 диалогов ИИ/мес", rows[1].CountsLine);
-        Assert.AreEqual("5 ботов · 5 каналов · 3\u00A0000 диалогов ИИ/мес", rows[2].CountsLine);
+        Assert.AreEqual("1 сотрудник · 1 канал · 300 диалогов ИИ/мес", rows[0].CountsLine);
+        Assert.AreEqual("3 сотрудника · 3 канала · 1\u00A0000 диалогов ИИ/мес", rows[1].CountsLine);
+        Assert.AreEqual("5 сотрудников · 5 каналов · 3\u00A0000 диалогов ИИ/мес", rows[2].CountsLine);
     }
 
     [Test]
@@ -86,10 +86,10 @@ public class PaywallRowsTests
             Assert.AreEqual(month[i].CountsLine, year[i].CountsLine);
     }
 
-    [TestCase(1, "1 бот")]
-    [TestCase(3, "3 бота")]
-    [TestCase(5, "5 ботов")]
-    [TestCase(11, "11 ботов")]
+    [TestCase(1, "1 сотрудник")]
+    [TestCase(3, "3 сотрудника")]
+    [TestCase(5, "5 сотрудников")]
+    [TestCase(11, "11 сотрудников")]
     public void Bot_plural(int n, string expected) => Assert.AreEqual(expected, PaywallCopy.Bots(n));
 
     [TestCase(1, "1 канал")]
@@ -313,7 +313,40 @@ public class PaywallRowsTests
 
     [Test]
     public void Receipt_title_names_the_trial_length()
-        => Assert.AreEqual("Ваш бот за 5 дней", PaywallCopy.ReceiptTitle());
+        => Assert.AreEqual("Ваш сотрудник за 5 дней", PaywallCopy.ReceiptTitle());
+
+    // ── Header: the receipt only where this install ran the trial ─────────────
+    //
+    // The TrialExpired paywall also opens when the SERVER says the account is expired while this
+    // install never ran a trial (a reinstall, «Удалить все данные»): a receipt of THIS install's
+    // trial would show zeros under «Итоги пробного периода» and read as «subscribe to create your
+    // first employee» (owner's report 2026-10-21).
+
+    [TestCase(false, false, PaywallHeader.Browse)]
+    [TestCase(false, true, PaywallHeader.Browse)]
+    [TestCase(true, true, PaywallHeader.Receipt)]
+    [TestCase(true, false, PaywallHeader.TrialUsed)]
+    public void Header_shows_the_receipt_only_when_this_install_ran_the_trial(
+        bool trialExpiredTrigger, bool trialStarted, PaywallHeader expected)
+        => Assert.AreEqual(expected, PaywallRows.Header(trialExpiredTrigger, trialStarted));
+
+    [Test]
+    public void Trial_used_header_says_the_trial_is_gone_and_what_to_do()
+    {
+        Assert.AreEqual("Пробный период уже использован", PaywallRows.TrialUsedTitle);
+        Assert.AreEqual("Выберите тариф, чтобы продолжить", PaywallRows.TrialUsedSubline);
+    }
+
+    [Test]
+    public void Each_header_carries_its_own_title_and_subline()
+    {
+        Assert.AreEqual(PaywallRows.HeaderTitle, PaywallRows.HeaderTitleFor(PaywallHeader.Browse));
+        Assert.AreEqual(PaywallRows.HeaderSubline, PaywallRows.HeaderSublineFor(PaywallHeader.Browse));
+        Assert.AreEqual(PaywallCopy.ReceiptTitle(), PaywallRows.HeaderTitleFor(PaywallHeader.Receipt));
+        Assert.AreEqual(PaywallRows.ReceiptSubline, PaywallRows.HeaderSublineFor(PaywallHeader.Receipt));
+        Assert.AreEqual(PaywallRows.TrialUsedTitle, PaywallRows.HeaderTitleFor(PaywallHeader.TrialUsed));
+        Assert.AreEqual(PaywallRows.TrialUsedSubline, PaywallRows.HeaderSublineFor(PaywallHeader.TrialUsed));
+    }
 
     // ── Copy moved out of PaywallController by Task 14b ───────────────────────
 

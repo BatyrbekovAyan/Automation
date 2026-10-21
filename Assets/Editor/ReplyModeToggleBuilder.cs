@@ -166,7 +166,7 @@ public static class ReplyModeToggleBuilder
         button.targetGraphic = track;
 
         // Both words live inside the track; the thumb (added last) covers the active one.
-        var faintPolu = BuildTrackLabel(root.transform, "FaintPolu", "Вместе", -70f, font);
+        var faintPolu = BuildTrackLabel(root.transform, "FaintPolu", "Выбрать", -70f, font);
         var faintAvto = BuildTrackLabel(root.transform, "FaintAvto", "Авто", 70f, font);
 
         var thumbGo = new GameObject("Thumb",
@@ -304,7 +304,7 @@ public static class ReplyModeToggleBuilder
             TextAlignmentOptions.Top, font);
         // Body: manual tweaks preserved — nudged up to -118 and vertically centred.
         var body = BuildPopupText(card.transform, "Body",
-            "Бот перестанет отвечать сам — он будет предлагать варианты ответа, а вы выберете.",
+            "Сотрудник перестанет отвечать сам — он будет предлагать варианты ответа, а вы выберете.",
             34f, false, Hex("#646468"), new Vector2(0f, -118f), new Vector2(-80f, 130f),
             TextAlignmentOptions.Center, font);
 

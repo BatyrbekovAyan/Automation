@@ -23,7 +23,7 @@ public static class BotActivationConfirm
 {
     private const string TitleText = "Включить авто-режим?";
     private const string BodyText =
-        "Бот будет отвечать клиентам сам. Выключить можно в любой момент — этой же кнопкой.";
+        "Сотрудник будет сам отвечать клиентам. Выключить можно в любой момент — этой же кнопкой.";
 
     // Authored card geometry. Public so ConfirmCardLayoutTests computes this twin's
     // clearance above the buttons from the same numbers BuildCard writes, instead of
