@@ -304,7 +304,7 @@ public static class ReplyModeToggleBuilder
             TextAlignmentOptions.Top, font);
         // Body: manual tweaks preserved — nudged up to -118 and vertically centred.
         var body = BuildPopupText(card.transform, "Body",
-            "Сотрудник перестанет отвечать сам — он будет предлагать варианты ответа, а вы выберете.",
+            "ИИ-сотрудник перестанет отвечать сам — он будет предлагать варианты ответа, а вы выберете.",
             34f, false, Hex("#646468"), new Vector2(0f, -118f), new Vector2(-80f, 130f),
             TextAlignmentOptions.Center, font);
 

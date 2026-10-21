@@ -128,7 +128,7 @@ export function init(root, ctx = {}) {
 
   function bubble(dir, text, time, from, bot) {
     const b = el('div', `dm-msg ${dir}`,
-      (bot ? `<span class="dm-bot">${SPARK}Ответил сотрудник · «Авто»</span>` : '')
+      (bot ? `<span class="dm-bot">${SPARK}ИИ-сотрудник · «Авто»</span>` : '')
       + `<span class="sr">${esc(from)}: </span><span class="dm-tx">${esc(text)}</span>`
       + `<span class="dm-meta">${esc(time)}${dir === 'out' ? TICKS : ''}</span>`);
     return b;
@@ -628,7 +628,7 @@ export function init(root, ctx = {}) {
     setSrc(s, 'hit');
     prog(0.55);
     const best = s.cards.find((c) => c.best) || s.cards[0];
-    const b = swap(ty, bubble('out', best.text, s.times[1], 'Сотрудник', true));
+    const b = swap(ty, bubble('out', best.text, s.times[1], 'ИИ-сотрудник', true));
     comp.classList.add('sent');
     b.classList.add('t1s');
     await sleep(650, g); b.classList.add('t2');
@@ -705,7 +705,7 @@ export function init(root, ctx = {}) {
     await sleep(1150, g);
     setTyping(false);
     swap(ty2, bubble('in', s.follow, s.times[2], s.name));
-    if (mode === 'with') setLoader('wait', 'Сотрудник подводит итог диалога…');
+    if (mode === 'with') setLoader('wait', 'ИИ-сотрудник подводит итог диалога…');
     await sleep(750, g);
     const chip = el('p', 'dm-ochip', `<i aria-hidden="true"></i>Сводка: ${esc(s.outcome.label.toLowerCase())}`);
     chip.dataset.st = s.outcome.status;
@@ -802,7 +802,7 @@ export function init(root, ctx = {}) {
     if (keyboardPick) { keyboardPick = false; thread.focus({ preventScroll: true }); }
     clearCards();
     slot('closed');
-    const b = bubble('out', s.cards[i].text, s.times[1], bot ? 'Сотрудник' : 'Вы', bot);
+    const b = bubble('out', s.cards[i].text, s.times[1], bot ? 'ИИ-сотрудник' : 'Вы', bot);
     b.classList.add('t1s', 't2', 'read');
     list.appendChild(b);
     comp.classList.add('sent');

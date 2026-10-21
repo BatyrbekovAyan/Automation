@@ -49,11 +49,14 @@ public static class PaywallCopy
     public static string Dialogs(int n)
         => Number(n) + " " + RuPlural.Pick(n, "диалог", "диалога", "диалогов");
 
-    /// <summary>Counts-line form: «300 диалогов ИИ/мес».</summary>
-    public static string DialogsPerMonth(int n) => Dialogs(n) + " ИИ/мес";
+    /// <summary>
+    /// Counts-line form: «300 диалогов/мес». No «ИИ» here since 2026-10-21: the line opens with «ИИ-сотрудник…», and
+    /// «5 ИИ-сотрудников · 5 каналов · 3 000 диалогов ИИ/мес» no longer fits the tier card's 900u column.
+    /// </summary>
+    public static string DialogsPerMonth(int n) => Dialogs(n) + "/мес";
 
     public static string Bots(int n)
-        => Number(n) + " " + RuPlural.Pick(n, "сотрудник", "сотрудника", "сотрудников");
+        => Number(n) + " " + RuPlural.Pick(n, "ИИ-сотрудник", "ИИ-сотрудника", "ИИ-сотрудников");
 
     public static string Channels(int n)
         => Number(n) + " " + RuPlural.Pick(n, "канал", "канала", "каналов");
@@ -86,8 +89,8 @@ public static class PaywallCopy
     public static string TrialPill(int daysLeft)
         => "Пробный · " + daysLeft.ToString(System.Globalization.CultureInfo.InvariantCulture) + " дн.";
 
-    /// <summary>Value-receipt header (PaywallTrigger.TrialExpired): «Ваш сотрудник за 5 дней».</summary>
+    /// <summary>Value-receipt header (PaywallTrigger.TrialExpired): «Ваш ИИ-сотрудник за 5 дней».</summary>
     public static string ReceiptTitle()
-        => "Ваш сотрудник за " + PlanCatalog.TrialDays.ToString(System.Globalization.CultureInfo.InvariantCulture)
+        => "Ваш ИИ-сотрудник за " + PlanCatalog.TrialDays.ToString(System.Globalization.CultureInfo.InvariantCulture)
          + " " + RuPlural.Pick(PlanCatalog.TrialDays, "день", "дня", "дней");
 }

@@ -21,7 +21,7 @@ using UnityEngine.UI;
 ///                             сохранить расписание — проверьте интернет» / «Сервер не принял расписание — повторим при
 ///                             следующем открытии настроек»), hidden; NO ThemedColor — BotSettings paints it by state (InkSecondary /
 ///                             Destructive), a ThemedColor would be a second owner
-///   ScheduleHint              «Вне часов сотрудник не отвечает сам — работает режим «Выбрать»»
+///   ScheduleHint              «Вне часов ИИ-сотрудник не отвечает сам — работает режим «Выбрать»»
 ///
 /// plus FormKeyboardScroll on the Основное tab (the fields sit low enough for the keyboard to cover them) and the six
 /// serialized refs on BotSettings. Every clone source is resolved through BotSettings' serialized refs, never a node
@@ -96,7 +96,7 @@ public static class BotScheduleBuilder
             var anchor = deleteButton != null ? deleteButton.transform : content.Find(DeleteGoName);
             if (anchor == null || anchor.parent != content)
             {
-                Debug.LogError($"{Tag} «Удалить сотрудника» is not in the Основное tab's list; aborting.");
+                Debug.LogError($"{Tag} «Удалить ИИ-сотрудника» is not in the Основное tab's list; aborting.");
                 return false;
             }
             var sourceHeader = content.GetComponentInChildren<SectionHeader>(true);

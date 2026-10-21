@@ -271,14 +271,14 @@ public static class BotServerDeletion
 /// </summary>
 public static class BotDeletionCopy
 {
-    public const string RetryTitle = "Не удалось удалить сотрудника";
-    public const string RetryBody = "Подтверждение удаления от сервера не получено. Сотрудник остался на телефоне — попробуйте ещё раз.";
+    public const string RetryTitle = "Не удалось удалить ИИ-сотрудника";
+    public const string RetryBody = "Подтверждение удаления от сервера не получено. ИИ-сотрудник остался на телефоне — попробуйте ещё раз.";
     public const string RetryAction = "Повторить";
     public const string RefusedTitle = "Удаление не подтверждено";
     public const string RefusedBodyUnproven =
-        "Сервер не подтвердил, что сотрудник ваш. Данные сотрудника на сервере останутся — удалить их можно по запросу в поддержку.";
+        "Сервер не подтвердил, что ИИ-сотрудник ваш. Его данные на сервере останутся — удалить их можно по запросу в поддержку.";
     public const string RefusedBodyElsewhere =
-        "Сотрудник подключён на другом устройстве — данные на сервере принадлежат тому устройству и останутся там.";
+        "ИИ-сотрудник подключён на другом устройстве — данные на сервере принадлежат тому устройству и останутся там.";
     public const string PhoneOnlyAction = "Удалить только с телефона";
     public const string WipeRetryTitle = "Не удалось удалить все данные";
     public const string WipeRetryBody = "Подтверждение удаления от сервера не получено. Часть данных не удалена — попробуйте ещё раз.";
@@ -288,7 +288,7 @@ public static class BotDeletionCopy
 
     /// <summary>The full wipe's single question about the bots the server refused (genitive: «удаление 1 бота / 5 ботов»).</summary>
     public static string WipeRefusedBody(int count, bool allOwnedElsewhere) =>
-        $"Сервер не подтвердил удаление {count} {RuPlural.Pick(count, "сотрудника", "сотрудников", "сотрудников")}. " +
+        $"Сервер не подтвердил удаление {count} {RuPlural.Pick(count, "ИИ-сотрудника", "ИИ-сотрудников", "ИИ-сотрудников")}. " +
         (allOwnedElsewhere
             ? "Данные на сервере принадлежат другому устройству и останутся там."
             : "Данные на сервере останутся — удалить их можно по запросу в поддержку.");

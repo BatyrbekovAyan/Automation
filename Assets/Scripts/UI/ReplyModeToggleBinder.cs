@@ -51,7 +51,7 @@ public class ReplyModeToggleBinder : MonoBehaviour
     private const float AnimDuration = 0.22f;
     private const string EnableTitle = "Включить авто-режим?";
     private const string EnableBody =
-        "Сотрудник будет сам отвечать клиентам. Выключить можно в любой момент — этой же кнопкой.";
+        "ИИ-сотрудник будет сам отвечать клиентам. Выключить можно в любой момент — этой же кнопкой.";
 
     private static ReplyModeToggleBinder instance;
 

@@ -22,8 +22,8 @@ public struct PaywallTierRow
     public PlanTier Tier;
     public string Title;            // «Бизнес»
     public string PriceText;        // «19 900 ₸/мес» / «199 000 ₸/год»
-    public string CountsLine;       // «3 сотрудника · 3 канала · 1 000 диалогов ИИ/мес»
-    public bool ShowCrossBotLine;   // «Сводка по всем сотрудникам» — Бизнес/Сеть only
+    public string CountsLine;       // «3 ИИ-сотрудника · 3 канала · 1 000 диалогов/мес»
+    public bool ShowCrossBotLine;   // «Сводка по всем ИИ-сотрудникам» — Бизнес/Сеть only
     public bool IsHighlighted;      // ★Популярный + accent ring
 }
 
@@ -79,7 +79,7 @@ public static class PaywallRows
     };
 
     public const string PopularBadge = "Популярный";
-    public const string CrossBotLine = "Сводка по всем сотрудникам";
+    public const string CrossBotLine = "Сводка по всем ИИ-сотрудникам";
     public const string AllPlansOverline = "ВО ВСЕХ ТАРИФАХ";
     public const string RestoreLabel = "Восстановить покупки";
 

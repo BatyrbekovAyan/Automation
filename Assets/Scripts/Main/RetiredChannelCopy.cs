@@ -8,7 +8,7 @@
 public static class RetiredChannelCopy
 {
     // ── Settings → «Основное»: the banner while a channel is off and no plan is active ──
-    public const string BannerTitle = "Сотрудник отключён";
+    public const string BannerTitle = "ИИ-сотрудник отключён";
     public const string BannerBodyTrial =
         "Пробный период закончился, и канал отключили. Настройки, прайс-листы и переписка сохранены — после оплаты подключите канал снова.";
     public const string BannerBodySubscription =
@@ -25,8 +25,8 @@ public static class RetiredChannelCopy
     public const string ConnectPill = "Подключить";
 
     // ── Chats: the empty state of a retired channel ──
-    public const string EmptyTitle = "Сотрудник отключён";
-    public const string EmptyBody = "Подключите канал снова в настройках сотрудника";
+    public const string EmptyTitle = "ИИ-сотрудник отключён";
+    public const string EmptyBody = "Подключите канал снова в настройках ИИ-сотрудника";
     public const string EmptyCta = "Открыть настройки";
 
     // ── The wait for the server before a pairing (the store callback lands before RevenueCat's webhook) ──
@@ -34,7 +34,7 @@ public static class RetiredChannelCopy
     public const string SettleTimedOut = "Оплата ещё не дошла до сервера. Попробуйте через минуту.";
 
     // ── The sheet after a purchase ──
-    public const string SheetTitle = "Подключите сотрудников снова";
+    public const string SheetTitle = "Подключите ИИ-сотрудников снова";
     public const string SheetBody =
         "Тариф активен. Настройки, прайс-листы и переписка на месте — осталось заново подключить WhatsApp или Telegram.";
     public const string SheetRowCta = "Подключить";

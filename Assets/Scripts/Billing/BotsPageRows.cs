@@ -43,10 +43,10 @@ public static class BotsPageRows
     /// (<see cref="QuotaFallbackPolicy"/>). Before Task 17b it was the app's one promise that
     /// nothing kept.
     /// </summary>
-    public const string OverHint = "Лимит исчерпан — сотрудник в режиме «Выбрать»";
+    public const string OverHint = "Лимит исчерпан — ИИ-сотрудник в режиме «Выбрать»";
 
-    public const string AddBotTitle = "Добавить сотрудника";
-    public const string BotLimitSubtext = "Лимит сотрудников тарифа";
+    public const string AddBotTitle = "Добавить ИИ-сотрудника";
+    public const string BotLimitSubtext = "Лимит ИИ-сотрудников тарифа";
 
     /// <summary>At or below this many days left the pill switches to the urgent tint.</summary>
     public const int UrgentDaysLeft = 1;
@@ -178,7 +178,7 @@ public static class BotsPageRows
         => liveBots == 0 && EntitlementPolicy.RemainingBots(effectiveTier, liveBots) > 0;
 
     /// <summary>
-    /// «Ещё 2 сотрудника в тарифе», or <see cref="BotLimitSubtext"/> once the plan is full.
+    /// «Ещё 2 ИИ-сотрудника в тарифе», or <see cref="BotLimitSubtext"/> once the plan is full.
     ///
     /// The count comes from <see cref="EntitlementPolicy.RemainingBots"/> — the same
     /// expression <see cref="EntitlementPolicy.CanCreateBot"/> is built on — rather than

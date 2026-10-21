@@ -370,13 +370,13 @@ public static class NavRestructureBuilder
         AddIconImage(hero, _hero, Color.white);
 
         var titleGo = NewChild(stack, "Title", out _);
-        var titleTmp = AddText(titleGo, "Добавьте первого сотрудника", 50f, _bold, Ink);
+        var titleTmp = AddText(titleGo, "Добавьте ИИ-сотрудника", 50f, _bold, Ink);
         titleTmp.alignment = TextAlignmentOptions.Center;
         titleTmp.margin = new Vector4(0f, 12f, 0f, 0f);
 
         var bodyGo = NewChild(stack, "Body", out _);
         var bodyTmp = AddText(bodyGo,
-            "Сотрудник отвечает клиентам в WhatsApp круглосуточно",
+            "Он ответит вашим клиентам в WhatsApp круглосуточно",
             38f, _regular, Muted);
         bodyTmp.alignment = TextAlignmentOptions.Center;
         bodyTmp.lineSpacing = 8f;
@@ -391,7 +391,7 @@ public static class NavRestructureBuilder
         ctaButton.targetGraphic = ctaBg;
         var ctaLabelGo = NewChild(cta, "Label", out var ctaLabelRt);
         StretchFill(ctaLabelRt);
-        var ctaLabel = AddText(ctaLabelGo, "Добавить сотрудника", 44f, _semibold, Color.white);
+        var ctaLabel = AddText(ctaLabelGo, "Добавить ИИ-сотрудника", 44f, _semibold, Color.white);
         ctaLabel.alignment = TextAlignmentOptions.Center;
 
         emptyStateGo.SetActive(false);

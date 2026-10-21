@@ -90,9 +90,9 @@ public static class OnboardingAuthBlocksBuilder
     // TMP's SF Pro line height at 34pt runs ~48px with the 4pt lineSpacing, not ~43.
     internal const float TrustCardHeight = 404f;
     internal const float TrustBodyHeight = 264f;
-    private const string SuccessTitleText = "Сотрудник подключён!";
+    private const string SuccessTitleText = "ИИ-сотрудник подключён!";
     private const string SuccessBodyText =
-        "Осталось научить сотрудника вашим ценам — загрузите прайс-лист, и он будет отвечать по вашим товарам";
+        "Осталось научить ИИ-сотрудника вашим ценам — загрузите прайс-лист, и он будет отвечать по вашим товарам";
     private const string SuccessPrimaryText = "Загрузить прайс-лист";
     private const string SuccessLaterText = "Позже";
 

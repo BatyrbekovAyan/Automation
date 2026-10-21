@@ -152,9 +152,9 @@ public class BotsPageRowsTests
     [Test]
     public void An_exhausted_quota_says_what_the_bot_does_now()
     {
-        Assert.AreEqual("Лимит исчерпан — сотрудник в режиме «Выбрать»",
+        Assert.AreEqual("Лимит исчерпан — ИИ-сотрудник в режиме «Выбрать»",
             BotsPageRows.MeterHint(300, 300, 0));
-        Assert.AreEqual("Лимит исчерпан — сотрудник в режиме «Выбрать»",
+        Assert.AreEqual("Лимит исчерпан — ИИ-сотрудник в режиме «Выбрать»",
             BotsPageRows.MeterHint(4000, 300, 0));
     }
 
@@ -227,33 +227,33 @@ public class BotsPageRowsTests
     [Test]
     public void Add_bot_subtext_counts_the_slots_left_in_the_plan()
     {
-        Assert.AreEqual("Ещё 3 сотрудника в тарифе", BotsPageRows.AddBotSubtext(PlanTier.Business, 0));
-        Assert.AreEqual("Ещё 2 сотрудника в тарифе", BotsPageRows.AddBotSubtext(PlanTier.Business, 1));
-        Assert.AreEqual("Ещё 1 сотрудник в тарифе", BotsPageRows.AddBotSubtext(PlanTier.Business, 2));
-        Assert.AreEqual("Ещё 5 сотрудников в тарифе", BotsPageRows.AddBotSubtext(PlanTier.Network, 0));
-        Assert.AreEqual("Ещё 1 сотрудник в тарифе", BotsPageRows.AddBotSubtext(PlanTier.Start, 0));
+        Assert.AreEqual("Ещё 3 ИИ-сотрудника в тарифе", BotsPageRows.AddBotSubtext(PlanTier.Business, 0));
+        Assert.AreEqual("Ещё 2 ИИ-сотрудника в тарифе", BotsPageRows.AddBotSubtext(PlanTier.Business, 1));
+        Assert.AreEqual("Ещё 1 ИИ-сотрудник в тарифе", BotsPageRows.AddBotSubtext(PlanTier.Business, 2));
+        Assert.AreEqual("Ещё 5 ИИ-сотрудников в тарифе", BotsPageRows.AddBotSubtext(PlanTier.Network, 0));
+        Assert.AreEqual("Ещё 1 ИИ-сотрудник в тарифе", BotsPageRows.AddBotSubtext(PlanTier.Start, 0));
     }
 
     [Test]
     public void At_the_limit_the_subtext_says_so_instead_of_counting_zero()
     {
-        Assert.AreEqual("Лимит сотрудников тарифа", BotsPageRows.AddBotSubtext(PlanTier.Business, 3));
-        Assert.AreEqual("Лимит сотрудников тарифа", BotsPageRows.AddBotSubtext(PlanTier.Start, 1));
-        Assert.AreEqual("Лимит сотрудников тарифа", BotsPageRows.AddBotSubtext(PlanTier.Network, 5));
-        Assert.AreEqual("Лимит сотрудников тарифа", BotsPageRows.AddBotSubtext(PlanTier.None, 0));
+        Assert.AreEqual("Лимит ИИ-сотрудников тарифа", BotsPageRows.AddBotSubtext(PlanTier.Business, 3));
+        Assert.AreEqual("Лимит ИИ-сотрудников тарифа", BotsPageRows.AddBotSubtext(PlanTier.Start, 1));
+        Assert.AreEqual("Лимит ИИ-сотрудников тарифа", BotsPageRows.AddBotSubtext(PlanTier.Network, 5));
+        Assert.AreEqual("Лимит ИИ-сотрудников тарифа", BotsPageRows.AddBotSubtext(PlanTier.None, 0));
     }
 
     [Test]
     public void More_bots_than_the_plan_allows_never_counts_backwards()
     {
         // Reachable after a downgrade: the bots stay, the allowance shrinks.
-        Assert.AreEqual("Лимит сотрудников тарифа", BotsPageRows.AddBotSubtext(PlanTier.Start, 4));
+        Assert.AreEqual("Лимит ИИ-сотрудников тарифа", BotsPageRows.AddBotSubtext(PlanTier.Start, 4));
     }
 
     [Test]
     public void The_trial_grants_the_business_slot_count()
     {
-        Assert.AreEqual("Ещё 3 сотрудника в тарифе", BotsPageRows.AddBotSubtext(PlanTier.Trial, 0));
+        Assert.AreEqual("Ещё 3 ИИ-сотрудника в тарифе", BotsPageRows.AddBotSubtext(PlanTier.Trial, 0));
     }
 
     // ── The one fixed string that is also a layout decision ──────────────────
@@ -261,7 +261,7 @@ public class BotsPageRowsTests
     [Test]
     public void The_add_bot_card_title_is_stable()
     {
-        Assert.AreEqual("Добавить сотрудника", BotsPageRows.AddBotTitle);
+        Assert.AreEqual("Добавить ИИ-сотрудника", BotsPageRows.AddBotTitle);
     }
 
     // ── Auto-open gate (Task 14d) ────────────────────────────────────────────

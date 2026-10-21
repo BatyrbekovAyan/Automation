@@ -276,7 +276,7 @@ public class DashboardPage : MonoBehaviour
         if (chips.Count <= 1) return;
 
         bool allOn = _botFilter == null || _botFilter.Count == 0;
-        AddChip("Все сотрудники", null, allOn);
+        AddChip("Все ИИ-сотрудники", null, allOn);
         foreach (var chip in chips)
         {
             string botName = PlayerPrefs.GetString(chip.botName + "Name", chip.botName);

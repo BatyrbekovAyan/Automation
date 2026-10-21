@@ -543,7 +543,7 @@ public static class PaywallBuilder
 
         // Counts.
         var countsGo = NewChild(card, "Counts", out _);
-        // 34, not 36: «5 сотрудников · 5 каналов · 3 000 диалогов ИИ/мес» is 916u at 36pt in the 900u column and wrapped
+        // 34, not 36: «5 ИИ-сотрудников · 5 каналов · 3 000 диалогов/мес» is 916u at 36pt in the 900u column and wrapped
         // (rename 2026-10-21) — one size for all three cards keeps the rows aligned.
         var counts = AddText(countsGo, row.CountsLine, 34f, _regular, ThemeRole.InkSecondary);
         counts.alignment = TextAlignmentOptions.TopLeft;

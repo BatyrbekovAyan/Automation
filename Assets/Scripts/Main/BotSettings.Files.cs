@@ -141,7 +141,7 @@ public partial class BotSettings
         replaceDecision = null;
 
         if (replaceFileConfirmBody != null)
-            replaceFileConfirmBody.text = $"«{fileName}» уже есть в списке. Заменить? Сотрудник будет отвечать по новой версии.";
+            replaceFileConfirmBody.text = $"«{fileName}» уже есть в списке. Заменить? ИИ-сотрудник будет отвечать по новой версии.";
 
         if (replaceFileConfirmPopup != null)
             PopupUI.Show(replaceFileConfirmPopup);
@@ -300,7 +300,7 @@ public partial class BotSettings
         pendingDeleteContentType = contentType;
 
         if (deleteFileConfirmBody != null)
-            deleteFileConfirmBody.text = $"Сотрудник перестанет использовать «{entry.Name}» в ответах. Это действие необратимо.";
+            deleteFileConfirmBody.text = $"ИИ-сотрудник перестанет использовать «{entry.Name}» в ответах. Это действие необратимо.";
         if (deleteFileConfirmPopup != null) PopupUI.Show(deleteFileConfirmPopup);
     }
 

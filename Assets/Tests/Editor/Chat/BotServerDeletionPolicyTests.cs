@@ -336,15 +336,15 @@ public class BotServerDeletionPolicyTests
             StringAssert.DoesNotContain("Сервер не подтвердил", text,
                 $"{name}: that is how the REFUSAL texts open — the retry must not read like the server's decision");
         }
-        StringAssert.Contains("Сотрудник остался на телефоне", BotDeletionCopy.RetryBody,
+        StringAssert.Contains("ИИ-сотрудник остался на телефоне", BotDeletionCopy.RetryBody,
             "the one thing known for sure: the bot is still on the phone (an unconfirmed 2xx may have deleted the server data)");
     }
 
-    [TestCase(1, "1 сотрудника")]
-    [TestCase(2, "2 сотрудников")]
-    [TestCase(5, "5 сотрудников")]
-    [TestCase(11, "11 сотрудников")]
-    [TestCase(21, "21 сотрудника")]
+    [TestCase(1, "1 ИИ-сотрудника")]
+    [TestCase(2, "2 ИИ-сотрудников")]
+    [TestCase(5, "5 ИИ-сотрудников")]
+    [TestCase(11, "11 ИИ-сотрудников")]
+    [TestCase(21, "21 ИИ-сотрудника")]
     public void WipeRefusedBody_AgreesWithTheCount(int count, string expected)
     {
         StringAssert.Contains($"удаление {expected}.", BotDeletionCopy.WipeRefusedBody(count, false));

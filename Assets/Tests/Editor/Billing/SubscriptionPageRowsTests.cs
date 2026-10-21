@@ -537,7 +537,7 @@ public class SubscriptionPageRowsTests
             SubscriptionPageRows.CancelCaptionText(iosStore: false));
         StringAssert.DoesNotContain("Google Play", SubscriptionPageRows.CancelCaptionText(iosStore: true));
         Assert.AreEqual("Диалоги ИИ", SubscriptionPageRows.DialogsTitle);
-        Assert.AreEqual("Сотрудники", SubscriptionPageRows.BotsTitle);
+        Assert.AreEqual("ИИ-сотрудники", SubscriptionPageRows.BotsTitle);
         Assert.AreEqual("Каналы", SubscriptionPageRows.ChannelsTitle);
     }
 

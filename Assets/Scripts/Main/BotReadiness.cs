@@ -29,8 +29,8 @@ public readonly struct BotReadiness
 /// <summary>RU lines of the readiness block (pinned by FontGlyphCoverageTests).</summary>
 public static class BotReadinessCopy
 {
-    public const string Title = "Проверка сотрудника";
-    public const string RowTitle = "Проверить сотрудника";
+    public const string Title = "Проверка ИИ-сотрудника";
+    public const string RowTitle = "Проверить ИИ-сотрудника";
     public const string RowSubline = "Тест без отправки клиенту и без расхода лимита";
     public const string Channel = "Канал подключён";
     public const string ChannelNo = "Канал не подключён";
@@ -44,7 +44,7 @@ public static class BotReadinessCopy
     public const string Placeholder = "Напишите как клиент…";
     public const string Send = "Отправить";
     public const string Close = "Закрыть";
-    public const string Sending = "Сотрудник думает…";
+    public const string Sending = "ИИ-сотрудник думает…";
     public const string SafeNote = "Тест: клиенту ничего не отправляется, лимит диалогов не расходуется.";
     public const string SourcesTitle = "Источники";
     public const string SourceCatalog = "каталог";
@@ -56,7 +56,7 @@ public static class BotReadinessCopy
     public const string RecentTitle = "Последние ответы";
     public const string RecentNone = "Ответов ещё не было";
     public const string ErrorGeneric = "Не удалось проверить: попробуйте позже";
-    public const string ErrorUnavailable = "Промпт сотрудника недоступен: сохраните настройки сотрудника и повторите";
+    public const string ErrorUnavailable = "Промпт ИИ-сотрудника недоступен: сохраните его настройки и повторите";
     public const string Correlation = "ID";
 
     // R15: which version of the bot answered — the ID line names it (the server's promptVersion)
@@ -67,7 +67,7 @@ public static class BotReadinessCopy
     public const int VersionIdChars = 8;
 
     public const string ErrorNetwork = "Нет связи: проверьте интернет и повторите";
-    public const string ErrorForbidden = "Этот сотрудник не привязан к этой установке";
+    public const string ErrorForbidden = "Этот ИИ-сотрудник не привязан к этой установке";
     public const string ErrorUnauthorized = "Сессия не подтверждена: перезапустите приложение";
     public const string Bullet = "• ";
 

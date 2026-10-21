@@ -3,7 +3,7 @@
 Ниже готовый EN-текст. Ссылка на демо-видео уже вписана (непубличный путь на
 choosereply.com, файл `~/choosereply/site/review/…` на VPS; исходник и монтаж —
 `~/Projects/Builds/demo-tools/`). Перед вставкой проверить, что юр-ссылки живые
-(https://choosereply.com/privacy.html, https://choosereply.com/terms.html). Тот же текст пригодится для ответа на вопросы Google Play. ПЕРЕИМЕНОВАНИЕ 2026-10-21: EN-текст ниже называет подписи новой сборки («Сотрудники», «Добавить сотрудника», режимы «Авто»/«Выбрать»), а демо-видео по ссылке снято 2026-09-04 со старыми («Боты», «Вместе») — перед подачей сборки с новыми подписями переснять его или предупредить ревьюера, что в ролике прежние названия.
+(https://choosereply.com/privacy.html, https://choosereply.com/terms.html). Тот же текст пригодится для ответа на вопросы Google Play. ПЕРЕИМЕНОВАНИЕ 2026-10-21: EN-текст ниже называет подписи новой сборки (вкладка «ИИ-сотрудники», «Добавить ИИ-сотрудника», пустой экран «Добавьте ИИ-сотрудника», режимы «Авто»/«Выбрать», строки тарифов «N ИИ-сотрудник… · N канал… · N диалогов/мес»), а демо-видео по ссылке снято 2026-09-04 со старыми («Боты», «Вместе») — перед подачей сборки с новыми подписями переснять его или предупредить ревьюера, что в ролике прежние названия.
 
 ВАЖНО (аудит 2026-08-30, не откатывать): в notes НЕТ ни номера гайдлайна 5.2.2,
 ни имени вендора-шлюза — сами notes не должны подсказывать ревьюеру формулировку
@@ -20,7 +20,7 @@ owner connects their OWN WhatsApp and/or Telegram account, describes their
 business (services, price lists, working details), and the app answers their
 customers' incoming messages with AI — either fully automatically (the «Авто» mode, "Auto")
 or semi-automatically, where the owner picks one of the suggested replies (the «Выбрать» mode, "Choose").
-The app UI is Russian-only, targeting the Kazakhstan market. Each AI assistant the owner sets up is called a «сотрудник» ("employee") in the app; they are listed on the «Сотрудники» ("Employees") tab.
+The app UI is Russian-only, targeting the Kazakhstan market. Each AI assistant the owner sets up is called an «ИИ-сотрудник» ("AI employee") in the app; they are listed on the «ИИ-сотрудники» ("AI employees") tab.
 
 **Why we cannot provide a demo account.**
 There is no login/account system in the app itself. The core flow requires
@@ -35,13 +35,13 @@ WhatsApp account and the customer messages are real):
 
 **What you CAN test directly in the review build without any account:**
 1. First-run onboarding.
-2. The «Добавить сотрудника» ("Add employee") wizard on the «Сотрудники» tab,
+2. The «Добавить ИИ-сотрудника» ("Add AI employee") wizard on the «ИИ-сотрудники» tab (also reachable from the tab's empty state «Добавьте ИИ-сотрудника»),
    up to the WhatsApp/Telegram authorization screen (QR + pairing code UI).
 3. The paywall: open it from Profile → «Подписка» → «Изменить тариф»
-   ("Change plan"). Monthly/yearly toggle, three tiers, feature list, Terms of
+   ("Change plan"). Monthly/yearly toggle, three tiers (each card lists its limits, e.g. «1 ИИ-сотрудник · 1 канал · 300 диалогов/мес» — AI employees · channels · AI dialogs per month), feature list, Terms of
    Use and Privacy Policy links at the bottom, and "Restore purchases"
    («Восстановить покупки»). (If a trial is already running, the trial pill in
-   the header of the «Сотрудники» tab opens the same paywall.)
+   the header of the «ИИ-сотрудники» tab opens the same paywall.)
 4. To purchase: select a tier card, then tap the large primary button
    «Оформить <тариф> — <цена>» ("Subscribe to <tier> — <price>") at the bottom.
    It opens the standard StoreKit purchase sheet for the selected tier in the

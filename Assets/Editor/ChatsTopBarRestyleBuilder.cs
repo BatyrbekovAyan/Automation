@@ -305,7 +305,7 @@ public static class ChatsTopBarRestyleBuilder
         // overlap again exactly as it did on 2026-09-04.
         StyleTmp(popup.Find("Content/Title"), "Включить авто-режим?", LInkPrimary, ThemeRole.InkPrimary);
         StyleTmp(popup.Find("Content/Body"),
-            "Сотрудник будет сам отвечать клиентам. Выключить можно в любой момент — этой же кнопкой.",
+            "ИИ-сотрудник будет сам отвечать клиентам. Выключить можно в любой момент — этой же кнопкой.",
             LInkSecondary, ThemeRole.InkSecondary);
 
         Transform cancel = popup.Find("Content/CancelButton");
@@ -590,7 +590,7 @@ public static class ChatsTopBarRestyleBuilder
             if (stale != null) UnityEngine.Object.DestroyImmediate(stale);
         }
 
-        titleTmp.text = "Ваши сотрудники";
+        titleTmp.text = "Ваши ИИ-сотрудники";
         titleTmp.color = LInkPrimary;
         EnsureThemed(title.gameObject, ThemeRole.InkPrimary);
         var titleLe = title.GetComponent<LayoutElement>();

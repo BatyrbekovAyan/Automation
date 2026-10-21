@@ -45,9 +45,9 @@ public class ConfirmCardFitterTests
     private const string ShortTitle = "Включить авто-режим?";
     private const string LongTitle = "Включить авто-режим в этом чате?";
     private const string ChatBody =
-        "Сотрудник будет сам отвечать этому клиенту. Выключить можно в любой момент — этой же кнопкой.";
+        "ИИ-сотрудник будет сам отвечать этому клиенту. Выключить можно в любой момент — этой же кнопкой.";
     private const string HeaderBody =
-        "Сотрудник будет сам отвечать клиентам. Выключить можно в любой момент — этой же кнопкой.";
+        "ИИ-сотрудник будет сам отвечать клиентам. Выключить можно в любой момент — этой же кнопкой.";
 
     private GameObject _canvasGo;
     private GameObject _popup;

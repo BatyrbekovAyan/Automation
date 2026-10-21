@@ -70,13 +70,13 @@ public class FirstStepsCard : MonoBehaviour
     // messenger here is wrong or ambiguous (owner decision 2026-07-23).
     private static readonly string[] RowLabelsBase =
     {
-        "Добавить сотрудника",
+        "Добавить ИИ-сотрудника",
         "Подключить мессенджер",
         "Загрузить прайс-лист",
-        "Получить первый ответ сотрудника",
+        "Получить первый ответ ИИ-сотрудника",
     };
     private const string CardTitle = "Первые шаги";
-    private const string Row4Hint = "Попросите знакомого написать вам — и посмотрите, как ответит сотрудник";
+    private const string Row4Hint = "Попросите знакомого написать вам — и посмотрите, как ответит ИИ-сотрудник";
 
     /// <summary>Set in Awake so external fact-change hooks (bot created, channel
     /// authed, wizard back-out, price-list uploaded, return to Bots) can call

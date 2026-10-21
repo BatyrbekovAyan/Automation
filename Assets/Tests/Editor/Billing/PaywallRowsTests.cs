@@ -72,9 +72,9 @@ public class PaywallRowsTests
     public void Counts_lines_carry_bots_channels_and_dialogs()
     {
         var rows = PaywallRows.Build(PaywallPeriod.Month);
-        Assert.AreEqual("1 сотрудник · 1 канал · 300 диалогов ИИ/мес", rows[0].CountsLine);
-        Assert.AreEqual("3 сотрудника · 3 канала · 1\u00A0000 диалогов ИИ/мес", rows[1].CountsLine);
-        Assert.AreEqual("5 сотрудников · 5 каналов · 3\u00A0000 диалогов ИИ/мес", rows[2].CountsLine);
+        Assert.AreEqual("1 ИИ-сотрудник · 1 канал · 300 диалогов/мес", rows[0].CountsLine);
+        Assert.AreEqual("3 ИИ-сотрудника · 3 канала · 1\u00A0000 диалогов/мес", rows[1].CountsLine);
+        Assert.AreEqual("5 ИИ-сотрудников · 5 каналов · 3\u00A0000 диалогов/мес", rows[2].CountsLine);
     }
 
     [Test]
@@ -86,10 +86,10 @@ public class PaywallRowsTests
             Assert.AreEqual(month[i].CountsLine, year[i].CountsLine);
     }
 
-    [TestCase(1, "1 сотрудник")]
-    [TestCase(3, "3 сотрудника")]
-    [TestCase(5, "5 сотрудников")]
-    [TestCase(11, "11 сотрудников")]
+    [TestCase(1, "1 ИИ-сотрудник")]
+    [TestCase(3, "3 ИИ-сотрудника")]
+    [TestCase(5, "5 ИИ-сотрудников")]
+    [TestCase(11, "11 ИИ-сотрудников")]
     public void Bot_plural(int n, string expected) => Assert.AreEqual(expected, PaywallCopy.Bots(n));
 
     [TestCase(1, "1 канал")]
@@ -313,7 +313,7 @@ public class PaywallRowsTests
 
     [Test]
     public void Receipt_title_names_the_trial_length()
-        => Assert.AreEqual("Ваш сотрудник за 5 дней", PaywallCopy.ReceiptTitle());
+        => Assert.AreEqual("Ваш ИИ-сотрудник за 5 дней", PaywallCopy.ReceiptTitle());
 
     // ── Header: the receipt only where this install ran the trial ─────────────
     //

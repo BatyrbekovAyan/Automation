@@ -2347,13 +2347,13 @@ public partial class Manager : MonoBehaviour
                      || UploadedFilesStore.Load(bot.name, "service").Count > 0;
         var cta = SuccessCtaSelector.Choose(hasFiles);
 
-        if (successTitleLabel != null) successTitleLabel.text = "Сотрудник подключён!";
+        if (successTitleLabel != null) successTitleLabel.text = "ИИ-сотрудник подключён!";
         // IN-02: branch the BODY on the CTA too. It used to always urge «загрузите прайс-лист»
         // even when the files-exist path had already switched the button to «Открыть чаты» —
         // the body asked for an action the button no longer offered.
         if (successBodyLabel != null) successBodyLabel.text = cta == SuccessCta.UploadPriceList
-            ? "Осталось научить сотрудника вашим ценам — загрузите прайс-лист, и он будет отвечать по вашим товарам"
-            : "Сотрудник уже знает ваши цены — откройте чаты и посмотрите, как он отвечает";
+            ? "Осталось научить ИИ-сотрудника вашим ценам — загрузите прайс-лист, и он будет отвечать по вашим товарам"
+            : "ИИ-сотрудник уже знает ваши цены — откройте чаты и посмотрите, как он отвечает";
         if (successPrimaryLabel != null) successPrimaryLabel.text =
             cta == SuccessCta.UploadPriceList ? "Загрузить прайс-лист" : "Открыть чаты";
 

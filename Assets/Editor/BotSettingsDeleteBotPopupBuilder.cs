@@ -158,13 +158,13 @@ public static class BotSettingsDeleteBotPopupBuilder
         TryAddRoundedCorners(card, radius: 48f);
         card.AddComponent<EventAbsorber>();
 
-        AddText(card, "Title", "Удалить сотрудника?", 54f, bold: true,
+        AddText(card, "Title", "Удалить ИИ-сотрудника?", 54f, bold: true,
             color: new Color(0.11f, 0.11f, 0.12f),
             anchorTopPivot: new Vector2(0.5f, 1f),
             anchoredPosition: new Vector2(0f, -72f),
             sizeDelta: new Vector2(-96f, 84f));
 
-        AddText(card, "Body", "Это действие необратимо. Все данные сотрудника будут удалены.",
+        AddText(card, "Body", "Это действие необратимо. Все данные ИИ-сотрудника будут удалены.",
             42f, bold: false,
             color: new Color(0.39f, 0.39f, 0.4f),
             anchorTopPivot: new Vector2(0.5f, 1f),

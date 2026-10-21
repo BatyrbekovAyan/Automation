@@ -24,7 +24,9 @@ The order and copy of FRAMES is the listing order (docs/store/submission-checkli
 The iOS output is byte-identical to the pre-Play version of this script (verified by md5
 on 2026-09-05) — keep it that way: the ASC upload was made from it. Exception: captions
 4–6 were renamed on 2026-10-21 (docs/design/2026-10-21-naming-sotrudnik-vybrat.md), so
-frames 04–06 differ from that upload until the listing is re-uploaded.
+frames 04–06 differ from that upload until the listing is re-uploaded. Frame 05's headline
+was reworded then: «Загрузите прайс — ИИ-сотрудник знает цены» needed three lines at the
+iOS size, «ИИ-сотрудник знает цены из прайса» keeps two on both targets.
 """
 from __future__ import annotations
 
@@ -49,9 +51,9 @@ FRAMES = [
     ("03-suggestions",       "01-vmeste",     "ИИ предлагает — вы выбираете",     "Готовые ответы под каждое сообщение клиента"),
     ("02-thread-auto",       "02-auto",       "Отвечает клиентам за вас",          "Цены, наличие, заявка — по вашему прайсу, 24/7"),
     ("01-chats",             "03-chats",      "Все чаты на одном экране",          "WhatsApp и Telegram на вашем номере"),
-    ("04-tab2",              "04-bots",       "Сотрудник под каждый бизнес",       "Включайте «Авто» одним тапом"),
-    ("06-settings-products", "05-pricelist",  "Загрузите прайс — сотрудник знает цены", "PDF, Excel, фото — разберёт сам"),
-    ("04-tab1",              "06-dashboard",  "Сводка за неделю",                  "Сколько заявок собрал сотрудник и где нужны вы"),
+    ("04-tab2",              "04-bots",       "ИИ-сотрудник под каждый бизнес",       "Включайте «Авто» одним тапом"),
+    ("06-settings-products", "05-pricelist",  "ИИ-сотрудник знает цены из прайса", "PDF, Excel, фото — разберёт сам"),
+    ("04-tab1",              "06-dashboard",  "Сводка за неделю",                  "Сколько заявок собрал ИИ-сотрудник и где нужны вы"),
     # Prices on this frame are PlanCatalog's fallback text (the Editor has no StoreKit); they equal
     # the ASC-confirmed grid (monetization spec, 2026-08-25). The «от 9 990 ₸» below is Start/month —
     # keep it in step with PlanCatalog if the grid ever moves.
