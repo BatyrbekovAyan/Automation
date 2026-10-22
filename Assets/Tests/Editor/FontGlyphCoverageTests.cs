@@ -303,7 +303,7 @@ public class FontGlyphCoverageTests
             typeof(BotDeletionCopy),    // V12 refused / failed bot deletion (2026-10-07)
             typeof(ProfileRetirementCopy), // M4 retired-channel subline of the bot card (2026-10-09)
             typeof(RetiredChannelCopy),    // F2 reconnect screens: banner, row hint, «Подключить», sheet, server wait (2026-10-11)
-            typeof(AutoReadinessCopy),     // learning B: capsule «Учится · N/20» + sheet «ИИ-сотрудник ещё учится» (2026-10-14)
+            typeof(AutoReadinessCopy),     // learning B + percent: sheet «ИИ-сотрудник ещё учится», «Авто» under the mark, «Учится · N %»; the capsule's «N/20» face until the percent capsule lands (2026-10-23)
             typeof(ChannelHealthCopy),     // A4 «Канал отключён · переподключите в настройках» on the bot card (2026-10-14)
             typeof(ScheduleCopy),          // B2 «РАСПИСАНИЕ РАБОТЫ» section + «Вне графика ·» row marker (2026-10-17)
         };
@@ -381,9 +381,14 @@ public class FontGlyphCoverageTests
         // The sheet row's authored half (the bot's own name stands in as placeholder text the app does not control).
         yield return ("RetiredChannelCopy.SheetRow(wa)", RetiredChannelCopy.SheetRow("Бот", ChatChannel.WhatsApp));
         yield return ("RetiredChannelCopy.SheetRow(tg)", RetiredChannelCopy.SheetRow("Бот", ChatChannel.Telegram));
-        // learning B: the soft-lock sheet body mid-way and the capsule's learning face (2026-10-14)
-        yield return ("AutoReadinessCopy.SheetBody(bot)", AutoReadinessCopy.SheetBody(7, perChat: false));
-        yield return ("AutoReadinessCopy.SheetBody(chat)", AutoReadinessCopy.SheetBody(7, perChat: true));
+        // learning B + percent (2026-10-23): the soft-lock sheet's three bodies (ordinary, the server's «почти готово», the per-chat tail),
+        // the big percent and the caption; the capsule's «N/20» face stays until the percent capsule replaces it
+        yield return ("AutoReadinessCopy.SheetBody(bot)", AutoReadinessCopy.SheetBody(70, capped: false, needChats: 0, needDays: 0, perChat: false));
+        yield return ("AutoReadinessCopy.SheetBody(chat)", AutoReadinessCopy.SheetBody(70, capped: false, needChats: 0, needDays: 0, perChat: true));
+        yield return ("AutoReadinessCopy.SheetBody(capped)", AutoReadinessCopy.SheetBody(70, capped: true, needChats: 2, needDays: 1, perChat: false));
+        yield return ("AutoReadinessCopy.SheetBody(capped, chat)", AutoReadinessCopy.SheetBody(70, capped: true, needChats: 5, needDays: 11, perChat: true));
+        yield return ("AutoReadinessCopy.Percent", AutoReadinessCopy.Percent(45));
+        yield return ("AutoReadinessCopy.Caption", AutoReadinessCopy.Caption(45));
         yield return ("AutoReadinessCopy.PillText", AutoReadinessCopy.PillText(7));
         // B2: the day chips (an array, not a const) and the window format's en dash
         for (int day = 0; day < ScheduleCopy.DayNames.Count; day++)

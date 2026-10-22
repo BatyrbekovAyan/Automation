@@ -58,8 +58,40 @@ public class AutoLockGateTests
         AutoLockGate.TryEnable(Bot, null, perChat: false, () => n++);
         Assert.IsTrue(AutoLockSheet.IsShowing);
         Assert.AreEqual(0, n, "the lock defers the enable");
+        // The sheet is fed the learning STATE: the percent and the server's threshold — not the window's «N из 20».
+        Assert.AreEqual("45\u00A0%", AutoLockSheetTestsAccess.TextOf("Percent"));
+        Assert.AreEqual(AutoReadinessCopy.SheetBody(70, false, 0, 0, false), AutoLockSheetTestsAccess.BodyText());
         AutoLockSheet.EnableAnyway();
         Assert.AreEqual(1, n);
+    }
+
+    [Test]
+    public void LockedVerdict_WhenTheServerCapsThePercent_TheSheetNamesWhatIsMissing()
+    {
+        Snapshot(new AutoReadinessEntry
+        {
+            botKey = Bot, matches = 12, total = 20, chats = 1, days = 1, ready = false,
+            progress = 69, unlockAt = 70, capped = true, needChats = 2, needDays = 1,
+        });
+        AutoLockGate.TryEnable(Bot, null, perChat: false, () => { });
+        Assert.IsTrue(AutoLockSheet.IsShowing);
+        Assert.AreEqual("69\u00A0%", AutoLockSheetTestsAccess.TextOf("Percent"));
+        Assert.AreEqual(AutoReadinessCopy.SheetBody(70, true, 2, 1, false), AutoLockSheetTestsAccess.BodyText());
+        StringAssert.Contains("в 2 других чатах и в 1 другой день", AutoLockSheetTestsAccess.BodyText());
+    }
+
+    [Test]
+    public void LockedVerdict_TheSheetShowsTheBetterOfThePhonesMemoryAndTheServer()
+    {
+        // The window got worse after a better one: the percent never falls (spec §0.6), and the sheet reads StateFor, not the raw row.
+        Snapshot(new AutoReadinessEntry { botKey = Bot, ready = false, progress = 60, unlockAt = 70 });
+        Snapshot(new AutoReadinessEntry { botKey = Bot, ready = false, progress = 45, unlockAt = 70 });
+        AutoLockGate.TryEnable(Bot, null, perChat: false, () => { });
+        Assert.IsTrue(AutoLockSheet.IsShowing);
+        Assert.AreEqual("60\u00A0%", AutoLockSheetTestsAccess.TextOf("Percent"));
+        var fill = AutoLockSheet.PanelForTests.transform.Find("Content/Bar/Fill");
+        Assert.IsNotNull(fill, "Content/Bar/Fill");
+        Assert.AreEqual(0.60f, ((UnityEngine.RectTransform)fill).anchorMax.x, 1e-4f);
     }
 
     [Test]
@@ -93,16 +125,18 @@ public class AutoLockGateTests
     }
 }
 
-/// <summary>Reads the live sheet's body through the EditMode seam (the panel is built lazily on the first Show).</summary>
+/// <summary>Reads the live sheet's labels through the EditMode seam (the panel is built lazily on the first Show).</summary>
 internal static class AutoLockSheetTestsAccess
 {
-    public static string BodyText()
+    public static string BodyText() => TextOf("Body");
+
+    public static string TextOf(string name)
     {
         var panel = AutoLockSheet.PanelForTests;
         Assert.IsNotNull(panel, "the sheet was shown");
         foreach (var tmp in panel.GetComponentsInChildren<TMPro.TextMeshProUGUI>(true))
-            if (tmp.name == "Body") return tmp.text;
-        Assert.Fail("Body label not found");
+            if (tmp.name == name) return tmp.text;
+        Assert.Fail($"{name} label not found");
         return null;
     }
 }
