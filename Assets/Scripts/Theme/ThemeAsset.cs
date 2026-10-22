@@ -63,6 +63,14 @@ public class ThemeAsset : ScriptableObject
     public Color accentSoft       = Hex("#E8F2FD"); // edit-button chip
     public Color destructiveSoft  = Hex("#FFCED5"); // «Удалить все данные» chip
     public Color scrim            = Hex("#000000"); // modal veil — black in both
+
+    // «Авто» capsule learning fill (spec 2026-10-22-learning-progress-percent §4.3).
+    // The label over each must keep 4.5:1 and the two greens 1.15:1 apart — LearnPaletteTests.
+    [Header("«Авто» learning fill")]
+    public Color learnFillOff = Hex("#D5DCEC"); // blue fill, «Авто» off
+    public Color learnFillOn  = Hex("#CBEBD9"); // green fill, «Авто» on
+    public Color learnTrackOn = Hex("#EEF8F2"); // lighter green under the ON fill
+
     public Color Resolve(ThemeRole role) => role switch
     {
         ThemeRole.Background           => background,
@@ -94,6 +102,9 @@ public class ThemeAsset : ScriptableObject
         ThemeRole.AccentSoft           => accentSoft,
         ThemeRole.DestructiveSoft      => destructiveSoft,
         ThemeRole.Scrim                => scrim,
+        ThemeRole.LearnFillOff         => learnFillOff,
+        ThemeRole.LearnFillOn          => learnFillOn,
+        ThemeRole.LearnTrackOn         => learnTrackOn,
         _                              => Color.magenta, // unmapped role — loud sentinel, tests assert it never happens
     };
 

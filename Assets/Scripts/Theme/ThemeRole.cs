@@ -57,4 +57,10 @@ public enum ThemeRole
     // and mapping it as ink is what turned every scrim into a white wash in dark.
     // Its alpha is authored per-scrim and preserved by ThemedColor.
     Scrim,
+
+    // The «Авто» capsule's learning fill (spec 2026-10-22-learning-progress-percent §4.3).
+    // Appended in THIS order, right after Scrim — the scene stores the ordinal.
+    LearnFillOff,      // blue fill growing over the capsule while «Авто» is OFF
+    LearnFillOn,       // dark-green fill while «Авто» is ON (dark = PositiveBg, so 100 % == today)
+    LearnTrackOn,      // the lighter green that ON fill grows over — the unfilled part
 }

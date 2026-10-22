@@ -29,19 +29,6 @@ public class NavTabPaletteTests
         ThemePrefs.GetInt = _origGet;
     }
 
-    // WCAG relative luminance / contrast ratio.
-    private static float Channel(float v) =>
-        v <= 0.03928f ? v / 12.92f : Mathf.Pow((v + 0.055f) / 1.055f, 2.4f);
-
-    private static float Luminance(Color c) =>
-        0.2126f * Channel(c.r) + 0.7152f * Channel(c.g) + 0.0722f * Channel(c.b);
-
-    private static float Contrast(Color a, Color b)
-    {
-        float la = Luminance(a), lb = Luminance(b);
-        return (Mathf.Max(la, lb) + 0.05f) / (Mathf.Min(la, lb) + 0.05f);
-    }
-
     [Test]
     public void RoleFor_MapsActiveToAccent_AndInactiveToMutedInk()
     {
@@ -61,7 +48,7 @@ public class NavTabPaletteTests
             foreach (bool isActive in new[] { true, false })
             {
                 Color ink = asset.Resolve(NavTabPalette.RoleFor(isActive));
-                float ratio = Contrast(ink, bar);
+                float ratio = ContrastMath.Contrast(ink, bar);
                 Assert.GreaterOrEqual(ratio, 3f,
                     $"{name} theme, active={isActive}: tab ink only {ratio:F2}:1 against the bar");
             }

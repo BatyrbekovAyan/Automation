@@ -22,6 +22,23 @@ public static class ThemeAssetsBuilder
     [MenuItem("Tools/Theme/Create Or Update Theme Assets")]
     public static void Build()
     {
+        SeedAndSave();
+        Debug.Log("[ThemeAssetsBuilder] Theme_Light + Theme_Dark created/updated. Scene untouched.");
+    }
+
+    /// <summary>
+    /// Batch entry: <c>Tools/run-editor-builder.sh ThemeAssetsBuilder.BuildHeadless</c>.
+    /// Same work as the menu item; the script waits for the log line below. Despite the
+    /// script's generic "scene was mutated" epilogue, no scene is opened or saved here.
+    /// </summary>
+    public static void BuildHeadless()
+    {
+        SeedAndSave();
+        Debug.Log("[ThemeAssetsBuilder] Headless build + save complete.");
+    }
+
+    private static void SeedAndSave()
+    {
         if (!AssetDatabase.IsValidFolder(Dir))
         {
             if (!AssetDatabase.IsValidFolder("Assets/Resources"))
@@ -38,7 +55,6 @@ public static class ThemeAssetsBuilder
         EditorUtility.SetDirty(light);
         EditorUtility.SetDirty(dark);
         AssetDatabase.SaveAssets();
-        Debug.Log("[ThemeAssetsBuilder] Theme_Light + Theme_Dark created/updated. Scene untouched.");
     }
 
     private static ThemeAsset LoadOrCreate(string path)
@@ -85,6 +101,12 @@ public static class ThemeAssetsBuilder
         t.accentSoft = Hex("#E8F2FD");        // today's edit-button chip
         t.destructiveSoft = Hex("#FFCED5");   // today's delete-button chip
         t.scrim = Hex("#000000");             // modal veil
+        // «Авто» capsule learning fill — spec 2026-10-22-learning-progress-percent §4.3.
+        // The spec leaves the light values to this builder inside two requirements (label
+        // 4.5:1 on each, the two greens ≥ 1.15:1 apart); LearnPaletteTests measures both.
+        t.learnFillOff = Hex("#D5DCEC");      // blue fill, «Авто» off
+        t.learnFillOn = Hex("#CBEBD9");       // green fill, «Авто» on
+        t.learnTrackOn = Hex("#EEF8F2");      // lighter green under the ON fill
 
     }
 
@@ -131,6 +153,12 @@ public static class ThemeAssetsBuilder
         // Deliberately identical to light: a veil is black in both themes. The
         // dimmed dark ground still separates from the #171C24 card above it.
         t.scrim = Hex("#000000");
+        // «Авто» capsule learning fill — the spec's fixed dark values (§4.3). FillOn is
+        // PositiveBg on purpose: at 100 % the filled ON capsule is exactly today's
+        // «Авто включено». The track under a partial fill is the LIGHTER green.
+        t.learnFillOff = Hex("#26365F");
+        t.learnFillOn = Hex("#123324");
+        t.learnTrackOn = Hex("#25473D");
 
     }
 
