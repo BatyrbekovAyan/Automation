@@ -196,7 +196,7 @@ def delete_clears(ctx):
     return ok, f"sets before/after = {n0}/{n1}, delete http={st} body={d}"
 
 
-@scenario("readiness_in_get_usage", "B: 10 owner sends with a shown set, card #1 matched, over 3 personal chats on 2 days → Get Usage readiness ready=true for the bot; at 9 it is false; a group send never counts")
+@scenario("readiness_in_get_usage", "B + progress percent: 11 owner sends with a shown set, card #1 matched, over 3 personal chats on 2 days → Get Usage readiness bestMatches 11, progress 69, ready=false; a group send never counts; the 12th match → bestMatches 12, progress 75, ready=true, unlockAt 70")
 def readiness_in_get_usage(ctx):
     owner, pid = owner_and_profile(ctx)
     psql(f"update bot_profiles set bot_key = 'Bot0' where profile_id = '{pid}';")   # a real bot gets it from Create's Register Profile
@@ -206,25 +206,28 @@ def readiness_in_get_usage(ctx):
         rows = d.get("readiness") if isinstance(d, dict) else None
         return st, next((r for r in rows or [] if r.get("botKey") == "Bot0"), None)
 
+    def shows(row, **want):
+        return row is not None and all(row.get(k) == v for k, v in want.items())
+
     chats = ["77010001001", "77010001002", "77010001003"]
-    for i in range(9):
+    for i in range(11):
         send(owner, pid, dict(ORIGIN, origin_top1=1), recipient=chats[i % 3])
     time.sleep(2)                                           # Record Owner Send runs after the proxy's Respond
     psql(f"update chat_history_events set created_at = created_at - interval '1 day' where profile_id = '{pid}' and chat_id like '77010001001%';")
-    st1, nine = bot0()
-    send(owner, pid, dict(ORIGIN, origin_top1=1), recipient="120363000000@g.us")   # a group: excluded from the window
+    st1, eleven = bot0()
+    send(owner, pid, dict(ORIGIN, origin_top1=1), recipient="120363000000@g.us")   # a group: excluded from the history
     time.sleep(2)
     st2, after_group = bot0()
     send(owner, pid, dict(ORIGIN, origin_top1=1), recipient=chats[1])
     time.sleep(2)
-    st3, ten = bot0()
+    st3, twelve = bot0()
     st_legacy, legacy = e2e_auth.hook("GetUsage", None, {"appUserId": owner.app_user_id})   # compat window: token-less → []
     legacy_ok = st_legacy == 200 and isinstance(legacy, dict) and legacy.get("readiness") == [] and legacy.get("success") is True
-    ok = (legacy_ok and st1 == 200 and nine is not None and nine.get("total") == 9 and nine.get("ready") is False
-          and st2 == 200 and after_group is not None and after_group.get("total") == 9
-          and st3 == 200 and ten is not None and ten.get("total") == 10 and ten.get("matches") == 10
-          and ten.get("chats") == 3 and ten.get("days") == 2 and ten.get("ready") is True)
-    return ok, f"nine={nine} after_group={after_group} ten={ten} legacy={st_legacy}/{legacy.get('readiness') if isinstance(legacy, dict) else legacy}"
+    ok = (legacy_ok
+          and st1 == 200 and shows(eleven, total=11, matches=11, bestMatches=11, progress=69, ready=False, capped=False, needChats=0, needDays=0)
+          and st2 == 200 and shows(after_group, total=11, bestMatches=11, progress=69, ready=False)
+          and st3 == 200 and shows(twelve, total=12, matches=12, chats=3, days=2, bestMatches=12, progress=75, ready=True, unlockAt=70, capped=False))
+    return ok, f"eleven={eleven} after_group={after_group} twelve={twelve} legacy={st_legacy}/{legacy.get('readiness') if isinstance(legacy, dict) else legacy}"
 
 
 def main():

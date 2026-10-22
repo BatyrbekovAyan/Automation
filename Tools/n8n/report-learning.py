@@ -15,6 +15,8 @@ the deadline may be missing) — compare `sets` with the panel's successful answ
 
 Learning B (2026-10-14): a second table, `readiness`, prints what the «Авто» lock sees per (install, bot_key) —
 the same window and thresholds Get Usage decides with, imported from apply-learning-b.py (never retyped).
+Progress percent (2026-10-23): it also prints the best window of the history, the percent the app shows, the anti-gaming
+flag and what is still missing — read it 2-3 weeks after a release to calibrate TARGET_MATCHES / UNLOCK_PERCENT.
 """
 import argparse
 import importlib.util
@@ -63,27 +65,27 @@ order by 1;
 COLS = ["profile_id", "sends", "card", "edited", "typed", "none", "top1_hits", "with_set", "edit_mean", "sets", "learning_sets", "learning_sets_3moves", "tokens"]
 
 # learning B: the lock's own arithmetic per (install, bot_key), across every install — rendered from the SAME fragments
-# the Get Usage CTE is generated from (apply-learning-b.send_filter / readiness_columns), never retyped; like the CTE, only
-# bots with a LIVE row are listed (review 2026-10-14 #7). Not windowed by --days: the lock is not either.
+# the Get Usage CTE is generated from (apply-learning-b.send_filter / window_columns / readiness_columns), never retyped; like
+# the CTE, only bots with a LIVE row are listed (review 2026-10-14 #7). Reads the WHOLE history (best window, progress and the
+# chats/days conditions are history-wide); matches / total / chats / days are the current window of the last WINDOW sends.
+# Not windowed by --days: the lock is not either.
 # This query does NOT go through the %-substitution above — single % in LIKE.
 READINESS_SQL = f"""
 with sends as (
   select bp.owner_id, bp.bot_key, e.chat_id, e.origin_top1, e.created_at,
-         row_number() over (partition by bp.owner_id, bp.bot_key order by e.created_at desc, e.id desc) as rn
+         {LB.window_columns('bp.owner_id, bp.bot_key', 'e')}
   from chat_history_events e
   join bot_profiles bp on bp.profile_id = e.profile_id
   where bp.bot_key is not null and bp.owner_id is not null
     and exists (select 1 from bot_profiles live where live.owner_id = bp.owner_id and live.bot_key = bp.bot_key and live.deleted_at is null)
     and {LB.send_filter('e')}
-), s as (
-  select * from sends where rn <= {LB.WINDOW}
 )
 select s.owner_id, s.bot_key,
          {LB.readiness_columns('s')}
-from s
+from sends s
 group by s.owner_id, s.bot_key
 """
-READINESS_COLS = ["owner_id", "bot_key", "matches", "total", "chats", "days", "ready"]
+READINESS_COLS = ["owner_id", "bot_key", "matches", "total", "chats", "days", "ready", "best_matches", "progress", "capped", "need_chats", "need_days"]
 
 
 def json_sql(sql, order="r.profile_id"):
@@ -131,8 +133,9 @@ def selftest():
     b = parse_rows("[" + '{"payload":' + sample + "}" + "]")
     c = parse_rows('{"payload":' + sample + "}")
     assert a == b == c and a[0][0] == "p" and a[0][-1] == "900", (a, b, c)
-    rb = parse_rows('{"rows":[{"owner_id":"i","bot_key":"Bot0","matches":7,"total":12,"chats":3,"days":2,"ready":false}]}', READINESS_COLS)
-    assert rb == [["i", "Bot0", "7", "12", "3", "2", "False"]], rb
+    rb = parse_rows('{"rows":[{"owner_id":"i","bot_key":"Bot0","matches":12,"total":12,"chats":3,"days":1,"ready":false,'
+                    '"best_matches":12,"progress":69,"capped":true,"need_chats":0,"need_days":1}]}', READINESS_COLS)
+    assert rb == [["i", "Bot0", "12", "12", "3", "1", "False", "12", "69", "True", "0", "1"]], rb
     print("selftest OK")
 
 
@@ -158,10 +161,13 @@ def main():
 
     # learning B: what the «Авто» lock sees — every install's bots over the lock's own window (not --days)
     rows_b = run(READINESS_SQL, READINESS_COLS, order="r.owner_id, r.bot_key")
-    print(f"\nreadiness: window {LB.WINDOW}, ready = matches ≥ {LB.MIN_MATCHES}, total ≥ {LB.MIN_TOTAL}, chats ≥ {LB.MIN_CHATS}, days ≥ {LB.MIN_DAYS}")
-    print(f"{'install':16} {'bot':6} {'match/total':>11} {'chats':>5} {'days':>4} {'ready':>5}")
-    for owner_id, bot_key, matches, total, chats, days, ready in rows_b:
-        print(f"{owner_id[:16]:16} {bot_key[:6]:6} {matches + '/' + total:>11} {chats:>5} {days:>4} {'yes' if ready.lower() == 'true' else 'no':>5}")
+    print(f"\nreadiness: window {LB.WINDOW}, target {LB.TARGET_MATCHES}, unlock {LB.UNLOCK_PERCENT}% (= {LB.MIN_MATCHES} matches), "
+          f"chats ≥ {LB.MIN_CHATS}, days ≥ {LB.MIN_DAYS} (history)")
+    print(f"(match/total, chats, days: the last {LB.WINDOW} sends; best, prog%, ready, capped, need c/d: the whole history)")
+    print(f"{'install':16} {'bot':6} {'match/total':>11} {'chats':>5} {'days':>4} {'best':>4} {'prog%':>5} {'ready':>5} {'capped':>6} {'need c/d':>8}")
+    for owner_id, bot_key, matches, total, chats, days, ready, best, progress, capped, need_chats, need_days in rows_b:
+        print(f"{owner_id[:16]:16} {bot_key[:6]:6} {matches + '/' + total:>11} {chats:>5} {days:>4} {best:>4} {progress:>5} "
+              f"{'yes' if ready.lower() == 'true' else 'no':>5} {'yes' if capped.lower() == 'true' else 'no':>6} {need_chats + '/' + need_days:>8}")
     if not rows_b:
         print("(no bot has a send with a shown set yet)")
 

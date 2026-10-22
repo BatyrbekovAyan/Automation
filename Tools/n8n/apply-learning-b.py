@@ -6,13 +6,19 @@
                     из Auth Gate (null в legacy → '').
   Shape Response  — поле readiness (строка с маркером // LEARNING-B) — массив как есть, [] если не массив.
 
-Пороги — ОДИН раз здесь; report-learning.py импортирует их, клиентская AutoReadinessPolicy зеркалит Window/MinMatches
-(tests/test_learning_b.py сверяет).
+Learning progress percent (2026-10-23, spec docs/superpowers/specs/2026-10-22-learning-progress-percent-design.md §2–§3): the row also
+carries the BEST window of the history (bestMatches), the percent 0-100 (progress), the unlock mark (unlockAt), the anti-gaming flag
+(capped) and what is still missing (needChats / needDays). `ready` now means «best window and the history conditions». matches / total /
+chats / days keep describing the CURRENT window of the last 20 sends — the report reads them to calibrate.
+
+The numbers live ONCE here; the client holds none (it draws the percent the server sends). report-learning.py and verify-learning-b.py
+import them. tests/test_learning_b.py runs the whole Read Usage query as real SQL.
 
     python3 Tools/n8n/apply-learning-b.py            # patch workflows/ in place (re-runnable)
     python3 Tools/n8n/apply-learning-b.py --check    # exit 2 если не применено
 """
 import json
+import math
 import os
 import re
 import sys
@@ -21,11 +27,12 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 WF = os.path.join(HERE, "workflows")
 GET_USAGE = "jtbssfzXbOxwTK4k-Get_Usage.json"
 
-WINDOW = 20        # the last N owner sends with a shown set, per bot
-MIN_MATCHES = 10   # card #1 matched the sent text (origin_top1 = 1)
-MIN_TOTAL = 10     # at least this many sends with a set in the window
-MIN_CHATS = 3      # … spread over this many personal chats
-MIN_DAYS = 2       # … on this many calendar days (Asia/Almaty)
+WINDOW = 20           # «best» is measured over any N consecutive owner sends with a shown set, per bot
+TARGET_MATCHES = 16   # card #1 matched the sent text (origin_top1 = 1) this many times within WINDOW = 100 % («8 out of 10»)
+UNLOCK_PERCENT = 70   # «Авто» opens from this percent
+MIN_MATCHES = math.ceil(UNLOCK_PERCENT * TARGET_MATCHES / 100)   # derived, never typed: the fewest matches that reach UNLOCK_PERCENT (12)
+MIN_CHATS = 3         # the HISTORY spans this many personal chats …
+MIN_DAYS = 2          # … and this many calendar days (Asia/Almaty); otherwise progress stops at UNLOCK_PERCENT - 1
 
 
 def send_filter(e):
@@ -34,21 +41,46 @@ def send_filter(e):
             f"    and {e}.chat_id not like '%@g.us' and {e}.chat_id not like '-%'")
 
 
+def window_columns(partition, e):
+    """rn — the send's rank, newest first (rn <= WINDOW is the CURRENT window the report reads); roll — the matches among the WINDOW
+    sends ending at this one, oldest first (its max over a bot is the BEST window of the history; the first sends form shorter windows)."""
+    return (f"row_number() over (partition by {partition} order by {e}.created_at desc, {e}.id desc) as rn,\n"
+            f"         sum(coalesce({e}.origin_top1, 0)) over (partition by {partition} order by {e}.created_at, {e}.id\n"
+            f"             rows between {WINDOW - 1} preceding and current row) as roll")
+
+
+def progress_sql(best, cond):
+    """The percent 0-100 of the best window against the target, round half up; without the history conditions it stops one short of the unlock."""
+    raw = f"round(100.0 * {best} / {TARGET_MATCHES})"
+    return f"(case when {cond} then least(100, {raw}) else least({UNLOCK_PERCENT - 1}, {raw}) end)::int"
+
+
 def readiness_columns(s):
-    """matches / total / chats / days / ready over the windowed sends (s = their alias) — ONE arithmetic for both renderers."""
-    return (f"(count({s}.bot_key) filter (where {s}.origin_top1 = 1))::int as matches,\n"
-            f"         count({s}.bot_key)::int as total,\n"
-            f"         count(distinct {s}.chat_id)::int as chats,\n"
-            f"         count(distinct ({s}.created_at at time zone 'Asia/Almaty')::date)::int as days,\n"
-            f"         (count({s}.bot_key) >= {MIN_TOTAL} and count({s}.bot_key) filter (where {s}.origin_top1 = 1) >= {MIN_MATCHES}\n"
-            f"          and count(distinct {s}.chat_id) >= {MIN_CHATS}\n"
-            f"          and count(distinct ({s}.created_at at time zone 'Asia/Almaty')::date) >= {MIN_DAYS}) as ready")
+    """Every output column over the sends of one bot (s = their alias, carrying window_columns' rn / roll) — ONE arithmetic for both renderers.
+    matches / total / chats / days: the current window; the rest: the whole history (the conditions) and its best window."""
+    win = f"{s}.rn <= {WINDOW}"
+    best = f"coalesce(max({s}.roll), 0)"
+    chats = f"count(distinct {s}.chat_id)"
+    days = f"count(distinct ({s}.created_at at time zone 'Asia/Almaty')::date)"
+    cond = f"({chats} >= {MIN_CHATS} and {days} >= {MIN_DAYS})"
+    return (f"(count({s}.bot_key) filter (where {win} and {s}.origin_top1 = 1))::int as matches,\n"
+            f"         (count({s}.bot_key) filter (where {win}))::int as total,\n"
+            f"         ({chats} filter (where {win}))::int as chats,\n"
+            f"         ({days} filter (where {win}))::int as days,\n"
+            f"         {best}::int as best_matches,\n"
+            f"         {progress_sql(best, cond)} as progress,\n"
+            f"         ({cond} and {best} >= {MIN_MATCHES}) as ready,\n"
+            f"         (not {cond} and round(100.0 * {best} / {TARGET_MATCHES}) >= {UNLOCK_PERCENT}) as capped,\n"
+            f"         greatest(0, {MIN_CHATS} - {chats})::int as need_chats,\n"
+            f"         greatest(0, {MIN_DAYS} - {days})::int as need_days")
 
 
 # The comments name the parameters in WORDS (verify-sql-comments.py: no dollar-digit inside a comment).
 READINESS_SQL = f"""-- LEARNING-B-BEGIN (generated by Tools/n8n/apply-learning-b.py — edit there)
--- Readiness of «Авто» per bot of the calling install (second parameter = install id, third = gate mode): the last {WINDOW}
--- owner_app sends WITH a shown set in personal chats, both channels and the superseded rows of the bot's line.
+-- Readiness of «Авто» per bot of the calling install (second parameter = install id, third = gate mode). History = every owner_app
+-- send WITH a shown set in personal chats, both channels and the superseded rows of the bot's line. best = the most card-1 matches in
+-- any {WINDOW} consecutive sends of the history (rolling sum); progress = round(100 * best / {TARGET_MATCHES}), held at {UNLOCK_PERCENT - 1} until
+-- the history holds {MIN_CHATS} chats and {MIN_DAYS} days. matches / total / chats / days describe the CURRENT window (the last {WINDOW} sends).
 line_bots as (
   select distinct bp.bot_key
   from bot_profiles bp
@@ -60,7 +92,7 @@ line_bots as (
   where bp.owner_id = $2::text
 ), sends as (
   select lp.bot_key, e.chat_id, e.origin_top1, e.created_at,
-         row_number() over (partition by lp.bot_key order by e.created_at desc, e.id desc) as rn
+         {window_columns('lp.bot_key', 'e')}
   from chat_history_events e
   join line_profiles lp on lp.profile_id = e.profile_id
   where {send_filter('e')}
@@ -68,13 +100,15 @@ line_bots as (
   select lb.bot_key,
          {readiness_columns('s')}
   from line_bots lb
-  left join sends s on s.bot_key = lb.bot_key and s.rn <= {WINDOW}
+  left join sends s on s.bot_key = lb.bot_key
   group by lb.bot_key
 ),
 -- LEARNING-B-END
 """
 READINESS_COLUMN = ("  (select coalesce(jsonb_agg(jsonb_build_object('botKey', r.bot_key, 'matches', r.matches, 'total', r.total, "
-                    "'chats', r.chats, 'days', r.days, 'ready', r.ready) order by r.bot_key), '[]'::jsonb) from readiness r) as readiness, -- LEARNING-B-COL\n")
+                    "'chats', r.chats, 'days', r.days, 'ready', r.ready, 'bestMatches', r.best_matches, 'progress', r.progress, "
+                    f"'unlockAt', {UNLOCK_PERCENT}, 'capped', r.capped, 'needChats', r.need_chats, 'needDays', r.need_days) "
+                    "order by r.bot_key), '[]'::jsonb) from readiness r) as readiness, -- LEARNING-B-COL\n")
 SUB_ANCHOR = "), sub as ("
 SELECT_ANCHOR = "select\n  coalesce(sub.plan, 'trial') as plan,"
 PARAMS = ("={{ [ $('Webhook').item.json.body.appUserId, ($('Auth Gate').first().json.crAuth.installId || ''), "

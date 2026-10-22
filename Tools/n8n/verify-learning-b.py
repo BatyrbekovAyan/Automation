@@ -30,8 +30,14 @@ expect(LB.check(wf), "get usage: apply-learning-b.py --check is not satisfied (s
 for frag in ("line_bots as (", "line_profiles as (", "sends as (", "readiness as (", "row_number() over (partition by lp.bot_key",
              "chat_id not like '%@g.us'", "chat_id not like '-%'", "coalesce(e.origin_set, 0) > 0", "source = 'owner_app'",
              f"s.rn <= {LB.WINDOW}", f">= {LB.MIN_MATCHES}", f">= {LB.MIN_CHATS}", f">= {LB.MIN_DAYS}", "$3::text = 'session'",
-             "bp.deleted_at is null"):
+             "bp.deleted_at is null",
+             # progress percent (2026-10-23): the best window, the percent, the unlock mark and what is missing
+             f"rows between {LB.WINDOW - 1} preceding and current row", f"/ {LB.TARGET_MATCHES}", f"least({LB.UNLOCK_PERCENT - 1},",
+             "'progress', r.progress", "'needChats', r.need_chats", f"'unlockAt', {LB.UNLOCK_PERCENT}"):
     expect(frag in q, f"get usage: Read Usage lacks `{frag}`")
+# The conditions and the best window are HISTORY-wide: the readiness CTE must join every send, never only the current window.
+expect("left join sends s on s.bot_key = lb.bot_key\n" in q and "lb.bot_key and s.rn" not in q,
+       "get usage: the readiness CTE must join the WHOLE history (no `rn <= window` on the join) — the conditions and the best window are history-wide")
 expect(q.count("-- LEARNING-B-BEGIN") == 1 and q.count("-- LEARNING-B-END") == 1 and q.count("LEARNING-B-COL") == 1, "get usage: marker count")
 expect("crAuth.installId" in params and "crAuth.mode" in params and "appUserId" in params,
        "get usage: Read Usage params must carry appUserId + installId + mode (Auth Gate)")
@@ -50,7 +56,7 @@ claude = open(os.path.join(ROOT, "CLAUDE.md"), encoding="utf-8").read()
 expect("требует колонок A" in claude, "CLAUDE.md: the Learning-B bullet must state the A-columns dependency and its blast radius")
 rep = open(os.path.join(HERE, "report-learning.py"), encoding="utf-8").read()
 expect("apply-learning-b" in rep and "readiness" in rep, "report: report-learning.py must import the module's constants and print readiness (Task 2)")
-expect("LB.send_filter(" in rep and "LB.readiness_columns(" in rep and "deleted_at is null" in rep,
+expect("LB.send_filter(" in rep and "LB.window_columns(" in rep and "LB.readiness_columns(" in rep and "deleted_at is null" in rep,
        "report: READINESS_SQL must be rendered from apply-learning-b's fragments and list only bots with a live row (review #7)")
 print("learning B verify:", "OK" if not problems else f"{len(problems)} problem(s)")
 sys.exit(1 if problems else 0)
