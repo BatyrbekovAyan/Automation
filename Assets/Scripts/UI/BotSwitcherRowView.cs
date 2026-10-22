@@ -8,7 +8,8 @@ using TMPro;
 /// restyle (docs/design/ui-restyle/chats-topbar-spec.md §4). Shows the
 /// business-tint avatar, the bot name, a subline of channel brand dots +
 /// «N чатов[ · M новых]», and a trailing per-bot «Авто» mini-chip that mirrors
-/// the header button (hidden for unconnected bots). The selected bot reads as
+/// the header button (hidden for unconnected bots) — its learning fill included,
+/// but not the caption, which the row is too small for. The selected bot reads as
 /// an AccentFill inset ring + left rail — no corner badge.
 ///
 /// The chip reuses the header's flow: enabling routes through
@@ -44,6 +45,7 @@ public class BotSwitcherRowView : MonoBehaviour
     [SerializeField] private Image chipDotRing;
     [SerializeField] private Image chipDotCore;
     [SerializeField] private TextMeshProUGUI chipLabel;
+    [SerializeField] private AutoChipProgress chipProgress;   // the bot's learning fill over chipFill — the row has no caption
 
     public CanvasGroup CanvasGroup => canvasGroup;
 
@@ -79,7 +81,7 @@ public class BotSwitcherRowView : MonoBehaviour
 
         ApplySubline();
         ApplySelection();
-        ApplyChip();
+        ApplyChip(animate: false);
 
         if (rowButton != null)
         {
@@ -97,12 +99,15 @@ public class BotSwitcherRowView : MonoBehaviour
     {
         ReplyModeToggleBinder.OnReplyModeChanged += HandleModeChanged;
         Theme.Changed += HandleThemeChanged;
+        UsageStore.OnUsageChanged += HandleUsageChanged;
     }
 
     private void OnDisable()
     {
         ReplyModeToggleBinder.OnReplyModeChanged -= HandleModeChanged;
         Theme.Changed -= HandleThemeChanged;
+        UsageStore.OnUsageChanged -= HandleUsageChanged;
+        KillChipTweens();
     }
 
     private static bool IsConnected(string profileId) =>
@@ -141,8 +146,9 @@ public class BotSwitcherRowView : MonoBehaviour
     }
 
     // Mirrors ReplyModeToggleBinder.ApplyVisuals — the chip IS the header button,
-    // replicated per bot, so the two must speak one visual language.
-    private void ApplyChip()
+    // replicated per bot, so the two must speak one visual language: the shared
+    // painter, with this row's bot's learning percent as the fill.
+    private void ApplyChip(bool animate)
     {
         if (chipRoot == null) return;
 
@@ -151,20 +157,37 @@ public class BotSwitcherRowView : MonoBehaviour
         if (!visible) return;
 
         bool on = AutoButtonModel.IsAutoOn(ReplyModeToggleBinder.GetMode(botId));
-        ReplyModeToggleBinder.PaintChip(on, chipRing, chipFill, chipLabel,
-            chipDotRing, chipDotCore, animate: false);
+        int? percent = AutoReadinessPolicy.StateFor(botId)?.Percent;
+        KillChipTweens();
+        ReplyModeToggleBinder.PaintChip(on, percent, chipRing, chipFill, chipProgress, chipLabel,
+            chipDotRing, chipDotCore, animate);
+    }
+
+    private void KillChipTweens()
+    {
+        if (chipRing != null) chipRing.DOKill();
+        if (chipFill != null) chipFill.DOKill();
+        if (chipLabel != null) chipLabel.DOKill();
+        if (chipDotRing != null) chipDotRing.DOKill();
+        if (chipDotCore != null) chipDotCore.DOKill();
     }
 
     private void HandleModeChanged(string changedBotId, ReplyModeToggleBinder.ReplyMode _)
     {
-        if (!string.IsNullOrEmpty(botId) && changedBotId == botId) ApplyChip();
+        if (!string.IsNullOrEmpty(botId) && changedBotId == botId) ApplyChip(animate: false);
     }
 
     private void HandleThemeChanged()
     {
         if (string.IsNullOrEmpty(botId)) return;
         ApplySelection();
-        ApplyChip();
+        ApplyChip(animate: false);
+    }
+
+    // A fresh Get Usage while the sheet is open: the bot's fill grows on screen.
+    private void HandleUsageChanged()
+    {
+        if (!string.IsNullOrEmpty(botId)) ApplyChip(animate: true);
     }
 
     private void HandleTap()

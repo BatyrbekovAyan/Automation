@@ -4,7 +4,6 @@
 /// server's row through AutoReadinessPolicy.StateFor, so the copy and the verdict cannot drift. Registered in
 /// FontGlyphCoverageTests (const strings + the composed samples). Counted nouns (chats, days) agree through RuPlural.
 /// A percent is always «N», a NO-BREAK space (U+00A0) and «%» — the number never parts from the sign across a line break.
-/// <see cref="PillText"/> is the capsule's old «N/20» face; it goes with the capsule rework.
 /// </summary>
 public static class AutoReadinessCopy
 {
@@ -51,7 +50,4 @@ public static class AutoReadinessCopy
             : null;
         return chats != null && days != null ? $"{chats} и {days}" : chats ?? days;
     }
-
-    /// <summary>The capsule's old learning face: «Учится · 7/20». Removed with the capsule rework.</summary>
-    public static string PillText(int matches) => $"Учится · {matches}/{AutoReadinessPolicy.Window}";
 }

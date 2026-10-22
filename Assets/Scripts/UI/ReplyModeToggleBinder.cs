@@ -10,7 +10,10 @@ using UnityEngine.UI;
 /// (docs/design/ui-restyle/chats-topbar-spec.md). Semi-auto is the silent
 /// default state and never appears as a word on this screen; the pill reads
 /// «Авто» with a state lamp — filled dot on PositiveBg when the bot answers
-/// clients itself, hollow dot in an outlined pill when it only proposes.
+/// clients itself, hollow dot in an outlined pill when it only proposes. The
+/// selected bot's learning percent fills the pill and captions it «Учится · N %»
+/// (spec 2026-10-22-learning-progress-percent §4.3), through the same
+/// <see cref="PaintChip"/> every «Авто» capsule is painted by.
 ///
 /// The mode stays a per-bot default persisted under "&lt;botName&gt;ReplyMode"
 /// (0 = auto ON, 1 = semi; unset reads SEMI — <see cref="AutoButtonModel.DefaultMode"/>,
@@ -31,11 +34,13 @@ public class ReplyModeToggleBinder : MonoBehaviour
 
     [Header("Auto button")]
     [SerializeField] private Button toggleButton;
-    [SerializeField] private Image ringImage;   // outer rounded rect: Border OFF / PositiveBg ON
-    [SerializeField] private Image fillImage;   // inner rounded rect: Surface OFF / PositiveBg ON
+    [SerializeField] private Image ringImage;   // outer rounded rect: Border OFF / PositiveBg ON (AutoChipLook's Ring)
+    [SerializeField] private Image fillImage;   // inner rounded rect, the face: Surface OFF / PositiveBg ON (AutoChipLook's Base)
     [SerializeField] private TextMeshProUGUI label;
     [SerializeField] private Image dotRing;     // 18u state lamp: InkTertiary hollow OFF / PositiveInk ON
-    [SerializeField] private Image dotCore;     // the hollow's hole: matches fill OFF / PositiveInk ON
+    [SerializeField] private Image dotCore;     // the hollow's hole: what is under it OFF / PositiveInk ON
+    [SerializeField] private AutoChipProgress progress;      // the selected bot's learning fill over fillImage
+    [SerializeField] private TextMeshProUGUI learnCaption;   // «Учится · N %» under the pill (PaintCaption)
 
     [Header("Confirm popup (enable only)")]
     [SerializeField] private GameObject confirmPopup;
@@ -183,35 +188,53 @@ public class ReplyModeToggleBinder : MonoBehaviour
     }
 
     /// <summary>
-    /// The single source of the «Авто» chip's state colors — used by the header
-    /// button, the sheet's per-bot chips, and the per-chat SemiAutoToggle so the
-    /// three controls can never drift apart. ON = PositiveBg pill + filled lamp;
-    /// OFF = Border ring on Surface + hollow lamp. Every ref is null-guarded.
+    /// The single painter of every «Авто» capsule — the bot card, this header button, the bot-switcher sheet's per-bot chips
+    /// and the per-chat SemiAutoToggle — so the four can never drift apart. What each part wears is
+    /// <see cref="AutoChipLook.For"/>'s answer (is «Авто» ON in this place; the bot's learning percent, null = no data): the
+    /// ring, the face (<paramref name="fill"/>), the label, the lamp, then the learning fill through <paramref name="progress"/>.
+    /// A hollow lamp's core is the colour actually under it — the fill's where the fill covers the lamp's centre, else the
+    /// face's. A repaint that LOWERS the fill (ON at 99 % → trained, where the fill goes and the face takes its colour) sets
+    /// every colour at once: a cross-fade would start the face from the lighter track under a fill that is already gone, a
+    /// flash. A growth and an ordinary mode change cross-fade as before. Every ref is null-guarded, the layer too (through
+    /// Unity's ==: an unassigned or destroyed component is not C# null) — a capsule without it paints as it always did.
     /// </summary>
-    public static void PaintChip(bool on, Image ring, Image fill, TextMeshProUGUI chipLabel,
-        Image lampRing, Image lampCore, bool animate, float duration = AnimDuration)
+    public static void PaintChip(bool on, int? percent, Image ring, Image fill, AutoChipProgress progress,
+        TextMeshProUGUI chipLabel, Image lampRing, Image lampCore, bool animate, float duration = AnimDuration)
     {
-        Color fillColor = on ? Theme.Color(ThemeRole.PositiveBg) : Theme.Color(ThemeRole.Surface);
-        Color ringColor = on ? Theme.Color(ThemeRole.PositiveBg) : Theme.Color(ThemeRole.Border);
-        Color inkColor = on ? Theme.Color(ThemeRole.PositiveInk) : Theme.Color(ThemeRole.InkSecondary);
-        Color lampColor = on ? Theme.Color(ThemeRole.PositiveInk) : Theme.Color(ThemeRole.InkTertiary);
-        Color lampCoreColor = on ? lampColor : fillColor;
+        AutoChipPaint paint = AutoChipLook.For(on, percent);
+        bool hasLayer = progress != null;
+        Color faceColor = Theme.Color(paint.Base);
+        Color fillColor = Theme.Color(paint.Fill);
+        Color lampColor = Theme.Color(paint.Lamp);
+        Color lampCoreColor = paint.LampSolid ? lampColor
+            : hasLayer && lampCore != null && progress.Covers(lampCore.rectTransform, paint.FillFraction) ? fillColor
+            : faceColor;
+        bool tween = animate && !(hasLayer && paint.FillFraction < progress.AppliedFraction);
 
-        if (!animate)
-        {
-            if (fill != null) fill.color = fillColor;
-            if (ring != null) ring.color = ringColor;
-            if (chipLabel != null) chipLabel.color = inkColor;
-            if (lampRing != null) lampRing.color = lampColor;
-            if (lampCore != null) lampCore.color = lampCoreColor;
-            return;
-        }
+        PaintPart(fill, faceColor, tween, duration);
+        PaintPart(ring, Theme.Color(paint.Ring), tween, duration);
+        PaintPart(chipLabel, Theme.Color(paint.Ink), tween, duration);
+        PaintPart(lampRing, lampColor, tween, duration);
+        PaintPart(lampCore, lampCoreColor, tween, duration);
+        if (hasLayer) progress.Apply(paint.FillFraction, fillColor, tween);
+    }
 
-        if (fill != null) fill.DOColor(fillColor, duration).SetEase(Ease.OutCubic);
-        if (ring != null) ring.DOColor(ringColor, duration).SetEase(Ease.OutCubic);
-        if (chipLabel != null) chipLabel.DOColor(inkColor, duration).SetEase(Ease.OutCubic);
-        if (lampRing != null) lampRing.DOColor(lampColor, duration).SetEase(Ease.OutCubic);
-        if (lampCore != null) lampCore.DOColor(lampCoreColor, duration).SetEase(Ease.OutCubic);
+    /// <summary>
+    /// The learning caption under a capsule — only the bot card's and this header's (the sheet row and the chat chip are too
+    /// small for it): shown with <paramref name="text"/>, hidden on null. Its colour is the caption's own ThemedColor binding.
+    /// </summary>
+    public static void PaintCaption(TextMeshProUGUI caption, string text)
+    {
+        if (caption == null) return;
+        if (text != null) caption.text = text;
+        caption.gameObject.SetActive(text != null);
+    }
+
+    private static void PaintPart(Graphic part, Color color, bool tween, float duration)
+    {
+        if (part == null) return;
+        if (tween) part.DOColor(color, duration).SetEase(Ease.OutCubic);
+        else part.color = color;
     }
 
     private void Awake()
@@ -237,6 +260,7 @@ public class ReplyModeToggleBinder : MonoBehaviour
         Theme.Changed += RepaintForTheme;
         ReplyModeSyncService.OnStateChanged += HandleSyncStateChanged;
         ReplyModeSyncService.OnServerNewer += HandleServerNewer;
+        UsageStore.OnUsageChanged += HandleUsageChanged;
         ApplyPending();
 
         if (ChatManager.Instance == null) return;
@@ -249,6 +273,7 @@ public class ReplyModeToggleBinder : MonoBehaviour
         Theme.Changed -= RepaintForTheme;
         ReplyModeSyncService.OnStateChanged -= HandleSyncStateChanged;
         ReplyModeSyncService.OnServerNewer -= HandleServerNewer;
+        UsageStore.OnUsageChanged -= HandleUsageChanged;
 
         if (ChatManager.Instance != null)
             ChatManager.Instance.OnActiveBotChanged -= Refresh;
@@ -283,6 +308,9 @@ public class ReplyModeToggleBinder : MonoBehaviour
     }
 
     private void RepaintForTheme() => ApplyVisuals(currentMode, animate: false);
+
+    // A fresh Get Usage can move the selected bot's percent: the fill grows on screen, the caption follows.
+    private void HandleUsageChanged() => ApplyVisuals(currentMode, animate: true);
 
     private void OnButtonPressed()
     {
@@ -321,7 +349,9 @@ public class ReplyModeToggleBinder : MonoBehaviour
     private void ApplyVisuals(ReplyMode mode, bool animate)
     {
         KillColorTweens();
-        PaintChip(AutoButtonModel.IsAutoOn(mode), ringImage, fillImage, label, dotRing, dotCore, animate);
+        int? percent = AutoReadinessPolicy.StateFor(currentBotId)?.Percent;
+        PaintChip(AutoButtonModel.IsAutoOn(mode), percent, ringImage, fillImage, progress, label, dotRing, dotCore, animate);
+        PaintCaption(learnCaption, AutoChipLook.Caption(percent));
     }
 
     private void KillColorTweens()

@@ -25,11 +25,10 @@ public class AutoReadinessPolicyTests
         UsageStore.Apply(UsageStore.Parse("{\"success\":true,\"plan\":\"trial\",\"readiness\":[{\"botKey\":\"" + StateBot + "\"," + fields + "}]}"));
 
     [Test]
-    public void NullEntry_IsOpen_AndProgressZero()
+    public void NullEntry_IsOpen()
     {
         Assert.AreEqual(AutoReadinessVerdict.Open, AutoReadinessPolicy.Verdict(null, false), "no snapshot / no row / old server → never locked");
         Assert.AreEqual(AutoReadinessVerdict.Open, AutoReadinessPolicy.Verdict(null, true));
-        Assert.AreEqual(0, AutoReadinessPolicy.Progress(null));
     }
 
     [Test]
@@ -62,16 +61,6 @@ public class AutoReadinessPolicyTests
         Assert.AreEqual(44, AutoReadinessPolicy.DisplayPercent(null, 44));
         Assert.IsNull(AutoReadinessPolicy.DisplayPercent(null, null));
         Assert.AreEqual(100, AutoReadinessPolicy.DisplayPercent(Row(progress: 20), 250), "a garbage memory is clamped too");
-    }
-
-    [Test]
-    public void Progress_IsMatchesClampedToTheWindow()
-    {
-        Assert.AreEqual(7, AutoReadinessPolicy.Progress(Entry("Bot0", 7, 12, false)));
-        Assert.AreEqual(AutoReadinessPolicy.Window, AutoReadinessPolicy.Progress(Entry("Bot0", 25, 20, true)), "the server's window bounds the number we print");
-        Assert.AreEqual(0, AutoReadinessPolicy.Progress(Entry("Bot0", -3, 0, false)), "a garbage negative never prints");
-        Assert.AreEqual(20, AutoReadinessPolicy.Window);
-        Assert.AreEqual(10, AutoReadinessPolicy.MinMatches);
     }
 
     [Test]

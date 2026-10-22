@@ -24,8 +24,9 @@ public class AutoReadinessEntry
 public enum AutoReadinessVerdict { Open, Locked }
 
 /// <summary>
-/// What the client knows about one bot's learning: the percent to draw, and the server's facts the lock sheet words.
-/// Built only by <see cref="AutoReadinessPolicy.StateFor"/> — the gate, the sheet and the four «Авто» capsules read this and nothing else.
+/// What the client knows about one bot's learning: the percent to draw, and the server's facts the lock sheet words. The app takes
+/// it from <see cref="AutoReadinessPolicy.StateFor"/> alone — the gate (and through it the sheet) and the four «Авто» capsules (the
+/// bot card, the chats header, the bot-switcher row, the open-chat chip) read the percent and the verdict there and nowhere else.
 /// </summary>
 public readonly struct LearningState
 {
@@ -52,14 +53,10 @@ public readonly struct LearningState
 /// Learning B + the percent: whether enabling «Авто» should first show «ИИ-сотрудник ещё учится». The lock is a HINT, never a
 /// guard — Locked only on the server's positive verdict (the bot is listed, the row carries a `progress`, it is not ready, and its
 /// «Авто» never opened); no snapshot, no row, an old server (no `progress`) or a legacy caller all read as Open. The thresholds the
-/// server decides with live in Tools/n8n/apply-learning-b.py; the client keeps none of its own — Window, MinMatches and Progress
-/// only feed the old «N из 20» copy until the percent wording replaces it.
+/// server decides with live in Tools/n8n/apply-learning-b.py; the client keeps none of its own.
 /// </summary>
 public static class AutoReadinessPolicy
 {
-    public const int Window = 20;
-    public const int MinMatches = 10;
-
     /// <summary>Locked ⇔ the row exists, carries a `progress`, is not `ready`, and «Авто» was never unlocked on this phone.</summary>
     public static AutoReadinessVerdict Verdict(AutoReadinessEntry entry, bool unlockedBefore) =>
         entry != null && entry.progress.HasValue && !entry.ready && !unlockedBefore
@@ -94,10 +91,6 @@ public static class AutoReadinessPolicy
         bool locked = Verdict(entry, LearnProgressStore.Unlocked(botKey)) == AutoReadinessVerdict.Locked;
         return new LearningState(percent.Value, entry.unlockAt, entry.capped, entry.needChats, entry.needDays, locked);
     }
-
-    /// <summary>Matches to print on the capsule and the sheet — clamped to the window the server counted.</summary>
-    public static int Progress(AutoReadinessEntry entry) =>
-        entry == null ? 0 : Math.Clamp(entry.matches, 0, Window);
 
     internal static int ClampPercent(int value) => Math.Clamp(value, 0, 100);
 }

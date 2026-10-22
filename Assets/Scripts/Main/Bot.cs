@@ -22,6 +22,8 @@ public class Bot : MonoBehaviour
     [SerializeField] private TextMeshProUGUI autoPillLabel;
     [SerializeField] private Image autoPillDotRing;
     [SerializeField] private Image autoPillDotCore;
+    [SerializeField] private AutoChipProgress autoPillProgress;   // the bot's learning fill over autoPillFill
+    [SerializeField] private TextMeshProUGUI learnCaption;        // «Учится · N %» under the capsule
 
     [Header("Channel icons (C2 subline — ready-made sprites, NEVER tinted)")]
     [SerializeField] private Image waChannelIcon;
@@ -106,8 +108,7 @@ public class Bot : MonoBehaviour
     private string authoredPillText;
     private float authoredLabelWidth;
     private bool cardStateReady;
-    private BotPillKind pillKind = BotPillKind.Auto;   // learning B: the capsule's face, decided in RefreshCardState
-    private int learningMatches;                        // learning B: the N of «Учится · N/20»
+    private BotPillKind pillKind = BotPillKind.Auto;   // the capsule's face («Авто» / «Подключить»), decided in RefreshCardState
     private Coroutine initRoutine;
 
 
@@ -133,7 +134,7 @@ public class Bot : MonoBehaviour
         ReplyModeSyncService.OnStateChanged += HandleReplyModeSyncState;
         ProfileRetirement.Changed += HandleRetirementChanged;
         ChannelHealth.Changed += HandleChannelHealthChanged;   // A4: a status check marked / unmarked one of this bot's channels
-        UsageStore.OnUsageChanged += HandleUsageChanged;   // learning B: a fresh Get Usage can flip the capsule's face
+        UsageStore.OnUsageChanged += HandleUsageChanged;   // a fresh Get Usage can move the learning fill and its caption
 
         // Returning to the Боты tab after Bot Settings: the channel toggles or
         // the business type may have changed while this card was inactive.
@@ -479,10 +480,10 @@ public class Bot : MonoBehaviour
         if (cardStateReady && botKey == transform.name) RefreshCardState(animatePill: false);
     }
 
-    // learning B: «Учится · N/20» ↔ «Авто» follows the server's verdict, which arrives with Get Usage and no other card event.
+    // The learning percent arrives with Get Usage and no other card event: on screen, the fill grows to it and the caption follows.
     private void HandleUsageChanged()
     {
-        if (cardStateReady) RefreshCardState(animatePill: false);
+        if (cardStateReady) RefreshCardState(animatePill: true);
     }
 
     // Deferred one frame: Manager renames the instantiated card and writes its
@@ -530,13 +531,11 @@ public class Bot : MonoBehaviour
         string waRetired = ProfileRetirement.ActiveReason(transform.name, ChatChannel.WhatsApp, whatsappProfileId, claims);
         string tgRetired = ProfileRetirement.ActiveReason(transform.name, ChatChannel.Telegram, telegramProfileId, claims);
         showsConnect = BotCardModel.ShowConnectPill(whatsappProfileId, waRetired, telegramProfileId, tgRetired);
+        pillKind = BotCardModel.PillKind(showsConnect);
 
-        // learning B: the capsule's third face — «Учится · N/20» while «Авто» is off and the bot is locked (StateFor: the server
-        // listed it with a percent and says not ready, and its «Авто» never opened — the same verdict the gate decides by).
-        AutoReadinessEntry readiness = AutoReadinessStore.Current(transform.name);
-        learningMatches = AutoReadinessPolicy.Progress(readiness);
-        bool locked = AutoReadinessPolicy.StateFor(transform.name)?.Locked == true;
-        pillKind = BotCardModel.PillKind(showsConnect, AutoOn, locked);
+        // The learning percent (StateFor: the better of the phone's memory and the server's number; null = no data) is the
+        // capsule's fill and the caption under it — never a face of its own. «Подключить» outranks both.
+        int? percent = AutoReadinessPolicy.StateFor(transform.name)?.Percent;
 
         // The capsule is the chats-header «Авто» pill 1:1 — one painter, one
         // look, and since the unification one STORE (the bot's ReplyMode).
@@ -546,14 +545,15 @@ public class Bot : MonoBehaviour
         KillPillTweens();
         ApplyPillFace();
         if (showsConnect) PaintConnectPill();
-        else ReplyModeToggleBinder.PaintChip(AutoOn, autoPillRing, autoPillFill,
+        else ReplyModeToggleBinder.PaintChip(AutoOn, percent, autoPillRing, autoPillFill, autoPillProgress,
             autoPillLabel, autoPillDotRing, autoPillDotCore, animatePill);
+        ReplyModeToggleBinder.PaintCaption(learnCaption, showsConnect ? null : AutoChipLook.Caption(percent));
 
         RefreshSubline(waRetired, tgRetired);
     }
 
     // T9: the capsule's text, lamp and width for its current face. «Подключить» is measured with the label's own font and
-    // the capsule grows to fit it (BotCardModel.PillWidth); «Авто» gets its authored geometry back.
+    // the capsule grows to fit it (BotCardModel.PillWidth); «Авто» gets its authored geometry back — at every learning percent.
     private void ApplyPillFace()
     {
         if (autoPillLabel == null || autoPillButton == null) return;
@@ -566,28 +566,29 @@ public class Bot : MonoBehaviour
             authoredLabelWidth = labelRect.sizeDelta.x;
         }
 
-        string text = pillKind == BotPillKind.Connect ? RetiredChannelCopy.ConnectPill
-                    : pillKind == BotPillKind.Learning ? AutoReadinessCopy.PillText(learningMatches)
-                    : authoredPillText;
-        float labelWidth = pillKind == BotPillKind.Auto ? authoredLabelWidth : Mathf.Ceil(autoPillLabel.GetPreferredValues(text).x);
+        bool connect = pillKind == BotPillKind.Connect;
+        string text = connect ? RetiredChannelCopy.ConnectPill : authoredPillText;
+        float labelWidth = connect ? Mathf.Ceil(autoPillLabel.GetPreferredValues(text).x) : authoredLabelWidth;
         float pillWidth = BotCardModel.PillWidth(pillKind, labelWidth);
         if (autoPillLabel.text == text && Mathf.Approximately(labelRect.sizeDelta.x, labelWidth)
             && (rootLayout == null || Mathf.Approximately(rootLayout.preferredWidth, pillWidth))) return;
 
         autoPillLabel.text = text;
         labelRect.sizeDelta = new Vector2(labelWidth, labelRect.sizeDelta.y);
-        if (autoPillDotRing != null) autoPillDotRing.gameObject.SetActive(pillKind == BotPillKind.Auto);   // the lamp belongs to «Авто» alone
+        if (autoPillDotRing != null) autoPillDotRing.gameObject.SetActive(!connect);   // only «Подключить» hides the lamp
         if (rootLayout != null) rootLayout.minWidth = rootLayout.preferredWidth = pillWidth;
         if (autoPillButton.transform.parent is RectTransform row) LayoutRebuilder.MarkLayoutForRebuild(row);
     }
 
-    // «Подключить» is a call to action: the accent fill and its on-fill ink, the house's primary-button pair.
+    // «Подключить» is a call to action: the accent fill and its on-fill ink, the house's primary-button pair — and it
+    // outranks the learning fill (RefreshCardState hides the caption).
     private void PaintConnectPill()
     {
         Color accent = Theme.Color(ThemeRole.AccentFill);
         if (autoPillFill != null) autoPillFill.color = accent;
         if (autoPillRing != null) autoPillRing.color = accent;
         if (autoPillLabel != null) autoPillLabel.color = Theme.Color(ThemeRole.AccentOnFill);
+        if (autoPillProgress != null) autoPillProgress.Apply(0f, Color.clear, false);
     }
 
     private void KillPillTweens()

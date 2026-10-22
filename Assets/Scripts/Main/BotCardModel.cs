@@ -33,6 +33,12 @@ public enum BotSublineKind
 }
 
 /// <summary>
+/// The capsule's face on the bot card: the authored «Авто» or «Подключить» (F2). The learning percent is never a face — it
+/// is the fill behind «Авто» and the caption under it (AutoChipLook, ReplyModeToggleBinder.PaintChip).
+/// </summary>
+public enum BotPillKind { Auto, Connect }
+
+/// <summary>
 /// Pure decision seam for the C2 bot card (sketch 006): the channel brand
 /// icons and the blinking «Подключение…» subline. No MonoBehaviour so the
 /// matrix is EditMode-testable (AutoButtonModel precedent).
@@ -43,9 +49,6 @@ public enum BotSublineKind
 /// <see cref="AutoButtonModel"/> / AutoButtonModelTests. The old master
 /// activation key is dead; workflows stay active per the channel toggles alone.
 /// </summary>
-/// <summary>The capsule's face on the bot card: the authored «Авто», «Подключить» (F2) or «Учится · N/20» (learning B).</summary>
-public enum BotPillKind { Auto, Connect, Learning }
-
 public static class BotCardModel
 {
     public const string ConnectingText = "Подключение…";
@@ -147,18 +150,15 @@ public static class BotCardModel
         return !whatsappLive && !telegramLive;
     }
 
-    /// <summary>Learning B: which face the capsule wears. A retired channel outranks everything but «Подключение…»; the lock
-    /// paints only a bot in «Вместе» the server says is not ready — an enabled «Авто» is never relabelled.</summary>
-    public static BotPillKind PillKind(bool connect, bool autoOn, bool locked)
-    {
-        if (connect) return BotPillKind.Connect;
-        if (!autoOn && locked) return BotPillKind.Learning;
-        return BotPillKind.Auto;
-    }
+    /// <summary>
+    /// Which face the capsule wears: «Подключить» when no channel of the bot is live (<see cref="ShowConnectPill"/>), else
+    /// «Авто» — in either reply mode and at every learning percent.
+    /// </summary>
+    public static BotPillKind PillKind(bool connect) => connect ? BotPillKind.Connect : BotPillKind.Auto;
 
-    /// <summary>Measured width for every face but the authored «Авто» (the lamp is hidden, the label is alone in the pill).</summary>
+    /// <summary>The face's width: «Подключить» is measured (the lamp is hidden, the label is alone in the pill), «Авто» is authored.</summary>
     public static float PillWidth(BotPillKind kind, float labelPreferredWidth) =>
-        PillWidth(kind != BotPillKind.Auto, labelPreferredWidth);
+        PillWidth(kind == BotPillKind.Connect, labelPreferredWidth);
 
     /// <summary>
     /// The capsule's width: the authored 190 for «Авто»; for «Подключить» its measured label plus the padding on both

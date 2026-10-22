@@ -9,7 +9,8 @@ using UnityEngine.UI;
 /// sibling of the chats-list <see cref="ReplyModeToggleBinder"/> button, sharing
 /// its exact visual language via <see cref="ReplyModeToggleBinder.PaintChip"/>
 /// (2026-08 restyle): PositiveBg pill + filled lamp when the bot answers THIS
-/// client itself, outlined pill + hollow lamp when it only proposes replies.
+/// client itself, outlined pill + hollow lamp when it only proposes replies —
+/// with the bot's learning fill over it, but no caption (too small for one).
 ///
 /// View only, same contract as the sliding-knob era: it raises
 /// <see cref="OnToggled"/> with the DESIRED semi-auto state on tap;
@@ -33,6 +34,7 @@ public class SemiAutoToggle : MonoBehaviour
     [SerializeField] private TextMeshProUGUI label;
     [SerializeField] private Image dotRing;
     [SerializeField] private Image dotCore;
+    [SerializeField] private AutoChipProgress progress;   // the bot's learning fill over fillImage — the chat chip has no caption
 
     /// <summary>Fires the desired semi-auto state on tap (after the confirm gate).</summary>
     public event Action<bool> OnToggled;
@@ -60,12 +62,14 @@ public class SemiAutoToggle : MonoBehaviour
     private void OnEnable()
     {
         Theme.Changed += RepaintForTheme;
+        UsageStore.OnUsageChanged += HandleUsageChanged;
         ApplyVisuals(_on, animate: false);
     }
 
     private void OnDisable()
     {
         Theme.Changed -= RepaintForTheme;
+        UsageStore.OnUsageChanged -= HandleUsageChanged;
         KillColorTweens();
         transform.DOKill();
         transform.localScale = Vector3.one;
@@ -100,6 +104,9 @@ public class SemiAutoToggle : MonoBehaviour
     public void SetFallbackOnly(bool fallbackOnly) => _fallbackOnly = _on && fallbackOnly;
 
     private void RepaintForTheme() => ApplyVisuals(_on, animate: false);
+
+    // A fresh Get Usage — typically right after the owner's answers in this very chat: the fill grows on screen.
+    private void HandleUsageChanged() => ApplyVisuals(_on, animate: true);
 
     private void HandlePressed()
     {
@@ -137,10 +144,13 @@ public class SemiAutoToggle : MonoBehaviour
         });
     }
 
+    // The colour is this chat's mode; the fill is the bot's learning, one for all its chats (spec §4.4).
     private void ApplyVisuals(bool semi, bool animate)
     {
         KillColorTweens();
-        ReplyModeToggleBinder.PaintChip(!semi, ringImage, fillImage, label, dotRing, dotCore, animate);
+        string botKey = ChatManager.Instance != null ? ChatManager.Instance.CurrentBotId : null;
+        int? percent = AutoReadinessPolicy.StateFor(botKey)?.Percent;
+        ReplyModeToggleBinder.PaintChip(!semi, percent, ringImage, fillImage, progress, label, dotRing, dotCore, animate);
     }
 
     private void KillColorTweens()
