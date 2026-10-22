@@ -17,7 +17,9 @@ using UnityEngine.UI;
 /// ready-made gray sprites (never tinted).
 ///
 /// Supersedes BotCardFooterBuilder (deleted with the footer). Idempotent:
-/// parks BotDesc, deletes previous SubRow/AutoPill, rebuilds. Prefab-only —
+/// parks BotDesc, deletes previous SubRow/AutoPill, rebuilds — and hands the
+/// new capsule to AutoChipLearnLayerBuilder.WireBotCard, which re-adds its
+/// learning fill and caption. Prefab-only —
 /// cards are runtime-instantiated from Manager.BotPrefab, no scene involved.
 /// The hidden Status TMP (Manager's data channel) is reparented to the card
 /// root before its old StatusPill home is destroyed.
@@ -243,6 +245,9 @@ public static class BotCardAutoPillBuilder
         SetRef(so, "autoPillDotRing", dotRing);
         SetRef(so, "autoPillDotCore", dotCore);
         so.ApplyModifiedPropertiesWithoutUndo();
+
+        // The capsule was rebuilt wholesale — give it back its learning fill and «Учится · N %» caption.
+        AutoChipLearnLayerBuilder.WireBotCard(bot);
     }
 
     // ---- Shared helpers (ChatsTopBarRestyleBuilder patterns) -------------

@@ -27,6 +27,9 @@ using UnityEngine.UI;
 /// ReplyModeToggleBuilder, BotSwitcherSheetBuilder) — the scene contains
 /// hand-tuning they would clobber. This builder touches only what it owns,
 /// is idempotent (safe to re-run), and saves the scene + prefab itself.
+/// Every «Авто» capsule it rebuilds (AutoButton, the row's AutoChip, the
+/// conversation chip) is handed to AutoChipLearnLayerBuilder right after,
+/// which re-adds the learning fill (and the header's caption).
 /// </summary>
 public static class ChatsTopBarRestyleBuilder
 {
@@ -264,6 +267,9 @@ public static class ChatsTopBarRestyleBuilder
             SetRef(so, "cancelButton", popup.transform.Find("Content/CancelButton")?.GetComponent<Button>());
         }
         so.ApplyModifiedPropertiesWithoutUndo();
+
+        // The button was rebuilt wholesale — give it back its learning fill and «Учится · N %» caption.
+        AutoChipLearnLayerBuilder.WireHeader(binder);
     }
 
     // ---- Confirm popup (existing object, restyled in place) --------------
@@ -400,6 +406,9 @@ public static class ChatsTopBarRestyleBuilder
         SetRef(so, "dotRing", dotRing);
         SetRef(so, "dotCore", dotCore);
         so.ApplyModifiedPropertiesWithoutUndo();
+
+        // The chip was rebuilt wholesale — give it back its learning fill (no caption: the chat chip is too small).
+        AutoChipLearnLayerBuilder.WireConversationChip(toggle);
 
         // The chip confirms from the open conversation — the shared popup must
         // sit above MessagesPanel. Locate ChatsPanel via the channel switcher.
@@ -750,6 +759,9 @@ public static class ChatsTopBarRestyleBuilder
             SetRef(so, "chipDotCore", chip.DotCore);
             SetRef(so, "chipLabel", chip.Label);
             so.ApplyModifiedPropertiesWithoutUndo();
+
+            // The chip was rebuilt wholesale — give it back its learning fill (no caption: the row is too small).
+            AutoChipLearnLayerBuilder.WireSwitcherRow(view);
 
             PrefabUtility.SaveAsPrefabAsset(root, RowPrefabPath, out bool success);
             Debug.Log(success
