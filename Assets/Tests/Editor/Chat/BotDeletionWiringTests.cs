@@ -75,6 +75,22 @@ public class BotDeletionWiringTests
     }
 
     [Test]
+    public void LocalWipe_ClearsTheLearningMemory()
+    {
+        // Learning percent: the phone remembers each bot's best percent and "«Авто» has opened" as {bot}LearnPeak / {bot}LearnUnlocked.
+        // Per-bot keys like any other: a deleted bot must not leave them behind — a NEW bot that ever takes the slot would
+        // start at the old one's percent, and a stale unlock would keep its «Авто» open.
+        string local = MethodBody(Src("Scripts/Main/Bot.cs"), "public void DeleteBotLocally");
+        string code = Regex.Replace(local, @"//[^\r\n]*", "");   // a commented-out call is no call
+        Assert.IsTrue(code.Contains("LearnProgressStore.Clear(transform.name)"), "the local wipe must clear the learning memory");
+        string store = Src("Scripts/Billing/LearnProgressStore.cs");
+        foreach (var suffix in new[] { "LearnPeak", "LearnUnlocked" })
+            Assert.IsTrue(store.Contains($"\"{suffix}\""), $"learning-memory key suffix {suffix} must be declared in LearnProgressStore");
+        string clear = MethodBody(store, "public static void Clear");
+        Assert.IsTrue(clear.Contains("PeakSuffix") && clear.Contains("UnlockedSuffix"), "Clear deletes both declared keys");
+    }
+
+    [Test]
     public void ServerHalf_DeletesTheRetiredSetToo_ButUnlinksOnlyTheCurrentProfiles()
     {
         // F2 (T8): after the transfer a retired channel's ids live in {bot}{Ch}Retired* and the current ones are -1. V12

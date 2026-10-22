@@ -293,6 +293,7 @@ public class Bot : MonoBehaviour
             ProfileRetirement.Clear(transform.name);                                  // M4/F2: the retired set of both channels
             ChannelHealth.Clear(transform.name);                                      // A4: both channels' «Канал отключён» marks
             BotScheduleStore.Clear(transform.name);                                   // B2: the schedule's four keys
+            LearnProgressStore.Clear(transform.name);                                 // learning %: the best percent and «Авто уже открывался»
             BusinessTimeZone.Clear(transform.name);                                   // B2: {bot}TimeZone leaked on every per-bot delete
             foreach (var channel in new[] { ChatChannel.WhatsApp, ChatChannel.Telegram })          // F1: a failed Create to repeat
                 PlayerPrefs.DeleteKey(transform.name + CreateWorkflowResponse.PendingSuffix(channel));
@@ -530,10 +531,12 @@ public class Bot : MonoBehaviour
         string tgRetired = ProfileRetirement.ActiveReason(transform.name, ChatChannel.Telegram, telegramProfileId, claims);
         showsConnect = BotCardModel.ShowConnectPill(whatsappProfileId, waRetired, telegramProfileId, tgRetired);
 
-        // learning B: the capsule's third face — «Учится · N/20» while «Авто» is off and the server says the bot is not ready.
+        // learning B: the capsule's third face — «Учится · N/20» while «Авто» is off and the bot is locked (StateFor: the server
+        // listed it with a percent and says not ready, and its «Авто» never opened — the same verdict the gate decides by).
         AutoReadinessEntry readiness = AutoReadinessStore.Current(transform.name);
         learningMatches = AutoReadinessPolicy.Progress(readiness);
-        pillKind = BotCardModel.PillKind(showsConnect, AutoOn, AutoReadinessPolicy.Verdict(readiness) == AutoReadinessVerdict.Locked);
+        bool locked = AutoReadinessPolicy.StateFor(transform.name)?.Locked == true;
+        pillKind = BotCardModel.PillKind(showsConnect, AutoOn, locked);
 
         // The capsule is the chats-header «Авто» pill 1:1 — one painter, one
         // look, and since the unification one STORE (the bot's ReplyMode).

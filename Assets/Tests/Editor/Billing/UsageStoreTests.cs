@@ -2,11 +2,14 @@ using NUnit.Framework;
 
 public class UsageStoreTests
 {
+    // Apply feeds the phone's learning memory (PlayerPrefs), so a test that applies a row with a `progress` uses a test-only bot name.
+    private const string MemoryBot = "UsageStoreLearnBot";
+
     [SetUp]
-    public void Seams() => UsageStore.ResetSeamsForTests();
+    public void Seams() { UsageStore.ResetSeamsForTests(); LearnProgressStore.Clear(MemoryBot); }
 
     [TearDown]
-    public void Reset() => UsageStore.ResetSeamsForTests();
+    public void Reset() { UsageStore.ResetSeamsForTests(); LearnProgressStore.Clear(MemoryBot); }
 
     private const string ValidJson =
         "{\"success\":true,\"plan\":\"business\",\"status\":\"active\",\"quota\":1000,\"used\":7," +
@@ -158,5 +161,62 @@ public class UsageStoreTests
         var without = UsageStore.Parse(ValidJson);
         Assert.IsNull(without.readiness, "an old server never breaks the snapshot");
         Assert.AreEqual(1000, without.quota);
+    }
+
+    // --- learning percent ----------------------------------------------------------------
+
+    [Test] public void Parse_ReadsTheNewReadinessFields_AndAMissingProgressIsNull()
+    {
+        var snapshot = UsageStore.Parse(
+            "{\"success\":true,\"plan\":\"trial\",\"readiness\":[" +
+            "{\"botKey\":\"Bot0\",\"matches\":9,\"total\":14,\"chats\":2,\"days\":1,\"ready\":false," +
+            "\"bestMatches\":11,\"progress\":69,\"unlockAt\":70,\"capped\":true,\"needChats\":2,\"needDays\":1}," +
+            "{\"botKey\":\"Bot1\",\"matches\":12,\"total\":15,\"chats\":3,\"days\":2,\"ready\":true}," +   // an older server's row: none of the new fields
+            "{\"botKey\":\"Bot2\",\"ready\":false,\"bestMatches\":0,\"progress\":0,\"unlockAt\":70,\"capped\":false,\"needChats\":3,\"needDays\":2}," +
+            "{\"botKey\":\"Bot3\",\"ready\":false,\"progress\":null}]}");
+
+        var full = snapshot.readiness[0];
+        Assert.AreEqual(11, full.bestMatches);
+        Assert.AreEqual(69, full.progress);
+        Assert.AreEqual(70, full.unlockAt);
+        Assert.IsTrue(full.capped);
+        Assert.AreEqual(2, full.needChats);
+        Assert.AreEqual(1, full.needDays);
+        Assert.AreEqual(9, full.matches, "the current-window fields still parse beside the new ones");
+
+        var older = snapshot.readiness[1];
+        Assert.IsNull(older.progress, "an absent progress is NULL — an older server — never 0");
+        Assert.AreEqual(0, older.bestMatches);
+        Assert.AreEqual(0, older.unlockAt);
+        Assert.IsFalse(older.capped);
+        Assert.AreEqual(0, older.needChats);
+        Assert.AreEqual(0, older.needDays);
+        Assert.IsTrue(older.ready, "the row's other fields survive");
+
+        var zero = snapshot.readiness[2];
+        Assert.IsTrue(zero.progress.HasValue, "a progress of 0 is a value the server sent");
+        Assert.AreEqual(0, zero.progress.Value);
+
+        Assert.IsNull(snapshot.readiness[3].progress, "an explicit null reads as null too");
+    }
+
+    [Test] public void Apply_AbsorbsTheLearningMemory_BeforeRaisingTheEvent()
+    {
+        int? peakInTheEvent = -1;
+        bool unlockedInTheEvent = false;
+        int fired = 0;
+        UsageStore.OnUsageChanged += () =>
+        {
+            fired++;
+            peakInTheEvent = LearnProgressStore.Peak(MemoryBot);
+            unlockedInTheEvent = LearnProgressStore.Unlocked(MemoryBot);
+        };
+
+        UsageStore.Apply(UsageStore.Parse(
+            "{\"success\":true,\"readiness\":[{\"botKey\":\"" + MemoryBot + "\",\"ready\":true,\"progress\":81,\"unlockAt\":70}]}"));
+
+        Assert.AreEqual(1, fired);
+        Assert.AreEqual(81, peakInTheEvent, "a subscriber reading the state inside the event must already see the new memory");
+        Assert.IsTrue(unlockedInTheEvent);
     }
 }

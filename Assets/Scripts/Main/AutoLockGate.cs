@@ -2,22 +2,23 @@ using System;
 using TMPro;
 
 /// <summary>
-/// Learning B: the ONE door to enabling «Авто» by the owner's hand. Open verdict → the ordinary path runs at once;
-/// Locked (the server listed the bot and says not ready) → the «Бот ещё учится» sheet, whose «Включить всё равно» runs
-/// the same path. Pinned by AutoLockWiringTests: the capsule, RequestEnableAuto (chats header + switcher row) and the
-/// per-chat toggle all call this before they commit; DisableAuto and ReconcileFromServer never do.
+/// Learning B: the ONE door to enabling «Авто» by the owner's hand. The verdict is <see cref="AutoReadinessPolicy.StateFor"/>'s:
+/// not Locked (no data, an older server, ready, or an «Авто» that opened once) → the ordinary path runs at once;
+/// Locked (the server listed the bot with a percent and says not ready) → the «ИИ-сотрудник ещё учится» sheet, whose
+/// «Включить всё равно» runs the same path. Pinned by AutoLockWiringTests: the capsule, RequestEnableAuto (chats header +
+/// switcher row) and the per-chat toggle all call this before they commit; DisableAuto and ReconcileFromServer never do.
 /// </summary>
 public static class AutoLockGate
 {
     public static void TryEnable(string botKey, TMP_FontAsset font, bool perChat, Action proceed)
     {
-        AutoReadinessEntry entry = AutoReadinessStore.Current(botKey);
-        if (AutoReadinessPolicy.Verdict(entry) == AutoReadinessVerdict.Open)
+        if (AutoReadinessPolicy.StateFor(botKey)?.Locked != true)
         {
             proceed?.Invoke();
             return;
         }
-        AutoLockSheet.Show(font, AutoReadinessPolicy.Progress(entry), perChat, proceed);
+        // The sheet still prints «N из 20» (the current window's matches); the percent version of the sheet replaces this call.
+        AutoLockSheet.Show(font, AutoReadinessPolicy.Progress(AutoReadinessStore.Current(botKey)), perChat, proceed);
     }
 
     /// <summary>

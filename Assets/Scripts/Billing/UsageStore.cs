@@ -35,9 +35,10 @@ public class UsageSnapshot
     public string interval;
 
     /// <summary>
-    /// Learning B (2026-10-14): per-bot readiness of «Авто» — the server's verdict over the last 20 owner sends with a shown
-    /// set (Get Usage `readiness`). Null on a payload from an older server; an empty list for a legacy (token-less) caller.
-    /// Read through <see cref="AutoReadinessStore.Current"/>, judged by <see cref="AutoReadinessPolicy"/>.
+    /// Learning B (2026-10-14): per-bot readiness of «Авто» (Get Usage `readiness`) — the server's verdict and, since the percent
+    /// (2026-10-22), its `progress` 0..100 over the bot's whole stored history of owner sends with a shown set.
+    /// Null on a payload from an older server; an empty list for a legacy (token-less) caller; a row from an older server has
+    /// no `progress`. Read through <see cref="AutoReadinessPolicy.StateFor"/> (rows: <see cref="AutoReadinessStore.Current"/>).
     /// </summary>
     public System.Collections.Generic.List<AutoReadinessEntry> readiness;
 }
@@ -87,13 +88,16 @@ public static class UsageStore
     }
 
     /// <summary>
-    /// Stores a freshly parsed snapshot as <see cref="Current"/> and notifies subscribers.
+    /// Stores a freshly parsed snapshot as <see cref="Current"/>, folds its learning rows into the phone's memory
+    /// (<see cref="LearnProgressStore.Absorb"/>) and notifies subscribers — in that order, so a subscriber that reads
+    /// <see cref="AutoReadinessPolicy.StateFor"/> inside the event already sees the new peak and unlock.
     /// No-op on null (a failed/garbage parse must never clear an already-cached snapshot).
     /// </summary>
     public static void Apply(UsageSnapshot snapshot)
     {
         if (snapshot == null) return;
         Current = snapshot;
+        LearnProgressStore.Absorb(snapshot);
         OnUsageChanged?.Invoke();
     }
 }
