@@ -598,3 +598,25 @@ e2e-learning 12/12, красный контроль на прод-ref падае
 "a69502e1-0b21-4ff9-882a-b343699ecb85"}` или `deploy-canonical.py --only jtbssfzXbOxwTK4k` из `1e446cb4`. **Дальше:** через 2–3 недели
 после выпуска сборки — `report-learning.py --prod` (калибровка `TARGET_MATCHES`/`UNLOCK_PERCENT`, выкладка одного Get Usage).
 Тексты 21.10 — по отдельному «да». Push `main` — по команде владельца.
+
+## Развёртывание 2026-10-23 (2) — тексты 21.10 «ИИ-сотрудник» + сайт (прод, по явному «да» владельца)
+
+«Да» владельца 2026-10-23: «да, и потом пуш» — ответ на предложение выложить серверные тексты 21.10 и сайт. Обе команды
+выкладки владелец запустил сам из своего терминала: фильтр безопасности режима auto запретил агенту production deploy
+(и `deploy-canonical.py --apply`, и `deploy.sh`). Канон — `main` `007ca164`: оба workflow не менялись с `f80b0f02`, сайт и
+юридические страницы — с `e9dd4d24`. Словарь переименования — `docs/design/2026-10-21-naming-sotrudnik-vybrat.md`.
+Миграций нет, шаблоны не менялись — `update-clones.py` не нужен.
+
+| Шаг | Результат | Доказательство |
+|---|---|---|
+| снимок «до» | канон 30, клонов 0; DIFF ×2 — ровно тексты 21.10: Channel Watch live = published `e907de5eae43` (канон `dd08325d3263`), Dashboard Outcomes `b806209a2090` (канон `5f4cd7fb634d`) — то есть прод = исходная точка переименования; остальные 28 OK | `docs/audits/2026-10-23-prod-before-naming.json` |
+| dry-run | `deploy-canonical.py --base https://n8n.choosereply.com --only crChannelWatch001 --only 2htWSV5IHO8E2CgB` → would_update 2, nodes 16 → 16 у обоих; точки отката — activeVersionId `654d19fe-daf7-4251-a76b-aaa47f5aaf1c` (Channel Watch), `45d2d314-6bf5-4cde-96c7-7d07e7116c01` (Dashboard Outcomes) | `docs/audits/2026-10-23-deploy-rollback-pointers.txt` |
+| apply (владелец) | `--apply --yes` → у обоих «published by the PUT … no publish call, no deactivate window», «read-back: ok»; updated 2, failed 0 | вывод инструмента |
+| снимок «после» | `verify-deployed.py` exit 0: канон 30 (diff 0), клонов 0; оба workflow — stored = published = канон | `docs/audits/2026-10-23-prod-after-naming.json` |
+| сайт (владелец) | `tools/deploy.sh --go`: preflight — блок choosereply.com в Caddyfile идентичен, обе конфигурации валидны; бэкап `site.bak-20261023-144123`; 53 файла ассетов (`assets/cc7bd9a97b`) + 9 корневых (index, privacy, terms, og.png …), Caddy перезагружен; smoke — `/`, `/privacy.html`, `/terms.html` 200, `/review/…/` и видео App Review, n8n `/healthz` — как до выкладки | вывод `deploy.sh` |
+| живая проверка | `index.html` с прода = локальный `dist` побайтно; H1 «ИИ предлагает. Вы выбираете.», title «Choose Reply — ИИ-сотрудник для WhatsApp и Telegram», og:title «Choose Reply — ИИ предлагает, вы выбираете»; «ИИ-сотрудник» на главной 36 / политика 7 / условия 3, голого «сотрудник», «бот» и «Вместе» нет | curl |
+
+Что изменилось для владельцев: сообщение Channel Watch — «Choose Reply: {WhatsApp|Telegram} отключился — ИИ-сотрудник не отвечает.
+Переподключите канал в приложении.»; резюме «Сводки» называют ассистента ИИ-сотрудником (старые резюме обновятся, когда чат
+классифицируется заново). Клиентская часть переименования — в новой сборке. **Откат:** `POST /workflows/<id>/activate
+{"versionId": …}` по указателям выше; сайт — командой отката `deploy.sh` из `docs/audits/2026-10-23-deploy-rollback-pointers.txt`.

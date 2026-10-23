@@ -3,3 +3,14 @@
 ~ jtbssfzXbOxwTK4k 'Get Usage' active=True nodes 8 → 8 (+0 -0)
     rollback pointer: versionId a69502e1-0b21-4ff9-882a-b343699ecb85 (activeVersionId a69502e1-0b21-4ff9-882a-b343699ecb85)
 jtbssfzXbOxwTK4k Get Usage: previous activeVersionId a69502e1-0b21-4ff9-882a-b343699ecb85 = the 2026-10-14 B version (graph 254f28474ad8, rule 10 of 20, no `progress`) (rollback: POST /workflows/jtbssfzXbOxwTK4k/activate {"versionId": "a69502e1-0b21-4ff9-882a-b343699ecb85"} or deploy-canonical.py --only jtbssfzXbOxwTK4k from 1e446cb4)
+
+# Тексты 21.10 «ИИ-сотрудник» — Channel Watch + Dashboard Outcomes (2026-10-23, owner «да, и потом пуш»; apply run by the owner)
+# Dry-run before the apply (deploy-canonical.py --base https://n8n.choosereply.com --only crChannelWatch001 --only 2htWSV5IHO8E2CgB):
+~ 2htWSV5IHO8E2CgB 'Dashboard Outcomes' active=True nodes 16 → 16 (+0 -0)
+    rollback pointer: versionId 45d2d314-6bf5-4cde-96c7-7d07e7116c01 (activeVersionId 45d2d314-6bf5-4cde-96c7-7d07e7116c01)
+~ crChannelWatch001 'Channel Watch' active=True nodes 16 → 16 (+0 -0)
+    rollback pointer: versionId 654d19fe-daf7-4251-a76b-aaa47f5aaf1c (activeVersionId 654d19fe-daf7-4251-a76b-aaa47f5aaf1c)
+2htWSV5IHO8E2CgB Dashboard Outcomes: previous graph b806209a2090 (rollback: POST /workflows/2htWSV5IHO8E2CgB/activate {"versionId": "45d2d314-6bf5-4cde-96c7-7d07e7116c01"})
+crChannelWatch001 Channel Watch: previous graph e907de5eae43 («… — бот не отвечает …») (rollback: POST /workflows/crChannelWatch001/activate {"versionId": "654d19fe-daf7-4251-a76b-aaa47f5aaf1c"})
+# Site choosereply.com (tools/deploy.sh --go, run by the owner, backup stamp 20261023-144123):
+ssh choosereply 'cd ~/choosereply && rsync -a --delete site.bak-20261023-144123/ site/ && cp Caddyfile.bak-20261023-144123 Caddyfile && docker compose exec -T caddy caddy validate --config /etc/caddy/Caddyfile && docker compose exec -T caddy caddy reload --config /etc/caddy/Caddyfile'
