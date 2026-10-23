@@ -573,3 +573,28 @@ published = stored. Ничего не менялось. 12b (первое жив
 **Дальше:** повтор запроса шага 10 после ближайшего тика Profile Lifecycle Sweep (прежние — 01:00 / 07:00 UTC, следующий ≈ 13:00
 UTC) и на следующее утро; новая клиентская сборка (A + B) → `inspect-artifact.sh` → `device-pass.md` → наблюдения на живом боте
 (шаг 12 пакета, по отдельному «да»). Push `main` — контроллер.
+
+## Развёртывание 2026-10-23 — обучение в процентах: Get Usage (прод, по явному «да» владельца)
+
+«Да» владельца 2026-10-23: «Да, выкладывай новый Get Usage на прод (только его, без текстов 21.10)». Спека
+`docs/superpowers/specs/2026-10-22-learning-progress-percent-design.md`, план `docs/superpowers/plans/2026-10-23-learning-progress-percent.md`
+(Task 10 Step 3). Канон — `main` `bb0cde03` (Get Usage побайтно = отрепетированный в Task 10 на стенде с прод-ref `1e446cb4`:
+e2e-learning 12/12, красный контроль на прод-ref падает). Один workflow, миграций нет, `update-clones.py` не нужен. Тексты 21.10
+(Channel Watch, Dashboard Outcomes — «ИИ-сотрудник») по решению владельца НЕ выкладывались. `DEPLOY_START` 2026-10-23T08:17:30Z.
+
+| Шаг | Результат | Доказательство |
+|---|---|---|
+| снимок «до» | 08:15Z: канон 30, клонов 0, unknown 0; DIFF ×3 — ровно ожидаемые: Get Usage (stored = published `254f28474ad8`, канон `46bb12615cdb`), Channel Watch, Dashboard Outcomes (тексты 21.10); остальные 27 OK | `docs/audits/2026-10-23-prod-before-percent.json` |
+| колонки A | `information_schema.columns` (`origin_set`, `origin_top1`) → `200 {"n":"2"}` (harness `sql-oneoff`, временный workflow удалён через 35 с) | `sql-oneoff` |
+| dry-run | `deploy-canonical.py --base https://n8n.choosereply.com --only jtbssfzXbOxwTK4k` → would_update 1, nodes 8 → 8; точка отката — activeVersionId `a69502e1-0b21-4ff9-882a-b343699ecb85` (версия B от 14.10) | `docs/audits/2026-10-23-deploy-rollback-pointers.txt` |
+| apply | `--apply --yes` → «published by the PUT … no publish call, no deactivate window», «read-back: ok», updated 1, failed 0; новый versionId = activeVersionId `0065138d-390c-455b-93ab-b6dc4a8b51cb` | вывод инструмента, API |
+| снимок «после» | канон 30, клонов 0, unknown 0; Get Usage OK — stored = published = канон `46bb12615cdb`, active; DIFF ×2 — только тексты 21.10 (Channel Watch `e907de5eae43` ≠ `dd08325d3263`, Dashboard Outcomes `b806209a2090` ≠ `5f4cd7fb634d`), как и решено; exit 2 только из-за них | `docs/audits/2026-10-23-prod-after-percent.json` |
+| smoke | GET → `[404]` «Did you mean to make a POST request?»; legacy POST без токена (compat-окно) `{"appUserId":"smoke-percent-2026-10-23"}` → `[200]` 2,65 с `{"success":true,"plan":"trial",…,"readiness":[]}` — новый SQL выполняется на прод-Postgres | curl |
+| наблюдение | с `DEPLOY_START`: выполнений Get Usage 1 (наш smoke, success), ошибочных — `[]` у Get Usage и `[]` по всему инстансу; лог n8n с 08:14Z — одна строка (наш GET-пробник), ни одной error / insights | API, `docker compose logs` |
+
+Сразу ничего видимого не меняется: нынешние сборки поля `bestMatches/progress/unlockAt/capped/needChats/needDays` не читают
+(одобренная 1.0 (4) — legacy, получает `readiness: []`; клиент B не выпускался). Проценты покажет новая сборка — её device pass §4а в
+`docs/audits/2026-10-19-device-pass-new-build.md`. **Откат:** `POST /workflows/jtbssfzXbOxwTK4k/activate {"versionId":
+"a69502e1-0b21-4ff9-882a-b343699ecb85"}` или `deploy-canonical.py --only jtbssfzXbOxwTK4k` из `1e446cb4`. **Дальше:** через 2–3 недели
+после выпуска сборки — `report-learning.py --prod` (калибровка `TARGET_MATCHES`/`UNLOCK_PERCENT`, выкладка одного Get Usage).
+Тексты 21.10 — по отдельному «да». Push `main` — по команде владельца.

@@ -1,0 +1,5 @@
+# Learning «обучение в процентах» — Get Usage (2026-10-23, owner «Да, выкладывай новый Get Usage на прод (только его, без текстов 21.10)»)
+# Dry-run before the apply (deploy-canonical.py --base https://n8n.choosereply.com --only jtbssfzXbOxwTK4k), 2026-10-23 ~08:17Z:
+~ jtbssfzXbOxwTK4k 'Get Usage' active=True nodes 8 → 8 (+0 -0)
+    rollback pointer: versionId a69502e1-0b21-4ff9-882a-b343699ecb85 (activeVersionId a69502e1-0b21-4ff9-882a-b343699ecb85)
+jtbssfzXbOxwTK4k Get Usage: previous activeVersionId a69502e1-0b21-4ff9-882a-b343699ecb85 = the 2026-10-14 B version (graph 254f28474ad8, rule 10 of 20, no `progress`) (rollback: POST /workflows/jtbssfzXbOxwTK4k/activate {"versionId": "a69502e1-0b21-4ff9-882a-b343699ecb85"} or deploy-canonical.py --only jtbssfzXbOxwTK4k from 1e446cb4)
