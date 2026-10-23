@@ -5,7 +5,7 @@ using NUnit.Framework;
 /// Pins <see cref="UsageClient.ShouldStart"/> — the whole decision the usage fetch makes
 /// before it touches the network (Task 14c carry-over).
 ///
-/// The in-flight arm collapses a burst of the five trigger sites to one request. The
+/// The in-flight arm collapses a burst of the trigger sites (listed in UsageClient) to one request. The
 /// staleness arm is the fallback for the case the routine's own try/finally cannot reach:
 /// an iterator that is never disposed strands the flag, and without an age check that would
 /// freeze the usage strip and the «Подписка» meters for the rest of the session.

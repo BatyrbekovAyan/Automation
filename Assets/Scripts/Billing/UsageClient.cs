@@ -22,9 +22,15 @@ using UnityEngine.Networking;
 /// </summary>
 public static class UsageClient
 {
-    // There are now five trigger sites (boot, the Bots tab becoming visible, the «Боты»
-    // billing strip, the «Подписка» page opening, and after a top-up/restore), several of
-    // which can land in the same frame — a tab switch that opens the page, or a fast
+    // There are now several trigger sites: boot (Manager.PreloadSecretsThenInitBilling), the
+    // Bots tab becoming visible (BotsPage.OnEnable), the «Подписка» page opening and its
+    // top-up/restore settle (ProfileSubPages.Subscription), a plan change or restore at the
+    // paywall (PaywallController.RefetchUsage — the «Боты» strip shows the new quota), a
+    // reinstall identity heal that moved something (Manager.VerifyIdentityRoutine), the wait
+    // for the server's free-channel count before a reconnect (BotSettings.Reconnect), and
+    // LearnRefresh — 5 s after an owner send that carried a shown suggestion set, at most
+    // once a minute, because the «Авто» learning percent rides this snapshot. Several of
+    // them can land in the same frame — a tab switch that opens the page, or a fast
     // double-tap. Overlapping fetches were harmless (the read is idempotent and Apply just
     // replaces the snapshot) but they doubled the request load and let an older response
     // land last, so the guard collapses a burst to one in-flight read.
