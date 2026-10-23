@@ -2347,6 +2347,10 @@ private IEnumerator PostTextMessageRoutine(
 
         Outbox.RemoveAt(sendCacheRoot, chatId, tempId);
         SuggestionPickStats.RecordFromOrigin(origin?.botId ?? CurrentBotId, origin);   // learning A: a card sent (as is or edited) is the preference, not the tap; credited to the bot it was sent on
+        // Learning percent (spec 2026-10-22 §4.1): a send that carried a shown set is new data for the «Авто» progress, so
+        // Get Usage is re-read shortly after (LearnRefresh: ~5 s later, at most once a minute). A retry from the outbox
+        // arrives here with the origin saved at its first attempt.
+        if (origin != null && origin.kind != SendOriginKind.None) LearnRefresh.AfterLearningSend();
         // A false adopt here means the poll's echo already reconciled the bubble (it is the
         // newest entry and never evicted in-session) and may have left it at ✓✓ — announce the
         // fresher of the two, never a hard-coded Sent that would step it back for a poll interval.
