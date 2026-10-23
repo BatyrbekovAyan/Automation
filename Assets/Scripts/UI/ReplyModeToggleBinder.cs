@@ -195,8 +195,11 @@ public class ReplyModeToggleBinder : MonoBehaviour
     /// A hollow lamp's core is the colour actually under it — the fill's where the fill covers the lamp's centre, else the
     /// face's. A repaint that LOWERS the fill (ON at 99 % → trained, where the fill goes and the face takes its colour) sets
     /// every colour at once: a cross-fade would start the face from the lighter track under a fill that is already gone, a
-    /// flash. A growth and an ordinary mode change cross-fade as before. Every ref is null-guarded, the layer too (through
-    /// Unity's ==: an unassigned or destroyed component is not C# null) — a capsule without it paints as it always did.
+    /// flash. So does the capsule's FIRST paint with a percent — the first snapshot over «данных нет», the «Авто» face back from
+    /// «Подключить» (<see cref="AutoChipProgress.IsFirstPercent"/>): spec §4.3 «при первой отрисовке — сразу», only a percent
+    /// grown from one this capsule already showed animates. A growth and an ordinary mode change cross-fade as before. Every ref
+    /// is null-guarded, the layer too (through Unity's ==: an unassigned or destroyed component is not C# null) — a capsule
+    /// without it paints as it always did.
     /// </summary>
     public static void PaintChip(bool on, int? percent, Image ring, Image fill, AutoChipProgress progress,
         TextMeshProUGUI chipLabel, Image lampRing, Image lampCore, bool animate, float duration = AnimDuration)
@@ -209,14 +212,15 @@ public class ReplyModeToggleBinder : MonoBehaviour
         Color lampCoreColor = paint.LampSolid ? lampColor
             : hasLayer && lampCore != null && progress.Covers(lampCore.rectTransform, paint.FillFraction) ? fillColor
             : faceColor;
-        bool tween = animate && !(hasLayer && paint.FillFraction < progress.AppliedFraction);
+        bool atOnce = hasLayer && (progress.IsFirstPercent(percent.HasValue) || paint.FillFraction < progress.AppliedFraction);
+        bool tween = animate && !atOnce;
 
         PaintPart(fill, faceColor, tween, duration);
         PaintPart(ring, Theme.Color(paint.Ring), tween, duration);
         PaintPart(chipLabel, Theme.Color(paint.Ink), tween, duration);
         PaintPart(lampRing, lampColor, tween, duration);
         PaintPart(lampCore, lampCoreColor, tween, duration);
-        if (hasLayer) progress.Apply(paint.FillFraction, fillColor, tween);
+        if (hasLayer) progress.Apply(paint.FillFraction, fillColor, tween, percent.HasValue);
     }
 
     /// <summary>

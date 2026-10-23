@@ -29,7 +29,8 @@ public static class UsageClient
     // reinstall identity heal that moved something (Manager.VerifyIdentityRoutine), the wait
     // for the server's free-channel count before a reconnect (BotSettings.Reconnect), and
     // LearnRefresh — 5 s after an owner send that carried a shown suggestion set, at most
-    // once a minute, because the «Авто» learning percent rides this snapshot. Several of
+    // once a minute (the minute's later sends get one trailing read right after it ends),
+    // because the «Авто» learning percent rides this snapshot. Several of
     // them can land in the same frame — a tab switch that opens the page, or a fast
     // double-tap. Overlapping fetches were harmless (the read is idempotent and Apply just
     // replaces the snapshot) but they doubled the request load and let an older response

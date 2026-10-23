@@ -13,7 +13,8 @@ using UnityEngine.UI;
 /// position is set by hand.
 ///
 /// DOTween does not tick in EditMode: a started tween leaves its target untouched until DOTween.CompleteAll. That is how
-/// "animated" and "set at once" are told apart below.
+/// "animated" and "set at once" are told apart below. A growth tweens only from a percent the capsule already showed — its
+/// first paint with one lands at once (spec §4.3) — so a test that wants a growth first paints a percent.
 /// </summary>
 public class AutoChipProgressTests
 {
@@ -59,7 +60,7 @@ public class AutoChipProgressTests
     {
         var colour = new Color(0.15f, 0.21f, 0.37f, 1f);
 
-        _progress.Apply(0.45f, colour, false);
+        _progress.Apply(0.45f, colour, false, hasPercent: true);
 
         Assert.AreEqual(0.45f * InnerWidth, _clip.sizeDelta.x, WidthTolerance, "the clip is the fraction of the inner width");
         Assert.AreEqual(new Vector2(InnerWidth, InnerHeight), _learnFill.rectTransform.sizeDelta,
@@ -71,9 +72,9 @@ public class AutoChipProgressTests
     [Test]
     public void Apply_Zero_HidesTheFill()
     {
-        _progress.Apply(0.6f, Color.white, false);
+        _progress.Apply(0.6f, Color.white, false, hasPercent: true);
 
-        _progress.Apply(0f, Color.white, false);
+        _progress.Apply(0f, Color.white, false, hasPercent: true);
 
         Assert.AreEqual(0f, _clip.sizeDelta.x, "a zero-width clip shows nothing");
         Assert.AreEqual(0f, _progress.AppliedFraction);
@@ -82,10 +83,10 @@ public class AutoChipProgressTests
     [Test]
     public void Apply_ClampsTheFraction_ToTheCapsule()
     {
-        _progress.Apply(1.5f, Color.white, false);
+        _progress.Apply(1.5f, Color.white, false, hasPercent: true);
         Assert.AreEqual(InnerWidth, _clip.sizeDelta.x, WidthTolerance, "never wider than the capsule");
 
-        _progress.Apply(-0.2f, Color.white, false);
+        _progress.Apply(-0.2f, Color.white, false, hasPercent: true);
         Assert.AreEqual(0f, _clip.sizeDelta.x, "never a negative width");
     }
 
@@ -93,24 +94,25 @@ public class AutoChipProgressTests
     public void Apply_AGrowthOnScreen_Tweens_ALowerFillLandsAtOnce()
     {
         LogAssert.ignoreFailingMessages = true;   // DOTween's first edit-mode use can log; not the behaviour under test
-        _progress.Apply(0.2f, Color.white, false);
+        _progress.Apply(0.2f, Color.white, false, hasPercent: true);   // a percent already shown: only that one grows smoothly
 
-        _progress.Apply(0.6f, Color.white, true);
+        _progress.Apply(0.6f, Color.white, true, hasPercent: true);
         Assert.AreEqual(0.2f * InnerWidth, _clip.sizeDelta.x, WidthTolerance, "a growth on screen is a tween, not a jump");
         Assert.AreEqual(0.6f, _progress.AppliedFraction, "the target is known at once");
         DOTween.CompleteAll();
         Assert.AreEqual(0.6f * InnerWidth, _clip.sizeDelta.x, WidthTolerance, "…and the tween lands on it");
 
-        _progress.Apply(0.3f, Color.white, true);
+        _progress.Apply(0.3f, Color.white, true, hasPercent: true);
         Assert.AreEqual(0.3f * InnerWidth, _clip.sizeDelta.x, WidthTolerance, "a lower fill is set at once, even when asked to animate");
     }
 
     [Test]
     public void Apply_OnAHiddenCapsule_LandsAtOnce()
     {
+        _progress.Apply(0.1f, Color.white, false, hasPercent: true);   // shown on screen first: on a visible capsule 0.5 would tween
         _pill.SetActive(false);
 
-        _progress.Apply(0.5f, Color.white, true);
+        _progress.Apply(0.5f, Color.white, true, hasPercent: true);
 
         Assert.AreEqual(0.5f * InnerWidth, _clip.sizeDelta.x, WidthTolerance,
             "nobody sees a hidden capsule grow — it shows the right fill the moment it appears");
@@ -207,7 +209,81 @@ public class AutoChipProgressTests
         AssertColour(ThemeRole.Surface, _lampCore.color, "no live layer: nothing but the face under a hollow lamp");
     }
 
+    // -------------------------------------------------- the first paint with a percent (spec §4.3 «при первой отрисовке — сразу»)
+
+    [Test]
+    public void PaintChip_TheFirstPercent_LandsAtOnce_EvenWhenAskedToAnimate()
+    {
+        LogAssert.ignoreFailingMessages = true;
+        PaintOff(null, animate: false);   // «данных нет»: the capsule has never shown a percent
+
+        PaintOff(45, animate: true);      // the first snapshot lands on a capsule that is on screen
+
+        Assert.AreEqual(0.45f * InnerWidth, _clip.sizeDelta.x, WidthTolerance, "a first paint: the fill stands at 45 % at once, no sweep 0 → 45");
+        AssertColour(ThemeRole.LearnFillOff, _learnFill.color, "…in its colour at once");
+        AssertNothingTweens("the first paint with a percent");
+        Assert.IsTrue(_progress.ShowsPercent, "from now on the capsule shows a percent");
+    }
+
+    [Test]
+    public void PaintChip_APercentTheCapsuleAlreadyShowed_StillGrowsSmoothly()
+    {
+        LogAssert.ignoreFailingMessages = true;
+        PaintOff(null, animate: false);
+        PaintOff(45, animate: true);
+
+        PaintOff(56, animate: true);
+
+        Assert.AreEqual(0.45f * InnerWidth, _clip.sizeDelta.x, WidthTolerance, "45 → 56 % on screen is a tween, not a jump");
+        Assert.IsTrue(DOTween.IsTweening(_clip), "the growth runs");
+        DOTween.CompleteAll();
+        Assert.AreEqual(0.56f * InnerWidth, _clip.sizeDelta.x, WidthTolerance, "…and lands on 56 %");
+    }
+
+    [Test]
+    public void PaintChip_AfterTheConnectClear_TheAutoFaceIsAFirstPaintAgain()
+    {
+        LogAssert.ignoreFailingMessages = true;
+        PaintOff(null, animate: false);
+        PaintOff(45, animate: true);
+        PaintOff(56, animate: true);
+        DOTween.CompleteAll();
+
+        _progress.Clear();   // Bot.PaintConnectPill: «Подключить» outranks the fill
+        Assert.AreEqual(0f, _clip.sizeDelta.x, "«Подключить» shows no fill");
+        Assert.IsFalse(_progress.ShowsPercent, "…and the capsule forgets its percent");
+
+        PaintOff(56, animate: true);   // the «Авто» face is back
+
+        Assert.AreEqual(0.56f * InnerWidth, _clip.sizeDelta.x, WidthTolerance, "set at once — no sweep 0 → 56 % on the capsule's return");
+        AssertNothingTweens("the «Авто» face back from «Подключить»");
+    }
+
+    [Test]
+    public void PaintChip_AfterANoDataPaint_ThePercentIsAFirstPaintAgain()
+    {
+        LogAssert.ignoreFailingMessages = true;
+        PaintOff(45, animate: false);
+        PaintOff(null, animate: false);   // «данных нет» (the chats header switched to a bot without learning data)
+        Assert.IsFalse(_progress.ShowsPercent, "a «данных нет» paint forgets the percent");
+
+        PaintOff(56, animate: true);
+
+        Assert.AreEqual(0.56f * InnerWidth, _clip.sizeDelta.x, WidthTolerance, "set at once");
+        AssertNothingTweens("the first percent after «данных нет»");
+    }
+
     // ------------------------------------------------------------------------------------------------ helpers
+
+    private void PaintOff(int? percent, bool animate) =>
+        ReplyModeToggleBinder.PaintChip(false, percent, _ring, _face, _progress, null, _lampRing, _lampCore, animate);
+
+    /// <summary>No part of the capsule — the layer or the face, ring and lamp the painter colours — has a tween running.</summary>
+    private void AssertNothingTweens(string what)
+    {
+        foreach (Object part in new Object[] { _clip, _learnFill, _face, _ring, _lampRing, _lampCore })
+            Assert.IsFalse(DOTween.IsTweening(part), $"{what} is set at once, yet {part.name} tweens");
+    }
 
     private static void AssertColour(ThemeRole role, Color actual, string message = null)
     {

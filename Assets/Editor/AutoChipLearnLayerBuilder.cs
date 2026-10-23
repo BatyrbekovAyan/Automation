@@ -38,6 +38,9 @@ using Object = UnityEngine.Object;
 /// </summary>
 public static class AutoChipLearnLayerBuilder
 {
+    // CaptionGap is the caption's anchoredPosition (0, +2) with a TOP pivot on the capsule root's bottom edge, so the caption box
+    // starts 2u INSIDE that edge (the root is the 96u hit area: 10u under the visual pill, so the box starts 8u under the pill).
+    // AutoChipLearnLayerPremiseTests adds the gap downward instead — it over-estimates by 4u, which only makes its check conservative.
     public const float CaptionGap = 2f, CaptionFontSize = 28f;
     public static readonly Vector2 CaptionSize = new Vector2(220f, 34f);
 
@@ -307,6 +310,7 @@ public static class AutoChipLearnLayerBuilder
             modified = true;
         }
         var caption = rect.GetComponent<TextMeshProUGUI>();
+        // Top pivot at the root's bottom edge, raised by CaptionGap: the box starts CaptionGap INSIDE that edge (see CaptionGap).
         modified |= SetRect(rect, BottomCentre, BottomCentre, TopCentre, new Vector2(0f, CaptionGap), CaptionSize);
         modified |= SetCaptionText(caption, font);
         modified |= BindTheme(rect.GetComponent<ThemedColor>(), ThemeRole.InkTertiary, caption);

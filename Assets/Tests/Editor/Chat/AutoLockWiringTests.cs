@@ -35,17 +35,25 @@ public class AutoLockWiringTests
         Assert.IsFalse(MethodBody("Scripts/UI/ReplyModeToggleBinder.cs", "ReconcileFromServer").Contains("AutoLockGate"), "a server-side truth is not the owner's tap");
     }
 
+    /// <summary>
+    /// The percent: AutoReadinessPolicy.StateFor is the ONE reader of the readiness rows — the gate (and through it the sheet)
+    /// and the four «Авто» capsules all ask it, so none of them may read AutoReadinessStore.Current itself.
+    /// </summary>
     [Test]
-    public void OnlyTheGateAndTheCard_ReadTheReadinessStore()
+    public void OnlyStateFor_ReadsTheReadinessStore()
     {
         var users = new List<string>();
         foreach (string path in Directory.GetFiles(Path.Combine(Application.dataPath, "Scripts"), "*.cs", SearchOption.AllDirectories))
         {
             string file = Path.GetFileName(path);
-            if (file == "AutoLockGate.cs" || file == "Bot.cs" || file == "AutoReadiness.cs") continue;
+            if (file == "AutoReadiness.cs") continue;
             if (File.ReadAllText(path).Contains("AutoReadinessStore.Current(")) users.Add(file);
         }
-        Assert.IsEmpty(users, "only the gate (the lock) and the card (its face) read readiness: " + string.Join(", ", users));
+        Assert.IsEmpty(users, "only AutoReadinessPolicy.StateFor reads readiness — the gate and the capsules ask it: " + string.Join(", ", users));
+
+        string home = File.ReadAllText(Path.Combine(Application.dataPath, "Scripts/Billing/AutoReadiness.cs"));
+        Assert.AreEqual(1, Regex.Matches(home, @"AutoReadinessStore\.Current\(").Count, "…and within its own file it reads the store once");
+        StringAssert.Contains("AutoReadinessStore.Current(", MethodBody("Scripts/Billing/AutoReadiness.cs", "StateFor"), "…inside StateFor");
     }
 
     /// <summary>
@@ -95,7 +103,7 @@ public class AutoLockWiringTests
     private static (int open, int close) MethodRange(string source, string method, string relativePath)
     {
         var decl = Regex.Match(source,
-            @"^[ \t]*(?:(?:public|private|internal|protected|static)[ \t]+)+(?!return\b)[\w<>.]+[ \t]+" + Regex.Escape(method) + @"[ \t]*\(",
+            @"^[ \t]*(?:(?:public|private|internal|protected|static)[ \t]+)+(?!return\b)[\w<>.?]+[ \t]+" + Regex.Escape(method) + @"[ \t]*\(",
             RegexOptions.Multiline);
         Assert.IsTrue(decl.Success, $"{method} not found in {relativePath}");
         int open = source.IndexOf('{', decl.Index);

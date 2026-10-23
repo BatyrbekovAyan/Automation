@@ -34,7 +34,10 @@ public class AutoChipLearnLayerPremiseTests
     private const float FreeUnderCardPill = 78f;
     // The header: 64u between the pill and the channel well — the caption must stay clear of the well (spec §4.3).
     private const float FreeAboveChannelWell = 64f;
-    // The caption hangs off the 96u hit area, whose bottom edge sits (96 − 76) / 2 = 10u under the visual pill.
+    // The caption hangs off the 96u hit area, whose bottom edge sits (96 − 76) / 2 = 10u under the visual pill. The two space
+    // checks below add CaptionGap DOWNWARD (10 + 2 + 34); the builder applies it as anchoredPosition (0, +2) with a top pivot,
+    // so the caption box really starts 2u INSIDE the root's bottom edge (8u under the pill, not 12u). The sum over-estimates
+    // the caption's reach by 4u — conservative, never a false pass.
     private const float HitAreaUnderPill = 10f;
     // Every capsule's face (Fill) is its Pill inset by the 3u ring.
     private const float RingInset = 3f;

@@ -12,9 +12,13 @@ using UnityEngine.UI;
 ///         the percent: under the bot-switcher sheet's stencil Mask Nobi's corners lag behind a resizing image
 ///         (RoundedCornerMaskSync), which is also why the cut is a RectMask2D and never a stencil Mask.</item>
 /// </list>
-/// Painted only by ReplyModeToggleBinder.PaintChip, which hands it AutoChipLook's fraction and fill colour. A growth on a
-/// capsule that is on screen tweens; a lower fill, a hidden capsule and a plain repaint land at once. It sits on the capsule's
-/// Pill, so it also hears the capsule resize (the bot card's «Подключить» ↔ «Авто») and refits itself to the new inner width.
+/// Painted by ReplyModeToggleBinder.PaintChip, which hands it AutoChipLook's fraction and fill colour, and cleared directly by
+/// Bot.PaintConnectPill («Подключить» outranks the fill; <see cref="Clear"/>). A growth on a capsule that is on screen tweens —
+/// but only from a percent this capsule already showed: its first paint with a percent (the first snapshot over «данных нет»,
+/// the «Авто» face back from «Подключить») is a first paint and lands at once, spec §4.3 «при первой отрисовке — сразу»
+/// (<see cref="ShowsPercent"/>, <see cref="IsFirstPercent"/>). A lower fill, a hidden capsule and a plain repaint land at once
+/// too. It sits on the capsule's Pill, so it also hears the capsule resize (the bot card's «Подключить» ↔ «Авто») and refits
+/// itself to the new inner width.
 /// </summary>
 public class AutoChipProgress : MonoBehaviour
 {
@@ -34,17 +38,32 @@ public class AutoChipProgress : MonoBehaviour
     public float AppliedFraction { get; private set; }
 
     /// <summary>
-    /// Shows <paramref name="fraction"/> (0..1) of the capsule in <paramref name="color"/>; 0 is a zero-width clip that shows
-    /// nothing. On an active capsule <paramref name="animate"/> cross-fades the colour and tweens a growth; a lower fill is set
-    /// at once, its colour too.
+    /// Whether the last paint carried a learning percent (<see cref="Apply"/>'s hasPercent). False on a fresh capsule, after a
+    /// «данных нет» paint and after <see cref="Clear"/>.
     /// </summary>
-    public void Apply(float fraction, Color color, bool animate)
+    public bool ShowsPercent { get; private set; }
+
+    /// <summary>
+    /// True when a paint that carries a percent would be this capsule's FIRST with one — a first paint, set at once (spec §4.3);
+    /// only a percent grown from one the capsule already showed animates. PaintChip asks it for the whole capsule, before it
+    /// paints.
+    /// </summary>
+    public bool IsFirstPercent(bool hasPercent) => hasPercent && !ShowsPercent;
+
+    /// <summary>
+    /// Shows <paramref name="fraction"/> (0..1) of the capsule in <paramref name="color"/>; 0 is a zero-width clip that shows
+    /// nothing. <paramref name="hasPercent"/>: the paint carries a learning percent (false = «данных нет», which forgets the last
+    /// one). On an active capsule <paramref name="animate"/> cross-fades the colour and tweens a growth — never on the first paint
+    /// with a percent; a lower fill is set at once, its colour too.
+    /// </summary>
+    public void Apply(float fraction, Color color, bool animate, bool hasPercent)
     {
         float target = Mathf.Clamp01(fraction);
-        bool tween = animate && target >= AppliedFraction && gameObject.activeInHierarchy;
+        bool tween = animate && !IsFirstPercent(hasPercent) && target >= AppliedFraction && gameObject.activeInHierarchy;
         bool grow = tween && target > AppliedFraction;
         StopTweens(complete: false);
         AppliedFraction = target;
+        ShowsPercent = hasPercent;
 
         if (fill != null)
         {
@@ -57,6 +76,12 @@ public class AutoChipProgress : MonoBehaviour
         if (grow) clip.DOSizeDelta(width, GrowSeconds).SetEase(Ease.OutCubic);
         else clip.sizeDelta = width;
     }
+
+    /// <summary>
+    /// «Подключить» (Bot.PaintConnectPill): no fill, and the capsule forgets its percent — the «Авто» face that comes back is a
+    /// first paint again and lands at once.
+    /// </summary>
+    public void Clear() => Apply(0f, Color.clear, animate: false, hasPercent: false);
 
     /// <summary>
     /// Whether <paramref name="target"/>'s centre lies under the fill at <paramref name="fraction"/>. The painter asks it for a

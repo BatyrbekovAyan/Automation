@@ -581,14 +581,15 @@ public class Bot : MonoBehaviour
     }
 
     // «Подключить» is a call to action: the accent fill and its on-fill ink, the house's primary-button pair — and it
-    // outranks the learning fill (RefreshCardState hides the caption).
+    // outranks the learning fill (RefreshCardState hides the caption). Clear also makes the capsule forget its percent, so
+    // the «Авто» face that comes back is a first paint and its fill lands at once (spec §4.3).
     private void PaintConnectPill()
     {
         Color accent = Theme.Color(ThemeRole.AccentFill);
         if (autoPillFill != null) autoPillFill.color = accent;
         if (autoPillRing != null) autoPillRing.color = accent;
         if (autoPillLabel != null) autoPillLabel.color = Theme.Color(ThemeRole.AccentOnFill);
-        if (autoPillProgress != null) autoPillProgress.Apply(0f, Color.clear, false);
+        if (autoPillProgress != null) autoPillProgress.Clear();
     }
 
     private void KillPillTweens()

@@ -6,9 +6,9 @@ using UnityEngine;
 /// The ONE reader and writer (BotScheduleStore's pattern); <see cref="AutoReadinessPolicy.StateFor"/> reads it, UsageStore.Apply
 /// feeds it through <see cref="Absorb"/>, Bot.DeleteBotLocally calls <see cref="Clear"/>.
 ///
-/// Why it exists: the server's learning marks expire after 180 days and a reinstall drops the phone's side, so a bot that has worked
-/// in «Авто» for months and gets no new panel answers would otherwise read «Учится» again — the percent never falls and an unlock
-/// never un-happens. It also lets a cold, offline start draw the last known percent before the first snapshot lands.
+/// Why it exists: the server's learning marks expire after 180 days, so a bot that has worked in «Авто» for months and gets no new
+/// panel answers would otherwise read «Учится» again — the percent never falls and an unlock never un-happens. It also lets a cold,
+/// offline start draw the last known percent before the first snapshot lands.
 /// </summary>
 public static class LearnProgressStore
 {
