@@ -66,6 +66,28 @@ def send(owner, pid, extra=None, recipient="77010001234"):
     return e2e_auth.proxy(owner.token, body)
 
 
+def readiness_of(owner, bot_key="Bot0"):
+    """(http status, the bot's row of Get Usage `readiness` or None)."""
+    st, d = e2e_auth.hook("GetUsage", owner.token, {"appUserId": owner.app_user_id})
+    rows = d.get("readiness") if isinstance(d, dict) else None
+    return st, next((r for r in rows or [] if r.get("botKey") == bot_key), None)
+
+
+def shows(row, **want):
+    return row is not None and all(row.get(k) == v for k, v in want.items())
+
+
+def wait_sends(pid, n, timeout=30):
+    """Record Owner Send runs AFTER the proxy's Respond, so a history row lands a moment after the send call returned:
+    wait until the profile holds n owner_app rows (polling, not a fixed sleep). True when it does."""
+    end = time.time() + timeout
+    while time.time() < end:
+        if int(psql(f"select count(*) from chat_history_events where profile_id = '{pid}' and source = 'owner_app';")) >= n:
+            return True
+        time.sleep(0.5)
+    return False
+
+
 @scenario("origin_recorded_on_tg_reply", "A: Telegram message.reply carries origin + chat_id in meta → owner_app row has origin_* AND chat_id, memory session = pid:chat; Wappi body has neither")
 def tg_reply(ctx):
     owner, pid = owner_and_profile(ctx, channel="telegram")
@@ -202,12 +224,7 @@ def readiness_in_get_usage(ctx):
     psql(f"update bot_profiles set bot_key = 'Bot0' where profile_id = '{pid}';")   # a real bot gets it from Create's Register Profile
 
     def bot0():
-        st, d = e2e_auth.hook("GetUsage", owner.token, {"appUserId": owner.app_user_id})
-        rows = d.get("readiness") if isinstance(d, dict) else None
-        return st, next((r for r in rows or [] if r.get("botKey") == "Bot0"), None)
-
-    def shows(row, **want):
-        return row is not None and all(row.get(k) == v for k, v in want.items())
+        return readiness_of(owner)
 
     chats = ["77010001001", "77010001002", "77010001003"]
     for i in range(11):
@@ -228,6 +245,30 @@ def readiness_in_get_usage(ctx):
           and st2 == 200 and shows(after_group, total=11, bestMatches=11, progress=69, ready=False)
           and st3 == 200 and shows(twelve, total=12, matches=12, chats=3, days=2, bestMatches=12, progress=75, ready=True, unlockAt=70, capped=False))
     return ok, f"eleven={eleven} after_group={after_group} twelve={twelve} legacy={st_legacy}/{legacy.get('readiness') if isinstance(legacy, dict) else legacy}"
+
+
+@scenario("readiness_capped_in_one_chat", "progress percent (spec §3): 12 owner sends with a shown set, card #1 matched, ALL in ONE personal chat (spread over 2 days) → readiness bestMatches 12, progress 69, ready=false, capped=true, needChats 2, needDays 0; a 2nd chat → needChats 1 (still capped, 69); a 3rd chat lifts the cap → ready=true, progress 88, capped=false")
+def readiness_capped_in_one_chat(ctx):
+    owner, pid = owner_and_profile(ctx)
+    psql(f"update bot_profiles set bot_key = 'Bot0' where profile_id = '{pid}';")   # a real bot gets it from Create's Register Profile
+    for _ in range(12):
+        send(owner, pid, ORIGIN, recipient="77010002001")                          # every send: card #1 matched, ONE personal chat
+    seeded1 = wait_sends(pid, 12)
+    # two days, so only the CHATS condition stays open (needDays = 0): the first six sends move to yesterday
+    psql(f"update chat_history_events set created_at = created_at - interval '1 day' where id in "
+         f"(select id from chat_history_events where profile_id = '{pid}' and source = 'owner_app' order by id limit 6);")
+    st1, one_chat = readiness_of(owner)
+    send(owner, pid, ORIGIN, recipient="77010002002")
+    seeded2 = wait_sends(pid, 13)
+    st2, two_chats = readiness_of(owner)
+    send(owner, pid, ORIGIN, recipient="77010002003")
+    seeded3 = wait_sends(pid, 14)
+    st3, three_chats = readiness_of(owner)
+    ok = (seeded1 and seeded2 and seeded3
+          and st1 == 200 and shows(one_chat, total=12, matches=12, chats=1, bestMatches=12, progress=69, ready=False, unlockAt=70, capped=True, needChats=2, needDays=0)
+          and st2 == 200 and shows(two_chats, total=13, bestMatches=13, chats=2, progress=69, ready=False, capped=True, needChats=1, needDays=0)
+          and st3 == 200 and shows(three_chats, total=14, bestMatches=14, chats=3, progress=88, ready=True, unlockAt=70, capped=False, needChats=0, needDays=0))
+    return ok, f"rows_seeded={seeded1}/{seeded2}/{seeded3} one_chat={one_chat} two_chats={two_chats} three_chats={three_chats}"
 
 
 def main():
