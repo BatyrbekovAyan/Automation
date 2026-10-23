@@ -18,7 +18,6 @@ import them. tests/test_learning_b.py runs the whole Read Usage query as real SQ
     python3 Tools/n8n/apply-learning-b.py --check    # exit 2 если не применено
 """
 import json
-import math
 import os
 import re
 import sys
@@ -27,12 +26,41 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 WF = os.path.join(HERE, "workflows")
 GET_USAGE = "jtbssfzXbOxwTK4k-Get_Usage.json"
 
+
+def half_up_percent(matches: int, target: int) -> int:
+    """round(100 * matches / target) with halves rounded UP, capped at 100 — the percent the owner sees once the conditions are met
+    (progress_sql's numeric round(), which rounds half away from zero: up, for these non-negative values). Integer arithmetic only:
+    Python's round() rounds halves to even and would split from Postgres — 2 of 16 = 12.5 is 13 % on the screen, round() says 12."""
+    return min(100, (200 * matches + target) // (2 * target))
+
+
+def min_matches(target: int, unlock: int, window: int) -> int:
+    """The fewest matches m in 0..window whose half_up_percent reaches `unlock` — so `best >= m` is exactly «the shown percent reaches
+    the unlock». ValueError when no m does: such a calibration could never open «Авто», and it fails at import, never on a phone."""
+    for m in range(window + 1):
+        if half_up_percent(m, target) >= unlock:
+            return m
+    raise ValueError(f"learning B: no m in 0..{window} reaches {unlock} % at target {target} — «Авто» could never open")
+
+
+def unlock_mismatches(min_count: int, target: int, unlock: int, window: int) -> list:
+    """Every best in 0..window where `best >= min_count` (the ready rule) and «the percent reaches the unlock» disagree; [] = consistent."""
+    return [b for b in range(window + 1) if (b >= min_count) != (half_up_percent(b, target) >= unlock)]
+
+
 WINDOW = 20           # «best» is measured over any N consecutive owner sends with a shown set, per bot
 TARGET_MATCHES = 16   # card #1 matched the sent text (origin_top1 = 1) this many times within WINDOW = 100 % («8 out of 10»)
 UNLOCK_PERCENT = 70   # «Авто» opens from this percent
-MIN_MATCHES = math.ceil(UNLOCK_PERCENT * TARGET_MATCHES / 100)   # derived, never typed: the fewest matches that reach UNLOCK_PERCENT (12)
+MIN_MATCHES = min_matches(TARGET_MATCHES, UNLOCK_PERCENT, WINDOW)   # derived, never typed: the fewest matches that reach UNLOCK_PERCENT (12)
 MIN_CHATS = 3         # the HISTORY spans this many personal chats …
 MIN_DAYS = 2          # … and this many calendar days (Asia/Almaty); otherwise progress stops at UNLOCK_PERCENT - 1
+
+# ready ⇔ progress >= unlockAt for every best 0..WINDOW (spec §3). Checked at import: --check and verify-learning-b.py import this
+# module, so a recalibration (or a typed MIN_MATCHES) that breaks it fails offline, before anything is deployed.
+_MISMATCHES = unlock_mismatches(MIN_MATCHES, TARGET_MATCHES, UNLOCK_PERCENT, WINDOW)
+if _MISMATCHES:
+    raise ValueError(f"learning B: MIN_MATCHES = {MIN_MATCHES} disagrees with the shown percent at best = {_MISMATCHES} "
+                     f"(target {TARGET_MATCHES}, unlock {UNLOCK_PERCENT} %)")
 
 
 def send_filter(e):

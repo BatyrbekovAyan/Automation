@@ -4,7 +4,7 @@ tables of the staging Postgres (tests/harness.py). One bot = one bot_key of the 
 History = every owner_app send WITH a shown set in personal chats. best = the most card-1 matches in any 20 consecutive sends of the
 history; progress = round(100 * best / 16), at most 69 until the history holds 3 chats and 2 days; ready = those conditions and
 best >= 12. matches / total / chats / days keep describing the CURRENT window (the last 20 sends) for the report.
-Needs `Tools/n8n/staging/pg.sh start` (+ `migrate` once)."""
+Needs `Tools/n8n/staging/pg.sh start` (+ `migrate` once) — all but the unlock-count cases at the top, which are pure arithmetic."""
 import importlib.util
 import itertools
 import json
@@ -71,9 +71,15 @@ def pick(row, *keys):
     return {k: row[k] for k in keys}
 
 
-def half_up(m):
-    """round(100 * m / TARGET_MATCHES), ties up — integer arithmetic, so the expectation shares no float with the SQL."""
-    return (200 * m + LB.TARGET_MATCHES) // (2 * LB.TARGET_MATCHES)
+def half_up(m, target=LB.TARGET_MATCHES):
+    """round(100 * m / target), ties up — integer arithmetic, so the expectation shares no float with the SQL (nor any code with the
+    module's own half_up_percent)."""
+    return (200 * m + target) // (2 * target)
+
+
+def ceil_rule(target, unlock):
+    """The unlock count the 2026-10-23 final review replaced: ceil(UNLOCK × TARGET / 100), in integers — the negative control below."""
+    return -(-unlock * target // 100)
 
 
 def synthetic_name(m, chats_ok, days_ok):
@@ -107,6 +113,29 @@ from s
 group by s.bot_key
 """
 
+
+# The unlock count must follow the percent's own rounding (round half up) at every calibration a recalibration could pick
+# (spec §7.3) — pure arithmetic, no Postgres; the cases below then run today's numbers through the real SQL.
+with Case('MIN_MATCHES = the fewest matches whose half-up percent reaches the unlock, for TARGET 10..20 x UNLOCK 50..90 (no Postgres)') as c:
+    grid = [(t, u) for t in range(10, 21) for u in range(50, 91)]
+    bad = [(t, u, b) for t, u in grid for b in range(LB.WINDOW + 1)
+           if (b >= LB.min_matches(t, u, LB.WINDOW)) != (min(100, half_up(b, t)) >= u)]
+    c.check(len(grid) == 451 and not bad, f'ready (best >= min_matches) and the shown percent split at (target, unlock, best) {bad[:5]}')
+    spots = {(16, 70): 12, (16, 69): 11, (16, 63): 10, (16, 88): 14, (15, 67): 10, (12, 67): 8}
+    got = {k: LB.min_matches(k[0], k[1], LB.WINDOW) for k in spots}
+    c.check(got == spots, f'spot values {got}')
+    c.check([ceil_rule(t, u) for t, u in spots] == [12, 12, 11, 15, 11, 9], 'the replaced ceil formula on the same pairs')
+    split = [(t, u) for t, u in grid if any((b >= ceil_rule(t, u)) != (min(100, half_up(b, t)) >= u) for b in range(LB.WINDOW + 1))]
+    c.check(len(split) == 28, f'negative control: ceil splits ready from the percent at 28 of 451 calibrations, got {len(split)}')
+    c.check(LB.unlock_mismatches(12, 16, 69, LB.WINDOW) == [11],
+            "the import-time check names what a typed ceil gets wrong at 16/69: 11 matches show «69 %» yet stay locked")
+    c.check(LB.unlock_mismatches(LB.MIN_MATCHES, LB.TARGET_MATCHES, LB.UNLOCK_PERCENT, LB.WINDOW) == [], "today's calibration is consistent")
+with Case('a calibration that can never reach its unlock is refused (ValueError at import, never on a phone)') as c:
+    try:
+        LB.min_matches(25, 90, LB.WINDOW)
+        c.check(False, 'target 25 in a window of 20 tops out at 80 % — 90 % is unreachable')
+    except ValueError:
+        pass
 
 with PgSession(SETUP) as pg:
     with Case('constants: spec §2 numbers, the client holds none') as c:
@@ -201,4 +230,16 @@ with PgSession(SETUP) as pg:
             g = bot(pg, key); r = rows.get((INST, key))
             c.check(r is not None and all(r[col] == g[k] for k, col in REPORT_COLUMNS), f'{key}: report {r} vs gate {g}')
         c.check((OTHER, 'Bot0') in rows and rows[(OTHER, 'Bot0')]['total'] == 1, 'other installs are listed with their own counts')
+    with Case('history-wide chats: a third chat older than the last 20 sends still meets the 3-chat condition') as c:
+        pg.x(f"insert into bot_profiles (profile_id, app_user_id, channel, owner_id, workflow_id, bot_key) values "
+             f"('p-b4', '{U}', 'whatsapp', '{INST}', 'wB4000000001', 'Bot4');")
+        send(pg, 'p-b4', '7723@c.us', 0, days_ago=3)   # the third chat: the 21st send back, outside the current window
+        for i in range(20):
+            send(pg, 'p-b4', ('7721@c.us', '7722@c.us')[i % 2], 1 if i < 12 else 0, days_ago=1 if i < 10 else 0)
+        e = bot(pg, 'Bot4')
+        c.check(pick(e, 'total', 'matches', 'chats', 'days') == {'total': 20, 'matches': 12, 'chats': 2, 'days': 2},
+                f'the current window holds two chats only: {e}')
+        c.check(pick(e, 'bestMatches', 'progress', 'ready', 'capped', 'needChats', 'needDays') ==
+                {'bestMatches': 12, 'progress': 75, 'ready': True, 'capped': False, 'needChats': 0, 'needDays': 0},
+                f'the conditions count the whole history (3 chats), never the window: {e}')
 report()
