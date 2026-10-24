@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sketch 009 — Личные и рабочие чаты</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.47.0/tabler-icons.min.css">
+<style>
+:root{--page-bg:#12161C;--page-ink:#E2E8F0;--page-ink-2:#93A1B3;--bg:#0E1116;--surface:#171C24;--hairline:#242C38;--border:#333E4E;--input-border:#556882;--ink:#ECF0F6;--ink-2:#9AA6B8;--ink-3:#79869A;--accent-fill:#3E61C6;--accent-text:#5981D6;--accent-soft:#1E2A44;--positive-bg:#123324;--positive-ink:#57DE95;--destructive:#F2555A;--wallpaper:#090B0E;--bubble-in:#252A31;--bubble-out:#33477E;--send:#128A50}
+*{box-sizing:border-box}
+body{margin:0;background:var(--page-bg);color:var(--page-ink);font-family:-apple-system,"SF Pro Text","Helvetica Neue",system-ui,sans-serif}
+header{max-width:1180px;margin:0 auto;padding:28px 20px 8px}
+header h1{font-size:22px;font-weight:600;margin:0 0 6px}
+header p{color:var(--page-ink-2);font-size:14px;line-height:1.5;margin:0;max-width:820px}
+.mk{max-width:1180px;margin:0 auto;padding:20px;display:flex;flex-wrap:wrap;gap:28px 22px;justify-content:center}
+.cell{width:314px}
+.ph{width:300px;height:650px;border:7px solid #05070a;border-radius:34px;overflow:hidden;background:var(--bg);position:relative;color:var(--ink);box-sizing:content-box}
+.sb{display:flex;justify-content:space-between;align-items:center;padding:9px 20px 5px;font-size:12px;font-weight:600}
+.cap{text-align:center;font-size:13px;color:var(--page-ink-2);margin-top:10px;line-height:1.4}
+.cap b{color:var(--page-ink);font-weight:600}
+.av{border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;flex:none}
+.cd{background:var(--surface);border-radius:14px}
+.r{display:flex;align-items:center;gap:9px}
+.m2{color:var(--ink-2)}.m3{color:var(--ink-3)}
+.sec{font-size:11px;color:var(--ink-3);letter-spacing:.05em;margin:14px 4px 6px}
+.ca{display:inline-flex;align-items:center;gap:5px;border-radius:999px;font-size:12px;padding:3px 10px;line-height:16px;white-space:nowrap;flex:none;cursor:pointer}
+.ca.on{background:var(--positive-bg);color:var(--positive-ink);border:1.5px solid var(--positive-bg)}
+.ca.pp{background:#242C38;color:var(--ink-2);border:1.5px solid #242C38}
+.lp{width:7px;height:7px;border-radius:50%;flex:none;background:var(--positive-ink)}
+.cb{width:20px;height:20px;border-radius:6px;border:1.5px solid var(--input-border);flex:none;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#fff}
+.cb.y{background:var(--accent-fill);border-color:var(--accent-fill)}
+.sw{width:38px;height:22px;border-radius:11px;background:var(--input-border);position:relative;flex:none;cursor:pointer}
+.sw::after{content:"";position:absolute;left:2px;top:2px;width:18px;height:18px;border-radius:50%;background:#fff}
+.sw.on{background:#34C759}.sw.on::after{left:18px}
+.bd{min-width:18px;height:18px;border-radius:9px;background:#2FB344;color:#fff;font-size:11px;display:flex;align-items:center;justify-content:center;padding:0 5px}
+.bd.mu{background:var(--border);color:var(--ink-2)}
+.btn{background:var(--accent-fill);border-radius:12px;height:42px;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:600;color:#fff;cursor:pointer}
+.pv{font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--ink-2)}
+.act{width:84px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:11px;cursor:pointer;color:#fff}
+.row{padding:7px 14px}
+.tm{display:flex;flex-direction:column;align-items:flex-end;gap:4px}
+.nav{position:absolute;left:0;right:0;bottom:0;height:58px;background:var(--bg);border-top:1px solid var(--hairline);display:flex;justify-content:space-around;align-items:center;font-size:11px;color:var(--ink-3)}
+.nav div{text-align:center}.nav i{font-size:20px}
+.dim{position:absolute;left:0;right:0;bottom:0;background:rgba(0,0,0,.55)}
+.sheet{position:absolute;left:0;right:0;bottom:0;background:var(--surface);border-radius:18px 18px 0 0;padding:8px 16px 18px}
+.grab{width:36px;height:4px;border-radius:2px;background:var(--border);margin:0 auto 12px}
+.link{text-align:center;font-size:14px;color:var(--accent-text);margin-top:12px;cursor:pointer}
+.toast{position:absolute;left:50%;transform:translateX(-50%);bottom:84px;background:#2a3140;color:var(--ink);font-size:12px;padding:7px 12px;border-radius:10px;white-space:nowrap;visibility:hidden}
+</style>
+</head>
+<body>
+<header>
+<h1>Sketch 009 · Личные и рабочие чаты</h1>
+<p>Кому отвечает ИИ-сотрудник. Чаты бывают двух видов: личные (ИИ-сотрудник не участвует, они спрятаны в папку «Личные») и рабочие (общий режим «Авто» и свой «Авто» в чате, как сейчас). Контакты из телефона и все, кто писал до подключения, по умолчанию личные; клиентов среди них отмечает владелец. Слово «Выбрать» на этих экранах не показывается. Итог четырёх раундов обсуждения, 2026-10-22…25. Всё, что выглядит кнопкой, можно нажимать.</p>
+</header>
+<div class="mk">
+
+<div class="cell">
+<div class="ph" id="s1">
+<div class="sb"><span>9:41</span><span><i class="ti ti-antenna-bars-5"></i> <i class="ti ti-wifi"></i> <i class="ti ti-battery-3"></i></span></div>
+<div style="padding:4px 16px 0">
+<div style="font-size:12px;color:var(--positive-ink);display:flex;align-items:center;gap:5px"><i class="ti ti-circle-check" style="font-size:15px"></i>WhatsApp подключён</div>
+<div style="font-size:19px;font-weight:600;margin:6px 0 4px">Кто из них клиенты?</div>
+<div class="m2" style="font-size:12px;line-height:1.4">Все ваши контакты и все, с кем вы переписывались до подключения, — личные: ИИ-сотрудник их не трогает. Отметьте клиентов, с ними он будет работать.</div>
+</div>
+<div style="padding:10px 12px 0">
+<div class="m3" style="background:var(--surface);border-radius:10px;padding:7px 10px;font-size:13px"><i class="ti ti-search"></i> Поиск по чатам</div>
+<div class="sec">НЕДАВНИЕ ЧАТЫ</div>
+<div class="cd" style="padding:0 12px">
+<div class="r" style="height:40px;border-bottom:1px solid var(--hairline)"><span class="cb y"><i class="ti ti-check" style="font-size:14px"></i></span><div class="av" style="width:26px;height:26px;background:#a9c6ef"><i class="ti ti-user" style="font-size:15px"></i></div><div style="flex:1;min-width:0"><div style="font-size:13px">Асем клиент</div><div class="m3" style="font-size:11px">в контактах</div></div></div>
+<div class="r" style="height:40px;border-bottom:1px solid var(--hairline)"><span class="cb"></span><div class="av" style="width:26px;height:26px;background:#eeb3cb"><i class="ti ti-user" style="font-size:15px"></i></div><div style="flex:1;min-width:0"><div style="font-size:13px">Мама</div><div class="m3" style="font-size:11px">в контактах</div></div></div>
+<div class="r" style="height:40px;border-bottom:1px solid var(--hairline)"><span class="cb y"><i class="ti ti-check" style="font-size:14px"></i></span><div class="av" style="width:26px;height:26px;background:#c9b8f0"><i class="ti ti-user" style="font-size:15px"></i></div><div style="flex:1;min-width:0"><div style="font-size:13px">Ерлан СТО</div><div class="m3" style="font-size:11px">в контактах</div></div></div>
+<div class="r" style="height:40px;border-bottom:1px solid var(--hairline)"><span class="cb"></span><div class="av" style="width:26px;height:26px;background:#f6c6a0"><i class="ti ti-user" style="font-size:15px"></i></div><div style="flex:1;min-width:0"><div style="font-size:13px">Даурен</div><div class="m3" style="font-size:11px">не в контактах, писал раньше</div></div></div>
+<div class="r" style="height:40px;border-bottom:1px solid var(--hairline)"><span class="cb"></span><div class="av" style="width:26px;height:26px;background:#9fd8c3"><i class="ti ti-user" style="font-size:15px"></i></div><div style="flex:1;min-width:0"><div style="font-size:13px">Гульнар клиент</div><div class="m3" style="font-size:11px">в контактах</div></div></div>
+<div class="r" style="height:40px"><span class="cb"></span><div class="av" style="width:26px;height:26px;background:#f2c39f"><i class="ti ti-user" style="font-size:15px"></i></div><div style="flex:1;min-width:0"><div style="font-size:13px">+7 701 555-20-11</div><div class="m3" style="font-size:11px">не в контактах, писал раньше</div></div></div>
+</div>
+<div style="font-size:12px;color:var(--accent-text);margin:6px 4px 0">Ещё 90 <i class="ti ti-chevron-right"></i></div>
+</div>
+<div style="position:absolute;left:12px;right:12px;bottom:12px">
+<div class="btn" id="cnt1">Готово · клиентов: 2</div>
+<div class="link" style="margin-top:8px;font-size:12px">Отмечу позже</div>
+</div>
+</div>
+<div class="cap"><b>1 · Сразу после подключения.</b> Это папка «Личные» в режиме выбора. Всё личное по умолчанию, галочкой выделяете клиентов.</div>
+</div>
+
+<div class="cell">
+<div class="ph">
+<div class="sb"><span>9:41</span><span><i class="ti ti-antenna-bars-5"></i> <i class="ti ti-wifi"></i> <i class="ti ti-battery-3"></i></span></div>
+<div class="r" style="padding:4px 14px 8px">
+<div class="av" style="width:30px;height:30px;background:#E5484D"><i class="ti ti-flower" style="font-size:17px"></i></div>
+<span style="font-size:17px;font-weight:600">Букет Астана</span><i class="ti ti-chevron-down m2" style="font-size:14px"></i>
+<span style="flex:1"></span>
+<span class="ca on"><span class="lp"></span>Авто</span>
+</div>
+<div style="margin:0 12px;background:var(--surface);border-radius:10px;display:flex;padding:3px;font-size:12px">
+<div class="r" style="flex:1;background:#242C38;border-radius:8px;padding:6px 0;justify-content:center;gap:5px"><span style="width:6px;height:6px;border-radius:50%;background:#25D366"></span>WhatsApp <span class="m3">2</span></div>
+<div class="r m2" style="flex:1;padding:6px 0;justify-content:center;gap:5px"><span style="width:6px;height:6px;border-radius:50%;background:#2AABEE"></span>Telegram</div>
+</div>
+<div class="m3" style="margin:8px 12px 2px;background:var(--surface);border-radius:10px;padding:7px 10px;font-size:13px"><i class="ti ti-search"></i> Поиск</div>
+<div class="r" style="padding:9px 14px;border-bottom:1px solid var(--hairline)"><div style="width:40px;display:flex;justify-content:center"><i class="ti ti-lock m2" style="font-size:20px"></i></div><span style="flex:1;font-size:14px;font-weight:600">Личные</span><span id="pb2" class="bd mu">2</span><i class="ti ti-chevron-right m3"></i></div>
+<div class="r row"><div class="av" style="width:40px;height:40px;background:#9fd8c3"><i class="ti ti-user" style="font-size:20px"></i></div><div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:600">Айдана</div><div class="pv"><i class="ti ti-checks" style="color:var(--accent-text)"></i> 25 роз — 18 000 ₸, доставка сегодня</div></div><div class="tm"><span class="m3" style="font-size:11px">10:12</span><span style="height:18px"></span></div></div>
+<div class="r row"><div class="av" style="width:40px;height:40px;background:#a9c6ef"><i class="ti ti-user" style="font-size:20px"></i></div><div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:600">Асем клиент</div><div class="pv"><i class="ti ti-checks" style="color:var(--accent-text)"></i> Пионы есть: 15 шт. — 22 000 ₸</div></div><div class="tm"><span class="m3" style="font-size:11px">09:59</span><span style="height:18px"></span></div></div>
+<div id="sw2" style="position:relative;overflow:hidden">
+<div style="position:absolute;right:0;top:0;bottom:0;display:flex">
+<div id="mv2" class="act" style="background:#3a4356"><i class="ti ti-lock" style="font-size:18px"></i>В личные</div>
+<div class="act" style="background:var(--destructive);cursor:default"><i class="ti ti-trash" style="font-size:18px"></i>Удалить</div>
+</div>
+<div class="r row" style="background:var(--bg);transform:translateX(-168px);position:relative"><div class="av" style="width:40px;height:40px;background:#f6c6a0"><i class="ti ti-user" style="font-size:20px"></i></div><div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:600">+7 777 456-12-90</div><div class="pv">Привет, это Алия, мой новый номер</div></div><div class="tm"><span class="m3" style="font-size:11px">09:30</span><span class="bd">1</span></div></div>
+</div>
+<div class="r row"><div class="av" style="width:40px;height:40px;background:#c9b8f0"><i class="ti ti-user" style="font-size:20px"></i></div><div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:600">Ерлан СТО</div><div class="pv">Можно на субботу?</div></div><div class="tm"><span class="m3" style="font-size:11px">09:15</span><span class="bd">1</span></div></div>
+<div class="r row"><div class="av" style="width:40px;height:40px;background:#f2c39f"><i class="ti ti-user" style="font-size:20px"></i></div><div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:600">+7 705 118-44-20</div><div class="pv"><i class="ti ti-checks" style="color:var(--accent-text)"></i> Доставка по городу — 1 500 ₸</div></div><div class="tm"><span class="m3" style="font-size:11px">08:10</span><span style="height:18px"></span></div></div>
+<div class="nav"><div style="color:var(--accent-text)"><i class="ti ti-message-circle"></i><div>Чаты</div></div><div><i class="ti ti-chart-bar"></i><div>Сводка</div></div><div><i class="ti ti-robot"></i><div>ИИ-сотрудники</div></div><div><i class="ti ti-user"></i><div>Профиль</div></div></div>
+</div>
+<div class="cap"><b>2 · Рабочий список.</b> Клиенты и новые люди, подписей режима нет. Сверху строка «Личные» с числом непрочитанных. Свайп по чату даёт «В личные».</div>
+</div>
+
+<div class="cell">
+<div class="ph">
+<div class="sb"><span>9:41</span><span><i class="ti ti-antenna-bars-5"></i> <i class="ti ti-wifi"></i> <i class="ti ti-battery-3"></i></span></div>
+<div class="r" style="padding:4px 14px 8px"><i class="ti ti-chevron-left" style="font-size:20px;color:var(--accent-text);width:60px"></i><span style="flex:1;text-align:center;font-size:16px;font-weight:600">Личные</span><span style="width:60px;text-align:right;font-size:14px;color:var(--accent-text)">Изменить</span></div>
+<div class="cd r" style="margin:2px 12px 6px;padding:10px 12px;align-items:flex-start"><i class="ti ti-lock m2" style="font-size:16px;margin-top:1px"></i><span class="m2" style="font-size:12px;line-height:1.4">Контакты из телефона, все, кто писал до подключения, группы и каналы. ИИ-сотрудник здесь не участвует, уведомлений нет.</span></div>
+<div id="sw3" style="position:relative;overflow:hidden">
+<div style="position:absolute;right:0;top:0;bottom:0;display:flex"><div id="mv3" class="act" style="background:var(--accent-fill)"><i class="ti ti-briefcase" style="font-size:18px"></i>В рабочие</div></div>
+<div class="r row" style="background:var(--bg);transform:translateX(-84px);position:relative"><div class="av" style="width:40px;height:40px;background:#9fd8c3"><i class="ti ti-user" style="font-size:20px"></i></div><div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:600">Сауле</div><div class="pv">Здравствуйте, есть красные розы на завтра?</div></div><div class="tm"><span class="m3" style="font-size:11px">10:05</span><span class="bd mu">1</span></div></div>
+</div>
+<div class="r row"><div class="av" style="width:40px;height:40px;background:#eeb3cb"><i class="ti ti-user" style="font-size:20px"></i></div><div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:600">Мама</div><div class="pv">Не забудь, в субботу ждём</div></div><div class="tm"><span class="m3" style="font-size:11px">09:40</span><span class="bd mu">2</span></div></div>
+<div class="r row"><div class="av" style="width:40px;height:40px;background:#3a4356"><i class="ti ti-users" style="font-size:19px"></i></div><div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:600">Семья</div><div class="pv">Группа · ИИ-сотрудник в группах не отвечает</div></div><div class="tm"><span class="m3" style="font-size:11px">09:20</span><span style="height:18px"></span></div></div>
+<div class="r row"><div class="av" style="width:40px;height:40px;background:#c9b8f0"><i class="ti ti-user" style="font-size:20px"></i></div><div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:600">Әже</div><div class="pv">Балам, қашан келесің?</div></div><div class="tm"><span class="m3" style="font-size:11px">09:12</span><span style="height:18px"></span></div></div>
+<div class="r row"><div class="av" style="width:40px;height:40px;background:#f6c6a0"><i class="ti ti-user" style="font-size:20px"></i></div><div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:600">Даурен</div><div class="pv">Брат, вечером футбол?</div></div><div class="tm"><span class="m3" style="font-size:11px">08:30</span><span style="height:18px"></span></div></div>
+<div class="r row"><div class="av" style="width:40px;height:40px;background:#a9c6ef"><i class="ti ti-user" style="font-size:20px"></i></div><div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:600">Папа</div><div class="pv">Сынок, позвони, как освободишься</div></div><div class="tm"><span class="m3" style="font-size:11px">Вчера</span><span style="height:18px"></span></div></div>
+<div class="m3" style="position:absolute;left:16px;right:16px;bottom:18px;font-size:11px;display:flex;gap:5px;align-items:center;justify-content:center"><i class="ti ti-hand-finger" style="font-size:15px"></i>Свайп по чату — сделать его рабочим</div>
+</div>
+<div class="cap"><b>3 · Папка «Личные»</b>, как «Архив» в WhatsApp. Её же открывает строка в настройках. Счётчики серые. У групп и каналов действия «В рабочие» нет.</div>
+</div>
+
+<div class="cell">
+<div class="ph" id="s4">
+<div class="sb"><span>9:41</span><span><i class="ti ti-antenna-bars-5"></i> <i class="ti ti-wifi"></i> <i class="ti ti-battery-3"></i></span></div>
+<div class="r" style="padding:4px 14px 8px"><span style="font-size:14px;color:var(--accent-text);width:60px">Отмена</span><span style="flex:1;text-align:center;font-size:16px;font-weight:600">Отметьте клиентов</span><span style="width:60px"></span></div>
+<div class="m3" style="margin:0 12px 6px;background:var(--surface);border-radius:10px;padding:7px 10px;font-size:13px"><i class="ti ti-search"></i> Поиск по личным</div>
+<div class="r row"><span class="cb y"><i class="ti ti-check" style="font-size:14px"></i></span><div class="av" style="width:38px;height:38px;background:#9fd8c3"><i class="ti ti-user" style="font-size:19px"></i></div><div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:600">Сауле</div><div class="pv">Здравствуйте, есть красные розы на завтра?</div></div></div>
+<div class="r row"><span class="cb"></span><div class="av" style="width:38px;height:38px;background:#eeb3cb"><i class="ti ti-user" style="font-size:19px"></i></div><div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:600">Мама</div><div class="pv">Не забудь, в субботу ждём</div></div></div>
+<div class="r row"><span class="cb"></span><div class="av" style="width:38px;height:38px;background:#c9b8f0"><i class="ti ti-user" style="font-size:19px"></i></div><div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:600">Әже</div><div class="pv">Балам, қашан келесің?</div></div></div>
+<div class="r row"><span class="cb y"><i class="ti ti-check" style="font-size:14px"></i></span><div class="av" style="width:38px;height:38px;background:#a9c6ef"><i class="ti ti-user" style="font-size:19px"></i></div><div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:600">Гульнар клиент</div><div class="pv">Спасибо, букет супер!</div></div></div>
+<div class="r row"><span class="cb"></span><div class="av" style="width:38px;height:38px;background:#f6c6a0"><i class="ti ti-user" style="font-size:19px"></i></div><div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:600">Даурен</div><div class="pv">Брат, вечером футбол?</div></div></div>
+<div class="r row"><span class="cb"></span><div class="av" style="width:38px;height:38px;background:#f2c39f"><i class="ti ti-user" style="font-size:19px"></i></div><div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:600">+7 701 555-20-11</div><div class="pv">Добрый день, вы работаете в воскресенье?</div></div></div>
+<div class="r row"><span class="cb"></span><div class="av" style="width:38px;height:38px;background:#a9c6ef"><i class="ti ti-user" style="font-size:19px"></i></div><div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:600">Папа</div><div class="pv">Сынок, позвони, как освободишься</div></div></div>
+<div style="position:absolute;left:12px;right:12px;bottom:14px"><div class="btn" id="cnt4">Сделать рабочими · 2</div></div>
+</div>
+<div class="cap"><b>4 · «Личные» → «Изменить».</b> Отмечаете сразу несколько клиентов. Группы и каналы здесь не показываются.</div>
+</div>
+
+<div class="cell">
+<div class="ph" style="background:var(--wallpaper)">
+<div class="sb" style="background:var(--bg)"><span>9:41</span><span><i class="ti ti-antenna-bars-5"></i> <i class="ti ti-wifi"></i> <i class="ti ti-battery-3"></i></span></div>
+<div class="r" style="background:var(--bg);padding:4px 12px 10px;position:relative;z-index:3">
+<div style="width:30px;height:30px;border-radius:50%;background:var(--surface);display:flex;align-items:center;justify-content:center"><i class="ti ti-chevron-left" style="font-size:17px"></i></div>
+<div class="av" style="width:30px;height:30px;background:#9fd8c3"><i class="ti ti-user" style="font-size:16px"></i></div>
+<div style="flex:1;min-width:0"><div style="font-size:15px;font-weight:600">Сауле</div><div class="m3" style="font-size:11px">в контактах</div></div>
+<span id="pill5" class="ca pp" style="outline:1.5px solid var(--accent-text);outline-offset:1px"><i class="ti ti-lock"></i>Личный</span>
+</div>
+<div id="th5" style="padding:12px;display:flex;flex-direction:column;gap:6px">
+<div class="m2" style="align-self:center;background:var(--surface);border-radius:8px;padding:2px 10px;font-size:11px">Сегодня</div>
+<div style="align-self:flex-start;background:var(--bubble-in);border-radius:12px;padding:6px 10px;font-size:13px;max-width:80%">Здравствуйте, есть красные розы на завтра? <span class="m3" style="font-size:11px">10:05</span></div>
+</div>
+<div class="r" style="position:absolute;left:0;right:0;bottom:0;padding:10px 10px 22px;background:var(--bg)"><i class="ti ti-plus" style="font-size:20px"></i><div style="flex:1;height:32px;border-radius:16px;background:var(--surface);border:1px solid var(--hairline)"></div><div style="width:32px;height:32px;border-radius:50%;background:var(--send);display:flex;align-items:center;justify-content:center"><i class="ti ti-send" style="font-size:16px"></i></div></div>
+<div id="dim5" class="dim" style="top:80px"></div>
+<div id="sh5" class="sheet">
+<div class="grab"></div>
+<div style="font-size:17px;font-weight:600">Сделать чат рабочим?</div>
+<div class="m2" style="font-size:13px;line-height:1.45;margin-top:6px">У вас включено «Авто»: ИИ-сотрудник сразу ответит на последнее сообщение и дальше будет отвечать сам. Выключить «Авто» в этом чате можно отдельно.</div>
+<div class="m3" style="font-size:11px;line-height:1.4;margin-top:6px">На сообщения старше суток он не отвечает — начнёт с нового.</div>
+<div class="btn" id="ok5" style="margin-top:14px">Сделать рабочим</div>
+<div id="no5" class="link">Оставить личным</div>
+</div>
+</div>
+<div class="cap"><b>5 · Личный чат.</b> Плашка «Личный» — кнопка. Она открывает окно «Сделать чат рабочим?», текст в нём зависит от режима и свежести сообщения.</div>
+</div>
+
+<div class="cell">
+<div class="ph" style="background:var(--wallpaper)">
+<div class="sb" style="background:var(--bg)"><span>9:41</span><span><i class="ti ti-antenna-bars-5"></i> <i class="ti ti-wifi"></i> <i class="ti ti-battery-3"></i></span></div>
+<div class="r" style="background:var(--bg);padding:4px 12px 10px;position:relative;z-index:3">
+<div style="width:30px;height:30px;border-radius:50%;background:var(--surface);display:flex;align-items:center;justify-content:center"><i class="ti ti-chevron-left" style="font-size:17px"></i></div>
+<div id="who6" class="r" style="flex:1;min-width:0;gap:9px;cursor:pointer;border-radius:10px;outline:1.5px solid var(--accent-text);outline-offset:2px"><div class="av" style="width:30px;height:30px;background:#a9c6ef"><i class="ti ti-user" style="font-size:16px"></i></div><div style="min-width:0"><div style="font-size:15px;font-weight:600">Асем клиент</div><div class="m3" style="font-size:11px">в контактах</div></div></div>
+<span id="chip6" class="ca on"><span class="lp"></span>Авто</span>
+</div>
+<div style="padding:12px;display:flex;flex-direction:column;gap:6px">
+<div class="m2" style="align-self:center;background:var(--surface);border-radius:8px;padding:2px 10px;font-size:11px">Сегодня</div>
+<div style="align-self:flex-start;background:var(--bubble-in);border-radius:12px;padding:6px 10px;font-size:13px;max-width:80%">А можно как в прошлый раз, пионы? <span class="m3" style="font-size:11px">09:58</span></div>
+<div style="align-self:flex-end;background:var(--bubble-out);border-radius:12px;padding:6px 10px;font-size:13px;max-width:80%">Пионы есть: 15 шт. — 22 000 ₸. Доставить сегодня? <span style="font-size:11px;color:#a9b8de">09:59</span></div>
+</div>
+<div class="r" style="position:absolute;left:0;right:0;bottom:0;padding:10px 10px 22px;background:var(--bg)"><i class="ti ti-plus" style="font-size:20px"></i><div style="flex:1;height:32px;border-radius:16px;background:var(--surface);border:1px solid var(--hairline)"></div><div style="width:32px;height:32px;border-radius:50%;background:var(--send);display:flex;align-items:center;justify-content:center"><i class="ti ti-send" style="font-size:16px"></i></div></div>
+<div id="toast6" class="toast">Чат перенесён в «Личные»</div>
+<div id="dim6" class="dim" style="top:80px"></div>
+<div id="sh6" class="sheet">
+<div class="grab"></div>
+<div class="r" style="gap:12px"><div class="av" style="width:44px;height:44px;background:#a9c6ef"><i class="ti ti-user" style="font-size:22px"></i></div><div><div style="font-size:16px;font-weight:600">Асем клиент</div><div class="m2" style="font-size:12px">+7 701 234-56-78 · в контактах</div></div></div>
+<div id="mk6" class="cd r" style="margin-top:14px;padding:12px;align-items:flex-start;background:#1c222c;cursor:pointer"><i class="ti ti-lock" style="font-size:18px;color:var(--ink);margin-top:1px"></i><div><div style="font-size:14px;font-weight:600">Сделать личным</div><div class="m2" style="font-size:12px;line-height:1.4;margin-top:2px">ИИ-сотрудник перестанет участвовать в этом чате. Через 2 дня он забудет эту переписку.</div></div></div>
+<div id="no6" class="link">Отмена</div>
+</div>
+</div>
+<div class="cap"><b>6 · Рабочий чат.</b> Нажатие на имя в шапке открывает «Сделать личным». Капсула «Авто» — по-прежнему только переключатель режима.</div>
+</div>
+
+<div class="cell">
+<div class="ph">
+<div class="sb"><span>9:41</span><span><i class="ti ti-antenna-bars-5"></i> <i class="ti ti-wifi"></i> <i class="ti ti-battery-3"></i></span></div>
+<div class="r" style="padding:4px 12px 8px"><i class="ti ti-chevron-left" style="font-size:20px;color:var(--accent-text)"></i><span style="flex:1;text-align:center;font-size:16px;font-weight:600">Букет Астана</span><span style="background:var(--accent-fill);border-radius:999px;padding:5px 11px;font-size:12px;font-weight:600">Сохранить</span></div>
+<div class="m2" style="display:flex;justify-content:space-between;padding:0 12px;font-size:12px;border-bottom:1px solid var(--hairline)"><span style="color:var(--ink);border-bottom:2px solid var(--accent-text);padding:8px 0">Основное</span><span style="padding:8px 0">Бизнес</span><span style="padding:8px 0">Продукты</span><span style="padding:8px 0">Услуги</span><span style="padding:8px 0">Промпты</span></div>
+<div style="padding:0 12px">
+<div class="sec">КАНАЛЫ</div>
+<div class="cd">
+<div class="r" style="padding:10px 12px;border-bottom:1px solid var(--hairline)"><i class="ti ti-brand-whatsapp" style="font-size:18px;color:#25D366"></i><span style="flex:1;font-size:14px">WhatsApp</span><span class="sw on"></span></div>
+<div class="r" style="padding:10px 12px"><i class="ti ti-brand-telegram" style="font-size:18px;color:#2AABEE"></i><span style="flex:1;font-size:14px">Telegram</span><span class="sw"></span></div>
+</div>
+<div class="sec">ЛИЧНЫЕ ЧАТЫ</div>
+<div class="cd"><div class="r" style="padding:12px 12px"><i class="ti ti-lock m2" style="font-size:16px"></i><span style="flex:1;font-size:14px">Личные чаты</span><span class="m2" style="font-size:13px">94</span><i class="ti ti-chevron-right m3"></i></div></div>
+<div class="m3" style="font-size:11px;line-height:1.45;margin:8px 4px 0">Контакты из телефона и все, кто писал до подключения. ИИ-сотрудник в них не участвует. Внутри можно отметить клиентов — с ними он будет работать. Ботам, каналам и рассылкам он не отвечает никогда.</div>
+<div class="sec">РАСПИСАНИЕ РАБОТЫ</div>
+<div class="cd"><div class="r" style="padding:10px 12px"><span style="flex:1;font-size:14px">Отвечать по расписанию</span><span class="sw"></span></div></div>
+</div>
+</div>
+<div class="cap"><b>7 · Настройки → Основное.</b> Одна строка «Личные чаты», она открывает папку. Переключателей «Авто для…» и «показывать личные» нет.</div>
+</div>
+
+</div>
+<script>
+function collapse(el){el.style.height=el.offsetHeight+'px';el.style.transition='height .25s ease, opacity .25s ease';requestAnimationFrame(function(){el.style.height='0px';el.style.opacity='0'})}
+function wireChecks(root,out,fmt){var boxes=root.querySelectorAll('.cb');boxes.forEach(function(c){c.addEventListener('click',function(){c.classList.toggle('y');c.innerHTML=c.classList.contains('y')?'<i class="ti ti-check" style="font-size:14px"></i>':'';out.textContent=fmt(root.querySelectorAll('.cb.y').length)})})}
+wireChecks(document.getElementById('s1'),document.getElementById('cnt1'),function(n){return 'Готово · клиентов: '+n});
+wireChecks(document.getElementById('s4'),document.getElementById('cnt4'),function(n){return n?'Сделать рабочими · '+n:'Отметьте хотя бы один чат'});
+document.querySelectorAll('.sw').forEach(function(s){s.addEventListener('click',function(){s.classList.toggle('on')})});
+document.getElementById('mv2').addEventListener('click',function(){collapse(document.getElementById('sw2'));document.getElementById('pb2').textContent='3'});
+document.getElementById('mv3').addEventListener('click',function(){collapse(document.getElementById('sw3'))});
+(function(){var pill=document.getElementById('pill5'),dim=document.getElementById('dim5'),sh=document.getElementById('sh5'),th=document.getElementById('th5'),work=false;
+function show(o){dim.style.visibility=o?'visible':'hidden';sh.style.visibility=o?'visible':'hidden';pill.style.outline=o?'1.5px solid var(--accent-text)':'none'}
+pill.addEventListener('click',function(){if(!work)show(true)});
+document.getElementById('no5').addEventListener('click',function(){show(false)});
+document.getElementById('ok5').addEventListener('click',function(){work=true;show(false);pill.className='ca on';pill.innerHTML='<span class="lp"></span>Авто';var t=document.createElement('div');t.style.cssText='align-self:flex-end;background:var(--bubble-out);border-radius:12px;padding:6px 10px;font-size:13px;max-width:80%;color:#a9b8de';t.textContent='ИИ-сотрудник пишет ответ…';th.appendChild(t);setTimeout(function(){t.style.color='var(--ink)';t.innerHTML='Здравствуйте, Сауле! Красные розы на завтра есть: 25 шт. — 18 000 ₸. К какому времени доставить? <span style="font-size:11px;color:#a9b8de">10:07</span>'},1400)})})();
+(function(){var who=document.getElementById('who6'),chip=document.getElementById('chip6'),dim=document.getElementById('dim6'),sh=document.getElementById('sh6'),toast=document.getElementById('toast6'),personal=false;
+function show(o){dim.style.visibility=o?'visible':'hidden';sh.style.visibility=o?'visible':'hidden';who.style.outline=o?'1.5px solid var(--accent-text)':'none'}
+who.addEventListener('click',function(){if(!personal)show(true)});
+document.getElementById('no6').addEventListener('click',function(){show(false)});
+document.getElementById('mk6').addEventListener('click',function(){personal=true;show(false);chip.className='ca pp';chip.innerHTML='<i class="ti ti-lock"></i>Личный';toast.style.visibility='visible';setTimeout(function(){toast.style.visibility='hidden'},1800)})})();
+</script>
+</body>
+</html>
