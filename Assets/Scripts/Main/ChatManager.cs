@@ -303,6 +303,12 @@ public partial class ChatManager : MonoBehaviour
             if (d != null && d.id != null && !ChatIdFormat.IsForeignToChannel(d.id, ActiveChannel))
                 serverIds.Add(ChatIdFormat.CanonicalKey(d.id, ActiveChannel));
 
+        // The bot's own WhatsApp number (the key BotSettings and the wizard write): the chat with that number is the chat
+        // with oneself («Избранное»), which only the stored number can tell. Telegram says it in the row (user.Self).
+        string ownWhatsappNumber = ActiveChannel == ChatChannel.WhatsApp
+            ? PlayerPrefs.GetString(CurrentBotId + "WhatsappNumber", "")
+            : "";
+
         // ONLY clear the UI and memory if this is the very first instant load
         if (isInitialLoad)
         {
@@ -356,6 +362,10 @@ public partial class ChatManager : MonoBehaviour
             // Derived from the canonical key so a stripped-suffix twin never mis-flags groupness.
             bool isGroup = ChatIdFormat.IsGroup(chatKey, chat.type, chat.isGroup);
 
+            // What the personal / business rule reads about this chat (ChatAudienceRule), from the same row every time. The
+            // list cache is this answer verbatim (chats.json), so the facts need no storage of their own.
+            AudienceFacts facts = ChatAudienceFacts.From(chat, ActiveChannel, chatKey, ownWhatsappNumber);
+
             // Read the unread count through our own ack ledger: while this row's last message
             // is one the owner already read on screen, it counts as 0 no matter what the server
             // still says. Without it, a message that arrived DURING an open chat repaints the
@@ -378,6 +388,7 @@ public partial class ChatManager : MonoBehaviour
                 existingVm.UpdateLastMessageId(chat.last_message_id);
                 bool mergedIsMine = chat.last_message_sender != null && chat.last_message_sender.isMe;
                 existingVm.UpdateLastMessageMeta(chat.last_message_type, chat.last_message_delivery_status, mergedIsMine);
+                existingVm.UpdateFacts(facts);   // a contact saved or deleted since the last read can move the chat between the lists
 
                 // A genuinely new last message resets per-message resolved state. Only then:
                 // adopt the new sender pushname (the resolver backfills it if empty for a LID
@@ -411,7 +422,8 @@ public partial class ChatManager : MonoBehaviour
                                                lastMessageDeliveryStatus: chat.last_message_delivery_status,
                                                isLastMessageMine: isMine,
                                                lastMessageSenderName: chat.last_message_sender?.pushname,
-                                               isGroup: isGroup);
+                                               isGroup: isGroup,
+                                               facts: facts);
                 Chats.Add(chatVM);
                 chatLookup[chatKey] = chatVM;
                 OnChatAdded?.Invoke(chatVM);

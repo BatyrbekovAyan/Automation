@@ -26,6 +26,11 @@ public class ChatViewModel
     // Only group rows get a sender prefix (same rule MessageListView uses for bubble headers).
     public bool IsGroup { get; }
 
+    // What the personal / business rule reads about this chat (ChatAudienceRule): the contact name or the Telegram user
+    // flags of the chat-list row, the chat id and type. Facts, not a verdict — the verdict also needs the server's decision
+    // and the channel's connection moment. default = nothing known, which the rule reads as personal / unknown.
+    public AudienceFacts Facts { get; private set; }
+
     // Reacted-to message context for a reaction last-message. Null = unknown
     // (formatter omits the "to …" clause). Phase 2 backfills these from a fetch.
     public string ReactionTargetText { get; private set; }
@@ -44,7 +49,8 @@ public class ChatViewModel
                          string lastMessageDeliveryStatus = null,
                          bool isLastMessageMine = false,
                          string lastMessageSenderName = null,
-                         bool isGroup = false)
+                         bool isGroup = false,
+                         AudienceFacts facts = default)
     {
         ChatId = chatId;
         Title = title;
@@ -60,6 +66,7 @@ public class ChatViewModel
         // Preserve the @g.us behavior when a caller doesn't pass the flag (existing tests),
         // and let ParseChatsJson pass true for Telegram groups (numeric id, no suffix).
         IsGroup = isGroup || ChatIdFormat.IsGroup(chatId);
+        Facts = facts;
         LastMessageTimeString = FormatTimestamp(lastTime);
 
         // OnlineStatus = "tap here for contact info";
@@ -83,6 +90,18 @@ public class ChatViewModel
         if (count < 0) count = 0;
         if (UnreadCount == count) return;
         UnreadCount = count;
+        NotifyUpdated();
+    }
+
+    /// <summary>
+    /// Re-reads the audience facts from a fresh chat-list row (the owner saved or deleted a contact, a Telegram card
+    /// changed). A change can move the chat between the working list and «Личные», so it tells the row; an identical
+    /// re-read does not.
+    /// </summary>
+    public void UpdateFacts(AudienceFacts facts)
+    {
+        if (Facts.Equals(facts)) return;
+        Facts = facts;
         NotifyUpdated();
     }
 
