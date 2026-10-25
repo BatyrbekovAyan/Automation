@@ -4,14 +4,26 @@ using UnityEngine;
 using UnityEngine.UI;
 using DG.Tweening;
 
+/// <summary>
+/// The chats screen's list: one ChatItem row per chat of the active bot's active channel, ordered by the last message,
+/// filtered by the search bar. «Личные и рабочие чаты» (spec §5.2): it shows the WORKING chats; the personal ones stand
+/// behind the «Личные» row (<see cref="PersonalChatsRowView"/>, right after the search bar) and come back — with a lock and
+/// a grey counter — only while a search is on. How each chat is drawn is <see cref="ChatAudienceStore.ViewOf"/>'s verdict
+/// under the channel's profile; what follows from it is <see cref="PersonalChatsListModel"/>'s. The verdict is re-read,
+/// once per frame at most, whenever it can change: a row's data (facts, unread, last message), a store change (a decision,
+/// a connection moment, the owner's move), a row added or removed, the query.
+/// </summary>
 public class ChatListView : MonoBehaviour
 {
     [Header("Containers")]
     public Transform content;
-    
+
     public ChatItemView prefab;
 
     [SerializeField] private ChatDeleteConfirm deleteConfirm;
+
+    [Tooltip("The «Личные» row in Content, right after ChatsSearchBar — stamped by PersonalChatsBuilder.")]
+    [SerializeField] private PersonalChatsRowView personalRow;
 
     private Dictionary<string, ChatItemView> itemsByChatId = new();
 
@@ -20,9 +32,15 @@ public class ChatListView : MonoBehaviour
     // applied in LateUpdate before the frame renders.
     private bool resortPending;
 
+    // Coalesced the same way: which rows the list shows, their locks and the «Личные» row.
+    private bool visibilityPending;
+
     private ChatSearchBar searchBar;
     private string currentQuery = "";
     private static readonly CompareInfo Ci = CultureInfo.InvariantCulture.CompareInfo;
+    private readonly List<(AudienceView v, int unread)> audienceScratch = new();
+
+    private bool SearchActive => !string.IsNullOrEmpty(currentQuery);
 
     void Start()
     {
@@ -33,6 +51,7 @@ public class ChatListView : MonoBehaviour
         manager.OnActiveBotChanged += HandleActiveBotChanged;
         manager.OnChatSelected += HandleChatSelected;
         manager.OnChatRemoved += RemoveChat;
+        ChatAudienceStore.OnChanged += RequestVisibilityRefresh;
 
         searchBar = GetComponentInChildren<ChatSearchBar>(true);
         if (searchBar != null)
@@ -40,17 +59,20 @@ public class ChatListView : MonoBehaviour
 
         foreach (var chat in manager.Chats)
             AddChat(chat);
+
+        RequestVisibilityRefresh();   // the «Личные» row follows even an empty list
     }
 
     void ClearChatList()
     {
         // Destroy only the items this view tracks — leaves any non-item
-        // siblings (e.g. ChatsSearchBar header) intact across bot switches.
+        // siblings (the ChatsSearchBar header, the «Личные» row) intact across bot switches.
         foreach (var item in itemsByChatId.Values)
         {
             if (item != null) Destroy(item.gameObject);
         }
         itemsByChatId.Clear();
+        RequestVisibilityRefresh();
     }
 
     void AddChat(ChatViewModel vm)
@@ -72,11 +94,12 @@ public class ChatListView : MonoBehaviour
         item.transform.SetAsLastSibling();
         item.transform.localScale = Vector3.one;
 
-        // Apply the active filter so newly-arriving chats respect any query
-        // the user has typed (e.g. after a bot switch with a query still set).
-        ApplyMatchToItem(item, vm);
+        // Apply the active filter at once so a newly-arriving chat never shows for a frame where it does
+        // not belong — a personal chat outside a search, or a query still set after a bot switch.
+        ApplyMatchToItem(item, ChatAudienceStore.ViewOf(ActiveProfileId(), vm), SearchActive);
 
         RequestResort();
+        RequestVisibilityRefresh();   // the «Личные» row may gain a chat
 
         // Row movement on update is handled inside ChatItemView.OnLastMessageChanged,
         // which unsubscribes itself in OnDestroy. Don't re-subscribe here — that leaks closures.
@@ -111,21 +134,56 @@ public class ChatListView : MonoBehaviour
     private void ApplyFilter(string query)
     {
         currentQuery = query ?? "";
-        foreach (var kvp in itemsByChatId)
-        {
-            var item = kvp.Value;
-            if (item == null) continue;
-            ApplyMatchToItem(item, item.Vm);
-        }
+        ApplyVisibility();   // at once — the owner is typing
     }
 
-    private void ApplyMatchToItem(ChatItemView item, ChatViewModel vm)
+    /// <summary>
+    /// Re-read which rows the list shows on the next LateUpdate (coalesced): a row's data changed (ChatItemView asks), the
+    /// audience store changed, a row came or went.
+    /// </summary>
+    public void RequestVisibilityRefresh() => visibilityPending = true;
+
+    // One pass over every row: the store's verdict, the row's visibility and marks, and the «Личные» row's count.
+    private void ApplyVisibility()
+    {
+        string profileId = ActiveProfileId();
+        bool searchActive = SearchActive;
+        audienceScratch.Clear();
+        foreach (var item in itemsByChatId.Values)
+        {
+            if (item == null || item.Vm == null) continue;
+            AudienceView view = ChatAudienceStore.ViewOf(profileId, item.Vm);
+            ApplyMatchToItem(item, view, searchActive);
+            audienceScratch.Add((view, item.Vm.UnreadCount));
+        }
+        ApplyPersonalRow(searchActive);
+    }
+
+    // A row is shown when it is working (or a search is on) and it matches the query; a personal one in the search results
+    // wears the lock, and its unread badge is grey (personal chats are muted in the app).
+    private void ApplyMatchToItem(ChatItemView item, AudienceView view, bool searchActive)
     {
         if (item == null) return;
-        bool match = Matches(vm, currentQuery);
-        if (item.gameObject.activeSelf != match)
-            item.gameObject.SetActive(match);
+        bool shown = PersonalChatsListModel.Visible(view, searchActive) && Matches(item.Vm, currentQuery);
+        if (item.gameObject.activeSelf != shown)
+            item.gameObject.SetActive(shown);
+        item.SetAudienceMarks(PersonalChatsListModel.ShowLock(view, searchActive), PersonalChatsListModel.IsPersonal(view));
     }
+
+    // The «Личные» row: there while there are personal chats and no search; its grey counter is the personal chats with
+    // something unread — hidden, like every row badge, when the owner turned the unread counter off.
+    private void ApplyPersonalRow(bool searchActive)
+    {
+        if (personalRow == null) return;
+        bool shown = PersonalChatsListModel.RowVisible(PersonalChatsListModel.PersonalCount(audienceScratch), searchActive);
+        if (personalRow.gameObject.activeSelf != shown)
+            personalRow.gameObject.SetActive(shown);
+        personalRow.Bind(NotifPrefs.UnreadBadgeEnabled ? PersonalChatsListModel.PersonalUnreadChats(audienceScratch) : 0);
+    }
+
+    // The active channel's profile — the key the audience decisions are kept under.
+    private static string ActiveProfileId() =>
+        ChatManager.Instance != null ? ChatManager.Instance.ActiveChannelProfileId() : null;
 
     private static bool Matches(ChatViewModel vm, string q)
     {
@@ -159,9 +217,18 @@ public class ChatListView : MonoBehaviour
 
     void LateUpdate()
     {
-        if (!resortPending) return;
-        resortPending = false;
-        ApplyOrderNow();
+        if (resortPending)
+        {
+            resortPending = false;
+            ApplyOrderNow();
+            // A row's last message may have changed since the previous pass — its
+            // visibility under the active search query can flip either way.
+            visibilityPending = true;
+        }
+
+        if (!visibilityPending) return;
+        visibilityPending = false;
+        ApplyVisibility();
     }
 
     private void ApplyOrderNow()
@@ -169,7 +236,7 @@ public class ChatListView : MonoBehaviour
         if (content == null) return;
 
         // Rows in current visual order. Skips non-row children (the pinned
-        // ChatsSearchBar header) and rows already collapsing out after a delete
+        // ChatsSearchBar header, the «Личные» row) and rows already collapsing out after a delete
         // (removed from itemsByChatId but alive until their tween completes).
         var rows = new List<ChatItemView>();
         for (int i = 0; i < content.childCount; i++)
@@ -182,8 +249,8 @@ public class ChatListView : MonoBehaviour
 
         // Fill ONLY the slots currently held by tracked rows, top-down, re-scanning
         // trackedness live because slots shift as rows move. Untracked children —
-        // the pinned ChatsSearchBar header and any delete-collapsing row — keep
-        // their own slots; assigning a contiguous block instead would expel a
+        // the pinned ChatsSearchBar header, the «Личные» row and any delete-collapsing
+        // row — keep their own slots; assigning a contiguous block instead would expel a
         // mid-collapse row to the list bottom whenever a resort lands inside its
         // 0.2s tween (deterministically so on the same-frame RollbackDelete path).
         // Rows only ever move UP to their slot, so placed slots are never disturbed.
@@ -195,10 +262,6 @@ public class ChatListView : MonoBehaviour
             var row = ordered[orderedIdx++];
             if (row.transform.GetSiblingIndex() != slot)
                 row.transform.SetSiblingIndex(slot);
-
-            // A row's last message may have changed since the previous pass — its
-            // visibility under the active search query can flip either way.
-            ApplyMatchToItem(row, row.Vm);
         }
     }
 
@@ -223,6 +286,7 @@ public class ChatListView : MonoBehaviour
         if (!itemsByChatId.TryGetValue(chatId, out var item))
             return;
         itemsByChatId.Remove(chatId);
+        RequestVisibilityRefresh();   // a personal chat leaving changes the «Личные» row
         if (item == null) return;
 
         var rt = (RectTransform)item.transform;
@@ -259,6 +323,8 @@ public class ChatListView : MonoBehaviour
             ChatManager.Instance.OnChatSelected -= HandleChatSelected;
             ChatManager.Instance.OnChatRemoved -= RemoveChat;
         }
+
+        ChatAudienceStore.OnChanged -= RequestVisibilityRefresh;
 
         if (searchBar != null)
             searchBar.OnQueryChanged -= ApplyFilter;

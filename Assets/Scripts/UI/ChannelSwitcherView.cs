@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using DG.Tweening;
 using TMPro;
 using UnityEngine;
@@ -19,6 +20,8 @@ using UnityEngine.UI;
 /// current <see cref="Bot"/>'s profile fields, decisions stay in the pure
 /// <see cref="ChannelSwitcherModel"/> seam. Event-driven with a late-activation
 /// catch-up Refresh in OnEnable; colors re-pull on <see cref="Theme.Changed"/>.
+/// «Личные и рабочие чаты»: the unread total counts WORKING chats only, and the
+/// events that move it (a chat added, an audience change) refresh once per frame.
 ///
 /// All serialized refs are stamped by ChatsTopBarRestyleBuilder via
 /// SerializedObject; every ref is null-guarded so a bot deleted mid-screen
@@ -51,9 +54,13 @@ public class ChannelSwitcherView : MonoBehaviour
 
     private Action<ChatViewModel> chatAddedHandler;
 
+    // The unread total walks every chat through the audience store, so a burst of events (the initial list load adds every
+    // chat in one frame) refreshes once, at the end of the frame, instead of once per chat.
+    private bool refreshPending;
+
     private void Awake()
     {
-        chatAddedHandler = _ => Refresh();
+        chatAddedHandler = _ => RequestRefresh();
         WireChip(waChipButton, ChatChannel.WhatsApp);
         WireChip(tgChipButton, ChatChannel.Telegram);
     }
@@ -61,6 +68,7 @@ public class ChannelSwitcherView : MonoBehaviour
     private void OnEnable()
     {
         Theme.Changed += Refresh;
+        ChatAudienceStore.OnChanged += RequestRefresh;   // a chat moved between the working list and «Личные»
 
         // Mirror ReplyModeToggleBinder: no ChatManager yet ⇒ nothing to bind.
         if (ChatManager.Instance == null) return;
@@ -75,9 +83,18 @@ public class ChannelSwitcherView : MonoBehaviour
         Refresh();
     }
 
+    private void LateUpdate()
+    {
+        if (!refreshPending) return;
+        Refresh();
+    }
+
+    private void RequestRefresh() => refreshPending = true;
+
     private void OnDisable()
     {
         Theme.Changed -= Refresh;
+        ChatAudienceStore.OnChanged -= RequestRefresh;
 
         if (ChatManager.Instance != null)
         {
@@ -124,6 +141,7 @@ public class ChannelSwitcherView : MonoBehaviour
     /// </summary>
     private void Refresh()
     {
+        refreshPending = false;
         string botId = ChatManager.Instance != null ? ChatManager.Instance.CurrentBotId : null;
         Bot bot = Manager.Instance != null ? Manager.Instance.FindBotByName(botId) : null;
 
@@ -147,18 +165,22 @@ public class ChannelSwitcherView : MonoBehaviour
 
     // Phase 1 of the spec: the count is the ACTIVE channel's — exactly what the
     // live chat list holds. The inactive channel's total needs its cache read and
-    // is deliberately deferred (spec §2, phase 2).
+    // is deliberately deferred (spec §2, phase 2). «Личные и рабочие чаты»: WORKING
+    // chats only — every chat drawn as the list draws it, under the channel's profile;
+    // a personal chat is muted in the app.
     private int ActiveUnreadTotal()
     {
-        if (ChatManager.Instance == null || ChatManager.Instance.Chats == null) return 0;
+        var manager = ChatManager.Instance;
+        if (manager == null || manager.Chats == null) return 0;
+        return PersonalChatsListModel.WorkingUnreadTotal(UnreadByAudience(manager.Chats, manager.ActiveChannelProfileId()));
+    }
 
-        int total = 0;
-        var chats = ChatManager.Instance.Chats;
+    private static IEnumerable<(AudienceView v, int unread)> UnreadByAudience(List<ChatViewModel> chats, string profileId)
+    {
         for (int i = 0; i < chats.Count; i++)
         {
-            if (chats[i] != null) total += Mathf.Max(0, chats[i].UnreadCount);
+            if (chats[i] != null) yield return (ChatAudienceStore.ViewOf(profileId, chats[i]), chats[i].UnreadCount);
         }
-        return total;
     }
 
     /// <summary>

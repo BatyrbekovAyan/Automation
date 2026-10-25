@@ -1,9 +1,11 @@
 /// <summary>
 /// Decides whether a chat-list sync result represents a fresh incoming message
 /// worth a local sound/vibration cue. Pure so the guard set is unit-testable:
-/// never on the initial cache load, only when the last message actually changed,
-/// never for our own outgoing echoes, only while the server reports unread, and
-/// suppressed for the chat currently open on screen (the user is already reading it).
+/// never for a personal chat («Личные и рабочие чаты»: the app stays quiet where
+/// the assistant stays out), never on the initial cache load, only when the last
+/// message actually changed, never for our own outgoing echoes, only while the
+/// server reports unread, and suppressed for the chat currently open on screen
+/// (the user is already reading it).
 /// </summary>
 public static class IncomingNotifyPolicy
 {
@@ -14,8 +16,10 @@ public static class IncomingNotifyPolicy
         int unreadCount,
         string chatId,
         string openChatId,
-        bool chatPanelVisible)
+        bool chatPanelVisible,
+        bool chatIsPersonal)
     {
+        if (chatIsPersonal) return false;
         if (isInitialLoad) return false;
         if (!lastIdChanged) return false;
         if (lastMessageIsMine) return false;

@@ -306,6 +306,7 @@ public class FontGlyphCoverageTests
             typeof(AutoReadinessCopy),     // learning B + percent: sheet «ИИ-сотрудник ещё учится», «Авто» under the mark, «Учится · N %» (2026-10-23)
             typeof(ChannelHealthCopy),     // A4 «Канал отключён · переподключите в настройках» on the bot card (2026-10-14)
             typeof(ScheduleCopy),          // B2 «РАСПИСАНИЕ РАБОТЫ» section + «Вне графика ·» row marker (2026-10-17)
+            typeof(PersonalChatsCopy),     // «Личные и рабочие чаты»: the list row, folder, onboarding, sheets, toasts, settings (2026-10-25)
         };
         foreach (var t in constTypes)
             foreach (var f in t.GetFields(BindingFlags.Public | BindingFlags.Static))
@@ -393,6 +394,17 @@ public class FontGlyphCoverageTests
         for (int day = 0; day < ScheduleCopy.DayNames.Count; day++)
             yield return ($"ScheduleCopy.DayName({day})", ScheduleCopy.DayName(day));
         yield return ("ScheduleModel.FormatWindow", ScheduleModel.FormatWindow(540, 1260));
+        // «Личные и рабочие чаты»: the composed texts — the counts, both channels, the wipe's days
+        yield return ("PersonalChatsCopy.MakeBusinessMany", PersonalChatsCopy.MakeBusinessMany(12));
+        yield return ("PersonalChatsCopy.OnboardingDone", PersonalChatsCopy.OnboardingDone(3));
+        foreach (bool telegram in new[] { false, true })
+        {
+            yield return ($"PersonalChatsCopy.OnboardingConnected({telegram})", PersonalChatsCopy.OnboardingConnected(telegram));
+            yield return ($"PersonalChatsCopy.OnboardingLoading({telegram})", PersonalChatsCopy.OnboardingLoading(telegram));
+            yield return ($"PersonalChatsCopy.OnboardingNoContacts({telegram})", PersonalChatsCopy.OnboardingNoContacts(telegram));
+        }
+        foreach (int days in new[] { 1, ChatAudienceRule.WipeDays, 5 })
+            yield return ($"PersonalChatsCopy.MakePersonalBody({days})", PersonalChatsCopy.MakePersonalBody(days));
 
         foreach (OutcomeStatus s in Enum.GetValues(typeof(OutcomeStatus)))
             yield return ($"DashboardStatusInfo.Label({s})", DashboardStatusInfo.Label(s));

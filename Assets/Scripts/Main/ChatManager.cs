@@ -320,6 +320,9 @@ public partial class ChatManager : MonoBehaviour
         // One cue per sync pass, no matter how many chats got new messages.
         bool notifyIncoming = false;
         bool chatPanelVisible = MessageListPanel != null && MessageListPanel.activeSelf;
+        // «Личные и рабочие чаты»: a personal chat never plays the cue. Judged under the channel's profile — the key the
+        // audience decisions are kept under — exactly as the list draws the chat.
+        string audienceProfileId = GetActiveProfileId();
 
         foreach (var chat in response.dialogs)
         {
@@ -404,7 +407,8 @@ public partial class ChatManager : MonoBehaviour
 
                 notifyIncoming |= IncomingNotifyPolicy.ShouldNotify(
                     isInitialLoad, lastIdChanged, mergedIsMine, effectiveUnread,
-                    chatKey, currentChatId, chatPanelVisible);
+                    chatKey, currentChatId, chatPanelVisible,
+                    chatIsPersonal: IsPersonalChat(audienceProfileId, existingVm));
             }
             else
             {
@@ -431,7 +435,8 @@ public partial class ChatManager : MonoBehaviour
                 notifyIncoming |= IncomingNotifyPolicy.ShouldNotify(
                     isInitialLoad, lastIdChanged: true, lastMessageIsMine: isMine,
                     unreadCount: effectiveUnread, chatId: chatKey,
-                    openChatId: currentChatId, chatPanelVisible: chatPanelVisible);
+                    openChatId: currentChatId, chatPanelVisible: chatPanelVisible,
+                    chatIsPersonal: IsPersonalChat(audienceProfileId, chatVM));
             }
         }
 
@@ -462,6 +467,13 @@ public partial class ChatManager : MonoBehaviour
             }
         }
     }
+
+    /// <summary>
+    /// «Личные и рабочие чаты»: the chat is personal as the list draws it (<see cref="ChatAudienceStore.ViewOf"/>: the
+    /// owner's move, else the server's decision, else the shared rule) — such a chat plays no incoming cue.
+    /// </summary>
+    private static bool IsPersonalChat(string profileId, ChatViewModel chat) =>
+        ChatAudienceStore.ViewOf(profileId, chat).Kind == AudienceKind.Personal;
 
     /// <summary>
     /// True while a chats/filter sync is in flight. Guards RefreshActiveBotChats

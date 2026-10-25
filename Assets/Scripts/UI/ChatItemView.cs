@@ -21,6 +21,10 @@ public class ChatItemView : MonoBehaviour
     public Button deleteButton;        // the red button revealed behind the row
     public SwipeToDelete swipeToDelete; // on the SwipeContent child
 
+    [Header("Личные и рабочие чаты")]
+    [Tooltip("The lock before the name — a personal chat in the search results. Hidden by default; stamped by PersonalChatsBuilder.")]
+    [SerializeField] private GameObject audienceLock;
+
     private ChatViewModel vm;
     public ChatViewModel Vm => vm;
     private string chatId;
@@ -201,6 +205,27 @@ public void Bind(ChatViewModel model)
         MaybeResolveRowDetails();
 
         ApplyUnreadBadge(vm.UnreadCount);
+
+        // New facts can move the chat between the working list and «Личные», and a new unread count changes the
+        // «Личные» row's counter — the list re-reads both (coalesced per frame).
+        if (parentList == null)
+            parentList = GetComponentInParent<ChatListView>(true);
+        if (parentList != null)
+            parentList.RequestVisibilityRefresh();
+    }
+
+    /// <summary>
+    /// «Личные и рабочие чаты»: how the list draws a personal chat. <paramref name="lockMark"/> shows the lock before the
+    /// name (a personal chat among the search results); <paramref name="greyBadge"/> mutes the unread accents — the badge
+    /// goes InkTertiary and the time keeps its read colour, because a personal chat is muted in the app.
+    /// </summary>
+    public void SetAudienceMarks(bool lockMark, bool greyBadge)
+    {
+        if (audienceLock != null && audienceLock.activeSelf != lockMark)
+            audienceLock.SetActive(lockMark);
+        if (mutedBadge == greyBadge) return;
+        mutedBadge = greyBadge;
+        ApplyUnreadBadge(lastUnreadCount);
     }
 
     // Phase 2 / group-author: when an on-screen row is missing detail — a reaction's target
@@ -539,6 +564,9 @@ public void Bind(ChatViewModel model)
     // runtime-tinted bits without waiting for the next rebind.
     private int lastUnreadCount;
 
+    // A personal chat's row: its unread accents are muted (SetAudienceMarks).
+    private bool mutedBadge;
+
     private void CacheUnreadBadgeColor()
     {
         if (unreadBadgeImage == null && unreadBadge != null)
@@ -562,12 +590,15 @@ public void Bind(ChatViewModel model)
             ? ChatManager.Instance.ActiveChannel
             : ChatChannel.WhatsApp;
 
+        // A personal chat is muted: no channel accent anywhere on its row — a grey badge, the time in its read colour.
         if (timeText != null)
-            timeText.color = hasUnread ? ChannelAccent.Resolve(channel, UnreadTimeColor) : ReadTimeColor;
+            timeText.color = hasUnread && !mutedBadge ? ChannelAccent.Resolve(channel, UnreadTimeColor) : ReadTimeColor;
 
         CacheUnreadBadgeColor();
         if (unreadBadgeImage != null)
-            unreadBadgeImage.color = ChannelAccent.Resolve(channel, Theme.Fixed.UnreadAccentWhatsApp);
+            unreadBadgeImage.color = mutedBadge
+                ? Theme.Color(ThemeRole.InkTertiary)
+                : ChannelAccent.Resolve(channel, Theme.Fixed.UnreadAccentWhatsApp);
 
         if (unreadBadge == null) return;
         if (!hasUnread)
