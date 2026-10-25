@@ -1286,6 +1286,28 @@
         }
       },
       "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- «Личные и рабочие чаты»: the Profile Lifecycle Sweep's step «Wipe Personal Chats» (every 6 hours; it does not depend on a\n-- dry-run flag). 2 days after the OWNER made a chat personal, what the assistant stored about that chat is deleted —\n-- the protection against a mis-tap: a chat the owner takes back sooner keeps everything.\n-- The work list is chat_audience: source 'owner' (a computed decision never has data to wipe), kind 'personal', the clock\n-- personal_since set and old enough, not wiped yet — the oldest first, 200 at most per run (the partial index\n-- chat_audience_wipe_idx is built for exactly this). The rows are locked, and a row another statement holds is skipped, never\n-- waited for: the owner's write that takes a chat back may be in flight, and that chat is left alone (it is business by the\n-- next run, so it is not selected again).\n-- For each chat: its rows in n8n_chat_histories (session_id = profile id, a colon, chat id), chat_history_events,\n-- conversation_outcomes, handoff_requests, reply_events, chat_reply_state, suggestion_sets and its OWN row of reply_mode_flags\n-- (never the bot-wide row, chat id '*'). Never dialog_counts (the tariff usage), never the decision itself, never the per-bot\n-- rows (bot_schedule, audience_connections). Then wiped_at = now(): the chat is done, whatever is written for it afterwards.\n-- One statement: all of it happens or none of it.\n-- ALWAYS one row: wiped_chats (decisions marked) and deleted_rows (rows deleted over all the tables). No parameters.\nwith batch as (\n  select a.profile_id, a.chat_id\n  from chat_audience a\n  where a.source = 'owner' and a.kind = 'personal' and a.wiped_at is null\n    and a.personal_since <= now() - interval '48 hours'\n  order by a.personal_since, a.profile_id, a.chat_id\n  limit 200\n  for update skip locked\n), hist as (\n  delete from n8n_chat_histories h using batch b\n  where h.session_id = b.profile_id || ':' || b.chat_id\n  returning 1\n), events as (\n  delete from chat_history_events e using batch b\n  where e.profile_id = b.profile_id and e.chat_id = b.chat_id\n  returning 1\n), outcomes as (\n  delete from conversation_outcomes o using batch b\n  where o.profile_id = b.profile_id and o.chat_id = b.chat_id\n  returning 1\n), handoffs as (\n  delete from handoff_requests r using batch b\n  where r.profile_id = b.profile_id and r.chat_id = b.chat_id\n  returning 1\n), ledger as (\n  delete from reply_events v using batch b\n  where v.profile_id = b.profile_id and v.chat_id = b.chat_id\n  returning 1\n), states as (\n  delete from chat_reply_state s using batch b\n  where s.profile_id = b.profile_id and s.chat_id = b.chat_id\n  returning 1\n), sets as (\n  delete from suggestion_sets g using batch b\n  where g.profile_id = b.profile_id and g.chat_id = b.chat_id\n  returning 1\n), flags as (\n  delete from reply_mode_flags f using batch b\n  where f.profile_id = b.profile_id and f.chat_id = b.chat_id and f.chat_id <> '*'\n  returning 1\n), marked as (\n  update chat_audience a set wiped_at = now(), updated_at = now()\n  from batch b\n  where a.profile_id = b.profile_id and a.chat_id = b.chat_id\n  returning 1\n)\nselect (select count(*) from marked)::int as wiped_chats,\n       ((select count(*) from hist) + (select count(*) from events) + (select count(*) from outcomes)\n        + (select count(*) from handoffs) + (select count(*) from ledger) + (select count(*) from states)\n        + (select count(*) from sets) + (select count(*) from flags))::int as deleted_rows",
+        "options": {}
+      },
+      "id": "149ba8e0-e472-5293-8292-68ccdf2aff67",
+      "name": "Wipe Personal Chats",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -680,
+        760
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "vvRrFiEXzLVqKjOx",
+          "name": "Postgres"
+        }
+      },
+      "onError": "continueRegularOutput"
     }
   ],
   "connections": {
@@ -1299,6 +1321,11 @@
           },
           {
             "node": "Expire Learning Rows",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Wipe Personal Chats",
             "type": "main",
             "index": 0
           }

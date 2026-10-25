@@ -50,7 +50,10 @@ paste them, never copy them:
   CONNECTED_SQL              the app reports a connection: another number restarts the moment;
   LIST_SQL                   what the app mirrors: the moment and the holding decisions of each profile;
   BACKFILL_SQL(row, owner)   when a chat turns business, the recent messages it lacks go into the history and the memory.
-tests/test_audience_sql.py runs every one of them on real SQL (staging Postgres), the race of two first messages included.
+  WIPE_SQL                   the Sweep's step: WIPE_DAYS after the OWNER made a chat personal, what the assistant stored
+                             about it is deleted (never dialog_counts) and the decision is marked wiped.
+tests/test_audience_sql.py runs every one of them but the last on real SQL (staging Postgres), the race of two first messages
+included; tests/test_personal_wipe.py runs WIPE_SQL (and the Sweep node that carries it) the same way.
 
     python3 Tools/n8n/audience.py              # print RULE_JS
 """
@@ -63,6 +66,7 @@ SETTLE_MINUTES = 30     # after a channel is connected, a chat without a decisio
                         # for this long (what Wappi can read of the account's history may be incomplete at first)
 FRESH_HOURS = 24        # a message that waited for the owner's decision is handed to the assistant again only while younger
 WIPE_DAYS = 2           # the data of a chat the owner made personal is wiped after this many days
+WIPE_BATCH = 200        # chats the Sweep wipes per run (every 6 hours); the oldest first, the rest wait for the next run
 WA_CONTACT_SOURCE = "webhook"   # where the WhatsApp «saved contact» fact comes from: "webhook" (contact_name of the incoming
                                 # message) | "chats_filter" (contact.FullName of the chat list); live check D1,
                                 # docs/audits/2026-10-25-personal-chats/live-checks.md
@@ -426,6 +430,76 @@ with aud_ok as (
   returning 1
 )
 select (select count(*) from ev)::int as added"""
+
+
+# The step is a node of the Profile Lifecycle Sweep (apply-personal-wipe.py): no parameters, nothing to bind. The delay is
+# WIPE_DAYS written as hours, so a clock change never moves it by an hour; the batch is WIPE_BATCH. Both numbers are written into
+# the statement's own comment as well, so the node reads on its own in the n8n editor. Unqualified table names, as in every
+# statement of this module (the tests run them against temp tables first on the search path).
+WIPE_SQL = """-- «Личные и рабочие чаты»: the Profile Lifecycle Sweep's step «Wipe Personal Chats» (every 6 hours; it does not depend on a
+-- dry-run flag). """ + str(WIPE_DAYS) + """ days after the OWNER made a chat personal, what the assistant stored about that chat is deleted —
+-- the protection against a mis-tap: a chat the owner takes back sooner keeps everything.
+-- The work list is chat_audience: source 'owner' (a computed decision never has data to wipe), kind 'personal', the clock
+-- personal_since set and old enough, not wiped yet — the oldest first, """ + str(WIPE_BATCH) + """ at most per run (the partial index
+-- chat_audience_wipe_idx is built for exactly this). The rows are locked, and a row another statement holds is skipped, never
+-- waited for: the owner's write that takes a chat back may be in flight, and that chat is left alone (it is business by the
+-- next run, so it is not selected again).
+-- For each chat: its rows in n8n_chat_histories (session_id = profile id, a colon, chat id), chat_history_events,
+-- conversation_outcomes, handoff_requests, reply_events, chat_reply_state, suggestion_sets and its OWN row of reply_mode_flags
+-- (never the bot-wide row, chat id '*'). Never dialog_counts (the tariff usage), never the decision itself, never the per-bot
+-- rows (bot_schedule, audience_connections). Then wiped_at = now(): the chat is done, whatever is written for it afterwards.
+-- One statement: all of it happens or none of it.
+-- ALWAYS one row: wiped_chats (decisions marked) and deleted_rows (rows deleted over all the tables). No parameters.
+with batch as (
+  select a.profile_id, a.chat_id
+  from chat_audience a
+  where a.source = 'owner' and a.kind = 'personal' and a.wiped_at is null
+    and a.personal_since <= now() - interval '""" + str(WIPE_DAYS * 24) + """ hours'
+  order by a.personal_since, a.profile_id, a.chat_id
+  limit """ + str(WIPE_BATCH) + """
+  for update skip locked
+), hist as (
+  delete from n8n_chat_histories h using batch b
+  where h.session_id = b.profile_id || ':' || b.chat_id
+  returning 1
+), events as (
+  delete from chat_history_events e using batch b
+  where e.profile_id = b.profile_id and e.chat_id = b.chat_id
+  returning 1
+), outcomes as (
+  delete from conversation_outcomes o using batch b
+  where o.profile_id = b.profile_id and o.chat_id = b.chat_id
+  returning 1
+), handoffs as (
+  delete from handoff_requests r using batch b
+  where r.profile_id = b.profile_id and r.chat_id = b.chat_id
+  returning 1
+), ledger as (
+  delete from reply_events v using batch b
+  where v.profile_id = b.profile_id and v.chat_id = b.chat_id
+  returning 1
+), states as (
+  delete from chat_reply_state s using batch b
+  where s.profile_id = b.profile_id and s.chat_id = b.chat_id
+  returning 1
+), sets as (
+  delete from suggestion_sets g using batch b
+  where g.profile_id = b.profile_id and g.chat_id = b.chat_id
+  returning 1
+), flags as (
+  delete from reply_mode_flags f using batch b
+  where f.profile_id = b.profile_id and f.chat_id = b.chat_id and f.chat_id <> '*'
+  returning 1
+), marked as (
+  update chat_audience a set wiped_at = now(), updated_at = now()
+  from batch b
+  where a.profile_id = b.profile_id and a.chat_id = b.chat_id
+  returning 1
+)
+select (select count(*) from marked)::int as wiped_chats,
+       ((select count(*) from hist) + (select count(*) from events) + (select count(*) from outcomes)
+        + (select count(*) from handoffs) + (select count(*) from ledger) + (select count(*) from states)
+        + (select count(*) from sets) + (select count(*) from flags))::int as deleted_rows"""
 
 
 if __name__ == "__main__":
