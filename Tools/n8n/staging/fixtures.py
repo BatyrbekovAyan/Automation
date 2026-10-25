@@ -102,6 +102,11 @@ def main():
         # B1 (2026-10-14): nor an earlier lifetime's schedule (it would keep a brand-new profile silent outside its window)
         if psql("select to_regclass('public.bot_schedule') is not null;") == "t":
             psql("delete from bot_schedule where profile_id ~ '^profile-[0-9]{6}$' and not (profile_id = any (select jsonb_array_elements_text(:'p0'::jsonb)));", live)
+        # «Личные и рабочие чаты» (2026-10-25): nor an earlier lifetime's audience decisions and connection moment (a chat it
+        # decided personal would stay silent, an old moment would skip the first-minutes window) — once the migration is applied
+        for tbl in ("chat_audience", "audience_connections"):
+            if psql(f"select to_regclass('public.{tbl}') is not null;") == "t":
+                psql(f"delete from {tbl} where profile_id ~ '^profile-[0-9]{{6}}$' and not (profile_id = any (select jsonb_array_elements_text(:'p0'::jsonb)));", live)
         print(f"swept {len(pids)} stale mock profile(s) (live mock knows {len(a.live)})")
     elif a.cmd == "delete":
         if not (a.app_user_id.startswith("probe-") or FIXTURE_RC.match(a.app_user_id)):
@@ -136,6 +141,12 @@ def main():
         if psql("select to_regclass('public.bot_schedule') is not null;") == "t":
             for pid in a.profile_id:
                 n = int(n or 0) + int(psql("with a as (delete from bot_schedule where profile_id = :'p0' returning 1) select count(*) from a;", pid) or 0)
+        # «Личные и рабочие чаты» (2026-10-25): a fixture profile's audience decisions and connection moment (only once the
+        # chat-audience migration is applied) — a decision left on a re-used staging id would decide a later scenario's chat
+        for tbl in ("chat_audience", "audience_connections"):
+            if psql(f"select to_regclass('public.{tbl}') is not null;") == "t":
+                for pid in a.profile_id:
+                    n = int(n or 0) + int(psql(f"with a as (delete from {tbl} where profile_id = :'p0' returning 1) select count(*) from a;", pid) or 0)
         print(f"deleted rows: {n}")
 
 

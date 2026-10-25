@@ -114,6 +114,10 @@ cmd_migrate() {
     # B1 «расписание бота» (2026-10-14): the bot's schedule (the templates' Read Reply Mode reads it — fail-closed, so BEFORE
     # the canon; crSetSchedule001 writes it; Create's bind moves it, Delete Bot Files deletes it)
     "${N8N_DIR}/sql/2026-10-14-bot-schedule.sql"
+    # «Личные и рабочие чаты» (2026-10-25): the per-chat decisions (chat_audience) and the connection moments
+    # (audience_connections) + reply_events' 'cancelled_personal' — every statement over them is Tools/n8n/audience.py; the
+    # templates' Read Reply Mode will read them (fail-closed), so BEFORE the canon. Re-running it is a no-op.
+    "${N8N_DIR}/sql/2026-10-25-chat-audience.sql"
   )
   for f in "${files[@]}"; do
     [ -s "$f" ] || { echo "skip (missing) $f"; continue; }
