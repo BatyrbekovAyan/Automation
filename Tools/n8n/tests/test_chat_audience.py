@@ -35,9 +35,12 @@ network, never production. Every scenario runs for a WhatsApp and a Telegram pro
   G10 connected_first_time_takes_the_line_moment
   G11 connected_other_phone_resets
   G12 connected_unauthorized_is_409 — and every other status refusal (502 / 400 / 500)
-  G13 the replay message is built from ONE messages/get row per channel (one function; the live check confirms the keys)
+  G13 the replay message is built from ONE messages/get row per channel (one function; the live check confirms the keys);
+      a row whose own `from` is not the chat (Telegram's documented username) is not handed on
   G14 a crossed, failed or refused page backfills and replays nothing; the decision stays business
   G15 what is not a client message is never replayed (voice, reaction, deleted, no fromMe)
+  G15b a group member's message (its own `from` is not the chat) is never replayed — the templates' group guard «If»
+      from == chatId is kept — but the backfill keeps it as history
   G16 several chats turned business at once: each its own tail, the replay carries its own chat (the pairing)
   G17 a failed backfill replays nothing; a failed set answers 500 and starts nothing; a failed list answers 500
   G18 the requests: the Wappi base per channel, limit 10 / order desc, never mark_all, the Wappi credential, fullResponse +
@@ -459,9 +462,10 @@ def wa_row(chat, mid, from_me, text, age_s, type_='chat', **extra):
 
 
 def tg_row(chat, mid, from_me, text, age_s, type_='text', **extra):
-    """A Telegram messages/get row in the documented shape (tg-docs.txt): `from` of the client's row is a USERNAME there
-    («FL00D»), the chat id is the dialog's numeric id."""
-    r = {'id': mid, 'type': type_, 'from': '996507585526' if from_me else 'FL00D', 'to': 'FL00D' if from_me else '996507585526',
+    """A Telegram messages/get row in the live shape (Tools/tapi/SHAPES.md #4): a private chat's incoming row carries
+    from == chatId (the dialog's numeric id), the owner's own row the profile user's id. The documented example
+    (tg-docs.txt) shows a username in the client row's `from` — that shape is pinned as «not replayed» in G13."""
+    r = {'id': mid, 'type': type_, 'from': '996507585526' if from_me else chat, 'to': chat if from_me else '996507585526',
          'fromMe': from_me, 'senderName': 'Varis' if from_me else 'Max Flood', 'time': int(time.time()) - age_s, 'body': text,
          'stanzaId': '', 'chatId': chat, 'isForwarded': False, 'isReply': False, 'caption': '', 'delivery_status': 'delivered',
          's3Info': {}, 'poll_votes': None, 'poll_options': None, 'poll_select_count': 0}
@@ -898,9 +902,10 @@ for ch, C in CH.items():
 
 # ================================================================================================ G13: the mapping
 with Case('G13 the replay message is built from ONE messages/get row, per channel: wh_type incoming_message, the token\'s '
-          'profile, the row\'s id / body / type / time / caption, from = chatId = the chat the decision names (Telegram\'s '
-          'documented row carries a username in `from`), the private-dialog chat type of the channel, is_bot only when the '
-          'row says so, contact_name only when present') as c:
+          'profile, the row\'s id / body / type / time / caption, from = the row\'s own from = the chat the decision names '
+          '(a row whose from is anything else — Telegram\'s documented row with a username there — is NOT handed on until '
+          'the live check settles it), the private-dialog chat type of the channel, is_bot only when the row says so, '
+          'contact_name only when present') as c:
     w = canon()
     js = node(w, 'Replay Plan')['parameters']['jsCode']
     c.check(node(w, 'Replay Plan')['parameters'].get('mode') == 'runOnceForEachItem', 'Replay Plan runs per item')
@@ -921,13 +926,21 @@ with Case('G13 the replay message is built from ONE messages/get row, per channe
         'wh_type': 'incoming_message', 'profile_id': 'wa-p', 'id': '3A945DD9CDD3016BE11B', 'body': 'Ответ на сообщение', 'type': 'chat',
         'from': '79115576366@c.us', 'chatId': '79115576366@c.us', 'time': t, 'caption': '', 'chat_type': 'dialog', 'is_bot': False},
         f'WhatsApp: {wa}')
+    docs = plan('telegram', 'tg-p', '89323786',
+                [{'id': '2909', 'type': 'text', 'from': 'FL00D', 'to': '996507585526', 'fromMe': False, 'senderName': 'Max Flood',
+                  'time': t, 'body': 'Ldlld', 'stanzaId': '', 'chatId': '89323786', 'isForwarded': False, 'isReply': False,
+                  'caption': '', 'delivery_status': 'delivered', 's3Info': {}}])
+    c.check(docs.get('replay') is False and docs.get('why') == 'not_from_chat' and docs.get('message') is None
+            and docs.get('triggerId') == '' and len(docs.get('page') or []) == 1,
+            f'Telegram\'s documented row (a username in from) is not handed on, but stays in the page for the backfill: {docs}')
     tg = plan('telegram', 'tg-p', '89323786',
-              [{'id': '2909', 'type': 'text', 'from': 'FL00D', 'to': '996507585526', 'fromMe': False, 'senderName': 'Max Flood',
+              [{'id': '2909', 'type': 'text', 'from': '89323786', 'to': '996507585526', 'fromMe': False, 'senderName': 'Max Flood',
                 'time': t, 'body': 'Ldlld', 'stanzaId': '', 'chatId': '89323786', 'isForwarded': False, 'isReply': False,
                 'caption': '', 'delivery_status': 'delivered', 's3Info': {}, 'contact_name': 'Max'}])
-    c.check(tg.get('message') == {'wh_type': 'incoming_message', 'profile_id': 'tg-p', 'id': '2909', 'body': 'Ldlld', 'type': 'text',
-                                  'from': '89323786', 'chatId': '89323786', 'time': t, 'caption': '', 'chat_type': 'user',
-                                  'is_bot': False, 'contact_name': 'Max'}, f'Telegram: {tg}')
+    c.check(tg.get('replay') is True and tg.get('message') == {
+        'wh_type': 'incoming_message', 'profile_id': 'tg-p', 'id': '2909', 'body': 'Ldlld', 'type': 'text', 'from': '89323786',
+        'chatId': '89323786', 'time': t, 'caption': '', 'chat_type': 'user', 'is_bot': False, 'contact_name': 'Max'},
+        f'Telegram, the live shape (from == chatId): {tg}')
     odd = plan('telegram', 'tg-p', '60227586',
                [{'id': '5902', 'type': 'image', 'from': '60227586', 'fromMe': False, 'time': str(t), 'body': {'thumb': 'x'},
                  'chatId': '60227586', 'is_bot': True}])
@@ -968,6 +981,28 @@ for ch, C in CH.items():
             with Session(SETUP) as pg:
                 r, fake = tail_scenario(pg, ch, [newest])
                 c.check(answer(r)[0] == 200 and not fake.replays and r.ran('Backfill'), f'{label}: {r}')
+
+    with Case(f'G15b [{ch}] a group member\'s message is never replayed: its own `from` names the member, not the chat — the '
+              'templates\' only group guard («If» from == chatId) would drop it, so the replay must not hand it on (no POST to '
+              'the bot\'s webhook) whatever the chat\'s decision says; it is history all the same — the backfill keeps it') as c:
+        with Session(SETUP) as pg:
+            # Telegram: a group the owner's set cannot refuse by its id (only the WhatsApp suffixes and the service account
+            # are refused there); WhatsApp: a group id IS refused, so the chat is person-shaped and the row's sender is not it.
+            group = '5550909090' if ch == 'TG' else C['chat']
+            member = '5550001' if ch == 'TG' else '77019998877@c.us'
+            profile(pg, P, C['channel'])
+            msg = {**row(group, 'g-member', False, 'всем привет', 120), 'from': member}
+            fake = Fake(pages={(P, group): [msg]})
+            r = call(pg, set_body(P, (group, 'business', 6)), [P], fake=fake)
+            c.check(answer(r)[0] == 200 and answer(r)[1]['results'][0]['applied'] is True and r.ran('Replay Plan'),
+                    f'the set applied and the tail ran: {r}')
+            c.check(not fake.replays and not any(x['node'] == 'Replay' for x in r.calls),
+                    f'no POST to the bot\'s webhook: {[x["body"] for x in r.calls if x["node"] == "Replay"]}')
+            plan_out = (r.outputs.get('Replay Plan') or [[]])[0]
+            c.check(len(plan_out) == 1 and plan_out[0]['json']['replay'] is False and plan_out[0]['json']['why'] == 'not_from_chat',
+                    f'Replay Plan names why: {[p["json"].get("why") for p in plan_out]}')
+            c.check([(h['message_id'], h['source']) for h in history(pg, P, group)] == [('g-member', 'client')],
+                    f'the backfill keeps it as history: {history(pg, P, group)}')
 
     with Case(f'G16 [{ch}] several chats turned business at once: each gets its own read, its own backfill, and only the '
               'fresh-waiting one is replayed — with ITS chat (the per-item pairing through the If, the HTTP read and the '

@@ -43,8 +43,10 @@ still wired as designed».
           only the two Wappi bases, messages/get with limit 10 / order desc, continue on error; mark_all nowhere;
       (6) the replay: only through Replay? (the backfill's committed row AND the plan's positive word), POST to the bot's own
           webhook on localhost, no credential, neverError, at most 10 s; Replay Plan runs per item, takes FRESH_HOURS from
-          audience.py, checks the page is this profile's and chat's, never replays a voice message, builds the message in ONE
-          function; Phone embeds build-handoff-workflows.OWNER_PHONE_JS verbatim and needs the echo and the boolean flag;
+          audience.py, checks the page is this profile's and chat's, hands on only a row whose own `from` is the chat (never a
+          group member's message — the templates' group guard «If» from == chatId must still see the real sender, so the
+          message keeps that `from`), never replays a voice message, builds the message in ONE function; Phone embeds
+          build-handoff-workflows.OWNER_PHONE_JS verbatim and needs the echo and the boolean flag;
       (7) crChatAudience01 is a protected infra id: build-client-webhooks.PROTECTED_IDS, staging/bootstrap.py
           ACTIVE_CANONICAL, Set Workflow State and the dependents regenerated from the list.
 
@@ -705,6 +707,9 @@ def check_webhook(bundle, sql=None):
          and "body.uuid !== profileId" in plan and "m.chatId !== chatId" in plan and "body.status === 'done'" in plan,
          "Replay Plan must run per item, take FRESH_HOURS from audience.py, check the page is this profile's and chat's, hand on "
          "only the client's fresh message (never a voice message) and build it in ONE function")
+    need("else if (String(newest.from) !== chatId) why = 'not_from_chat';" in plan and "    from: String(row.from),\n" in plan,
+         "Replay Plan must hand on only a row whose own `from` is the chat and keep that `from` in the message — the templates' "
+         "only group guard («If» from == chatId) must still see the real sender: a group member's message is never replayed")
     ph = P["Phone"].get("jsCode", "")
     need(CRA.HW.OWNER_PHONE_JS in ph and "phone: error ? '' : ownerPhone(wapi, status)" in ph and "status.profile_id !== v.profileId" in ph
          and "status.authorized === false) error = 'not_authorized'" in ph and "status.authorized !== true" in ph,
@@ -824,6 +829,10 @@ WEBHOOK_MUTATIONS = (
                                                  "phone: error ? '' : String(status.phone || '').replace(/\\D/g, '')"),
      "Phone must embed"),
     ("Replay Plan replays a voice message", _wh("Replay Plan", "jsCode", '"chat", "text", ', '"chat", "text", "ptt", '), "Replay Plan must"),
+    ("Replay Plan replays a group member's message", _wh("Replay Plan", "jsCode", "else if (String(newest.from) !== chatId) why = 'not_from_chat';\n", ""),
+     "own `from` is the chat"),
+    ("the replay rewrites the sender to the chat", _wh("Replay Plan", "jsCode", "    from: String(row.from),\n", "    from: chatId,\n"),
+     "own `from` is the chat"),
     ("Replay Plan without the freshness", _wh("Replay Plan", "jsCode", " && time >= Math.floor(Date.now() / 1000) - FRESH_HOURS * 3600", ""),
      "Replay Plan must"),
     ("Replay Plan takes a crossed page", _wh("Replay Plan", "jsCode", " && !(typeof body.uuid === 'string' && body.uuid !== '' && body.uuid !== profileId)", ""),
