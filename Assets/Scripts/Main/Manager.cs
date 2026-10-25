@@ -1916,6 +1916,7 @@ public partial class Manager : MonoBehaviour
         // Step 4: Create workflows
         if (useWhatsapp)
         {
+            ReportNewBotPairing(newBot.name, whatsappProfileId, telegram: false);
             StartCoroutine(CreateWhatsappWorkflowFromStart(newBot));
         }
         else
@@ -1926,6 +1927,7 @@ public partial class Manager : MonoBehaviour
 
         if (useTelegram)
         {
+            ReportNewBotPairing(newBot.name, telegramProfileId, telegram: true);
             StartCoroutine(CreateTelegramWorkflowFromStart(newBot));
         }
         else
@@ -2001,6 +2003,16 @@ public partial class Manager : MonoBehaviour
         // This is the ONE creation-flow site — ShowAuthSuccess never re-fires it (its else branch
         // is gated on !isCreatingBot), so a "both" creation shows the moment exactly once.
         yield return StartCoroutine(ShowInteractiveSuccessMoment(newBotComp));
+    }
+
+    // «Личные и рабочие чаты»: a channel of a NEW bot is paired (its auth confirmed above, its Create next). The server
+    // learns the connection — it reads the number from get/status itself — and «Кто из них клиенты?» waits for this bot's
+    // chats on the channel: a new bot is always a first connection. Reported before the Create, since the first message
+    // may come any moment now.
+    private static void ReportNewBotPairing(string botName, string profileId, bool telegram)
+    {
+        ChatAudienceSyncService.ReportConnected(profileId);
+        PersonalChatsOnboarding.Request(botName, telegram);
     }
 
     /// <summary>
@@ -3553,13 +3565,16 @@ public partial class Manager : MonoBehaviour
 
         ReplyModeSyncService.Existing?.Hold(botId);
         ScheduleSyncService.Existing?.Hold(botId);   // B2: Delete Bot Files removes the bot_schedule rows too
+        ChatAudienceSyncService.Hold(botId);         // and the line's chat decisions and connection rows
         if (showLoading) LoadingPanel.SetActive(true);
         // The hold stops the NEXT send; a batch already on the wire must land before the server wipes its rows
         // (bounded by twice the send's own timeout: a refresh retry is one more request).
         float drainUntil = Time.realtimeSinceStartup
-                           + 2 * Mathf.Max(ReplyModeSyncService.RequestTimeoutSeconds, ScheduleSyncService.RequestTimeoutSeconds);
+                           + 2 * Mathf.Max(ReplyModeSyncService.RequestTimeoutSeconds, ScheduleSyncService.RequestTimeoutSeconds,
+                                           ChatAudienceSyncService.RequestTimeoutSeconds);
         while (((ReplyModeSyncService.Existing != null && ReplyModeSyncService.Existing.IsSending(botId))
-                || (ScheduleSyncService.Existing != null && ScheduleSyncService.Existing.IsSending(botId)))
+                || (ScheduleSyncService.Existing != null && ScheduleSyncService.Existing.IsSending(botId))
+                || ChatAudienceSyncService.IsSending(botId))
                && Time.realtimeSinceStartup < drainUntil)
             yield return null;
         BotServerDeletion.Outcome? stop = null;
@@ -3605,6 +3620,7 @@ public partial class Manager : MonoBehaviour
         {
             ReplyModeSyncService.Existing?.Release(botId);
             ScheduleSyncService.Existing?.Release(botId);
+            ChatAudienceSyncService.Release(botId);
             Debug.LogWarning($"[DeleteBotOnServer] {botId}: {outcome.Verdict} ({outcome.Reason}) — the bot stays on the phone");
         }
         done?.Invoke(outcome);

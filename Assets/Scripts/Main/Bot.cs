@@ -261,6 +261,14 @@ public class Bot : MonoBehaviour
     // be DeleteBot(), which wiped the phone first and fired the server calls without reading one answer.
     public void DeleteBotLocally()
     {
+        // «Личные и рабочие чаты»: the bot's undelivered chat moves and connection reports go with it (a late send would
+        // recreate the decisions Delete Bot Files removed), and so does the mirror of its profiles' decisions — FIRST,
+        // while the retired ids are still stored (ProfileRetirement.Clear below deletes them). «Кто из них клиенты?» is not
+        // owed for a bot that is gone; a bot created anew owes it again.
+        ChatAudienceSyncService.ForgetBot(transform.name);
+        PersonalChatsOnboarding.Clear(transform.name, telegram: false);
+        PersonalChatsOnboarding.Clear(transform.name, telegram: true);
+
         if (PlayerPrefs.HasKey(transform.name + "Name"))
         {
             // IN-01: activation state lives under TWO keys — the bare bot name (written by
