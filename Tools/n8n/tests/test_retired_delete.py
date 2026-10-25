@@ -22,7 +22,12 @@ Postgres, n8n's own expression engine; no n8n server, no network, never producti
       BEFORE anything else and a storage failure is 503 (session) — the retry finds the chunks still there;
   S1  the sweep deactivates the clone of a profile IT retired (trial/churn), once (stamped), never a liveness/app_delete
       row, never a workflow a live row still drives, never a protected id;
-  N1  verify-auth-gate.py fails on copies that bypass any of it.
+  N1  verify-auth-gate.py fails on copies that bypass any of it;
+  A1  «Личные и рабочие чаты» (2026-10-25): the chat decisions (chat_audience) and the connection moment
+      (audience_connections) of every profile of the bot's line go with the bot, a neighbour's stay, the answer counts
+      them (deletedAudience / deletedConnections in Delete Chat Memory's row and in Respond);
+  A2  Deletion Settled? refuses an answer whose new counter is not a number;
+  N2  verify-history-handoff.py / verify-auth-gate.py fail on copies that keep the schedule, the decisions or the moment.
 """
 import copy
 import json
@@ -46,8 +51,12 @@ LIKE = 'create temp table {0} (like public.{0} including all);\n'
 SETUP = ''.join(LIKE.format(t) for t in ('installs', 'bot_profiles', 'billing_bindings', 'subscribers', 'documents', 'n8n_chat_histories',
                                          'chat_history_events', 'handoff_requests', 'reply_events', 'chat_reply_state',
                                          'conversation_outcomes', 'reply_mode_flags', 'uploaded_files', 'clone_retirements', 'suggestion_sets',
-                                         'bot_schedule'))
+                                         'bot_schedule', 'chat_audience', 'audience_connections'))
 CHANNELS = (('whatsapp', 'wa'), ('telegram', 'tg'))
+# Every counter Delete Chat Memory answers — what Deletion Settled? must find as numbers before success:true.
+MEM_COUNTERS = ('deletedMemoryRows', 'deletedOutcomes', 'deletedReplyFlags', 'deletedHistoryEvents', 'deletedHandoffs',
+                'deletedReplyEvents', 'deletedChatStates', 'deletedSuggestionSets', 'deletedSchedules',
+                'deletedAudience', 'deletedConnections')     # personal chats (2026-10-25): the decisions and the moment
 
 
 def E(n, i=0):
@@ -113,7 +122,9 @@ insert into chat_history_events (profile_id, chat_id, message_id, source, body, 
 insert into reply_mode_flags (profile_id, chat_id, suppressed, version) values ('{pid}', '*', true, 5);
 insert into conversation_outcomes (session_id, profile_id, chat_id, outcome, last_history_id, last_message_at, outcome_at)
   values ('{pid}:77001@c.us', '{pid}', '77001@c.us', 'in_dialog', 1, now(), now());
-insert into bot_schedule (profile_id, enabled, days_mask, start_min, end_min, tz, version) values ('{pid}', true, 31, 540, 1080, 'Asia/Almaty', 5);""")
+insert into bot_schedule (profile_id, enabled, days_mask, start_min, end_min, tz, version) values ('{pid}', true, 31, 540, 1080, 'Asia/Almaty', 5);
+insert into chat_audience (profile_id, chat_id, kind, source, reason, version) values ('{pid}', '77001@c.us', 'business', 'owner', 'owner', 5);
+insert into audience_connections (profile_id, phone, connected_at) values ('{pid}', '77010000001', now() - interval '3 days');""")
 
 
 def counts(pg, pid, wid, key):
@@ -122,7 +133,9 @@ def counts(pg, pid, wid, key):
   (select count(*) from chat_history_events where profile_id = '{pid}')::int as hist,
   (select count(*) from reply_mode_flags where profile_id = '{pid}')::int as flags,
   (select count(*) from conversation_outcomes where profile_id = '{pid}')::int as outcomes,
-  (select count(*) from bot_schedule where profile_id = '{pid}')::int as schedule""")[0]
+  (select count(*) from bot_schedule where profile_id = '{pid}')::int as schedule,
+  (select count(*) from chat_audience where profile_id = '{pid}')::int as audience,
+  (select count(*) from audience_connections where profile_id = '{pid}')::int as connections""")[0]
 
 
 def retire_by_sweep(pg):
@@ -202,6 +215,9 @@ for channel, short in CHANNELS:
             # CTE (or none) under deletedSchedules must fail here, not only in the row counts above
             c.check((rows.get('mem') or {}).get('deletedSchedules') == 1,
                     f'Delete Chat Memory must count the one deleted schedule as deletedSchedules: {rows.get("mem")}')
+            # personal chats: the same for the chat decision and the connection moment
+            c.check(((rows.get('mem') or {}).get('deletedAudience'), (rows.get('mem') or {}).get('deletedConnections')) == (1, 1),
+                    f'Delete Chat Memory must count the deleted decision / moment as deletedAudience / deletedConnections: {rows.get("mem")}')
 
 with Case('V12 D2: Set Workflow State — delete/deactivate of the owner\'s retired clone go to Delete Ownership and pass; activate never does') as c:
     with PgSession(SETUP) as pg:
@@ -372,9 +388,7 @@ with Case('V12 M1: Delete Bot Files says success only on real counters; storage 
             f'no response = failure, «object not found» = gone, a failed listing is marked: {err["originals"]} {nf["originals"]} {le}')
     bad_mem = {'error': {'message': 'Connection terminated'}}
     c.check(cond(DBF, 'Deletion Settled?', bad_mem, {'Retire Bot Profiles': {'retiredProfiles': 1}, 'Delete Bot Chunks': {'deletedChunks': 0, 'fileIds': []}}) is False
-            and cond(DBF, 'Deletion Settled?', {**{k: 0 for k in ('deletedMemoryRows', 'deletedOutcomes', 'deletedReplyFlags', 'deletedHistoryEvents',
-                                                                 'deletedHandoffs', 'deletedReplyEvents', 'deletedChatStates', 'deletedSuggestionSets',
-                                                                 'deletedSchedules')}},
+            and cond(DBF, 'Deletion Settled?', {k: 0 for k in MEM_COUNTERS},
                      {'Retire Bot Profiles': {'error': {'message': 'x'}}, 'Delete Bot Chunks': {'deletedChunks': 0}}) is False,
             'an error item from Delete Chat Memory or Retire must never become success:true')
     for n in ('Delete Bot Chunks', 'Delete Chat Memory', 'Retire Bot Profiles', 'Delete Ownership', 'List Bot Originals'):
@@ -386,6 +400,66 @@ with Case('V12 M1: Delete Bot Files says success only on real counters; storage 
     c.check(preds(DBF, 'Respond') == [('Deletion Settled?', 0)] and preds(DBF, 'Retire Bot Profiles') == [('Originals Deleted?', 0)]
             and preds(DBF, 'Delete Stored Original') == [('Has Original?', 0)] and preds(DBF, 'List Bot Originals') == [('Owned?', 0)]
             and edges(DBF, 'Respond') == [], f'Delete Bot Files order: Respond<-{preds(DBF, "Respond")} Retire<-{preds(DBF, "Retire Bot Profiles")}')
+
+# ------------------------------------------------------------------------------------------------ A1 / A2 personal chats
+def audience_rows(pg, pid, chats=2):
+    """«Личные и рабочие чаты»: `chats` chat decisions and the connection row of one profile."""
+    for i in range(chats):
+        pg.x(f"insert into chat_audience (profile_id, chat_id, kind, source, reason) values "
+             f"('{pid}', '7700{i}@c.us', 'personal', 'default', 'contact');")
+    pg.x(f"insert into audience_connections (profile_id, phone, connected_at) values ('{pid}', '77010000001', now() - interval '3 days');")
+
+
+def audience_counts(pg, pid):
+    return pg.q(f"""select (select count(*) from chat_audience where profile_id = '{pid}')::int as audience,
+  (select count(*) from audience_connections where profile_id = '{pid}')::int as connections""")[0]
+
+
+with Case('personal chats A1: bot_delete_wipes_both_tables_for_the_line — the chat decisions and the connection moment of every '
+          'profile of the bot\'s line go (the named profile, a superseded predecessor, the other channel\'s row), a neighbour\'s '
+          'stay; Delete Chat Memory counts them and Respond reports both counters') as c:
+    with PgSession(SETUP) as pg:
+        boot(pg, 'inst-A', RA)
+        pg.x("insert into installs (install_id, secret_hash) values ('inst-B', 'h');")
+        line = {'wa-cur': ('whatsapp', 'wfCloneWaCur001'), 'wa-old': ('whatsapp', 'wfCloneWaOld001'),
+                'tg-cur': ('telegram', 'wfCloneTgCur001')}
+        for pid, (channel, wid) in line.items():
+            bot(pg, pid, channel, 'inst-A', wid)
+        bot(pg, 'wa-n7', 'whatsapp', 'inst-A', 'wfCloneWaN7001')            # another bot of the same install
+        bot(pg, 'wa-b', 'whatsapp', 'inst-B', 'wfCloneWaB0001', rc=RB)     # the same bot key under another install
+        pg.x("update bot_profiles set bot_key = case when profile_id = 'wa-n7' then 'Bot7' else 'Bot0' end;")
+        pg.x("update bot_profiles set superseded_by = 'wa-cur', superseded_at = now(), deleted_at = now(), deleted_reason = 'replaced' "
+             "where profile_id = 'wa-old';")
+        for pid in list(line) + ['wa-n7', 'wa-b']:
+            audience_rows(pg, pid)
+        g = gate(DBF, token(claims_of(pg, 'inst-A', RA)), dbf_body('wa-cur', '-1', 'wfCloneWaCur001', '-1'))
+        own = ownership(pg, DBF, g)
+        rows = {}
+        _, _, _, ok = run_dbf_deletes(pg, g, rows=rows)
+        c.check(own.get('allowed') is True and ok is True, f'premise: ownership {own}, Deletion Settled? {ok}')
+        left = {pid: audience_counts(pg, pid) for pid in line}
+        c.check(all(v == {'audience': 0, 'connections': 0} for v in left.values()), f'left on the line: {left}')
+        kept = {pid: audience_counts(pg, pid) for pid in ('wa-n7', 'wa-b')}
+        c.check(all(v == {'audience': 2, 'connections': 1} for v in kept.values()), f'a neighbour lost its rows: {kept}')
+        mem = rows.get('mem') or {}
+        c.check((mem.get('deletedAudience'), mem.get('deletedConnections')) == (6, 3), f'Delete Chat Memory counters {mem}')
+        answer = expr(node(DBF, 'Respond')['parameters']['responseBody'], mem,
+                      {'Retire Bot Profiles': rows.get('retire'), 'Delete Bot Chunks': rows.get('chunks')})
+        c.check(isinstance(answer, dict) and answer.get('success') is True
+                and (answer.get('deletedAudience'), answer.get('deletedConnections')) == (6, 3),
+                f'Respond must report deletedAudience / deletedConnections: {answer}')
+
+with Case('personal chats A2: deletion_settled_refuses_a_non_number_counter — Deletion Settled? passes only when deletedAudience '
+          'and deletedConnections are numbers too: a null, a string or a missing counter is never success:true') as c:
+    named = {'Retire Bot Profiles': {'retiredProfiles': 1}, 'Delete Bot Chunks': {'deletedChunks': 0}}
+    every = {k: 0 for k in MEM_COUNTERS}
+    c.check(cond(DBF, 'Deletion Settled?', every, named) is True, 'every counter a number must settle')
+    for k in ('deletedAudience', 'deletedConnections'):
+        for bad in (None, '1', 'none'):
+            got = cond(DBF, 'Deletion Settled?', {**every, k: bad}, named)
+            c.check(got is False, f'{k} = {bad!r} settled: {got}')
+        got = cond(DBF, 'Deletion Settled?', {kk: v for kk, v in every.items() if kk != k}, named)
+        c.check(got is False, f'an answer without {k} settled: {got}')
 
 # ------------------------------------------------------------------------------------------------ D5 idempotent delete
 with Case('V12 D5: Set Workflow State delete is idempotent (200/404 = gone) and reports a real failure (502)') as c:
@@ -488,9 +562,9 @@ with Case('V12 N1: verify-auth-gate.py rejects copies that route around the data
         rc, out = mutate_run(fname, fn)
         c.check(rc != 0 and 'V12' in out, f'{label}: verifier passed ({rc}): {out}')
 
-with Case('B1 N2: a delete that keeps the schedule is caught — verify-history-handoff.py (Delete Chat Memory without the '
-          'bot_schedule CTE, deletedSchedules counting another CTE, Respond without deletedSchedules) and verify-auth-gate.py '
-          '(Deletion Settled? without it)') as c:
+with Case('B1 + personal chats N2: a delete that keeps the schedule, the chat decisions or the connection moment is caught — '
+          'verify-history-handoff.py (Delete Chat Memory without the CTE, the counter counting another CTE, Respond without the '
+          'counter) and verify-auth-gate.py (Deletion Settled? without the counter)') as c:
     def run_on(tool, fname, fn):
         d = Path(tempfile.mkdtemp(prefix='b1-del-neg-'))
         try:
@@ -526,10 +600,48 @@ with Case('B1 N2: a delete that keeps the schedule is caught — verify-history-
         cnd = node(w, 'Deletion Settled?')['parameters']['conditions']['conditions'][0]
         cnd['leftValue'] = cnd['leftValue'].replace(" && typeof $json.deletedSchedules === 'number'", '')
 
+    # personal chats (2026-10-25): the chat decisions and the connection moment, the same four ways
+    def keeps(table):
+        def fn(w):
+            p = node(w, 'Delete Chat Memory')['parameters']
+            p['query'] = p['query'].replace('DELETE FROM public.' + table, 'SELECT 1 FROM public.' + table, 1)
+        fn.__name__ = 'dcm_keeps_' + table
+        return fn
+
+    def counts_another_cte(cte, other):
+        def fn(w):
+            p = node(w, 'Delete Chat Memory')['parameters']
+            assert p['query'].count(f'FROM {cte})') == 1, f'the {cte} count is not where this mutation expects it'
+            p['query'] = p['query'].replace(f'FROM {cte})', f'FROM {other})', 1)
+        fn.__name__ = f'dcm_counts_{cte}_from_{other}'
+        return fn
+
+    def respond_without(counter):
+        def fn(w):
+            p = node(w, 'Respond')['parameters']
+            p['responseBody'] = p['responseBody'].replace(f', "{counter}": $json.{counter} ?? null', '')
+        fn.__name__ = 'respond_without_' + counter
+        return fn
+
+    def verdict_without(counter):
+        def fn(w):
+            cnd = node(w, 'Deletion Settled?')['parameters']['conditions']['conditions'][0]
+            cnd['leftValue'] = cnd['leftValue'].replace(f" && typeof $json.{counter} === 'number'", '')
+        fn.__name__ = 'verdict_without_' + counter
+        return fn
+
     for tool, fn, needle in (('verify-history-handoff.py', dcm_keeps_schedule, 'bot_schedule'),
                              ('verify-history-handoff.py', dcm_counts_another_cte, 'deletedSchedules'),
                              ('verify-history-handoff.py', respond_without_counter, 'deletedSchedules'),
-                             ('verify-auth-gate.py', verdict_without_counter, 'Deletion Settled?')):
+                             ('verify-auth-gate.py', verdict_without_counter, 'Deletion Settled?'),
+                             ('verify-history-handoff.py', keeps('chat_audience'), 'chat_audience'),
+                             ('verify-history-handoff.py', keeps('audience_connections'), 'audience_connections'),
+                             ('verify-history-handoff.py', counts_another_cte('audience', 'schedule'), 'deletedAudience'),
+                             ('verify-history-handoff.py', counts_another_cte('connections', 'audience'), 'deletedConnections'),
+                             ('verify-history-handoff.py', respond_without('deletedAudience'), 'deletedAudience'),
+                             ('verify-history-handoff.py', respond_without('deletedConnections'), 'deletedConnections'),
+                             ('verify-auth-gate.py', verdict_without('deletedAudience'), 'Deletion Settled?'),
+                             ('verify-auth-gate.py', verdict_without('deletedConnections'), 'Deletion Settled?')):
         rc, out = run_on(tool, DBF_F, fn)
         c.check(rc != 0 and needle in out, f'{tool} / {fn.__name__}: exit {rc}: {out}')
 

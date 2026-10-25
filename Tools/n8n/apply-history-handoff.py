@@ -15,7 +15,7 @@ Create WA/TG: subscribe to outgoing_message_phone + outgoing_message_api.
 Dashboard Outcomes: owner rows labelled «Владелец:» for the classifier; open handoffs are REAL
   events (source='event') that outrank the classifier (order → order_collected, else owner_needed).
 Delete Bot Files: wipes chat_history_events / handoff_requests / reply_events / chat_reply_state (+ learning A's
-  suggestion_sets, B1's bot_schedule — every profile of the bot's line).
+  suggestion_sets, B1's bot_schedule, personal chats' chat_audience / audience_connections — every profile of the bot's line).
 Set Workflow State: the three handoff workflow ids are protected.
 T6 (Q1 B + V6-unknown, follow-ups 2026-10-11): the memory marks — owner rows open with «Владелец: » (Record Outgoing
 here, Record Owner Send in the Wappi Proxy), the bot's reply of unknown delivery with «[доставка не подтверждена] »
@@ -625,7 +625,7 @@ SELECT (SELECT count(*)::int FROM hist)        AS "deletedMemoryRows",
 # T5 (F1 + F2, plan 2026-10-11 §1.6): the deleted bot's memory goes with its WHOLE line — the earlier profiles of a
 # re-paired / reconnected bot (the pre-F1 orphans, a superseded predecessor, the other channel's retired row) — not only
 # the two profile ids the app names. The head is clone_lineage's (the same fragment and parameters as Delete Bot Files'
-# other deleting nodes, apply-auth-gate.py); this file keeps owning the deletes (the seven tables, DELETE_NEW_TAIL).
+# other deleting nodes, apply-auth-gate.py); this file keeps owning the deletes (every table, DELETE_NEW_TAIL).
 # Learning A (2026-10-13): the «Вместе» panel's shown sets (suggestion_sets) are the bot's data too — deleted by the SAME
 # statement and judged by the SAME verdict (V12: nothing runs after the answer; success only when every counter is a
 # number). The T5 shape stays recognisable so the patcher can bring a T5 canon forward.
@@ -656,14 +656,39 @@ DELETE_NEW_TAIL = DELETE_LEARNING_A_TAIL.replace(
     "       (SELECT count(*)::int FROM sets)        AS \"deletedSuggestionSets\",\n"
     "       (SELECT count(*)::int FROM schedule)    AS \"deletedSchedules\";", 1)
 assert DELETE_NEW_TAIL != DELETE_LEARNING_A_TAIL and DELETE_NEW_TAIL.count("bot_schedule") == 1, "B1: the schedule CTE did not land"
+# «Личные и рабочие чаты» (2026-10-25, spec §4.1): which chats are personal (chat_audience) and the moment the channel
+# counts as connected (audience_connections) are the bot's data too — deleted by the SAME statement (every profile of the
+# line: a bot deleted and created anew starts over, owner decision 13) and judged by the SAME verdict (Deletion Settled?
+# reads deletedAudience / deletedConnections, apply-auth-gate.DELETION_SETTLED). The B1 shape stays recognisable so the
+# patcher can bring that canon forward.
+DELETE_SCHEDULE_TAIL = DELETE_NEW_TAIL
+DELETE_NEW_TAIL = DELETE_SCHEDULE_TAIL.replace(
+    ")\nSELECT (SELECT count(*)::int FROM hist)        AS \"deletedMemoryRows\",",
+    "), audience AS (      -- personal chats: the chat decisions of every profile of the line\n"
+    "  DELETE FROM public.chat_audience a\n"
+    "  WHERE a.profile_id IN (SELECT profile_id FROM valid)\n"
+    "  RETURNING 1\n"
+    "), connections AS (   -- personal chats: the connection moment of every profile of the line\n"
+    "  DELETE FROM public.audience_connections cn\n"
+    "  WHERE cn.profile_id IN (SELECT profile_id FROM valid)\n"
+    "  RETURNING 1\n"
+    ")\nSELECT (SELECT count(*)::int FROM hist)        AS \"deletedMemoryRows\",", 1).replace(
+    "       (SELECT count(*)::int FROM schedule)    AS \"deletedSchedules\";",
+    "       (SELECT count(*)::int FROM schedule)    AS \"deletedSchedules\",\n"
+    "       (SELECT count(*)::int FROM audience)    AS \"deletedAudience\",\n"
+    "       (SELECT count(*)::int FROM connections) AS \"deletedConnections\";", 1)
+assert DELETE_NEW_TAIL != DELETE_SCHEDULE_TAIL and DELETE_NEW_TAIL.count("chat_audience") == 1 \
+    and DELETE_NEW_TAIL.count("audience_connections") == 1 and DELETE_NEW_TAIL.count('AS "deletedConnections";') == 1, \
+    "personal chats: the decisions / connections CTEs did not land"
 
 DELETE_CHAT_MEMORY_SQL = """-- Privacy deletion (2026-09-01, store audit / Data Safety «можно запросить удаление»), by the bot's line (T5):
 -- a deleted bot's server-side conversation memory goes with it — under every profile of its line (session: this
 -- install's rows of the same bot key, both channels, and the superseded chain; legacy: the named ids only). Chat
 -- transcripts key off session_id = '<profileId>:<chatId>' (both bot templates' Chat Memory nodes); the history,
--- outcomes, handoffs, reply ledger, chat state, flags, shown sets and the schedule carry profile_id directly.
--- Sentinels ('-1', '', 'null', 'undefined') are no ids. dialog_counts stay UNTOUCHED on purpose: they are the owner's
--- billing usage records (Task 17a moves them with the money on transfer), not chat content.
+-- outcomes, handoffs, reply ledger, chat state, flags, shown sets, the schedule, the chat decisions and the connection
+-- moment carry profile_id directly. Sentinels ('-1', '', 'null', 'undefined') are no ids. dialog_counts stay UNTOUCHED
+-- on purpose: they are the owner's billing usage records (Task 17a moves them with the money on transfer), not chat
+-- content.
 -- Parameters, in order: gate mode, install id, JSON array of the profile ids, JSON array of the workflow ids.
 """ + cl.DBF_LINE_HEAD + """, valid AS (
   SELECT profile_id FROM lineage_profiles
@@ -691,6 +716,11 @@ RESPOND_LEARNING_A_TAIL = RESPOND_NEW_TAIL          # B1: the answer reports the
 RESPOND_NEW_TAIL = RESPOND_LEARNING_A_TAIL.replace('"deletedSuggestionSets": $json.deletedSuggestionSets ?? null } }}',
                                                    '"deletedSuggestionSets": $json.deletedSuggestionSets ?? null, "deletedSchedules": $json.deletedSchedules ?? null } }}', 1)
 assert RESPOND_NEW_TAIL != RESPOND_LEARNING_A_TAIL
+RESPOND_SCHEDULE_TAIL = RESPOND_NEW_TAIL            # personal chats: and the deleted decisions and connection moments
+RESPOND_NEW_TAIL = RESPOND_SCHEDULE_TAIL.replace('"deletedSchedules": $json.deletedSchedules ?? null } }}',
+                                                 '"deletedSchedules": $json.deletedSchedules ?? null, "deletedAudience": $json.deletedAudience ?? null, '
+                                                 '"deletedConnections": $json.deletedConnections ?? null } }}', 1)
+assert RESPOND_NEW_TAIL != RESPOND_SCHEDULE_TAIL
 
 
 def patch_delete_bot():
@@ -700,7 +730,7 @@ def patch_delete_bot():
     n = node(wf, "Delete Chat Memory")
     q = n["parameters"]["query"]
     if q != DELETE_CHAT_MEMORY_SQL:
-        assert DELETE_OLD_TAIL in q or DELETE_T5_TAIL in q or DELETE_LEARNING_A_TAIL in q or DELETE_NEW_TAIL in q, \
+        assert any(t in q for t in (DELETE_OLD_TAIL, DELETE_T5_TAIL, DELETE_LEARNING_A_TAIL, DELETE_SCHEDULE_TAIL, DELETE_NEW_TAIL)), \
             "Delete Chat Memory has an unexpected shape"
         n["parameters"]["query"] = DELETE_CHAT_MEMORY_SQL
         ch = True
@@ -709,7 +739,8 @@ def patch_delete_bot():
         ch = True
     r = node(wf, "Respond")
     body = r["parameters"]["responseBody"]
-    for old in (RESPOND_OLD_TAIL, RESPOND_T5_TAIL, RESPOND_LEARNING_A_TAIL):   # the pre-T5, T5 and learning-A answers come forward
+    # the pre-T5, T5, learning-A and B1 answers come forward
+    for old in (RESPOND_OLD_TAIL, RESPOND_T5_TAIL, RESPOND_LEARNING_A_TAIL, RESPOND_SCHEDULE_TAIL):
         if old in body and RESPOND_NEW_TAIL not in body:
             body = body.replace(old, RESPOND_NEW_TAIL, 1)
             r["parameters"]["responseBody"] = body

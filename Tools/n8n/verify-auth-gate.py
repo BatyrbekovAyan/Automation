@@ -396,6 +396,13 @@ def check_delete_ownership(mig):
     assert not leak, f"V12: {sorted(leak)} reachable without Owned?(0)"
     for n, cond_value in (("Originals Deleted?", mig.ORIGINALS_DELETED), ("Deletion Settled?", mig.DELETION_SETTLED), ("Has Original?", mig.HAS_ORIGINAL)):
         assert node(dbf, n)["parameters"]["conditions"]["conditions"][0]["leftValue"] == cond_value, f"V12: {n} condition is stale"
+    # Every counter Delete Chat Memory answers is one Deletion Settled? requires as a number (an error item has none, so a
+    # counter the verdict does not read could let a failed delete answer success:true) — the parity, so a table that joins
+    # the delete (personal chats 2026-10-25: deletedAudience / deletedConnections) cannot be left out of the verdict.
+    counters = re.findall(r'AS "(deleted\w+)"', node(dbf, "Delete Chat Memory")["parameters"]["query"])
+    verdict = node(dbf, "Deletion Settled?")["parameters"]["conditions"]["conditions"][0]["leftValue"]
+    unjudged = [k for k in counters if f"typeof $json.{k} === 'number'" not in verdict]
+    assert counters and not unjudged, f"V12: Deletion Settled? must require every Delete Chat Memory counter as a number: {unjudged}"
     assert node(dbf, "Split File Ids")["parameters"]["jsCode"] == mig.SPLIT_FILE_IDS_JS and node(dbf, "Originals Settled")["parameters"]["jsCode"] == mig.ORIGINALS_SETTLED_JS, \
         "V12: Split File Ids / Originals Settled are stale"
     assert edges(dbf, "Originals Deleted?", 0) == [E("Retire Bot Profiles")] and edges(dbf, "Originals Deleted?", 1) == [E("Respond Delete Failed")], \

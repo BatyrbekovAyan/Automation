@@ -497,8 +497,19 @@ def verify_integrations():
     check("DELETE FROM public.bot_schedule b\n  WHERE b.profile_id IN (SELECT profile_id FROM valid)" in q
           and re.search(r'\(SELECT count\(\*\)::int FROM schedule\)\s+AS "deletedSchedules"', q),
           "B1: Delete Bot Files must wipe bot_schedule for every profile of the line (Delete Chat Memory) and count it as deletedSchedules")
+    # «Личные и рабочие чаты» (2026-10-25): the chat decisions and the connection moment go with the bot the same way —
+    # every profile of the line, the same statement, each counted under its own name (Deletion Settled? reads both).
+    # Pinned here, after the T5 line check, for the reason the B1 pin gives: a pre-T5 copy must still be reported as the
+    # T5 failure it is (tests/test_clone_retirements.py T5 N1) — the early table list above stops at its first miss.
+    for table, alias, cte, counter in (("chat_audience", "a", "audience", "deletedAudience"),
+                                       ("audience_connections", "cn", "connections", "deletedConnections")):
+        check(f"DELETE FROM public.{table} {alias}\n  WHERE {alias}.profile_id IN (SELECT profile_id FROM valid)" in q
+              and re.search(r'\(SELECT count\(\*\)::int FROM ' + cte + r'\)\s+AS "' + counter + '"', q),
+              f"personal chats: Delete Bot Files must wipe {table} for every profile of the line (Delete Chat Memory) and "
+              f"count it as {counter}")
     rb = node(load("lmjYsdNcQA2IE5rl-Delete_Bot_Files.json"), "Respond")["parameters"]["responseBody"]
-    for k in ("deletedHistoryEvents", "deletedHandoffs", "deletedReplyEvents", "deletedChatStates", "deletedSchedules"):
+    for k in ("deletedHistoryEvents", "deletedHandoffs", "deletedReplyEvents", "deletedChatStates", "deletedSchedules",
+              "deletedAudience", "deletedConnections"):
         check(k in rb, f"Delete Bot Files response must report {k}")
     st = load("0DP79STI3pafXO9B-Set_Workflow_State.json")
     check(any(all(i in n["parameters"].get("jsCode", "") for i in ("'crHandoffReq0001'", "'crHandoffNtfy001'", "'crHandoffsApi001'", "'crTestDialog0001'", "'crHandoffDry0001'")) for n in st["nodes"]),

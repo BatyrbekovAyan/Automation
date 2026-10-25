@@ -11,9 +11,9 @@ Delete Bot Files) never carry their own copy:
   CLONE_PLAN_SQL         read-only: own_id (reuse), foreign (refuse), pred_profiles (adopt), replace_ids (replace) — the
                          predecessor rule of plan §1.3, proven in the DATABASE (never by the token's 12-hour lists);
   BIND_WORKFLOW_SQL[ch]  ONE statement: bind + move memory / history / outcomes / handoffs / reply ledger / chat state /
-                         chat flags / shown sets / the schedule of the predecessors, chunks + file registry of the
-                         replaced clones, the pre-F1 '-1' rule, mark the predecessors superseded, book the replaced
-                         clones — every condition re-checked on
+                         chat flags / shown sets / the schedule / the chat decisions and the connection moment (personal
+                         chats) of the predecessors, chunks + file registry of the replaced clones, the pre-F1 '-1'
+                         rule, mark the predecessors superseded, book the replaced clones — every condition re-checked on
                          the rows it writes, on the version a concurrent statement committed (≈ 10 s pass between the
                          plan and the bind: the V6-concurrent lesson). A concurrent bind of the same profile that
                          committed first wins: this one answers bound = false instead of overwriting a binding it never
@@ -52,14 +52,18 @@ CHANNELS = {
                  "file_column": "bot_tg_id"},
 }
 
-# The nine tables Delete Chat Memory clears (Delete Bot Files) — the bind moves EXACTLY these (pinned by the test against
+# The eleven tables Delete Chat Memory clears (Delete Bot Files) — the bind moves EXACTLY these (pinned by the test against
 # the canon). dialog_counts are billing usage records keyed by the app user, not chat content: never moved, never deleted.
 # suggestion_sets (learning A, 2026-10-13): the «Вместе» panel's shown sets — the learning journal follows the bot's line
 # like its memory does, so a re-paired bot keeps its shadow score.
 # bot_schedule (B1 «расписание бота», 2026-10-14): the owner's working hours — a reconnect (a new profile of the same bot)
 # keeps them; the new profile's own row wins, among predecessors the freshest.
+# chat_audience + audience_connections («Личные и рабочие чаты», 2026-10-25, spec §4.1 / §3.3, owner decisions 13 and 19):
+# which chats are personal and the moment the channel counts as connected — a reconnect keeps the owner's marks and the
+# moment; another number is a new connection. Their merge rules are written at the bind's own CTEs (aud_*, conn_*).
 MOVED_TABLES = ("n8n_chat_histories", "chat_history_events", "conversation_outcomes", "handoff_requests", "reply_events",
-                "chat_reply_state", "reply_mode_flags", "suggestion_sets", "bot_schedule")
+                "chat_reply_state", "reply_mode_flags", "suggestion_sets", "bot_schedule", "chat_audience",
+                "audience_connections")
 
 
 def protected_ids():
@@ -169,6 +173,15 @@ _BIND_TEMPLATE = """-- F1 + F2 (plan 2026-10-11 §1.5): bind the clone to the pr
 --   move to the new profile (row ids kept: the memory order and the run watermarks stay right). Where the new profile
 --   already holds the same key its row wins; among several predecessors the freshest. The predecessors' '*' rows go: the
 --   new one was seeded from the client's current mode. dialog_counts stay (billing records, not chat content).
+--   The chat decisions and the connection moment (personal chats) have rules of their own. Per chat ONE decision stays
+--   on the new profile: the owner's over a computed one, among equals the new profile's own row, among predecessors the
+--   freshest — its values unchanged (the moment moves with it, so a moved computed decision keeps holding). The
+--   connection: the new profile's own row stays when its number and the number of the predecessors' EARLIEST row are
+--   both known and differ (another number is a new connection; its moment is raised to the newest predecessor moment
+--   when older, never lowered); otherwise the new profile ends with the row carrying the earliest moment, with that
+--   row's number. A kept row keeps its updated_at unless its values change. Every predecessor row of the two tables is
+--   deleted and the winner is inserted again under the new profile, so a row the first messages of a chat wrote for the
+--   new profile while this statement ran is met by ON CONFLICT on its committed version — never a key clash.
 --   The moved clones' chunks and file registry go to the new clone — this install's rows and owner-less ones (a compat
 --   upload), so a file's row and its chunks keep naming ONE clone (the V4 evidence of Delete File / Register Upload);
 --   a file row of another install never. Plus the pre-F1 rule: a second channel joining a bot takes the other
@@ -360,6 +373,41 @@ with me as (
   delete from bot_schedule s using sch_r r
   where s.profile_id = r.pid and (r.rn > 1 or r.taken)
   returning 1
+), aud_take as (       -- personal chats: the predecessors' chat decisions (PK profile_id + chat_id) all leave their profiles,
+  delete from chat_audience a                    -- each on its committed version: a row a concurrent statement moved
+  where a.profile_id in (select pid from p)      -- meanwhile is skipped, never taken back
+  returning a.profile_id as pid, a.chat_id, a.kind, a.source, a.reason, a.version, a.decided_at, a.personal_since,
+    a.wiped_at, a.updated_at
+), aud_mv as (         -- the best of each chat lands on the new profile: the owner's over a computed one, then the freshest
+  insert into chat_audience as t (profile_id, chat_id, kind, source, reason, version, decided_at, personal_since, wiped_at,
+                                  updated_at)
+  select distinct on (w.chat_id) $1, w.chat_id, w.kind, w.source, w.reason, w.version, w.decided_at, w.personal_since,
+    w.wiped_at, w.updated_at
+  from aud_take w
+  order by w.chat_id, (w.source = 'owner') desc, w.updated_at desc, w.version desc, w.decided_at desc, w.pid desc
+  on conflict (profile_id, chat_id) do update set kind = excluded.kind, source = excluded.source, reason = excluded.reason,
+    version = excluded.version, decided_at = excluded.decided_at, personal_since = excluded.personal_since,
+    wiped_at = excluded.wiped_at, updated_at = excluded.updated_at
+  where excluded.source = 'owner' and t.source <> 'owner'   -- the new profile's own row (its committed version) stays,
+  returning 1                                               -- unless it is a computed one and the predecessor's the owner's
+), conn_take as (      -- personal chats: the predecessors' connection rows (PK profile_id) all leave their profiles, likewise
+  delete from audience_connections c where c.profile_id in (select pid from p)
+  returning c.profile_id as pid, c.phone, c.connected_at, c.updated_at
+), conn_e as (         -- the earliest of them (its moment, its number, its updated_at) and the newest moment among them
+  select e.phone, e.connected_at, e.updated_at, max(e.connected_at) over () as newest
+  from conn_take e order by e.connected_at, e.updated_at, e.pid limit 1
+), conn_mv as (        -- onto the new profile: its own row (its committed version) stays when both numbers are known and
+  insert into audience_connections as t (profile_id, phone, connected_at, updated_at)   -- differ, the moment raised to the
+  select $1, e.phone, e.connected_at, e.updated_at from conn_e e                        -- newest predecessor's when older;
+  on conflict (profile_id) do update set                                                -- otherwise the earlier row wins
+    phone        = case when <ANOTHER_NUMBER> then t.phone else excluded.phone end,
+    connected_at = case when <ANOTHER_NUMBER> then greatest(t.connected_at, (select newest from conn_e))
+                        else excluded.connected_at end,
+    updated_at   = case when <ANOTHER_NUMBER> then now() else excluded.updated_at end
+  where case when <ANOTHER_NUMBER> then (select newest from conn_e) > t.connected_at    -- a kept row changes only when its
+             else excluded.connected_at < t.connected_at end                            -- values do
+  returning t.phone is not distinct from (select phone from conn_e)     -- took: the earliest predecessor row landed (false:
+    and t.connected_at = (select connected_at from conn_e) as took      -- the own row kept, its moment only raised)
 )
 select exists (select 1 from bind where workflow_id = $2) as bound, $2::text as workflow_id,
   coalesce((select jsonb_agg(a.pid order by a.pid) from (
@@ -379,15 +427,29 @@ select exists (select 1 from bind where workflow_id = $2) as bound, $2::text as 
   (select count(*) from fl_mv)::int as moved_flags,
   (select count(*) from set_mv)::int as moved_sets,
   (select count(*) from sch_mv)::int as moved_schedules,
+  (select count(*) from aud_mv)::int as moved_audience,
+  (select count(*) from conn_mv where took)::int as moved_connections,
   ((select count(*) from hist_dup) + (select count(*) from outc_dup) + (select count(*) from hand_dup)
    + (select count(*) from ev_dup) + (select count(*) from st_dup) + (select count(*) from fl_dup) + (select count(*) from set_dup)
-   + (select count(*) from sch_dup))::int as dropped_rows"""
+   + (select count(*) from sch_dup)
+   + (select count(*) from aud_take) - (select count(*) from aud_mv)
+   + (select count(*) from conn_take) - (select count(*) from conn_mv where took))::int as dropped_rows"""
+
+
+def _digits(expr):
+    """A number's digits, NULL when it has none — how audience.CONNECTED_SQL compares and stores a connected number."""
+    return "nullif(regexp_replace(coalesce(" + expr + ", ''), '[^0-9]', '', 'g'), '')"
+
+
+# Inside conn_mv's conflict: the new profile's own number (t) and the earliest predecessor's (excluded) are BOTH known and
+# their digits differ — another number, a new connection (owner decision 19). An unknown number on either side is not one.
+_ANOTHER_NUMBER = "coalesce(" + _digits("t.phone") + " <> " + _digits("excluded.phone") + ", false)"
 
 
 def bind_workflow_sql(channel):
     c = CHANNELS[channel]
     return _sql(_BIND_TEMPLATE, KEY=c["meta_key"], OTHER=c["other_meta_key"], FCOL=c["file_column"],
-                PREDS=_json_strings("$8"), REPLACE=_json_strings("$7"))
+                PREDS=_json_strings("$8"), REPLACE=_json_strings("$7"), ANOTHER_NUMBER=_ANOTHER_NUMBER)
 
 
 BIND_WORKFLOW_SQL = {ch: bind_workflow_sql(ch) for ch in CHANNELS}
