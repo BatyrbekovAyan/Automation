@@ -47,7 +47,7 @@ paste them, never copy them:
   ENSURE_CONNECTION_SQL      the profile's connection row, created with the line's moment when the app has not reported one;
   DECIDE_WRITE_SQL           a computed decision, written once (it replaces only a computed row that no longer holds);
   OWNER_SET_SQL              the owner's decisions, version-guarded, refused for a chat that is not a person;
-  CONNECTED_SQL              the app reports a connection: another number restarts the moment;
+  CONNECTED_SQL              the app reports a connection: another number restarts the moment (and says so: restarted);
   LIST_SQL                   what the app mirrors: the moment and the holding decisions of each profile;
   BACKFILL_SQL(row, owner)   when a chat turns business, the recent messages it lacks go into the history and the memory.
   WIPE_SQL                   the Sweep's step: WIPE_DAYS after the OWNER made a chat personal, what the assistant stored
@@ -326,10 +326,16 @@ CONNECTED_SQL = """-- «Личные и рабочие чаты»: the app repor
 -- number. A row without a number takes the number and keeps its moment. The same number, or none given, changes nothing.
 -- ANOTHER number is a new connection (owner decision 19): the moment becomes now — every computed decision taken before
 -- it stops holding (VALID_SQL), the owner's stay — and the new number is kept.
--- ALWAYS one row: connected_at_ms of the row after it (null for a sentinel profile, which writes nothing).
+-- ALWAYS one row: connected_at_ms of the row after it (null for a sentinel profile, which writes nothing) and restarted —
+-- true only when THIS statement moved the moment (an existing row, another known number: the app then asks «Кто из них
+-- клиенты?» again); a first row, a number filled in, the same or no number, a sentinel: false. «Moved» is read off the
+-- row itself — the moment is now exactly when this statement set it — so a concurrent report that moved it first does
+-- not make this one say so.
 -- Parameters, in order: profile id, the connected number.
 with num as (
   select """ + _digits("$2") + """ as phone
+), prev as (
+  select c0.connected_at from audience_connections c0 where c0.profile_id = $1
 ), up as (
   insert into audience_connections as c (profile_id, phone, connected_at)
   select $1, num.phone, """ + LINE_CONNECTED_AT_SQL("$1") + """ from num
@@ -340,7 +346,8 @@ with num as (
     updated_at   = case when """ + _NUMBER_CHANGES + """ then now() else c.updated_at end
   returning c.connected_at
 )
-select """ + _ms("(select connected_at from up)") + """ as connected_at_ms"""
+select """ + _ms("(select connected_at from up)") + """ as connected_at_ms,
+       coalesce(exists (select 1 from prev) and (select connected_at from up) = now(), false) as restarted"""
 
 
 LIST_SQL = """-- «Личные и рабочие чаты»: what the app mirrors (the ChatAudience webhook's list). For every profile asked — each once, in

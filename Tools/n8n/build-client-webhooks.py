@@ -89,6 +89,7 @@ PROTECTED_IDS = [
     "crVerifyIdent001",  # Verify Identity — identity-heal after a reinstall (A3 «защита платящих», 2026-10-14)
     "crChannelWatch001",  # Channel Watch — «канал отключился» notices to the owner every 10 min (A4 «защита платящих», 2026-10-14)
     "crSetSchedule001",  # Set Schedule — the owner's bot schedule, one version-guarded upsert (B1 «расписание бота», 2026-10-14)
+    "crChatAudience01",  # Chat Audience — the app's personal / business chat decisions: list, set, connected («Личные и рабочие чаты», 2026-10-25)
 ]
 
 

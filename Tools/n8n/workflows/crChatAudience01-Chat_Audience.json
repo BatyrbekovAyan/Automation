@@ -1,0 +1,1126 @@
+{
+  "id": "crChatAudience01",
+  "name": "Chat Audience",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ChatAudience",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "a704758c-9372-5df2-97e4-4e0ab16d4388",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        300
+      ],
+      "webhookId": "c32aeedc-448f-52dc-b1ff-1ba8796e6a5c"
+    },
+    {
+      "parameters": {
+        "jsCode": "// crAuth GATE — generated into every client webhook by Tools/n8n/apply-auth-gate.py from\n// Tools/n8n/auth/gate.js (+ token.js). Edit the sources, re-run the migration; never the copies.\n//\n// Verifies the Bearer capability token WITHOUT a database round-trip (HMAC, see token.js), then\n// checks that every id the request names is owned by the token's install:\n//   RULE.profiles  — body fields whose value(s) must be ⊆ claims.p   (sentinels ''/'-1' pass)\n//   RULE.workflows — body fields whose value(s) must be ⊆ claims.w   (sentinels ''/'-1' pass)\n//   RULE.appUser   — body fields that must EQUAL claims.u; a token WITHOUT a billing identity (u = null: the\n//                    id is held by another install or was not bindable) can name none (R2, 2026-09-27)\n//   RULE.appUserRequired — appUser fields that may not be empty/sentinel in session mode (Create WA/TG: an\n//                    empty AppUserID skipped the channel count and let the dialog quota fail open)\n//   RULE.legacy    — true: a request WITHOUT a token is admitted in `legacy` mode while\n//                    CR_AUTH_COMPAT_UNTIL lies in the future (old clients); false: 401\n// Output: the webhook item re-emitted — json AND binary: a Code node drops whatever it does not return,\n// and a multipart upload's parts (Unity WWWForm files even its text fields there) live in `binary`\n// (R3, 2026-09-27) — with `crAuth` = { ok, mode, reason, installId, appUserId, profiles, workflows,\n// claimPending } so downstream nodes can read the verified identity. The gate sees `body` only, so\n// ids that arrive as multipart parts are checked by the workflow after it decodes them.\n// CRAUTH-TOKEN-BEGIN\nconst crAuth = (() => {\n  const crypto = require('crypto');\n  const b64u = (buf) => Buffer.from(buf).toString('base64').replace(/\\+/g, '-').replace(/\\//g, '_').replace(/=+$/, '');\n  const unb64u = (s) => Buffer.from(String(s).replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((String(s).length + 3) % 4), 'base64');\n  const isIdList = (a) => Array.isArray(a) && a.every((x) => typeof x === 'string' && x.length > 0 && x.length <= 128);\n  function sign(payload, secret) {\n    if (!secret) throw new Error('crAuth: no signing secret');\n    const p = b64u(JSON.stringify(payload));\n    const sig = crypto.createHmac('sha256', secret).update('v1.' + p).digest();\n    return 'v1.' + p + '.' + b64u(sig);\n  }\n  function verify(token, secrets, nowSec) {\n    if (typeof token !== 'string' || !token) return { ok: false, reason: 'missing' };\n    const parts = token.split('.');\n    if (parts.length !== 3 || parts[0] !== 'v1' || !parts[1] || !parts[2]) return { ok: false, reason: 'malformed' };\n    const given = unb64u(parts[2]);\n    let good = false;\n    for (const sec of (secrets || []).filter(Boolean)) {\n      const exp = crypto.createHmac('sha256', sec).update(parts[0] + '.' + parts[1]).digest();\n      if (exp.length === given.length && crypto.timingSafeEqual(exp, given)) { good = true; break; }\n    }\n    if (!good) return { ok: false, reason: 'bad_signature' };\n    let c;\n    try { c = JSON.parse(unb64u(parts[1]).toString('utf8')); } catch (e) { return { ok: false, reason: 'malformed' }; }\n    if (!c || typeof c !== 'object' || typeof c.i !== 'string' || !c.i || !isIdList(c.p) || !isIdList(c.w)) return { ok: false, reason: 'malformed' };\n    if (typeof c.e !== 'number' || !(c.e > nowSec)) return { ok: false, reason: 'expired' };\n    if (c.c !== undefined && !isIdList(c.c)) return { ok: false, reason: 'malformed' };\n    return { ok: true, claims: { i: c.i, u: (typeof c.u === 'string' && c.u) ? c.u : null, p: c.p, w: c.w, c: c.c || [], e: c.e, n: (typeof c.n === 'number') ? c.n : 1 } };\n  }\n  function sha256Hex(s) { return crypto.createHash('sha256').update(String(s)).digest('hex'); }\n  function randomSecret(bytes) { return b64u(crypto.randomBytes(bytes || 32)); }\n  function bearer(headers) {\n    const h = headers || {};\n    const a = String(h.authorization || h.Authorization || '');\n    return a.startsWith('Bearer ') ? a.slice(7).trim() : '';\n  }\n  return { sign, verify, sha256Hex, randomSecret, bearer, b64u, unb64u };\n})();\n// CRAUTH-TOKEN-END\nconst RULE = {\"profiles\": [\"profileIds\", \"profileId\"], \"workflows\": [], \"appUser\": [], \"legacy\": false};\nconst inItem = $input.first();\nconst wh = inItem.json;\nconst secrets = [$env.CR_AUTH_SECRET, $env.CR_AUTH_SECRET_PREV];\nconst compatUntil = Date.parse($env.CR_AUTH_COMPAT_UNTIL || '') || 0;\nconst nowMs = Date.now();\nconst token = crAuth.bearer(wh.headers);\nlet mode = 'session', claims = null, deny = null;\nif (!token) {\n  if (RULE.legacy && compatUntil > nowMs) mode = 'legacy';\n  else deny = 'unauthorized:missing';\n} else {\n  const v = crAuth.verify(token, secrets, Math.floor(nowMs / 1000));\n  if (!v.ok) deny = 'unauthorized:' + v.reason; else claims = v.claims;\n}\nconst body = (wh.body && typeof wh.body === 'object') ? wh.body : {};\nconst isSentinel = (x) => x === undefined || x === null || x === '' || x === '-1';\nconst listOf = (v) => (Array.isArray(v) ? v : [v]);\nconst owned = (set, v) => listOf(v).every((x) => isSentinel(x) || (typeof x === 'string' && set.includes(x)));\nif (!deny && mode === 'session') {\n  for (const f of RULE.profiles || []) if (!owned(claims.p, body[f])) { deny = 'forbidden:' + f; break; }\n  if (!deny) for (const f of RULE.workflows || []) if (!owned(claims.w, body[f])) { deny = 'forbidden:' + f; break; }\n  if (!deny) for (const f of RULE.appUser || []) {\n    const v = body[f];\n    if (isSentinel(v)) {\n      if ((RULE.appUserRequired || []).includes(f)) { deny = 'forbidden:' + f; break; }\n      continue;\n    }\n    if (!claims.u || String(v) !== claims.u) { deny = 'forbidden:' + f; break; }\n  }\n}\nreturn [{ json: { ...wh, crAuth: {\n  ok: !deny, mode, reason: deny,\n  installId: claims ? claims.i : null, appUserId: claims ? claims.u : null,\n  profiles: claims ? claims.p : [], workflows: claims ? claims.w : [], claimPending: claims ? (claims.c || []) : [],\n} }, ...(inItem.binary ? { binary: inItem.binary } : {}), pairedItem: { item: 0 } }];\n"
+      },
+      "id": "dd0d0162-512f-53e7-ba54-ca3b1ecb315d",
+      "name": "Auth Gate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "25d8ec0d-02bb-54f1-b39e-e54c8bd63c48",
+              "leftValue": "={{ $json.crAuth.ok }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "1fbcdf66-e173-5c24-8b03-6e238d4f4201",
+      "name": "Authorized?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        440,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { success: false, error: 'unauthorized', reason: $json.crAuth.reason } }}",
+        "options": {
+          "responseCode": "={{ String($json.crAuth.reason || '').startsWith('forbidden') ? 403 : 401 }}"
+        }
+      },
+      "id": "185c9a19-9ae1-583a-9012-39a77e8b06f6",
+      "name": "Respond 401",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        660,
+        640
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// CHAT AUDIENCE / Validate (generated by Tools/n8n/build-chat-audience.py — edit there, never the JSON).\n// The gate already refused a profile id the token does not own. Here every id is taken again from the body: the sentinels\n// ('-1', '') dropped, the rest re-intersected with the token's profiles (a statement only ever sees the caller's own). The\n// limits are the op's: list at most 20 profile ids (de-duplicated), set at most 50 chats. A chat id is\n// a non-empty string of at most 128 characters with no whitespace, and never '*' — the reply mode's\n// bot-wide row, which names every chat and is no chat. kind is personal or business; version a positive safe integer\n// (digits in a string are taken too, and leave as a number: the statement reads a JSON number). The first malformed field\n// refuses the whole request, naming it.\nconst wh = $input.first().json || {};\nconst b = (wh.body && typeof wh.body === 'object' && !Array.isArray(wh.body)) ? wh.body : {};\nconst owned = new Set((wh.crAuth && wh.crAuth.profiles) || []);\nconst bad = (reason) => [{ json: { ok: false, error: 'bad_request', reason }, pairedItem: { item: 0 } }];\nconst good = (fields) => [{ json: Object.assign({ ok: true }, fields), pairedItem: { item: 0 } }];\nconst mine = (x) => typeof x === 'string' && x !== '' && x !== '-1' && owned.has(x);\nconst op = b.op;\nif (op === 'list') {\n  if (!Array.isArray(b.profileIds) || b.profileIds.length > 20) return bad('profileIds');\n  const ids = Array.from(new Set(b.profileIds.filter(mine)));\n  if (ids.length === 0) return bad('profileIds');\n  return good({ op, profileIds: ids });\n}\nif (op !== 'set' && op !== 'connected') return bad('op');\nif (!mine(b.profileId)) return bad('profileId');\nif (op === 'connected') return good({ op, profileId: b.profileId });\nif (!Array.isArray(b.chats) || b.chats.length === 0 || b.chats.length > 50) return bad('chats');\nconst chats = [];\nfor (const c of b.chats) {\n  if (!c || typeof c !== 'object' || Array.isArray(c)) return bad('chats');\n  const id = c.chatId;\n  if (typeof id !== 'string' || id === '' || id.length > 128 || /\\s/.test(id) || id === '*') return bad('chatId');\n  if (c.kind !== 'personal' && c.kind !== 'business') return bad('kind');\n  const v = c.version;\n  const version = (Number.isSafeInteger(v) && v > 0) ? v\n    : ((typeof v === 'string' && /^[1-9][0-9]{0,15}$/.test(v) && Number.isSafeInteger(Number(v))) ? Number(v) : 0);\n  if (!version) return bad('version');\n  chats.push({ chatId: id, kind: c.kind, version });\n}\nreturn good({ op, profileId: b.profileId, chats });\n"
+      },
+      "id": "b603e0a5-0ad5-5d47-be93-59af252e7a45",
+      "name": "Validate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "a512d888-26d8-5015-9c52-4df66b85e40b",
+              "leftValue": "={{ $json.ok }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "4d4b94ae-9494-50cb-ba3a-25bd59f0072e",
+      "name": "Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        880,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { success: false, error: 'bad_request', reason: $json.reason } }}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "id": "c0de7926-3ae1-5ab6-8e46-c2fda514b492",
+      "name": "Respond 400",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1100,
+        640
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "d03e74a0-ba0a-56a9-9cc0-a0e315e915c8",
+              "leftValue": "={{ $json.op === 'list' }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "7977a67b-c0cc-5ca5-bc1d-38f3842bae2b",
+      "name": "Is List?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1100,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "ad4bfac0-bfef-51d8-979e-4b3301b99bc5",
+              "leftValue": "={{ $json.op === 'set' }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "a19b3465-405f-51d1-b5e1-778a969c799a",
+      "name": "Is Set?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1320,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "a70a724a-2084-5890-b5ca-c8f267ecc08f",
+              "leftValue": "={{ $json.op === 'connected' }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "146fbf20-f32c-54ef-891a-ba69d71c10e4",
+      "name": "Is Connected?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1540,
+        540
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- «Личные и рабочие чаты»: what the app mirrors (the ChatAudience webhook's list). For every profile asked — each once, in\n-- the order asked, sentinels and non-strings skipped — the moment of its connection (connected_at_ms, null without a row)\n-- and the decisions that HOLD (VALID_SQL: the owner's, and the computed ones taken on the current connection) as\n-- decisions [{chatId, kind, source, reason, version}], ordered by chat id.\n-- Parameter: JSON array of the profile ids.\nwith ids as (\n  select e.x #>> '{}' as profile_id, min(e.ord) as ord\n  from jsonb_array_elements((case when jsonb_typeof($1::jsonb) = 'array' then $1::jsonb else '[]'::jsonb end)) with ordinality as e(x, ord)\n  where jsonb_typeof(e.x) = 'string' and e.x #>> '{}' not in ('', '-1')\n  group by e.x #>> '{}'\n)\nselect i.profile_id,\n       (extract(epoch from c.connected_at) * 1000)::bigint as connected_at_ms,\n       coalesce((select jsonb_agg(jsonb_build_object('chatId', a.chat_id, 'kind', a.kind, 'source', a.source,\n                                                     'reason', a.reason, 'version', a.version) order by a.chat_id)\n                 from chat_audience a where a.profile_id = i.profile_id and (a.source = 'owner' or a.decided_at >= coalesce(c.connected_at, '-infinity'))),\n                '[]'::jsonb) as decisions\nfrom ids i left join audience_connections c on c.profile_id = i.profile_id\norder by i.ord",
+        "options": {
+          "queryReplacement": "={{ [ JSON.stringify($json.profileIds) ] }}"
+        }
+      },
+      "id": "70e7d4e2-7666-5e16-acfd-c899536805ac",
+      "name": "List",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1320,
+        100
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "vvRrFiEXzLVqKjOx",
+          "name": "Postgres"
+        }
+      },
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// CHAT AUDIENCE / Shape List (generated by Tools/n8n/build-chat-audience.py — edit there, never the JSON).\n// List continues on error: a database fault reaches here as an item carrying `message` / `error`, an empty answer as one\n// empty item — never as «the node continued». Success = exactly one row per asked profile, each naming its profile and\n// carrying its decisions array. bigint columns arrive as text: connectedAt and every version leave as JSON numbers.\nconst v = $('Validate').first().json;\nconst rows = $input.all().map((i) => i.json).filter((r) => r && typeof r === 'object' && Object.keys(r).length > 0);\nconst asked = Array.isArray(v.profileIds) ? v.profileIds : [];\nconst ok = rows.length > 0 && rows.length === asked.length\n  && rows.every((r) => r.error === undefined && typeof r.profile_id === 'string' && Array.isArray(r.decisions));\nif (!ok) return [{ json: { success: false, error: 'db_unavailable', _status: 500 }, pairedItem: { item: 0 } }];\nconst num = (x) => (x === null || x === undefined || x === '' || !Number.isFinite(Number(x))) ? null : Number(x);\nconst profiles = rows.map((r) => ({\n  profileId: r.profile_id,\n  connectedAt: num(r.connected_at_ms),\n  decisions: r.decisions.filter((d) => d && typeof d === 'object' && typeof d.chatId === 'string').map((d) => ({\n    chatId: d.chatId, kind: d.kind, source: d.source, reason: d.reason, version: num(d.version) || 0 })),\n}));\nreturn [{ json: { success: true, profiles, _status: 200 }, pairedItem: { item: 0 } }];"
+      },
+      "id": "69886117-73d5-550e-bad9-11b43e8de755",
+      "name": "Shape List",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1540,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ Object.fromEntries(Object.entries($json).filter(([k]) => k !== '_status')) }}",
+        "options": {
+          "responseCode": "={{ $json._status || 200 }}"
+        }
+      },
+      "id": "3f6c137b-aef0-5b20-813a-36068f95db53",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        3300,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- «Личные и рабочие чаты»: the owner's decisions, several chats at once (the ChatAudience webhook's set). One answer row\n-- per chat, in the order of the request (a chat named twice: once, at its first place, with its highest version):\n-- {chat_id, applied, kind, version, refused, became_business}. kind / version are the server's after the statement —\n-- the client adopts them when applied is false.\n--   refused 'nonhuman'  the chat is not a person — by its id (a group, a channel, the status / broadcast list, the service\n--                       account) or by a recorded reason nonhuman: never written, whatever kind was asked;\n--   applied             no row yet, a computed row (even one that holds), or an owner row of an OLDER version;\n--   personal_since      business (or no row) → personal stamps now; personal → personal keeps it; → business clears it;\n--   wiped_at            cleared whenever personal_since changes and when the chat turns business;\n--   became_business     applied, business, and the decision that held before was not business (no row, or a computed row\n--                       that no longer holds, counts as not business) — the webhook then backfills the conversation.\n-- Malformed elements (no chat id, a kind that is neither, a version that is not a positive integer) give no row.\n-- Parameters, in order: profile id, JSON array of {chatId, kind, version}.\nwith req as (\n  select e.x->>'chatId' as chat_id, e.x->>'kind' as kind,\n         case when e.x->>'version' ~ '^[1-9][0-9]{0,15}$' then (e.x->>'version')::bigint end as version, e.ord\n  from jsonb_array_elements((case when jsonb_typeof($2::jsonb) = 'array' then $2::jsonb else '[]'::jsonb end)) with ordinality as e(x, ord)\n  where nullif($1, '') is not null and $1 <> '-1'\n    and jsonb_typeof(e.x) = 'object' and jsonb_typeof(e.x->'chatId') = 'string' and e.x->>'chatId' <> ''\n    and e.x->>'kind' in ('personal', 'business')\n    and jsonb_typeof(e.x->'version') = 'number' and e.x->>'version' ~ '^[1-9][0-9]{0,15}$'\n), want as (\n  select r.chat_id, (array_agg(r.kind order by r.version desc, r.ord desc))[1] as kind, max(r.version) as version,\n         min(r.ord) as ord\n  from req r group by r.chat_id\n), cur as (\n  select w.chat_id, w.kind, w.version, w.ord, a.kind as old_kind, a.version as old_version,\n         coalesce(a.profile_id is not null and (a.source = 'owner' or a.decided_at >= coalesce(c.connected_at, '-infinity')), false) as old_valid,\n         ((right(w.chat_id, 5) = '@g.us' or right(w.chat_id, 11) = '@newsletter' or right(w.chat_id, 10) = '@broadcast' or w.chat_id in ('777000')) or coalesce(a.reason = 'nonhuman', false)) as refused\n  from want w\n  left join chat_audience a on a.profile_id = $1 and a.chat_id = w.chat_id\n  left join audience_connections c on c.profile_id = $1\n), up as (\n  insert into chat_audience as t (profile_id, chat_id, kind, source, reason, version, decided_at, personal_since, wiped_at,\n                                  updated_at)\n  select $1, u.chat_id, u.kind, 'owner', 'owner', u.version, now(), case when u.kind = 'personal' then now() end, null, now()\n  from cur u where not u.refused\n  on conflict (profile_id, chat_id) do update set\n    kind = excluded.kind, source = 'owner', reason = 'owner', version = excluded.version, decided_at = excluded.decided_at,\n    personal_since = case when excluded.kind = 'business' then null\n                          when t.kind = 'personal' then t.personal_since\n                          else excluded.decided_at end,\n    wiped_at = case when excluded.kind = 'personal' and t.kind = 'personal' then t.wiped_at end,\n    updated_at = excluded.updated_at\n  where t.reason <> 'nonhuman' and (t.source = 'default' or t.version < excluded.version)\n  returning t.chat_id, t.kind, t.version\n)\nselect c.chat_id,\n       u.chat_id is not null as applied,\n       coalesce(u.kind, c.old_kind, 'personal') as kind,\n       coalesce(u.version, c.old_version, 0) as version,\n       case when c.refused then 'nonhuman' end as refused,\n       (u.chat_id is not null and u.kind = 'business' and not coalesce(c.old_valid and c.old_kind = 'business', false))\n         as became_business\nfrom cur c left join up u on u.chat_id = c.chat_id\norder by c.ord",
+        "options": {
+          "queryReplacement": "={{ [ $json.profileId, JSON.stringify($json.chats) ] }}"
+        }
+      },
+      "id": "4cb90c4f-cd9b-5aae-bf09-9675916a6ca4",
+      "name": "Set",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1540,
+        320
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "vvRrFiEXzLVqKjOx",
+          "name": "Postgres"
+        }
+      },
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// CHAT AUDIENCE / Shape Set (generated by Tools/n8n/build-chat-audience.py — edit there, never the JSON).\n// Set continues on error: a database fault reaches here as an item carrying `message` / `error`. Success = exactly one\n// well-formed row per DISTINCT chat of the request (the statement answers a chat named twice once): its chat id, the\n// booleans applied and became_business, a kind. The version arrives as text and leaves as a JSON number; refused is the\n// statement's word or null.\nconst v = $('Validate').first().json;\nconst rows = $input.all().map((i) => i.json).filter((r) => r && typeof r === 'object' && Object.keys(r).length > 0);\nconst asked = new Set((Array.isArray(v.chats) ? v.chats : []).map((c) => c.chatId)).size;\nconst ok = rows.length > 0 && rows.length === asked\n  && rows.every((r) => r.error === undefined && typeof r.chat_id === 'string' && typeof r.applied === 'boolean'\n    && typeof r.became_business === 'boolean' && (r.kind === 'personal' || r.kind === 'business'));\nif (!ok) return [{ json: { success: false, error: 'db_unavailable', _status: 500 }, pairedItem: { item: 0 } }];\nconst results = rows.map((r) => ({ chatId: r.chat_id, applied: r.applied, kind: r.kind,\n  version: Number.isFinite(Number(r.version)) ? Number(r.version) : 0, refused: typeof r.refused === 'string' ? r.refused : null }));\nreturn [{ json: { success: true, results, _status: 200 }, pairedItem: { item: 0 } }];"
+      },
+      "id": "7bab5910-a887-5849-8c1d-89f1bc0fc2e3",
+      "name": "Shape Set",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1760,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ Object.fromEntries(Object.entries($json).filter(([k]) => k !== '_status')) }}",
+        "options": {
+          "responseCode": "={{ $json._status || 200 }}"
+        }
+      },
+      "id": "7c9ba8bd-f565-5e04-be1e-77834e394695",
+      "name": "Respond Set",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1980,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// CHAT AUDIENCE / Replay Items (generated by Tools/n8n/build-chat-audience.py — edit there, never the JSON).\n// After the answer is on the wire: one item per chat this set just turned BUSINESS — the statement's positive\n// became_business (applied, business, and no business decision held before). None, or a set the answer called a failure:\n// no item, nothing more runs.\nconst shaped = $('Shape Set').first().json || {};\nif (shaped.success !== true) return [];\nconst v = $('Validate').first().json;\nconst seen = new Set();\nconst out = [];\nfor (const it of $('Set').all()) {\n  const r = it.json || {};\n  if (r.became_business !== true || r.applied !== true || r.kind !== 'business') continue;\n  if (typeof r.chat_id !== 'string' || r.chat_id === '' || seen.has(r.chat_id)) continue;\n  seen.add(r.chat_id);\n  out.push({ json: { profileId: v.profileId, chatId: r.chat_id }, pairedItem: { item: 0 } });\n}\nreturn out;"
+      },
+      "id": "0c1f8fa0-d125-5a09-95fe-85e2dc6a992e",
+      "name": "Replay Items",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2200,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- «Личные и рабочие чаты»: the ChatAudience webhook's set, after the answer — the channel of the profile whose chat just\n-- turned business, so its recent messages are read from the right Wappi base. One row: the profile id and the chat id\n-- handed back, and the channel of the profile's LIVE bot_profiles row (null without one: nothing is read then).\n-- Parameters, in order: profile id, chat id.\nselect $1::text as profile_id, $2::text as chat_id,\n       (select b.channel from bot_profiles b where b.profile_id = $1::text and b.deleted_at is null) as channel",
+        "options": {
+          "queryReplacement": "={{ [ $json.profileId, $json.chatId ] }}"
+        }
+      },
+      "id": "2ef7ddc3-0c33-5738-a524-7cb03c8ea41b",
+      "name": "Chat Channel",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        2420,
+        320
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "vvRrFiEXzLVqKjOx",
+          "name": "Postgres"
+        }
+      },
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "a44a7071-0bf0-521f-8078-cb5c276d9c44",
+              "leftValue": "={{ ($json.channel === 'whatsapp' || $json.channel === 'telegram') && typeof $json.profile_id === 'string' && $json.profile_id !== '' && typeof $json.chat_id === 'string' && $json.chat_id !== '' }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "b9d0151f-4355-5940-a6c6-eedc7b4689d7",
+      "name": "Has Channel?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2640,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ ($json.channel === 'telegram' ? 'https://wappi.pro/tapi/' : 'https://wappi.pro/api/') + 'sync/messages/get' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 10000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          },
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 300
+            }
+          }
+        },
+        "sendQuery": true,
+        "specifyQuery": "json",
+        "jsonQuery": "={{ JSON.stringify({ profile_id: $json.profile_id, chat_id: $json.chat_id, limit: 10, order: 'desc' }) }}"
+      },
+      "id": "417c05f4-69c7-55aa-a908-b64768f5477c",
+      "name": "Recent Messages",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2860,
+        320
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "EuhhqAaV56DpoqAN",
+          "name": "WappiAuthToken"
+        }
+      },
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// CHAT AUDIENCE / Replay Plan (generated by Tools/n8n/build-chat-audience.py — edit there, never the JSON; runs PER\n// ITEM — one chat that just turned business). In: Recent Messages' answer for the chat Chat Channel named.\n// The page counts only when Wappi answered 200 / done with a messages array that is THIS profile's (the top-level uuid,\n// when given) and THIS chat's (no row naming another chat) — Wappi crosses concurrent answers, and a crossed page must\n// never reach another chat's history or memory. It goes to the backfill exactly as Wappi returned it (newest first),\n// or as nothing.\n// The trigger — the message handed to the bot again (spec §4.5) — is the NEWEST message of the page, only when: it is the\n// client's (fromMe the boolean false — the owner did not write after it), a message the bot answers from these fields\n// (REPLAY_TYPES: text and the media it answers with «напишите текстом»; never a voice message, whose file a messages/get\n// row does not carry), not deleted, with a string id, and at most FRESH_HOURS old. Otherwise nothing is handed on and\n// the whole page — that message included — goes into the history and the memory through the backfill.\n// «Авто» against «Выбрать» is not decided here: the template reads the chat's mode itself.\nconst FRESH_HOURS = 24;\nconst REPLAY_TYPES = [\"chat\", \"text\", \"image\", \"video\", \"document\", \"audio\", \"sticker\", \"location\", \"vcard\"];\nconst PRIVATE_CHAT_TYPE = {\"whatsapp\": \"dialog\", \"telegram\": \"user\"};\n\n// The incoming-webhook message the bot template reads, built from ONE messages/get row (the only place the two shapes\n// meet: a live check confirms the row's keys). from = chatId = the chat the decision names: a private chat's incoming\n// webhook always carries from == chatId (the template drops anything else), while a messages/get row's own `from` may\n// name a username (Telegram). profile_id is the profile asked — a row carries none. chat_type is the channel's private\n// dialog: only a person's chat can be made business.\nfunction replayMessage(channel, profileId, chatId, row) {\n  const message = {\n    wh_type: 'incoming_message',\n    profile_id: profileId,\n    id: String(row.id),\n    body: typeof row.body === 'string' ? row.body : '',\n    type: String(row.type),\n    from: chatId,\n    chatId: chatId,\n    time: Number(row.time),\n    caption: row.caption === undefined ? null : row.caption,\n    chat_type: PRIVATE_CHAT_TYPE[channel],\n    is_bot: row.is_bot === true,\n  };\n  if (typeof row.contact_name === 'string') message.contact_name = row.contact_name;\n  return message;\n}\n\nconst req = $('Chat Channel').item.json;\nconst profileId = req.profile_id, chatId = req.chat_id, channel = req.channel;\nconst res = $json || {};\nconst body = (res.body && typeof res.body === 'object' && !Array.isArray(res.body)) ? res.body : {};\nconst rows = Array.isArray(body.messages) ? body.messages : null;\nconst foreign = (m) => !!(m && typeof m === 'object' && typeof m.chatId === 'string' && m.chatId !== '' && m.chatId !== chatId);\nconst pageOk = Number(res.statusCode) === 200 && body.status === 'done' && rows !== null\n  && !(typeof body.uuid === 'string' && body.uuid !== '' && body.uuid !== profileId) && !rows.some(foreign);\nconst page = pageOk ? rows : [];\nconst newest = page.length > 0 && page[0] && typeof page[0] === 'object' ? page[0] : null;\nconst time = newest ? Number(newest.time) : NaN;\nlet why = 'replay';\nif (!pageOk) why = 'no_page';\nelse if (!newest) why = 'empty';\nelse if (newest.fromMe !== false) why = 'not_from_client';\nelse if (typeof newest.id !== 'string' || newest.id === '' || REPLAY_TYPES.indexOf(newest.type) < 0\n         || newest.isDeleted === true || newest.is_deleted === true) why = 'not_replayable';\nelse if (!(Number.isFinite(time) && time > 0 && time >= Math.floor(Date.now() / 1000) - FRESH_HOURS * 3600)) why = 'stale';\nconst replay = why === 'replay';\nreturn { json: { profileId, chatId, channel, page, triggerId: replay ? newest.id : '', replay, why,\n                 message: replay ? replayMessage(channel, profileId, chatId, newest) : null } };",
+        "mode": "runOnceForEachItem"
+      },
+      "id": "76ba1c24-1753-54c0-bce0-ed6da2bee49e",
+      "name": "Replay Plan",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3080,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- «Личные и рабочие чаты»: the start of a conversation that just turned business. Writes ONLY while the chat's holding\n-- decision is business. Skips the trigger message (it goes on through the normal path, which records it) and every\n-- message whose id the chat's history already has (the assistant's replies, the app's and the phone's sends recorded\n-- while the chat was business); elements without a string id or a boolean fromMe are skipped too. The page comes as\n-- Wappi's messages/get returns it with order=desc — NEWEST FIRST — and the rest is stored REVERSED, oldest first, by the\n-- page position alone (never by time: Wappi's order breaks equal timestamps, and a message without a parseable time keeps\n-- its place); history ids and memory row ids both follow it. The owner's message (fromMe) becomes an owner_phone history\n-- row + an ai memory row that opens with the owner mark, the client's a client history row + a human memory row — both\n-- carrying source and message_id. A media message stores its type and caption, never its payload. The time only fills\n-- sent_at. ALWAYS one row: added = the history rows written.\n-- Parameters, in order: profile id, chat id, the trigger message id (empty = none), JSON array of {id, fromMe, body,\n-- type, time} = a messages/get page, newest first (caption optional; time in unix seconds).\nwith aud_ok as (\n  select coalesce((select aud.kind from chat_audience aud\n      left join audience_connections aud_conn on aud_conn.profile_id = aud.profile_id\n      where aud.profile_id = $1 and aud.chat_id = $2\n        and (aud.source = 'owner' or aud.decided_at >= coalesce(aud_conn.connected_at, '-infinity'))) = 'business', false) as business\n), src as (\n  select e.x, e.ord from jsonb_array_elements((case when jsonb_typeof($4::jsonb) = 'array' then $4::jsonb else '[]'::jsonb end)) with ordinality as e(x, ord)\n  where jsonb_typeof(e.x) = 'object' and jsonb_typeof(e.x->'id') = 'string' and e.x->>'id' <> ''\n    and jsonb_typeof(e.x->'fromMe') = 'boolean'\n), msgs as (\n  select distinct on (s.x->>'id') s.x->>'id' as id, s.ord, (s.x->'fromMe') = 'true'::jsonb as from_me,\n         case when s.x->>'type' in ('chat', 'text') then left(coalesce(s.x->>'body', ''), 4000)\n              else '[' || coalesce(nullif(s.x->>'type', ''), 'media') || ']'\n                   || coalesce(' ' || left(nullif(s.x->>'caption', ''), 1000), '') end as body,\n         coalesce(s.x->>'type', '') as msg_type,\n         case when s.x->>'time' ~ '^[0-9]{1,11}$' then (s.x->>'time')::bigint end as t\n  from src s\n  where (select business from aud_ok)\n    and s.x->>'id' is distinct from nullif($3, '')\n    and not exists (select 1 from chat_history_events h\n                    where h.profile_id = $1 and h.chat_id = $2 and h.message_id = s.x->>'id')\n  order by s.x->>'id', s.ord\n), ev as (\n  insert into chat_history_events (profile_id, chat_id, message_id, source, body, msg_type, sent_at)\n  select $1, $2, m.id, case when m.from_me then 'owner_phone' else 'client' end, m.body, m.msg_type, to_timestamp(m.t)\n  from msgs m\n  order by m.ord desc\n  on conflict (profile_id, chat_id, message_id) do nothing\n  returning message_id\n), mem as (\n  insert into n8n_chat_histories (session_id, message)\n  select $1 || ':' || $2, case when m.from_me then jsonb_build_object('type', 'ai', 'content', 'Владелец: ' || m.body, 'additional_kwargs', jsonb_build_object('source', 'owner_phone', 'message_id', m.id), 'response_metadata', '{}'::jsonb)\n                          else jsonb_build_object('type', 'human', 'content', m.body, 'additional_kwargs', jsonb_build_object('source', 'client', 'message_id', m.id), 'response_metadata', '{}'::jsonb) end\n  from msgs m\n  where m.id in (select message_id from ev)\n    and not exists (select 1 from n8n_chat_histories x\n                    where x.session_id = $1 || ':' || $2 and x.message->'additional_kwargs'->>'message_id' = m.id)\n  order by m.ord desc\n  returning 1\n)\nselect (select count(*) from ev)::int as added",
+        "options": {
+          "queryReplacement": "={{ [ $json.profileId, $json.chatId, $json.triggerId, JSON.stringify($json.page) ] }}"
+        }
+      },
+      "id": "7cec4530-837d-5618-9c40-cefd347565c2",
+      "name": "Backfill",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        3300,
+        320
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "vvRrFiEXzLVqKjOx",
+          "name": "Postgres"
+        }
+      },
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "ae3deca5-f4f2-59b0-84b7-913c138b622e",
+              "leftValue": "={{ typeof $json.added === 'number' && $('Replay Plan').item.json.replay === true }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "f2bd6da2-f243-536d-8ccd-3f7ded37aac2",
+      "name": "Replay?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        3520,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'http://localhost:5678/webhook/' + encodeURIComponent($('Replay Plan').item.json.profileId) }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ messages: [ $('Replay Plan').item.json.message ] }) }}",
+        "options": {
+          "timeout": 10000,
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 300
+            }
+          },
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "612ee969-8e8b-5dce-be72-0801e6f534da",
+      "name": "Replay",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3740,
+        320
+      ],
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- «Личные и рабочие чаты»: the ChatAudience webhook's connected — which Wappi base to ask for the profile's status. ALWAYS\n-- one row: the channel of the profile's LIVE bot_profiles row, null without one (the request names no live profile).\n-- Parameter: the profile id.\nselect (select b.channel from bot_profiles b where b.profile_id = $1::text and b.deleted_at is null) as channel",
+        "options": {
+          "queryReplacement": "={{ [ $json.profileId ] }}"
+        }
+      },
+      "id": "91d946a4-a866-5f4b-9e1e-38a0937ec93d",
+      "name": "Channel",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1760,
+        540
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "vvRrFiEXzLVqKjOx",
+          "name": "Postgres"
+        }
+      },
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "614ba440-0c28-5add-be72-5db5618d7a49",
+              "leftValue": "={{ $json.channel === 'whatsapp' || $json.channel === 'telegram' }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "b9b1914a-17ae-55de-b284-fe4d2233077c",
+      "name": "Channel Known?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1980,
+        540
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ ($json.channel === 'telegram' ? 'https://wappi.pro/tapi/' : 'https://wappi.pro/api/') + 'sync/get/status' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 10000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        },
+        "sendQuery": true,
+        "specifyQuery": "json",
+        "jsonQuery": "={{ JSON.stringify({ profile_id: $('Validate').first().json.profileId }) }}"
+      },
+      "id": "540e80de-6ff0-5768-b2a9-c6754bc7fd80",
+      "name": "Status",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2200,
+        540
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "EuhhqAaV56DpoqAN",
+          "name": "WappiAuthToken"
+        }
+      },
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// CHAT AUDIENCE / Phone (generated by Tools/n8n/build-chat-audience.py — edit there, never the JSON).\n// The connected number, read by the server itself from the profile's get/status — never sent by the app — by the A5 rule\n// (build-handoff-workflows.OWNER_PHONE_JS, embedded verbatim: Telegram's authorised account first, else the top-level\n// phone). Wappi's answer is a verdict only when it is HTTP 200 and echoes THIS profile (Wappi crosses concurrent answers):\n// the boolean authorized true is a pairing, the boolean false is «not authorized» (409); anything else — no answer, an\n// error, a crossed answer, a flag that is not a boolean — is no verdict (502). A pairing without a usable number still\n// records the connection: the moment is kept, the number stays unknown.\n// OWNER PHONE (A5): the number a message to the owner goes to, from Wappi's get/status BODY — the V2 rule of\n// Claim Decide. Telegram (wapi 'tapi'): the AUTHORISED account's phone (status.account.phone) first; the top-level\n// phone may be a number someone named in auth/phone, so it is only the fallback. WhatsApp: the top-level phone.\n// Digits only; '' = no usable number.\nfunction ownerPhone(wapi, status) {\n  const st = (status && typeof status === 'object') ? status : {};\n  const acct = (wapi === 'tapi' && st.account && typeof st.account === 'object') ? st.account.phone : null;\n  return String(acct || st.phone || '').replace(/\\D/g, '');\n}\nconst v = $('Validate').first().json;\nconst ch = $('Channel').first().json || {};\nconst r = $json || {};\nconst status = (r.body && typeof r.body === 'object' && !Array.isArray(r.body)) ? r.body : {};\nconst wapi = ch.channel === 'telegram' ? 'tapi' : 'api';\nlet error = '';\nif (Number(r.statusCode) !== 200) error = 'wappi_unavailable';\nelse if (status.profile_id !== v.profileId) error = 'wappi_unavailable';\nelse if (status.authorized === false) error = 'not_authorized';\nelse if (status.authorized !== true) error = 'wappi_unavailable';\nreturn [{ json: { ok: !error, error, profileId: v.profileId, phone: error ? '' : ownerPhone(wapi, status) }, pairedItem: { item: 0 } }];\n"
+      },
+      "id": "4609a470-394b-531d-abba-abb4f801d744",
+      "name": "Phone",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2420,
+        540
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "d10a1be0-ebe4-5c02-9560-cd114a206ac8",
+              "leftValue": "={{ $json.ok === true }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "82123aff-8c6f-569d-80b0-c2d99abfa926",
+      "name": "Phone OK?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2640,
+        540
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- «Личные и рабочие чаты»: the app reports a confirmed connection of the profile's channel; the number is the one the\n-- server read from get/status (only its digits count; empty = not known). No row: created with the line's moment and the\n-- number. A row without a number takes the number and keeps its moment. The same number, or none given, changes nothing.\n-- ANOTHER number is a new connection (owner decision 19): the moment becomes now — every computed decision taken before\n-- it stops holding (VALID_SQL), the owner's stay — and the new number is kept.\n-- ALWAYS one row: connected_at_ms of the row after it (null for a sentinel profile, which writes nothing) and restarted —\n-- true only when THIS statement moved the moment (an existing row, another known number: the app then asks «Кто из них\n-- клиенты?» again); a first row, a number filled in, the same or no number, a sentinel: false. «Moved» is read off the\n-- row itself — the moment is now exactly when this statement set it — so a concurrent report that moved it first does\n-- not make this one say so.\n-- Parameters, in order: profile id, the connected number.\nwith num as (\n  select nullif(regexp_replace(coalesce($2, ''), '[^0-9]', '', 'g'), '') as phone\n), prev as (\n  select c0.connected_at from audience_connections c0 where c0.profile_id = $1\n), up as (\n  insert into audience_connections as c (profile_id, phone, connected_at)\n  select $1, num.phone, coalesce((with recursive aud_line as (\n        select aud_lp.profile_id, aud_lp.channel, aud_lp.created_at from bot_profiles aud_lp\n        where aud_lp.profile_id = $1\n        union\n        select aud_lq.profile_id, aud_lq.channel, aud_lq.created_at from bot_profiles aud_lq\n        join aud_line on aud_lq.superseded_by = aud_line.profile_id and aud_lq.channel = aud_line.channel)\n      select min(aud_line.created_at) from aud_line), now()) from num\n  where nullif($1, '') is not null and $1 <> '-1'\n  on conflict (profile_id) do update set\n    connected_at = case when excluded.phone is not null and nullif(regexp_replace(coalesce(c.phone, ''), '[^0-9]', '', 'g'), '') <> excluded.phone then now() else c.connected_at end,\n    phone        = case when excluded.phone is not null and excluded.phone is distinct from nullif(regexp_replace(coalesce(c.phone, ''), '[^0-9]', '', 'g'), '') then excluded.phone else c.phone end,\n    updated_at   = case when excluded.phone is not null and excluded.phone is distinct from nullif(regexp_replace(coalesce(c.phone, ''), '[^0-9]', '', 'g'), '') then now() else c.updated_at end\n  returning c.connected_at\n)\nselect (extract(epoch from (select connected_at from up)) * 1000)::bigint as connected_at_ms,\n       coalesce(exists (select 1 from prev) and (select connected_at from up) = now(), false) as restarted",
+        "options": {
+          "queryReplacement": "={{ [ $json.profileId, $json.phone ] }}"
+        }
+      },
+      "id": "d594b697-0d91-5f8d-a6b1-d72ec9176b2a",
+      "name": "Connected",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        2860,
+        540
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "vvRrFiEXzLVqKjOx",
+          "name": "Postgres"
+        }
+      },
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// CHAT AUDIENCE / Shape Connected (generated by Tools/n8n/build-chat-audience.py — edit there, never the JSON).\n// Reached from three places, judged in their order:\n//   Channel (always one row, a `channel` column): an item without that column is a database fault (500); a null channel\n//     is no live row of the profile (400 profileId) — Wappi is never asked then;\n//   Phone (its verdict): not paired → 409 not_authorized, no verdict → 502 wappi_unavailable — nothing written;\n//   Connected (continues on error): success only on ONE row with a positive connected_at_ms (bigint, as text) and a\n//     boolean restarted — connectedAt leaves as a JSON number.\nconst done = (body, status) => [{ json: Object.assign({}, body, { _status: status }), pairedItem: { item: 0 } }];\nconst ch = $('Channel').first().json || {};\nif (ch.channel !== 'whatsapp' && ch.channel !== 'telegram') {\n  const fault = ch.error !== undefined || ch.message !== undefined || !Object.prototype.hasOwnProperty.call(ch, 'channel');\n  return fault ? done({ success: false, error: 'db_unavailable' }, 500) : done({ success: false, error: 'bad_request', reason: 'profileId' }, 400);\n}\nconst phone = $('Phone').first().json || {};\nif (phone.ok !== true) {\n  return phone.error === 'not_authorized' ? done({ success: false, error: 'not_authorized' }, 409)\n                                          : done({ success: false, error: 'wappi_unavailable' }, 502);\n}\nconst rows = $input.all().map((i) => i.json).filter((x) => x && typeof x === 'object' && Object.keys(x).length > 0);\nconst row = rows.length === 1 ? rows[0] : null;\nconst ms = row && row.connected_at_ms !== null && row.connected_at_ms !== undefined ? Number(row.connected_at_ms) : NaN;\nif (!row || row.error !== undefined || !(Number.isSafeInteger(ms) && ms > 0) || typeof row.restarted !== 'boolean') {\n  return done({ success: false, error: 'db_unavailable' }, 500);\n}\nreturn done({ success: true, connectedAt: ms, restarted: row.restarted }, 200);"
+      },
+      "id": "8beb7758-b835-5ed6-817f-4d54bc7cc793",
+      "name": "Shape Connected",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3080,
+        640
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Auth Gate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Auth Gate": {
+      "main": [
+        [
+          {
+            "node": "Authorized?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Authorized?": {
+      "main": [
+        [
+          {
+            "node": "Validate",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond 401",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate": {
+      "main": [
+        [
+          {
+            "node": "Valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Valid?": {
+      "main": [
+        [
+          {
+            "node": "Is List?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond 400",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is List?": {
+      "main": [
+        [
+          {
+            "node": "List",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Is Set?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Set?": {
+      "main": [
+        [
+          {
+            "node": "Set",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Is Connected?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Connected?": {
+      "main": [
+        [
+          {
+            "node": "Channel",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond 400",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "List": {
+      "main": [
+        [
+          {
+            "node": "Shape List",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Shape List": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set": {
+      "main": [
+        [
+          {
+            "node": "Shape Set",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Shape Set": {
+      "main": [
+        [
+          {
+            "node": "Respond Set",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respond Set": {
+      "main": [
+        [
+          {
+            "node": "Replay Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Replay Items": {
+      "main": [
+        [
+          {
+            "node": "Chat Channel",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chat Channel": {
+      "main": [
+        [
+          {
+            "node": "Has Channel?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Channel?": {
+      "main": [
+        [
+          {
+            "node": "Recent Messages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Recent Messages": {
+      "main": [
+        [
+          {
+            "node": "Replay Plan",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Replay Plan": {
+      "main": [
+        [
+          {
+            "node": "Backfill",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Backfill": {
+      "main": [
+        [
+          {
+            "node": "Replay?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Replay?": {
+      "main": [
+        [
+          {
+            "node": "Replay",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Channel": {
+      "main": [
+        [
+          {
+            "node": "Channel Known?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Channel Known?": {
+      "main": [
+        [
+          {
+            "node": "Status",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Shape Connected",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Status": {
+      "main": [
+        [
+          {
+            "node": "Phone",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Phone": {
+      "main": [
+        [
+          {
+            "node": "Phone OK?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Phone OK?": {
+      "main": [
+        [
+          {
+            "node": "Connected",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Shape Connected",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Connected": {
+      "main": [
+        [
+          {
+            "node": "Shape Connected",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Shape Connected": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataSuccessExecution": "none",
+    "saveDataErrorExecution": "all",
+    "saveManualExecutions": false
+  },
+  "staticData": null,
+  "meta": null,
+  "tags": []
+}

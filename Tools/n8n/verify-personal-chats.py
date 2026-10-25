@@ -28,10 +28,29 @@ still wired as designed».
           Response names personal_chat to an authenticated session caller only;
       (3) Dashboard Outcomes: Find Changed Sessions keeps only business sessions (the session split at its FIRST colon) inside
           `changed`, before its LIMIT; Fetch Outcomes returns verdicts and open handoffs of business chats only.
+  webhook — Task 7: the app's ChatAudience webhook crChatAudience01 (build-chat-audience.py; behaviour in
+      tests/test_chat_audience.py):
+      (1) the workflow IS the generator's output, with exactly its nodes, none disabled; successful executions not saved;
+      (2) the gate is TOKEN ONLY and scopes profileIds / profileId to the token; Validate re-intersects with the token, drops
+          the sentinels, keeps the limits (20 profiles, 50 chats), refuses the reply mode's wildcard '*', an empty / over-long
+          / whitespace chat id, a wrong kind or version; a refused call reaches no statement and no Wappi call;
+      (3) the op fork is three Ifs on op; List / Set / Connected / Backfill carry audience.py's statements exactly (Backfill
+          composed with apply-history-handoff.py's MEMORY_ROW and OWNER_CONTENT_SQL), every statement continues on error and
+          its Shape node judges the rows' positive fields;
+      (4) the owner's answer goes out BEFORE the tail: Replay Items is entered from Respond Set alone, and with that one edge
+          cut nothing of the tail is reachable;
+      (5) the Wappi reads (Recent Messages, Status): the canonical Wappi credential, fullResponse + neverError, at most 10 s,
+          only the two Wappi bases, messages/get with limit 10 / order desc, continue on error; mark_all nowhere;
+      (6) the replay: only through Replay? (the backfill's committed row AND the plan's positive word), POST to the bot's own
+          webhook on localhost, no credential, neverError, at most 10 s; Replay Plan runs per item, takes FRESH_HOURS from
+          audience.py, checks the page is this profile's and chat's, never replays a voice message, builds the message in ONE
+          function; Phone embeds build-handoff-workflows.OWNER_PHONE_JS verbatim and needs the echo and the boolean flag;
+      (7) crChatAudience01 is a protected infra id: build-client-webhooks.PROTECTED_IDS, staging/bootstrap.py
+          ACTIVE_CANONICAL, Set Workflow State and the dependents regenerated from the list.
 
-Every group carries its own tripwire (WIPE_MUTATIONS for `wipe`, READER_MUTATIONS for `readers`): a list of (label, mutation, the message the checks must
-produce); a normal run applies each one to a copy of a PASSING workflow and fails if the checks accept it — a tripwire that
-accepts a broken sweep is no tripwire.
+Every group carries its own tripwire (WIPE_MUTATIONS for `wipe`, READER_MUTATIONS for `readers`, WEBHOOK_MUTATIONS for
+`webhook`): a list of (label, mutation, the message the checks must produce); a normal run applies each one to a copy of a
+PASSING workflow and fails if the checks accept it — a tripwire that accepts a broken sweep is no tripwire.
 
     python3 Tools/n8n/verify-personal-chats.py                 # every group
     python3 Tools/n8n/verify-personal-chats.py --only wipe     # one group
@@ -83,14 +102,17 @@ def sources(wf, dst):
                   for e in (out or []) if e.get("node") == dst)
 
 
-def reachable(wf, start):
+def reachable(wf, start, cut=None):
+    """The nodes reachable from `start`; `cut` = (node, output index) is an output not followed."""
     seen, todo = set(), [start]
     while todo:
         n = todo.pop()
         if n in seen:
             continue
         seen.add(n)
-        for out in (wf["connections"].get(n) or {}).get("main") or []:
+        for i, out in enumerate((wf["connections"].get(n) or {}).get("main") or []):
+            if cut and (n, i) == cut:
+                continue
             todo.extend(e["node"] for e in (out or []))
     return seen
 
@@ -487,7 +509,360 @@ def group_readers(directory):
                    f"{len(READER_MUTATIONS)} mutations rejected")
 
 
-GROUPS = {"wipe": group_wipe, "readers": group_readers}
+# ================================================================================================ group: webhook
+# Task 7: the app's ChatAudience webhook (build-chat-audience.py). Behaviour: tests/test_chat_audience.py.
+CRA = _module("build_chat_audience", "build-chat-audience.py")
+BCW = _module("build_client_webhooks", "build-client-webhooks.py")
+BOOT = _module("staging_bootstrap", os.path.join("staging", "bootstrap.py"))
+WEBHOOK_FILE = CRA.WF_FILE
+SET_STATE_FILE = "0DP79STI3pafXO9B-Set_Workflow_State.json"
+PROTECTED_KEY, ACTIVE_KEY = "<build-client-webhooks.PROTECTED_IDS>", "<staging/bootstrap.py ACTIVE_CANONICAL>"
+# The dependents of build-client-webhooks.PROTECTED_IDS and the nodes that carry the protected list there.
+PROTECTED_DEPENDENTS = {SET_STATE_FILE: ("Validate",),
+                        "XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json": ("Clone Plan", "Bind Workflow Id"),
+                        "Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json": ("Clone Plan", "Bind Workflow Id"),
+                        "lmjYsdNcQA2IE5rl-Delete_Bot_Files.json": ("List Bot Originals", "Retire Bot Profiles", "Delete Bot Chunks",
+                                                                   "Delete Chat Memory"),
+                        SWEEP_FILE: ("Clone Retirements",)}
+WEBHOOK_NODES = ("Webhook", "Auth Gate", "Authorized?", "Respond 401", "Validate", "Valid?", "Respond 400", "Is List?", "Is Set?",
+                 "Is Connected?", "List", "Shape List", "Respond", "Set", "Shape Set", "Respond Set", "Replay Items", "Chat Channel",
+                 "Has Channel?", "Recent Messages", "Replay Plan", "Backfill", "Replay?", "Replay", "Channel", "Channel Known?",
+                 "Status", "Phone", "Phone OK?", "Connected", "Shape Connected")
+TAIL = ("Replay Items", "Chat Channel", "Has Channel?", "Recent Messages", "Replay Plan", "Backfill", "Replay?", "Replay")
+# Written here on their own — not read from the generator that wrote the nodes.
+WAPPI_CRED = {"httpHeaderAuth": {"id": "EuhhqAaV56DpoqAN", "name": "WappiAuthToken"}}
+WAPPI_BASES = {"https://wappi.pro/api/", "https://wappi.pro/tapi/"}
+REPLAY_HOST = "http://localhost:5678/webhook/"
+STATEMENTS = {"List": ("audience.LIST_SQL", AUD.LIST_SQL), "Set": ("audience.OWNER_SET_SQL", AUD.OWNER_SET_SQL),
+              "Connected": ("audience.CONNECTED_SQL", AUD.CONNECTED_SQL),
+              "Backfill": ("audience.BACKFILL_SQL", AUD.BACKFILL_SQL(CRA.AHH.MEMORY_ROW, CRA.AHH.OWNER_CONTENT_SQL))}
+
+
+def _cut_edge(wf, src, out_index, dst):
+    """The workflow's connections with ONE edge removed (for «with this edge cut, is X still reachable»)."""
+    w = {"connections": copy.deepcopy(wf["connections"])}
+    outs = (w["connections"].get(src) or {}).get("main") or []
+    if out_index < len(outs):
+        outs[out_index] = [e for e in (outs[out_index] or []) if e.get("node") != dst]
+    return w
+
+
+def _condition(wf, name):
+    n = node(wf, name) or {}
+    conds = (((n.get("parameters") or {}).get("conditions") or {}).get("conditions")) or [{}]
+    return conds[0].get("leftValue") if len(conds) == 1 else None
+
+
+def _hosts(text):
+    return set(re.findall(r"https?://[^'\"\s)]+", text or ""))
+
+
+def check_webhook(bundle, sql=None):
+    """Findings for the ChatAudience webhook. `bundle` = {file name: workflow, PROTECTED_KEY: ids, ACTIVE_KEY: ids};
+    `sql` is unused (the self-check's signature)."""
+    fails = []
+
+    def need(cond, msg):
+        if not cond:
+            fails.append(msg)
+        return cond
+
+    wf = bundle.get(WEBHOOK_FILE) or {"nodes": [], "connections": {}}
+    names = sorted(n.get("name") for n in wf.get("nodes", []))
+    need(json.dumps(wf, indent=2, ensure_ascii=False) + "\n" == CRA.text(),
+         f"{WEBHOOK_FILE} differs from build-chat-audience.py's output — edit the generator, never the JSON")
+    if not need(names == sorted(WEBHOOK_NODES), f"the webhook's node set changed: {names}"):
+        return fails
+    N = {n["name"]: n for n in wf["nodes"]}
+    P = {k: (N[k].get("parameters") or {}) for k in N}
+    for name, n in N.items():
+        need(not n.get("disabled"), f"{name} is disabled — n8n hands a disabled node's input on untouched")
+    need((wf.get("settings") or {}).get("saveDataSuccessExecution") == "none",
+         "settings.saveDataSuccessExecution must be 'none' — a successful execution must not keep the chats it read")
+
+    # (2) the gate, Validate
+    gate = P["Auth Gate"].get("jsCode", "")
+    need('"legacy": false' in gate and '"profiles": ["profileIds", "profileId"]' in gate
+         and f"const RULE = {json.dumps(CRA.RULE, ensure_ascii=False)};" in gate,
+         "Auth Gate must be token ONLY (legacy false) and scope profileIds and profileId to the token's profiles")
+    need(targets(wf, "Webhook") == [["Auth Gate"]] and targets(wf, "Auth Gate") == [["Authorized?"]]
+         and _condition(wf, "Authorized?") == "={{ $json.crAuth.ok }}" and targets(wf, "Authorized?") == [["Validate"], ["Respond 401"]],
+         "the Webhook must feed the gate alone, and Authorized? send true to Validate, false to Respond 401")
+    v = P["Validate"].get("jsCode", "")
+    need("const owned = new Set((wh.crAuth && wh.crAuth.profiles) || []);" in v
+         and "typeof x === 'string' && x !== '' && x !== '-1' && owned.has(x)" in v,
+         "Validate must drop the sentinels and re-intersect every id with the token's profiles")
+    need(f"b.profileIds.length > {CRA.MAX_LIST_PROFILES}) return bad('profileIds')" in v
+         and f"b.chats.length > {CRA.MAX_SET_CHATS}) return bad('chats')" in v
+         and "Array.from(new Set(b.profileIds.filter(mine)))" in v,
+         f"Validate must keep the limits ({CRA.MAX_LIST_PROFILES} profiles, {CRA.MAX_SET_CHATS} chats) and de-duplicate the profiles")
+    need(f"id === '{CRA.WILDCARD_CHAT}') return bad('chatId')" in v,
+         "Validate must refuse the reply mode's wildcard '*' as a chat id (it names every chat)")
+    need("/\\s/.test(id)" in v and f"id.length > {CRA.MAX_CHAT_ID}" in v and "id === ''" in v,
+         f"Validate must refuse an empty chat id, one over {CRA.MAX_CHAT_ID} characters and one with whitespace")
+    need("if (c.kind !== 'personal' && c.kind !== 'business') return bad('kind');" in v, "Validate must accept only the two kinds")
+    need("Number.isSafeInteger(v) && v > 0" in v and "if (!version) return bad('version');" in v,
+         "Validate must accept only a positive safe integer version")
+    need("return bad('op');" in v and _condition(wf, "Valid?") == "={{ $json.ok }}" and targets(wf, "Valid?") == [["Is List?"], ["Respond 400"]],
+         "Valid? must send a refused body to Respond 400 and only a valid one on (and Validate refuse an unknown op)")
+    for gate_edge in (("Authorized?", 0), ("Valid?", 0)):
+        reach = reachable(wf, "Webhook", cut=gate_edge)
+        need(not reach & {"List", "Set", "Channel", "Connected", "Recent Messages", "Status", "Replay"},
+             f"a statement or a Wappi call is reachable without passing {gate_edge[0]} true: {sorted(reach & set(N))}")
+
+    # (3) the op fork, the statements, the Shape nodes
+    fork = {"Is List?": ("list", [["List"], ["Is Set?"]]), "Is Set?": ("set", [["Set"], ["Is Connected?"]]),
+            "Is Connected?": ("connected", [["Channel"], ["Respond 400"]])}
+    for name, (op, outs) in fork.items():
+        need(_condition(wf, name) == f"={{{{ $json.op === '{op}' }}}}" and targets(wf, name) == outs,
+             f"the op fork: {name} must test op === '{op}' and route {outs}: {targets(wf, name)}")
+    for name, (label, text) in STATEMENTS.items():
+        n = N[name]
+        need(n.get("type") == "n8n-nodes-base.postgres" and P[name].get("operation") == "executeQuery" and P[name].get("query") == text,
+             f"{name}'s query differs from {label} — edit the module, never the JSON")
+        need(n.get("onError") == "continueRegularOutput" and n.get("alwaysOutputData") is True and n.get("credentials") == CANONICAL_PG,
+             f"{name} must continue on error with output on the canonical Postgres credential — its Shape node judges the rows")
+    for name in ("Chat Channel", "Channel"):
+        need(N[name].get("onError") == "continueRegularOutput" and N[name].get("credentials") == CANONICAL_PG,
+             f"{name} must continue on error on the canonical Postgres credential")
+    need(sources(wf, "List") == [("Is List?", 0)] and sources(wf, "Set") == [("Is Set?", 0)]
+         and sources(wf, "Channel") == [("Is Connected?", 0)] and sources(wf, "Connected") == [("Phone OK?", 0)],
+         "each statement must be entered from its own gate alone (List ← Is List?, Set ← Is Set?, Channel ← Is Connected?, "
+         "Connected ← Phone OK?)")
+    sl, ss, sc = P["Shape List"].get("jsCode", ""), P["Shape Set"].get("jsCode", ""), P["Shape Connected"].get("jsCode", "")
+    need("rows.length === asked.length" in sl and "Array.isArray(r.decisions)" in sl and "num(r.connected_at_ms)" in sl
+         and "version: num(d.version) || 0" in sl,
+         "Shape List must answer success only on one row per asked profile with its decisions, the numbers as numbers")
+    need("rows.length === asked" in ss and "typeof r.applied === 'boolean'" in ss and "typeof r.became_business === 'boolean'" in ss
+         and "Number(r.version)" in ss,
+         "Shape Set must answer success only on one well-formed row per distinct chat, the version as a number")
+    need("typeof row.restarted !== 'boolean'" in sc and "Number.isSafeInteger(ms) && ms > 0" in sc
+         and "done({ success: false, error: 'not_authorized' }, 409)" in sc and "done({ success: false, error: 'wappi_unavailable' }, 502)" in sc
+         and "reason: 'profileId' }, 400)" in sc,
+         "Shape Connected must answer 409 / 502 / 400 / 500 by what happened and success only on one row with a positive "
+         "moment and a boolean restarted")
+    need(sources(wf, "Respond") == [("Shape Connected", 0), ("Shape List", 0)] and sources(wf, "Shape Connected")
+         == [("Channel Known?", 1), ("Connected", 0), ("Phone OK?", 1)],
+         f"Respond must answer Shape List and Shape Connected alone, Shape Connected judge every way out of connected: "
+         f"{sources(wf, 'Respond')} {sources(wf, 'Shape Connected')}")
+
+    # (4) the answer before the tail
+    need(sources(wf, "Respond Set") == [("Shape Set", 0)] and targets(wf, "Shape Set") == [["Respond Set"]]
+         and sources(wf, "Replay Items") == [("Respond Set", 0)],
+         "the tail must start only once the answer is on the wire: Replay Items entered from Respond Set alone (before the answer)")
+    reach = reachable(_cut_edge(wf, "Respond Set", 0, "Replay Items"), "Webhook")
+    need(not reach & set(TAIL), f"with Respond Set → Replay Items cut, the tail is still reachable (before the answer): "
+                                f"{sorted(reach & set(TAIL))}")
+    ri = P["Replay Items"].get("jsCode", "")
+    need("if (shaped.success !== true) return [];" in ri and "r.became_business !== true" in ri,
+         "Replay Items must start nothing for a failed set and hand on only the chats the statement says became business")
+
+    # (5) the Wappi reads
+    for name, path in (("Recent Messages", "sync/messages/get"), ("Status", "sync/get/status")):
+        n, p = N[name], P[name]
+        resp = ((p.get("options") or {}).get("response") or {}).get("response") or {}
+        timeout = (p.get("options") or {}).get("timeout")
+        need(n.get("type") == "n8n-nodes-base.httpRequest" and n.get("credentials") == WAPPI_CRED
+             and resp.get("fullResponse") is True and resp.get("neverError") is True
+             and isinstance(timeout, int) and 0 < timeout <= 10000
+             and n.get("onError") == "continueRegularOutput" and _hosts(p.get("url")) == WAPPI_BASES and f"'{path}'" in p.get("url", ""),
+             f"{name} must be a Wappi read: the canonical Wappi credential, fullResponse + neverError, at most 10 s, continue on "
+             f"error, only the two Wappi bases ({path})")
+    rq = P["Recent Messages"].get("jsonQuery", "")
+    need(f"limit: {CRA.RECENT_LIMIT}" in rq and "order: 'desc'" in rq and "chat_id: $json.chat_id" in rq,
+         "Recent Messages must read limit 10 and order desc of THIS chat (the page the backfill takes, newest first)")
+    need("mark_all" not in json.dumps(wf, ensure_ascii=False),
+         "mark_all must appear nowhere in the webhook — reading a chat must never mark it read")
+    need(sources(wf, "Recent Messages") == [("Has Channel?", 0)] and sources(wf, "Replay Plan") == [("Recent Messages", 0)]
+         and sources(wf, "Backfill") == [("Replay Plan", 0)],
+         "the tail must run Has Channel? → Recent Messages → Replay Plan → Backfill in this order")
+
+    # (6) the replay, the plan, the phone
+    rp = N["Replay"]
+    rpp = P["Replay"]
+    resp = ((rpp.get("options") or {}).get("response") or {}).get("response") or {}
+    timeout = (rpp.get("options") or {}).get("timeout")
+    need(_hosts(rpp.get("url")) == {REPLAY_HOST} and "encodeURIComponent($('Replay Plan').item.json.profileId)" in rpp.get("url", "")
+         and rpp.get("method") == "POST",
+         f"Replay must POST to the bot's own webhook on localhost ({REPLAY_HOST}<profile id>) — never a public host")
+    need(not rp.get("credentials") and rpp.get("authentication") in (None, "none"),
+         "Replay must carry no credential (a localhost call to the bot's webhook needs none — never the Wappi token)")
+    need(resp.get("neverError") is True and isinstance(timeout, int) and 0 < timeout <= 10000 and rp.get("onError") == "continueRegularOutput",
+         "Replay must be neverError, at most 10 s, continue on error")
+    need("$('Replay Plan').item.json.message" in rpp.get("jsonBody", "") and sources(wf, "Replay") == [("Replay?", 0)],
+         "Replay must send the plan's message and run only through Replay? true")
+    need(_condition(wf, "Replay?") == "={{ typeof $json.added === 'number' && $('Replay Plan').item.json.replay === true }}",
+         "Replay? must require the backfill's committed row (added, a number) AND the plan's positive word (replay true)")
+    plan = P["Replay Plan"].get("jsCode", "")
+    types = re.search(r"^const REPLAY_TYPES = (\[[^\]]*\]);$", plan, re.M)
+    try:
+        types = json.loads(types.group(1)) if types else []
+    except ValueError:
+        types = []
+    need(P["Replay Plan"].get("mode") == "runOnceForEachItem" and f"const FRESH_HOURS = {AUD.FRESH_HOURS};" in plan
+         and "FRESH_HOURS * 3600" in plan and "function replayMessage(" in plan and plan.count("function replayMessage(") == 1
+         and "newest.fromMe !== false" in plan and {"chat", "text"} <= set(types) and "ptt" not in types
+         and "body.uuid !== profileId" in plan and "m.chatId !== chatId" in plan and "body.status === 'done'" in plan,
+         "Replay Plan must run per item, take FRESH_HOURS from audience.py, check the page is this profile's and chat's, hand on "
+         "only the client's fresh message (never a voice message) and build it in ONE function")
+    ph = P["Phone"].get("jsCode", "")
+    need(CRA.HW.OWNER_PHONE_JS in ph and "phone: error ? '' : ownerPhone(wapi, status)" in ph and "status.profile_id !== v.profileId" in ph
+         and "status.authorized === false) error = 'not_authorized'" in ph and "status.authorized !== true" in ph,
+         "Phone must embed build-handoff-workflows.OWNER_PHONE_JS verbatim and count only an answer that echoes this profile "
+         "with the boolean authorized")
+    need(_condition(wf, "Phone OK?") == "={{ $json.ok === true }}" and _condition(wf, "Channel Known?")
+         == "={{ $json.channel === 'whatsapp' || $json.channel === 'telegram' }}",
+         "Phone OK? and Channel Known? must judge positive fields (the phone's ok, a known channel)")
+
+    # (7) protected everywhere
+    need(CRA.WF_ID in (bundle.get(PROTECTED_KEY) or []), f"{CRA.WF_ID} is missing from build-client-webhooks.PROTECTED_IDS (protected)")
+    need(CRA.WF_ID in (bundle.get(ACTIVE_KEY) or []), f"{CRA.WF_ID} is missing from staging/bootstrap.py ACTIVE_CANONICAL (protected)")
+    for fname, holders in PROTECTED_DEPENDENTS.items():
+        dep = bundle.get(fname) or {"nodes": []}
+        for h in holders:
+            p = (node(dep, h) or {}).get("parameters") or {}
+            need(f"'{CRA.WF_ID}'" in (p.get("query") or p.get("jsCode") or ""),
+                 f"{fname} / {h} does not carry {CRA.WF_ID} in its protected list — regenerate it from build-client-webhooks.PROTECTED_IDS")
+    return fails
+
+
+def _wh(name, key, old, new):
+    """Replace `old` by `new` in one text parameter of one webhook node (the anchor must be there)."""
+    def m(bundle):
+        p = node(bundle[WEBHOOK_FILE], name)["parameters"]
+        target = p["options"] if key == "queryReplacement" else p
+        assert old in target[key], f"mutation anchor not found in {name}.{key}: {old[:70]!r}"
+        target[key] = target[key].replace(old, new, 1)
+    return m
+
+
+def _cond(name, old, new):
+    """Replace `old` by `new` in an If node's (single) condition."""
+    def m(bundle):
+        c = node(bundle[WEBHOOK_FILE], name)["parameters"]["conditions"]["conditions"][0]
+        assert old in c["leftValue"], f"mutation anchor not found in {name}'s condition: {old[:70]!r}"
+        c["leftValue"] = c["leftValue"].replace(old, new, 1)
+    return m
+
+
+def _wh_node(name, key, value):
+    def m(bundle):
+        n = node(bundle[WEBHOOK_FILE], name)
+        if value is None:
+            n.pop(key)
+        else:
+            n[key] = copy.deepcopy(value)
+    return m
+
+
+def _rewire(src, out_index, dsts):
+    def m(bundle):
+        bundle[WEBHOOK_FILE]["connections"][src]["main"][out_index] = [{"node": d, "type": "main", "index": 0} for d in dsts]
+    return m
+
+
+def _drop_id(key):
+    def m(bundle):
+        assert CRA.WF_ID in bundle[key]
+        bundle[key] = [x for x in bundle[key] if x != CRA.WF_ID]
+    return m
+
+
+def _unprotect(fname, holder):
+    def m(bundle):
+        p = node(bundle[fname], holder)["parameters"]
+        k = "query" if "query" in p else "jsCode"
+        assert f"'{CRA.WF_ID}'" in p[k], f"{fname} / {holder} carries no {CRA.WF_ID}"
+        p[k] = p[k].replace(f"'{CRA.WF_ID}', ", "").replace(f",\n  '{CRA.WF_ID}'", "").replace(f", '{CRA.WF_ID}'", "")
+    return m
+
+
+WEBHOOK_MUTATIONS = (
+    ("the gate opened to token-less calls", _wh("Auth Gate", "jsCode", '"legacy": false', '"legacy": true'), "token ONLY"),
+    ("the gate no longer scopes profileId", _wh("Auth Gate", "jsCode", '"profiles": ["profileIds", "profileId"]', '"profiles": ["profileIds"]'),
+     "token ONLY"),
+    ("Validate without the re-intersection", _wh("Validate", "jsCode", " && owned.has(x)", ""), "re-intersect"),
+    ("Validate keeps the sentinels", _wh("Validate", "jsCode", "x !== '' && x !== '-1' && ", ""), "re-intersect"),
+    ("Validate takes the wildcard as a chat", _wh("Validate", "jsCode", " || id === '*') return bad('chatId')", ") return bad('chatId')"),
+     "wildcard"),
+    ("Validate takes whitespace in a chat id", _wh("Validate", "jsCode", " || /\\s/.test(id)", ""), "whitespace"),
+    ("Validate without the list limit", _wh("Validate", "jsCode", "b.profileIds.length > 20", "b.profileIds.length > 2000"), "limits"),
+    ("Validate without the set limit", _wh("Validate", "jsCode", "b.chats.length > 50", "b.chats.length > 5000"), "limits"),
+    ("Validate without the version check", _wh("Validate", "jsCode", "if (!version) return bad('version');", ""), "version"),
+    ("a refused body reaches the statements", _rewire("Valid?", 1, ["Is List?"]), "without passing Valid?"),
+    ("an unauthorised call reaches Validate", _rewire("Authorized?", 1, ["Validate"]), "Authorized? send true to Validate"),
+    ("List's statement edited by hand", _wh("List", "query", "order by i.ord", "order by i.ord desc"), "differs from audience.LIST_SQL"),
+    ("Set without the version guard", _wh("Set", "query", " or t.version < excluded.version", " or true"),
+     "differs from audience.OWNER_SET_SQL"),
+    ("Connected's statement edited by hand", _wh("Connected", "query", "then now() else c.connected_at", "then c.connected_at else c.connected_at"),
+     "differs from audience.CONNECTED_SQL"),
+    ("Backfill composed without the owner mark", _wh("Backfill", "query", "Владелец: ", ""), "differs from audience.BACKFILL_SQL"),
+    ("Set fails closed", _wh_node("Set", "onError", None), "must continue on error"),
+    ("the tail hung off Shape Set", _rewire("Shape Set", 0, ["Respond Set", "Replay Items"]), "before the answer"),
+    ("the tail moved before the answer", lambda b: (_rewire("Shape Set", 0, ["Replay Items"])(b), _rewire("Replay Plan", 0, ["Respond Set"])(b)),
+     "before the answer"),
+    ("the replay skips the backfill", _rewire("Replay Plan", 0, ["Replay?"]), "Has Channel? → Recent Messages → Replay Plan → Backfill"),
+    ("the replay sent to the public host", _wh("Replay", "url", "http://localhost:5678/webhook/", "https://n8n.choosereply.com/webhook/"),
+     "localhost"),
+    ("the replay carries the Wappi token", _wh_node("Replay", "credentials", WAPPI_CRED), "no credential"),
+    ("Replay? without the backfill's row", _cond("Replay?", "typeof $json.added === 'number' && ", ""), "Replay? must require"),
+    ("Replay? without the plan's word", _cond("Replay?", " && $('Replay Plan').item.json.replay === true", ""), "Replay? must require"),
+    ("Phone OK? lets any verdict through", _cond("Phone OK?", "$json.ok === true", "true"), "Phone OK? and Channel Known?"),
+    ("Recent Messages without neverError", lambda b: node(b[WEBHOOK_FILE], "Recent Messages")["parameters"]["options"]["response"]["response"]
+     .__setitem__("neverError", False), "Recent Messages must be a Wappi read"),
+    ("Recent Messages waits 30 s", lambda b: node(b[WEBHOOK_FILE], "Recent Messages")["parameters"]["options"].__setitem__("timeout", 30000),
+     "Recent Messages must be a Wappi read"),
+    ("Recent Messages on another credential", _wh_node("Recent Messages", "credentials", {"httpHeaderAuth": {"id": "dev0000000000000",
+                                                                                                          "name": "Wappi Dev"}}),
+     "Recent Messages must be a Wappi read"),
+    ("Recent Messages marks the chat read", _wh("Recent Messages", "jsonQuery", "order: 'desc'", "order: 'desc', mark_all: true"), "mark_all"),
+    ("Recent Messages reads the oldest first", _wh("Recent Messages", "jsonQuery", "order: 'desc'", "order: 'asc'"), "limit 10 and order desc"),
+    ("Status on another host", _wh("Status", "url", "https://wappi.pro/api/", "https://wappi.example/api/"), "Status must be a Wappi read"),
+    ("Phone without the echo", _wh("Phone", "jsCode", "else if (status.profile_id !== v.profileId) error = 'wappi_unavailable';\n", ""),
+     "Phone must embed"),
+    ("Phone reads the top-level phone only", _wh("Phone", "jsCode", "phone: error ? '' : ownerPhone(wapi, status)",
+                                                 "phone: error ? '' : String(status.phone || '').replace(/\\D/g, '')"),
+     "Phone must embed"),
+    ("Replay Plan replays a voice message", _wh("Replay Plan", "jsCode", '"chat", "text", ', '"chat", "text", "ptt", '), "Replay Plan must"),
+    ("Replay Plan without the freshness", _wh("Replay Plan", "jsCode", " && time >= Math.floor(Date.now() / 1000) - FRESH_HOURS * 3600", ""),
+     "Replay Plan must"),
+    ("Replay Plan takes a crossed page", _wh("Replay Plan", "jsCode", " && !(typeof body.uuid === 'string' && body.uuid !== '' && body.uuid !== profileId)", ""),
+     "Replay Plan must"),
+    ("Shape Set calls any row a success", _wh("Shape Set", "jsCode", "typeof r.became_business === 'boolean'", "true"), "Shape Set must"),
+    ("Shape Connected without restarted", _wh("Shape Connected", "jsCode", " || typeof row.restarted !== 'boolean'", ""), "Shape Connected must"),
+    ("Auth Gate disabled", _wh_node("Auth Gate", "disabled", True), "Auth Gate is disabled"),
+    ("Replay Plan disabled", _wh_node("Replay Plan", "disabled", True), "Replay Plan is disabled"),
+    ("successful executions saved", lambda b: b[WEBHOOK_FILE]["settings"].__setitem__("saveDataSuccessExecution", "all"),
+     "saveDataSuccessExecution"),
+    ("the node moved by hand", lambda b: node(b[WEBHOOK_FILE], "Respond Set").__setitem__("position", [0, 0]),
+     "differs from build-chat-audience.py's output"),
+    ("dropped from PROTECTED_IDS", _drop_id(PROTECTED_KEY), "missing from build-client-webhooks.PROTECTED_IDS"),
+    ("dropped from ACTIVE_CANONICAL", _drop_id(ACTIVE_KEY), "missing from staging/bootstrap.py ACTIVE_CANONICAL"),
+    ("Set Workflow State no longer protects it", _unprotect(SET_STATE_FILE, "Validate"), f"{SET_STATE_FILE} / Validate does not carry"),
+    ("the sweep's clone branch no longer spares it", _unprotect(SWEEP_FILE, "Clone Retirements"), f"{SWEEP_FILE} / Clone Retirements"),
+)
+
+
+def group_webhook(directory):
+    bundle = {}
+    for fname in (WEBHOOK_FILE,) + tuple(PROTECTED_DEPENDENTS):
+        path = os.path.join(directory, fname)
+        if not os.path.exists(path):
+            return [f"{fname} is missing"], ""
+        with open(path, encoding="utf-8") as fh:
+            bundle[fname] = json.load(fh)
+    bundle[PROTECTED_KEY] = list(BCW.PROTECTED_IDS)
+    bundle[ACTIVE_KEY] = list(BOOT.ACTIVE_CANONICAL)
+    fails = check_webhook(bundle)
+    if not fails:
+        fails = self_check(bundle, check_webhook, WEBHOOK_MUTATIONS)
+    return fails, (f"webhook: {CRA.WF_ID} = build-chat-audience.py's output — token-only gate, Validate (wildcard, limits), the op "
+                   f"fork, audience.py's statements, the answer before the tail, Wappi reads without mark_all, the replay to "
+                   f"localhost only after the backfill, the A5 phone rule, protected everywhere; tripwire self-check: "
+                   f"{len(WEBHOOK_MUTATIONS)} mutations rejected")
+
+
+GROUPS = {"wipe": group_wipe, "readers": group_readers, "webhook": group_webhook}
 
 
 def run(directory=None, only=None):

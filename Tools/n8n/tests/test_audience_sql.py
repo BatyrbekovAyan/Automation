@@ -17,6 +17,8 @@ as the generators will compose it. No n8n server, no network, never prod.
   race_two_first_messages_one_decision    two connections, personal/history against business/new: one row, BOTH answers are
                                           the written row (the second waited on the first's uncommitted insert)
   race_two_first_messages_one_moment      the same race on ENSURE_CONNECTION_SQL: one row, both answers carry the moment
+  race_two_reports_of_a_new_number_one_restart   two connections report the same new number: the first says restarted,
+                                          the second (waiting on its lock) finds the moved moment and does not
   owner_outranks_default_and_default_never_overwrites_owner
   owner_version_guard                     an older or replayed version is not applied, the answer names the server's version;
                                           one answer per chat in the request's order, malformed elements skipped
@@ -24,6 +26,9 @@ as the generators will compose it. No n8n server, no network, never prod.
                                           owner's stays; DECIDE_WRITE_SQL then replaces the stale row
   same_or_empty_phone_keeps_the_moment    CONNECTED_SQL: no row → the line's moment; a missing number is filled in; the same
                                           or an empty number changes nothing
+  connected_says_restarted_only_when_it_moved_the_moment   restarted = THIS statement moved connected_at (another known
+                                          number on an existing row); a first row, a filled-in number, the same / no number,
+                                          a sentinel: false
   owner_set_refuses_nonhuman              by '@g.us' / '@newsletter' / '@broadcast', by 777000, by a recorded reason
   personal_since_rules                    business → personal stamps now, personal → personal keeps, → business clears;
                                           wiped_at clears with them
@@ -282,6 +287,22 @@ with Case('race_two_first_messages_one_moment: two connections ensure the same m
         c.check(fx.main.q(f"select count(*)::int as n from audience_connections where profile_id = {L(P)}")[0]['n'] == 1, 'one row')
         c.check(waited, "the second never waited on the first's uncommitted insert — the race was not exercised")
 
+with Case('race_two_reports_of_a_new_number_one_restart: two connections report the same NEW number for a profile at once — '
+          'the first moves the moment and says restarted, the second (waiting on its lock) finds the number already there: '
+          'the same moment, restarted false') as c:
+    P = 'tg-race-restart'
+    with Race() as fx:
+        fx.main.x(f"insert into bot_profiles (profile_id, app_user_id, channel, created_at) values "
+                  f"({L(P)}, 'u-audience-test', 'telegram', now() - interval '3 days');")
+        fx.main.q(bind(AUD.CONNECTED_SQL, [P, '77010000001']))        # the old number, the line's moment
+        old = fx.main.q(f"select (extract(epoch from connected_at) * 1000)::bigint as ms from audience_connections "
+                        f"where profile_id = {L(P)}")[0]['ms']
+        a, b, waited = race(fx, bind(AUD.CONNECTED_SQL, [P, '77020000002']), bind(AUD.CONNECTED_SQL, [P, '+7 702 000 00 02']))
+        c.check(waited, "the second never waited on the first's uncommitted update — the race was not exercised")
+        c.check(len(a) == 1 and a[0]['restarted'] is True and a[0]['connected_at_ms'] > old, f'the first moved it: {a} (old {old})')
+        c.check(b == [{'connected_at_ms': a[0]['connected_at_ms'] if a else None, 'restarted': False}],
+                f'the second must find the moved moment and not say restarted: {b} vs {a}')
+
 for ch, C in CH.items():
     P = f'{ch.lower()}-aud-p1'
     with Case(f'owner_outranks_default_and_default_never_overwrites_owner [{ch}]') as c:
@@ -349,8 +370,10 @@ for ch, C in CH.items():
               'owner\'s holds; a new computed decision then replaces the stale row') as c:
         with PgSession(SETUP) as pg:
             profile(pg, P, C['channel'], '3 days')
-            first_moment = connected(pg, P, '77010000001')[0]['connected_at_ms']
-            c.check(first_moment == created_ms(pg, P), f'the first connection takes the line\'s moment: {first_moment}')
+            first = connected(pg, P, '77010000001')[0]
+            first_moment = first['connected_at_ms']
+            c.check(first_moment == created_ms(pg, P) and first['restarted'] is False,
+                    f'the first connection takes the line\'s moment, nothing restarted: {first}')
             decide(pg, P, C['chat'], 'business', 'new')
             owner_set(pg, P, [{'chatId': C['chat2'], 'kind': 'personal', 'version': 100}])
             decide(pg, P, C['chat3'], 'personal', 'contact')
@@ -358,8 +381,10 @@ for ch, C in CH.items():
                     == ('business', 'personal', 'personal'), 'before the number change')
             owner_row = row(pg, P, C['chat2'])
             tick(pg)
-            moment = connected(pg, P, '77010000002')[0]['connected_at_ms']
-            c.check(moment > first_moment and moment <= now_ms(pg), f'another number restarts the moment: {first_moment} → {moment}')
+            changed = connected(pg, P, '77010000002')[0]
+            moment = changed['connected_at_ms']
+            c.check(moment > first_moment and moment <= now_ms(pg) and changed['restarted'] is True,
+                    f'another number restarts the moment and says so: {first_moment} → {changed}')
             tick(pg)
             c.check(audience(pg, P, C['chat']) is None and business(pg, P, C['chat']) is False,
                     'a computed decision of the old number must not hold')
@@ -387,25 +412,50 @@ for ch, C in CH.items():
             tick(pg)
             got = connected(pg, P, '+7 (701) 111-22-33')
             filled = conn_row(pg, P)
-            c.check(got == [{'connected_at_ms': moment}] and filled['phone'] == '77011112233' and filled['ms'] == moment,
-                    f'a missing number is filled in, the moment kept: {got} {filled}')
+            c.check(got == [{'connected_at_ms': moment, 'restarted': False}] and filled['phone'] == '77011112233'
+                    and filled['ms'] == moment, f'a missing number is filled in, the moment kept: {got} {filled}')
             for same in ('77011112233', '7 701 111 22 33', '', None):
                 tick(pg)
                 got = connected(pg, P, same)
-                c.check(got == [{'connected_at_ms': moment}] and conn_row(pg, P) == filled,
+                c.check(got == [{'connected_at_ms': moment, 'restarted': False}] and conn_row(pg, P) == filled,
                         f'{same!r} must change nothing: {got} {conn_row(pg, P)}')
             Q = f'{ch.lower()}-aud-q1'
             profile(pg, Q, C['channel'], '2 days')
             got = connected(pg, Q, '77012223344')
-            c.check(got == [{'connected_at_ms': created_ms(pg, Q)}] and conn_row(pg, Q)['phone'] == '77012223344',
+            c.check(got == [{'connected_at_ms': created_ms(pg, Q), 'restarted': False}] and conn_row(pg, Q)['phone'] == '77012223344',
                     f'no row → the line\'s moment and the number: {got} {conn_row(pg, Q)}')
             tick(pg)
             got = connected(pg, P, '77019998877')
-            c.check(got[0]['connected_at_ms'] > moment and conn_row(pg, P)['phone'] == '77019998877',
+            c.check(got[0]['connected_at_ms'] > moment and got[0]['restarted'] is True and conn_row(pg, P)['phone'] == '77019998877',
                     f'another number: {got} {conn_row(pg, P)}')
-            c.check(connected(pg, '', '77019998877') == [{'connected_at_ms': None}]
-                    and connected(pg, '-1', '7701') == [{'connected_at_ms': None}] and n_rows(pg, 'audience_connections', '-1') == 0,
-                    'a sentinel profile: one row of nulls, nothing written')
+            c.check(connected(pg, '', '77019998877') == [{'connected_at_ms': None, 'restarted': False}]
+                    and connected(pg, '-1', '7701') == [{'connected_at_ms': None, 'restarted': False}]
+                    and n_rows(pg, 'audience_connections', '-1') == 0,
+                    'a sentinel profile: one row of nulls (restarted false), nothing written')
+
+    with Case(f'connected_says_restarted_only_when_it_moved_the_moment [{ch}]: true exactly when this statement moved '
+              'connected_at — another KNOWN number on an existing row; a first row (with or without a number), a filled-in '
+              'number, the same digits, an empty or missing number: false, and a repeat of the new number: false') as c:
+        with PgSession(SETUP) as pg:
+            R = f'{ch.lower()}-aud-r1'
+            profile(pg, R, C['channel'], '4 days')
+            seen = [connected(pg, R, None)[0]]                         # a first row without a number
+            tick(pg)
+            seen.append(connected(pg, R, '+7 701 000 00 01')[0])     # the number filled in
+            tick(pg)
+            seen.append(connected(pg, R, '77010000001')[0])          # the same digits
+            tick(pg)
+            seen.append(connected(pg, R, '')[0])                     # none given
+            tick(pg)
+            seen.append(connected(pg, R, '77020000002')[0])          # another number: the moment moves
+            tick(pg)
+            seen.append(connected(pg, R, '+7 702 000 00 02')[0])     # the new number again
+            c.check([s['restarted'] for s in seen] == [False, False, False, False, True, False], f'restarted: {seen}')
+            c.check(len({s['connected_at_ms'] for s in seen[:4]}) == 1 and seen[4]['connected_at_ms'] > seen[0]['connected_at_ms']
+                    and seen[5]['connected_at_ms'] == seen[4]['connected_at_ms'], f'the moments: {seen}')
+            S = f'{ch.lower()}-aud-s1'
+            profile(pg, S, C['channel'], '1 day')
+            c.check(connected(pg, S, '77030000003')[0]['restarted'] is False, 'a first row WITH a number is not a restart')
 
 with Case('owner_set_refuses_nonhuman: by suffix (@g.us, @newsletter, @broadcast), by 777000 and by a recorded reason — '
           'never applied, never written; the person in the same request is applied') as c:
@@ -526,7 +576,8 @@ for ch, C in CH.items():
             profile(pg, cb, C['channel'], '6 days', superseded_by=ca)
             c.check(line_ms(pg, cb) == created_ms(pg, ca), 'a cycle terminates and still answers the earliest')
             c.check(ensure(pg, p3) == [{'connected_at_ms': m1, 'phone': None}], f'ENSURE takes the line\'s moment: {ensure(pg, p3)}')
-            c.check(connected(pg, p2, '77010000009') == [{'connected_at_ms': m1}], 'CONNECTED on a fresh row takes it too')
+            c.check(connected(pg, p2, '77010000009') == [{'connected_at_ms': m1, 'restarted': False}],
+                    'CONNECTED on a fresh row takes it too')
 
     with Case(f'ensure_connection_always_one_row [{ch}]: created once with the line\'s moment and no number, an existing row '
               'comes back unchanged, a sentinel profile answers one row of nulls') as c:
