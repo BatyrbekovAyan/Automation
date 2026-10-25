@@ -1,8 +1,11 @@
 -- «Личные и рабочие чаты» (2026-10-25; spec docs/superpowers/specs/2026-10-25-personal-chats-design.md §3.2, §3.3, §4.1,
 -- §4.3, §4.6; plan docs/superpowers/plans/2026-10-25-personal-chats.md Task 2): a chat is PERSONAL (the assistant does
 -- not answer, suggest or store anything) or BUSINESS (everything as before). The server decides ONCE, on the first
--- incoming message of a chat that has no decision yet, and writes it down; afterwards only the owner changes it. Every
--- statement over these tables lives in ONE module, Tools/n8n/audience.py (pinned by tests/test_audience_sql.py).
+-- incoming message of a chat that has no decision yet, and writes it down; afterwards only the owner changes it. The
+-- statements over these tables live in Tools/n8n/audience.py (pinned by tests/test_audience_sql.py) — except the bot's
+-- line: the move on a reconnect is in Tools/n8n/clone_lineage.py (Create's Bind Workflow Id), the delete with the bot in
+-- Tools/n8n/apply-history-handoff.py (Delete Bot Files' Delete Chat Memory); pinned by tests/test_clone_lineage_sql.py
+-- and tests/test_retired_delete.py.
 --
 -- chat_audience — one row per (Wappi profile, chat key = the webhook's `from`):
 --   kind            personal | business;
@@ -19,10 +22,11 @@
 --   bot's line, or now() when another number was connected) and the connected number's digits (null = not known yet).
 -- reply_events.state gains 'cancelled_personal' (a reply in preparation is cancelled when its chat turned personal).
 --
--- Both tables move with the bot's line on a reconnect (clone_lineage.MOVED_TABLES) and are deleted with the bot (Delete
--- Bot Files) — those statements come with their own tasks. Additive + idempotent: re-running this file changes nothing
--- (the CHECK is rebuilt only while it lacks 'cancelled_personal'). Apply BEFORE the workflows that read the tables: the
--- templates' Read Reply Mode is fail-closed by design — without the tables every incoming message would fail.
+-- Both tables move with the bot's line on a reconnect (clone_lineage.MOVED_TABLES, the bind in clone_lineage.py) and are
+-- deleted with the bot (Delete Bot Files, Delete Chat Memory in apply-history-handoff.py). Additive + idempotent:
+-- re-running this file changes nothing (the CHECK is rebuilt only while it lacks 'cancelled_personal'). Apply BEFORE the
+-- workflows that read the tables: the templates' Read Reply Mode is fail-closed by design — without the tables every
+-- incoming message would fail.
 -- TABLE-BEGIN
 create table if not exists public.chat_audience (
   profile_id     text not null,                    -- the Wappi profile (a bot_profiles row's id)

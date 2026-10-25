@@ -24,13 +24,15 @@ current ids»: every existing deletion path must reach everything after a move, 
           L19 — a clone booked for deletion is never offered for reuse (no live row ever drives a booked clone);
   L20     B1 (2026-10-14): the bot's schedule follows its line — the predecessor's row moves (values and version kept),
           the new profile's own row wins, among two predecessors the freshest; nothing is left under an old id;
-  L21–L25 «Личные и рабочие чаты» (2026-10-25): the chat decisions (chat_audience) and the connection moment
+  L21–L27 «Личные и рабочие чаты» (2026-10-25): the chat decisions (chat_audience) and the connection moment
           (audience_connections), written by the real audience.py statements, follow the line — L21 a reconnect carries
           them and the moved computed decisions keep holding; L22 per chat the owner's row beats a computed one (the new
           profile's own row is replaced IN PLACE, one row per key), among equals the new profile's own row, among
           predecessors the freshest; L23 the predecessors' earliest connection beats the new profile's lazy row; L24
           another number keeps the new profile's own row (the moved computed decisions stop holding, the owner's stay);
-          L25 a number change never yields an older moment than the newest predecessor's;
+          L25 a number change never yields an older moment than the newest predecessor's; L26 an earliest row without
+          a number keeps the new profile's own known number; L27 a recorded non-human decision beats everything, the
+          owner's row included;
   C1–C3   races on TWO real connections over a shared fixture schema (the V6-concurrent pattern): the second bind's
           snapshot predates the first's commit. C1 — two Creates of the same profile: the loser answers bound = false
           (no clone lost, the price lists follow the bound one, the retry reuses the winner). C2 — two new profiles adopt
@@ -1178,6 +1180,73 @@ def number_change_never_yields_an_older_moment(ch):
                             f'moved_connections / dropped_rows {b}')
 
 
+def own_number_survives_an_unknown_earliest_number(ch):
+    P1, P2, WF1, WF2 = P(ch, 'P1'), P(ch, 'P2'), W(ch, 'old'), W(ch, 'new')
+    with Case(tagged(f'L26 [{ch}] the earliest predecessor row has NO number, the new profile\'s own row has one (B): the new '
+                     'profile ends with the early moment AND number B — the kept number is the winning row\'s, else the new '
+                     'profile\'s own known one, never dropped')) as c:
+        with PgSession(SETUP) as pg:
+            row(pg, ch, P1, wfid=WF1, reason='trial_expiry')
+            pg.x(f"update bot_profiles set created_at = now() - interval '10 days' where profile_id = {L(P1)};")
+            pg.q(bind(AUD.ENSURE_CONNECTION_SQL, [P1]))                   # the predecessor's lazy row: the moment, no number
+            proxy_row(pg, ch, P2)
+            register(pg, ch, P2)
+            seed_star(pg, P2)
+            connect(pg, P2, '+7 702 000 00 02')                           # the app's report on the new profile: number B
+            pred, own = connection(pg, P1), connection(pg, P2)
+            c.check(pred is not None and pred['phone'] is None and own is not None and own['phone'] == '77020000002'
+                    and ms(pg, pred['connected_at']) < ms(pg, own['connected_at']), f'premise: predecessor {pred}, own {own}')
+            plan, b, _ = create(pg, ch, P2, WF2, prev=P1)
+            c.check(b.get('bound') is True or HEAD_MODE, f'bind {b}')
+            got = connection(pg, P2)
+            c.check(got is not None and got['connected_at'] == pred['connected_at'] and got['phone'] == '77020000002',
+                    f'the new profile ends with {got}, expected the early moment {pred["connected_at"]} and number B')
+            c.check(got is not None and ms(pg, got['updated_at']) > max(ms(pg, pred['updated_at']), ms(pg, own['updated_at'])),
+                    f'the merged row is neither row as it was — a new updated_at: {got}, predecessor {pred}, own {own}')
+            c.check(connection(pg, P1) is None, f'the predecessor\'s connection row is left: {connection(pg, P1)}')
+            if not HEAD_MODE:
+                c.check((b.get('moved_connections'), b.get('dropped_rows')) == (1, 0), f'moved_connections / dropped_rows {b}')
+
+
+def nonhuman_beats_everything(ch):
+    P0, P1, P2 = P(ch, 'P0'), P(ch, 'P1'), P(ch, 'P2')
+    WF0, WF1, WF2 = W(ch, 'p0'), W(ch, 'p1'), W(ch, 'new')
+    X = '77061@c.us'
+    for v, title in (('own', 'a recorded non-human decision beats everything: the new profile\'s own personal/nonhuman row stays '
+                             'over the predecessor\'s OWNER row'),
+                     ('pred', 'the mirror: the predecessor\'s personal/nonhuman row replaces the new profile\'s own OWNER row'),
+                     ('two', 'two predecessors: the older non-human row beats a fresher owner row')):
+        with Case(tagged(f'L27 [{ch}] {title} (non-human is permanent; the owner\'s set refuses it too)')) as c:
+            with PgSession(SETUP) as pg:
+                row(pg, ch, P1, wfid=WF1, reason='trial_expiry')
+                if v == 'two':
+                    row(pg, ch, P0, wfid=WF0, retired=True)               # Retire Same Bot Slot long ago (NULL reason)
+                proxy_row(pg, ch, P2)
+                register(pg, ch, P2)
+                seed_star(pg, P2)
+                if v == 'own':
+                    owner_decides(pg, P1, X, 'business', 1760000000011, ago='1 day')
+                    decide(pg, P2, X, 'personal', 'nonhuman')             # the new profile learnt it is not a person
+                    want, counters = decision(pg, P2, X), (0, 1)
+                elif v == 'pred':
+                    decide(pg, P1, X, 'personal', 'nonhuman', ago='1 day')
+                    owner_decides(pg, P2, X, 'business', 1760000000012)   # the new profile has no non-human record yet
+                    want, counters = decision(pg, P1, X), (1, 0)
+                else:
+                    decide(pg, P0, X, 'personal', 'nonhuman', ago='9 days')
+                    owner_decides(pg, P1, X, 'business', 1760000000013, ago='1 day')
+                    want, counters = decision(pg, P0, X), (1, 1)
+                c.check(want is not None and want['reason'] == 'nonhuman', f'premise: the non-human row {want}')
+                plan, b, _ = create(pg, ch, P2, WF2, prev=P1)
+                c.check(v != 'two' or plan.get('pred_profiles') == [P0, P1], f'premise: plan {plan}')
+                c.check(b.get('bound') is True or HEAD_MODE, f'bind {b}')
+                c.check(decision(pg, P2, X) == want, f'the new profile holds {decision(pg, P2, X)}, expected {want}')
+                c.check(holds(pg, P2, X) == 'personal', f'what holds for the chat: {holds(pg, P2, X)}')
+                c.check(decisions(pg, P1) == [] and decisions(pg, P0) == [], f'left: {decisions(pg, P0)} {decisions(pg, P1)}')
+                if not HEAD_MODE:
+                    c.check((b.get('moved_audience'), b.get('dropped_rows')) == counters, f'moved_audience / dropped_rows {b}')
+
+
 def race_lazy_rows_during_the_bind(ch):
     P1, P2, WF1, WF2 = P(ch, 'P1'), P(ch, 'P2'), W(ch, 'old'), W(ch, 'new')
     A = '77051@c.us'
@@ -1219,7 +1288,8 @@ CREATE_MATRIX = (reconnect_after_purchase, same_profile_clone_gone, same_profile
                  protected, shared_clone, concurrent_same_profile, bind_ownership, rebind_clears_mark, booked_clone_never_reused,
                  race_same_profile, race_two_new_profiles, schedule_follows_line, reconnect_moves_decisions_and_keeps_the_moment,
                  owner_on_predecessor_beats_default_on_new, earliest_connection_wins_over_a_lazy_row_of_the_new_profile,
-                 own_row_wins_when_the_number_changed, number_change_never_yields_an_older_moment, race_lazy_rows_during_the_bind)
+                 own_row_wins_when_the_number_changed, number_change_never_yields_an_older_moment,
+                 own_number_survives_an_unknown_earliest_number, nonhuman_beats_everything, race_lazy_rows_during_the_bind)
 
 
 # ---------------------------------------------------------------- module-only statements (no pre-F1 counterpart)

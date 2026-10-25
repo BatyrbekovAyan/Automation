@@ -2,7 +2,9 @@
 """«Личные и рабочие чаты» (2026-10-25; spec docs/superpowers/specs/2026-10-25-personal-chats-design.md §3.2, §3.3, §4.1,
 §4.3, §4.6; plan docs/superpowers/plans/2026-10-25-personal-chats.md Task 2): the per-chat decisions on the server — the
 migration (sql/2026-10-25-chat-audience.sql: chat_audience, audience_connections, reply_events' 'cancelled_personal') and
-every statement the later n8n tasks run against them, all in ONE module (Tools/n8n/audience.py), executed here on REAL SQL.
+the statements the later n8n tasks run against them (Tools/n8n/audience.py), executed here on REAL SQL. The bot's line is
+pinned elsewhere: the move on a reconnect (clone_lineage.py) by tests/test_clone_lineage_sql.py, the delete with the bot
+(apply-history-handoff.py) by tests/test_retired_delete.py.
 
 What runs — the module's statements, bound the way n8n's queryReplacement binds them (harness.bind), against session temp
 tables of the staging Postgres (`like public.X including all`: the migration must be applied — pg.sh migrate); the race
@@ -575,7 +577,7 @@ with Case('list_returns_only_valid_decisions_and_the_moment: every profile asked
 
 # ================================================================================================ backfill
 def wappi_page(trigger_time=1006):
-    """A messages/get page exactly as Wappi returns it with order=desc — NEWEST FIRST (ruling R7: BACKFILL_SQL's input),
+    """A messages/get page exactly as Wappi returns it with order=desc — NEWEST FIRST (BACKFILL_SQL's input contract),
     already in the {id, fromMe, body, type, time} shape. The ids sort neither like the page nor like its reverse, so only
     storing the page reversed puts the rows in the conversation's order: b1 · m2 (recorded) · k3 · z4 · a5 · m6 (the
     trigger)."""

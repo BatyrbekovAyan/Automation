@@ -174,14 +174,16 @@ _BIND_TEMPLATE = """-- F1 + F2 (plan 2026-10-11 §1.5): bind the clone to the pr
 --   already holds the same key its row wins; among several predecessors the freshest. The predecessors' '*' rows go: the
 --   new one was seeded from the client's current mode. dialog_counts stay (billing records, not chat content).
 --   The chat decisions and the connection moment (personal chats) have rules of their own. Per chat ONE decision stays
---   on the new profile: the owner's over a computed one, among equals the new profile's own row, among predecessors the
---   freshest — its values unchanged (the moment moves with it, so a moved computed decision keeps holding). The
---   connection: the new profile's own row stays when its number and the number of the predecessors' EARLIEST row are
---   both known and differ (another number is a new connection; its moment is raised to the newest predecessor moment
---   when older, never lowered); otherwise the new profile ends with the row carrying the earliest moment, with that
---   row's number. A kept row keeps its updated_at unless its values change. Every predecessor row of the two tables is
---   deleted and the winner is inserted again under the new profile, so a row the first messages of a chat wrote for the
---   new profile while this statement ran is met by ON CONFLICT on its committed version — never a key clash.
+--   on the new profile: a recorded non-human decision over everything, the owner's included (non-human is permanent:
+--   the owner's set refuses it too), then the owner's over a computed one, among equals the new profile's own row,
+--   among predecessors the freshest — its values unchanged (the moment moves with it, so a moved computed decision keeps
+--   holding). The connection: the new profile's own row stays when its number and the number of the predecessors'
+--   EARLIEST row are both known and differ (another number is a new connection; its moment is raised to the newest
+--   predecessor moment when older, never lowered); otherwise the new profile ends with the earliest moment and that
+--   row's number — or, when that row has none, the new profile's own known number (never dropped). A kept row keeps
+--   its updated_at unless its values change. Every predecessor row of the two tables is deleted and the winner is
+--   inserted again under the new profile, so a row the first messages of a chat wrote for the new profile while this
+--   statement ran is met by ON CONFLICT on its committed version — never a key clash.
 --   The moved clones' chunks and file registry go to the new clone — this install's rows and owner-less ones (a compat
 --   upload), so a file's row and its chunks keep naming ONE clone (the V4 evidence of Delete File / Register Upload);
 --   a file row of another install never. Plus the pre-F1 rule: a second channel joining a bot takes the other
@@ -378,18 +380,20 @@ with me as (
   where a.profile_id in (select pid from p)      -- meanwhile is skipped, never taken back
   returning a.profile_id as pid, a.chat_id, a.kind, a.source, a.reason, a.version, a.decided_at, a.personal_since,
     a.wiped_at, a.updated_at
-), aud_mv as (         -- the best of each chat lands on the new profile: the owner's over a computed one, then the freshest
+), aud_mv as (         -- the best of each chat lands on the new profile: a non-human decision over everything, then the
   insert into chat_audience as t (profile_id, chat_id, kind, source, reason, version, decided_at, personal_since, wiped_at,
-                                  updated_at)
+                                  updated_at)                     -- owner's over a computed one, then the freshest
   select distinct on (w.chat_id) $1, w.chat_id, w.kind, w.source, w.reason, w.version, w.decided_at, w.personal_since,
     w.wiped_at, w.updated_at
   from aud_take w
-  order by w.chat_id, (w.source = 'owner') desc, w.updated_at desc, w.version desc, w.decided_at desc, w.pid desc
+  order by w.chat_id, (w.reason = 'nonhuman') desc, (w.source = 'owner') desc, w.updated_at desc, w.version desc,
+    w.decided_at desc, w.pid desc
   on conflict (profile_id, chat_id) do update set kind = excluded.kind, source = excluded.source, reason = excluded.reason,
     version = excluded.version, decided_at = excluded.decided_at, personal_since = excluded.personal_since,
     wiped_at = excluded.wiped_at, updated_at = excluded.updated_at
-  where excluded.source = 'owner' and t.source <> 'owner'   -- the new profile's own row (its committed version) stays,
-  returning 1                                               -- unless it is a computed one and the predecessor's the owner's
+  where t.reason <> 'nonhuman'           -- the new profile's own row (its committed version) stays unless it loses: a
+    and (excluded.reason = 'nonhuman' or (excluded.source = 'owner' and t.source <> 'owner'))   -- non-human row beats it,
+  returning 1                                                                     -- an owner row beats a computed one
 ), conn_take as (      -- personal chats: the predecessors' connection rows (PK profile_id) all leave their profiles, likewise
   delete from audience_connections c where c.profile_id in (select pid from p)
   returning c.profile_id as pid, c.phone, c.connected_at, c.updated_at
@@ -399,15 +403,18 @@ with me as (
 ), conn_mv as (        -- onto the new profile: its own row (its committed version) stays when both numbers are known and
   insert into audience_connections as t (profile_id, phone, connected_at, updated_at)   -- differ, the moment raised to the
   select $1, e.phone, e.connected_at, e.updated_at from conn_e e                        -- newest predecessor's when older;
-  on conflict (profile_id) do update set                                                -- otherwise the earlier row wins
-    phone        = case when <ANOTHER_NUMBER> then t.phone else excluded.phone end,
+  on conflict (profile_id) do update set                                                -- otherwise the earlier row wins,
+    phone        = case when <ANOTHER_NUMBER> or <EARLIEST_UNKNOWN> then t.phone        -- with its number, else with the new
+                        else excluded.phone end,                                        -- profile's own known one
     connected_at = case when <ANOTHER_NUMBER> then greatest(t.connected_at, (select newest from conn_e))
                         else excluded.connected_at end,
-    updated_at   = case when <ANOTHER_NUMBER> then now() else excluded.updated_at end
+    updated_at   = case when <ANOTHER_NUMBER> then now()
+                        when <EARLIEST_UNKNOWN> and <OWN_KNOWN> then now()      -- the early moment with the own number: a
+                        else excluded.updated_at end                            -- row neither of them was
   where case when <ANOTHER_NUMBER> then (select newest from conn_e) > t.connected_at    -- a kept row changes only when its
              else excluded.connected_at < t.connected_at end                            -- values do
-  returning t.phone is not distinct from (select phone from conn_e)     -- took: the earliest predecessor row landed (false:
-    and t.connected_at = (select connected_at from conn_e) as took      -- the own row kept, its moment only raised)
+  returning t.connected_at = (select connected_at from conn_e)          -- took: the earliest predecessor moment landed, its
+    and (<EARLIEST_UNKNOWN_SUB> or t.phone is not distinct from (select phone from conn_e)) as took   -- number not overruled
 )
 select exists (select 1 from bind where workflow_id = $2) as bound, $2::text as workflow_id,
   coalesce((select jsonb_agg(a.pid order by a.pid) from (
@@ -444,12 +451,18 @@ def _digits(expr):
 # Inside conn_mv's conflict: the new profile's own number (t) and the earliest predecessor's (excluded) are BOTH known and
 # their digits differ — another number, a new connection (owner decision 19). An unknown number on either side is not one.
 _ANOTHER_NUMBER = "coalesce(" + _digits("t.phone") + " <> " + _digits("excluded.phone") + ", false)"
+# The earliest predecessor row carries no number: the merged row keeps the new profile's own known number instead of
+# dropping it (the kept number is the winning row's, else the new profile's own). The _SUB form reads it in RETURNING.
+_EARLIEST_UNKNOWN = _digits("excluded.phone") + " is null"
+_EARLIEST_UNKNOWN_SUB = _digits("(select phone from conn_e)") + " is null"
+_OWN_KNOWN = _digits("t.phone") + " is not null"
 
 
 def bind_workflow_sql(channel):
     c = CHANNELS[channel]
     return _sql(_BIND_TEMPLATE, KEY=c["meta_key"], OTHER=c["other_meta_key"], FCOL=c["file_column"],
-                PREDS=_json_strings("$8"), REPLACE=_json_strings("$7"), ANOTHER_NUMBER=_ANOTHER_NUMBER)
+                PREDS=_json_strings("$8"), REPLACE=_json_strings("$7"), ANOTHER_NUMBER=_ANOTHER_NUMBER,
+                EARLIEST_UNKNOWN_SUB=_EARLIEST_UNKNOWN_SUB, EARLIEST_UNKNOWN=_EARLIEST_UNKNOWN, OWN_KNOWN=_OWN_KNOWN)
 
 
 BIND_WORKFLOW_SQL = {ch: bind_workflow_sql(ch) for ch in CHANNELS}

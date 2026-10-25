@@ -34,8 +34,11 @@ every row of FIXTURE — {constants: {settleMinutes, freshHours, wipeDays}, case
 contact, history, owner, expectKind, expectReason}]} — so a new case goes into that one file and nowhere else.
 tests/test_audience_rule.py guards the rule, the table and the constants.
 
-The decisions in SQL (plan Task 2; schema sql/2026-10-25-chat-audience.sql: chat_audience, audience_connections). Every
-statement the n8n nodes run over the two tables is written here once; the generators paste them, never copy them:
+The decisions in SQL (plan Task 2; schema sql/2026-10-25-chat-audience.sql: chat_audience, audience_connections). The
+statements the n8n nodes run over the two tables are written here once — except the two that belong to the bot's line:
+the move on a reconnect is part of clone_lineage.py's BIND_WORKFLOW_SQL (Create WA/TG's Bind Workflow Id), the delete
+with the bot part of apply-history-handoff.py's DELETE_NEW_TAIL (Delete Bot Files' Delete Chat Memory). The generators
+paste them, never copy them:
   VALID_SQL(a, c)            «this decision holds»: the owner's always, a computed one only while taken on the current
                              connection (decided_at >= connected_at; another number moves connected_at);
   AUDIENCE_SQL(p, c)         the kind of the decision that holds, else NULL (no decision) — a scalar subquery;
@@ -365,7 +368,7 @@ def BACKFILL_SQL(memory_row, owner_content_sql):
     writers store — a client message as Record Suppressed writes it (history 'client', memory 'human'), an owner message as
     Record Outgoing writes the owner's phone message (history 'owner_phone', memory 'ai' opening with «Владелец: »).
 
-    The input contract (ruling R7): the JSON parameter is a Wappi messages/get page exactly as returned with order=desc —
+    The input contract: the JSON parameter is a Wappi messages/get page exactly as returned with order=desc —
     NEWEST FIRST. The statement stores it REVERSED (oldest first), by the page position alone and never by time: Wappi's own
     order is what breaks equal timestamps (a same-second burst, an album), and a message without a parseable time keeps its
     place instead of jumping to the front. The time only fills sent_at. The history ids and the memory row ids both follow
