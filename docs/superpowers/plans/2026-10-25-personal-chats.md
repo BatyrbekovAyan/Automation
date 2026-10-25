@@ -106,6 +106,8 @@ SETTLE_MINUTES, FRESH_HOURS, WIPE_DAYS = 30, 24, 2
 WA_CONTACT_SOURCE = "webhook"            # Task 0 D1: "webhook" | "chats_filter"
 WA_NONHUMAN_SUFFIXES = ("@g.us", "@newsletter", "@broadcast")
 TG_SERVICE_IDS = ("777000",)
+TG_PERSON_TYPE = "user"                  # решение R6 (журнал SDD): тип личного чата Telegram, сравнивается точно
+TG_NONHUMAN_TYPES = ("channel", "chat")  # решение R6: известные «не люди»; любой другой тип — personal/unknown
 FIXTURE = os.path.join(HERE, "fixtures", "audience-cases.json")
 RULE_JS: str    # function decideAudience(f) → {kind: 'personal'|'business', reason: 'nonhuman'|'owner'|'contact'|'history'|'new'|'unknown'}
 ```
@@ -115,8 +117,9 @@ RULE_JS: str    # function decideAudience(f) → {kind: 'personal'|'business', r
 Правило (одинаково в обоих двойниках):
 1. **Не человек → `personal/nonhuman`.**
    - WhatsApp: `chatId` кончается одним из `WA_NONHUMAN_SUFFIXES`, или `flags.bot` / `flags.self` истинны.
-   - Telegram: `chatId` входит в `TG_SERVICE_IDS`; `chatType` не пуст и не `user`; или истинен любой из `flags.bot/support/self`.
+   - Telegram: `chatId` входит в `TG_SERVICE_IDS`; `chatType` входит в `TG_NONHUMAN_TYPES` (точное сравнение); или истинен любой из `flags.bot/support/self`.
 2. **Telegram, `flags === null` → `personal/unknown`:** нельзя исключить бота.
+   - **2a. Telegram, `chatType !== TG_PERSON_TYPE` → `personal/unknown`** (решение R6): пустой, незнакомый или иначе написанный тип не записывается.
 3. **`owner` → `{owner}/owner`.**
 4. **`contact === true` → `personal/contact`.**
 5. **`history === true` → `personal/history`.**
