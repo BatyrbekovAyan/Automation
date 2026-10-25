@@ -2,13 +2,13 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
-using System.Runtime.ExceptionServices;
 using Newtonsoft.Json;
 using NUnit.Framework;
 using TMPro;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.UI;
+using static OpenChatFixture;
 using static SourceGuard;
 
 /// <summary>
@@ -20,8 +20,8 @@ using static SourceGuard;
 ///     never be working: its pill only says why.
 ///   • A tap on the name or avatar of a chat shown as working opens «Сделать личным» — the name, the number with
 ///     «в контактах» / «новый», the action card (MakePersonal + «Чат перенесён в «Личные»») and «Отмена».
-/// The sheets and the header are driven for real (the header on a bare ChatManager fed through ParseChatsJson, the way
-/// PersonalChatCueTests does); the taps go through the very DelayedFingerUpAction the sheets wired. In EditMode the queue
+/// The sheets and the header are driven for real (the header on a bare ChatManager fed through ParseChatsJson —
+/// OpenChatFixture); the taps go through the very DelayedFingerUpAction the sheets wired. In EditMode the queue
 /// sends nothing, so a move is observed through PersonalChatSheets.Committed, raised right before the queue is called.
 /// </summary>
 public class PersonalChatSheetsWiringTests
@@ -349,7 +349,7 @@ public class PersonalChatSheetsWiringTests
     {
         const string client = "77000000412@c.us";
         Header header = NewOpenChatHeader(Row(client, "Ерлан", contact: ""));
-        SetOpenChat(client);
+        OpenChat(ChatManager.Instance, client);   // what the controller resolves (the header keeps its own from HandleChatSelected)
         var controller = NewHost("Suggestions").AddComponent<SuggestionsController>();
         var refs = new SerializedObject(controller);
         refs.FindProperty("_toggle").objectReferenceValue = header.Chip;   // the header's chip is the controller's chip
@@ -489,14 +489,6 @@ public class PersonalChatSheetsWiringTests
         return (T)field.GetValue(target);
     }
 
-    // The ChatManager's open chat — what SuggestionsController resolves (the header keeps its own from HandleChatSelected).
-    private static void SetOpenChat(string chatId)
-    {
-        FieldInfo open = typeof(ChatManager).GetField("currentChatId", BindingFlags.Instance | BindingFlags.NonPublic);
-        Assert.IsNotNull(open, "ChatManager.currentChatId moved — update PersonalChatSheetsWiringTests");
-        open.SetValue(ChatManager.Instance, chatId);
-    }
-
     private static (TMP_FontAsset regular, TMP_FontAsset semibold) Fonts()
     {
         // Medium/Bold are left out on purpose: their font materials carry stale TMP shader ratios in the repo, and measuring
@@ -568,10 +560,10 @@ public class PersonalChatSheetsWiringTests
 
     private Header NewOpenChatHeader(params object[] rows)
     {
-        Manager.Instance = NewManagerWithBot();
-        ChatManager chats = NewChatManager();
+        Manager.Instance = ManagerWithBot(TestBot, Profile, hosts);
+        ChatManager chats = BareChatManager(TestBot, hosts);
         ChatManager.Instance = chats;
-        Parse(chats, JsonConvert.SerializeObject(new { status = "done", dialogs = rows }));
+        Parse(chats, JsonConvert.SerializeObject(new { status = "done", dialogs = rows }), isInitialLoad: true);
 
         GameObject top = NewHost("TopBar");
         var header = top.AddComponent<MessageHeaderView>();
@@ -619,51 +611,12 @@ public class PersonalChatSheetsWiringTests
         last_message_sender = new { isMe = false, pushname = "" },
     };
 
-    private Manager NewManagerWithBot()
-    {
-        var manager = NewHost("ManagerHost").AddComponent<Manager>();
-        GameObject botsParent = NewHost("BotsParent");
-        var botGo = new GameObject(TestBot);
-        botGo.transform.SetParent(botsParent.transform);
-        botGo.AddComponent<Bot>().whatsappProfileId = Profile;
-        FieldInfo field = typeof(Manager).GetField("BotsParent", BindingFlags.Instance | BindingFlags.NonPublic);
-        Assert.IsNotNull(field, "Manager.BotsParent moved — update PersonalChatSheetsWiringTests");
-        field.SetValue(manager, botsParent);
-        return manager;
-    }
-
-    private ChatManager NewChatManager()
-    {
-        var manager = NewHost("ChatManagerHost").AddComponent<ChatManager>();
-        typeof(ChatManager).GetProperty(nameof(ChatManager.ActiveChannel))?.SetValue(manager, ChatChannel.WhatsApp);
-        typeof(ChatManager).GetProperty(nameof(ChatManager.CurrentBotId))?.SetValue(manager, TestBot);
-        return manager;
-    }
-
-    private static void Parse(ChatManager manager, string json)
-    {
-        MethodInfo parse = typeof(ChatManager).GetMethod("ParseChatsJson", BindingFlags.Instance | BindingFlags.NonPublic);
-        Assert.IsNotNull(parse, "ChatManager.ParseChatsJson moved — update PersonalChatSheetsWiringTests");
-        Call(() => parse.Invoke(manager, new object[] { json, true }));
-    }
-
+    // A private method of the header or the controller (EditMode runs no Awake and no events), what it threw rethrown.
     private static void Invoke(object target, string method, params object[] args)
     {
         MethodInfo info = target.GetType().GetMethod(method, BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
         Assert.IsNotNull(info, $"{target.GetType().Name}.{method} moved — update PersonalChatSheetsWiringTests");
         Call(() => info.Invoke(target, args));
-    }
-
-    private static void Call(Action call)
-    {
-        try
-        {
-            call();
-        }
-        catch (TargetInvocationException e)
-        {
-            ExceptionDispatchInfo.Capture(e.InnerException).Throw();
-        }
     }
 
     private GameObject NewHost(string name)

@@ -4,6 +4,7 @@ using System.IO;
 using System.Reflection;
 using NUnit.Framework;
 using UnityEngine;
+using static OpenChatFixture;
 using static SourceGuard;
 
 /// <summary>
@@ -253,26 +254,13 @@ public class SuggestionsAudienceGuardTests
 
     // ---- the harness ----
 
-    // A Manager with the test bot (a WhatsApp profile) and a bare ChatManager on that bot's WhatsApp channel with the chat open.
+    // The Manager with the test bot (a WhatsApp profile) and a bare ChatManager on its WhatsApp channel with the chat open
+    // (OpenChatFixture), both installed as the singletons the controller and the provider read.
     private void SetUpOpenChat()
     {
-        var managerGo = NewHost("ManagerHost");
-        var manager = managerGo.AddComponent<Manager>();
-        var botsParent = NewHost("BotsParent");
-        var botGo = new GameObject(TestBot);
-        botGo.transform.SetParent(botsParent.transform);
-        botGo.AddComponent<Bot>().whatsappProfileId = Profile;
-        FieldInfo bots = typeof(Manager).GetField("BotsParent", BindingFlags.Instance | BindingFlags.NonPublic);
-        Assert.IsNotNull(bots, "Manager.BotsParent moved — update SuggestionsAudienceGuardTests");
-        bots.SetValue(manager, botsParent);
-        Manager.Instance = manager;
-
-        var chatManager = NewHost("ChatManagerHost").AddComponent<ChatManager>();
-        typeof(ChatManager).GetProperty(nameof(ChatManager.ActiveChannel))?.SetValue(chatManager, ChatChannel.WhatsApp);
-        typeof(ChatManager).GetProperty(nameof(ChatManager.CurrentBotId))?.SetValue(chatManager, TestBot);
-        FieldInfo open = typeof(ChatManager).GetField("currentChatId", BindingFlags.Instance | BindingFlags.NonPublic);
-        Assert.IsNotNull(open, "ChatManager.currentChatId moved — update SuggestionsAudienceGuardTests");
-        open.SetValue(chatManager, Chat);
+        Manager.Instance = ManagerWithBot(TestBot, Profile, hosts);
+        ChatManager chatManager = BareChatManager(TestBot, hosts);
+        OpenChat(chatManager, Chat);
         ChatManager.Instance = chatManager;
         Assert.AreEqual(Profile, chatManager.ActiveChannelProfileId(), "the harness resolves the bot's WhatsApp profile");
     }

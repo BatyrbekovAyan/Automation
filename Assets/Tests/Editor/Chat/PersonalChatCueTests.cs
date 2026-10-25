@@ -1,16 +1,15 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Reflection;
-using System.Runtime.ExceptionServices;
 using Newtonsoft.Json;
 using NUnit.Framework;
 using UnityEngine;
+using static OpenChatFixture;
 
 /// <summary>
 /// «Личные и рабочие чаты»: what an incoming message does on the REAL ChatManager.ParseChatsJson (driven by reflection on a
-/// bare manager, the way ChatDialogAudienceParseTests drives it, with a bot whose WhatsApp profile the audience store knows
-/// and has a connection moment for).
+/// bare manager — OpenChatFixture — with a bot whose WhatsApp profile the audience store knows and has a connection moment
+/// for).
 ///   • The cue. On a merged row the chat's verdict BEFORE the message counts too: the app judges an undecided chat's
 ///     history by its LAST message, and the message itself moves that past the connection moment — while the server decides
 ///     the chat on that very message by its history. So a conversation from before the connection does not ring.
@@ -43,7 +42,7 @@ public class PersonalChatCueTests
         ChatAudienceStore.ApplyConnected(Profile, MomentMs);
 
         previousManager = Manager.Instance;
-        Manager.Instance = NewManagerWithBot();
+        Manager.Instance = ManagerWithBot(TestBot, Profile, hosts);
 
         cues = 0;
         readRequests = 0;
@@ -160,56 +159,10 @@ public class PersonalChatCueTests
         Assert.AreEqual(1, cues, "one cue per pass, as before");
     }
 
-    // ---- the harness ----
+    // ---- the harness (the Manager with the bot, the bare ChatManager and Parse are OpenChatFixture's) ----
 
-    // A Manager singleton whose BotsParent holds the test bot with a WhatsApp profile — GetActiveProfileId resolves it.
-    private Manager NewManagerWithBot()
-    {
-        var managerGo = new GameObject("ManagerHost");
-        hosts.Add(managerGo);
-        var manager = managerGo.AddComponent<Manager>();
-        var botsParent = new GameObject("BotsParent");
-        hosts.Add(botsParent);
-        var botGo = new GameObject(TestBot);
-        botGo.transform.SetParent(botsParent.transform);
-        botGo.AddComponent<Bot>().whatsappProfileId = Profile;
-        FieldInfo field = typeof(Manager).GetField("BotsParent", BindingFlags.Instance | BindingFlags.NonPublic);
-        Assert.IsNotNull(field, "Manager.BotsParent moved — update PersonalChatCueTests");
-        field.SetValue(manager, botsParent);
-        return manager;
-    }
-
-    // A real ChatManager without its Awake/Start (EditMode runs neither), on the test bot's WhatsApp channel.
-    private ChatManager NewChatManager()
-    {
-        var host = new GameObject("ChatManagerHost");
-        hosts.Add(host);
-        var manager = host.AddComponent<ChatManager>();
-        SetProperty(manager, nameof(ChatManager.ActiveChannel), ChatChannel.WhatsApp);
-        SetProperty(manager, nameof(ChatManager.CurrentBotId), TestBot);
-        return manager;
-    }
-
-    private static void SetProperty(ChatManager manager, string name, object value)
-    {
-        PropertyInfo property = typeof(ChatManager).GetProperty(name, BindingFlags.Instance | BindingFlags.Public);
-        Assert.IsNotNull(property, $"ChatManager.{name} moved — update PersonalChatCueTests");
-        property.SetValue(manager, value);
-    }
-
-    private static void Parse(ChatManager manager, string json, bool isInitialLoad)
-    {
-        MethodInfo parse = typeof(ChatManager).GetMethod("ParseChatsJson", BindingFlags.Instance | BindingFlags.NonPublic);
-        Assert.IsNotNull(parse, "ChatManager.ParseChatsJson moved — update PersonalChatCueTests");
-        try
-        {
-            parse.Invoke(manager, new object[] { json, isInitialLoad });
-        }
-        catch (TargetInvocationException e)
-        {
-            ExceptionDispatchInfo.Capture(e.InnerException).Throw();
-        }
-    }
+    // A real ChatManager on the test bot's WhatsApp channel.
+    private ChatManager NewChatManager() => BareChatManager(TestBot, hosts);
 
     private static AudienceView View(ChatManager manager, string chatId)
     {
