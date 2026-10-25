@@ -13,12 +13,15 @@ using UnityEngine.UI;
 ///     on WhatsApp), a tap opens the chat as the list does. «Изменить» switches to Edit; the chevron, the left-edge swipe and
 ///     Android Back close the folder.
 ///   • Edit — «Отметьте клиентов»: a checkbox on every person; «Сделать рабочими · N» makes the marked chats working (nothing
-///     marked: «Отметьте хотя бы один чат»); «Отмена» and Back go back to Browse.
+///     marked: «Отметьте хотя бы один чат»; no live profile on the channel: «Не удалось перенести чат», the marks stay);
+///     «Отмена» and Back go back to Browse.
 ///   • Onboarding — «Кто из них клиенты?» (<see cref="PersonalChatsOnboarding"/>): the same selection right after a channel was
 ///     connected, each row saying why it is personal; the loader while the channel's chat list is empty — asked again every
 ///     <see cref="OnboardingPollSeconds"/> s while the screen is up — and a soft note when chats came and none is a contact.
 ///     «Готово · клиентов: N» makes the marked chats working and «Отмечу позже» (Back too) leaves them: both are done with the
-///     screen for good.
+///     screen for good (a move the channel cannot send keeps the screen, as in Edit).
+/// The onboarding waits while the owner marks chats; leaving Edit and closing ask the chats screen to check it again at the
+/// end of the frame (<see cref="ChatListView.RequestOnboardingCheck"/>).
 /// What is listed is <see cref="PersonalChatsFolderModel"/>'s; how each chat stands, <see cref="ChatAudienceStore.ViewOf"/> under
 /// the channel's profile. The rows are the chat list's own ChatItem rows; a row's swipe moves and deletes through the chat
 /// list's own <see cref="ChatListView.RequestMove"/> / <see cref="ChatListView.RequestDelete"/> — one code path for both lists —
@@ -151,9 +154,7 @@ public class PersonalChatsFolderView : MonoBehaviour
     public void Close()
     {
         if (!IsOpen) return;
-        IsOpen = false;
-        StopPoll();
-        _selected.Clear();
+        MarkClosed();
         SlideOut();
     }
 
@@ -164,8 +165,7 @@ public class PersonalChatsFolderView : MonoBehaviour
         switch (Mode)
         {
             case FolderMode.Edit:
-                SetMode(FolderMode.Browse);
-                Rebuild();
+                LeaveEdit();
                 break;
             case FolderMode.Onboarding:
                 Later();
@@ -177,7 +177,10 @@ public class PersonalChatsFolderView : MonoBehaviour
         return true;
     }
 
-    /// <summary>«Кто из них клиенты?» is owed for the chats on screen: shown, unless it already is or the owner is marking chats.</summary>
+    /// <summary>
+    /// «Кто из них клиенты?» is owed for the chats on screen: shown, unless it already is or the owner is marking chats — then it
+    /// waits, and the folder asks again when it leaves «Изменить» or closes.
+    /// </summary>
     public void ShowOnboarding()
     {
         if (IsOpen && Mode != FolderMode.Browse) return;
@@ -302,50 +305,89 @@ public class PersonalChatsFolderView : MonoBehaviour
         else if (Mode == FolderMode.Onboarding) FinishOnboarding(moveMarked: true);
     }
 
-    // «Сделать рабочими · N»: the marked chats become working and the folder is itself again; nothing marked — it says so.
+    // «Сделать рабочими · N»: the marked chats become working and the folder is itself again. Nothing marked — it says so; a
+    // channel without a live profile cannot take the move — it says that, and the marks stay.
     private void ConfirmEdit()
     {
-        int moved = MoveMarkedToWork();
-        if (moved == 0)
+        List<string> chatIds = MarkedToMove();
+        if (chatIds.Count == 0)
         {
             AudienceToast.Show(PersonalChatsCopy.SelectAtLeastOne);
             return;
         }
-        AudienceToast.Show(PersonalChatsFolderModel.MovedToast(moved));
+        if (!MoveToWork(chatIds))
+        {
+            AudienceToast.Show(PersonalChatsCopy.WriteFailed);
+            return;
+        }
+        AudienceToast.Show(PersonalChatsFolderModel.MovedToast(chatIds.Count));
+        LeaveEdit();
+    }
+
+    // «Отмена» or a confirmed move: the folder is itself again, and a «Кто из них клиенты?» that became owed while the owner was
+    // marking chats shows now.
+    private void LeaveEdit()
+    {
         SetModeAndRedraw(FolderMode.Browse);
+        RequestOnboardingCheck();
     }
 
     // «Отмечу позже» (and Back): the screen is done with, nothing moves.
     private void Later() => FinishOnboarding(moveMarked: false);
 
-    // «Готово» moves what is marked — nothing at all when nothing is — and either way the screen is no longer owed.
+    // «Готово» moves what is marked — nothing at all when nothing is — and the screen is no longer owed. A channel without a
+    // live profile cannot take the move: it says so, and the screen stays, marks and all.
     private void FinishOnboarding(bool moveMarked)
     {
-        int moved = moveMarked ? MoveMarkedToWork() : 0;
+        List<string> chatIds = moveMarked ? MarkedToMove() : new List<string>();
+        if (chatIds.Count > 0 && !MoveToWork(chatIds))
+        {
+            AudienceToast.Show(PersonalChatsCopy.WriteFailed);
+            return;
+        }
         PersonalChatsOnboarding.Clear(_bot, _channel == ChatChannel.Telegram);
         Close();
-        if (moved > 0) AudienceToast.Show(PersonalChatsFolderModel.MovedToast(moved));
+        if (chatIds.Count > 0) AudienceToast.Show(PersonalChatsFolderModel.MovedToast(chatIds.Count));
     }
 
-    // The marked chats the folder lists and the server takes go to work through the queue; how many went (never an empty call).
-    private int MoveMarkedToWork()
+    // The marked chats the folder lists and the server takes — never anything else.
+    private List<string> MarkedToMove() => PersonalChatsFolderModel.ChatsToMove(_allRows, _selected);
+
+    // They go to work through the queue under the channel's live profile; false — the channel has none, nothing is sent.
+    private bool MoveToWork(List<string> chatIds)
     {
         ChatManager chats = ChatManager.Instance;
         string profileId = chats != null ? chats.ActiveChannelProfileId() : null;
-        List<string> chatIds = PersonalChatsFolderModel.ChatsToMove(_allRows, _selected);
-        if (!ChatAudienceRequest.IsRealProfileId(profileId) || chatIds.Count == 0) return 0;
+        if (!ChatAudienceRequest.IsRealProfileId(profileId)) return false;
         ChatAudienceSyncService.MakeBusiness(_bot, profileId, chatIds);
-        return chatIds.Count;
+        return true;
     }
 
     // The left-edge swipe already slid the page off the screen (Browse only).
     private void HandleSwipedAway()
     {
         if (!IsOpen) return;
+        MarkClosed();
+        FinishClose();
+    }
+
+    // Every way the folder closes: not open, no poll, no marks — and the chats screen checks «Кто из них клиенты?» again (a
+    // screen that became owed while the folder was up shows now).
+    private void MarkClosed()
+    {
         IsOpen = false;
         StopPoll();
         _selected.Clear();
-        FinishClose();
+        RequestOnboardingCheck();
+    }
+
+    // Decided by the chats screen at the end of the frame (ChatListView → PersonalChatsOnboarding.TryShow), never inline: the
+    // folder also closes from inside a bot switch, which announces the new bot while the chats still show the old bot's
+    // channel (ChatManager.SetActiveBot resolves it afterwards, silently) — an inline check would open the screen for the new
+    // bot on the old channel and nothing would put it right.
+    private void RequestOnboardingCheck()
+    {
+        if (chatList != null) chatList.RequestOnboardingCheck();
     }
 
     // ---- a row's own requests: one code path for both lists ----
@@ -570,9 +612,7 @@ public class PersonalChatsFolderView : MonoBehaviour
     // Back on screen for a bot or channel it no longer belongs to: gone at once, no slide over the new chats.
     private void CloseAtOnce()
     {
-        IsOpen = false;
-        StopPoll();
-        _selected.Clear();
+        MarkClosed();
         _slide?.Kill();
         FinishClose();
     }

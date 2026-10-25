@@ -24,11 +24,12 @@ public static class ChatAudienceConnectPolicy
     }
 
     /// <summary>
-    /// A confirmed pairing in the settings owes «Кто из них клиенты?»: the channel was never seen on this bot (its first
-    /// connection — whatever ids or number the phone kept from before), or it now carries another number.
+    /// A confirmed pairing owes «Кто из них клиенты?»: the channel was never seen on this bot (its first connection — whatever ids
+    /// or number the phone kept from before), or it now carries another number than <paramref name="lastPairedNumber"/>, the last
+    /// one confirmed on it (unknown — nothing proves a change).
     /// </summary>
-    public static bool OwesOnboarding(bool channelSeen, string storedNumber, string authedNumber) =>
-        !channelSeen || NumberChanged(storedNumber, authedNumber);
+    public static bool OwesOnboarding(bool channelSeen, string lastPairedNumber, string authedNumber) =>
+        !channelSeen || NumberChanged(lastPairedNumber, authedNumber);
 
     /// <summary>
     /// The server's answer to a connection report says the number changed: its own word (<paramref name="restarted"/> — it

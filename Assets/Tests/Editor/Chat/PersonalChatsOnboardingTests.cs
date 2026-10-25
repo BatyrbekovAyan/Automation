@@ -9,9 +9,10 @@ using static SourceGuard;
 /// «Личные и рабочие чаты» (spec §5.4): when «Кто из них клиенты?» is owed and when it shows.
 ///   • Owed once per channel of a bot: at its first connection — a channel never seen on this bot
 ///     (<c>{bot}AudienceChannelSeen{Whatsapp|Telegram}</c>, set at every confirmed pairing, cleared only when the bot is
-///     deleted) — and again when the channel now carries another number: the server says so (<c>restarted</c>), its moment
-///     moved later for the same profile, or the settings saw two different numbers. Channels paired before this version are
-///     marked seen once, after the bots load, so they never get the screen.
+///     deleted) — and again when the channel now carries another number: another number than the last one confirmed on it
+///     (<c>{bot}AudienceNumber{Whatsapp|Telegram}</c> — kept across logouts and fresh profiles), or the server says so
+///     (<c>restarted</c>, a later moment for the same profile) for a pairing the app did not ask for itself — the screen comes
+///     once. Channels paired before this version are marked seen once, after the bots load, their stored numbers remembered.
 ///   • Shown while the chats screen shows that bot and that channel; «Готово» and «Отмечу позже» clear it for good.
 /// The flags and the policy are pure; the screen is the real folder over a bare app (PersonalChatsFolderFixture); the
 /// wiring EditMode cannot run — a pairing, a boot, a server answer — is pinned at the source.
@@ -73,11 +74,9 @@ public class PersonalChatsOnboardingTests
     {
         foreach (string bot in new[] { TestBot, OtherTestBot })
         {
-            PersonalChatsOnboarding.Clear(bot, telegram: false);
-            PersonalChatsOnboarding.Clear(bot, telegram: true);
-            PersonalChatsOnboarding.ClearChannelsSeen(bot);
-            PlayerPrefs.DeleteKey(bot + "WhatsappProfileId");
-            PlayerPrefs.DeleteKey(bot + "TelegramProfileId");
+            PersonalChatsOnboarding.ForgetBot(bot);
+            foreach (string key in new[] { "WhatsappProfileId", "TelegramProfileId", "WhatsappNumber", "TelegramNumber" })
+                PlayerPrefs.DeleteKey(bot + key);
         }
     }
 
@@ -111,7 +110,7 @@ public class PersonalChatsOnboardingTests
         Assert.IsTrue(PersonalChatsOnboarding.IsChannelSeen(TestBot, telegram: false), "done with the screen is not a new channel");
 
         PersonalChatsOnboarding.MarkChannelSeen(TestBot, telegram: true);
-        PersonalChatsOnboarding.ClearChannelsSeen(TestBot);        // Bot.DeleteBotLocally
+        PersonalChatsOnboarding.ForgetBot(TestBot);                 // Bot.DeleteBotLocally
         Assert.IsFalse(PersonalChatsOnboarding.IsChannelSeen(TestBot, telegram: false), "a deleted bot's channels are forgotten…");
         Assert.IsFalse(PersonalChatsOnboarding.IsChannelSeen(TestBot, telegram: true), "…both of them: a bot made anew owes the screen again");
     }
@@ -123,9 +122,9 @@ public class PersonalChatsOnboardingTests
     {
         Assert.IsTrue(ChatAudienceConnectPolicy.OwesOnboarding(false, "", "77011112233"), "a channel never seen on this bot");
         Assert.IsTrue(ChatAudienceConnectPolicy.OwesOnboarding(false, "77011112233", "77011112233"),
-            "never seen — even with a number stored (an outside logout, Back on «Сменить номер»: the channel itself was seen)");
+            "never seen — whatever number the phone kept from before");
         Assert.IsFalse(ChatAudienceConnectPolicy.OwesOnboarding(true, "77011112233", "77011112233"), "a re-pairing of the same number");
-        Assert.IsFalse(ChatAudienceConnectPolicy.OwesOnboarding(true, "", "77011112233"), "the stored number is not known: nothing proves a change");
+        Assert.IsFalse(ChatAudienceConnectPolicy.OwesOnboarding(true, "", "77011112233"), "the last paired number is not known: nothing proves a change");
         Assert.IsTrue(ChatAudienceConnectPolicy.OwesOnboarding(true, "77011112233", "77019998877"), "another number is a new connection");
     }
 
@@ -179,7 +178,7 @@ public class PersonalChatsOnboardingTests
         Assert.IsFalse(PersonalChatsOnboarding.IsChannelSeen(OtherTestBot, telegram: false));
         Assert.AreEqual(1, PlayerPrefs.GetInt(PersonalChatsOnboarding.SeenPresetKey, 0), "done once, remembered");
 
-        PersonalChatsOnboarding.ClearChannelsSeen(TestBot);
+        PersonalChatsOnboarding.ForgetBot(TestBot);
         Assert.IsFalse(PersonalChatsOnboarding.PresetChannelsSeen(bots), "never again: a pairing cut short later keeps its screen");
         Assert.IsFalse(PersonalChatsOnboarding.IsChannelSeen(TestBot, telegram: false));
         Assert.IsEmpty(requested, "the preset owes nothing");
@@ -212,28 +211,201 @@ public class PersonalChatsOnboardingTests
         StringAssert.Contains("ProfileRetirement.MarkerId(bot.name, ChatChannel.Telegram)", channels);
     }
 
-    // ---- where it is owed (sources: a pairing, a server answer) ----
+    [Test]
+    public void Preset_RemembersTheStoredNumbers_SoALaterNumberChangeStillOwesTheScreen()
+    {
+        PlayerPrefs.DeleteKey(PersonalChatsOnboarding.SeenPresetKey);
+        PlayerPrefs.SetString(PersonalChatsOnboarding.PairedNumberKey(OtherTestBot, telegram: false), "77015554433");
+        var bots = new[]
+        {
+            new PersonalChatsOnboarding.BotChannels(TestBot, "wa-now", "-1", "", "", whatsappNumber: "77011112233", telegramNumber: ""),
+            new PersonalChatsOnboarding.BotChannels(OtherTestBot, "wa-other", "", "", "", whatsappNumber: "77010000000"),
+        };
+
+        Assert.IsTrue(PersonalChatsOnboarding.PresetChannelsSeen(bots));
+        Assert.AreEqual("77011112233", PersonalChatsOnboarding.PairedNumber(TestBot, telegram: false),
+            "a channel paired before this version: its stored number is its last paired one");
+        Assert.AreEqual("", PersonalChatsOnboarding.PairedNumber(TestBot, telegram: true), "no number stored — none remembered");
+        Assert.AreEqual("77015554433", PersonalChatsOnboarding.PairedNumber(OtherTestBot, telegram: false), "a number already remembered stays");
+
+        Assert.IsFalse(PersonalChatsOnboarding.ReportPairing(TestBot, telegram: false, "wa-fresh", "+7 701 111 22 33", newBot: false),
+            "the same number paired again later: nothing new");
+        Assert.IsTrue(PersonalChatsOnboarding.ReportPairing(TestBot, telegram: false, "wa-fresh2", "77019998877", newBot: false),
+            "another number later: that pre-release channel still gets the screen");
+    }
+
+    // ---- a confirmed pairing ----
 
     [Test]
-    public void EveryConfirmedPairing_MarksTheChannelSeen()
+    public void FirstPairing_OwesTheScreen_RemembersTheNumber_AndRecordsTheAppsOwnRequest()
     {
-        string wizard = MethodBody(Read("Scripts/Main/Manager.cs"), "private static void ReportNewBotPairing(string botName, string profileId, bool telegram)");
-        StringAssert.Contains("PersonalChatsOnboarding.MarkChannelSeen(botName, telegram);", wizard, "the wizard: a new bot's channel");
-        StringAssert.Contains("PersonalChatsOnboarding.Request(botName, telegram);", wizard, "…always a first connection");
+        Assert.AreEqual(TestBot + "AudienceNumberWhatsapp", PersonalChatsOnboarding.PairedNumberKey(TestBot, telegram: false));
+        Assert.AreEqual(TestBot + "AudienceNumberTelegram", PersonalChatsOnboarding.PairedNumberKey(TestBot, telegram: true));
+        Assert.AreEqual(TestBot + "AudienceOnboardingForWhatsapp", PersonalChatsOnboarding.RequestedForKey(TestBot, telegram: false));
+        Assert.AreEqual(TestBot + "AudienceOnboardingForTelegram", PersonalChatsOnboarding.RequestedForKey(TestBot, telegram: true));
 
-        string settings = MethodBody(Read("Scripts/Main/BotSettings.Auth.cs"), "private static void ReportSettingsPairing(");
-        int seen = settings.IndexOf("PersonalChatsOnboarding.IsChannelSeen(botName, telegram)", StringComparison.Ordinal);
-        int mark = settings.IndexOf("PersonalChatsOnboarding.MarkChannelSeen(botName, telegram);", StringComparison.Ordinal);
-        int owes = settings.IndexOf("ChatAudienceConnectPolicy.OwesOnboarding(", StringComparison.Ordinal);
-        Assert.IsTrue(seen >= 0 && mark > seen && owes > mark, "the settings: read whether the channel was seen, mark it, then decide");
-        Assert.IsFalse(settings.Contains("IsFirstConnection("), "the seen flag replaced the stored-id guess");
+        Assert.IsTrue(PersonalChatsOnboarding.ReportPairing(TestBot, telegram: false, "wa-first", "+7 701 111 22 33", newBot: true),
+            "the wizard: a new bot is always a first connection");
+        Assert.IsTrue(PersonalChatsOnboarding.IsRequested(TestBot, telegram: false));
+        Assert.IsTrue(PersonalChatsOnboarding.IsChannelSeen(TestBot, telegram: false), "seen from now on");
+        Assert.AreEqual("+7 701 111 22 33", PersonalChatsOnboarding.PairedNumber(TestBot, telegram: false), "the first pairing writes the number");
+        Assert.AreEqual("wa-first", PlayerPrefs.GetString(PersonalChatsOnboarding.RequestedForKey(TestBot, telegram: false), ""),
+            "the app asked for this profile's screen itself");
 
-        string local = MethodBody(Read("Scripts/Main/Bot.cs"), "public void DeleteBotLocally");
-        StringAssert.Contains("PersonalChatsOnboarding.ClearChannelsSeen(transform.name);", local, "only the bot's deletion forgets its channels");
+        Assert.IsTrue(PersonalChatsOnboarding.ReportPairing(TestBot, telegram: true, "tg-first", "", newBot: false),
+            "the settings: a channel never seen on this bot is a first connection too");
+        Assert.AreEqual("", PersonalChatsOnboarding.PairedNumber(TestBot, telegram: true), "a number not known is not written");
+        CollectionAssert.AreEqual(new[] { (TestBot, false), (TestBot, true) }, requested);
     }
 
     [Test]
-    public void TheConnectedAnswer_TellsANumberChange_ToTheBotHoldingTheProfile()
+    public void FreshProfile_WithAnotherNumber_OwesTheScreen()
+    {
+        PersonalChatsOnboarding.ReportPairing(TestBot, telegram: false, "wa-old", "77011112233", newBot: true);
+        PersonalChatsOnboarding.Clear(TestBot, telegram: false);   // the owner was done with the screen
+        // A new SIM logs the device out (or «Сменить номер» and its Back): the stored number is cleared and the profile deleted —
+        // the owner pairs ANOTHER number on a fresh profile.
+        PlayerPrefs.DeleteKey(TestBot + "WhatsappNumber");
+        requested.Clear();
+
+        Assert.IsTrue(PersonalChatsOnboarding.ReportPairing(TestBot, telegram: false, "wa-fresh", "77019998877", newBot: false),
+            "decided against the last paired number, not the stored one a logout cleared");
+        Assert.IsTrue(PersonalChatsOnboarding.IsRequested(TestBot, telegram: false));
+        Assert.AreEqual("77019998877", PersonalChatsOnboarding.PairedNumber(TestBot, telegram: false), "written after the decision: the new number");
+        Assert.AreEqual("wa-fresh", PlayerPrefs.GetString(PersonalChatsOnboarding.RequestedForKey(TestBot, telegram: false), ""));
+        Assert.AreEqual(1, requested.Count);
+    }
+
+    [Test]
+    public void FreshProfile_WithTheSameNumber_OwesNothing()
+    {
+        PersonalChatsOnboarding.ReportPairing(TestBot, telegram: false, "wa-old", "77011112233", newBot: true);
+        PersonalChatsOnboarding.Clear(TestBot, telegram: false);
+        PlayerPrefs.DeleteKey(PersonalChatsOnboarding.RequestedForKey(TestBot, telegram: false));   // its answer came
+        PlayerPrefs.DeleteKey(TestBot + "WhatsappNumber");
+        requested.Clear();
+
+        Assert.IsFalse(PersonalChatsOnboarding.ReportPairing(TestBot, telegram: false, "wa-fresh", "+7 (701) 111-22-33", newBot: false),
+            "the same number on a fresh profile is the same connection");
+        Assert.IsFalse(PersonalChatsOnboarding.IsRequested(TestBot, telegram: false));
+        Assert.IsFalse(PlayerPrefs.HasKey(PersonalChatsOnboarding.RequestedForKey(TestBot, telegram: false)), "nothing asked, nothing recorded");
+
+        Assert.IsFalse(PersonalChatsOnboarding.ReportPairing(TestBot, telegram: false, "wa-fresh", "", newBot: false),
+            "a pairing whose number is not known proves nothing…");
+        Assert.AreEqual("+7 (701) 111-22-33", PersonalChatsOnboarding.PairedNumber(TestBot, telegram: false), "…and keeps the last number");
+        Assert.IsEmpty(requested);
+    }
+
+    [Test]
+    public void ForgetBot_ForgetsEverythingKeptForTheBot_OnlyTheBotsDeletionCallsIt()
+    {
+        PersonalChatsOnboarding.ReportPairing(TestBot, telegram: false, "wa-p", "77011112233", newBot: true);
+        PersonalChatsOnboarding.ReportPairing(TestBot, telegram: true, "tg-p", "77019998877", newBot: true);
+        PersonalChatsOnboarding.ReportPairing(OtherTestBot, telegram: false, "wa-o", "77015554433", newBot: true);
+
+        PersonalChatsOnboarding.ForgetBot(TestBot);
+        foreach (bool telegram in new[] { false, true })
+            foreach (string key in new[]
+                     {
+                         PersonalChatsOnboarding.FlagKey(TestBot, telegram), PersonalChatsOnboarding.ChannelSeenKey(TestBot, telegram),
+                         PersonalChatsOnboarding.PairedNumberKey(TestBot, telegram), PersonalChatsOnboarding.RequestedForKey(TestBot, telegram),
+                     })
+                Assert.IsFalse(PlayerPrefs.HasKey(key), $"{key}: a deleted bot leaves nothing behind");
+        Assert.IsTrue(PersonalChatsOnboarding.IsChannelSeen(OtherTestBot, telegram: false), "another bot keeps its own");
+        Assert.AreEqual("77015554433", PersonalChatsOnboarding.PairedNumber(OtherTestBot, telegram: false));
+
+        StringAssert.Contains("PersonalChatsOnboarding.ForgetBot(transform.name);", MethodBody(Read("Scripts/Main/Bot.cs"), "public void DeleteBotLocally"),
+            "the bot's deletion forgets it all");
+        string scripts = Path.Combine(Application.dataPath, "Scripts");
+        foreach (string file in Directory.GetFiles(scripts, "*.cs", SearchOption.AllDirectories))
+        {
+            if (Path.GetFileName(file) == "Bot.cs") continue;
+            StringAssert.DoesNotContain("PersonalChatsOnboarding.ForgetBot(", File.ReadAllText(file),
+                $"{Path.GetFileName(file)}: only the bot's deletion forgets the channels seen and their numbers");
+        }
+    }
+
+    // ---- the server's answer to a pairing ----
+
+    [Test]
+    public void TheAppsOwnRequest_TakesTheServersAnswerToTheSamePairing_TheScreenComesOnce()
+    {
+        PlayerPrefs.SetString(TestBot + "WhatsappProfileId", "wa-p");
+        string[] bots = { OtherTestBot, TestBot };
+        Assert.IsTrue(PersonalChatsOnboarding.ReportPairing(TestBot, telegram: false, "wa-p", "77011112233", newBot: true));
+        PersonalChatsOnboarding.Clear(TestBot, telegram: false);   // the owner is done with the screen before the answer lands
+
+        Assert.IsFalse(PersonalChatsOnboarding.AnswerConnected("wa-p", numberRestarted: true, bots), "the app asked at this pairing already");
+        Assert.IsFalse(PersonalChatsOnboarding.IsRequested(TestBot, telegram: false), "…so the screen the owner finished does not come back");
+        Assert.AreEqual(1, requested.Count, "requested once");
+        Assert.IsFalse(PlayerPrefs.HasKey(PersonalChatsOnboarding.RequestedForKey(TestBot, telegram: false)), "the answer consumed the request");
+
+        Assert.IsTrue(PersonalChatsOnboarding.AnswerConnected("wa-p", numberRestarted: true, bots),
+            "that once only: a later restart of the profile is the server's own news");
+        Assert.AreEqual(2, requested.Count);
+    }
+
+    [Test]
+    public void WithoutTheAppsRequest_ARestartOwesTheScreen()
+    {
+        PlayerPrefs.SetString(TestBot + "WhatsappProfileId", "wa-p");
+        Assert.IsFalse(PersonalChatsOnboarding.AnswerConnected("wa-p", numberRestarted: false, new[] { TestBot }), "no restart — nothing owed");
+        Assert.IsFalse(PersonalChatsOnboarding.IsRequested(TestBot, telegram: false));
+
+        Assert.IsTrue(PersonalChatsOnboarding.AnswerConnected("wa-p", numberRestarted: true, new[] { TestBot }));
+        Assert.IsTrue(PersonalChatsOnboarding.IsRequested(TestBot, telegram: false), "owed to the bot holding the profile");
+        Assert.IsFalse(PersonalChatsOnboarding.AnswerConnected(global::Bot.UnauthedProfileSentinel, true, new[] { TestBot }));
+        Assert.IsFalse(PersonalChatsOnboarding.AnswerConnected("wa-p", true, null));
+        Assert.AreEqual(1, requested.Count);
+    }
+
+    [Test]
+    public void TheAppsOwnRequest_IsConsumedByAnAnswerSayingNoRestart_Too()
+    {
+        PlayerPrefs.SetString(TestBot + "WhatsappProfileId", "wa-p");
+        PersonalChatsOnboarding.ReportPairing(TestBot, telegram: false, "wa-p", "77011112233", newBot: true);
+        PersonalChatsOnboarding.Clear(TestBot, telegram: false);
+
+        Assert.IsFalse(PersonalChatsOnboarding.AnswerConnected("wa-p", numberRestarted: false, new[] { TestBot }));
+        Assert.IsFalse(PlayerPrefs.HasKey(PersonalChatsOnboarding.RequestedForKey(TestBot, telegram: false)),
+            "the first answer for the profile consumes the request, whatever it says");
+        Assert.IsTrue(PersonalChatsOnboarding.AnswerConnected("wa-p", numberRestarted: true, new[] { TestBot }),
+            "so the next restart is owed again");
+    }
+
+    [Test]
+    public void TheAppsOwnRequest_ForAnotherProfile_IsLeftAlone()
+    {
+        PersonalChatsOnboarding.ReportPairing(TestBot, telegram: false, "wa-old", "77011112233", newBot: true);   // its answer never came
+        PersonalChatsOnboarding.Clear(TestBot, telegram: false);
+        PlayerPrefs.SetString(TestBot + "WhatsappProfileId", "wa-new");
+
+        Assert.IsTrue(PersonalChatsOnboarding.AnswerConnected("wa-new", numberRestarted: true, new[] { TestBot }),
+            "another profile's answer is judged on its own");
+        Assert.AreEqual("wa-old", PlayerPrefs.GetString(PersonalChatsOnboarding.RequestedForKey(TestBot, telegram: false), ""),
+            "…and the request it does not name stays");
+    }
+
+    // ---- where it is owed (sources: a pairing, a server answer) ----
+
+    [Test]
+    public void EveryConfirmedPairing_GoesThroughOneDecision()
+    {
+        string wizard = MethodBody(Read("Scripts/Main/Manager.cs"),
+            "private static void ReportNewBotPairing(string botName, string profileId, bool telegram, string authedNumber)");
+        StringAssert.Contains("PersonalChatsOnboarding.ReportPairing(botName, telegram, profileId, authedNumber, newBot: true);", wizard,
+            "the wizard: a new bot's channel, always a first connection, its number remembered");
+
+        string settings = MethodBody(Read("Scripts/Main/BotSettings.Auth.cs"), "private static void ReportSettingsPairing(");
+        StringAssert.Contains(
+            "PersonalChatsOnboarding.ReportPairing(Manager.openBot.name, channel == ChatChannel.Telegram, profileId, authedNumber, newBot: false);",
+            settings, "the settings: never seen, or another number than the last paired one");
+        StringAssert.DoesNotContain("PlayerPrefs", settings, "never the stored number: a logout clears it before the next pairing");
+        Assert.IsFalse(settings.Contains("IsFirstConnection("), "the seen flag replaced the stored-id guess");
+    }
+
+    [Test]
+    public void TheConnectedAnswer_TellsANumberChange_UnlessTheAppAskedAtThatPairing()
     {
         string send = MethodBody(Read("Scripts/Chat/ChatAudienceSyncService.cs"), "private IEnumerator SendConnected(");
         StringAssert.Contains("ChatAudienceResponse.ClassifyConnected(www.responseCode, www.downloadHandler?.text, out long connectedAtMs, out bool restarted)",
@@ -241,9 +413,10 @@ public class PersonalChatsOnboardingTests
         int mirrored = send.IndexOf("ChatAudienceStore.ConnectedAtMs(profileId)", StringComparison.Ordinal);
         int applied = send.IndexOf("ChatAudienceStore.ApplyConnected(profileId, connectedAtMs);", StringComparison.Ordinal);
         Assert.IsTrue(mirrored >= 0 && applied > mirrored, "the mirrored moment is read before the answer replaces it");
-        int policy = send.IndexOf("ChatAudienceConnectPolicy.NumberRestarted(restarted, mirrored, connectedAtMs)", StringComparison.Ordinal);
-        int request = send.IndexOf("PersonalChatsOnboarding.RequestForProfile(profileId,", StringComparison.Ordinal);
-        Assert.IsTrue(policy > 0 && request > policy, "a restart owes the screen to the bot that holds the profile");
+        int answer = send.IndexOf("PersonalChatsOnboarding.AnswerConnected(profileId, ChatAudienceConnectPolicy.NumberRestarted(restarted, mirrored, connectedAtMs),",
+            StringComparison.Ordinal);
+        Assert.Greater(answer, applied, "every answered report is settled against the app's own request");
+        StringAssert.DoesNotContain("PersonalChatsOnboarding.RequestForProfile(", send, "never past the app's own request");
     }
 
     // ---- when it shows ----

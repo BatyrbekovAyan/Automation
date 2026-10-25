@@ -49,13 +49,13 @@ public class PersonalChatsFolderViewTests
         ChatAudienceStore.ApplyConnected(Profile, MomentMs);
         previousManager = Manager.Instance;
         previousChatManager = ChatManager.Instance;
-        PersonalChatsOnboarding.Clear(Bot, telegram: false);
+        PersonalChatsOnboarding.ForgetBot(Bot);
     }
 
     [TearDown]
     public void TearDown()
     {
-        PersonalChatsOnboarding.Clear(Bot, telegram: false);
+        PersonalChatsOnboarding.ForgetBot(Bot);
         Manager.Instance = previousManager;
         ChatManager.Instance = previousChatManager;
         foreach (GameObject host in hosts)
@@ -197,6 +197,80 @@ public class PersonalChatsFolderViewTests
         Assert.AreEqual("Сделать рабочими · 0", h.PrimaryLabel.text, "the marks did not survive the cancel");
     }
 
+    [Test]
+    public void Edit_WithoutALiveProfile_SaysTheMoveFailed_AndKeepsTheMarks()
+    {
+        FolderHarness h = Folder();
+        h.Folder.Open(FolderMode.Edit);
+        h.Folder.RowForTests(Saule).button.onClick.Invoke();
+        h.Manager.FindBotByName(Bot).whatsappProfileId = global::Bot.UnauthedProfileSentinel;   // the channel lost its profile meanwhile
+
+        h.Primary.onClick.Invoke();
+        Assert.AreEqual(PersonalChatsCopy.WriteFailed, AudienceToast.LastText, "a chat is marked — not «Отметьте хотя бы один чат»");
+        Assert.AreEqual(FolderMode.Edit, h.Folder.Mode, "still selecting");
+        Assert.AreEqual("Сделать рабочими · 1", h.PrimaryLabel.text, "the marks are kept");
+        Assert.IsTrue(Checked(h.Folder.RowForTests(Saule)).activeSelf);
+    }
+
+    [Test]
+    public void OnboardingDone_WithoutALiveProfile_KeepsTheScreenAndItsMarks()
+    {
+        FolderHarness h = Folder();
+        PersonalChatsOnboarding.Request(Bot, telegram: false);
+        h.Folder.Open(FolderMode.Onboarding);
+        h.Folder.RowForTests(Saule).button.onClick.Invoke();
+        h.Manager.FindBotByName(Bot).whatsappProfileId = global::Bot.UnauthedProfileSentinel;
+
+        h.Primary.onClick.Invoke();   // «Готово · клиентов: 1»
+        Assert.AreEqual(PersonalChatsCopy.WriteFailed, AudienceToast.LastText, "the move cannot be sent — it says so");
+        Assert.IsTrue(h.Folder.IsOpen, "the screen stays: the marked clients are not silently left personal");
+        Assert.AreEqual(FolderMode.Onboarding, h.Folder.Mode);
+        Assert.IsTrue(PersonalChatsOnboarding.IsRequested(Bot, telegram: false), "…and it is still owed");
+        Assert.AreEqual("Готово · клиентов: 1", h.PrimaryLabel.text, "the marks are kept");
+    }
+
+    // ---- «Кто из них клиенты?» owed while the folder is up ----
+
+    [Test]
+    public void AScreenOwedWhileMarking_ShowsWhenEditEnds_AtTheEndOfTheFrame()
+    {
+        FolderHarness h = Folder();
+        h.Folder.Open(FolderMode.Edit);
+        PersonalChatsOnboarding.Request(Bot, telegram: false);
+        PersonalChatsOnboarding.TryShow();   // what the chats screen does on the request
+        Assert.AreEqual(FolderMode.Edit, h.Folder.Mode, "the owner is marking chats — the screen waits");
+
+        h.Back.onClick.Invoke();   // «Отмена»
+        Assert.AreEqual(FolderMode.Browse, h.Folder.Mode, "decided at the end of the frame, not inline");
+        Assert.IsTrue(CheckPending(h.List), "…the chats screen is asked to check again");
+        EndOfFrame(h.List);
+        Assert.AreEqual(FolderMode.Onboarding, h.Folder.Mode, "the owed screen shows as soon as the owner stops marking");
+
+        StringAssert.Contains("LeaveEdit();", MethodBody(Read("Scripts/UI/PersonalChatsFolderView.cs"), "private void ConfirmEdit("),
+            "a confirmed move leaves Edit the same way");
+    }
+
+    [Test]
+    public void Closing_ChecksAgainAtTheEndOfTheFrame_NeverInline()
+    {
+        FolderHarness h = Folder();
+        h.Folder.Open(FolderMode.Browse);
+        PersonalChatsOnboarding.Request(Bot, telegram: false);   // owed while the folder was up (nothing listens in EditMode)
+
+        h.Back.onClick.Invoke();   // the chevron
+        Assert.IsFalse(h.Folder.IsOpen, "closed — the check does not run inside the close");
+        Assert.IsTrue(CheckPending(h.List), "…the chats screen is asked");
+        EndOfFrame(h.List);
+        Assert.IsTrue(h.Folder.IsOpen, "the chats screen showed the owed screen at the end of the frame");
+        Assert.AreEqual(FolderMode.Onboarding, h.Folder.Mode);
+
+        string folder = Read("Scripts/UI/PersonalChatsFolderView.cs");
+        StringAssert.DoesNotContain("PersonalChatsOnboarding.TryShow(", folder,
+            "never inline: a close inside a bot switch would see the new bot on the old bot's channel");
+        foreach (string close in new[] { "public void Close(", "private void HandleSwipedAway(", "private void CloseAtOnce(" })
+            StringAssert.Contains("MarkClosed();", MethodBody(folder, close), $"{close}: one bookkeeping for every way the folder closes");
+    }
+
     // ---- «Кто из них клиенты?» ----
 
     [Test]
@@ -256,6 +330,28 @@ public class PersonalChatsFolderViewTests
     }
 
     [Test]
+    public void BackOnScreenForAnotherBot_ClosesAtOnce_ItsOwnStaysOpen()
+    {
+        FolderHarness h = Folder();
+        h.Folder.Open(FolderMode.Browse);
+        GameObject screen = h.Folder.transform.parent.gameObject;
+
+        screen.SetActive(false);   // another tab
+        screen.SetActive(true);
+        Enable(h.Folder);          // what Unity calls when the folder is back on screen (EditMode calls nothing)
+        Assert.IsTrue(h.Folder.IsOpen, "back for its own bot and channel: still open");
+        Assert.IsTrue(h.Folder.gameObject.activeSelf);
+
+        screen.SetActive(false);
+        SetCurrentBot(h.Chats, "SomeOtherBot");   // the chats moved on while the folder was hidden
+        screen.SetActive(true);
+        Enable(h.Folder);
+        Assert.IsFalse(h.Folder.IsOpen, "back for another bot: closed");
+        Assert.IsFalse(h.Folder.gameObject.activeSelf, "…at once, no slide over the new chats");
+        Assert.IsFalse(PersonalChatsFolderView.IsShowing);
+    }
+
+    [Test]
     public void TheSwipeBack_ClosesTheFolder()
     {
         FolderHarness h = Folder();
@@ -289,5 +385,34 @@ public class PersonalChatsFolderViewTests
         FieldInfo field = typeof(ChatManager).GetField(evt, BindingFlags.Instance | BindingFlags.NonPublic);
         Assert.IsNotNull(field, $"ChatManager.{evt} moved");
         (field.GetValue(chats) as Action<T>)?.Invoke(value);
+    }
+
+    // The chat list holds a «Кто из них клиенты?» check for its end of frame.
+    private static bool CheckPending(ChatListView list)
+    {
+        FieldInfo field = typeof(ChatListView).GetField("onboardingCheckPending", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.IsNotNull(field, "ChatListView.onboardingCheckPending moved");
+        return (bool)field.GetValue(list);
+    }
+
+    // The chat list's end of frame — its LateUpdate, which EditMode never runs.
+    private static void EndOfFrame(ChatListView list) => Call(list, "LateUpdate");
+
+    // The folder back on screen — its OnEnable, which EditMode never runs.
+    private static void Enable(PersonalChatsFolderView folder) => Call(folder, "OnEnable");
+
+    private static void Call(object target, string method)
+    {
+        MethodInfo info = target.GetType().GetMethod(method, BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.IsNotNull(info, $"{target.GetType().Name}.{method} moved");
+        info.Invoke(target, null);
+    }
+
+    // The chats screen's bot changed with no event reaching the folder (ChatManager.CurrentBotId has a private setter).
+    private static void SetCurrentBot(ChatManager chats, string botId)
+    {
+        PropertyInfo property = typeof(ChatManager).GetProperty(nameof(ChatManager.CurrentBotId));
+        Assert.IsNotNull(property, "ChatManager.CurrentBotId moved");
+        property.SetValue(chats, botId);
     }
 }

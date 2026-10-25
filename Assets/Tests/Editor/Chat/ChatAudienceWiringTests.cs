@@ -40,17 +40,6 @@ public class ChatAudienceWiringTests
         return null;
     }
 
-    // An expression-bodied member («=> …;»): from its arrow to the semicolon that ends it. MethodBody would skip to the next
-    // member's braces.
-    private static string ExpressionBody(string text, string signature)
-    {
-        int i = At(text, signature);
-        int arrow = text.IndexOf("=>", i, StringComparison.Ordinal);
-        int brace = text.IndexOf('{', i);
-        Assert.IsTrue(arrow > i && (brace < 0 || arrow < brace), $"{signature}: not an expression-bodied member");
-        return text.Substring(arrow, text.IndexOf(';', arrow) - arrow + 1);
-    }
-
     private static int At(string text, string needle)
     {
         int i = text.IndexOf(needle, StringComparison.Ordinal);
@@ -120,9 +109,9 @@ public class ChatAudienceWiringTests
         string wizard = MethodBody(manager, "private IEnumerator CreateBotFromForm()");
         foreach (var (auth, report, create) in new[]
                  {
-                     ("while (!whatsappAuthCompleted)", "ReportNewBotPairing(newBot.name, whatsappProfileId, telegram: false);",
+                     ("while (!whatsappAuthCompleted)", "ReportNewBotPairing(newBot.name, whatsappProfileId, telegram: false, LastAuthedWhatsappNumber);",
                       "StartCoroutine(CreateWhatsappWorkflowFromStart(newBot));"),
-                     ("while (!telegramAuthCompleted)", "ReportNewBotPairing(newBot.name, telegramProfileId, telegram: true);",
+                     ("while (!telegramAuthCompleted)", "ReportNewBotPairing(newBot.name, telegramProfileId, telegram: true, LastAuthedTelegramNumber);",
                       "StartCoroutine(CreateTelegramWorkflowFromStart(newBot));"),
                  })
         {
@@ -130,52 +119,37 @@ public class ChatAudienceWiringTests
             Assert.IsTrue(confirmed < reported && reported < created, $"{report}: after the pairing is confirmed, before the Create");
             Assert.IsFalse(wizard.Substring(reported, created - reported).Contains("}"), $"{report}: in the same branch as the Create");
         }
-        string helper = MethodBody(manager, "private static void ReportNewBotPairing(string botName, string profileId, bool telegram)");
-        Assert.IsTrue(helper.Contains("ChatAudienceSyncService.ReportConnected(profileId);"), "the server learns the connection");
-        Assert.IsTrue(helper.Contains("PersonalChatsOnboarding.MarkChannelSeen(botName, telegram);"), "the channel is seen on this bot from now on");
-        Assert.IsTrue(helper.Contains("PersonalChatsOnboarding.Request(botName, telegram);"),
-            "a new bot is a first connection: «Кто из них клиенты?» is owed");
+        string helper = MethodBody(manager, "private static void ReportNewBotPairing(string botName, string profileId, bool telegram, string authedNumber)");
+        int connected = At(helper, "ChatAudienceSyncService.ReportConnected(profileId);");
+        int decided = At(helper, "PersonalChatsOnboarding.ReportPairing(botName, telegram, profileId, authedNumber, newBot: true);");
+        Assert.Less(connected, decided, "the server learns the connection; a new bot is a first connection — «Кто из них клиенты?» is owed, " +
+            "the channel seen and the number just paired remembered");
     }
 
     [Test]
-    public void Settings_ReportThePairing_BeforeTheStoredNumberIsOverwritten()
+    public void Settings_ReportThePairing_AgainstTheLastPairedNumber()
     {
         string auth = Src("Scripts/Main/BotSettings.Auth.cs");
-        foreach (var (done, channel, field, word, show, open) in new[]
+        foreach (var (done, channel, word) in new[]
                  {
-                     ("private void OnWhatsappAuthFromSettingsDone()", "WhatsApp", "_whatsappBeforePairing", "Whatsapp",
-                      "private void ShowWhatsappAuthFromSettings(string profileId)", "Manager.Instance.OpenWhatsappAuthFromSettings("),
-                     ("private void OnTelegramAuthFromSettingsDone()", "Telegram", "_telegramBeforePairing", "Telegram",
-                      "private void ShowTelegramAuthFromSettings(string profileId)", "Manager.Instance.OpenTelegramAuthFromSettings("),
+                     ("private void OnWhatsappAuthFromSettingsDone()", "WhatsApp", "Whatsapp"),
+                     ("private void OnTelegramAuthFromSettingsDone()", "Telegram", "Telegram"),
                  })
         {
             string body = MethodBody(auth, done);
-            int reported = At(body, $"ReportSettingsPairing(ChatChannel.{channel}, Manager.openBot.GetComponent<Bot>().{word.ToLowerInvariant()}ProfileId,");
-            int overwritten = At(body, $"PlayerPrefs.SetString(Manager.openBot.name + \"{word}Number\"");
-            Assert.Less(reported, overwritten, $"{done}: decided while the stored number is still the old one");
-            Assert.IsTrue(body.Contains($"{field} ?? StoredNumber(ChatChannel.{channel})"),
-                $"{done}: the number as it was when the pairing began");
-            Assert.IsTrue(body.Contains($"Manager.Instance.LastAuthed{word}Number"), $"{done}: against the number just paired");
-
-            // «Сменить номер» logs out first — the logout clears the stored number long before the new one pairs: the number is
-            // read when the pairing BEGINS.
-            string begin = MethodBody(auth, show);
-            Assert.Less(At(begin, $"{field} = StoredNumber(ChatChannel.{channel});"), At(begin, open), $"{show}: captured before the auth page opens");
+            At(body, $"ReportSettingsPairing(ChatChannel.{channel}, Manager.openBot.GetComponent<Bot>().{word.ToLowerInvariant()}ProfileId,");
+            Assert.IsTrue(body.Contains($"Manager.Instance.LastAuthed{word}Number"), $"{done}: the number just paired");
         }
 
         string helper = MethodBody(auth, "private static void ReportSettingsPairing(");
         int report = At(helper, "ChatAudienceSyncService.ReportConnected(profileId);");
-        int seen = At(helper, "PersonalChatsOnboarding.IsChannelSeen(botName, telegram)");
-        int mark = At(helper, "PersonalChatsOnboarding.MarkChannelSeen(botName, telegram);");
-        int ask = At(helper, "PersonalChatsOnboarding.Request(botName, telegram);");
-        Assert.IsTrue(helper.Contains("ChatAudienceConnectPolicy.OwesOnboarding(seen, numberBefore, authedNumber)"),
-            "a channel never seen on this bot, or another number");
-        Assert.IsTrue(report < seen && seen < mark && mark < ask,
-            "every pairing is reported and marks its channel seen; the screen only for a first connection or another number");
+        int decided = At(helper,
+            "PersonalChatsOnboarding.ReportPairing(Manager.openBot.name, channel == ChatChannel.Telegram, profileId, authedNumber, newBot: false);");
+        Assert.Less(report, decided, "every pairing is reported; the screen only for a first connection or another number");
         Assert.IsFalse(helper.Contains("IsFirstConnection("), "the seen flag decides a first connection, not the stored ids");
-
-        string stored = ExpressionBody(auth, "private static string StoredNumber(ChatChannel channel)");
-        Assert.IsTrue(stored.Contains("\"Number\""), "the stored number of the channel");
+        // «Сменить номер», its Back and an outside logout clear the stored number long before the next pairing — a fresh profile
+        // included — so nothing captures it: the last paired number (PersonalChatsOnboarding) is the comparison.
+        Assert.IsFalse(auth.Contains("BeforePairing") || auth.Contains("StoredNumber("), "the settings never decide against the stored number");
     }
 
     // ── deletion ─────────────────────────────────────────────────────────────────────────────────────────────
@@ -202,11 +176,9 @@ public class ChatAudienceWiringTests
         int forget = At(local, "ChatAudienceSyncService.ForgetBot(transform.name);");
         Assert.Less(forget, At(local, "ProfileRetirement.Clear(transform.name)"),
             "forgotten while the retired ids are still stored — their mirror goes too");
-        Assert.IsTrue(local.Contains("PersonalChatsOnboarding.Clear(transform.name, telegram: false);")
-                      && local.Contains("PersonalChatsOnboarding.Clear(transform.name, telegram: true);"),
-            "«Кто из них клиенты?» is not owed for a bot that is gone — a recreated one gets it afresh");
-        Assert.IsTrue(local.Contains("PersonalChatsOnboarding.ClearChannelsSeen(transform.name);"),
-            "…its channels are forgotten too: a bot made anew connects them for the first time");
+        Assert.IsTrue(local.Contains("PersonalChatsOnboarding.ForgetBot(transform.name);"),
+            "«Кто из них клиенты?» is not owed for a bot that is gone, and its channels, numbers and requests go too — a bot made " +
+            "anew connects its channels for the first time");
 
         string forgetBot = MethodBody(Service, "private void Forget(string botName)");
         Assert.IsTrue(forgetBot.Contains("ChatAudienceSyncQueue.ForgetBot(_model, botName,") && forgetBot.Contains("ChatAudienceStore.ForgetProfile("),

@@ -151,6 +151,12 @@ public class ChatListView : MonoBehaviour
     // on screen.
     private void HandleOnboardingRequested(string botName, bool telegram) => onboardingCheckPending = true;
 
+    /// <summary>
+    /// «Кто из них клиенты?» may be owed for the chats on screen — decided at the end of the frame. The «Личные» folder asks when
+    /// it leaves «Изменить» or closes: a screen owed meanwhile waited for the owner to stop marking chats.
+    /// </summary>
+    public void RequestOnboardingCheck() => onboardingCheckPending = true;
+
     private void HandleChatSelected(string _)
     {
         // User opened a chat — drop search focus so TMP's caret can't linger

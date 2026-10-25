@@ -49,28 +49,15 @@ public partial class BotSettings
         Manager.Instance.EnableSave();
     }
 
-    // «Личные и рабочие чаты»: each channel's number as it stood when its pairing BEGAN. The pairing itself rewrites it
-    // before it is confirmed: «Сменить номер» logs out first, and the logout clears the stored number long before the new
-    // account pairs.
-    private string _whatsappBeforePairing;
-    private string _telegramBeforePairing;
-
-    private static string StoredNumber(ChatChannel channel) =>
-        PlayerPrefs.GetString(Manager.openBot.name + (channel == ChatChannel.Telegram ? "Telegram" : "Whatsapp") + "Number", "");
-
-    // A pairing from the settings is confirmed. The server learns the connection (it reads the number itself and restarts
-    // the moment for another number — its answer owes the screen again too), and the channel is seen on this bot from now
-    // on. «Кто из них клиенты?» is asked for when the channel was never seen on this bot — its first connection, whatever ids
-    // the phone kept — or now carries another number. A re-pairing of the same number asks for nothing.
-    private static void ReportSettingsPairing(ChatChannel channel, string profileId, string numberBefore, string authedNumber)
+    // «Личные и рабочие чаты»: a pairing from the settings is confirmed. The server learns the connection (it reads the number
+    // itself and restarts the moment for another number). «Кто из них клиенты?» is asked for when the channel was never seen on
+    // this bot — its first connection, whatever ids the phone kept — or now carries another number than the last one confirmed
+    // on it. Never against the stored number: «Сменить номер», its Back and an outside logout clear that one long before the
+    // next pairing, a fresh profile included. A re-pairing of the same number asks for nothing.
+    private static void ReportSettingsPairing(ChatChannel channel, string profileId, string authedNumber)
     {
-        string botName = Manager.openBot.name;
-        bool telegram = channel == ChatChannel.Telegram;
         ChatAudienceSyncService.ReportConnected(profileId);
-        bool seen = PersonalChatsOnboarding.IsChannelSeen(botName, telegram);
-        PersonalChatsOnboarding.MarkChannelSeen(botName, telegram);
-        if (ChatAudienceConnectPolicy.OwesOnboarding(seen, numberBefore, authedNumber))
-            PersonalChatsOnboarding.Request(botName, telegram);
+        PersonalChatsOnboarding.ReportPairing(Manager.openBot.name, channel == ChatChannel.Telegram, profileId, authedNumber, newBot: false);
     }
 
     public void OpenConfirmChangeWhatsappNumberPopup() => PopupUI.Show(ConfirmChangeWhatsappNumberPopup);
@@ -216,7 +203,6 @@ public partial class BotSettings
 
     private void ShowWhatsappAuthFromSettings(string profileId)
     {
-        _whatsappBeforePairing = StoredNumber(ChatChannel.WhatsApp);
         Manager.Instance.OpenWhatsappAuthFromSettings(
             profileId: profileId,
             onDone: OnWhatsappAuthFromSettingsDone,
@@ -225,10 +211,8 @@ public partial class BotSettings
 
     private void OnWhatsappAuthFromSettingsDone()
     {
-        // Decided before the stored number is overwritten below.
         ReportSettingsPairing(ChatChannel.WhatsApp, Manager.openBot.GetComponent<Bot>().whatsappProfileId,
-            _whatsappBeforePairing ?? StoredNumber(ChatChannel.WhatsApp), Manager.Instance.LastAuthedWhatsappNumber);
-        _whatsappBeforePairing = null;
+            Manager.Instance.LastAuthedWhatsappNumber);
 
         WhatsappNumberField.Value = Manager.Instance.LastAuthedWhatsappNumber;
         WhatsappNumberField.gameObject.SetActive(!string.IsNullOrEmpty(WhatsappNumberField.Value));
@@ -443,7 +427,6 @@ public partial class BotSettings
 
     private void ShowTelegramAuthFromSettings(string profileId)
     {
-        _telegramBeforePairing = StoredNumber(ChatChannel.Telegram);
         Manager.Instance.OpenTelegramAuthFromSettings(
             profileId: profileId,
             onDone: OnTelegramAuthFromSettingsDone,
@@ -452,10 +435,8 @@ public partial class BotSettings
 
     private void OnTelegramAuthFromSettingsDone()
     {
-        // Decided before the stored number is overwritten below — see the WhatsApp twin.
         ReportSettingsPairing(ChatChannel.Telegram, Manager.openBot.GetComponent<Bot>().telegramProfileId,
-            _telegramBeforePairing ?? StoredNumber(ChatChannel.Telegram), Manager.Instance.LastAuthedTelegramNumber);
-        _telegramBeforePairing = null;
+            Manager.Instance.LastAuthedTelegramNumber);
 
         TelegramNumberField.Value = Manager.Instance.LastAuthedTelegramNumber;
         TelegramNumberField.gameObject.SetActive(!string.IsNullOrEmpty(TelegramNumberField.Value));

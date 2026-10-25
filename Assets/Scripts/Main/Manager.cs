@@ -762,7 +762,8 @@ public partial class Manager : MonoBehaviour
         SweepPendingUploads();
     }
 
-    // The loaded bots' channels as the onboarding preset reads them: the profile each holds now and the one the server retired.
+    // The loaded bots' channels as the onboarding preset reads them: the profile each holds now, the one the server retired
+    // and the stored number.
     private List<PersonalChatsOnboarding.BotChannels> AudienceChannelsOfLoadedBots()
     {
         var bots = new List<PersonalChatsOnboarding.BotChannels>();
@@ -773,7 +774,8 @@ public partial class Manager : MonoBehaviour
             var bot = root.GetChild(i).GetComponent<Bot>();
             if (bot == null) continue;
             bots.Add(new PersonalChatsOnboarding.BotChannels(bot.name, bot.whatsappProfileId, bot.telegramProfileId,
-                ProfileRetirement.MarkerId(bot.name, ChatChannel.WhatsApp), ProfileRetirement.MarkerId(bot.name, ChatChannel.Telegram)));
+                ProfileRetirement.MarkerId(bot.name, ChatChannel.WhatsApp), ProfileRetirement.MarkerId(bot.name, ChatChannel.Telegram),
+                PlayerPrefs.GetString(bot.name + "WhatsappNumber", ""), PlayerPrefs.GetString(bot.name + "TelegramNumber", "")));
         }
         return bots;
     }
@@ -1945,7 +1947,7 @@ public partial class Manager : MonoBehaviour
         // Step 4: Create workflows
         if (useWhatsapp)
         {
-            ReportNewBotPairing(newBot.name, whatsappProfileId, telegram: false);
+            ReportNewBotPairing(newBot.name, whatsappProfileId, telegram: false, LastAuthedWhatsappNumber);
             StartCoroutine(CreateWhatsappWorkflowFromStart(newBot));
         }
         else
@@ -1956,7 +1958,7 @@ public partial class Manager : MonoBehaviour
 
         if (useTelegram)
         {
-            ReportNewBotPairing(newBot.name, telegramProfileId, telegram: true);
+            ReportNewBotPairing(newBot.name, telegramProfileId, telegram: true, LastAuthedTelegramNumber);
             StartCoroutine(CreateTelegramWorkflowFromStart(newBot));
         }
         else
@@ -2035,14 +2037,13 @@ public partial class Manager : MonoBehaviour
     }
 
     // «Личные и рабочие чаты»: a channel of a NEW bot is paired (its auth confirmed above, its Create next). The server
-    // learns the connection — it reads the number from get/status itself — the channel is seen on this bot from now on, and
-    // «Кто из них клиенты?» waits for this bot's chats on the channel: a new bot is always a first connection. Reported
-    // before the Create, since the first message may come any moment now.
-    private static void ReportNewBotPairing(string botName, string profileId, bool telegram)
+    // learns the connection — it reads the number from get/status itself — and «Кто из них клиенты?» waits for this bot's
+    // chats on the channel: a new bot is always a first connection (the channel is seen from now on, the number just paired
+    // is its last one). Reported before the Create, since the first message may come any moment now.
+    private static void ReportNewBotPairing(string botName, string profileId, bool telegram, string authedNumber)
     {
         ChatAudienceSyncService.ReportConnected(profileId);
-        PersonalChatsOnboarding.MarkChannelSeen(botName, telegram);
-        PersonalChatsOnboarding.Request(botName, telegram);
+        PersonalChatsOnboarding.ReportPairing(botName, telegram, profileId, authedNumber, newBot: true);
     }
 
     /// <summary>

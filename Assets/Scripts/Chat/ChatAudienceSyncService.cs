@@ -15,7 +15,8 @@ using UnityEngine.Networking;
 ///     the server did not take goes back on the screen first, then <see cref="OnWriteFailed"/> tells the toast.
 ///   • Connection reports — <see cref="ReportConnected"/>, after every confirmed pairing: the same queue, sent first; the
 ///     answer is the profile's connection moment — and when another number restarted it (the server's word, or a moment later
-///     than the one mirrored), «Кто из них клиенты?» is owed again (<see cref="PersonalChatsOnboarding.RequestForProfile"/>).
+///     than the one mirrored), «Кто из них клиенты?» is owed again, unless the app asked for it at that very pairing
+///     (<see cref="PersonalChatsOnboarding.AnswerConnected"/>).
 ///   • The list — <see cref="RequestList"/>: read at launch, on a bot switch, on a return to the app (at most once a
 ///     minute) and 2 s after every delivered write. A list answered while a write was delivered is stale and is dropped.
 ///     And <see cref="RequestListSoon"/>: 3 s after an incoming message in a chat the app holds no verdict for — the
@@ -391,9 +392,10 @@ public class ChatAudienceSyncService : MonoBehaviour
         _deliveries++;
         long? mirrored = ChatAudienceStore.ConnectedAtMs(profileId);   // read before the answer replaces it
         ChatAudienceStore.ApplyConnected(profileId, connectedAtMs);
-        // Another number on the channel is a new connection: «Кто из них клиенты?» is owed again to the bot holding the profile.
-        if (ChatAudienceConnectPolicy.NumberRestarted(restarted, mirrored, connectedAtMs))
-            PersonalChatsOnboarding.RequestForProfile(profileId, BotNames());
+        // Another number on the channel is a new connection: «Кто из них клиенты?» is owed again to the bot holding the profile —
+        // unless the app itself asked for it at this pairing (the first answer for that profile is consumed, whatever it says).
+        PersonalChatsOnboarding.AnswerConnected(profileId, ChatAudienceConnectPolicy.NumberRestarted(restarted, mirrored, connectedAtMs),
+            BotNames());
         ListAfterDelivery();
     }
 

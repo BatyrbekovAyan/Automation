@@ -264,12 +264,10 @@ public class Bot : MonoBehaviour
         // «Личные и рабочие чаты»: the bot's undelivered chat moves and connection reports go with it (a late send would
         // recreate the decisions Delete Bot Files removed), and so does the mirror of its profiles' decisions — FIRST,
         // while the retired ids are still stored (ProfileRetirement.Clear below deletes them). «Кто из них клиенты?» is not
-        // owed for a bot that is gone, and its channels are forgotten as seen: a bot created anew connects them for the first
-        // time and owes the screen again.
+        // owed for a bot that is gone, and everything it kept for the bot goes (channels seen, last paired numbers, the app's
+        // own requests): a bot created anew connects its channels for the first time and owes the screen again.
         ChatAudienceSyncService.ForgetBot(transform.name);
-        PersonalChatsOnboarding.Clear(transform.name, telegram: false);
-        PersonalChatsOnboarding.Clear(transform.name, telegram: true);
-        PersonalChatsOnboarding.ClearChannelsSeen(transform.name);
+        PersonalChatsOnboarding.ForgetBot(transform.name);
 
         if (PlayerPrefs.HasKey(transform.name + "Name"))
         {
