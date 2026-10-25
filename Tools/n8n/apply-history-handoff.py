@@ -14,6 +14,8 @@ Bot templates (both):
 Create WA/TG: subscribe to outgoing_message_phone + outgoing_message_api.
 Dashboard Outcomes: owner rows labelled «Владелец:» for the classifier; open handoffs are REAL
   events (source='event') that outrank the classifier (order → order_collected, else owner_needed).
+  «Личные и рабочие чаты» (2026-10-25): only BUSINESS chats (audience.BUSINESS_SQL) — in the classifier's input (Find
+  Changed Sessions) and in what the app gets (Fetch Outcomes: verdicts and open handoffs alike).
 Delete Bot Files: wipes chat_history_events / handoff_requests / reply_events / chat_reply_state (+ learning A's
   suggestion_sets, B1's bot_schedule, personal chats' chat_audience / audience_connections — every profile of the bot's line).
 Set Workflow State: the three handoff workflow ids are protected.
@@ -35,6 +37,7 @@ WF = os.path.join(HERE, "workflows")
 sys.path.insert(0, HERE)
 import clone_lineage as cl  # noqa: E402  (Delete Chat Memory deletes by the bot's line, T5)
 import bot_schedule as bs  # noqa: E402  (B1: the schedule's window predicate, one home — the mode read's off-hours term)
+import audience as au  # noqa: E402  (personal chats: «is this a business chat», one home — the «Сводка» reads; never imported back)
 PG_CRED = {"id": "vvRrFiEXzLVqKjOx", "name": "Postgres"}
 BOTS = ("4wYitz5ek30SVNlT-WhatsApp_Bot.json", "4VN3gsFaC2HUYmcc-Telegram_Bot.json")
 CREATES = ("XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json", "Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json")
@@ -533,17 +536,35 @@ TRANSCRIPT_NEW = "(CASE WHEN m.message->>'type' = 'ai' THEN (CASE WHEN m.message
 # «[доставка не подтверждена]» in a «Бот:» line).
 CONTENT_OLD = "coalesce(m.message->>'content', m.message->'data'->>'content', '')"
 CONTENT_NEW = "regexp_replace(" + CONTENT_OLD + ", " + MARKS_LEAD_SQL + ", '')"
+# «Личные и рабочие чаты» (2026-10-25, spec §4.3, §5.8): «Сводка» passes only BUSINESS chats — a decision that holds and says
+# business (audience.BUSINESS_SQL; a personal chat, a chat without a decision and a computed decision another number voided
+# are not). In the classifier's input: a chat the owner made personal keeps its memory for WIPE_DAYS (the mis-tap guard), and
+# that memory must not reach the classifier LLM meanwhile — nor the memory of anything else that is not business. The filter
+# stands before the LIMIT, so the classifier's batch and the total (the app's drain loop) count business sessions only. A
+# session's profile and chat are its session_id split at the FIRST colon (the sessions CTE computes both that way).
+SESSION_PROFILE_SQL = "split_part(%s, ':', 1)"
+SESSION_CHAT_SQL = "substr(%s, position(':' in %s) + 1)"
+# Find Changed Sessions is hand-authored in the export and patched in place: the business filter is the ONE line between
+# the group filter and the watermark test of the `changed` CTE — inserted there, or re-written when audience.py changes.
+CHANGED_HEAD = "  WHERE s.chat_id NOT LIKE '%@g.us'\n"
+CHANGED_TAIL = "    AND s.max_id > COALESCE(o.last_history_id, 0)\n"
+CHANGED_BUSINESS = "    AND " + au.BUSINESS_SQL("s.profile_id", "s.chat_id") + "\n"
+CHANGED_WHERE_NEW = CHANGED_HEAD + CHANGED_BUSINESS + CHANGED_TAIL
 FETCH_OUTCOMES_SQL = """-- «Сводка» reads ONE source: the classifier's verdict per session, outranked by a REAL event — an
 -- open/taken handoff (order → order_collected, question/escalation → owner_needed), marked
 -- source='event' so the app can tell a fact from a classification.
+-- «Личные и рабочие чаты»: only BUSINESS chats come back — a chat made personal leaves «Сводка» at once (not when its data
+-- is wiped), its verdict and its open handoff alike; a verdict's chat is its session_id split at the FIRST colon.
 WITH ids AS (
   SELECT jsonb_array_elements_text(convert_from(decode($1, 'base64'), 'UTF8')::jsonb) AS profile_id
 ), o AS (
   SELECT c.* FROM public.conversation_outcomes c WHERE c.profile_id IN (SELECT profile_id FROM ids)
+    AND """ + au.BUSINESS_SQL(SESSION_PROFILE_SQL % "c.session_id", SESSION_CHAT_SQL % ("c.session_id", "c.session_id")) + """
 ), h AS (
   SELECT DISTINCT ON (r.profile_id, r.chat_id) r.*
   FROM public.handoff_requests r
   WHERE r.profile_id IN (SELECT profile_id FROM ids) AND r.status <> 'done'
+    AND """ + au.BUSINESS_SQL("r.profile_id", "r.chat_id") + """
   ORDER BY r.profile_id, r.chat_id, r.created_at DESC
 )
 SELECT coalesce(o.profile_id, h.profile_id) AS "profileId",
@@ -572,6 +593,16 @@ def patch_dashboard():
     if CONTENT_NEW not in fc["parameters"]["query"]:
         assert fc["parameters"]["query"].count(CONTENT_OLD) == 1, "Find Changed Sessions has an unexpected transcript shape"
         fc["parameters"]["query"] = fc["parameters"]["query"].replace(CONTENT_OLD, CONTENT_NEW)
+        ch = True
+    # personal chats: the business filter between the group filter and the watermark test (nothing else may stand there)
+    q = fc["parameters"]["query"]
+    assert q.count(CHANGED_HEAD) == 1 and q.count(CHANGED_TAIL) == 1 and q.index(CHANGED_HEAD) < q.index(CHANGED_TAIL), \
+        "Find Changed Sessions: the `changed` filter is not where the business filter expects it"
+    a, b_ = q.index(CHANGED_HEAD) + len(CHANGED_HEAD), q.index(CHANGED_TAIL)
+    assert q[a:b_] == "" or (q[a:b_].startswith("    AND ") and "chat_audience" in q[a:b_]), \
+        f"Find Changed Sessions: an unexpected line stands where the business filter goes: {q[a:b_]!r}"
+    if q[a:b_] != CHANGED_BUSINESS:
+        fc["parameters"]["query"] = q[:a] + CHANGED_BUSINESS + q[b_:]
         ch = True
     fo = node(wf, "Fetch Outcomes")
     if fo["parameters"]["query"] != FETCH_OUTCOMES_SQL:
@@ -795,7 +826,8 @@ def check():
             bad.append(f)
     wf = json.load(open(os.path.join(WF, DASHBOARD), encoding="utf-8"))
     if node(wf, "Fetch Outcomes")["parameters"]["query"] != FETCH_OUTCOMES_SQL or TRANSCRIPT_NEW not in node(wf, "Find Changed Sessions")["parameters"]["query"] \
-            or CONTENT_NEW not in node(wf, "Find Changed Sessions")["parameters"]["query"]:
+            or CONTENT_NEW not in node(wf, "Find Changed Sessions")["parameters"]["query"] \
+            or node(wf, "Find Changed Sessions")["parameters"]["query"].count(CHANGED_WHERE_NEW) != 1:
         bad.append(DASHBOARD)
     wf = json.load(open(os.path.join(WF, DELETE_BOT), encoding="utf-8"))
     dcm = node(wf, "Delete Chat Memory")["parameters"]

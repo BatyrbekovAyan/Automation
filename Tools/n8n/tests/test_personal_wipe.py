@@ -473,7 +473,10 @@ with Case('verifier_accepts_the_canon: verify-personal-chats.py is OK — its tr
 with Case('verifier_rejects_a_broken_sweep_on_a_scratch_copy: --dir on copies of the Sweep — a dry-run gate, a disabled node, a '
           'missing file — exits 1 with the finding; the untouched copy is the positive control') as c:
     def verify_copy(mutate):
+        # the whole canon set (the verifier has a group per piece — the readers read three more files), the Sweep mutated
         with tempfile.TemporaryDirectory() as d:
+            for p in (N8N / 'workflows').glob('*.json'):
+                (Path(d) / p.name).write_bytes(p.read_bytes())
             w = wf(SWEEP_FILE)
             if mutate:
                 mutate(w)

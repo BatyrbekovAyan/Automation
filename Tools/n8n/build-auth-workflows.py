@@ -34,6 +34,10 @@ def _history_handoff():
 
 OWNER_CONTENT_SQL = _history_handoff().OWNER_CONTENT_SQL
 
+# «Личные и рабочие чаты» (2026-10-25): «is this a business chat» has ONE home, audience.py (its BUSINESS_SQL).
+sys.path.insert(0, HERE)
+import audience as au  # noqa: E402
+
 SESSION_ID, SESSION_NAME = "crAuthSession001", "Auth Session"
 PROXY_ID, PROXY_NAME = "crWappiProxy0001", "Wappi Proxy"
 TOKEN_TTL_SEC = 12 * 3600
@@ -654,11 +658,19 @@ RECORD_OWNER_SEND_SQL = """-- A6 (stage 4): a message the OWNER sent from the ap
 -- source, so a cancelled generation's cleanup never touches it). Runs AFTER the response.
 -- T6 (Q1 B): the memory content opens with the owner mark — the model sees role + content only, and without the
 -- mark the owner's agreement read as the bot's own earlier answer. The history keeps the text as sent.
-with ev as (
+-- «Личные и рабочие чаты» (2026-10-25): only a BUSINESS chat is recorded — a decision that holds and says business
+-- (audience.BUSINESS_SQL). A personal chat, a chat without a decision yet (its client has not written since the channel
+-- was connected) and a computed decision another number voided get nothing at all, neither the history nor the memory;
+-- the answer says why (business false, recorded false, remembered false).
+-- Parameters, in order: profile id, chat id, message id, text, message type, execution id, the six origin fields.
+with aud as (
+  select __BUSINESS__ as business
+), ev as (
   insert into chat_history_events (profile_id, chat_id, message_id, source, body, msg_type, sent_at, execution_id,
                                    origin_kind, origin_index, origin_key, origin_edit, origin_top1, origin_set)
-  values ($1, $2, $3, 'owner_app', $4, $5, now(), $6,
-          $7::text, $8::smallint, $9::text, $10::smallint, $11::smallint, $12::smallint)
+  select $1, $2, $3, 'owner_app', $4, $5, now(), $6,
+         $7::text, $8::smallint, $9::text, $10::smallint, $11::smallint, $12::smallint
+  where (select business from aud)
   on conflict (profile_id, chat_id, message_id) do update set source = 'owner_app', body = excluded.body, execution_id = excluded.execution_id,
     origin_kind = excluded.origin_kind, origin_index = excluded.origin_index, origin_key = excluded.origin_key,
     origin_edit = excluded.origin_edit, origin_top1 = excluded.origin_top1, origin_set = excluded.origin_set
@@ -666,10 +678,12 @@ with ev as (
 ), mem as (
   insert into n8n_chat_histories (session_id, message)
   select $1 || ':' || $2, jsonb_build_object('type', 'ai', 'content', __OWNER_CONTENT__, 'additional_kwargs', jsonb_build_object('source', 'owner_app', 'message_id', $3), 'response_metadata', '{}'::jsonb)
-  where not exists (select 1 from n8n_chat_histories x where x.session_id = $1 || ':' || $2 and x.message->'additional_kwargs'->>'message_id' = $3)
+  where (select business from aud)
+    and not exists (select 1 from n8n_chat_histories x where x.session_id = $1 || ':' || $2 and x.message->'additional_kwargs'->>'message_id' = $3)
   returning 1
 )
-select exists(select 1 from ev) as recorded, exists(select 1 from mem) as remembered;""".replace("__OWNER_CONTENT__", OWNER_CONTENT_SQL % "$4")
+select (select business from aud) as business, exists(select 1 from ev) as recorded, exists(select 1 from mem) as remembered;""" \
+    .replace("__OWNER_CONTENT__", OWNER_CONTENT_SQL % "$4").replace("__BUSINESS__", au.BUSINESS_SQL("$1", "$2"))
 
 OWNER_SEND_PARAMS = """={{ (r => { const b = r.jsonBody || {}; const m = r.meta || {}; const nz = (v) => (v === undefined || v === null || v === '') ? null : v;
   const rec = String(b.recipient || m.chat_id || ''); const chat = (r.channel === 'whatsapp' && rec && !rec.includes('@')) ? rec + '@c.us' : rec;

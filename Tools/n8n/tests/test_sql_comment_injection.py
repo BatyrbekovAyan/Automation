@@ -110,12 +110,18 @@ PINNED = [
          legit=['inst-v1-legit', 'a' * 64, 'device-fallback-id', 'ios', '1.0.0'],
          after="select install_id, app_user_id, platform, app_version from installs order by 1;",
          expect=['inst-v1-legit||1|{}|{}|{}|f', 'inst-v1-legit||ios|1.0.0']),
-    dict(file='9PTyYcelRQI7bGDb-Suggest_Replies.json', node='Suggestion Gate', text=[0, 1],
+    # «Личные и рабочие чаты» (2026-10-25): + the request's profile and chat (the third and fourth values) — the panel
+    # counts and answers only in a BUSINESS chat, so the fixture's chat carries the owner's business decision; the gate's
+    # row leads with that word (business | known | status | n | allowed)
+    dict(file='9PTyYcelRQI7bGDb-Suggest_Replies.json', node='Suggestion Gate', text=[0, 1, 2, 3],
          setup=UTC + LIKE.format('subscribers') + LIKE.format('suggestion_counts') + LIKE.format('suggestion_request_keys') +
-         f"insert into subscribers (app_user_id, plan, status) values ('{RC_ID}', 'business', 'active');",
-         legit=[RC_ID, 'chat1|tail|'],
+         LIKE.format('chat_audience') + LIKE.format('audience_connections') +
+         f"insert into subscribers (app_user_id, plan, status) values ('{RC_ID}', 'business', 'active');"
+         "insert into chat_audience (profile_id, chat_id, kind, source, reason, version) values "
+         "('wa-profile-1', '77011234567@c.us', 'business', 'owner', 'owner', 1);",
+         legit=[RC_ID, 'chat1|tail|', 'wa-profile-1', '77011234567@c.us'],
          after="select app_user_id, n from suggestion_counts order by 1; select count(*) from suggestion_request_keys;",
-         expect=['t|active|1|t', f'{RC_ID}|1', '1']),
+         expect=['t|t|active|1|t', f'{RC_ID}|1', '1']),
     # $3 (channel) is a constant of the node's own expression and CHECK-constrained — not a text the caller controls
     dict(file='XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json', node='Register Profile', text=[0, 1, 3],
          setup=REG_SETUP, legit=['wa-profile-1', RC_ID, 'whatsapp', 'Bot0'], after=REG_AFTER,

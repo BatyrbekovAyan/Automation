@@ -37,6 +37,11 @@
              cards when a Kazakh one remains, never an error (lenient) — the same asymmetry as the titles.
   Build Response — for an authenticated caller the refusal kind rides the wire (subscription / daily
              cap / unknown account / bad request); legacy callers keep the opaque generation_failed.
+  «Личные и рабочие чаты» (2026-10-25, spec §4.2 «Панель подсказок», §4.3): the panel exists only in a BUSINESS chat
+             (audience.BUSINESS_SQL). The gate statement takes the request's profileId and chatId (from Prep) and, for
+             any other chat, refuses before a single counter row is written; Gate Decision labels it personal_chat
+             (a gate that could not read the chat — a DB error — no longer opens the panel: audience_unknown); Build
+             Response names personal_chat to an authenticated session caller only.
   Settings — executionTimeout 20 s (needs EXECUTIONS_TIMEOUT on the instance).
 
     python3 Tools/n8n/apply-suggest-v2.py            # patch workflows/ in place (re-runnable)
@@ -52,6 +57,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 _ps_spec = importlib.util.spec_from_file_location("price_search", os.path.join(HERE, "build-price-search.py"))
 ps = importlib.util.module_from_spec(_ps_spec)
 _ps_spec.loader.exec_module(ps)
+sys.path.insert(0, HERE)
+import audience as au  # noqa: E402  (personal chats: «is this a business chat», one home)
 WF = os.path.join(HERE, "workflows")
 FNAME = "9PTyYcelRQI7bGDb-Suggest_Replies.json"
 PG_CRED = {"id": "vvRrFiEXzLVqKjOx", "name": "Postgres"}
@@ -372,7 +379,12 @@ PREP_RETURN_NEW = """return [{ json: {
 GATE_SQL = """-- «Вместе» subscription gate + daily anti-abuse cap (Task 17a; owner decision 2026-08-26,
 -- spec §5.3). ONE statement does lookup, increment and verdict, so a hammering client
 -- cannot slip between a read and a write. Parameters, in order: appUserId, requestKey ('' from a legacy
--- client).
+-- client), profileId, chatId (the chat the panel is asked for).
+--
+-- «Личные и рабочие чаты» (2026-10-25): the panel exists only in a BUSINESS chat — a decision that holds and says
+-- business (audience.BUSINESS_SQL). A personal chat, a chat without a decision yet and a computed decision another
+-- number voided are refused, and for them NOTHING is counted: neither the request key nor the daily counter.
+-- `business` is the statement's positive word for the chat; Gate Decision names the refusal personal_chat.
 --
 -- Suggestions are FREE: this NEVER touches dialog_counts. Over-quota is deliberately
 -- ALLOWED -- the panel IS the fallback the quota gate routes people into. What is refused:
@@ -380,8 +392,10 @@ GATE_SQL = """-- «Вместе» subscription gate + daily anti-abuse cap (Task
 --
 -- S3 (stage 5): the SAME request key within 10 minutes (a retry after the server deadline, a
 -- re-open with an unchanged tail) is served without a second increment — a timeout is never
--- counted twice. The counter row is only ever created for an entitled caller.
-with me as (
+-- counted twice. The counter row is only ever created for an entitled caller in a business chat.
+with aud as (
+  select __BUSINESS__ as business
+), me as (
   select status from subscribers where app_user_id = $1
 ), today as (
   select (now() at time zone 'Asia/Almaty')::date d   -- same day boundary as dialog_counts
@@ -389,27 +403,30 @@ with me as (
   select (select status from me) in ('active','trialing','grace') as ok
 ), key as (
   insert into suggestion_request_keys (app_user_id, request_key, counted_at)
-  select $1, $2, now() where (select ok from entitled) and $2 <> ''
+  select $1, $2, now() where (select business from aud) and (select ok from entitled) and $2 <> ''
   on conflict (app_user_id, request_key) do update set counted_at = now()
     where suggestion_request_keys.counted_at < now() - interval '10 minutes'
   returning 1
 ), bump as (
   insert into suggestion_counts (app_user_id, d, n)
   select $1, t.d, 1 from today t
-  where (select ok from entitled) and ($2 = '' or exists (select 1 from key))
+  where (select business from aud) and (select ok from entitled) and ($2 = '' or exists (select 1 from key))
   on conflict (app_user_id, d) do update set n = suggestion_counts.n + 1
   returning n
 ), cur as (
   select coalesce((select n from bump), (select n from suggestion_counts where app_user_id = $1 and d = (select d from today)), 0) as n
 )
 select
+  (select business from aud) as business,
   exists(select 1 from me) as known,
   (select status from me) as status,
   (select n from cur) as n,
   -- 100/day/account. `n` is the count INCLUDING this request, so request 101 is the first
-  -- refused one. NULL never leaks: cur coalesces to 0, entitled is a real boolean.
-  ((select ok from entitled) and (select n from cur) <= 100) as allowed;"""
-GATE_PARAMS = "={{ [ $json.appUserId, $json.requestKey || '' ] }}"
+  -- refused one. cur coalesces to 0 and business is a real boolean; allowed is NULL only for an id
+  -- with no row at all in a business chat (Gate Decision opens the panel only on allowed = true).
+  ((select business from aud) and (select ok from entitled) and (select n from cur) <= 100) as allowed;""" \
+    .replace("__BUSINESS__", au.BUSINESS_SQL("$3", "$4"))
+GATE_PARAMS = "={{ [ $json.appUserId, $json.requestKey || '', $json.profileId || '', $json.chatId || '' ] }}"
 
 EXACT_SQL = """-- S4 (stage 5): an article / model code must match EXACTLY, not by embedding proximity — a
 -- semantically «close» part is the wrong part. Runs once per request and only when the query
@@ -629,7 +646,7 @@ BUILD_OLD = """if (j.invalid || !j.ok) {
   // debugging; the client never read it (SuggestRepliesResponse has no such field).
   return [{ json: { v: 1, requestSeq, suggestions: [], error: 'generation_failed' } }];
 }"""
-BUILD_NEW = """if (j.invalid || !j.ok) {
+BUILD_S8 = """if (j.invalid || !j.ok) {
   // S8 (stage 5): the refusal KIND rides the wire for an AUTHENTICATED caller (A1 token — the
   // account is proven, so subscription / daily_cap / unknown_account are no oracle any more).
   // A legacy token-less caller keeps the opaque envelope (review N-4 reasoning still applies to it).
@@ -646,6 +663,65 @@ BUILD_NEW = """if (j.invalid || !j.ok) {
   }
   return [{ json: { v: 1, requestSeq, suggestions: [], error } }];
 }"""
+BUILD_NEW = """if (j.invalid || !j.ok) {
+  // S8 (stage 5): the refusal KIND rides the wire for an AUTHENTICATED caller (A1 token — the
+  // account is proven, so subscription / daily_cap / unknown_account are no oracle any more).
+  // A legacy token-less caller keeps the opaque envelope (review N-4 reasoning still applies to it).
+  // «Личные и рабочие чаты» (2026-10-25): personal_chat — the panel is not for this chat — is named the same way, to a
+  // session caller only (its token proves the profile); a gate that could not read the chat stays generation_failed.
+  let authMode = 'legacy';
+  try { authMode = String($('Auth Gate').first().json.crAuth.mode || 'legacy'); } catch (e) { authMode = 'legacy'; }
+  let error = 'generation_failed';
+  if (authMode === 'session') {
+    if (j.invalid) error = 'bad_request';
+    else if (j.gateReason) {
+      const r = String(j.gateReason);
+      error = r === 'daily_cap' ? 'daily_cap' : r === 'unknown_account' ? 'unknown_account' : r === 'personal_chat' ? 'personal_chat'
+            : r.startsWith('subscription_') ? 'subscription' : r === 'missing_app_user_id' ? 'bad_request' : 'generation_failed';
+    }
+  }
+  return [{ json: { v: 1, requestSeq, suggestions: [], error } }];
+}"""
+
+# «Личные и рабочие чаты» (2026-10-25): Gate Decision's verdict lines — owned here, between markers, since this change (the
+# legacy hand-written lines are replaced exactly once). apply-learning-a.py owns the stage block and the return shape below.
+GATE_DECISION_BEGIN, GATE_DECISION_END = "// PERSONAL-CHATS-GATE-BEGIN", "// PERSONAL-CHATS-GATE-END"
+GATE_DECISION_LEGACY = """// FAIL OPEN on a DB error, the house posture for the bot/panel hot paths. "No row" is
+// NOT an error here: the gate SQL's final SELECT has no FROM clause, so it always returns
+// exactly one row -- `allowed === undefined` really does mean the query never ran.
+const failOpen = Boolean(row.error) || row.allowed === undefined;
+const allowed = failOpen ? true : row.allowed === true;
+// The SQL owns the VERDICT; this only labels it. Order matters: an expired account has
+// n = null (nothing was counted for it), so the cap test can never mislabel it.
+let gateReason = null;
+if (!allowed) {
+  if (!src.appUserId) gateReason = 'missing_app_user_id';
+  else if (row.known !== true) gateReason = 'unknown_account';
+  else if (Number(row.n) > 100) gateReason = 'daily_cap';
+  else gateReason = 'subscription_' + String(row.status ?? 'unknown');
+}"""
+GATE_DECISION_BLOCK = GATE_DECISION_BEGIN + """ (generated by Tools/n8n/apply-suggest-v2.py — edit there)
+// «Личные и рабочие чаты» (2026-10-25): the panel works only in a BUSINESS chat, and that is known ONLY from the gate
+// statement's positive word, business === true. A personal chat, a chat without a decision and a voided computed
+// decision answer business = false: refused as personal_chat (nothing was counted for them). A DB error says nothing
+// about the chat, so the gate no longer fails open: it refuses as audience_unknown (Build Response answers
+// generation_failed, the client's retry state) — never a panel over a chat that may be personal. "No row" is NOT an
+// error here: the gate SQL's final SELECT has no FROM clause, so it always returns exactly one row -- allowed ===
+// undefined really does mean the query never ran (failOpen keeps its name for the return shape below; it says only that).
+const business = row.business === true;
+const failOpen = Boolean(row.error) || row.allowed === undefined;
+const allowed = business && row.allowed === true;
+// The SQL owns the VERDICT; this only labels it. Order matters: the chat first (nothing is counted outside a business
+// chat), then the account exactly as before.
+let gateReason = null;
+if (!allowed) {
+  if (!src.appUserId) gateReason = 'missing_app_user_id';
+  else if (!business) gateReason = failOpen ? 'audience_unknown' : 'personal_chat';
+  else if (row.known !== true) gateReason = 'unknown_account';
+  else if (Number(row.n) > 100) gateReason = 'daily_cap';
+  else gateReason = 'subscription_' + String(row.status ?? 'unknown');
+}
+""" + GATE_DECISION_END
 
 
 def nid(*parts):
@@ -716,6 +792,18 @@ def patch():
     if gate["parameters"]["query"] != GATE_SQL or gate["parameters"]["options"].get("queryReplacement") != GATE_PARAMS:
         gate["parameters"]["query"] = GATE_SQL
         gate["parameters"]["options"]["queryReplacement"] = GATE_PARAMS
+        ch = True
+    # Gate Decision (personal chats): the verdict reads the statement's business word
+    gd = node(wf, "Gate Decision")
+    js = gd["parameters"]["jsCode"]
+    if GATE_DECISION_BEGIN in js:
+        new = splice(js, GATE_DECISION_BEGIN, GATE_DECISION_END, GATE_DECISION_BLOCK)
+    else:
+        assert js.count(GATE_DECISION_LEGACY) == 1, "Gate Decision: the verdict lines are not where the personal-chats block expects them"
+        new = js.replace(GATE_DECISION_LEGACY, GATE_DECISION_BLOCK)
+    assert new.count(GATE_DECISION_BLOCK) == 1 and new.index(GATE_DECISION_END) < new.index("return [{"), "Gate Decision shape"
+    if new != js:
+        gd["parameters"]["jsCode"] = new
         ch = True
     # RAG nodes fail open
     for name in ("Retrieve RAG", "Retrieve RAG TG"):
@@ -815,10 +903,12 @@ def patch():
     # Build Response
     br = node(wf, "Build Response")
     js = br["parameters"]["jsCode"]
-    if BUILD_OLD in js:
-        br["parameters"]["jsCode"] = js.replace(BUILD_OLD, BUILD_NEW)
-        ch = True
-    assert "S8 (stage 5)" in br["parameters"]["jsCode"], "Build Response shape"
+    for old_ in (BUILD_OLD, BUILD_S8):            # the Task 17a envelope, then the S8 mapping without personal_chat
+        if old_ in js:
+            br["parameters"]["jsCode"] = js.replace(old_, BUILD_NEW)
+            ch = True
+            break
+    assert br["parameters"]["jsCode"].count(BUILD_NEW) == 1, "Build Response shape"
     # settings
     if wf.get("settings", {}).get("executionTimeout") != EXECUTION_TIMEOUT_SEC:
         wf.setdefault("settings", {})["executionTimeout"] = EXECUTION_TIMEOUT_SEC
@@ -835,8 +925,10 @@ def check():
     ok = PREP_BLOCK in node(wf, "Prep")["parameters"]["jsCode"] and PREP_RETURN_NEW in node(wf, "Prep")["parameters"]["jsCode"] \
         and MERGE_BLOCK in node(wf, "Prep")["parameters"]["jsCode"] and MERGE_LEGACY not in node(wf, "Prep")["parameters"]["jsCode"] \
         and node(wf, "Suggestion Gate")["parameters"]["query"] == GATE_SQL and node(wf, "Exact Match") is not None \
+        and node(wf, "Suggestion Gate")["parameters"]["options"].get("queryReplacement") == GATE_PARAMS \
+        and node(wf, "Gate Decision")["parameters"]["jsCode"].count(GATE_DECISION_BLOCK) == 1 \
         and node(wf, "Exact Match")["parameters"]["query"] == EXACT_SQL and "STAGE5-ASSEMBLE-BEGIN" in node(wf, "Assemble")["parameters"]["jsCode"] and CATALOG_LINE_V2 in node(wf, "Assemble")["parameters"]["jsCode"] \
-        and "S8 (stage 5)" in node(wf, "Build Response")["parameters"]["jsCode"] and wf.get("settings", {}).get("executionTimeout") == EXECUTION_TIMEOUT_SEC \
+        and node(wf, "Build Response")["parameters"]["jsCode"].count(BUILD_NEW) == 1 and wf.get("settings", {}).get("executionTimeout") == EXECUTION_TIMEOUT_SEC \
         and TRIVIAL_TAIL_NEW in node(wf, "Assemble")["parameters"]["jsCode"] and ASSEMBLE_LANG in node(wf, "Assemble")["parameters"]["jsCode"] \
         and ASSEMBLE_RAG_NEW in node(wf, "Assemble")["parameters"]["jsCode"] and PRICE_RULE_ANCHOR + PRICE_RULE in node(wf, "Assemble")["parameters"]["jsCode"] \
         and VALIDATE_NEW in node(wf, "Validate")["parameters"]["jsCode"] and VALIDATE2_NEW in node(wf, "Validate 2")["parameters"]["jsCode"] \

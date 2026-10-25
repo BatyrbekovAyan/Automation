@@ -21,7 +21,17 @@ SETUP = """create temp table reply_events (like public.reply_events including al
 create temp table chat_reply_state (like public.chat_reply_state including all);
 create temp table chat_history_events (like public.chat_history_events including all);
 create temp table n8n_chat_histories (like public.n8n_chat_histories including all);
-create temp table reply_mode_flags (like public.reply_mode_flags including all);"""
+create temp table reply_mode_flags (like public.reply_mode_flags including all);
+create temp table chat_audience (like public.chat_audience including all);
+create temp table audience_connections (like public.audience_connections including all);"""
+
+
+def business(pg, ch, chat=None):
+    """«Личные и рабочие чаты» (2026-10-25): the owner made channel `ch`'s test chat (or `chat`) a BUSINESS chat — an owner
+    decision, which always holds. The writers and readers that pass only a business chat (audience.BUSINESS_SQL) need it."""
+    pid, c = CHATS[ch]
+    pg.x("insert into chat_audience (profile_id, chat_id, kind, source, reason, version) values "
+         f"({_lit(pid)}, {_lit(chat or c)}, 'business', 'owner', 'owner', 1) on conflict do nothing;")
 
 
 def msg(ch, mid, t, body=None, from_me=False, chat=None, mtype='chat'):

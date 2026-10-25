@@ -656,8 +656,11 @@ def check_suggest_replies():
         f"{f}: If Gate Allows false-branch must go straight to Build Response (the " \
         f"existing generation_failed envelope), reaching no LLM node: {ga[1]}"
 
-    # (vii-b) fail-open contract, identical to Count Dialog's: a Supabase outage must never
-    # kill the panel, so onError + alwaysOutputData, and the shared executeQuery credential.
+    # (vii-b) a Supabase outage must never leave the request without an answer, so onError +
+    # alwaysOutputData, and the shared executeQuery credential: Gate Decision always runs and
+    # answers. Since «Личные и рабочие чаты» (2026-10-25) it no longer OPENS the panel on such a
+    # failure — the chat is not known to be a business chat, so the panel is refused
+    # (verify-personal-chats.py `readers`; behaviour in tests/test_personal_readers.py).
     gate = node(ns, "Suggestion Gate")
     assert gate["type"] == "n8n-nodes-base.postgres", f"{f}: Suggestion Gate is not postgres"
     assert gate.get("onError") == "continueRegularOutput", \
@@ -697,7 +700,7 @@ def check_suggest_replies():
         f"above it drops the incoming item"
     assert "pairedItem" in gd, f"{f}: Gate Decision does not set an explicit pairedItem"
     assert "row.allowed === undefined" in gd, \
-        f"{f}: Gate Decision does not fail open on a DB error"
+        f"{f}: Gate Decision does not recognise a gate statement that never ran (a DB error)"
 
     # (vii-e) the client contract is UNCHANGED: a refusal reuses the existing
     # generation_failed envelope (the panel has no new state for this), with `reason` as an

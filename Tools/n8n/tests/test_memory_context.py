@@ -22,7 +22,9 @@ copy the model reads — _core.md → the Create/Edit WA/TG maps → a Create-co
 Rows are written by the REAL writers — the proxy's Record Owner Send, the templates' Record Outgoing (owner_phone),
 the chain Claim → Stamp Draft → Final Check → Acquire Send Lease → Settle → Record Send (reply_chain.Run) — on session
 temp tables of the staging Postgres; they are read back with the memory class's own statement and turned into model
-messages by the LangChain classes of the staging n8n install (tests/memory_context.js). Both channels.
+messages by the LangChain classes of the staging n8n install (tests/memory_context.js). Both channels. The test chat is a
+BUSINESS chat (an owner decision, reply_chain.business): since «Личные и рабочие чаты» (2026-10-25) the proxy's Record Owner
+Send and the «Сводка» classifier pass only business chats — tests/test_personal_readers.py pins the other kinds.
 
     python3 Tools/n8n/tests/test_memory_context.py
 """
@@ -37,7 +39,7 @@ import subprocess
 import tempfile
 
 from harness import N8N, Case, PgSession, bind, code, expr, module, node, report, wf
-from reply_chain import CHATS, SETUP, TEMPLATES, Run, _lit, history, msg, record_outgoing
+from reply_chain import CHATS, SETUP, TEMPLATES, Run, _lit, business, history, msg, record_outgoing
 
 OWNER = 'Владелец: '                         # the contract (plan §4.1) — the generator's constants must equal it
 UNDELIVERED = '[доставка не подтверждена] '
@@ -86,8 +88,10 @@ def model_view(cases):
 
 
 def conversation(ch, pg):
-    """sent reply → owner from the app → owner from the phone → reply with delivery unknown → reply refused (send_failed)."""
+    """sent reply → owner from the app → owner from the phone → reply with delivery unknown → reply refused (send_failed),
+    in a chat the owner made a business chat."""
     T = TEMPLATES[ch]
+    business(pg, ch)
     m1 = msg(ch, 'C1', 100, ASK_1)
     r1 = Run(T, pg, m1, 'exec-1')
     r1.claim(); r1.latest([m1]); r1.generate(SENT_1); r1.final([m1]); r1.lease(); r1.send_ok('sent-1')

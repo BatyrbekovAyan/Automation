@@ -18,8 +18,18 @@ still wired as designed».
           dialog_counts — the tariff usage —, never the per-bot rows, never the decision itself), the chat's own reply_mode_flags
           row only (never the bot-wide '*' row), takes the work list locked and skipping what is locked, at most WIPE_BATCH
           oldest first, owner decisions only, not yet wiped, older than WIPE_DAYS written as hours, and marks wiped_at.
+  readers — Task 5: the three server places outside the bot templates that write or read a chat pass only a BUSINESS chat
+      (audience.BUSINESS_SQL — never «not personal»):
+      (1) the Wappi Proxy's Record Owner Send opens with the business word keyed on its profile and chat parameters, both
+          inserts (history, memory) stand behind it, the answer names it;
+      (2) Suggest Replies: Suggestion Gate gets Prep's profileId and chatId as its third and fourth parameters, opens with the
+          business word keyed on them, both counter inserts and the verdict stand behind it; Gate Decision opens the panel
+          only on the positive word (never fails open) and labels the refusal personal_chat before any account reason; Build
+          Response names personal_chat to an authenticated session caller only;
+      (3) Dashboard Outcomes: Find Changed Sessions keeps only business sessions (the session split at its FIRST colon) inside
+          `changed`, before its LIMIT; Fetch Outcomes returns verdicts and open handoffs of business chats only.
 
-Every group carries its own tripwire (WIPE_MUTATIONS for `wipe`): a list of (label, mutation, the message the checks must
+Every group carries its own tripwire (WIPE_MUTATIONS for `wipe`, READER_MUTATIONS for `readers`): a list of (label, mutation, the message the checks must
 produce); a normal run applies each one to a copy of a PASSING workflow and fails if the checks accept it — a tripwire that
 accepts a broken sweep is no tripwire.
 
@@ -287,7 +297,197 @@ def group_wipe(directory):
                    f"fail-open; the statement keeps its safety shape; tripwire self-check: {len(WIPE_MUTATIONS)} mutations rejected")
 
 
-GROUPS = {"wipe": group_wipe}
+# ================================================================================================ group: readers
+# Task 5: the three server places outside the bot templates that write or read a chat pass only a BUSINESS chat — the
+# one predicate audience.BUSINESS_SQL (a decision that holds and says business; never «not personal»). Behaviour:
+# tests/test_personal_readers.py.
+PROXY_FILE = "crWappiProxy0001-Wappi_Proxy.json"
+SUGGEST_FILE = "9PTyYcelRQI7bGDb-Suggest_Replies.json"
+DASH_FILE = "2htWSV5IHO8E2CgB-Dashboard_Outcomes.json"
+READER_FILES = (PROXY_FILE, SUGGEST_FILE, DASH_FILE)
+BUSINESS_WORD = "(select business from aud)"
+SESSION_SPLIT = ("split_part(c.session_id, ':', 1)", "substr(c.session_id, position(':' in c.session_id) + 1)")
+
+
+def _aud_head(profile, chat):
+    """How a gated statement opens: ONE business word for the chat, from audience.BUSINESS_SQL keyed on (profile, chat)."""
+    return "with aud as (\n  select " + AUD.BUSINESS_SQL(profile, chat) + " as business\n)"
+
+
+def _inserts(code):
+    """Each `insert into …` of a statement, up to its `on conflict` / `returning` — the part where its condition stands."""
+    out = []
+    for part in re.split(r"\binsert into\b", code)[1:]:
+        m = re.search(r"\bon conflict\b|\breturning\b", part)
+        out.append(part[:m.start()] if m else part)
+    return out
+
+
+def _array_items(expr):
+    m = re.fullmatch(r"=\{\{\s*\[(.*)\]\s*\}\}", (expr or "").strip(), re.S)
+    return [x.strip() for x in m.group(1).split(",")] if m else []
+
+
+def _block(js, head):
+    """The `{ … }` block that `head` opens (brace-matched), '' when `head` is missing."""
+    if head not in js:
+        return ""
+    i = js.index(head) + len(head) - 1
+    depth = 0
+    for j in range(i, len(js)):
+        depth += {"{": 1, "}": -1}.get(js[j], 0)
+        if depth == 0:
+            return js[i:j + 1]
+    return ""
+
+
+def check_readers(bundle, sql=None):
+    """Findings for the three readers. `bundle` = {file name: workflow}; `sql` is unused (the self-check's signature)."""
+    fails = []
+
+    def need(cond, msg):
+        if not cond:
+            fails.append(msg)
+        return cond
+
+    def query(fname, name):
+        n = node(bundle.get(fname) or {}, name)
+        need(n is not None, f"{fname}: node {name!r} is missing")
+        return n or {"parameters": {}}
+
+    # (1) the proxy's Record Owner Send — the owner's app sends (owner_app), after the response
+    rec = query(PROXY_FILE, "Record Owner Send")
+    code = code_of(rec["parameters"].get("query") or "")
+    need(_aud_head("$1", "$2") in code, "proxy: Record Owner Send must open with the business word for the chat it records — "
+                                         "audience.BUSINESS_SQL on the first two parameters (profile id, chat id)")
+    ins = _inserts(code)
+    need(len(ins) == 2 and all(re.search(r"\bwhere\s*\(select business from aud\)", i) and not re.search(r"\bvalues\s*\(", i)
+                               for i in ins),
+         "proxy: every insert of Record Owner Send (the history AND the memory) must stand behind `where (select business from aud)`")
+    need(BUSINESS_WORD + " as business" in code, "proxy: Record Owner Send's answer must name the business word (why nothing was written)")
+
+    # (2) Suggest Replies — Suggestion Gate, Gate Decision, Build Response
+    gate = query(SUGGEST_FILE, "Suggestion Gate")
+    code = code_of(gate["parameters"].get("query") or "")
+    need(_aud_head("$3", "$4") in code, "panel: Suggestion Gate must open with the business word for the chat — audience.BUSINESS_SQL "
+                                         "on the third and fourth parameters (profile id, chat id)")
+    items = _array_items((gate["parameters"].get("options") or {}).get("queryReplacement"))
+    need(len(items) == 4 and items[2].startswith("$json.profileId") and items[3].startswith("$json.chatId"),
+         f"panel: Suggestion Gate's parameters must hand on Prep's profileId and chatId as the third and fourth: {items}")
+    ins = _inserts(code)
+    need(len(ins) == 2 and all(re.search(r"\bwhere\s*\(select business from aud\) and\b", i) for i in ins),
+         "panel: every counter insert of Suggestion Gate (the request key AND the daily counter) must stand behind the business word")
+    need(re.search(r"\(\(select business from aud\) and [^;]*\) as allowed", code) is not None and BUSINESS_WORD + " as business" in code,
+         "panel: Suggestion Gate's verdict (allowed) must require the business word, and the row must carry it")
+    gd = query(SUGGEST_FILE, "Gate Decision")["parameters"].get("jsCode") or ""
+    need("const business = row.business === true;" in gd and "const allowed = business && row.allowed === true;" in gd,
+         "panel: Gate Decision may open the panel only on the statement's positive business word — never fail open")
+    label = "else if (!business) gateReason = failOpen ? 'audience_unknown' : 'personal_chat';"
+    need(label in gd and "else if (row.known !== true)" in gd and gd.index(label) < gd.index("else if (row.known !== true)"),
+         "panel: Gate Decision must label a non-business chat personal_chat (a failed read audience_unknown) before any account reason")
+    br = query(SUGGEST_FILE, "Build Response")["parameters"].get("jsCode") or ""
+    session = _block(br, "if (authMode === 'session') {")
+    need("r === 'personal_chat' ? 'personal_chat'" in session and br.count("'personal_chat'") == session.count("'personal_chat'"),
+         "panel: Build Response must name personal_chat to an authenticated session caller only (a legacy caller keeps generation_failed)")
+
+    # (3) Dashboard Outcomes — the classifier's input and what the app gets
+    fc = code_of(query(DASH_FILE, "Find Changed Sessions")["parameters"].get("query") or "")
+    biz = AUD.BUSINESS_SQL("s.profile_id", "s.chat_id")
+    need("split_part(h.session_id, ':', 1) AS profile_id" in fc and "substr(h.session_id, position(':' in h.session_id) + 1) AS chat_id" in fc,
+         "«Сводка»: Find Changed Sessions must split a session at its FIRST colon (profile, chat)")
+    need("changed AS (" in fc and "LIMIT 21" in fc and fc.count(biz) == 1
+         and fc.index("changed AS (") < fc.find(biz) < fc.index("LIMIT 21"),
+         "«Сводка»: Find Changed Sessions must keep only business sessions — audience.BUSINESS_SQL on the session's profile and chat, "
+         "inside `changed` and before its LIMIT (the classifier's batch and the total count business sessions only)")
+    fo = code_of(query(DASH_FILE, "Fetch Outcomes")["parameters"].get("query") or "")
+    o_cte, h_cte = fo.split("), h AS (", 1) if "), h AS (" in fo else (fo, "")
+    need(AUD.BUSINESS_SQL(*SESSION_SPLIT) in o_cte,
+         "«Сводка»: Fetch Outcomes must return a verdict only for a business chat (audience.BUSINESS_SQL on the session split)")
+    need(AUD.BUSINESS_SQL("r.profile_id", "r.chat_id") in h_cte,
+         "«Сводка»: Fetch Outcomes must return an open handoff only for a business chat (audience.BUSINESS_SQL on the request's chat)")
+    return fails
+
+
+def _on(fname, name, key, old, new):
+    """Replace `old` by `new` in one parameter of one node of the bundle (the anchor must be there)."""
+    def m(bundle):
+        p = node(bundle[fname], name)["parameters"]
+        target = p["options"] if key == "queryReplacement" else p
+        assert old in target[key], f"mutation anchor not found in {name}.{key}: {old[:70]!r}"
+        target[key] = target[key].replace(old, new, 1)
+    return m
+
+
+_GATE_DECISION_OPEN = "const allowed = business && row.allowed === true;"
+READER_MUTATIONS = (
+    ("the proxy's history insert ungated", _on(PROXY_FILE, "Record Owner Send", "query", "  where (select business from aud)\n  on conflict", "  on conflict"),
+     "every insert of Record Owner Send"),
+    ("the proxy's memory insert ungated",
+     _on(PROXY_FILE, "Record Owner Send", "query", "  where (select business from aud)\n    and not exists", "  where not exists"),
+     "every insert of Record Owner Send"),
+    ("the proxy's business word keyed on the message id", _on(PROXY_FILE, "Record Owner Send", "query", "aud.chat_id = $2", "aud.chat_id = $3"),
+     "must open with the business word for the chat it records"),
+    ("the proxy asks «not personal»", _on(PROXY_FILE, "Record Owner Send", "query", "= 'business', false)", "<> 'personal', true)"),
+     "must open with the business word for the chat it records"),
+    ("the gate counts the request key in any chat",
+     _on(SUGGEST_FILE, "Suggestion Gate", "query", "now() where (select business from aud) and ", "now() where "),
+     "every counter insert of Suggestion Gate"),
+    ("the gate counts the day in any chat",
+     _on(SUGGEST_FILE, "Suggestion Gate", "query", "  where (select business from aud) and (select ok from entitled) and ($2",
+         "  where (select ok from entitled) and ($2"),
+     "every counter insert of Suggestion Gate"),
+    ("the gate allows without the business word",
+     _on(SUGGEST_FILE, "Suggestion Gate", "query", "((select business from aud) and (select ok from entitled)", "((select ok from entitled)"),
+     "verdict (allowed) must require the business word"),
+    ("the gate is not told the chat",
+     _on(SUGGEST_FILE, "Suggestion Gate", "queryReplacement", ", $json.profileId || '', $json.chatId || ''", ""),
+     "hand on Prep's profileId and chatId"),
+    ("Gate Decision fails open again",
+     _on(SUGGEST_FILE, "Gate Decision", "jsCode", _GATE_DECISION_OPEN, "const allowed = failOpen ? true : row.allowed === true;"),
+     "never fail open"),
+    ("Gate Decision drops the personal_chat label",
+     _on(SUGGEST_FILE, "Gate Decision", "jsCode", "  else if (!business) gateReason = failOpen ? 'audience_unknown' : 'personal_chat';\n", ""),
+     "label a non-business chat personal_chat"),
+    ("Build Response names personal_chat to every caller",
+     _on(SUGGEST_FILE, "Build Response", "jsCode", "  let authMode = 'legacy';",
+         "  if (j.gateReason === 'personal_chat') return [{ json: { v: 1, requestSeq, suggestions: [], error: 'personal_chat' } }];\n"
+         "  let authMode = 'legacy';"),
+     "personal_chat to an authenticated session caller only"),
+    ("Build Response forgets personal_chat",
+     _on(SUGGEST_FILE, "Build Response", "jsCode", " : r === 'personal_chat' ? 'personal_chat'", ""),
+     "personal_chat to an authenticated session caller only"),
+    ("the classifier reads every session",
+     _on(DASH_FILE, "Find Changed Sessions", "query", "    AND " + AUD.BUSINESS_SQL("s.profile_id", "s.chat_id") + "\n", ""),
+     "Find Changed Sessions must keep only business sessions"),
+    ("the classifier's filter keyed on the session id",
+     _on(DASH_FILE, "Find Changed Sessions", "query", "aud.chat_id = s.chat_id", "aud.chat_id = s.session_id"),
+     "Find Changed Sessions must keep only business sessions"),
+    ("«Сводка» returns every verdict",
+     _on(DASH_FILE, "Fetch Outcomes", "query", "\n    AND " + AUD.BUSINESS_SQL(*SESSION_SPLIT), ""),
+     "return a verdict only for a business chat"),
+    ("«Сводка» returns every open handoff",
+     _on(DASH_FILE, "Fetch Outcomes", "query", "\n    AND " + AUD.BUSINESS_SQL("r.profile_id", "r.chat_id"), ""),
+     "return an open handoff only for a business chat"),
+)
+
+
+def group_readers(directory):
+    bundle = {}
+    for fname in READER_FILES:
+        path = os.path.join(directory, fname)
+        if not os.path.exists(path):
+            return [f"{fname} is missing"], ""
+        with open(path, encoding="utf-8") as fh:
+            bundle[fname] = json.load(fh)
+    fails = check_readers(bundle)
+    if not fails:
+        fails = self_check(bundle, check_readers, READER_MUTATIONS)
+    return fails, (f"readers: the proxy's Record Owner Send, the panel's gate (+ Gate Decision, Build Response) and «Сводка» "
+                   f"(Find Changed Sessions, Fetch Outcomes) pass only business chats (audience.BUSINESS_SQL); tripwire self-check: "
+                   f"{len(READER_MUTATIONS)} mutations rejected")
+
+
+GROUPS = {"wipe": group_wipe, "readers": group_readers}
 
 
 def run(directory=None, only=None):
