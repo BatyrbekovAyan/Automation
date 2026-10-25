@@ -18,7 +18,7 @@ public class MessageHeaderView : MonoBehaviour
 
     // «Личные и рабочие чаты» (spec §5.5, §5.6) — stamped by PersonalChatsBuilder.
     [Header("Personal chats")]
-    [SerializeField] private SemiAutoToggle semiAutoToggle;          // «Авто» — hidden in a personal chat
+    [SerializeField] private SemiAutoToggle semiAutoToggle;          // «Авто» — only in a decided working chat
     [SerializeField] private Button personalPill;                    // «Личный» — in its place, opens «Сделать чат рабочим?»
     [SerializeField] private Image pillLock;                         // the pill's lock — the «Сделать личным» card wears it too
     [SerializeField] private Button nameTap;                         // over the avatar and the name — «Сделать личным»
@@ -199,16 +199,32 @@ public class MessageHeaderView : MonoBehaviour
     }
 
     // --- «Личные и рабочие чаты» (spec §5.5, §5.6, sketch 009 screens 5–6) ---
-    // A personal chat wears the «Личный» pill instead of the «Авто» chip; the pill is a button: «Сделать чат рабочим?». A
-    // working chat keeps the chip, and a tap on its name or avatar opens «Сделать личным». Judged by the verdict the list
-    // draws (ChatAudienceStore.ViewOf under the active channel's profile) and judged again on every decision or move and on
-    // every update of the open chat — a move made from here shows at once, while the chat is still open.
+    // The header's right side shows exactly one of three things (HeaderMarks): the «Личный» pill — a button, «Сделать чат
+    // рабочим?» — for a personal chat; the «Авто» chip for a DECIDED working chat, the only kind the assistant works in, so
+    // the chip's mode is real (SuggestionsController paints the stored mode on it, as before this feature); nothing for a
+    // chat the rule shows as working that nobody has decided yet (the settle window after a connection, a chat the owner
+    // began): a lit «Авто» there would promise what the server has not decided, and its tap would do nothing. A tap on the
+    // name or avatar of a chat shown as working — decided or not — opens «Сделать личным». Judged again on every decision or
+    // move and on every update of the open chat: a move made from here, or the server's decision arriving, shows at once.
 
     private void ApplyAudience()
     {
-        bool personal = TryGetOpenChat(out _, out _, out _, out AudienceView view) && view.Kind == AudienceKind.Personal;
-        if (semiAutoToggle != null && semiAutoToggle.gameObject.activeSelf == personal) semiAutoToggle.gameObject.SetActive(!personal);
-        if (personalPill != null && personalPill.gameObject.activeSelf != personal) personalPill.gameObject.SetActive(personal);
+        (bool pill, bool chip) = HeaderMarks();
+        if (personalPill != null && personalPill.gameObject.activeSelf != pill) personalPill.gameObject.SetActive(pill);
+        if (semiAutoToggle != null && semiAutoToggle.gameObject.activeSelf != chip) semiAutoToggle.gameObject.SetActive(chip);
+    }
+
+    // The pill: the chat is personal as the list shows it (ViewOf). The chip: the chat is working by the server's decision
+    // or the owner's move on its way (AllowsAssistant — exactly when the suggestions panel may exist). Never both; neither
+    // for a chat shown as working with no decision.
+    private (bool pill, bool chip) HeaderMarks()
+    {
+        ChatManager manager = ChatManager.Instance;
+        if (manager == null || string.IsNullOrEmpty(currentChatId)) return (false, false);
+        string profileId = manager.ActiveChannelProfileId();
+        if (ChatAudienceStore.AllowsAssistant(profileId, currentChatId)) return (false, true);
+        ChatViewModel chat = manager.GetChat(currentChatId);
+        return (chat != null && ChatAudienceStore.ViewOf(profileId, chat).Kind == AudienceKind.Personal, false);
     }
 
     // «Сделать чат рабочим?». A chat that is not a person can never be working — its pill says why instead.

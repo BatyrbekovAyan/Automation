@@ -12,11 +12,13 @@ using UnityEngine.UI;
 using static SourceGuard;
 
 /// <summary>
-/// «Личные и рабочие чаты» (spec §5.5, §5.6, sketch 009 screens 5–6): the open chat.
-///   • A personal chat wears the «Личный» pill instead of the «Авто» chip; the pill opens «Сделать чат рабочим?», whose text
-///     says what the assistant will do (MakeBusinessCopy) — «Сделать рабочим» moves the chat, «Оставить личным» and Back
-///     leave it. A chat that is not a person (a group, a channel, …) can never be working: its pill only says why.
-///   • A working chat keeps the chip; a tap on its name or avatar opens «Сделать личным» — the name, the number with
+/// «Личные и рабочие чаты» (spec §5.5, §5.6, sketch 009 screens 5–6): the open chat. Its header shows exactly one of three
+/// things on the right — the «Личный» pill (personal), the «Авто» chip (a decided working chat, painted in the stored mode by
+/// SuggestionsController), or nothing (shown as working, decided by nobody yet) — and re-judges on every decision or move.
+///   • The pill opens «Сделать чат рабочим?», whose text says what the assistant will do (MakeBusinessCopy) — «Сделать
+///     рабочим» moves the chat, «Оставить личным» and Back leave it. A chat that is not a person (a group, a channel, …) can
+///     never be working: its pill only says why.
+///   • A tap on the name or avatar of a chat shown as working opens «Сделать личным» — the name, the number with
 ///     «в контактах» / «новый», the action card (MakePersonal + «Чат перенесён в «Личные»») and «Отмена».
 /// The sheets and the header are driven for real (the header on a bare ChatManager fed through ParseChatsJson, the way
 /// PersonalChatCueTests does); the taps go through the very DelayedFingerUpAction the sheets wired. In EditMode the queue
@@ -299,19 +301,31 @@ public class PersonalChatSheetsWiringTests
     // ---- the header ----
 
     [Test]
-    public void APersonalChat_WearsThePill_AWorkingChat_TheChip()
+    public void TheHeader_ShowsExactlyOneOfThree_ThePill_TheChip_OrNothing()
     {
-        const string friend = "77000000401@c.us";
-        const string client = "77000000402@c.us";
-        Header header = NewOpenChatHeader(Row(friend, "Сауле", contact: "Сауле"), Row(client, "Ерлан", contact: ""));
+        const string friend = "77000000401@c.us";    // a saved contact: personal by the rule
+        const string fresh = "77000000402@c.us";     // a new person nobody has decided yet: shown as working
+        const string client = "77000000410@c.us";    // a new person the server decided working
+        const string moving = "77000000411@c.us";    // a chat the owner is making working right now
+        ChatAudienceStore.ApplyList(new[] { Decisions((client, AudienceKind.Business)) });
+        ChatAudienceStore.ApplyDesire(Profile, moving, AudienceKind.Business);
+        Header header = NewOpenChatHeader(Row(friend, "Сауле", contact: "Сауле"), Row(fresh, "Ерлан", contact: ""),
+            Row(client, "Асем", contact: ""), Row(moving, "Дана", contact: "Дана"));
 
         header.Select(friend);
-        Assert.IsTrue(header.Pill.gameObject.activeSelf, "a saved contact is personal: «Личный»");
-        Assert.IsFalse(header.Chip.gameObject.activeSelf, "…instead of «Авто»");
+        AssertMarks(header, pill: true, chip: false, "a personal chat wears «Личный» instead of «Авто»");
 
         header.Select(client);
-        Assert.IsFalse(header.Pill.gameObject.activeSelf, "a new person is a working chat");
-        Assert.IsTrue(header.Chip.gameObject.activeSelf, "…with the «Авто» chip as today");
+        AssertMarks(header, pill: false, chip: true, "a decided working chat keeps the «Авто» chip as today");
+
+        header.Select(moving);
+        AssertMarks(header, pill: false, chip: true, "the owner's move to business on its way counts as decided");
+
+        header.Select(fresh);
+        AssertMarks(header, pill: false, chip: false,
+            "shown as working but decided by nobody: no lit «Авто» promising what the server has not decided, no dead tap");
+        header.NameTap.onClick.Invoke();
+        Assert.IsTrue(PersonalChatSheets.IsShowing, "…while its name still opens «Сделать личным»");
     }
 
     [Test]
@@ -320,15 +334,56 @@ public class PersonalChatSheetsWiringTests
         const string client = "77000000403@c.us";
         Header header = NewOpenChatHeader(Row(client, "Ерлан", contact: ""));
         header.Select(client);
-        Assert.IsTrue(header.Chip.gameObject.activeSelf);
+        AssertMarks(header, pill: false, chip: false, "a new person nobody has decided yet");
 
         ChatAudienceStore.ApplyDesire(Profile, client, AudienceKind.Personal);
-        Assert.IsTrue(header.Pill.gameObject.activeSelf, "«Сделать личным» — the pill appears while the chat is still open");
-        Assert.IsFalse(header.Chip.gameObject.activeSelf);
+        AssertMarks(header, pill: true, chip: false, "«Сделать личным» — the pill appears while the chat is still open");
 
         ChatAudienceStore.ApplyDesire(Profile, client, AudienceKind.Business);
-        Assert.IsFalse(header.Pill.gameObject.activeSelf, "«Сделать рабочим» — the chip comes back");
-        Assert.IsTrue(header.Chip.gameObject.activeSelf);
+        AssertMarks(header, pill: false, chip: true, "«Сделать рабочим» — the chip comes");
+    }
+
+    [TestCase(true)]
+    [TestCase(false)]
+    public void TheServersDecision_BringsTheChip_PaintedInTheStoredMode(bool storedSemi)
+    {
+        const string client = "77000000412@c.us";
+        Header header = NewOpenChatHeader(Row(client, "Ерлан", contact: ""));
+        SetOpenChat(client);
+        var controller = NewHost("Suggestions").AddComponent<SuggestionsController>();
+        var refs = new SerializedObject(controller);
+        refs.FindProperty("_toggle").objectReferenceValue = header.Chip;   // the header's chip is the controller's chip
+        refs.ApplyModifiedPropertiesWithoutUndo();
+
+        Func<string, int> savedGet = SemiAutoStore.GetInt;
+        Action<string, int> savedSet = SemiAutoStore.SetIntAndSave;
+        Func<string, bool> savedDefault = SemiAutoStore.BotDefaultSemi;
+        var memory = new Dictionary<string, int>();
+        SemiAutoStore.GetInt = key => memory.TryGetValue(key, out int value) ? value : 0;
+        SemiAutoStore.SetIntAndSave = (key, value) => memory[key] = value;
+        SemiAutoStore.BotDefaultSemi = _ => storedSemi;   // the stored mode: the bot's default, no override for the chat
+        try
+        {
+            header.Select(client);
+            Invoke(controller, "RestoreForActiveChat");   // the chat opens
+            AssertMarks(header, pill: false, chip: false, "no decision yet");
+            Assert.IsFalse(Field<bool>(controller, "_semiAutoOn"), "…and no panel");
+
+            // The client wrote, the server decided the chat working on that message, the list read brought the decision.
+            ChatAudienceStore.ApplyList(new[] { Decisions((client, AudienceKind.Business)) });
+            Invoke(controller, "HandleAudienceChanged");   // EditMode ran no Awake: the controller's subscription, by hand
+
+            AssertMarks(header, pill: false, chip: true, "the server's decision brings the chip");
+            Assert.AreEqual(storedSemi, Field<bool>(header.Chip, "_on"),
+                storedSemi ? "painted «Выбрать» — the stored mode, as before this feature" : "painted «Авто» — the stored mode");
+            Assert.AreEqual(storedSemi, Field<bool>(controller, "_semiAutoOn"), "the panel follows the same stored mode");
+        }
+        finally
+        {
+            SemiAutoStore.GetInt = savedGet;
+            SemiAutoStore.SetIntAndSave = savedSet;
+            SemiAutoStore.BotDefaultSemi = savedDefault;
+        }
     }
 
     [Test]
@@ -411,6 +466,36 @@ public class PersonalChatSheetsWiringTests
 
     private static AudienceView View(AudienceKind kind, AudienceReason reason) =>
         new AudienceView { Kind = kind, Reason = reason, NonHuman = NonHumanKind.None, Decided = true };
+
+    // The server's decisions for the test profile, as a list answer carries them (the connection moment kept).
+    private static AudienceProfileState Decisions(params (string chat, AudienceKind kind)[] rows)
+    {
+        var state = new AudienceProfileState { ProfileId = Profile, ConnectedAtMs = MomentMs, Decisions = new List<AudienceDecision>() };
+        foreach ((string chat, AudienceKind kind) in rows)
+            state.Decisions.Add(new AudienceDecision { ChatId = chat, Kind = kind, Reason = AudienceReason.New, ByOwner = false, Version = 0 });
+        return state;
+    }
+
+    private static void AssertMarks(Header header, bool pill, bool chip, string why)
+    {
+        Assert.AreEqual(pill, header.Pill.gameObject.activeSelf, $"«Личный»: {why}");
+        Assert.AreEqual(chip, header.Chip.gameObject.activeSelf, $"«Авто»: {why}");
+    }
+
+    private static T Field<T>(object target, string name)
+    {
+        FieldInfo field = target.GetType().GetField(name, BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.IsNotNull(field, $"{target.GetType().Name}.{name} moved — update PersonalChatSheetsWiringTests");
+        return (T)field.GetValue(target);
+    }
+
+    // The ChatManager's open chat — what SuggestionsController resolves (the header keeps its own from HandleChatSelected).
+    private static void SetOpenChat(string chatId)
+    {
+        FieldInfo open = typeof(ChatManager).GetField("currentChatId", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.IsNotNull(open, "ChatManager.currentChatId moved — update PersonalChatSheetsWiringTests");
+        open.SetValue(ChatManager.Instance, chatId);
+    }
 
     private static (TMP_FontAsset regular, TMP_FontAsset semibold) Fonts()
     {
