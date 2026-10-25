@@ -18,7 +18,7 @@ public class ChatItemView : MonoBehaviour
     public TextMeshProUGUI unreadCountText;
 
     [Header("Swipe actions (SwipeToDelete)")]
-    public Button deleteButton;        // «Удалить», revealed behind the row (a working WhatsApp chat)
+    public Button deleteButton;        // «Удалить», revealed behind the row (every WhatsApp chat)
     public SwipeToDelete swipeToDelete; // on the SwipeContent child
 
     [Header("Личные и рабочие чаты")]
@@ -155,9 +155,9 @@ public void Bind(ChatViewModel model)
     }
 
     /// <summary>
-    /// The row's place, which decides its swipe (<see cref="ChatRowSwipePolicy"/>): false — a working chat in the working list
-    /// («В личные», and «Удалить» on WhatsApp); true — a personal chat, in the «Личные» folder or among the working list's
-    /// search results («В рабочие» only). Sets the move button's word too. Cheap on every refresh: nothing moves unless the
+    /// The row's place, which names its move (<see cref="ChatRowSwipePolicy"/>): false — a working chat in the working list
+    /// («В личные»); true — a personal chat, in the «Личные» folder or among the working list's search results («В рабочие»).
+    /// «Удалить» stays on WhatsApp in both. Sets the move button's word too. Cheap on every refresh: nothing moves unless the
     /// actions change, so an open row stays open. Before the first bind it only records the place; Bind applies it.
     /// </summary>
     public void SetSwipeContext(bool inFolder)

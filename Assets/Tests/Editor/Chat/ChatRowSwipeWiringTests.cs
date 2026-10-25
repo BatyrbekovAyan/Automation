@@ -9,12 +9,14 @@ using Object = UnityEngine.Object;
 
 /// <summary>
 /// Pins how a chat row's swipe follows its chat (spec §5.2, §5.3; a personal chat found by the working list's search swipes
-/// as in the «Личные» folder). ChatItemView applies <see cref="ChatRowSwipePolicy"/> on the bind and applies it again — never
-/// snapping an open row shut unless the actions changed — whenever its place changes (ChatListView.ApplyMatchToItem, on every
-/// visibility pass: the store's OnChanged and every row update) or its facts do (the row's OnUpdated); its move button hands
-/// the chat to whoever made the row. The list's side, which EditMode cannot run (it needs ChatManager), is a source guard.
+/// as in the «Личные» folder; «Удалить» stays on every WhatsApp chat). ChatItemView applies <see cref="ChatRowSwipePolicy"/>
+/// on the bind and applies it again — never snapping an open row shut unless the actions changed — whenever its place changes
+/// (ChatListView.ApplyMatchToItem, on every visibility pass: the store's OnChanged and every row update) or its facts do (the
+/// row's OnUpdated); its move button hands the chat to whoever made the row. The list's side, which EditMode cannot run (it
+/// needs ChatManager), is a source guard.
 ///
-/// The row is built in code with an empty title and preview, so no text is measured and nothing starts a tween.
+/// The row is built in code with an empty title and preview, so no text is measured and nothing starts a tween. With no
+/// ChatManager the row's channel is WhatsApp; the Telegram rows are the policy's tests.
 /// </summary>
 public class ChatRowSwipeWiringTests
 {
@@ -42,7 +44,7 @@ public class ChatRowSwipeWiringTests
         AssertSwipe(row, true, true, PersonalChatsCopy.SwipeToPersonal, "a working WhatsApp chat");
 
         row.View.SetSwipeContext(true);    // the chat turned personal while the search keeps it on the screen
-        AssertSwipe(row, true, false, PersonalChatsCopy.SwipeToBusiness, "a personal chat swipes as in the folder");
+        AssertSwipe(row, true, true, PersonalChatsCopy.SwipeToBusiness, "a personal chat swipes as in the folder, «Удалить» kept");
         ChatViewModel moved = null;
         row.View.MoveRequested += c => moved = c;
         row.Move.onClick.Invoke();
@@ -61,18 +63,18 @@ public class ChatRowSwipeWiringTests
     }
 
     [Test]
-    public void ANonPerson_GetsNoSwipe_AndTheRowFollowsItsFacts()
+    public void ANonPerson_NeverMoves_AndTheRowFollowsItsFacts()
     {
         Row row = BuildRow();
         ChatViewModel chat = Chat(Person());
         row.View.SetSwipeContext(true);
         row.View.Bind(chat);
-        Assert.IsTrue(row.Swipe.enabled, "a person: «В рабочие»");
+        AssertSwipe(row, true, true, PersonalChatsCopy.SwipeToBusiness, "a person in the folder's place");
 
         chat.UpdateFacts(Person(bot: true));   // a fresh chat-list row says it is a bot — the row's OnUpdated
-        Assert.IsFalse(row.Swipe.enabled, "nothing to reveal — no swipe at all");
         Assert.IsFalse(row.Move.gameObject.activeSelf, "no move for a non-person");
-        Assert.IsFalse(row.Delete.gameObject.activeSelf, "and no «Удалить» in the folder's place");
+        Assert.IsTrue(row.Delete.gameObject.activeSelf, "«Удалить» alone stays on WhatsApp");
+        Assert.IsTrue(row.Swipe.enabled, "the swipe reveals «Удалить»");
         ChatViewModel moved = null;
         row.View.MoveRequested += c => moved = c;
         row.Move.onClick.Invoke();
@@ -80,11 +82,12 @@ public class ChatRowSwipeWiringTests
     }
 
     [Test]
-    public void TheSamePlace_LeavesAnOpenRowOpen()
+    public void AnUnchangedSwipe_LeavesAnOpenRowOpen_NewActionsSnapItShut()
     {
         Row row = BuildRow();
+        ChatViewModel chat = Chat(Person());
         row.View.SetSwipeContext(false);
-        row.View.Bind(Chat(Person()));
+        row.View.Bind(chat);
         float open = -row.Swipe.RevealWidth;
         Assert.Less(open, 0f, "the row has something to reveal");
         row.Content.anchoredPosition = new Vector2(open, 0f);   // the owner swiped it open
@@ -92,7 +95,11 @@ public class ChatRowSwipeWiringTests
         row.View.SetSwipeContext(false);   // a visibility pass that changed nothing for this row
         Assert.AreEqual(open, row.Content.anchoredPosition.x, "a refresh never snaps an open row shut");
 
-        row.View.SetSwipeContext(true);    // the actions change
+        row.View.SetSwipeContext(true);    // the chat turned personal: on WhatsApp the actions stay, only the word changes
+        Assert.AreEqual(open, row.Content.anchoredPosition.x, "the same actions in a new place keep the row open");
+        Assert.AreEqual(PersonalChatsCopy.SwipeToBusiness, row.MoveLabel.text, "…under the folder's word");
+
+        chat.UpdateFacts(Person(bot: true));   // the actions change: «Удалить» alone
         Assert.AreEqual(0f, row.Content.anchoredPosition.x, "new actions snap it shut first");
     }
 

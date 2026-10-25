@@ -86,13 +86,13 @@ public class SwipeActionsLayoutTests
     {
         SwipeToDelete swipe = Row(out _, out RectTransform move, out RectTransform delete);
 
-        swipe.SetActions(true, false);   // a Telegram working chat, or a personal chat
+        swipe.SetActions(true, false);   // a Telegram person, in any place
         Assert.AreEqual(MoveWidth, swipe.RevealWidth);
         Assert.IsTrue(move.gameObject.activeSelf);
         Assert.IsFalse(delete.gameObject.activeSelf, "no «Удалить» to reveal");
         Assert.AreEqual(MoveWidth, move.anchoredPosition.x, "parked just past the edge");
 
-        swipe.SetActions(false, true);   // a non-person among the working list's WhatsApp rows
+        swipe.SetActions(false, true);   // a WhatsApp chat that is not a person, in any place
         Assert.AreEqual(DeleteWidth, swipe.RevealWidth);
         Assert.IsFalse(move.gameObject.activeSelf);
         Assert.IsTrue(delete.gameObject.activeSelf);
@@ -125,10 +125,10 @@ public class SwipeActionsLayoutTests
         Assert.AreEqual(-(MoveWidth + DeleteWidth), content.anchoredPosition.x, "still open");
         Assert.AreEqual(0f, delete.anchoredPosition.x);
 
-        swipe.SetActions(true, false);   // the chat turned personal while it is shown
+        swipe.SetActions(false, true);   // a fresh chat-list row says the chat is a bot
         Assert.AreEqual(0f, content.anchoredPosition.x, "snapped shut before the new actions");
-        Assert.AreEqual(MoveWidth, move.anchoredPosition.x, "the move alone, parked past the edge");
-        Assert.IsFalse(delete.gameObject.activeSelf);
+        Assert.AreEqual(DeleteWidth, delete.anchoredPosition.x, "«Удалить» alone, parked past the edge");
+        Assert.IsFalse(move.gameObject.activeSelf);
     }
 
     // ---- helpers ----

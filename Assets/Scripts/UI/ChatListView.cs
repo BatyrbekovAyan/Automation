@@ -12,8 +12,9 @@ using DG.Tweening;
 /// under the channel's profile; what follows from it is <see cref="PersonalChatsListModel"/>'s. The verdict is re-read,
 /// once per frame at most, whenever it can change: a row's data (facts, unread, last message), a store change (a decision,
 /// a connection moment, the owner's move), a row added or removed, the query. Each row's swipe follows the same verdict
-/// (spec §5.2; <see cref="ChatRowSwipePolicy.InFolder"/>): a working chat offers «В личные» (and «Удалить» on WhatsApp), a
-/// personal one in the search results «В рабочие», as in the folder; <see cref="RequestMove"/> carries the move out.
+/// (spec §5.2; <see cref="ChatRowSwipePolicy.InFolder"/>): a working chat offers «В личные», a personal one in the search
+/// results «В рабочие», as in the folder, and every WhatsApp chat keeps «Удалить»; <see cref="RequestMove"/> carries the move
+/// out.
 /// </summary>
 public class ChatListView : MonoBehaviour
 {

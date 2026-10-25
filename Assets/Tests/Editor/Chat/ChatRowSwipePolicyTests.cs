@@ -4,11 +4,12 @@ using NUnit.Framework;
 /// <summary>
 /// Pins ChatRowSwipePolicy — which actions a chat row's swipe offers (spec §5.2, §5.3):
 /// <list type="bullet">
-///   <item>the working list: a working chat offers «В личные» and, on WhatsApp only, today's «Удалить» (Telegram has no
-///   chat/delete endpoint, so a Telegram row never carries a delete);</item>
-///   <item>the «Личные» folder: «В рабочие» and nothing else;</item>
-///   <item>a chat that is not a person (a group, a channel, a bot, the service account, «Избранное») never offers a move — in
-///   the folder its row has no swipe at all;</item>
+///   <item>the move, for a person in every place: «В личные» on a working chat in the working list, «В рабочие» in the
+///   «Личные» folder's place;</item>
+///   <item>today's «Удалить» on every WhatsApp chat in every place — the working list, the folder, the search results — and
+///   never on Telegram (no chat/delete endpoint);</item>
+///   <item>a chat that is not a person (a group, a channel, a bot, the service account, «Избранное») never moves: on WhatsApp
+///   it keeps «Удалить» alone, on Telegram it has no swipe at all;</item>
 ///   <item>the working list's search results: a personal chat found there swipes as it would in the folder
 ///   (<see cref="ChatRowSwipePolicy.InFolder"/>), with the folder's word (<see cref="ChatRowSwipePolicy.MoveLabel"/>).</item>
 /// </list>
@@ -32,12 +33,12 @@ public class ChatRowSwipePolicyTests
     [TestCase(ChatChannel.Telegram, List, NonHumanKind.Bot, false, false)]
     [TestCase(ChatChannel.Telegram, List, NonHumanKind.Service, false, false)]
     [TestCase(ChatChannel.Telegram, List, NonHumanKind.Self, false, false)]
-    [TestCase(ChatChannel.WhatsApp, Folder, NonHumanKind.None, true, false)]
-    [TestCase(ChatChannel.WhatsApp, Folder, NonHumanKind.Group, false, false)]
-    [TestCase(ChatChannel.WhatsApp, Folder, NonHumanKind.Channel, false, false)]
-    [TestCase(ChatChannel.WhatsApp, Folder, NonHumanKind.Bot, false, false)]
-    [TestCase(ChatChannel.WhatsApp, Folder, NonHumanKind.Service, false, false)]
-    [TestCase(ChatChannel.WhatsApp, Folder, NonHumanKind.Self, false, false)]
+    [TestCase(ChatChannel.WhatsApp, Folder, NonHumanKind.None, true, true)]
+    [TestCase(ChatChannel.WhatsApp, Folder, NonHumanKind.Group, false, true)]
+    [TestCase(ChatChannel.WhatsApp, Folder, NonHumanKind.Channel, false, true)]
+    [TestCase(ChatChannel.WhatsApp, Folder, NonHumanKind.Bot, false, true)]
+    [TestCase(ChatChannel.WhatsApp, Folder, NonHumanKind.Service, false, true)]
+    [TestCase(ChatChannel.WhatsApp, Folder, NonHumanKind.Self, false, true)]
     [TestCase(ChatChannel.Telegram, Folder, NonHumanKind.None, true, false)]
     [TestCase(ChatChannel.Telegram, Folder, NonHumanKind.Group, false, false)]
     [TestCase(ChatChannel.Telegram, Folder, NonHumanKind.Channel, false, false)]
@@ -63,6 +64,19 @@ public class ChatRowSwipePolicyTests
         }
     }
 
+    [Test]
+    public void Delete_IsWhatsAppsInEveryPlace()
+    {
+        foreach (NonHumanKind kind in Enum.GetValues(typeof(NonHumanKind)))
+            foreach (bool place in new[] { List, Folder })
+            {
+                Assert.IsTrue(ChatRowSwipePolicy.Actions(ChatChannel.WhatsApp, place, kind).Delete,
+                    $"WhatsApp, {(place ? "the folder" : "the list")}, {kind}: today's «Удалить» stays");
+                Assert.IsFalse(ChatRowSwipePolicy.Actions(ChatChannel.Telegram, place, kind).Delete,
+                    $"Telegram, {(place ? "the folder" : "the list")}, {kind}: no chat/delete endpoint");
+            }
+    }
+
     // ---- the working list's search results (a personal chat swipes as in the folder) ----
 
     [Test]
@@ -72,21 +86,24 @@ public class ChatRowSwipePolicyTests
         bool place = ChatRowSwipePolicy.InFolder(personal);
 
         Assert.IsTrue(place, "a personal chat found by the search stands in the folder's place");
-        Assert.AreEqual((true, false), ChatRowSwipePolicy.Actions(ChatChannel.WhatsApp, place, personal.NonHuman),
-            "«В рабочие» and no «Удалить» — the folder's rule, on WhatsApp too");
-        Assert.AreEqual((true, false), ChatRowSwipePolicy.Actions(ChatChannel.Telegram, place, personal.NonHuman));
+        Assert.AreEqual((true, true), ChatRowSwipePolicy.Actions(ChatChannel.WhatsApp, place, personal.NonHuman),
+            "«В рабочие» and today's «Удалить» on WhatsApp");
+        Assert.AreEqual((true, false), ChatRowSwipePolicy.Actions(ChatChannel.Telegram, place, personal.NonHuman),
+            "«В рабочие» alone on Telegram");
         Assert.AreEqual(PersonalChatsCopy.SwipeToBusiness, ChatRowSwipePolicy.MoveLabel(place));
     }
 
     [Test]
-    public void SearchResults_ANonPerson_GetsNoSwipe()
+    public void SearchResults_ANonPerson_NeverMoves_DeletesOnWhatsAppOnly()
     {
         foreach (NonHumanKind kind in new[] { NonHumanKind.Group, NonHumanKind.Channel, NonHumanKind.Bot, NonHumanKind.Service, NonHumanKind.Self })
         {
             var view = new AudienceView { Kind = AudienceKind.Personal, Reason = AudienceReason.NonHuman, NonHuman = kind };
             bool place = ChatRowSwipePolicy.InFolder(view);
-            Assert.AreEqual((false, false), ChatRowSwipePolicy.Actions(ChatChannel.WhatsApp, place, kind), $"{kind} on WhatsApp");
-            Assert.AreEqual((false, false), ChatRowSwipePolicy.Actions(ChatChannel.Telegram, place, kind), $"{kind} on Telegram");
+            Assert.AreEqual((false, true), ChatRowSwipePolicy.Actions(ChatChannel.WhatsApp, place, kind),
+                $"{kind} on WhatsApp: «Удалить» alone");
+            Assert.AreEqual((false, false), ChatRowSwipePolicy.Actions(ChatChannel.Telegram, place, kind),
+                $"{kind} on Telegram: no swipe at all");
         }
     }
 
