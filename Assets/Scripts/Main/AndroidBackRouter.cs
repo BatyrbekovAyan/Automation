@@ -169,6 +169,10 @@ public class AndroidBackRouter : MonoBehaviour
                 () => AddBotPanel.Instance != null && AddBotPanel.Instance.IsOpen,
                 () => { if (manager != null) manager.CloseAddBotForm(); else AddBotPanel.Instance.Close(); }),
 
+            // ---- the «Личные» folder: under the open chat (a chat opened from it slides in over it) and the full-screen
+            // flows, over the chat list it stands on. Back = its own left button: close · «Отмена» · «Отмечу позже» ----
+            new BackTarget("personal-chats-folder", () => PersonalChatsFolderView.IsShowing, () => PersonalChatsFolderView.Instance?.TryBack()),
+
             // ---- slide-in sub-pages ----
             new BackTarget("profile-subpage",
                 () => Find<ProfileSubPages>() is { HasOpenPage: true },

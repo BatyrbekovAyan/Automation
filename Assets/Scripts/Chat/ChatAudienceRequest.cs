@@ -8,7 +8,7 @@ using Newtonsoft.Json.Linq;
 /// bodies. One POST path, the op in the body:
 ///   list       {op, profileIds[≤ 20]}                       → {success, profiles[{profileId, connectedAt|null, decisions[…]}]}
 ///   set        {op, profileId, chats[{chatId, kind, version} ≤ 50]} → {success, results[{chatId, applied, kind, version, refused}]}
-///   connected  {op, profileId}                              → {success, connectedAt}
+///   connected  {op, profileId}                              → {success, connectedAt, restarted}
 /// The server reads the connected number from get/status itself — the app never sends one. A chat id is the chat-list key
 /// (<c>ChatViewModel.ChatId</c> = <c>ChatManager.CurrentChatId</c>), the key the per-chat reply mode uses; the reply mode's
 /// wildcard <c>'*'</c> names every chat and is never one (<see cref="IsSendableChatId"/>). Answers are read by
@@ -192,14 +192,24 @@ public static class ChatAudienceResponse
         return status;
     }
 
-    public static ChatAudienceSyncQueue.BatchStatus ClassifyConnected(long responseCode, string body, out long connectedAtMs)
+    public static ChatAudienceSyncQueue.BatchStatus ClassifyConnected(long responseCode, string body, out long connectedAtMs) =>
+        ClassifyConnected(responseCode, body, out connectedAtMs, out _);
+
+    /// <summary>
+    /// The connected answer, with <paramref name="restarted"/> — the server moved the moment because another number was paired
+    /// (only the boolean true says so; a missing or non-boolean field is false, and an answer that names no moment says nothing).
+    /// </summary>
+    public static ChatAudienceSyncQueue.BatchStatus ClassifyConnected(long responseCode, string body, out long connectedAtMs, out bool restarted)
     {
         connectedAtMs = 0;
+        restarted = false;
         var status = Envelope(responseCode, body, null, out JObject envelope);
         if (status != ChatAudienceSyncQueue.BatchStatus.Answered) return status;
         long? moment = ReadLong(envelope["connectedAt"]);
         if (moment == null || moment.Value <= 0) return ChatAudienceSyncQueue.BatchStatus.Transient;   // names no moment
         connectedAtMs = moment.Value;
+        JToken word = envelope["restarted"];
+        restarted = word != null && word.Type == JTokenType.Boolean && (bool)word;
         return status;
     }
 

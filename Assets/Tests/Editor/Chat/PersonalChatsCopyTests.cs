@@ -31,6 +31,17 @@ public class PersonalChatsCopyTests
         StringAssert.Contains(phrase + " он забудет эту переписку.", PersonalChatsCopy.MakePersonalBody(days));
     }
 
+    [TestCase(2, "2 чата стали рабочими")]
+    [TestCase(4, "4 чата стали рабочими")]
+    [TestCase(5, "5 чатов стали рабочими")]
+    [TestCase(11, "11 чатов стали рабочими")]
+    [TestCase(21, "21 чат стал рабочим")]
+    [TestCase(22, "22 чата стали рабочими")]
+    public void MovedToBusinessMany_AgreesTheCount(int count, string text)
+    {
+        Assert.AreEqual(text, PersonalChatsCopy.MovedToBusinessMany(count));
+    }
+
     [Test]
     public void StaleNote_MatchesFreshHours()
     {

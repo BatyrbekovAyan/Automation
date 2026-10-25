@@ -28,17 +28,32 @@ public class ChatItemView : MonoBehaviour
     [SerializeField] private Button moveButton;
     [Tooltip("The move button's word. Stamped by PersonalChatsBuilder.")]
     [SerializeField] private TextMeshProUGUI moveLabel;
+    [Tooltip("The checkbox before the avatar — the «Личные» folder's selection modes. Hidden by default; stamped by PersonalChatsBuilder.")]
+    [SerializeField] private GameObject selectCheck;
+    [Tooltip("The checkbox's marked face. Stamped by PersonalChatsBuilder.")]
+    [SerializeField] private GameObject selectChecked;
 
-    /// <summary>
-    /// The swipe's move button («В личные» / «В рабочие») was tapped: the list or the folder that made the row moves the chat.
-    /// Subscribe once, when the row is made.
-    /// </summary>
+    // Whoever made the row — the chat list or the «Личные» folder — subscribes to its requests ONCE, when the row is made; the
+    // row never looks for its owner (the folder's rows have no chat list above them).
+
+    /// <summary>The swipe's move button («В личные» / «В рабочие») was tapped: whoever made the row moves the chat.</summary>
     public event System.Action<ChatViewModel> MoveRequested;
+
+    /// <summary>The swipe's «Удалить» was tapped: whoever made the row asks (the chat list's confirm card).</summary>
+    public event System.Action<ChatViewModel> DeleteRequested;
+
+    /// <summary>A tap on a row that selects (<see cref="SetSelectable"/>): whoever made the row toggles the mark.</summary>
+    public event System.Action<ChatViewModel> SelectToggled;
+
+    /// <summary>The row's chat changed (its facts, unread count, last message): whoever made the row re-reads where it belongs.</summary>
+    public event System.Action ChatUpdated;
+
+    /// <summary>The row's last message changed: whoever made the row re-sorts.</summary>
+    public event System.Action OrderChanged;
 
     private ChatViewModel vm;
     public ChatViewModel Vm => vm;
     private string chatId;
-    private ChatListView parentList;
     private Coroutine avatarLoadCoroutine;   // non-null while LoadAvatar's download is in flight
     private UnityWebRequest avatarRequest;   // that download — disposed by hand when the coroutine is cut off
     private bool pendingAvatarLoad;
@@ -51,6 +66,11 @@ public class ChatItemView : MonoBehaviour
     private bool swipeMove;
     private bool swipeDelete;
 
+    // The «Личные» folder's selection modes: a checkbox instead of the swipe, a tap toggles the mark (SetSelectable).
+    private bool selectable;
+    // The line under the name instead of the last message (SetSubline): what a non-person is, why a chat is personal.
+    private string subline;
+
     // LRU cache: [ChatID_RawMessage] -> [Perfectly Sliced String]. Capped to bound memory on long sessions.
     private const int MaxTextCacheCount = 500;
     private static readonly Dictionary<string, LinkedListNode<KeyValuePair<string, string>>> textCache = new();
@@ -58,12 +78,6 @@ public class ChatItemView : MonoBehaviour
     
 public void Bind(ChatViewModel model)
     {
-        // includeInactive: the initial cache load binds rows while the chat panel is
-        // still hidden — the default overload would return null there and leave the
-        // row detached from its list until a later rebind.
-        if (parentList == null)
-            parentList = GetComponentInParent<ChatListView>(true);
-
         if (vm != null)
         {
             vm.OnUpdated -= OnVmUpdated;
@@ -173,12 +187,43 @@ public void Bind(ChatViewModel model)
         if (moveLabel != null && moveLabel.text != text) moveLabel.text = text;
     }
 
+    /// <summary>
+    /// «Личные и рабочие чаты»: the «Личные» folder's selection modes («Изменить», «Кто из них клиенты?»). A selectable row shows
+    /// its checkbox — marked or not — and does not swipe (a drag scrolls the list); a tap toggles the mark through
+    /// <see cref="SelectToggled"/> instead of opening the chat. Cheap on every redraw: the swipe is re-applied only when the
+    /// row starts or stops selecting.
+    /// </summary>
+    public void SetSelectable(bool selectable, bool selected)
+    {
+        if (selectCheck != null && selectCheck.activeSelf != selectable) selectCheck.SetActive(selectable);
+        bool marked = selectable && selected;
+        if (selectChecked != null && selectChecked.activeSelf != marked) selectChecked.SetActive(marked);
+        if (this.selectable == selectable) return;
+        this.selectable = selectable;
+        swipeApplied = false;
+        ApplySwipeActions();
+    }
+
+    /// <summary>
+    /// «Личные и рабочие чаты»: the line under the name instead of the chat's last message — what a chat that is not a person is,
+    /// why a chat is personal («в контактах»). Null gives the row its last message back. Kept across the chat's updates.
+    /// </summary>
+    public void SetSubline(string text)
+    {
+        if (subline == text) return;
+        subline = text;
+        if (vm != null) UpdatePreviewText(vm.LastMessage ?? "");
+    }
+
     // The swipe's actions for the row's chat in its place: the buttons shown and the reveal laid out (SwipeToDelete.SetActions),
-    // the offered ones wired. Re-run on every bind, place and data change; it acts only when the actions change.
+    // the offered ones wired. Re-run on every bind, place and data change; it acts only when the actions change. A row that
+    // selects swipes nothing.
     private void ApplySwipeActions()
     {
         if (vm == null) return;
-        (bool move, bool delete) = ChatRowSwipePolicy.Actions(RowChannel(), swipeInFolder, ChatAudienceRule.NonHuman(vm.Facts));
+        (bool move, bool delete) = selectable
+            ? (false, false)
+            : ChatRowSwipePolicy.Actions(RowChannel(), swipeInFolder, ChatAudienceRule.NonHuman(vm.Facts));
         if (swipeApplied && move == swipeMove && delete == swipeDelete) return;
         swipeApplied = true;
         swipeMove = move;
@@ -267,11 +312,8 @@ public void Bind(ChatViewModel model)
         ApplySwipeActions();
 
         // New facts can move the chat between the working list and «Личные», and a new unread count changes the
-        // «Личные» row's counter — the list re-reads both (coalesced per frame), the row's swipe place included.
-        if (parentList == null)
-            parentList = GetComponentInParent<ChatListView>(true);
-        if (parentList != null)
-            parentList.RequestVisibilityRefresh();
+        // «Личные» row's counter — whoever made the row re-reads both (coalesced per frame), the row's swipe place included.
+        ChatUpdated?.Invoke();
     }
 
     /// <summary>
@@ -303,15 +345,9 @@ public void Bind(ChatViewModel model)
 
     private void OnLastMessageChanged(ChatViewModel vmRef)
     {
-        // Ask the list for a data-driven resort (coalesced per frame) instead of a
-        // positional self-move — per-row insert-at-top reversed every chat that
-        // changed within one multi-chat sync pass. Re-resolve with includeInactive:
-        // Bind can run while the chat panel is hidden, where the default
-        // GetComponentInParent skips inactive ancestors and returns null.
-        if (parentList == null)
-            parentList = GetComponentInParent<ChatListView>(true);
-        if (parentList != null)
-            parentList.RequestResort();
+        // Ask whoever made the row for a data-driven resort (coalesced per frame) instead of a positional self-move —
+        // per-row insert-at-top reversed every chat that changed within one multi-chat sync pass.
+        OrderChanged?.Invoke();
     }
 
     // Title/preview emoji are converted in Hide mode so a sprite that has not
@@ -341,6 +377,13 @@ public void Bind(ChatViewModel model)
 
     private void UpdatePreviewText(string rawMessage)
     {
+        // The «Личные» folder's line stands in for the last message (SetSubline) — plain copy, never a preview.
+        if (subline != null)
+        {
+            lastMessageText.text = subline;
+            return;
+        }
+
         // Phase 2: prepend [tick] [media-emoji] using ChatPreviewFormatter, then
         // convert any Unicode emoji (in either the rawMessage or our injected
         // media emoji prefix) to EmojiOne sprite tags. Tick sprite tags are ASCII
@@ -580,13 +623,18 @@ public void Bind(ChatViewModel model)
         }
         if (ScrollClickBlocker.IsBlocking) return;
 
+        // In the «Личные» folder's selection modes a tap marks the chat; it does not open it.
+        if (selectable)
+        {
+            SelectToggled?.Invoke(vm);
+            return;
+        }
+
         ChatManager.Instance.SelectChat(chatId);
     }
 
-    void OnDeleteClicked()
-    {
-        if (parentList != null) parentList.RequestDelete(vm);
-    }
+    // «Удалить»: whoever made the row asks (the chat list's confirm card — for the folder's rows too).
+    void OnDeleteClicked() => DeleteRequested?.Invoke(vm);
 
     // The move button: put the row away, then hand the chat to whoever made the row (ChatListView.RequestMove; the folder).
     void OnMoveClicked()

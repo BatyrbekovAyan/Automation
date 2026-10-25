@@ -161,6 +161,63 @@ public class BackNavigationTests
         }
     }
 
+    /// <summary>
+    /// «Личные и рабочие чаты» (spec §5.3, §5.4): the «Личные» folder joins the router below the open chat (a chat opened from
+    /// the folder slides in over it) and the full-screen flows, above nothing of its own screen. Back does what the folder's
+    /// own left button does in each mode: the folder closes; «Изменить» is cancelled (the folder stays); «Кто из них
+    /// клиенты?» is «Отмечу позже» — the flag is cleared and the screen closes. The source order is pinned, and the REAL router
+    /// list is walked over a real folder (PersonalChatsFolderFixture).
+    /// </summary>
+    [Test]
+    public void Back_ClosesFolder_EditIsCancel_OnboardingIsLater()
+    {
+        string router = File.ReadAllText(Path.Combine(Application.dataPath, "Scripts/Main/AndroidBackRouter.cs"));
+        const string entry = "new BackTarget(\"personal-chats-folder\", () => PersonalChatsFolderView.IsShowing, () => PersonalChatsFolderView.Instance?.TryBack())";
+        int folder = router.IndexOf(entry, System.StringComparison.Ordinal);
+        Assert.GreaterOrEqual(folder, 0, "the folder must be a Back target, closed by its own left button");
+        foreach (string above in new[] { "new BackTarget(\"chat-thread\"", "new BackTarget(\"auth-page\"", "new BackTarget(\"bot-settings\"",
+                     "new BackTarget(\"add-bot\"", "new BackTarget(\"loading\"", "new BackTarget(\"personal-chat-sheets\"" })
+            Assert.Greater(folder, router.IndexOf(above, System.StringComparison.Ordinal), $"{above} stands above the folder");
+        foreach (string below in new[] { "new BackTarget(\"profile-subpage\"", "new BackTarget(\"dashboard-list\"" })
+            Assert.Less(folder, router.IndexOf(below, System.StringComparison.Ordinal), $"the folder comes before {below}");
+
+        const string bot = "BackNavigationFolderBot";
+        var hosts = new List<GameObject>();
+        Manager previousManager = Manager.Instance;
+        ChatManager previousChats = ChatManager.Instance;
+        PersonalChatsFolderView.ResetForTests();
+        try
+        {
+            FolderHarness h = PersonalChatsFolderFixture.Build(bot, "back-folder-profile", hosts);
+
+            h.Folder.Open(FolderMode.Browse);
+            Assert.AreEqual("personal-chats-folder", BackNavigation.Dispatch(RouterTargets()), "Back over the folder");
+            Assert.IsFalse(h.Folder.IsOpen, "the folder closes");
+            Assert.AreNotEqual("personal-chats-folder", BackNavigation.Dispatch(RouterTargets()), "nothing of it is left to close");
+
+            h.Folder.Open(FolderMode.Edit);
+            Assert.AreEqual("personal-chats-folder", BackNavigation.Dispatch(RouterTargets()), "Back over «Изменить»");
+            Assert.IsTrue(h.Folder.IsOpen, "«Отмена»: the folder stays…");
+            Assert.AreEqual(FolderMode.Browse, h.Folder.Mode, "…back in its own mode");
+            h.Folder.Close();
+
+            PersonalChatsOnboarding.Request(bot, telegram: false);
+            h.Folder.Open(FolderMode.Onboarding);
+            Assert.AreEqual("personal-chats-folder", BackNavigation.Dispatch(RouterTargets()), "Back over «Кто из них клиенты?»");
+            Assert.IsFalse(h.Folder.IsOpen, "«Отмечу позже»: the screen closes…");
+            Assert.IsFalse(PersonalChatsOnboarding.IsRequested(bot, telegram: false), "…and is not owed any more");
+        }
+        finally
+        {
+            PersonalChatsOnboarding.Clear(bot, telegram: false);
+            Manager.Instance = previousManager;
+            ChatManager.Instance = previousChats;
+            foreach (GameObject host in hosts)
+                if (host != null) Object.DestroyImmediate(host);
+            PersonalChatsFolderView.ResetForTests();
+        }
+    }
+
     // The router's live list, as one Back press reads it (its other surfaces are all closed in EditMode).
     private static List<BackTarget> RouterTargets()
     {

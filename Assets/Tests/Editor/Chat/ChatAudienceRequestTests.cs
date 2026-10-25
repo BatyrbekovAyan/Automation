@@ -222,6 +222,34 @@ public class ChatAudienceRequestTests
             ChatAudienceResponse.ClassifyConnected(502, "{\"success\":false,\"error\":\"wappi_unavailable\"}", out _));
     }
 
+    [Test]
+    public void ConnectedAnswer_SaysWhetherTheServerRestartedTheMoment()
+    {
+        Assert.AreEqual(ChatAudienceSyncQueue.BatchStatus.Answered, ChatAudienceResponse.ClassifyConnected(200,
+            "{\"success\":true,\"connectedAt\":1760000000000,\"restarted\":true}", out long at, out bool restarted));
+        Assert.AreEqual(1760000000000L, at);
+        Assert.IsTrue(restarted, "another number: the server moved the moment");
+
+        foreach (string body in new[]
+                 {
+                     "{\"success\":true,\"connectedAt\":1760000000000,\"restarted\":false}",
+                     "{\"success\":true,\"connectedAt\":1760000000000}",
+                     "{\"success\":true,\"connectedAt\":1760000000000,\"restarted\":\"true\"}",
+                     "{\"success\":true,\"connectedAt\":1760000000000,\"restarted\":1}",
+                     "{\"success\":true,\"connectedAt\":1760000000000,\"restarted\":null}",
+                 })
+        {
+            Assert.AreEqual(ChatAudienceSyncQueue.BatchStatus.Answered, ChatAudienceResponse.ClassifyConnected(200, body, out _, out bool not));
+            Assert.IsFalse(not, $"'{body}': only the boolean true says the moment restarted");
+        }
+
+        Assert.AreEqual(ChatAudienceSyncQueue.BatchStatus.Transient,
+            ChatAudienceResponse.ClassifyConnected(200, "{\"success\":true,\"restarted\":true}", out _, out bool noMoment));
+        Assert.IsFalse(noMoment, "an answer that names no moment says nothing at all");
+        Assert.AreEqual(ChatAudienceSyncQueue.BatchStatus.Rejected, ChatAudienceResponse.ClassifyConnected(403, Refusal, out _, out bool refused));
+        Assert.IsFalse(refused);
+    }
+
     [TestCase(400, ChatAudienceSyncQueue.BatchStatus.Rejected, TestName = "EveryOp_400_BadRequest_IsARefusal")]
     [TestCase(401, ChatAudienceSyncQueue.BatchStatus.Rejected, TestName = "EveryOp_401_AfterTheRefreshRetry_IsARefusal")]
     [TestCase(403, ChatAudienceSyncQueue.BatchStatus.Rejected, TestName = "EveryOp_403_NotTheTokensProfile_IsARefusal")]

@@ -14,7 +14,9 @@ using DG.Tweening;
 /// a connection moment, the owner's move), a row added or removed, the query. Each row's swipe follows the same verdict
 /// (spec §5.2; <see cref="ChatRowSwipePolicy.InFolder"/>): a working chat offers «В личные», a personal one in the search
 /// results «В рабочие», as in the folder, and every WhatsApp chat keeps «Удалить»; <see cref="RequestMove"/> carries the move
-/// out.
+/// out. The «Личные» folder's rows bring their moves and deletes here too (one code path for both lists). And «Кто из них
+/// клиенты?» is asked for here (<see cref="PersonalChatsOnboarding.TryShow"/>): when the list comes on screen, on a bot or
+/// channel switch and when the screen becomes owed — at the end of the frame.
 /// </summary>
 public class ChatListView : MonoBehaviour
 {
@@ -38,6 +40,10 @@ public class ChatListView : MonoBehaviour
     // Coalesced the same way: which rows the list shows, their locks and the «Личные» row.
     private bool visibilityPending;
 
+    // «Кто из них клиенты?» may be owed for the chats on screen — decided at the end of the frame (a bot switch announces the
+    // bot before it resolves the bot's channel).
+    private bool onboardingCheckPending;
+
     private ChatSearchBar searchBar;
     private string currentQuery = "";
     private static readonly CompareInfo Ci = CultureInfo.InvariantCulture.CompareInfo;
@@ -54,7 +60,9 @@ public class ChatListView : MonoBehaviour
         manager.OnActiveBotChanged += HandleActiveBotChanged;
         manager.OnChatSelected += HandleChatSelected;
         manager.OnChatRemoved += RemoveChat;
+        manager.OnActiveChannelChanged += HandleActiveChannelChanged;
         ChatAudienceStore.OnChanged += RequestVisibilityRefresh;
+        PersonalChatsOnboarding.Requested += HandleOnboardingRequested;
 
         searchBar = GetComponentInChildren<ChatSearchBar>(true);
         if (searchBar != null)
@@ -65,6 +73,9 @@ public class ChatListView : MonoBehaviour
 
         RequestVisibilityRefresh();   // the «Личные» row follows even an empty list
     }
+
+    // The chat list is on screen again (its tab shown, an open chat closed): «Кто из них клиенты?» may be owed.
+    void OnEnable() => onboardingCheckPending = true;
 
     void ClearChatList()
     {
@@ -87,8 +98,13 @@ public class ChatListView : MonoBehaviour
         }
 
         // --- THE FIX: Everything goes into the normalContent now! ---
+        // The row's requests, subscribed once — here, when it is made: its swipe's «В личные» / «В рабочие» and «Удалить», its
+        // data (a pass over the list's verdicts) and its last message (a resort).
         var item = Instantiate(prefab, content);
-        item.MoveRequested += RequestMove;   // the row's swipe: «В личные» / «В рабочие»
+        item.MoveRequested += RequestMove;
+        item.DeleteRequested += RequestDelete;
+        item.ChatUpdated += RequestVisibilityRefresh;
+        item.OrderChanged += RequestResort;
 
         // Apply the active filter BEFORE the bind, so a newly-arriving chat never shows for a frame where it does
         // not belong (a personal chat outside a search, a query still set after a bot switch) — and a row hidden here
@@ -126,7 +142,14 @@ public class ChatListView : MonoBehaviour
         {
             content.gameObject.SetActive(true);
         }
+        onboardingCheckPending = true;
     }
+
+    private void HandleActiveChannelChanged(ChatChannel _) => onboardingCheckPending = true;
+
+    // A pairing (or the server's word about another number) owes «Кто из них клиенты?» — shown at once when it is for the chats
+    // on screen.
+    private void HandleOnboardingRequested(string botName, bool telegram) => onboardingCheckPending = true;
 
     private void HandleChatSelected(string _)
     {
@@ -235,9 +258,16 @@ public class ChatListView : MonoBehaviour
             visibilityPending = true;
         }
 
-        if (!visibilityPending) return;
-        visibilityPending = false;
-        ApplyVisibility();
+        if (visibilityPending)
+        {
+            visibilityPending = false;
+            ApplyVisibility();
+        }
+
+        // At the end of the frame: a bot switch has resolved its channel by now.
+        if (!onboardingCheckPending) return;
+        onboardingCheckPending = false;
+        PersonalChatsOnboarding.TryShow();
     }
 
     private void ApplyOrderNow()
@@ -360,9 +390,11 @@ public class ChatListView : MonoBehaviour
             ChatManager.Instance.OnActiveBotChanged -= HandleActiveBotChanged;
             ChatManager.Instance.OnChatSelected -= HandleChatSelected;
             ChatManager.Instance.OnChatRemoved -= RemoveChat;
+            ChatManager.Instance.OnActiveChannelChanged -= HandleActiveChannelChanged;
         }
 
         ChatAudienceStore.OnChanged -= RequestVisibilityRefresh;
+        PersonalChatsOnboarding.Requested -= HandleOnboardingRequested;
 
         if (searchBar != null)
             searchBar.OnQueryChanged -= ApplyFilter;

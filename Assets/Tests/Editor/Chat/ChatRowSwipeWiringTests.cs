@@ -133,8 +133,86 @@ public class ChatRowSwipeWiringTests
 
         string row = SourceGuard.Read("Scripts/UI/ChatItemView.cs");
         string updated = SourceGuard.MethodBody(row, "void OnVmUpdated(");
-        StringAssert.Contains("parentList.RequestVisibilityRefresh();", updated, "a row update starts a pass");
+        StringAssert.Contains("ChatUpdated?.Invoke();", updated, "a row update tells whoever made the row");
+        StringAssert.Contains("item.ChatUpdated += RequestVisibilityRefresh;", SourceGuard.MethodBody(list, "void AddChat("),
+            "…and the list starts a pass");
         StringAssert.Contains("ApplySwipeActions();", updated, "and re-reads the row's own facts (a non-person never moves)");
+    }
+
+    [Test]
+    public void ARowNeverReachesForItsList_WhoeverMadeItSubscribesOnce()
+    {
+        string row = SourceGuard.Read("Scripts/UI/ChatItemView.cs");
+        Assert.IsFalse(row.Contains("GetComponentInParent<ChatListView>"),
+            "a row does not look for its list — the «Личные» folder's rows have none above them");
+        StringAssert.Contains("DeleteRequested?.Invoke(vm);", SourceGuard.MethodBody(row, "void OnDeleteClicked("));
+        StringAssert.Contains("OrderChanged?.Invoke();", SourceGuard.MethodBody(row, "private void OnLastMessageChanged("));
+
+        string add = SourceGuard.MethodBody(SourceGuard.Read("Scripts/UI/ChatListView.cs"), "void AddChat(");
+        foreach (string subscription in new[] { "item.MoveRequested += RequestMove;", "item.DeleteRequested += RequestDelete;",
+                     "item.ChatUpdated += RequestVisibilityRefresh;", "item.OrderChanged += RequestResort;" })
+            Assert.AreEqual(1, Count(add, subscription), $"{subscription} — once, when the row is made");
+
+        string folder = SourceGuard.Read("Scripts/UI/PersonalChatsFolderView.cs");
+        string make = SourceGuard.MethodBody(folder, "private ChatItemView MakeRow(");
+        foreach (string subscription in new[] { "item.MoveRequested += HandleRowMove;", "item.DeleteRequested += HandleRowDelete;",
+                     "item.SelectToggled += HandleRowSelectToggled;", "item.ChatUpdated += RequestRefresh;", "item.OrderChanged += RequestRefresh;" })
+            Assert.AreEqual(1, Count(make, subscription), $"the folder: {subscription} — once, when the row is made");
+    }
+
+    [Test]
+    public void TheDeleteButton_HandsTheChatToWhoeverMadeTheRow()
+    {
+        Row row = BuildRow();
+        ChatViewModel chat = Chat(Person());
+        row.View.Bind(chat);
+        ChatViewModel asked = null;
+        row.View.DeleteRequested += c => asked = c;
+
+        row.Delete.onClick.Invoke();
+
+        Assert.AreSame(chat, asked, "the list's confirm card or the folder's — whoever made the row asks");
+    }
+
+    [Test]
+    public void ASelectableRow_TogglesOnTap_AndDoesNotSwipe()
+    {
+        Row row = BuildRow();
+        ChatViewModel chat = Chat(Person());
+        row.View.Bind(chat);
+        Assert.IsTrue(row.Swipe.enabled, "a list row swipes");
+        Assert.IsFalse(row.Check.activeSelf, "…and has no checkbox");
+
+        row.View.SetSelectable(true, false);
+        Assert.IsTrue(row.Check.activeSelf, "the folder's selection modes show the checkbox");
+        Assert.IsFalse(row.Checked.activeSelf, "…unmarked");
+        Assert.IsFalse(row.Swipe.enabled, "a selection list does not swipe — the drag scrolls the list");
+        Assert.IsFalse(row.Move.gameObject.activeSelf);
+
+        ChatViewModel toggled = null;
+        row.View.SelectToggled += c => toggled = c;
+        row.View.button.onClick.Invoke();
+        Assert.AreSame(chat, toggled, "a tap toggles the mark instead of opening the chat");
+        row.View.SetSelectable(true, true);
+        Assert.IsTrue(row.Checked.activeSelf, "marked");
+
+        row.View.SetSelectable(false, false);
+        Assert.IsFalse(row.Check.activeSelf, "back in the folder itself");
+        Assert.IsTrue(row.Swipe.enabled, "…the swipe returns");
+        AssertSwipe(row, true, true, PersonalChatsCopy.SwipeToPersonal, "the row's own actions again");
+    }
+
+    [Test]
+    public void ASubline_StandsInForTheLastMessage()
+    {
+        Row row = BuildRow();
+        row.View.SetSubline(PersonalChatsCopy.SublineContact);
+        row.View.Bind(Chat(Person()));
+        Assert.AreEqual(PersonalChatsCopy.SublineContact, row.View.lastMessageText.text, "set before the bind — the bind keeps it");
+        row.View.SetSubline(PersonalChatsCopy.NonHumanGroup);
+        Assert.AreEqual(PersonalChatsCopy.NonHumanGroup, row.View.lastMessageText.text, "a new line at once");
+        row.View.SetSubline(null);
+        Assert.AreEqual("", row.View.lastMessageText.text, "null — the chat's own last message (empty here)");
     }
 
     [Test]
@@ -164,6 +242,16 @@ public class ChatRowSwipeWiringTests
         public Button Move;
         public Button Delete;
         public TextMeshProUGUI MoveLabel;
+        public GameObject Check;
+        public GameObject Checked;
+    }
+
+    private static int Count(string text, string needle)
+    {
+        int count = 0;
+        for (int at = text.IndexOf(needle, StringComparison.Ordinal); at >= 0; at = text.IndexOf(needle, at + needle.Length, StringComparison.Ordinal))
+            count++;
+        return count;
     }
 
     // ChatItem's shape and the references ChatItemView.Bind reads: the two buttons behind (pinned to the right edge), the
@@ -188,17 +276,23 @@ public class ChatRowSwipeWiringTests
         view.defaultAvatar = Child(content, "Default").gameObject.AddComponent<Image>();
         view.deleteButton = delete;
         view.swipeToDelete = swipe;
+        GameObject check = Child(content, "SelectCheck").gameObject;
+        check.SetActive(false);
+        GameObject marked = Child(check.transform, "Checked").gameObject;
+        marked.SetActive(false);
 
         var rowRefs = new SerializedObject(view);
         rowRefs.FindProperty("moveButton").objectReferenceValue = move;
         rowRefs.FindProperty("moveLabel").objectReferenceValue = label;
+        rowRefs.FindProperty("selectCheck").objectReferenceValue = check;
+        rowRefs.FindProperty("selectChecked").objectReferenceValue = marked;
         rowRefs.ApplyModifiedPropertiesWithoutUndo();
         var swipeRefs = new SerializedObject(swipe);
         swipeRefs.FindProperty("deleteButton").objectReferenceValue = delete.transform;
         swipeRefs.FindProperty("moveButton").objectReferenceValue = move.transform;
         swipeRefs.ApplyModifiedPropertiesWithoutUndo();
 
-        return new Row { View = view, Swipe = swipe, Content = content, Move = move, Delete = delete, MoveLabel = label };
+        return new Row { View = view, Swipe = swipe, Content = content, Move = move, Delete = delete, MoveLabel = label, Check = check, Checked = marked };
     }
 
     private static Button ActionButton(Transform parent, string name)

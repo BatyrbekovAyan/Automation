@@ -396,6 +396,8 @@ public class FontGlyphCoverageTests
         yield return ("ScheduleModel.FormatWindow", ScheduleModel.FormatWindow(540, 1260));
         // «Личные и рабочие чаты»: the composed texts — the counts, both channels, the wipe's days
         yield return ("PersonalChatsCopy.MakeBusinessMany", PersonalChatsCopy.MakeBusinessMany(12));
+        foreach (int moved in new[] { 2, 5, 21 })
+            yield return ($"PersonalChatsCopy.MovedToBusinessMany({moved})", PersonalChatsCopy.MovedToBusinessMany(moved));
         yield return ("PersonalChatsCopy.OnboardingDone", PersonalChatsCopy.OnboardingDone(3));
         foreach (bool telegram in new[] { false, true })
         {

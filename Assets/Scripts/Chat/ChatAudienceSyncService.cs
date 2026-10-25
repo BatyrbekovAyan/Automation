@@ -14,7 +14,8 @@ using UnityEngine.Networking;
 ///     <see cref="AuthorizedRequest"/>, retried with a bounded backoff, settled on the server's per-chat answer. A move
 ///     the server did not take goes back on the screen first, then <see cref="OnWriteFailed"/> tells the toast.
 ///   • Connection reports — <see cref="ReportConnected"/>, after every confirmed pairing: the same queue, sent first; the
-///     answer is the profile's connection moment.
+///     answer is the profile's connection moment — and when another number restarted it (the server's word, or a moment later
+///     than the one mirrored), «Кто из них клиенты?» is owed again (<see cref="PersonalChatsOnboarding.RequestForProfile"/>).
 ///   • The list — <see cref="RequestList"/>: read at launch, on a bot switch, on a return to the app (at most once a
 ///     minute) and 2 s after every delivered write. A list answered while a write was delivered is stale and is dropped.
 ///     And <see cref="RequestListSoon"/>: 3 s after an incoming message in a chat the app holds no verdict for — the
@@ -382,14 +383,28 @@ public class ChatAudienceSyncService : MonoBehaviour
         }
         using var scope = www;
 
-        var status = ChatAudienceResponse.ClassifyConnected(www.responseCode, www.downloadHandler?.text, out long connectedAtMs);
+        var status = ChatAudienceResponse.ClassifyConnected(www.responseCode, www.downloadHandler?.text, out long connectedAtMs, out bool restarted);
         LogUnanswered(ChatAudienceRequest.OpConnected, status, www);
         ChatAudienceSyncQueue.ApplyConnectedResult(_model, entry, sentReport, status, NowMs());
         Persist();
         if (status != ChatAudienceSyncQueue.BatchStatus.Answered || forgets != _forgets) yield break;
         _deliveries++;
+        long? mirrored = ChatAudienceStore.ConnectedAtMs(profileId);   // read before the answer replaces it
         ChatAudienceStore.ApplyConnected(profileId, connectedAtMs);
+        // Another number on the channel is a new connection: «Кто из них клиенты?» is owed again to the bot holding the profile.
+        if (ChatAudienceConnectPolicy.NumberRestarted(restarted, mirrored, connectedAtMs))
+            PersonalChatsOnboarding.RequestForProfile(profileId, BotNames());
         ListAfterDelivery();
+    }
+
+    // The names of the bots on the phone.
+    private static List<string> BotNames()
+    {
+        var names = new List<string>();
+        Transform root = Manager.Instance != null ? Manager.Instance.BotsRoot : null;
+        if (root == null) return names;
+        for (int i = 0; i < root.childCount; i++) names.Add(root.GetChild(i).name);
+        return names;
     }
 
     private IEnumerator SendSet(List<ChatAudienceSyncQueue.Desire> batch)

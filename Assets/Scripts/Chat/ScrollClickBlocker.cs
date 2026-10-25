@@ -13,6 +13,16 @@ public class ScrollClickBlocker : MonoBehaviour
     
     private float lastFrameVelocity = 0f;
 
+    // The press frame the shared verdict was last started on. Two lists can be on screen at once (the «Личные» folder over
+    // the chat list), and their blockers judge the same press in an order Unity does not fix.
+    private static int judgedFrame = -1;
+
+    /// <summary>
+    /// One blocker's say on a press: the first to judge a press frame starts from «not blocking», and any list that was flying
+    /// blocks — so a still list can never clear the catch of a flying one, whichever judges first.
+    /// </summary>
+    internal static bool Verdict(bool soFar, bool firstToJudge, bool flying) => (!firstToJudge && soFar) || flying;
+
     void Awake()
     {
         // Automatically grab the ScrollRect on this object
@@ -24,15 +34,11 @@ public class ScrollClickBlocker : MonoBehaviour
         // 1. On the exact frame the finger hits the glass...
         if (Pointer.current != null && Pointer.current.press.wasPressedThisFrame)
         {
-            // 2. Was it flying now, or flying one frame ago?
-            if (scrollRect != null && (scrollRect.velocity.sqrMagnitude > 900f || lastFrameVelocity > 900f))
-            {
-                IsBlocking = true; // They caught a spinning list!
-            }
-            else
-            {
-                IsBlocking = false; // Peaceful, normal tap.
-            }
+            // 2. Was it flying now, or flying one frame ago? They caught a spinning list — or it is a peaceful, normal tap.
+            bool flying = scrollRect != null && (scrollRect.velocity.sqrMagnitude > 900f || lastFrameVelocity > 900f);
+            int frame = Time.frameCount;
+            IsBlocking = Verdict(IsBlocking, judgedFrame != frame, flying);
+            judgedFrame = frame;
         }
 
         // 3. Always record the speed for the next frame

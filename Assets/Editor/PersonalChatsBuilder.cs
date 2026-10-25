@@ -51,10 +51,17 @@ using Object = UnityEngine.Object;
 ///   TopBar/LeftZone:                           [BackButton] [Avatar] [Text/Name ……]  + NameTap (over Avatar..Text)
 ///   TopBar/RightZone:                          [SemiAutoToggle] [PersonalPill/Pill(Ring, Fill, Content[Lock][Label])]
 ///
+/// The «Личные» folder (spec §5.3, §5.4; sketch 009 screens 1, 3, 4) — PersonalChatsBuilder.Folder.cs:
+///   • ChatItem.prefab — <see cref="EnsureChatItemSelectCheck"/>: SelectCheck, the checkbox of the folder's selection modes,
+///     right before the avatar; hidden; ChatItemView.selectCheck / selectChecked;
+///   • Main.unity — <see cref="EnsureFolderPanel"/>: Screen_Messanger/PersonalChatsPanel, right after the chat list and before
+///     the open chat, over the tab bar like it; hidden; every PersonalChatsFolderView part wired. The chat list's delete card
+///     moves up beside it, over it — a folder row's «Удалить» asks through it.
+///
 /// Colours are ThemedColor bindings (the glyphs are white sprites tinted by role, never baked); the authored colours are
 /// the light theme's, like the rest of the scene. Geometry is in 1080×1920 canvas reference units.
 /// </summary>
-public static class PersonalChatsBuilder
+public static partial class PersonalChatsBuilder
 {
     public const string RowName = "PersonalChatsRow";
     public const string LockName = "AudienceLock";
@@ -183,6 +190,9 @@ public static class PersonalChatsBuilder
         bool modified = false;
         EnsureListRow(list, ref modified);
         EnsureHeaderParts(Single<MessageHeaderView>(scene, Tag), Single<SuggestionsController>(scene, Tag), ref modified);
+        GameObject thread = Single<ChatManager>(scene, Tag).MessageListPanel;
+        if (thread == null) throw new InvalidOperationException($"{Tag} ChatManager.MessageListPanel is not wired.");
+        EnsureFolderPanel(list, thread.transform, ref modified);
         if (!modified)
         {
             Debug.Log($"{Tag} {ScenePath}: already applied — not saved.");
@@ -190,7 +200,7 @@ public static class PersonalChatsBuilder
         }
         EditorSceneManager.MarkSceneDirty(scene);
         if (!EditorSceneManager.SaveScene(scene)) throw new InvalidOperationException($"{Tag} Could not save {ScenePath}.");
-        Debug.Log($"{Tag} {ScenePath}: the «Личные» row and the open chat's header parts updated and saved.");
+        Debug.Log($"{Tag} {ScenePath}: the «Личные» row, the open chat's header parts and the «Личные» folder updated and saved.");
     }
 
     private static void WireItemPrefab(string path)
@@ -203,6 +213,7 @@ public static class PersonalChatsBuilder
             bool modified = false;
             EnsureChatItemLock(item, ref modified);
             EnsureChatItemMoveButton(item, ref modified);
+            EnsureChatItemSelectCheck(item, ref modified);
             if (!modified)
             {
                 Debug.Log($"{Tag} {path}: already applied — not saved.");
@@ -210,7 +221,7 @@ public static class PersonalChatsBuilder
             }
             PrefabUtility.SaveAsPrefabAsset(root, path, out bool saved);
             if (!saved) throw new InvalidOperationException($"{Tag} Could not save {path}.");
-            Debug.Log($"{Tag} {path}: the audience lock and the swipe's move button updated and saved.");
+            Debug.Log($"{Tag} {path}: the audience lock, the swipe's move button and the checkbox updated and saved.");
         }
         finally
         {

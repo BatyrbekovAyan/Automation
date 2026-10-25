@@ -644,6 +644,19 @@ public partial class Manager : MonoBehaviour
             }
         }
 
+        // «Личные и рабочие чаты»: the channels paired before this version are marked seen — once — so their bots never get
+        // «Кто из них клиенты?». Only now that the bots are loaded: a run over an empty BotsParent would spend the one-time
+        // marker and leave every existing channel owing the screen. try/catch like the backfill below: a throw must not
+        // abort the rest of LoadBots.
+        try
+        {
+            PersonalChatsOnboarding.PresetChannelsSeen(AudienceChannelsOfLoadedBots());
+        }
+        catch (Exception e)
+        {
+            Debug.LogError($"[Manager] the personal-chats channel preset threw — continuing: {e}");
+        }
+
         // Trial backfill (Task 15b): installs that authed a channel BEFORE Task 15a's
         // auth-time StartIfNeeded shipped carry no TrialStartedUtc at all, so their trial
         // never starts and — since IsExpired is `HasStarted && DaysLeft() <= 0` — never
@@ -747,6 +760,22 @@ public partial class Manager : MonoBehaviour
         }
 
         SweepPendingUploads();
+    }
+
+    // The loaded bots' channels as the onboarding preset reads them: the profile each holds now and the one the server retired.
+    private List<PersonalChatsOnboarding.BotChannels> AudienceChannelsOfLoadedBots()
+    {
+        var bots = new List<PersonalChatsOnboarding.BotChannels>();
+        Transform root = BotsRoot;
+        if (root == null) return bots;
+        for (int i = 0; i < root.childCount; i++)
+        {
+            var bot = root.GetChild(i).GetComponent<Bot>();
+            if (bot == null) continue;
+            bots.Add(new PersonalChatsOnboarding.BotChannels(bot.name, bot.whatsappProfileId, bot.telegramProfileId,
+                ProfileRetirement.MarkerId(bot.name, ChatChannel.WhatsApp), ProfileRetirement.MarkerId(bot.name, ChatChannel.Telegram)));
+        }
+        return bots;
     }
 
     // Same safety net, one layer down: an upload whose process died between the
@@ -2006,12 +2035,13 @@ public partial class Manager : MonoBehaviour
     }
 
     // «Личные и рабочие чаты»: a channel of a NEW bot is paired (its auth confirmed above, its Create next). The server
-    // learns the connection — it reads the number from get/status itself — and «Кто из них клиенты?» waits for this bot's
-    // chats on the channel: a new bot is always a first connection. Reported before the Create, since the first message
-    // may come any moment now.
+    // learns the connection — it reads the number from get/status itself — the channel is seen on this bot from now on, and
+    // «Кто из них клиенты?» waits for this bot's chats on the channel: a new bot is always a first connection. Reported
+    // before the Create, since the first message may come any moment now.
     private static void ReportNewBotPairing(string botName, string profileId, bool telegram)
     {
         ChatAudienceSyncService.ReportConnected(profileId);
+        PersonalChatsOnboarding.MarkChannelSeen(botName, telegram);
         PersonalChatsOnboarding.Request(botName, telegram);
     }
 

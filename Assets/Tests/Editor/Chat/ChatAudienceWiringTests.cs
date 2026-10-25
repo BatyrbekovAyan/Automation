@@ -40,6 +40,17 @@ public class ChatAudienceWiringTests
         return null;
     }
 
+    // An expression-bodied member («=> …;»): from its arrow to the semicolon that ends it. MethodBody would skip to the next
+    // member's braces.
+    private static string ExpressionBody(string text, string signature)
+    {
+        int i = At(text, signature);
+        int arrow = text.IndexOf("=>", i, StringComparison.Ordinal);
+        int brace = text.IndexOf('{', i);
+        Assert.IsTrue(arrow > i && (brace < 0 || arrow < brace), $"{signature}: not an expression-bodied member");
+        return text.Substring(arrow, text.IndexOf(';', arrow) - arrow + 1);
+    }
+
     private static int At(string text, string needle)
     {
         int i = text.IndexOf(needle, StringComparison.Ordinal);
@@ -121,6 +132,7 @@ public class ChatAudienceWiringTests
         }
         string helper = MethodBody(manager, "private static void ReportNewBotPairing(string botName, string profileId, bool telegram)");
         Assert.IsTrue(helper.Contains("ChatAudienceSyncService.ReportConnected(profileId);"), "the server learns the connection");
+        Assert.IsTrue(helper.Contains("PersonalChatsOnboarding.MarkChannelSeen(botName, telegram);"), "the channel is seen on this bot from now on");
         Assert.IsTrue(helper.Contains("PersonalChatsOnboarding.Request(botName, telegram);"),
             "a new bot is a first connection: «Кто из них клиенты?» is owed");
     }
@@ -141,26 +153,29 @@ public class ChatAudienceWiringTests
             int reported = At(body, $"ReportSettingsPairing(ChatChannel.{channel}, Manager.openBot.GetComponent<Bot>().{word.ToLowerInvariant()}ProfileId,");
             int overwritten = At(body, $"PlayerPrefs.SetString(Manager.openBot.name + \"{word}Number\"");
             Assert.Less(reported, overwritten, $"{done}: decided while the stored number is still the old one");
-            Assert.IsTrue(body.Contains($"{field} ?? StoredChannel(ChatChannel.{channel})"),
-                $"{done}: the channel as it was when the pairing began");
+            Assert.IsTrue(body.Contains($"{field} ?? StoredNumber(ChatChannel.{channel})"),
+                $"{done}: the number as it was when the pairing began");
             Assert.IsTrue(body.Contains($"Manager.Instance.LastAuthed{word}Number"), $"{done}: against the number just paired");
 
-            // «Сменить номер» logs out first — the logout clears the stored number long before the new one pairs — and a code
-            // requested again stores the recreated profile: the channel is read when the pairing BEGINS.
+            // «Сменить номер» logs out first — the logout clears the stored number long before the new one pairs: the number is
+            // read when the pairing BEGINS.
             string begin = MethodBody(auth, show);
-            Assert.Less(At(begin, $"{field} = StoredChannel(ChatChannel.{channel});"), At(begin, open), $"{show}: captured before the auth page opens");
+            Assert.Less(At(begin, $"{field} = StoredNumber(ChatChannel.{channel});"), At(begin, open), $"{show}: captured before the auth page opens");
         }
 
         string helper = MethodBody(auth, "private static void ReportSettingsPairing(");
         int report = At(helper, "ChatAudienceSyncService.ReportConnected(profileId);");
-        int ask = At(helper, "PersonalChatsOnboarding.Request(botName, channel == ChatChannel.Telegram);");
-        Assert.IsTrue(helper.Contains("ChatAudienceConnectPolicy.IsFirstConnection(before.profileId, ProfileRetirement.MarkerId(botName, channel))"),
-            "a channel new to this bot — no profile before it and none the server retired");
-        Assert.IsTrue(helper.Contains("ChatAudienceConnectPolicy.NumberChanged(before.number, authedNumber)"), "…or another number");
-        Assert.Less(report, ask, "every pairing is reported; the screen only for a first connection or another number");
+        int seen = At(helper, "PersonalChatsOnboarding.IsChannelSeen(botName, telegram)");
+        int mark = At(helper, "PersonalChatsOnboarding.MarkChannelSeen(botName, telegram);");
+        int ask = At(helper, "PersonalChatsOnboarding.Request(botName, telegram);");
+        Assert.IsTrue(helper.Contains("ChatAudienceConnectPolicy.OwesOnboarding(seen, numberBefore, authedNumber)"),
+            "a channel never seen on this bot, or another number");
+        Assert.IsTrue(report < seen && seen < mark && mark < ask,
+            "every pairing is reported and marks its channel seen; the screen only for a first connection or another number");
+        Assert.IsFalse(helper.Contains("IsFirstConnection("), "the seen flag decides a first connection, not the stored ids");
 
-        string stored = MethodBody(auth, "private static (string profileId, string number) StoredChannel(ChatChannel channel)");
-        Assert.IsTrue(stored.Contains("\"ProfileId\"") && stored.Contains("\"Number\""), "the stored profile id and number of the channel");
+        string stored = ExpressionBody(auth, "private static string StoredNumber(ChatChannel channel)");
+        Assert.IsTrue(stored.Contains("\"Number\""), "the stored number of the channel");
     }
 
     // ── deletion ─────────────────────────────────────────────────────────────────────────────────────────────
@@ -190,6 +205,8 @@ public class ChatAudienceWiringTests
         Assert.IsTrue(local.Contains("PersonalChatsOnboarding.Clear(transform.name, telegram: false);")
                       && local.Contains("PersonalChatsOnboarding.Clear(transform.name, telegram: true);"),
             "«Кто из них клиенты?» is not owed for a bot that is gone — a recreated one gets it afresh");
+        Assert.IsTrue(local.Contains("PersonalChatsOnboarding.ClearChannelsSeen(transform.name);"),
+            "…its channels are forgotten too: a bot made anew connects them for the first time");
 
         string forgetBot = MethodBody(Service, "private void Forget(string botName)");
         Assert.IsTrue(forgetBot.Contains("ChatAudienceSyncQueue.ForgetBot(_model, botName,") && forgetBot.Contains("ChatAudienceStore.ForgetProfile("),

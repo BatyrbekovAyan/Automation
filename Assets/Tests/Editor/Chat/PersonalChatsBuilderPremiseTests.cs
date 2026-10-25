@@ -192,8 +192,10 @@ public class PersonalChatsBuilderPremiseTests
             Assert.IsFalse(PersonalChatsBuilder.EnsureChatItemLock(item),
                 "the saved prefab already holds everything the builder authors");
             Assert.IsFalse(PersonalChatsBuilder.EnsureChatItemMoveButton(item), "…the move button included");
+            Assert.IsFalse(PersonalChatsBuilder.EnsureChatItemSelectCheck(item), "…and the checkbox");
             Assert.AreEqual(1, root.GetComponentsInChildren<Transform>(true).Count(t => t.name == PersonalChatsBuilder.LockName));
             Assert.AreEqual(1, root.GetComponentsInChildren<Transform>(true).Count(t => t.name == PersonalChatsBuilder.MoveButtonName));
+            Assert.AreEqual(1, root.GetComponentsInChildren<Transform>(true).Count(t => t.name == PersonalChatsBuilder.SelectCheckName));
         }
         finally
         {
@@ -484,6 +486,300 @@ public class PersonalChatsBuilderPremiseTests
         Assert.AreEqual(chipWord.fontSize, word.fontSize, 0.001f);
         Assert.AreEqual(chipWord.fontStyle, word.fontStyle);
     }
+
+    // ---- ChatItem.prefab: the checkbox of the folder's selection modes (spec §5.3, §5.4) ----
+
+    [Test]
+    public void ChatItemPrefab_SelectCheck_IsHiddenBeforeTheAvatar_AndWired()
+    {
+        GameObject root = PrefabUtility.LoadPrefabContents(ItemPrefabPath);
+        try
+        {
+            var item = root.GetComponent<ChatItemView>();
+            var refs = new SerializedObject(item);
+            var check = refs.FindProperty("selectCheck")?.objectReferenceValue as GameObject;
+            var marked = refs.FindProperty("selectChecked")?.objectReferenceValue as GameObject;
+            Assert.IsNotNull(check, "ChatItemView.selectCheck is wired");
+            Assert.IsNotNull(marked, "ChatItemView.selectChecked is wired");
+            Assert.AreEqual(PersonalChatsBuilder.SelectCheckName, check.name);
+            Assert.IsFalse(check.activeSelf, "hidden by default — only the folder's selection modes show it");
+            Assert.IsFalse(marked.activeSelf, "unmarked by default");
+            Assert.AreSame(check.transform, marked.transform.parent, "the mark is the checkbox's own face");
+
+            Transform avatarColumn = item.avatarImage.transform.parent;
+            Assert.AreSame(avatarColumn.parent, check.transform.parent, "in the row's layout, beside the avatar");
+            Assert.AreEqual(avatarColumn.GetSiblingIndex() - 1, check.transform.GetSiblingIndex(), "right before the avatar");
+            var slot = check.GetComponent<LayoutElement>();
+            Assert.IsNotNull(slot, "the checkbox takes its place in the row's layout");
+            Assert.AreEqual(PersonalChatsBuilder.SelectCheckSize, slot.preferredWidth, 0.001f);
+            Assert.AreEqual(PersonalChatsBuilder.SelectCheckSize, ((RectTransform)check.transform).sizeDelta.y, 0.001f,
+                "the row's layout does not control heights — the box is its own height");
+
+            foreach (Graphic graphic in check.GetComponentsInChildren<Graphic>(true))
+            {
+                Assert.IsFalse(graphic.raycastTarget, $"{graphic.name}: the row takes the tap, never its checkbox");
+                Assert.IsNotNull(graphic.GetComponent<ThemedColor>(), $"{graphic.name}: tinted by its role");
+            }
+            AssertBound(GraphicNamed(check, "Ring"), ThemeRole.InputBorder);
+            AssertBound(GraphicNamed(check, "Hole"), ThemeRole.Surface);
+            AssertBound(GraphicNamed(marked, "Fill"), ThemeRole.AccentFill);
+            var tick = (Image)GraphicNamed(marked, "Tick");
+            AssertBound(tick, ThemeRole.AccentOnFill);
+            Assert.AreSame(AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Images/Icons/Tick.png"), tick.sprite, "the app's tick glyph");
+        }
+        finally
+        {
+            PrefabUtility.UnloadPrefabContents(root);
+        }
+    }
+
+    [Test]
+    public void EnsureChatItemSelectCheck_OnARowWithoutIt_BuildsOnce()
+    {
+        GameObject root = PrefabUtility.LoadPrefabContents(ItemPrefabPath);   // never saved here
+        try
+        {
+            var item = root.GetComponent<ChatItemView>();
+            foreach (Transform stale in root.GetComponentsInChildren<Transform>(true).Where(t => t.name == PersonalChatsBuilder.SelectCheckName).ToArray())
+                Object.DestroyImmediate(stale.gameObject);
+
+            Assert.IsTrue(PersonalChatsBuilder.EnsureChatItemSelectCheck(item), "the first run builds the checkbox");
+            Assert.IsFalse(PersonalChatsBuilder.EnsureChatItemSelectCheck(item), "a second run changes nothing");
+            Assert.AreEqual(1, root.GetComponentsInChildren<Transform>(true).Count(t => t.name == PersonalChatsBuilder.SelectCheckName));
+            Assert.AreSame(root.GetComponentsInChildren<Transform>(true).Single(t => t.name == PersonalChatsBuilder.SelectCheckName).gameObject,
+                new SerializedObject(item).FindProperty("selectCheck").objectReferenceValue);
+        }
+        finally
+        {
+            PrefabUtility.UnloadPrefabContents(root);
+        }
+    }
+
+    // ---- Main.unity: the «Личные» folder (spec §5.3, §5.4; sketch 009 screens 1, 3, 4) ----
+
+    private static readonly string[] FolderFields =
+    {
+        "backButton", "backChevron", "backLabel", "title", "editButton", "statusLine", "statusText", "body", "bodyText", "search",
+        "searchPlaceholder", "sectionHeader", "loadingLabel", "scroll", "rowsContent", "noContactsNote", "noContactsText", "bottomBar",
+        "primaryButton", "primaryLabel", "secondaryButton", "footer", "swipeBack",
+    };
+
+    [Test]
+    public void Scene_FolderPanel_StandsAfterTheChatList_AndBeforeTheThread_OverTheTabBar()
+    {
+        SceneYaml scene = SceneYaml.Load(ScenePath);
+        string listRect = scene.RectOf(scene.GameObjectOf(scene.Single(ScriptGuid(typeof(ChatListView)), "ChatListView")));
+        string[] screen = scene.Children(scene.Parent(listRect)).ToArray();
+        int list = System.Array.IndexOf(screen, listRect);
+        Assert.Greater(screen.Length, list + 1, "nothing after the chat list");
+        string panel = screen[list + 1];
+        Assert.AreEqual(PersonalChatsBuilder.FolderPanelName, scene.NameOf(scene.GameObjectOf(panel)), "right after the chat list");
+        Assert.IsFalse(scene.IsActive(scene.GameObjectOf(panel)), "authored hidden — the folder shows itself");
+        Assert.AreEqual(1, screen.Count(r => scene.NameOf(scene.GameObjectOf(r)) == PersonalChatsBuilder.FolderPanelName), "one folder");
+
+        string thread = scene.RectOf(scene.Ref(scene.Single(ScriptGuid(typeof(ChatManager)), "ChatManager"), "MessageListPanel"));
+        Assert.Greater(System.Array.IndexOf(screen, thread), list + 1, "before the open chat, which slides in over it");
+        foreach (string field in new[] { "m_AnchorMin", "m_AnchorMax", "m_Pivot", "m_AnchoredPosition", "m_SizeDelta" })
+            Assert.AreEqual(scene.Field(thread, field), scene.Field(panel, field), $"the open chat's full screen, over the tab bar ({field})");
+    }
+
+    [Test]
+    public void Scene_FolderPanel_IsWired_ToItsOwnParts_AndToTheChatList()
+    {
+        SceneYaml scene = SceneYaml.Load(ScenePath);
+        string view = scene.Single(ScriptGuid(typeof(PersonalChatsFolderView)), "PersonalChatsFolderView");
+        string panelGo = scene.GameObjectOf(view);
+        Assert.AreEqual(PersonalChatsBuilder.FolderPanelName, scene.NameOf(panelGo));
+        string list = scene.Single(ScriptGuid(typeof(ChatListView)), "ChatListView");
+        Assert.AreEqual(list, scene.Ref(view, "chatList"), "a row's move and delete go to the chat list's own requests");
+        Assert.AreEqual(scene.Field(list, "prefab"), scene.Field(view, "rowPrefab"), "the folder's rows are the chat list's rows");
+
+        var own = new HashSet<string>(scene.Subtree(scene.RectOf(panelGo)));
+        foreach (string field in FolderFields)
+        {
+            string target = scene.Ref(view, field);
+            Assert.IsNotNull(target, $"PersonalChatsFolderView.{field} is wired — run Tools/Personal Chats/Build");
+            Assert.IsTrue(own.Contains(scene.RectOf(scene.GameObjectOf(target) ?? target)), $"{field} is one of the folder's own parts");
+        }
+
+        string surface = scene.Component(panelGo, ScriptGuid(typeof(Image)));
+        Assert.AreEqual("1", scene.Field(surface, "m_RaycastTarget"), "the page takes every tap — nothing reaches the list below");
+        AssertRole(scene, panelGo, ThemeRole.Surface, surface);
+    }
+
+    [Test]
+    public void Scene_FolderSwipeBack_SlidesThePanel_AndForwardsVerticalDragsToItsRows()
+    {
+        SceneYaml scene = SceneYaml.Load(ScenePath);
+        string view = scene.Single(ScriptGuid(typeof(PersonalChatsFolderView)), "PersonalChatsFolderView");
+        string panelRect = scene.RectOf(scene.GameObjectOf(view));
+        string swipe = scene.Ref(view, "swipeBack");
+        string stripGo = scene.GameObjectOf(swipe);
+        Assert.AreEqual(scene.RectOf(stripGo), scene.Children(panelRect).Last(), "the strip is the panel's last child: it wins the edge");
+        Assert.AreEqual(panelRect, scene.Ref(swipe, "panelToSlide"), "it slides the folder");
+        Assert.AreEqual(scene.Ref(view, "scroll"), scene.Ref(swipe, "contentScrollRect"), "a vertical drag still scrolls the rows");
+        string pass = scene.Component(stripGo, ScriptGuid(typeof(ClickPassthrough)));
+        Assert.IsNotNull(pass, "taps on the strip reach what is under it");
+        Assert.AreEqual(panelRect, scene.Ref(pass, "allowedPanel"), "…inside the folder only — never the chat list below");
+        Assert.AreEqual("1", scene.Field(pass, "deliverPressToAllBehind"));
+        Assert.AreEqual("1", scene.Field(scene.Component(stripGo, ScriptGuid(typeof(LayoutElement))), "m_IgnoreLayout"),
+            "the page's layout never moves the strip");
+
+        string folder = System.IO.File.ReadAllText(System.IO.Path.Combine(Application.dataPath, "Scripts/UI/PersonalChatsFolderView.cs"));
+        StringAssert.Contains("swipeBack.OnCommitted = HandleSwipedAway;", folder,
+            "OnCommitted is not serialized: the folder takes the strip's commit when it wires itself");
+    }
+
+    [Test]
+    public void Scene_FolderSearch_IsConfiguredLikeTheOtherFields()
+    {
+        SceneYaml scene = SceneYaml.Load(ScenePath);
+        string view = scene.Single(ScriptGuid(typeof(PersonalChatsFolderView)), "PersonalChatsFolderView");
+        string bar = scene.Ref(view, "search");
+        Assert.AreEqual(ScriptGuid(typeof(ChatSearchBar)), scene.ScriptGuidOf(bar), "the chat list's own search bar, cloned");
+        string listBar = scene.Children(scene.Ref(scene.Single(ScriptGuid(typeof(ChatListView)), "ChatListView"), "content"))
+            .Select(scene.GameObjectOf).First(go => scene.Component(go, ScriptGuid(typeof(ChatSearchBar))) != null);
+        Assert.AreNotEqual(listBar, scene.GameObjectOf(bar), "…its own copy, not the list's bar");
+
+        string input = scene.Ref(bar, "input");
+        Assert.AreEqual(ScriptGuid(typeof(DeferredDismissInputField)), scene.ScriptGuidOf(input),
+            "the single-focus field type every input of the app uses");
+        Assert.AreNotEqual(((int)TMP_InputField.LineType.SingleLine).ToString(CultureInfo.InvariantCulture), scene.Field(input, "m_LineType"),
+            "never SingleLine — mixed line types restart the IME on a switch");
+        Assert.AreEqual(((int)TMP_InputField.InputType.Standard).ToString(CultureInfo.InvariantCulture), scene.Field(input, "m_InputType"),
+            "autocorrection off");
+        Assert.AreEqual(((int)TouchScreenKeyboardType.Default).ToString(CultureInfo.InvariantCulture), scene.Field(input, "m_KeyboardType"),
+            "the Default keypad");
+        Assert.AreEqual(scene.Ref(input, "m_Placeholder"), scene.Ref(view, "searchPlaceholder"), "the folder rewrites the bar's own hint");
+    }
+
+    [Test]
+    public void Scene_DeleteConfirm_StandsAboveTheFolder()
+    {
+        SceneYaml scene = SceneYaml.Load(ScenePath);
+        string list = scene.Single(ScriptGuid(typeof(ChatListView)), "ChatListView");
+        string listRect = scene.RectOf(scene.GameObjectOf(list));
+        string[] screen = scene.Children(scene.Parent(listRect)).ToArray();
+        string confirm = scene.RectOf(scene.GameObjectOf(scene.Ref(list, "deleteConfirm")));
+        int folder = System.Array.IndexOf(screen, screen.First(r => scene.NameOf(scene.GameObjectOf(r)) == PersonalChatsBuilder.FolderPanelName));
+        Assert.AreEqual(folder + 1, System.Array.IndexOf(screen, confirm),
+            "«Удалить» in the folder asks through the chat list's card — it must stand over the folder, not under it");
+        string thread = scene.RectOf(scene.Ref(scene.Single(ScriptGuid(typeof(ChatManager)), "ChatManager"), "MessageListPanel"));
+        Assert.Less(System.Array.IndexOf(screen, confirm), System.Array.IndexOf(screen, thread), "…and under the open chat, as before");
+        foreach ((string field, string value) in new[] { ("m_AnchorMin", "{x: 0, y: 0}"), ("m_AnchorMax", "{x: 1, y: 1}"), ("m_SizeDelta", "{x: 0, y: 0}") })
+            Assert.AreEqual(value, scene.Field(confirm, field), $"it still covers the chats screen ({field})");
+    }
+
+    [Test]
+    public void Scene_FolderTitles_FitTheHeader()
+    {
+        SceneYaml scene = SceneYaml.Load(ScenePath);
+        string title = scene.Ref(scene.Single(ScriptGuid(typeof(PersonalChatsFolderView)), "PersonalChatsFolderView"), "title");
+        var font = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(AssetDatabase.GUIDToAssetPath(scene.FontGuid(title)));
+        Assert.IsNotNull(font, "the title's font");
+        StringAssert.DoesNotContain("Medium", font.name, "measured only in a font whose materials do not rewrite themselves");
+        StringAssert.DoesNotContain("Bold SDF", font.name);
+        var host = new GameObject("TitleMeasure", typeof(RectTransform));
+        _created.Add(host);
+        var tmp = host.AddComponent<TextMeshProUGUI>();
+        tmp.font = font;
+        tmp.fontSize = scene.Float(title, "m_fontSize");
+        tmp.textWrappingMode = TextWrappingModes.NoWrap;
+
+        float room = 1080f - 2f * PersonalChatsBuilder.HeaderSideWidth;   // the header is at least the reference width
+        foreach (string text in new[] { PersonalChatsCopy.FolderTitle, PersonalChatsCopy.EditTitle, PersonalChatsCopy.OnboardingTitle })
+        {
+            tmp.text = text;
+            float width = tmp.GetPreferredValues().x;
+            TestContext.Out.WriteLine($"[FIT] «{text}» {width:F1}u in {room:F0}u");
+            Assert.Greater(width, 0f, "measured");
+            Assert.LessOrEqual(width, room, $"«{text}» fits between the header's two side buttons");
+        }
+    }
+
+    [Test]
+    public void EnsureFolderPanel_OnACodeBuiltScreen_BuildsOnce()
+    {
+        ChatListView list = CodeBuiltChatsScreen(out RectTransform thread, out GameObject confirm);
+        Transform screen = list.transform.parent;
+
+        Assert.IsTrue(PersonalChatsBuilder.EnsureFolderPanel(list, thread), "the first run builds the folder");
+        Assert.IsFalse(PersonalChatsBuilder.EnsureFolderPanel(list, thread), "a second run changes nothing");
+
+        Transform[] panels = screen.Cast<Transform>().Where(t => t.name == PersonalChatsBuilder.FolderPanelName).ToArray();
+        Assert.AreEqual(1, panels.Length, "one folder, however many runs");
+        Assert.AreEqual(list.transform.GetSiblingIndex() + 1, panels[0].GetSiblingIndex(), "right after the chat list");
+        Assert.AreSame(screen, confirm.transform.parent, "the delete card moved up beside the folder…");
+        Assert.AreEqual(panels[0].GetSiblingIndex() + 1, confirm.transform.GetSiblingIndex(), "…right over it");
+        Assert.Less(confirm.transform.GetSiblingIndex(), thread.GetSiblingIndex(), "…and still under the open chat");
+        Assert.IsFalse(panels[0].gameObject.activeSelf, "authored hidden");
+
+        var view = panels[0].GetComponent<PersonalChatsFolderView>();
+        Assert.IsNotNull(view);
+        var refs = new SerializedObject(view);
+        Assert.AreSame(list, refs.FindProperty("chatList").objectReferenceValue);
+        Assert.AreSame(list.prefab, refs.FindProperty("rowPrefab").objectReferenceValue);
+        foreach (string field in FolderFields)
+            Assert.IsNotNull(refs.FindProperty(field).objectReferenceValue, $"{field} is wired");
+        var search = (ChatSearchBar)refs.FindProperty("search").objectReferenceValue;
+        var input = (TMP_InputField)new SerializedObject(search).FindProperty("input").objectReferenceValue;
+        Assert.IsInstanceOf<DeferredDismissInputField>(input, "the clone takes the single-focus field type");
+        Assert.AreEqual(TMP_InputField.LineType.MultiLineSubmit, input.lineType, "the clone takes the house line type");
+        Assert.IsTrue(input.transform.IsChildOf(search.transform), "the clone's own input");
+
+        var listBar = list.content.GetComponentInChildren<ChatSearchBar>(true);
+        var listInput = (TMP_InputField)new SerializedObject(listBar).FindProperty("input").objectReferenceValue;
+        Assert.AreEqual(TMP_InputField.LineType.SingleLine, listInput.lineType, "the chat list's own bar is left as it is");
+    }
+
+    // The chats screen the builder anchors on, built in code: the chat list (its Content holding a search bar with a real
+    // input — the single-focus field type, SingleLine, like the scene's — its row prefab, its delete card) and the open
+    // chat's panel after it.
+    private ChatListView CodeBuiltChatsScreen(out RectTransform thread, out GameObject confirm)
+    {
+        var screen = new GameObject("Screen_Messanger", typeof(RectTransform));
+        _created.Add(screen);
+        RectTransform panel = Rect("ChatsPanel", screen.transform, Vector2.zero, Vector2.one, Centre(), Vector2.zero, Vector2.zero);
+        var list = panel.gameObject.AddComponent<ChatListView>();
+        RectTransform content = Rect("Content", panel, new Vector2(0f, 1f), Vector2.one, new Vector2(0.5f, 1f), Vector2.zero, Vector2.zero);
+        content.gameObject.AddComponent<VerticalLayoutGroup>();
+        list.content = content;
+        list.prefab = ItemPrefab();
+        CodeBuiltSearchBar(content);
+
+        confirm = Rect("DeleteChatConfirmPanel", panel, Vector2.zero, Vector2.one, Centre(), Vector2.zero, Vector2.zero).gameObject;
+        var card = confirm.AddComponent<ChatDeleteConfirm>();
+        var listRefs = new SerializedObject(list);
+        listRefs.FindProperty("deleteConfirm").objectReferenceValue = card;
+        listRefs.ApplyModifiedPropertiesWithoutUndo();
+
+        thread = Rect("MessagesPanel", screen.transform, Vector2.zero, Vector2.one, Centre(), new Vector2(0f, -104f), new Vector2(0f, 208f));
+        return list;
+    }
+
+    private static void CodeBuiltSearchBar(Transform content)
+    {
+        RectTransform barRect = Rect("ChatsSearchBar", content, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0.5f, 1f), Vector2.zero,
+            new Vector2(1080f, 124f));
+        var bar = barRect.gameObject.AddComponent<ChatSearchBar>();
+        barRect.gameObject.AddComponent<LayoutElement>().preferredHeight = 124f;
+        RectTransform inputRect = Rect("Input", barRect, Centre(), Centre(), Centre(), Vector2.zero, new Vector2(800f, 60f));
+        inputRect.gameObject.AddComponent<Image>();
+        var input = inputRect.gameObject.AddComponent<DeferredDismissInputField>();
+        input.lineType = TMP_InputField.LineType.SingleLine;
+        RectTransform area = Rect("Text Area", inputRect, Vector2.zero, Vector2.one, Centre(), Vector2.zero, Vector2.zero);
+        var placeholder = Rect("Placeholder", area, Vector2.zero, Vector2.one, Centre(), Vector2.zero, Vector2.zero).gameObject.AddComponent<TextMeshProUGUI>();
+        var text = Rect("Text", area, Vector2.zero, Vector2.one, Centre(), Vector2.zero, Vector2.zero).gameObject.AddComponent<TextMeshProUGUI>();
+        input.textViewport = area;
+        input.textComponent = text;
+        input.placeholder = placeholder;
+        var barRefs = new SerializedObject(bar);
+        barRefs.FindProperty("input").objectReferenceValue = input;
+        barRefs.ApplyModifiedPropertiesWithoutUndo();
+    }
+
+    private static Graphic GraphicNamed(GameObject root, string name) =>
+        root.GetComponentsInChildren<Graphic>(true).Single(g => g.name == name);
 
     // ---- helpers ----
 

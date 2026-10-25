@@ -23,8 +23,23 @@ public static class ChatAudienceConnectPolicy
         return stored.Length > 0 && authed.Length > 0 && stored != authed;
     }
 
-    // The number's digits, or "" when the text is not a number at all.
-    private static string NumberDigits(string number)
+    /// <summary>
+    /// A confirmed pairing in the settings owes «Кто из них клиенты?»: the channel was never seen on this bot (its first
+    /// connection — whatever ids or number the phone kept from before), or it now carries another number.
+    /// </summary>
+    public static bool OwesOnboarding(bool channelSeen, string storedNumber, string authedNumber) =>
+        !channelSeen || NumberChanged(storedNumber, authedNumber);
+
+    /// <summary>
+    /// The server's answer to a connection report says the number changed: its own word (<paramref name="restarted"/> — it
+    /// moved the moment), or a moment later than the one mirrored for the same profile — a report retried after its first
+    /// answer was lost moves nothing any more and says false. Nothing mirrored proves nothing: a first answer is no restart.
+    /// </summary>
+    public static bool NumberRestarted(bool restarted, long? mirroredConnectedAtMs, long answeredConnectedAtMs) =>
+        restarted || (mirroredConnectedAtMs > 0 && answeredConnectedAtMs > mirroredConnectedAtMs);
+
+    /// <summary>The number's digits, or "" when the text is not a number at all (the settings, the folder's search).</summary>
+    public static string NumberDigits(string number)
     {
         if (string.IsNullOrWhiteSpace(number)) return "";
         foreach (char c in number)

@@ -86,6 +86,13 @@ public static class PersonalChatsCopy
     /// <summary>The «Изменить» mode's button: «Сделать рабочими · 2».</summary>
     public static string MakeBusinessMany(int count) => $"Сделать рабочими · {count}";
 
+    /// <summary>
+    /// The toast after several chats were made working at once («Сделать рабочими · N», «Готово · клиентов: N»): «2 чата стали
+    /// рабочими». One chat keeps <see cref="MovedToBusiness"/>.
+    /// </summary>
+    public static string MovedToBusinessMany(int count) =>
+        $"{count} {RuPlural.Pick(count, "чат стал рабочим", "чата стали рабочими", "чатов стали рабочими")}";
+
     /// <summary>The onboarding's first line: «WhatsApp подключён» / «Telegram подключён».</summary>
     public static string OnboardingConnected(bool telegram) => $"{ChannelName(telegram)} подключён";
 
