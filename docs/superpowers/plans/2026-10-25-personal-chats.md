@@ -88,6 +88,7 @@
   - **D3, «не люди».** Какие из них приходят входящими (`@newsletter`, `status@broadcast`, боты, 777000, «Избранное») и чем помечены (`chat_type`, `is_bot`, выполняется ли `from == chatId`);
   - **D4, история.** Видит ли `messages/get?limit=1&order=asc` сообщение до подключения сразу после подключения или через сколько минут; оставить `SETTLE_MINUTES = 30` или поднять;
   - **D5, журнал.** Значение не `none` — Task 4 Step 6 ставит шаблонам `saveDataSuccessExecution: "none"`;
+  - **D4a, порядок страницы.** `messages/get?order=desc` на `api` и `tapi` отдаёт новые первыми, а сообщения одной секунды — в порядке Wappi (на этом стоит `BACKFILL_SQL`);
   - **D6, повторная подача.** Соответствие полей строки `messages/get` полям webhook, которые читают шаблоны: `profile_id, id, body, type, from, chatId, time, caption, chat_type, is_bot`.
 - [ ] **Step 5: Commit** — `docs(personal-chats): проверки на живом номере (§7)`.
 
@@ -106,8 +107,8 @@ SETTLE_MINUTES, FRESH_HOURS, WIPE_DAYS = 30, 24, 2
 WA_CONTACT_SOURCE = "webhook"            # Task 0 D1: "webhook" | "chats_filter"
 WA_NONHUMAN_SUFFIXES = ("@g.us", "@newsletter", "@broadcast")
 TG_SERVICE_IDS = ("777000",)
-TG_PERSON_TYPE = "user"                  # решение R6 (журнал SDD): тип личного чата Telegram, сравнивается точно
-TG_NONHUMAN_TYPES = ("channel", "chat")  # решение R6: известные «не люди»; любой другой тип — personal/unknown
+TG_PERSON_TYPE = "user"                  # тип личного чата Telegram, сравнивается точно
+TG_NONHUMAN_TYPES = ("channel", "chat")  # известные «не люди»; любой другой тип — personal/unknown
 FIXTURE = os.path.join(HERE, "fixtures", "audience-cases.json")
 RULE_JS: str    # function decideAudience(f) → {kind: 'personal'|'business', reason: 'nonhuman'|'owner'|'contact'|'history'|'new'|'unknown'}
 ```
@@ -119,7 +120,7 @@ RULE_JS: str    # function decideAudience(f) → {kind: 'personal'|'business', r
    - WhatsApp: `chatId` кончается одним из `WA_NONHUMAN_SUFFIXES`, или `flags.bot` / `flags.self` истинны.
    - Telegram: `chatId` входит в `TG_SERVICE_IDS`; `chatType` входит в `TG_NONHUMAN_TYPES` (точное сравнение); или истинен любой из `flags.bot/support/self`.
 2. **Telegram, `flags === null` → `personal/unknown`:** нельзя исключить бота.
-   - **2a. Telegram, `chatType !== TG_PERSON_TYPE` → `personal/unknown`** (решение R6): пустой, незнакомый или иначе написанный тип не записывается.
+   - **2a. Telegram, `chatType !== TG_PERSON_TYPE` → `personal/unknown`** (решение исполнения 2026-10-25): пустой, незнакомый или иначе написанный тип не записывается.
 3. **`owner` → `{owner}/owner`.**
 4. **`contact === true` → `personal/contact`.**
 5. **`history === true` → `personal/history`.**
@@ -182,7 +183,7 @@ def BACKFILL_SQL(memory_row: str, owner_content_sql: str) -> str   # профи�
 - **`BACKFILL_SQL`.**
   - Пишет только если чат рабочий (`BUSINESS_SQL`).
   - Пропускает сообщение-повод и всё, чей id уже есть в `chat_history_events` этого чата: туда попадают ответы ИИ, отправки из приложения и с телефона.
-  - Пишет по порядку времени. Сообщение владельца → история `owner_phone` и память `ai` с отметкой «Владелец: » (`owner_content_sql`). Сообщение клиента → история `client` и память `human` той же формы (`memory_row`), что пишет `Record Suppressed`. Обе строки несут `source` и `message_id`.
+  - На входе — страница `messages/get` с `order=desc` ровно в том виде, в каком её вернул Wappi (новые первыми). Пишет её развёрнутой, по позиции в странице, и по времени не пересортировывает: сообщения одной секунды и сообщения без времени остаются на своих местах. Сообщение владельца → история `owner_phone` и память `ai` с отметкой «Владелец: » (`owner_content_sql`). Сообщение клиента → история `client` и память `human` той же формы (`memory_row`), что пишет `Record Suppressed`. Обе строки несут `source` и `message_id`.
 
 - [ ] **Step 1: Падающие тесты** (временные таблицы `like public.X including all`, как в `test_set_schedule.py`):
   - `default_written_once` — второе решение по тому же чату ничего не меняет;
@@ -237,7 +238,7 @@ def BACKFILL_SQL(memory_row: str, owner_content_sql: str) -> str   # профи�
    - Не 200, `status` не `done`, массив пуст или его нет → `history = null`.
    - На выходе `persist = reason !== 'unknown'`.
 6. `Persist?` (If: `$json.persist === true`) → `Write Decision` (PG; continue) → `Became Business?` (If: прочитанная строка говорит `business`).
-   - Если да: `Recent Messages` (`{api|tapi}/sync/messages/get?…&limit=10&order=desc`) → `Backfill` (PG `BACKFILL_SQL`; continue) → `Shape`.
+   - Если да: `Recent Messages` (`{api|tapi}/sync/messages/get?…&limit=10&order=desc`) → `Backfill` (PG `BACKFILL_SQL`; continue) → `Shape`. Страница уходит в `Backfill` ровно как её вернул Wappi, новые первыми — без сортировки.
    - Если нет: сразу `Shape` (Code).
 
    Сбой `Recent Messages` или `Backfill` решения не меняет: рабочий чат остаётся рабочим. Все стопы ведут прямо в `Shape` со своим `outcome`.
@@ -398,7 +399,7 @@ RULE = {"profiles": ["profileIds", "profileId"], "workflows": [], "appUser": [],
 3. **list:** `List` (PG `LIST_SQL`) → `Shape List` → `Respond`.
 4. **set:** `Set` (PG `OWNER_SET_SQL`) → `Shape Set` → `Respond`, затем начало разговора и повторная подача:
    - `Replay Items` (Code: строки с `became_business`);
-   - `Recent Messages` — `{api|tapi}/sync/messages/get?…&limit=10&order=desc`, без `mark_all`;
+   - `Recent Messages` — `{api|tapi}/sync/messages/get?…&limit=10&order=desc`, без `mark_all`; страница уходит в `Backfill` ровно как её вернул Wappi, новые первыми;
    - `Replay Plan` (Code): повод для повторной подачи — самое новое сообщение, если оно от клиента (не от нас) и `time ≥ now − FRESH_HOURS × 3600`. Тело webhook собирается из строки по записи D6;
    - `Backfill` (PG `BACKFILL_SQL`; continue) — id повода передаётся, только если подача будет: несвежее или уже отвеченное сообщение попадает в историю;
    - `Replay?` → `Replay` (POST `http://localhost:5678/webhook/<profileId>`, `neverError`, 10 с).
