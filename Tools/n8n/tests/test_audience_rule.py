@@ -20,7 +20,7 @@ body). No database, no n8n server, no network, never prod.
   the_table_covers_every_outcome     all seven results on both channels; every nonhuman marker of the module has a row
   the_table_pins_the_step_order      for every two steps that can answer differently, a row on which both apply and the
                                      earlier one wins — so a twin that orders the steps differently fails the table
-  rule_js_carries_the_modules_constants   the suffix list and the service ids in RULE_JS are the module's tuples
+  rule_js_carries_the_modules_constants   the suffix list, the service ids and the Telegram chat types in RULE_JS are the module's
   missing_facts_fail_closed          a fact that is not given is unknown, never a known «no»; an unknown channel is not decided
 
     python3 Tools/n8n/tests/test_audience_rule.py
@@ -140,24 +140,29 @@ with Case('the_table_covers_every_outcome: all seven results on both channels, a
             c.check(any(x['channel'] == 'whatsapp' and x['chatId'].endswith(s) and is_nonhuman(x) for x in CASES), f'no WhatsApp nonhuman row ends with {s}')
         for t in AUD.TG_SERVICE_IDS:
             c.check(any(x['channel'] == 'telegram' and x['chatId'] == t and is_nonhuman(x) for x in CASES), f'no Telegram nonhuman row for the service id {t}')
+        for t in AUD.TG_NONHUMAN_TYPES:
+            c.check(any(x['channel'] == 'telegram' and x['chatType'] == t and is_nonhuman(x) for x in CASES), f'no Telegram nonhuman row for the chat type {t}')
 
-# The steps of the rule, in order. `fires` is a reference written for the table's sake — NOT the code under test: it says
-# which steps apply to a row on their own, so the test can prove the table orders every pair of steps that can disagree.
-STEPS = ('nonhuman', 'flags_unknown', 'owner', 'contact', 'history', 'unknown')
-SAME_ANSWER = {('flags_unknown', 'unknown')}        # both answer personal/unknown: there is no order between them to pin
+# The steps of the rule, in order (`type_unknown` is step 2a: a Telegram chat type that is not the person's, a known non-human
+# one excepted — that is step 1). `fires` is a reference written for the table's sake — NOT the code under test: it says which
+# steps apply to a row on their own, so the test can prove the table orders every pair of steps that can disagree.
+STEPS = ('nonhuman', 'flags_unknown', 'type_unknown', 'owner', 'contact', 'history', 'unknown')
+SAME_ANSWER = {('flags_unknown', 'type_unknown'), ('flags_unknown', 'unknown'), ('type_unknown', 'unknown')}
+# ^ all three answer personal/unknown: there is no order among them to pin
 
 
 def fires(x):
     tg = x['channel'] == 'telegram'
     fl = x['flags'] or {}
     if tg:
-        nonhuman = (x['chatId'] in AUD.TG_SERVICE_IDS or x['chatType'] not in ('', 'user')
+        nonhuman = (x['chatId'] in AUD.TG_SERVICE_IDS or x['chatType'] in AUD.TG_NONHUMAN_TYPES
                     or bool(fl.get('bot') or fl.get('support') or fl.get('self')))
     else:
         nonhuman = x['chatId'].endswith(tuple(AUD.WA_NONHUMAN_SUFFIXES)) or bool(fl.get('bot') or fl.get('self'))
     return {
         'nonhuman': ('personal', 'nonhuman') if nonhuman else None,
         'flags_unknown': ('personal', 'unknown') if tg and x['flags'] is None else None,
+        'type_unknown': ('personal', 'unknown') if tg and x['chatType'] != AUD.TG_PERSON_TYPE else None,
         'owner': (x['owner'], 'owner') if x['owner'] else None,
         'contact': ('personal', 'contact') if x['contact'] is True else None,
         'history': ('personal', 'history') if x['history'] is True else None,
@@ -181,23 +186,28 @@ with Case('the_table_pins_the_step_order: for every two steps that can answer di
                 c.check(pins, f'no row pins step «{a}» above step «{b}»: a twin that swaps them would pass the table')
 
 # ---------------------------------------------------------------------------------------------- the JS itself
-with Case("rule_js_carries_the_modules_constants: the suffix list and the service ids inside RULE_JS are the module's tuples") as c:
+with Case("rule_js_carries_the_modules_constants: the suffix list, the service ids and the Telegram chat types inside RULE_JS are the module's") as c:
     c.check(AUD is not None, NO_MODULE)
     if AUD is not None:
         c.check(json.dumps(list(AUD.WA_NONHUMAN_SUFFIXES)) in AUD.RULE_JS, f'WA_NONHUMAN_SUFFIXES {AUD.WA_NONHUMAN_SUFFIXES} not in RULE_JS')
         c.check(json.dumps(list(AUD.TG_SERVICE_IDS)) in AUD.RULE_JS, f'TG_SERVICE_IDS {AUD.TG_SERVICE_IDS} not in RULE_JS')
+        c.check(f'const TG_NONHUMAN_TYPES = {json.dumps(list(AUD.TG_NONHUMAN_TYPES))};' in AUD.RULE_JS, f'TG_NONHUMAN_TYPES {AUD.TG_NONHUMAN_TYPES} not declared in RULE_JS')
+        c.check(f'const TG_PERSON_TYPE = {json.dumps(AUD.TG_PERSON_TYPE)};' in AUD.RULE_JS, f'TG_PERSON_TYPE {AUD.TG_PERSON_TYPE!r} not declared in RULE_JS')
         c.check(not re.search(r'__[A-Z_]+__', AUD.RULE_JS), 'RULE_JS still carries a template placeholder')
 
 with Case('missing_facts_fail_closed: a fact that is not given reads as unknown, never as a known «no»; an unknown channel is not decided') as c:
     c.check(AUD is not None, NO_MODULE)
     if AUD is not None:
         wa, tg = '77000000001@c.us', '5550000001'
+        card = {'bot': False, 'support': False, 'self': False}
         unknown = {'kind': 'personal', 'reason': 'unknown'}
         probes = [
             ('whatsapp: only the id is given', {'channel': 'whatsapp', 'chatId': wa}),
             ('whatsapp: contact known, history not given', {'channel': 'whatsapp', 'chatId': wa, 'contact': False}),
             ('whatsapp: history known, contact not given', {'channel': 'whatsapp', 'chatId': wa, 'history': False}),
             ('telegram: flags not given', {'channel': 'telegram', 'chatId': tg, 'chatType': 'user', 'contact': False, 'history': False}),
+            ('telegram: chat type not given', {'channel': 'telegram', 'chatId': tg, 'flags': card, 'contact': False, 'history': False}),
+            ('telegram: chat type is null', {'channel': 'telegram', 'chatId': tg, 'chatType': None, 'flags': card, 'contact': False, 'history': False}),
             ('unknown channel', {'channel': 'sms', 'chatId': wa, 'contact': False, 'history': False}),
             ('no channel', {'chatId': wa, 'contact': False, 'history': False}),
         ]

@@ -13,10 +13,14 @@ The rule — RULE_JS, `decideAudience(f)` → {kind: 'personal' | 'business', re
   1. not a person → personal / nonhuman
        WhatsApp  the chat id ends with one of WA_NONHUMAN_SUFFIXES (a group, a channel, the status and broadcast lists), or
                  flags.bot / flags.self (the chat with oneself);
-       Telegram  the chat id is one of TG_SERVICE_IDS (777000, the service account), or the chat type is neither '' nor
-                 'user' (a channel, a group), or any of flags.bot / flags.support / flags.self;
+       Telegram  the chat id is one of TG_SERVICE_IDS (777000, the service account), or the chat type is one of
+                 TG_NONHUMAN_TYPES ('channel', 'chat' — a channel, a group), or any of flags.bot / flags.support / flags.self;
   2. Telegram without the chat card (flags null) → personal / unknown: a bot cannot be ruled out. WhatsApp has no card to
      miss, so there `flags: null` reads as all false;
+  2a. Telegram with a chat type other than TG_PERSON_TYPE ('user') → personal / unknown. ANY other value counts: '' (not
+     given), another spelling or case ('User'), a literal nobody has seen yet. Such a chat cannot be classified, and what
+     cannot be classified is never written down; only the two known non-human types are decided (step 1). WhatsApp does not
+     read the chat type at all;
   3. the owner's own decision ('personal' | 'business'), if there is one → {owner} / owner;
   4. a saved contact → personal / contact;
   5. a conversation before the channel was connected → personal / history;
@@ -46,18 +50,21 @@ WA_CONTACT_SOURCE = "webhook"   # where the WhatsApp «saved contact» fact come
                                 # docs/audits/2026-10-25-personal-chats/live-checks.md
 WA_NONHUMAN_SUFFIXES = ("@g.us", "@newsletter", "@broadcast")   # a group; a channel; the status and broadcast lists
 TG_SERVICE_IDS = ("777000",)                                    # the Telegram service account (login codes and the like)
+TG_NONHUMAN_TYPES = ("channel", "chat")                         # Telegram chat types that are not a person: a channel; a group
+TG_PERSON_TYPE = "user"                                         # the Telegram chat type of a private dialog — the only person
 FIXTURE = os.path.join(HERE, "fixtures", "audience-cases.json")
 
 # ASCII only on purpose: the same text is embedded in n8n Code nodes and mirrored in C#. Nothing here may read a clock, the
 # network or an n8n global (tests/test_audience_rule.py: rule_js_is_pure), and the only name it leaves at the top level of a
-# Code node is `decideAudience`. The two lists are the module's tuples above, written in by the replacements below.
+# Code node is `decideAudience`. The lists and the person type are the module's constants above, written in below.
 RULE_JS = r"""// AUDIENCE RULE - is this chat PERSONAL (the assistant stays out) or BUSINESS (a client)? ONE function, two runners:
 // the Decide Audience Code node embeds this text verbatim (Tools/n8n/audience.py) and the app's ChatAudienceRule.Decide is its
 // C# twin; both run every row of Tools/n8n/fixtures/audience-cases.json. Pure: no clock, no network, no n8n globals.
 //
 // f = { channel,   'whatsapp' | 'telegram'
 //       chatId,    string
-//       chatType,  string; '' = unknown (Telegram: 'user' | 'channel' | 'chat' ...)
+//       chatType,  string; Telegram: 'user' = a person, 'channel' | 'chat' = not a person, anything else ('' = not given
+//                  included) = not recognised; WhatsApp: not used
 //       flags,     { bot, support, self } | null; Telegram: null = the chat card was not received, WhatsApp: null = all false
 //       contact,   true | false | null; a saved contact, null = not known
 //       history,   true | false | null; a conversation before the connection, null = not known
@@ -67,6 +74,8 @@ RULE_JS = r"""// AUDIENCE RULE - is this chat PERSONAL (the assistant stays out)
 function decideAudience(f) {
   const WA_NONHUMAN_SUFFIXES = __WA_NONHUMAN_SUFFIXES__;
   const TG_SERVICE_IDS = __TG_SERVICE_IDS__;
+  const TG_NONHUMAN_TYPES = __TG_NONHUMAN_TYPES__;
+  const TG_PERSON_TYPE = __TG_PERSON_TYPE__;
   const personal = (reason) => ({ kind: 'personal', reason: reason });
   const telegram = f.channel === 'telegram';
   // A channel that is neither is not decided: step 1 would not know which of its two halves applies.
@@ -78,11 +87,13 @@ function decideAudience(f) {
 
   // 1. Not a person: never a client, whatever the owner says.
   const nonhuman = telegram
-    ? TG_SERVICE_IDS.indexOf(id) >= 0 || (type !== '' && type !== 'user') || flag('bot') || flag('support') || flag('self')
+    ? TG_SERVICE_IDS.indexOf(id) >= 0 || TG_NONHUMAN_TYPES.indexOf(type) >= 0 || flag('bot') || flag('support') || flag('self')
     : WA_NONHUMAN_SUFFIXES.some((suffix) => id.endsWith(suffix)) || flag('bot') || flag('self');
   if (nonhuman) return personal('nonhuman');
   // 2. Telegram without the chat card: a bot cannot be ruled out.
   if (telegram && flags === null) return personal('unknown');
+  // 2a. Telegram with a chat type we do not recognise ('' included, any other spelling or case): it cannot be classified.
+  if (telegram && type !== TG_PERSON_TYPE) return personal('unknown');
   // 3. The owner's own decision.
   if (f.owner === 'personal' || f.owner === 'business') return { kind: f.owner, reason: 'owner' };
   // 4-5. A saved contact, or a conversation that existed before the connection.
@@ -92,7 +103,10 @@ function decideAudience(f) {
   if (f.contact !== false || f.history !== false) return personal('unknown');
   // 7. A new person.
   return { kind: 'business', reason: 'new' };
-}""".replace("__WA_NONHUMAN_SUFFIXES__", json.dumps(list(WA_NONHUMAN_SUFFIXES))).replace("__TG_SERVICE_IDS__", json.dumps(list(TG_SERVICE_IDS)))
+}"""
+for _name, _value in (("WA_NONHUMAN_SUFFIXES", list(WA_NONHUMAN_SUFFIXES)), ("TG_SERVICE_IDS", list(TG_SERVICE_IDS)),
+                      ("TG_NONHUMAN_TYPES", list(TG_NONHUMAN_TYPES)), ("TG_PERSON_TYPE", TG_PERSON_TYPE)):
+    RULE_JS = RULE_JS.replace("__" + _name + "__", json.dumps(_value))
 
 
 if __name__ == "__main__":
