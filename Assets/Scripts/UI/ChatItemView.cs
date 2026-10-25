@@ -17,13 +17,23 @@ public class ChatItemView : MonoBehaviour
     public GameObject unreadBadge;
     public TextMeshProUGUI unreadCountText;
 
-    [Header("Swipe-to-delete")]
-    public Button deleteButton;        // the red button revealed behind the row
+    [Header("Swipe actions (SwipeToDelete)")]
+    public Button deleteButton;        // «Удалить», revealed behind the row (a working WhatsApp chat)
     public SwipeToDelete swipeToDelete; // on the SwipeContent child
 
     [Header("Личные и рабочие чаты")]
     [Tooltip("The lock before the name — a personal chat in the search results. Hidden by default; stamped by PersonalChatsBuilder.")]
     [SerializeField] private GameObject audienceLock;
+    [Tooltip("The swipe's «В личные» / «В рабочие», on the left of «Удалить». Hidden until the row offers a move; stamped by PersonalChatsBuilder.")]
+    [SerializeField] private Button moveButton;
+    [Tooltip("The move button's word. Stamped by PersonalChatsBuilder.")]
+    [SerializeField] private TextMeshProUGUI moveLabel;
+
+    /// <summary>
+    /// The swipe's move button («В личные» / «В рабочие») was tapped: the list or the folder that made the row moves the chat.
+    /// Subscribe once, when the row is made.
+    /// </summary>
+    public event System.Action<ChatViewModel> MoveRequested;
 
     private ChatViewModel vm;
     public ChatViewModel Vm => vm;
@@ -32,6 +42,14 @@ public class ChatItemView : MonoBehaviour
     private Coroutine avatarLoadCoroutine;   // non-null while LoadAvatar's download is in flight
     private UnityWebRequest avatarRequest;   // that download — disposed by hand when the coroutine is cut off
     private bool pendingAvatarLoad;
+
+    // The row's place, which decides its swipe (ChatRowSwipePolicy): false — the working list's; true — the «Личные» folder's
+    // (a personal chat, in the folder or among the working list's search results).
+    private bool swipeInFolder;
+    // The swipe's actions as last applied: the same ones again change nothing, so a refresh never snaps an open row shut.
+    private bool swipeApplied;
+    private bool swipeMove;
+    private bool swipeDelete;
 
     // LRU cache: [ChatID_RawMessage] -> [Perfectly Sliced String]. Capped to bound memory on long sessions.
     private const int MaxTextCacheCount = 500;
@@ -127,38 +145,72 @@ public void Bind(ChatViewModel model)
         button.onClick.RemoveAllListeners();
         button.onClick.AddListener(OnClick);
 
-        // Swipe-to-delete is a WhatsApp-only affordance (Telegram has no chat/delete endpoint —
-        // the 05-03 network guard already no-ops it; the D4 owner decision removes the VISUAL
-        // slide on TG rows too). Rows are pooled and rebind across bots/channels, so set the
-        // enabled state EXPLICITLY on every Bind — never inherit the prior channel's state.
-        ChatChannel rowChannel = ChatManager.Instance != null
-            ? ChatManager.Instance.ActiveChannel
-            : ChatChannel.WhatsApp;
-        bool swipeEnabled = ChatRowSwipePolicy.Enabled(rowChannel);
+        // The swipe's actions follow the chat — its channel (no «Удалить» on Telegram), its place (the working list or the
+        // «Личные» folder's) and whether it is a person (ChatRowSwipePolicy). Rows are pooled and rebind across bots/channels,
+        // so snap shut first and apply them EXPLICITLY on every Bind — never inherit the previous chat's.
+        if (swipeToDelete != null) swipeToDelete.ResetClosed();
+        swipeApplied = false;
+        SetMoveLabel(ChatRowSwipePolicy.MoveLabel(swipeInFolder));
+        ApplySwipeActions();
+    }
 
-        // Snap shut first so a row swiped-open on WhatsApp closes before a channel-swap rebind
-        // (and stays closed when the affordance is then disabled on Telegram).
+    /// <summary>
+    /// The row's place, which decides its swipe (<see cref="ChatRowSwipePolicy"/>): false — a working chat in the working list
+    /// («В личные», and «Удалить» on WhatsApp); true — a personal chat, in the «Личные» folder or among the working list's
+    /// search results («В рабочие» only). Sets the move button's word too. Cheap on every refresh: nothing moves unless the
+    /// actions change, so an open row stays open. Before the first bind it only records the place; Bind applies it.
+    /// </summary>
+    public void SetSwipeContext(bool inFolder)
+    {
+        swipeInFolder = inFolder;
+        SetMoveLabel(ChatRowSwipePolicy.MoveLabel(inFolder));
+        ApplySwipeActions();
+    }
+
+    /// <summary>The move button's word («В личные» / «В рабочие» — PersonalChatsCopy).</summary>
+    public void SetMoveLabel(string text)
+    {
+        if (moveLabel != null && moveLabel.text != text) moveLabel.text = text;
+    }
+
+    // The swipe's actions for the row's chat in its place: the buttons shown and the reveal laid out (SwipeToDelete.SetActions),
+    // the offered ones wired. Re-run on every bind, place and data change; it acts only when the actions change.
+    private void ApplySwipeActions()
+    {
+        if (vm == null) return;
+        (bool move, bool delete) = ChatRowSwipePolicy.Actions(RowChannel(), swipeInFolder, ChatAudienceRule.NonHuman(vm.Facts));
+        if (swipeApplied && move == swipeMove && delete == swipeDelete) return;
+        swipeApplied = true;
+        swipeMove = move;
+        swipeDelete = delete;
+
         if (swipeToDelete != null)
         {
-            swipeToDelete.ResetClosed();
-            swipeToDelete.enabled = swipeEnabled; // disabled ⇒ no drag callbacks ⇒ no slide
+            swipeToDelete.SetActions(move, delete);
         }
-
-        if (deleteButton != null)
+        else
         {
-            deleteButton.onClick.RemoveAllListeners();
-            if (swipeEnabled)
-            {
-                deleteButton.gameObject.SetActive(true);
-                deleteButton.onClick.AddListener(OnDeleteClicked);
-            }
-            else
-            {
-                // No reveal target on Telegram — hide the red button so a disabled swipe
-                // can never expose it on a pooled row that had been a WhatsApp row.
-                deleteButton.gameObject.SetActive(false);
-            }
+            // Nothing could reveal them: keep both hidden.
+            SetShown(moveButton, false);
+            SetShown(deleteButton, false);
         }
+        Wire(deleteButton, delete, OnDeleteClicked);
+        Wire(moveButton, move, OnMoveClicked);
+    }
+
+    private static ChatChannel RowChannel() =>
+        ChatManager.Instance != null ? ChatManager.Instance.ActiveChannel : ChatChannel.WhatsApp;
+
+    private static void Wire(Button button, bool offered, UnityEngine.Events.UnityAction handler)
+    {
+        if (button == null) return;
+        button.onClick.RemoveAllListeners();
+        if (offered) button.onClick.AddListener(handler);
+    }
+
+    private static void SetShown(Component part, bool shown)
+    {
+        if (part != null && part.gameObject.activeSelf != shown) part.gameObject.SetActive(shown);
     }
 
     IEnumerator LoadAvatar(ChatViewModel vm)
@@ -211,8 +263,11 @@ public void Bind(ChatViewModel model)
 
         ApplyUnreadBadge(vm.UnreadCount);
 
+        // New facts can say the chat is not a person after all — it never moves (no-op unless the actions change).
+        ApplySwipeActions();
+
         // New facts can move the chat between the working list and «Личные», and a new unread count changes the
-        // «Личные» row's counter — the list re-reads both (coalesced per frame).
+        // «Личные» row's counter — the list re-reads both (coalesced per frame), the row's swipe place included.
         if (parentList == null)
             parentList = GetComponentInParent<ChatListView>(true);
         if (parentList != null)
@@ -531,6 +586,13 @@ public void Bind(ChatViewModel model)
     void OnDeleteClicked()
     {
         if (parentList != null) parentList.RequestDelete(vm);
+    }
+
+    // The move button: put the row away, then hand the chat to whoever made the row (ChatListView.RequestMove; the folder).
+    void OnMoveClicked()
+    {
+        if (swipeToDelete != null && swipeToDelete.IsOpen) swipeToDelete.Close();
+        MoveRequested?.Invoke(vm);
     }
     
     // --- THE WHATSAPP DEFAULT COLORS ---

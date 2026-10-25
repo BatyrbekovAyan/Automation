@@ -28,7 +28,15 @@ using Object = UnityEngine.Object;
 ///     font, a grey counter shaped like the unread badge, the bot card's chevron, the inset divider. Hidden — ChatListView
 ///     shows it — and built hidden, so nothing under it wakes while it is authored; ChatListView.personalRow.
 ///
+/// The swipe (spec §5.2, §5.3):
+///   • ChatItem.prefab — <see cref="EnsureChatItemMoveButton"/>: MoveButton, the swipe's «В личные» / «В рабочие», 200u
+///     (<see cref="MoveButtonWidth"/>) right on the left of DeleteButton and right before it among the siblings, so both stay
+///     behind the sliding SwipeContent; «Удалить»'s twin in shape (anchors, height, press, word font and size) in AccentFill
+///     with an AccentOnFill word. Authored hidden — SwipeToDelete.SetActions shows it when the row offers a move — and wired:
+///     SwipeToDelete.moveButton, ChatItemView.moveButton / moveLabel. Anchored through SwipeToDelete.deleteButton.
+///
 ///   ChatItem (SwipeContent/TextBlock/TopRow):  [AudienceLock][Name ……][Time]
+///   ChatItem (behind SwipeContent):            … row's right edge | [MoveButton/Label][DeleteButton/Label]  (parked at rest)
 ///   PersonalChatsRow (Button, HLG):            [Avatar/Circle/Lock] [Title ……] [Counter/Count] [Chevron/Icon]  + Divider
 ///
 /// Colours are ThemedColor bindings (the glyphs are white sprites tinted by role, never baked); the authored colours are
@@ -38,6 +46,10 @@ public static class PersonalChatsBuilder
 {
     public const string RowName = "PersonalChatsRow";
     public const string LockName = "AudienceLock";
+    public const string MoveButtonName = "MoveButton";
+
+    /// <summary>The swipe's move button: as wide as «Удалить» (200u), right on its left.</summary>
+    public const float MoveButtonWidth = 200f;
 
     /// <summary>The lock before a chat's name: its ink (74 % of the sprite's height) is about the 44u name's cap height.</summary>
     public const float LockGlyphSize = 42f;
@@ -55,6 +67,7 @@ public static class PersonalChatsBuilder
     private const string IconName = "Icon";
     private const string AvatarName = "Avatar", CircleName = "Circle", RowLockName = "Lock", TitleName = "Title";
     private const string CounterName = "Counter", CountName = "Count", ChevronName = "Chevron", DividerName = "Divider";
+    private const string MoveLabelName = "Label";
     private const float DividerThickness = 1f;
     private const string CountPreview = "1";   // authored hidden; PersonalChatsRowView.Bind writes the number
 
@@ -97,6 +110,14 @@ public static class PersonalChatsBuilder
         return modified;
     }
 
+    /// <summary>The swipe's move button in a chat row (see the class summary); true when something was changed.</summary>
+    public static bool EnsureChatItemMoveButton(ChatItemView item)
+    {
+        bool modified = false;
+        EnsureChatItemMoveButton(item, ref modified);
+        return modified;
+    }
+
     /// <summary>The «Личные» row in the list (see the class summary); true when something was changed.</summary>
     public static bool EnsureListRow(ChatListView list)
     {
@@ -135,6 +156,7 @@ public static class PersonalChatsBuilder
             if (item == null) throw new InvalidOperationException($"{Tag} {path}: no ChatItemView on the prefab root.");
             bool modified = false;
             EnsureChatItemLock(item, ref modified);
+            EnsureChatItemMoveButton(item, ref modified);
             if (!modified)
             {
                 Debug.Log($"{Tag} {path}: already applied — not saved.");
@@ -142,7 +164,7 @@ public static class PersonalChatsBuilder
             }
             PrefabUtility.SaveAsPrefabAsset(root, path, out bool saved);
             if (!saved) throw new InvalidOperationException($"{Tag} Could not save {path}.");
-            Debug.Log($"{Tag} {path}: the audience lock updated and saved.");
+            Debug.Log($"{Tag} {path}: the audience lock and the swipe's move button updated and saved.");
         }
         finally
         {
@@ -171,6 +193,85 @@ public static class PersonalChatsBuilder
 
         modified |= SetActive(slot.gameObject, false);   // ChatListView shows it on a personal chat in the search results
         modified |= SetRef(new SerializedObject(item), "audienceLock", slot.gameObject, Tag);
+    }
+
+    // ---- ChatItem: the swipe's move button, right on «Удалить»'s left ----
+
+    // «Удалить»'s twin in shape — pinned to the row's right edge, as tall, «Удалить»'s press and word style — in AccentFill under
+    // an AccentOnFill word, right on its left. Hidden: SwipeToDelete.SetActions shows it when the row offers a move.
+    private static void EnsureChatItemMoveButton(ChatItemView item, ref bool modified)
+    {
+        (SerializedObject swipeRefs, RectTransform delete, TextMeshProUGUI deleteWord) = DeleteButtonOf(item);
+
+        RectTransform move = FindOrCreateMoveButton(delete, swipeRefs, ref modified);
+        modified |= PlaceBefore(move, delete);
+        modified |= SetRect(move, delete.anchorMin, delete.anchorMax, delete.pivot,
+            new Vector2(delete.anchoredPosition.x - MoveButtonWidth, delete.anchoredPosition.y),
+            new Vector2(MoveButtonWidth, delete.sizeDelta.y));
+        (Button button, TextMeshProUGUI word) = EnsureMoveFace(move, item.deleteButton.colors, deleteWord, ref modified);
+        modified |= SetActive(move.gameObject, false);
+
+        modified |= SetRef(swipeRefs, "moveButton", move, Tag);
+        var view = new SerializedObject(item);
+        modified |= SetRef(view, "moveButton", button, Tag);
+        modified |= SetRef(view, "moveLabel", word, Tag);
+    }
+
+    // «Удалить» as the row's swipe holds it (SwipeToDelete.deleteButton — the same button as ChatItemView.deleteButton) and
+    // its word, which the move button's word matches.
+    private static (SerializedObject swipeRefs, RectTransform delete, TextMeshProUGUI word) DeleteButtonOf(ChatItemView item)
+    {
+        if (item == null) throw new ArgumentNullException(nameof(item));
+        SwipeToDelete swipe = item.swipeToDelete;
+        if (swipe == null) throw new InvalidOperationException($"{Tag} {item.name}: ChatItemView.swipeToDelete is not wired.");
+        var swipeRefs = new SerializedObject(swipe);
+        var delete = swipeRefs.FindProperty("deleteButton")?.objectReferenceValue as RectTransform;
+        if (delete == null || delete.parent == null)
+            throw new InvalidOperationException($"{Tag} {item.name}: SwipeToDelete.deleteButton is not wired into the row.");
+        if (item.deleteButton == null || item.deleteButton.transform != delete)
+            throw new InvalidOperationException($"{Tag} {item.name}: ChatItemView.deleteButton is not SwipeToDelete's «Удалить».");
+        TextMeshProUGUI word = delete.GetComponentInChildren<TextMeshProUGUI>(true);
+        if (word == null) throw new InvalidOperationException($"{Tag} {item.name}: «Удалить» has no TMP word to match.");
+        return (swipeRefs, delete, word);
+    }
+
+    // The fill — AccentFill, the tap target, pressed like «Удалить» — and the word: «В личные» (the working list's; the row
+    // rewrites it per place), «Удалить»'s font and size, AccentOnFill, filling the button.
+    private static (Button button, TextMeshProUGUI word) EnsureMoveFace(RectTransform move, ColorBlock press, TextMeshProUGUI deleteWord,
+                                                                        ref bool modified)
+    {
+        var fill = move.GetComponent<Image>();
+        modified |= SetImage(fill, null, ThemeRole.AccentFill, raycast: true);
+        modified |= BindTheme(move.GetComponent<ThemedColor>(), ThemeRole.AccentFill, fill);
+        var button = move.GetComponent<Button>();
+        modified |= SetButton(button, fill, press);
+
+        RectTransform wordRect = EnsureChild(move, MoveLabelName, ref modified, typeof(CanvasRenderer), typeof(TextMeshProUGUI),
+            typeof(ThemedColor));
+        var word = wordRect.GetComponent<TextMeshProUGUI>();
+        modified |= SetLabel(word, PersonalChatsCopy.SwipeToPersonal, deleteWord.font, deleteWord.fontSize, TextAlignmentOptions.Center,
+            TextOverflowModes.Overflow, ThemeRole.AccentOnFill);
+        modified |= BindTheme(wordRect.GetComponent<ThemedColor>(), ThemeRole.AccentOnFill, word);
+        modified |= SetRect(wordRect, Vector2.zero, Vector2.one, Centre, Vector2.zero, Vector2.zero);
+        return (button, word);
+    }
+
+    // The button the swipe already holds, else the one beside «Удалить» by its name, else a new one — built HIDDEN from its
+    // first moment, so nothing under it wakes while it is authored.
+    private static RectTransform FindOrCreateMoveButton(RectTransform delete, SerializedObject swipeRefs, ref bool modified)
+    {
+        var wired = swipeRefs.FindProperty("moveButton")?.objectReferenceValue as RectTransform;
+        var move = wired != null && wired.parent == delete.parent ? wired : delete.parent.Find(MoveButtonName) as RectTransform;
+        if (move == null)
+        {
+            var go = new GameObject(MoveButtonName, typeof(RectTransform)) { layer = delete.parent.gameObject.layer };
+            go.SetActive(false);
+            move = (RectTransform)go.transform;
+            move.SetParent(delete.parent, false);
+            modified = true;
+        }
+        AddMissing(move, ref modified, typeof(CanvasRenderer), typeof(Image), typeof(Button), typeof(ThemedColor));
+        return move;
     }
 
     // ---- the list: the «Личные» row ----

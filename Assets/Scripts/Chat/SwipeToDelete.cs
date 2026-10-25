@@ -4,10 +4,13 @@ using UnityEngine.UI;
 using DG.Tweening;
 
 /// <summary>
-/// WhatsApp-style swipe-left-to-reveal-Delete on a chat list row. Lives on the row's
-/// SwipeContent (the layer carrying avatar/text/bg/tap-button) and slides it on the X axis;
-/// the DeleteButton (a sibling pinned to the right, started off-screen) is driven in tandem so
-/// it slides IN with the swipe rather than being statically revealed.
+/// WhatsApp-style swipe-left-to-reveal on a chat list row. Lives on the row's SwipeContent (the layer carrying
+/// avatar/text/bg/tap-button) and slides it on the X axis. The action buttons behind it — «Удалить» rightmost and, on its
+/// left, the move button («В личные» / «В рабочие», «Личные и рабочие чаты») — are siblings pinned to the row's right edge,
+/// parked off-screen at rest and driven in tandem, so they slide IN with the swipe rather than being statically revealed.
+/// Which of them the row offers is <see cref="SetActions"/>'s (ChatItemView, from ChatRowSwipePolicy); where they stand is
+/// <see cref="SwipeActionsLayout"/>'s, and the row slides open by their widths together. A row with no action has this
+/// component off, so its drags go straight to the list's scroll.
 ///
 /// Horizontal drags are claimed here; vertical / blocked drags are forwarded to the list
 /// ScrollRect. Only one row is open at a time, and any other interaction (tapping a row,
@@ -18,8 +21,12 @@ using DG.Tweening;
 public class SwipeToDelete : MonoBehaviour,
     IInitializePotentialDragHandler, IBeginDragHandler, IDragHandler, IEndDragHandler
 {
-    [SerializeField] private float revealWidth = 200f;   // == DeleteButton width; set by the builder
-    [SerializeField] private RectTransform deleteButton; // slides in alongside the content
+    [Tooltip("How far the row slides open: the visible buttons' widths together. SetActions derives it; the authored value is «Удалить» alone.")]
+    [SerializeField] private float revealWidth = 200f;
+    [Tooltip("«Удалить» — the rightmost button.")]
+    [SerializeField] private RectTransform deleteButton;
+    [Tooltip("«В личные» / «В рабочие» — on the left of «Удалить». Stamped by PersonalChatsBuilder.")]
+    [SerializeField] private RectTransform moveButton;
     private const float SnapSeconds = 0.18f;
 
     private RectTransform _rt;
@@ -29,13 +36,24 @@ public class SwipeToDelete : MonoBehaviour,
     private bool _gestureWasDrag;
     private float _baseX;
     private Tween _snap;
-    private Tween _btnSnap;
+    private Tween _deleteSnap;
+    private Tween _moveSnap;
+
+    // SetActions' last answer (the same actions again change nothing) and each button's x once the row is fully open.
+    private bool _actionsSet;
+    private bool _showMove;
+    private bool _showDelete;
+    private float _moveOpenX;
+    private float _deleteOpenX;
 
     public bool IsOpen { get; private set; }
 
+    /// <summary>How far the row slides open: the visible buttons' widths together, 0 with no action.</summary>
+    public float RevealWidth => revealWidth;
+
     private static SwipeToDelete _openInstance;
 
-    /// <summary>True while some row's delete reveal is open.</summary>
+    /// <summary>True while some row's reveal is open.</summary>
     public static bool AnyOpen => _openInstance != null;
 
     /// <summary>Close whichever row is currently open (no-op if none).</summary>
@@ -48,20 +66,42 @@ public class SwipeToDelete : MonoBehaviour,
     {
         _rt = (RectTransform)transform;
         _scroll = GetComponentInParent<ScrollRect>();
-        PlaceButton(0f); // park the button off-screen at rest
+        PlaceButtons(0f); // park the buttons off-screen at rest
     }
 
     private void OnDisable()
     {
-        _snap?.Kill(); _snap = null;
-        _btnSnap?.Kill(); _btnSnap = null;
+        KillTweens();
         _routeToParent = false;
         _dragging = false;
         if (_openInstance == this) _openInstance = null;
         // Snap shut so a row hidden mid-open (e.g. page switch) is closed when shown again.
         SetContentX(0f);
-        PlaceButton(0f);
+        PlaceButtons(0f);
         IsOpen = false;
+    }
+
+    /// <summary>
+    /// The actions the row offers — <paramref name="move"/>: the move button, <paramref name="delete"/>: «Удалить». The visible
+    /// buttons stand right to left behind the row, «Удалить» rightmost, and the row slides open by their widths together; a
+    /// button not offered is deactivated. No action turns the swipe off. The same actions again change nothing, so an open row
+    /// stays open; different ones snap the row shut first and cut a drag in progress.
+    /// </summary>
+    public void SetActions(bool move, bool delete)
+    {
+        bool showMove = move && moveButton != null;
+        bool showDelete = delete && deleteButton != null;
+        if (_actionsSet && showMove == _showMove && showDelete == _showDelete) return;
+        _actionsSet = true;
+        _showMove = showMove;
+        _showDelete = showDelete;
+
+        (revealWidth, _moveOpenX, _deleteOpenX) =
+            SwipeActionsLayout.Solve(showMove, showDelete, WidthOf(moveButton), WidthOf(deleteButton));
+        SetShown(moveButton, showMove);
+        SetShown(deleteButton, showDelete);
+        ResetClosed();
+        enabled = showMove || showDelete;
     }
 
     /// <summary>True if the gesture that just ended was a drag/scroll (so a tap handler can ignore it).</summary>
@@ -72,22 +112,22 @@ public class SwipeToDelete : MonoBehaviour,
         return was;
     }
 
-    /// <summary>Snap shut instantly (used by ChatItemView.Bind on prefab reuse).</summary>
+    /// <summary>Snap shut instantly (ChatItemView.Bind on prefab reuse; SetActions on new actions). Cuts a drag in progress.</summary>
     public void ResetClosed()
     {
-        _snap?.Kill(); _snap = null;
-        _btnSnap?.Kill(); _btnSnap = null;
+        KillTweens();
+        _dragging = false;
         SetContentX(0f);
-        PlaceButton(0f);
+        PlaceButtons(0f);
         IsOpen = false;
         if (_openInstance == this) _openInstance = null;
     }
 
     public void Close()
     {
-        _snap?.Kill(); _btnSnap?.Kill();
+        KillTweens();
         _snap = Rt.DOAnchorPosX(0f, SnapSeconds).SetEase(Ease.OutCubic);
-        AnimateButtonTo(0f);
+        AnimateButtonsTo(0f);
         IsOpen = false;
         if (_openInstance == this) _openInstance = null;
     }
@@ -96,9 +136,9 @@ public class SwipeToDelete : MonoBehaviour,
     {
         if (_openInstance != null && _openInstance != this) _openInstance.Close();
         _openInstance = this;
-        _snap?.Kill(); _btnSnap?.Kill();
+        KillTweens();
         _snap = Rt.DOAnchorPosX(-revealWidth, SnapSeconds).SetEase(Ease.OutCubic);
-        AnimateButtonTo(-revealWidth);
+        AnimateButtonsTo(-revealWidth);
         IsOpen = true;
     }
 
@@ -131,7 +171,7 @@ public class SwipeToDelete : MonoBehaviour,
         }
 
         _dragging = true;
-        _snap?.Kill(); _btnSnap?.Kill();
+        KillTweens();
         _baseX = IsOpen ? -revealWidth : 0f;
     }
 
@@ -142,7 +182,7 @@ public class SwipeToDelete : MonoBehaviour,
         float dx = e.position.x - e.pressPosition.x;
         float x = Mathf.Clamp(_baseX + dx, -revealWidth, 0f);
         SetContentX(x);
-        PlaceButton(x);
+        PlaceButtons(x);
     }
 
     public void OnEndDrag(PointerEventData e)
@@ -166,18 +206,45 @@ public class SwipeToDelete : MonoBehaviour,
     private void SetContentX(float x)
         => Rt.anchoredPosition = new Vector2(x, Rt.anchoredPosition.y);
 
-    // The DeleteButton (pivot/anchor on the right edge) is parked off-screen to the right at rest
-    // (contentX 0 → buttonX +revealWidth) and slides flush to the right edge as the content slides
-    // left (contentX -revealWidth → buttonX 0), so its left edge tracks the content's right edge.
-    private void PlaceButton(float contentX)
+    // Every button (pivot/anchor on the row's right edge) rides with the content: its x is its open x + the reveal + the
+    // content's x — parked just past the right edge at rest (content 0) and at its open x once the row is fully open (content
+    // -revealWidth), so the buttons' left edge tracks the content's right edge.
+    private void PlaceButtons(float contentX)
     {
-        if (deleteButton == null) return;
-        deleteButton.anchoredPosition = new Vector2(revealWidth + contentX, deleteButton.anchoredPosition.y);
+        Place(deleteButton, _deleteOpenX + revealWidth + contentX);
+        Place(moveButton, _moveOpenX + revealWidth + contentX);
     }
 
-    private void AnimateButtonTo(float contentTargetX)
+    private void AnimateButtonsTo(float contentTargetX)
     {
-        if (deleteButton == null) return;
-        _btnSnap = deleteButton.DOAnchorPosX(revealWidth + contentTargetX, SnapSeconds).SetEase(Ease.OutCubic);
+        _deleteSnap = SnapButton(deleteButton, _deleteOpenX + revealWidth + contentTargetX);
+        _moveSnap = SnapButton(moveButton, _moveOpenX + revealWidth + contentTargetX);
+    }
+
+    private void KillTweens()
+    {
+        _snap?.Kill(); _snap = null;
+        _deleteSnap?.Kill(); _deleteSnap = null;
+        _moveSnap?.Kill(); _moveSnap = null;
+    }
+
+    private static void Place(RectTransform button, float x)
+    {
+        if (button == null) return;
+        button.anchoredPosition = new Vector2(x, button.anchoredPosition.y);
+    }
+
+    // A hidden button is placed, never animated.
+    private static Tween SnapButton(RectTransform button, float x)
+    {
+        if (button == null || !button.gameObject.activeSelf) return null;
+        return button.DOAnchorPosX(x, SnapSeconds).SetEase(Ease.OutCubic);
+    }
+
+    private static float WidthOf(RectTransform button) => button != null ? button.rect.width : 0f;
+
+    private static void SetShown(RectTransform button, bool shown)
+    {
+        if (button != null && button.gameObject.activeSelf != shown) button.gameObject.SetActive(shown);
     }
 }

@@ -11,7 +11,9 @@ using DG.Tweening;
 /// a grey counter — only while a search is on. How each chat is drawn is <see cref="ChatAudienceStore.ViewOf"/>'s verdict
 /// under the channel's profile; what follows from it is <see cref="PersonalChatsListModel"/>'s. The verdict is re-read,
 /// once per frame at most, whenever it can change: a row's data (facts, unread, last message), a store change (a decision,
-/// a connection moment, the owner's move), a row added or removed, the query.
+/// a connection moment, the owner's move), a row added or removed, the query. Each row's swipe follows the same verdict
+/// (spec §5.2; <see cref="ChatRowSwipePolicy.InFolder"/>): a working chat offers «В личные» (and «Удалить» on WhatsApp), a
+/// personal one in the search results «В рабочие», as in the folder; <see cref="RequestMove"/> carries the move out.
 /// </summary>
 public class ChatListView : MonoBehaviour
 {
@@ -85,6 +87,7 @@ public class ChatListView : MonoBehaviour
 
         // --- THE FIX: Everything goes into the normalContent now! ---
         var item = Instantiate(prefab, content);
+        item.MoveRequested += RequestMove;   // the row's swipe: «В личные» / «В рабочие»
 
         // Apply the active filter BEFORE the bind, so a newly-arriving chat never shows for a frame where it does
         // not belong (a personal chat outside a search, a query still set after a bot switch) — and a row hidden here
@@ -162,7 +165,9 @@ public class ChatListView : MonoBehaviour
     }
 
     // A row is shown when it is working (or a search is on) and it matches the query; a personal one in the search results
-    // wears the lock, and its unread badge is grey (personal chats are muted in the app).
+    // wears the lock, its unread badge is grey (personal chats are muted in the app) and it swipes as in the «Личные» folder
+    // («В рабочие»). The swipe's place is re-read on every pass, so a chat that changes kind while it is shown never offers
+    // the wrong move (the row acts only when its actions change).
     private void ApplyMatchToItem(ChatItemView item, ChatViewModel vm, AudienceView view, bool searchActive)
     {
         if (item == null) return;
@@ -170,6 +175,7 @@ public class ChatListView : MonoBehaviour
         if (item.gameObject.activeSelf != shown)
             item.gameObject.SetActive(shown);
         item.SetAudienceMarks(PersonalChatsListModel.ShowLock(view, searchActive), PersonalChatsListModel.IsPersonal(view));
+        item.SetSwipeContext(ChatRowSwipePolicy.InFolder(view));
     }
 
     // The «Личные» row: there while there are personal chats and no search; its grey counter is the personal chats with
@@ -304,6 +310,35 @@ public class ChatListView : MonoBehaviour
             .SetEase(Ease.InCubic)
             .OnComplete(() => { if (go != null) Destroy(go); });
         cg.DOFade(0f, 0.2f);
+    }
+
+    /// <summary>
+    /// A row's move button (ChatItemView.MoveRequested): a working chat goes to «Личные», a personal one — found by the search —
+    /// becomes working. Decided by the chat's kind now, the same verdict that chose the button's word
+    /// (<see cref="ChatRowSwipePolicy.InFolder"/>). The store draws the move at once, the queue delivers it, the toast says so.
+    /// A chat that is not a person never moves, and a move the queue would drop (no real profile, an id the server refuses)
+    /// is not announced.
+    /// </summary>
+    public void RequestMove(ChatViewModel chat)
+    {
+        ChatManager manager = ChatManager.Instance;
+        if (chat == null || manager == null) return;
+        string profileId = manager.ActiveChannelProfileId();
+        if (!ChatAudienceRequest.IsRealProfileId(profileId) || !ChatAudienceRequest.IsSendableChatId(chat.ChatId)) return;
+        AudienceView view = ChatAudienceStore.ViewOf(profileId, chat);
+        if (!view.CanMove) return;
+
+        var chats = new[] { chat.ChatId };
+        if (ChatRowSwipePolicy.InFolder(view))
+        {
+            ChatAudienceSyncService.MakeBusiness(manager.CurrentBotId, profileId, chats);
+            AudienceToast.Show(PersonalChatsCopy.MovedToBusiness);
+        }
+        else
+        {
+            ChatAudienceSyncService.MakePersonal(manager.CurrentBotId, profileId, chats);
+            AudienceToast.Show(PersonalChatsCopy.MovedToPersonal);
+        }
     }
 
     // Called by a row's Delete button (via ChatItemView) — raises the confirm dialog.

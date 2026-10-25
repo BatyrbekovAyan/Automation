@@ -18,7 +18,11 @@ using static SceneYaml;
 ///   grey counter and a chevron. Authored hidden — ChatListView shows it when there are personal chats and no search —
 ///   and wired: ChatListView.personalRow, PersonalChatsRowView's button and counter;</item>
 ///   <item>ChatItem.prefab — AudienceLock, the lock a personal chat wears in the search results: right before the name,
-///   hidden by default, wired to ChatItemView.audienceLock.</item>
+///   hidden by default, wired to ChatItemView.audienceLock;</item>
+///   <item>ChatItem.prefab — MoveButton, the swipe's «В личные» / «В рабочие» (spec §5.2, §5.3): 200u, pinned to the row's
+///   right edge right before DeleteButton (both behind the sliding content), an AccentFill fill and «Удалить»'s word style in
+///   AccentOnFill, hidden until SwipeToDelete.SetActions shows it, wired to SwipeToDelete.moveButton and ChatItemView's
+///   moveButton / moveLabel.</item>
 /// </list>
 /// The builder is additive and idempotent: a second run changes nothing. The prefab is loaded with
 /// PrefabUtility.LoadPrefabContents (never saved here); the scene is read as raw YAML, so no test opens Main.unity.
@@ -178,9 +182,97 @@ public class PersonalChatsBuilderPremiseTests
         GameObject root = PrefabUtility.LoadPrefabContents(ItemPrefabPath);
         try
         {
-            Assert.IsFalse(PersonalChatsBuilder.EnsureChatItemLock(root.GetComponent<ChatItemView>()),
+            var item = root.GetComponent<ChatItemView>();
+            Assert.IsFalse(PersonalChatsBuilder.EnsureChatItemLock(item),
                 "the saved prefab already holds everything the builder authors");
+            Assert.IsFalse(PersonalChatsBuilder.EnsureChatItemMoveButton(item), "…the move button included");
             Assert.AreEqual(1, root.GetComponentsInChildren<Transform>(true).Count(t => t.name == PersonalChatsBuilder.LockName));
+            Assert.AreEqual(1, root.GetComponentsInChildren<Transform>(true).Count(t => t.name == PersonalChatsBuilder.MoveButtonName));
+        }
+        finally
+        {
+            PrefabUtility.UnloadPrefabContents(root);
+        }
+    }
+
+    // ---- ChatItem.prefab: the swipe's move button («В личные» / «В рабочие») ----
+
+    [Test]
+    public void ChatItemPrefab_MoveButton_Is200u_RightBeforeDelete_AndWired()
+    {
+        GameObject root = PrefabUtility.LoadPrefabContents(ItemPrefabPath);
+        try
+        {
+            var item = root.GetComponent<ChatItemView>();
+            SwipeToDelete swipe = item.swipeToDelete;
+            Assert.IsNotNull(swipe, "ChatItemView.swipeToDelete is wired");
+            var swipeRefs = new SerializedObject(swipe);
+            var move = swipeRefs.FindProperty("moveButton")?.objectReferenceValue as RectTransform;
+            var delete = swipeRefs.FindProperty("deleteButton")?.objectReferenceValue as RectTransform;
+            Assert.IsNotNull(move, "SwipeToDelete.moveButton is wired");
+            Assert.IsNotNull(delete, "SwipeToDelete.deleteButton is wired");
+            Assert.AreEqual(PersonalChatsBuilder.MoveButtonName, move.name);
+
+            // 200u, right before «Удалить», both behind the sliding content
+            Assert.AreEqual(200f, PersonalChatsBuilder.MoveButtonWidth, "200u wide");
+            Assert.AreEqual(PersonalChatsBuilder.MoveButtonWidth, move.sizeDelta.x, 0.001f);
+            Assert.AreSame(delete.parent, move.parent, "a sibling of «Удалить»");
+            Assert.AreEqual(delete.GetSiblingIndex() - 1, move.GetSiblingIndex(), "right before «Удалить»");
+            Assert.Less(move.GetSiblingIndex(), swipe.transform.GetSiblingIndex(), "behind the row's sliding content");
+            Assert.AreEqual(delete.anchorMin, move.anchorMin, "pinned to the row's right edge like «Удалить»");
+            Assert.AreEqual(delete.anchorMax, move.anchorMax);
+            Assert.AreEqual(delete.pivot, move.pivot);
+            Assert.AreEqual(delete.sizeDelta.y, move.sizeDelta.y, 0.001f, "as tall as «Удалить»");
+            Assert.AreEqual(delete.anchoredPosition.x - PersonalChatsBuilder.MoveButtonWidth, move.anchoredPosition.x, 0.001f, "on its left");
+            Assert.IsFalse(move.gameObject.activeSelf, "hidden until SwipeToDelete.SetActions shows it");
+
+            // the fill: AccentFill, tinted by its role; pressed like «Удалить»
+            var fill = move.GetComponent<Image>();
+            Assert.IsNotNull(fill, "the button's fill");
+            Assert.IsTrue(fill.raycastTarget, "the fill takes the tap");
+            AssertBound(fill, ThemeRole.AccentFill);
+            var button = move.GetComponent<Button>();
+            Assert.IsNotNull(button);
+            Assert.AreSame(fill, button.targetGraphic);
+            Assert.AreEqual(item.deleteButton.colors, button.colors, "pressed like «Удалить»");
+
+            // the word: «Удалить»'s font and size, AccentOnFill, never a tap target of its own
+            TextMeshProUGUI label = move.GetComponentsInChildren<TextMeshProUGUI>(true).Single();
+            TextMeshProUGUI deleteLabel = delete.GetComponentsInChildren<TextMeshProUGUI>(true).Single();
+            Assert.AreEqual(PersonalChatsCopy.SwipeToPersonal, label.text, "authored with the working list's word");
+            Assert.AreSame(deleteLabel.font, label.font, "«Удалить»'s font");
+            Assert.AreEqual(deleteLabel.fontSize, label.fontSize, 0.001f, "«Удалить»'s size");
+            Assert.IsFalse(label.raycastTarget);
+            AssertBound(label, ThemeRole.AccentOnFill);
+
+            var rowRefs = new SerializedObject(item);
+            Assert.AreSame(button, rowRefs.FindProperty("moveButton")?.objectReferenceValue, "ChatItemView.moveButton");
+            Assert.AreSame(label, rowRefs.FindProperty("moveLabel")?.objectReferenceValue, "ChatItemView.moveLabel");
+        }
+        finally
+        {
+            PrefabUtility.UnloadPrefabContents(root);
+        }
+    }
+
+    [Test]
+    public void EnsureChatItemMoveButton_OnARowWithoutIt_BuildsOnce()
+    {
+        GameObject root = PrefabUtility.LoadPrefabContents(ItemPrefabPath);   // never saved here
+        try
+        {
+            var item = root.GetComponent<ChatItemView>();
+            foreach (Transform stale in root.GetComponentsInChildren<Transform>(true).Where(t => t.name == PersonalChatsBuilder.MoveButtonName).ToArray())
+                Object.DestroyImmediate(stale.gameObject);
+
+            Assert.IsTrue(PersonalChatsBuilder.EnsureChatItemMoveButton(item), "the first run builds the button");
+            Assert.IsFalse(PersonalChatsBuilder.EnsureChatItemMoveButton(item), "a second run changes nothing");
+
+            Transform[] buttons = root.GetComponentsInChildren<Transform>(true).Where(t => t.name == PersonalChatsBuilder.MoveButtonName).ToArray();
+            Assert.AreEqual(1, buttons.Length, "one button, however many runs");
+            Transform delete = item.deleteButton.transform;
+            Assert.AreEqual(delete.GetSiblingIndex() - 1, buttons[0].GetSiblingIndex(), "right before «Удалить»");
+            Assert.AreSame(buttons[0], new SerializedObject(item.swipeToDelete).FindProperty("moveButton").objectReferenceValue);
         }
         finally
         {
@@ -245,4 +337,13 @@ public class PersonalChatsBuilderPremiseTests
     }
 
     private static string AssetGuid(Object asset) => AssetDatabase.AssetPathToGUID(AssetDatabase.GetAssetPath(asset));
+
+    private static void AssertBound(Graphic graphic, ThemeRole role)
+    {
+        var themed = graphic.GetComponent<ThemedColor>();
+        Assert.IsNotNull(themed, $"{graphic.name}: its colour is a ThemedColor binding");
+        Assert.AreEqual(role, themed.Role, $"{graphic.name}: {role}");
+        Assert.AreSame(graphic, new SerializedObject(themed).FindProperty("target").objectReferenceValue,
+            $"{graphic.name}: the binding paints its own graphic");
+    }
 }
