@@ -14,6 +14,9 @@ using DG.Tweening;
 /// Screen_Dashboard controller (Variant B). Fetches conversation outcomes from the
 /// DashboardOutcomes webhook, caches to disk, and renders the hero funnel + status
 /// rows + recent заявки. Period and bot filters are client-side (no refetch).
+/// «Личные и рабочие чаты» (spec §5.8): nothing from a personal chat is shown — every number,
+/// list and marker is computed from <see cref="VisibleRows"/> (DashboardAudienceFilter), and the
+/// page filters again on every decision or move while it is shown.
 /// </summary>
 public class DashboardPage : MonoBehaviour
 {
@@ -49,6 +52,7 @@ public class DashboardPage : MonoBehaviour
     private readonly List<DashboardOutcome> _all = new();
     private DashboardPeriod _period = DashboardPeriod.Today;
     private ISet<string> _botFilter;         // null/empty = all bots (a bot's profile-id set otherwise)
+    private OutcomeStatus? _listStatus;      // the drill-down list's status while it is open
     private bool _fetching;
     private const int TruncatedRefetchCap = 5;
 
@@ -65,6 +69,7 @@ public class DashboardPage : MonoBehaviour
     {
         _all.Clear();
         _all.AddRange(DashboardStore.Load());     // instant paint from cache
+        ChatAudienceStore.OnChanged += HandleAudienceChanged;   // a chat made personal leaves «Сводка» at once
         BuildChips();
         Render();
 
@@ -111,11 +116,12 @@ public class DashboardPage : MonoBehaviour
         if (_fetching && attempt == 0) yield break;
         _fetching = true;
 
-        // First-ever open with no cache: show the loading state, not a flash of the empty
-        // state, while the request is in flight. Render() suppresses empty when _fetching
-        // is true, and this runs synchronously before the first yield — so the empty state
-        // OnEnable painted a moment earlier never reaches the screen.
-        if (_all.Count == 0) { SetLoading(true); Render(); }
+        // First-ever open with nothing to show (no cache, or personal chats only): show the
+        // loading state, not a flash of the empty state, while the request is in flight.
+        // Render() suppresses empty when _fetching is true, and this runs synchronously before
+        // the first yield — so the empty state OnEnable painted a moment earlier never reaches
+        // the screen.
+        if (VisibleRows().Count == 0) { SetLoading(true); Render(); }
 
         var profiles = AuthedProfiles();
         if (profiles.Count == 0) { _fetching = false; SetLoading(false); Render(); yield break; }
@@ -154,9 +160,21 @@ public class DashboardPage : MonoBehaviour
 
     // ---- rendering -----------------------------------------------------------
 
+    // «Личные и рабочие чаты» (spec §5.8): the rows «Сводка» may show — nothing from a personal chat. Every number, list and
+    // marker below is computed from these, so the numbers and the rows agree.
+    private List<DashboardOutcome> VisibleRows() => DashboardAudienceFilter.WithoutPersonal(_all);
+
+    // A decision or a move changed while the page is shown: the numbers and the rows again, the open drill-down list too.
+    private void HandleAudienceChanged()
+    {
+        Render();
+        if (_listStatus.HasValue && IsStatusListOpen) SpawnRows(listRoot, rowTemplate, StatusRows(_listStatus.Value));
+    }
+
     private void Render()
     {
-        var rows = DashboardMetrics.FilterByProfiles(_all, _botFilter).ToList();
+        List<DashboardOutcome> visible = VisibleRows();
+        var rows = DashboardMetrics.FilterByProfiles(visible, _botFilter).ToList();
         var w = DashboardMetrics.ComputeWindow(_period, NowMs(), TodayStartMs());
 
         int orders = DashboardMetrics.CountOrders(rows, w);
@@ -175,7 +193,7 @@ public class DashboardPage : MonoBehaviour
         RenderStatusRows(counts);
         RenderRecent(DashboardMetrics.Recent(rows, w, 5));
 
-        bool empty = _all.Count == 0 && !_fetching;
+        bool empty = visible.Count == 0 && !_fetching;
         if (emptyState) emptyState.SetActive(empty);
     }
 
@@ -304,16 +322,20 @@ public class DashboardPage : MonoBehaviour
     public void OpenStatusList(OutcomeStatus status)
     {
         if (listPanel == null) return;
-        var rows = DashboardMetrics.FilterByProfiles(_all, _botFilter)
-            .Where(r => r.Status == status)
-            .OrderByDescending(r => r.lastMessageAt).ToList();
+        _listStatus = status;
         if (listTitle) listTitle.text = DashboardStatusInfo.Label(status);
-        SpawnRows(listRoot, rowTemplate, rows);
+        SpawnRows(listRoot, rowTemplate, StatusRows(status));
         listPanel.gameObject.SetActive(true);
         listPanel.SetAsLastSibling();
         listPanel.anchoredPosition = new Vector2(CanvasWidth(), listPanel.anchoredPosition.y);
         listPanel.DOAnchorPosX(0f, 0.3f).SetEase(DG.Tweening.Ease.OutCubic);
     }
+
+    // The drill-down list's rows: one status, newest first, within the bot filter.
+    private List<DashboardOutcome> StatusRows(OutcomeStatus status) =>
+        DashboardMetrics.FilterByProfiles(VisibleRows(), _botFilter)
+            .Where(r => r.Status == status)
+            .OrderByDescending(r => r.lastMessageAt).ToList();
 
     /// <summary>True while the drill-down list is up (Back router).</summary>
     public bool IsStatusListOpen => listPanel != null && listPanel.gameObject.activeSelf;
@@ -324,6 +346,7 @@ public class DashboardPage : MonoBehaviour
     private void CloseStatusList()
     {
         if (listPanel == null) return;
+        _listStatus = null;
         listPanel.DOAnchorPosX(CanvasWidth(), 0.25f).SetEase(DG.Tweening.Ease.InCubic)
             .OnComplete(() => listPanel.gameObject.SetActive(false));
     }
@@ -463,6 +486,7 @@ public class DashboardPage : MonoBehaviour
 
     private void OnDisable()
     {
+        ChatAudienceStore.OnChanged -= HandleAudienceChanged;
         // Screen_Dashboard toggles via SetActive, which stops our coroutines mid-flight
         // and skips their post-yield cleanup. Reset the fetch guard so leaving during a
         // load can't wedge _fetching=true and freeze every later refresh. (The deep-link
@@ -471,6 +495,7 @@ public class DashboardPage : MonoBehaviour
         _fetching = false;
         // Close any open drill-down so it doesn't reappear stale when the tab returns.
         if (listPanel != null) listPanel.gameObject.SetActive(false);
+        _listStatus = null;
     }
 
     // Deterministic avatar (mirror ChatItemView) + display-name fallback.

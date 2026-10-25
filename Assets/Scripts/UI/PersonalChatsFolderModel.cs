@@ -25,7 +25,8 @@ public sealed class FolderRow
 /// <summary>
 /// The folder's rules, pure (no Unity, no clock): which chats it lists in each mode and in what order, the line under each
 /// name, the search, the bottom button's word, the onboarding's soft note, what a confirmed selection moves and the toast
-/// that says so, and when a bot or channel switch takes the folder away. <see cref="PersonalChatsFolderView"/> draws it.
+/// that says so, when a bot or channel switch takes the folder away, and the channel the bot settings' «Личные чаты» row
+/// opens it on. <see cref="PersonalChatsFolderView"/> draws it.
 /// A chat whose view is missing reads as personal and never moves — what is not known is personal.
 /// </summary>
 public static class PersonalChatsFolderModel
@@ -139,6 +140,18 @@ public static class PersonalChatsFolderModel
     /// </summary>
     public static bool StaysOpen(string openedBot, ChatChannel openedChannel, string bot, ChatChannel channel) =>
         string.Equals(openedBot, bot, StringComparison.Ordinal) && openedChannel == channel;
+
+    /// <summary>
+    /// The channel the folder opens on from the bot's settings (spec §5.7): the one the chats screen shows when the bot has it
+    /// connected, else the other one when that is; null when neither is — there is no folder to open, the chats screen says why.
+    /// </summary>
+    public static ChatChannel? ChannelFromSettings(ChatChannel shown, bool whatsappConnected, bool telegramConnected)
+    {
+        ChatChannel other = shown == ChatChannel.Telegram ? ChatChannel.WhatsApp : ChatChannel.Telegram;
+        bool Connected(ChatChannel channel) => channel == ChatChannel.Telegram ? telegramConnected : whatsappConnected;
+        if (Connected(shown)) return shown;
+        return Connected(other) ? other : (ChatChannel?)null;
+    }
 
     // Browse holds every personal chat; the selection modes only the people — the chats that can be made working.
     private static bool Belongs(AudienceView view, FolderMode mode) =>

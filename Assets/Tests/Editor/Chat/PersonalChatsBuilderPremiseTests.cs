@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using Automation.BotSettingsUI;
 using Nobi.UiRoundedCorners;
 using NUnit.Framework;
 using TMPro;
@@ -29,6 +30,10 @@ using static SceneYaml;
 ///   avatar and the name — the
 ///   zone's last child, ignored by its layout group, never over the back button. MessageHeaderView holds the chip, the pill,
 ///   its lock, the tap and the scene's SuggestionsController.</item>
+///   <item>BotSettings.prefab — the «ЛИЧНЫЕ ЧАТЫ» section of the Основное tab (spec §5.7, sketch 009 screen 7), right above
+///   «РАСПИСАНИЕ РАБОТЫ»: the header (a clone of the tab's first one), PersonalChatsRow (the channel rows' card as one button —
+///   «Личные чаты», the number, «›») and the hint, PersonalChatsCopy.SettingsHint, its box its measured height; BotSettings'
+///   personalChatsRow and personalChatsCount are stamped.</item>
 /// </list>
 /// The builder is additive and idempotent: a second run changes nothing. The prefab is loaded with
 /// PrefabUtility.LoadPrefabContents (never saved here); the scene is read as raw YAML, so no test opens Main.unity.
@@ -780,6 +785,218 @@ public class PersonalChatsBuilderPremiseTests
 
     private static Graphic GraphicNamed(GameObject root, string name) =>
         root.GetComponentsInChildren<Graphic>(true).Single(g => g.name == name);
+
+    // ---- BotSettings.prefab: the «ЛИЧНЫЕ ЧАТЫ» section (spec §5.7, sketch 009 screen 7) ----
+
+    [Test]
+    public void SettingsPrefab_TheSection_StandsRightAboveTheSchedule()
+    {
+        BotSettings settings = SettingsPrefab();
+        Transform content = settings.BotNameField.transform.parent;
+        Transform header = content.Find(PersonalChatsBuilder.SettingsHeaderName);
+        Assert.IsNotNull(header, $"no {PersonalChatsBuilder.SettingsHeaderName} in the Основное tab — run Tools/Personal Chats/Build");
+        Assert.IsNotNull(settings.PersonalChatsRow, "BotSettings.personalChatsRow is wired");
+        Transform row = settings.PersonalChatsRow.transform;
+        Transform hint = content.Find(PersonalChatsBuilder.SettingsHintName);
+        Assert.IsNotNull(hint, $"no {PersonalChatsBuilder.SettingsHintName} in the Основное tab");
+        Transform scheduleHeader = ScheduleHeaderOf(settings);
+
+        Transform[] order = { header, row, hint, scheduleHeader };
+        foreach (Transform part in order)
+            Assert.AreSame(content, part.parent, $"{part.name} is a direct child of the tab's list");
+        for (int i = 1; i < order.Length; i++)
+            Assert.AreEqual(order[i - 1].GetSiblingIndex() + 1, order[i].GetSiblingIndex(),
+                $"{order[i - 1].name} → {order[i].name}: one block, the hint right before «РАСПИСАНИЕ РАБОТЫ»");
+        foreach (string name in new[] { PersonalChatsBuilder.SettingsHeaderName, PersonalChatsBuilder.SettingsRowName, PersonalChatsBuilder.SettingsHintName })
+            Assert.AreEqual(1, content.Cast<Transform>().Count(t => t.name == name), $"one {name}");
+    }
+
+    [Test]
+    public void SettingsPrefab_TheHeader_IsATwinOfTheTabsHeaders()
+    {
+        BotSettings settings = SettingsPrefab();
+        Transform content = settings.BotNameField.transform.parent;
+        var header = content.Find(PersonalChatsBuilder.SettingsHeaderName).GetComponent<SectionHeader>();
+        Assert.IsNotNull(header, "the header carries SectionHeader");
+        Assert.AreEqual(PersonalChatsCopy.SettingsHeader, header.Text, "authored from PersonalChatsCopy");
+        var first = content.GetComponentInChildren<SectionHeader>(true).GetComponent<TextMeshProUGUI>();
+        var label = header.GetComponent<TextMeshProUGUI>();
+        Assert.AreSame(first.font, label.font, "the tab's header font");
+        Assert.AreEqual(first.fontSize, label.fontSize, 0.001f);
+        Assert.AreEqual(((RectTransform)first.transform).sizeDelta.y, ((RectTransform)label.transform).sizeDelta.y, 0.001f);
+        AssertBound(label, first.GetComponent<ThemedColor>().Role);
+    }
+
+    [Test]
+    public void SettingsPrefab_TheRow_IsAChannelRowsCard_AsOneButton()
+    {
+        BotSettings settings = SettingsPrefab();
+        Button row = settings.PersonalChatsRow;
+        Assert.IsNotNull(row, "BotSettings.personalChatsRow is wired — run Tools/Personal Chats/Build");
+        Assert.AreEqual(PersonalChatsBuilder.SettingsRowName, row.name);
+        var card = row.GetComponent<Image>();
+        Assert.AreSame(card, row.targetGraphic, "the card takes the press");
+        Assert.IsTrue(card.raycastTarget, "the card takes the tap");
+        AssertBound(card, ThemeRole.Surface);
+
+        ToggleRow channelRow = settings.whatsappRow;
+        Assert.AreEqual(((RectTransform)channelRow.transform).sizeDelta.y, ((RectTransform)row.transform).sizeDelta.y, 0.001f,
+            "as tall as the channel rows");
+        Assert.AreEqual(channelRow.GetComponent<ImageWithRoundedCorners>().radius, row.GetComponent<ImageWithRoundedCorners>().radius, 0.001f,
+            "their corners");
+        var shadow = row.GetComponent<Shadow>();
+        Assert.IsNotNull(shadow, "their shadow");
+        Assert.AreEqual(channelRow.GetComponent<Shadow>().effectColor, shadow.effectColor);
+        Assert.AreEqual(channelRow.GetComponent<Shadow>().effectDistance, shadow.effectDistance);
+
+        var channelLabel = (TextMeshProUGUI)new SerializedObject(channelRow).FindProperty("labelText").objectReferenceValue;
+        TextMeshProUGUI label = TextNamed(row, "Label");
+        Assert.AreEqual(PersonalChatsCopy.SettingsRow, label.text);
+        Assert.AreSame(channelLabel.font, label.font, "the channel rows' label font…");
+        Assert.AreEqual(channelLabel.fontSize, label.fontSize, 0.001f, "…size…");
+        Assert.AreEqual(channelLabel.fontWeight, label.fontWeight, "…and weight");
+        AssertBound(label, ThemeRole.InkPrimary);
+
+        TextMeshProUGUI count = settings.PersonalChatsCountLabel;
+        Assert.IsNotNull(count, "BotSettings.personalChatsCount is wired");
+        Assert.AreSame(row.transform, count.transform.parent, "the number is the row's own");
+        Assert.AreEqual(HorizontalAlignmentOptions.Right, count.horizontalAlignment, "the number stands against the chevron");
+        AssertBound(count, ThemeRole.InkSecondary);
+
+        TextMeshProUGUI chevron = TextNamed(row, "Chevron");
+        Assert.AreEqual(PersonalChatsCopy.SettingsChevron, chevron.text);
+        AssertBound(chevron, ThemeRole.InkTertiary);
+
+        foreach (TextMeshProUGUI text in row.GetComponentsInChildren<TextMeshProUGUI>(true))
+            Assert.IsFalse(text.raycastTarget, $"{text.name}: only the card takes the tap");
+
+        // Left to right, whatever the card's width: the label ends before the number, the number before the chevron.
+        var labelRect = (RectTransform)label.transform;
+        var countRect = (RectTransform)count.transform;
+        var chevronRect = (RectTransform)chevron.transform;
+        foreach (RectTransform pinned in new[] { countRect, chevronRect })
+        {
+            Assert.AreEqual(1f, pinned.anchorMin.x, 0.001f, $"{pinned.name} is pinned to the card's right edge");
+            Assert.AreEqual(1f, pinned.anchorMax.x, 0.001f);
+            Assert.AreEqual(1f, pinned.pivot.x, 0.001f);
+        }
+        Assert.AreEqual(0f, labelRect.anchorMin.x, 0.001f, "the label spans the card");
+        Assert.AreEqual(1f, labelRect.anchorMax.x, 0.001f);
+        Assert.LessOrEqual(labelRect.offsetMax.x, countRect.anchoredPosition.x - countRect.sizeDelta.x, "the label ends before the number");
+        Assert.LessOrEqual(countRect.anchoredPosition.x, chevronRect.anchoredPosition.x - chevronRect.sizeDelta.x, "the number ends before the chevron");
+        Assert.Less(chevronRect.anchoredPosition.x, 0f, "the chevron keeps off the card's edge");
+    }
+
+    [Test]
+    public void SettingsPrefab_TheHint_IsTheSettingsHint_AndHoldsAllItsLines()
+    {
+        GameObject root = PrefabUtility.LoadPrefabContents(PersonalChatsBuilder.SettingsPrefabPath);   // never saved here
+        try
+        {
+            var settings = root.GetComponent<BotSettings>();
+            Transform content = settings.BotNameField.transform.parent;
+            Transform hintRect = content.Find(PersonalChatsBuilder.SettingsHintName);
+            Assert.IsNotNull(hintRect, "run Tools/Personal Chats/Build");
+            var hint = hintRect.GetComponent<TextMeshProUGUI>();
+            Assert.AreEqual(PersonalChatsCopy.SettingsHint, hint.text, "authored from PersonalChatsCopy");
+            Assert.AreEqual(TextWrappingModes.Normal, hint.textWrappingMode, "it wraps");
+            Assert.IsFalse(hint.raycastTarget);
+            AssertBound(hint, ThemeRole.InkTertiary);
+            Assert.AreSame(settings.BotNameField.GetComponentInChildren<TextMeshProUGUI>(true).font, hint.font,
+                "the schedule hint's font (SF Pro Regular)");
+
+            var list = content.GetComponent<VerticalLayoutGroup>();
+            float width = 1080f - list.padding.left - list.padding.right;
+            float lines = hint.GetPreferredValues(hint.text, width, 0f).y;
+            float box = ((RectTransform)hintRect).sizeDelta.y;
+            Assert.GreaterOrEqual(box + 0.5f, lines, "the box holds every line of the hint");
+            Assert.Less(box, lines + hint.fontSize, "…and no more than that");
+        }
+        finally
+        {
+            PrefabUtility.UnloadPrefabContents(root);
+        }
+    }
+
+    [Test]
+    public void EnsureSettingsSection_ASecondRun_ChangesNothing()
+    {
+        GameObject root = PrefabUtility.LoadPrefabContents(PersonalChatsBuilder.SettingsPrefabPath);   // never saved here
+        try
+        {
+            var settings = root.GetComponent<BotSettings>();
+            Assert.IsFalse(PersonalChatsBuilder.EnsureSettingsSection(settings), "the saved prefab already holds everything the builder authors");
+            Transform content = settings.BotNameField.transform.parent;
+            foreach (string name in new[] { PersonalChatsBuilder.SettingsHeaderName, PersonalChatsBuilder.SettingsRowName, PersonalChatsBuilder.SettingsHintName })
+                Assert.AreEqual(1, content.Cast<Transform>().Count(t => t.name == name), $"one {name}");
+        }
+        finally
+        {
+            PrefabUtility.UnloadPrefabContents(root);
+        }
+    }
+
+    [Test]
+    public void EnsureSettingsSection_OnAPrefabWithoutIt_BuildsOnce_AboveTheSchedule()
+    {
+        GameObject root = PrefabUtility.LoadPrefabContents(PersonalChatsBuilder.SettingsPrefabPath);   // never saved here
+        try
+        {
+            var settings = root.GetComponent<BotSettings>();
+            Transform content = settings.BotNameField.transform.parent;
+            foreach (string name in new[] { PersonalChatsBuilder.SettingsHeaderName, PersonalChatsBuilder.SettingsRowName, PersonalChatsBuilder.SettingsHintName })
+            {
+                Transform part = content.Find(name);
+                if (part != null) Object.DestroyImmediate(part.gameObject);
+            }
+            var refs = new SerializedObject(settings);
+            refs.FindProperty("personalChatsRow").objectReferenceValue = null;
+            refs.FindProperty("personalChatsCount").objectReferenceValue = null;
+            refs.ApplyModifiedPropertiesWithoutUndo();
+
+            Assert.IsTrue(PersonalChatsBuilder.EnsureSettingsSection(settings), "the first run builds the section");
+            Assert.IsFalse(PersonalChatsBuilder.EnsureSettingsSection(settings), "a second run changes nothing");
+
+            Transform header = content.Find(PersonalChatsBuilder.SettingsHeaderName);
+            Transform hint = content.Find(PersonalChatsBuilder.SettingsHintName);
+            Assert.IsNotNull(settings.PersonalChatsRow, "the row is stamped again");
+            Assert.IsNotNull(settings.PersonalChatsCountLabel, "the number is stamped again");
+            Assert.AreSame(settings.PersonalChatsRow.transform, settings.PersonalChatsCountLabel.transform.parent);
+            Transform[] order = { header, settings.PersonalChatsRow.transform, hint, ScheduleHeaderOf(settings) };
+            for (int i = 1; i < order.Length; i++)
+                Assert.AreEqual(order[i - 1].GetSiblingIndex() + 1, order[i].GetSiblingIndex(), $"{order[i - 1].name} → {order[i].name}");
+            foreach (string name in new[] { PersonalChatsBuilder.SettingsHeaderName, PersonalChatsBuilder.SettingsRowName, PersonalChatsBuilder.SettingsHintName })
+                Assert.AreEqual(1, content.Cast<Transform>().Count(t => t.name == name), $"one {name}, however many runs");
+        }
+        finally
+        {
+            PrefabUtility.UnloadPrefabContents(root);
+        }
+    }
+
+    private static BotSettings SettingsPrefab()
+    {
+        var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(PersonalChatsBuilder.SettingsPrefabPath);
+        Assert.IsNotNull(prefab, $"{PersonalChatsBuilder.SettingsPrefabPath} moved");
+        var settings = prefab.GetComponent<BotSettings>();
+        Assert.IsNotNull(settings, "BotSettings.prefab carries BotSettings on its root");
+        return settings;
+    }
+
+    // «РАСПИСАНИЕ РАБОТЫ»: the header right above the schedule's toggle (BotSettings.scheduleRow).
+    private static Transform ScheduleHeaderOf(BotSettings settings)
+    {
+        Assert.IsNotNull(settings.ScheduleRow, "BotSettings.scheduleRow is wired");
+        Transform toggle = settings.ScheduleRow.transform;
+        Transform header = toggle.parent.GetChild(toggle.GetSiblingIndex() - 1);
+        var section = header.GetComponent<SectionHeader>();
+        Assert.IsNotNull(section, "a header stands right above the schedule's toggle");
+        Assert.AreEqual(ScheduleCopy.SectionTitle, section.Text, "…«РАСПИСАНИЕ РАБОТЫ»");
+        return header;
+    }
+
+    private static TextMeshProUGUI TextNamed(Component root, string name) =>
+        root.GetComponentsInChildren<TextMeshProUGUI>(true).Single(t => t.name == name);
 
     // ---- helpers ----
 

@@ -160,6 +160,7 @@ public partial class BotSettings : MonoBehaviour
         WireHeaderButtons();
         WireDeleteBot();
         WireUploadedFiles();
+        WirePersonalChats();
         SyncHeaderTitle();
 
         // General-tab layout: each authenticated-number field must sit right
@@ -346,6 +347,7 @@ public partial class BotSettings : MonoBehaviour
         BindReconnectEvents();
         RefreshReconnectUi();   // F2 (T9): banner + row hints of a retired channel, runtime-added like the test row
         BindScheduleSync();     // B2 fix round 3 (I-1): the schedule's delivery line follows the sync service
+        RefreshPersonalChatsCount();   // «Личные чаты · N» for a screen left open (a fresh open: Bot.OpenSettings, after the pairing)
     }
     
     // Mirrors the bot's current name onto the header. Called on enable, after

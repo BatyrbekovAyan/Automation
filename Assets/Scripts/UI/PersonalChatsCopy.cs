@@ -78,6 +78,8 @@ public static class PersonalChatsCopy
 
     public const string SettingsHeader = "ЛИЧНЫЕ ЧАТЫ";
     public const string SettingsRow = "Личные чаты";
+    /// <summary>The row's chevron — the «Проверить ИИ-сотрудника» row's «›» (U+203A, in the static SF Pro atlases).</summary>
+    public const string SettingsChevron = "›";
     public const string SettingsHint =
         "Контакты из телефона и все, кто писал до подключения. ИИ-сотрудник в них не участвует. Внутри можно отметить клиентов — с ними он будет работать. Ботам, каналам и рассылкам он не отвечает никогда.";
 

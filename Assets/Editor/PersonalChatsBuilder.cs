@@ -58,6 +58,12 @@ using Object = UnityEngine.Object;
 ///     the open chat, over the tab bar like it; hidden; every PersonalChatsFolderView part wired. The chat list's delete card
 ///     moves up beside it, over it — a folder row's «Удалить» asks through it.
 ///
+/// The bot settings' «ЛИЧНЫЕ ЧАТЫ» section (spec §5.7; sketch 009 screen 7) — PersonalChatsBuilder.Settings.cs:
+///   • BotSettings.prefab — <see cref="EnsureSettingsSection"/>: in the Основное tab, right above «РАСПИСАНИЕ РАБОТЫ», the
+///     header, PersonalChatsRow (the channel rows' card as one button: «Личные чаты», the number, «›») and the hint; anchored
+///     through BotSettings' own references the way BotScheduleBuilder is, the open scene never touched; BotSettings'
+///     personalChatsRow and personalChatsCount wired.
+///
 /// Colours are ThemedColor bindings (the glyphs are white sprites tinted by role, never baked); the authored colours are
 /// the light theme's, like the rest of the scene. Geometry is in 1080×1920 canvas reference units.
 /// </summary>
@@ -180,12 +186,13 @@ public static partial class PersonalChatsBuilder
 
     // ---- the two places ----
 
-    // The chat row prefab first, then the scene; each is saved only when something in it changed.
+    // The chat row prefab and the bot settings prefab first, then the scene; each is saved only when something in it changed.
     private static void Apply(Scene scene)
     {
         ChatListView list = Single<ChatListView>(scene, Tag);
         if (list.prefab == null) throw new InvalidOperationException($"{Tag} ChatListView.prefab is not wired.");
         WireItemPrefab(AssetDatabase.GetAssetPath(list.prefab));
+        WireSettingsPrefab();
 
         bool modified = false;
         EnsureListRow(list, ref modified);

@@ -1302,6 +1302,13 @@ public partial class Manager : MonoBehaviour
         BotSettingsDirtyPolicy.CanSave(BuildEditedSettingsSnapshot(),
                                        ReadSavedSettings(openBot.name));
 
+    // The open settings screen holds an edit that is not saved: the Save button's snapshots, its dirty half only — an
+    // invalid schedule cannot be saved, yet it is still an edit the back chevron would discard («Личные чаты» asks first).
+    public bool HasUnsavedBotSettings() =>
+        openBot != null && openBotSettings != null
+        && BotSettingsDirtyPolicy.IsDirty(BuildEditedSettingsSnapshot(),
+                                          ReadSavedSettings(openBot.name));
+
     // The live screen. Values are normalized to what SaveSettings would
     // actually persist (trimmed list names, non-empty rows only) so "saved,
     // nothing left to write" always evaluates to clean.

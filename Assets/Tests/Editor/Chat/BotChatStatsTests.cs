@@ -109,6 +109,37 @@ public class BotChatStatsTests
         Assert.AreEqual(0, BotChatStats.Tally(new ChatsResponse(), ChatChannel.Telegram, Tg, "").UnreadCount);
     }
 
+    [Test]
+    public void Read_AddsUpBothChannelsCaches()
+    {
+        const string bot = "BotChatStatsReadTestBot";
+        Manager previous = Manager.Instance;
+        Manager.Instance = null;   // no bot object: every chat counts, nothing is a working chat's unread
+        BotChatStats.UseCacheRootForTests(Path.Combine(_dir, "BotCache"));
+        try
+        {
+            Assert.AreEqual(0, BotChatStats.Read(bot).ChatCount, "no cache yet");
+            WriteCache(bot, ChatChannel.WhatsApp, WaRow("77000000001@c.us", unread: 3, fullName: "Мама", time: After),
+                WaRow("77000000002@c.us", unread: 2, fullName: "", time: After));
+            Assert.AreEqual(2, BotChatStats.Read(bot).ChatCount, "WhatsApp alone — Telegram has no cache");
+            WriteCache(bot, ChatChannel.Telegram, TgRow("5550000001", unread: 2, contact: false, bot: false));
+            Assert.AreEqual(3, BotChatStats.Read(bot).ChatCount, "both channels' caches");
+        }
+        finally
+        {
+            BotChatStats.ResetForTests();
+            Manager.Instance = previous;
+        }
+    }
+
+    private void WriteCache(string bot, ChatChannel channel, params object[] dialogs)
+    {
+        string folder = Path.Combine(_dir, "BotCache", bot, ChannelCachePath.SubDir(channel));
+        Directory.CreateDirectory(folder);
+        File.WriteAllText(Path.Combine(folder, "chats.json"), JsonConvert.SerializeObject(new { status = "done", dialogs },
+            new JsonSerializerSettings { NullValueHandling = NullValueHandling.Ignore }));
+    }
+
     // ---- rows as Wappi sends them ----
 
     private static ChatsResponse Parse(params object[] dialogs)
