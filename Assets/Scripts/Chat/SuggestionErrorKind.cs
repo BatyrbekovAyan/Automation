@@ -15,6 +15,13 @@ public static class SuggestionErrorKind
     public const string BadRequest = "bad_request";
     public const string Generation = "generation_failed";
 
+    /// <summary>
+    /// «Личные и рабочие чаты»: the server refused the panel because the chat is not a working chat on its side. Not an
+    /// error for the owner — N8nSuggestionsProvider answers it as an EMPTY result (no error text) carrying this kind, and
+    /// so does its own refusal to ask for a chat the app does not hold working. Never reaches <see cref="FromServer"/>.
+    /// </summary>
+    public const string PersonalChat = "personal_chat";
+
     /// <summary>A server `error` value → a known kind (unknown strings collapse to generation — never a raw server string in the UI).</summary>
     public static string FromServer(string error)
     {

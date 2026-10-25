@@ -103,5 +103,19 @@ public static class PersonalChatsCopy
     public static string MakePersonalBody(int days) =>
         $"ИИ-сотрудник перестанет участвовать в этом чате. Через {days} {RuPlural.Pick(days, "день", "дня", "дней")} он забудет эту переписку.";
 
+    /// <summary>
+    /// What a chat that is not a person is, and that the assistant never answers it — its line in the folder, and what its
+    /// «Личный» pill says when tapped (such a chat can never be made working). Null for a person.
+    /// </summary>
+    public static string NonHumanLine(NonHumanKind kind) => kind switch
+    {
+        NonHumanKind.Group => NonHumanGroup,
+        NonHumanKind.Channel => NonHumanChannel,
+        NonHumanKind.Bot => NonHumanBot,
+        NonHumanKind.Service => NonHumanService,
+        NonHumanKind.Self => NonHumanSelf,
+        _ => null,
+    };
+
     private static string ChannelName(bool telegram) => telegram ? "Telegram" : "WhatsApp";
 }

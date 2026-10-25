@@ -10,6 +10,6 @@ public class SuggestionResult
     public List<SuggestionItem> items;  // ranked best-first (PANEL-03)
     public long requestSeq;             // echoed correlation id
     public SuggestionStatus status;     // Ok | Empty | Error (drives PANEL-04 states)
-    public string errorKind;            // S8: a SuggestionErrorKind value when status == Error; null otherwise
+    public string errorKind;            // S8: a SuggestionErrorKind value when status == Error; on Empty only PersonalChat (the chat is not a working chat); null otherwise
     public string requestKey;           // learning A: the set's request key (N8nSuggestionsProvider.RequestKey); null on Empty/Error
 }

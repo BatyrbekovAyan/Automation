@@ -14,7 +14,7 @@ using Object = UnityEngine.Object;
 /// <summary>
 /// «Личные и рабочие чаты» (spec §5, sketch 009): the scene and prefab parts of the feature. ADDITIVE and idempotent — it
 /// authors the objects it owns and nothing else, resolves every anchor through a serialized reference (ChatListView.content
-/// and .prefab, ChatItemView's own fields), finds its own objects again by their names, and compares every value before it
+/// and .prefab, ChatItemView's and MessageHeaderView's own fields), finds its own objects again by their names, and compares every value before it
 /// writes it: a second run changes nothing and saves nothing (a scene save re-mints every Nobi material in Main.unity). The
 /// building blocks it shares with AutoChipLearnLayerBuilder live in BuilderSceneUtil.
 /// Run it with the Editor closed: Tools/run-editor-builder.sh PersonalChatsBuilder.BuildHeadless.
@@ -35,9 +35,21 @@ using Object = UnityEngine.Object;
 ///     with an AccentOnFill word. Authored hidden — SwipeToDelete.SetActions shows it when the row offers a move — and wired:
 ///     SwipeToDelete.moveButton, ChatItemView.moveButton / moveLabel. Anchored through SwipeToDelete.deleteButton.
 ///
+/// The open chat's header (spec §5.5, §5.6, sketch 009 screens 5–6):
+///   • Main.unity — <see cref="EnsureHeaderParts"/>: PersonalPill, the «Личный» pill, right after the «Авто» chip in its zone,
+///     as tall as the chip and <see cref="PersonalPillWidth"/> wide: the chip's transparent tap box over the chip's
+///     ring-and-fill pill (a Border ring, a Hairline fill) holding the lock (Lock.png) and «Личный» in the chip's word font,
+///     both InkSecondary. Hidden — MessageHeaderView
+///     swaps it with the chip in a personal chat. NameTap, a transparent button over the avatar and the name column, the
+///     zone's last child and ignored by its layout group, from the avatar's left edge — never over the back button.
+///     Anchored through MessageHeaderView's own fields (avatarImage, nameText) and the chip the SuggestionsController drives;
+///     MessageHeaderView's semiAutoToggle, personalPill, pillLock, nameTap and suggestions are stamped.
+///
 ///   ChatItem (SwipeContent/TextBlock/TopRow):  [AudienceLock][Name ……][Time]
 ///   ChatItem (behind SwipeContent):            … row's right edge | [MoveButton/Label][DeleteButton/Label]  (parked at rest)
 ///   PersonalChatsRow (Button, HLG):            [Avatar/Circle/Lock] [Title ……] [Counter/Count] [Chevron/Icon]  + Divider
+///   TopBar/LeftZone:                           [BackButton] [Avatar] [Text/Name ……]  + NameTap (over Avatar..Text)
+///   TopBar/RightZone:                          [SemiAutoToggle] [PersonalPill/Pill(Ring, Fill, Content[Lock][Label])]
 ///
 /// Colours are ThemedColor bindings (the glyphs are white sprites tinted by role, never baked); the authored colours are
 /// the light theme's, like the rest of the scene. Geometry is in 1080×1920 canvas reference units.
@@ -47,6 +59,26 @@ public static class PersonalChatsBuilder
     public const string RowName = "PersonalChatsRow";
     public const string LockName = "AudienceLock";
     public const string MoveButtonName = "MoveButton";
+    public const string PersonalPillName = "PersonalPill";
+    public const string NameTapName = "NameTap";
+
+    /// <summary>The pill's lock: its ink (74 % of the sprite's height) is about the cap height of the chip's 26u word.</summary>
+    public const float PillLockSize = 26f;
+    /// <summary>Between the lock and «Личный»; the sprite's own transparent margin adds ≈ 3u — the chip's lamp-to-word rhythm.</summary>
+    public const float PillSpacing = 8f;
+    /// <summary>The least room the pill keeps on each side of the lock and the word (pinned by the premise tests).</summary>
+    public const float PillMinPadding = 20f;
+    /// <summary>
+    /// The pill's width — the chip's height, but wider than the chip's 170u: «Личный» in the chip's word font measures ≈ 111u,
+    /// so the lock and the word need ≈ 145u and the pill keeps ≈ 27u on each side. Its zone's layout group seats it on the
+    /// zone's right edge, where the chip stands.
+    /// </summary>
+    public const float PersonalPillWidth = 200f;
+    /// <summary>
+    /// How far the name's tap reaches above and below its 100u zone: 132u in all, the house touch floor. Above the zone is the
+    /// bar's status strip, below it the bar's own bottom edge — nothing there takes a tap.
+    /// </summary>
+    public const float NameTapBleed = 16f;
 
     /// <summary>The swipe's move button: as wide as «Удалить» (200u), right on its left.</summary>
     public const float MoveButtonWidth = 200f;
@@ -68,6 +100,8 @@ public static class PersonalChatsBuilder
     private const string AvatarName = "Avatar", CircleName = "Circle", RowLockName = "Lock", TitleName = "Title";
     private const string CounterName = "Counter", CountName = "Count", ChevronName = "Chevron", DividerName = "Divider";
     private const string MoveLabelName = "Label";
+    private const string PillFaceName = "Pill", RingName = "Ring", FillName = "Fill", ContentName = "Content", PillWordName = "Label";
+    private const float PillRingWidth = 3f;   // the chip's: its Fill sits 3u inside its Ring
     private const float DividerThickness = 1f;
     private const string CountPreview = "1";   // authored hidden; PersonalChatsRowView.Bind writes the number
 
@@ -126,6 +160,17 @@ public static class PersonalChatsBuilder
         return modified;
     }
 
+    /// <summary>
+    /// The open chat's header parts — the «Личный» pill and the name's tap (see the class summary); true when something was
+    /// changed. <paramref name="suggestions"/> — the scene's SuggestionsController, stamped on the header (null: left as is).
+    /// </summary>
+    public static bool EnsureHeaderParts(MessageHeaderView header, SuggestionsController suggestions)
+    {
+        bool modified = false;
+        EnsureHeaderParts(header, suggestions, ref modified);
+        return modified;
+    }
+
     // ---- the two places ----
 
     // The chat row prefab first, then the scene; each is saved only when something in it changed.
@@ -137,6 +182,7 @@ public static class PersonalChatsBuilder
 
         bool modified = false;
         EnsureListRow(list, ref modified);
+        EnsureHeaderParts(Single<MessageHeaderView>(scene, Tag), Single<SuggestionsController>(scene, Tag), ref modified);
         if (!modified)
         {
             Debug.Log($"{Tag} {ScenePath}: already applied — not saved.");
@@ -144,7 +190,7 @@ public static class PersonalChatsBuilder
         }
         EditorSceneManager.MarkSceneDirty(scene);
         if (!EditorSceneManager.SaveScene(scene)) throw new InvalidOperationException($"{Tag} Could not save {ScenePath}.");
-        Debug.Log($"{Tag} {ScenePath}: the «Личные» row updated and saved.");
+        Debug.Log($"{Tag} {ScenePath}: the «Личные» row and the open chat's header parts updated and saved.");
     }
 
     private static void WireItemPrefab(string path)
@@ -432,6 +478,178 @@ public static class PersonalChatsBuilder
             new Vector2(-inset, thickness));
     }
 
+    // ---- the open chat's header: the «Личный» pill and the name's tap ----
+
+    private static void EnsureHeaderParts(MessageHeaderView header, SuggestionsController suggestions, ref bool modified)
+    {
+        if (header == null) throw new ArgumentNullException(nameof(header));
+        var view = new SerializedObject(header);
+        SemiAutoToggle chip = ChipOf(header, view, suggestions);
+        (Button pill, Image pillLock) = EnsurePersonalPill(chip, view.FindProperty("personalPill")?.objectReferenceValue as Button, ref modified);
+        Button nameTap = EnsureNameTap(header, view.FindProperty("nameTap")?.objectReferenceValue as Button, ref modified);
+
+        modified |= SetRef(view, "semiAutoToggle", chip, Tag);
+        modified |= SetRef(view, "personalPill", pill, Tag);
+        modified |= SetRef(view, "pillLock", pillLock, Tag);
+        modified |= SetRef(view, "nameTap", nameTap, Tag);
+        if (suggestions != null) modified |= SetRef(view, "suggestions", suggestions, Tag);
+    }
+
+    // The «Авто» chip: the header's own reference once stamped, else the one chip in the header — and it must be the very chip
+    // the suggestions controller paints (the header hides what the controller drives).
+    private static SemiAutoToggle ChipOf(MessageHeaderView header, SerializedObject view, SuggestionsController suggestions)
+    {
+        var chip = view.FindProperty("semiAutoToggle")?.objectReferenceValue as SemiAutoToggle;
+        if (chip == null)
+        {
+            SemiAutoToggle[] chips = header.GetComponentsInChildren<SemiAutoToggle>(true);
+            if (chips.Length != 1)
+                throw new InvalidOperationException($"{Tag} Expected one SemiAutoToggle under {header.name}, found {chips.Length}.");
+            chip = chips[0];
+        }
+        if (chip.transform.parent == null) throw new InvalidOperationException($"{Tag} The «Авто» chip has no zone.");
+        if (suggestions != null)
+        {
+            var driven = new SerializedObject(suggestions).FindProperty("_toggle")?.objectReferenceValue as SemiAutoToggle;
+            if (driven != null && driven != chip)
+                throw new InvalidOperationException($"{Tag} The header's «Авто» chip is not SuggestionsController._toggle.");
+        }
+        return chip;
+    }
+
+    // «Личный» in the chip's place: the chip's anchors and height (its width is <see cref="PersonalPillWidth"/>), its
+    // transparent tap box, its ring-and-fill pill (a Border ring, a Hairline fill) and in it the lock and the word in the
+    // chip's word font, InkSecondary. Hidden — MessageHeaderView shows it in a personal chat. Right after the chip in its
+    // zone, so the zone's layout group seats it on the zone's right edge, where the chip stands.
+    private static (Button pill, Image lockImage) EnsurePersonalPill(SemiAutoToggle chip, Button wired, ref bool modified)
+    {
+        var chipRect = (RectTransform)chip.transform;
+        var chipRefs = new SerializedObject(chip);
+        var chipRing = chipRefs.FindProperty("ringImage")?.objectReferenceValue as Image;
+        var chipWord = chipRefs.FindProperty("label")?.objectReferenceValue as TextMeshProUGUI;
+        if (chipRing == null || chipRing.transform.parent == null)
+            throw new InvalidOperationException($"{Tag} SemiAutoToggle.ringImage is not wired into the chip's pill.");
+        if (chipWord == null) throw new InvalidOperationException($"{Tag} SemiAutoToggle.label is not wired.");
+        var chipFace = (RectTransform)chipRing.transform.parent;
+
+        RectTransform pill = FindOrCreatePill(chipRect.parent, wired, ref modified);
+        modified |= PlaceAfter(pill, chipRect);
+        modified |= SetRect(pill, chipRect.anchorMin, chipRect.anchorMax, chipRect.pivot, chipRect.anchoredPosition,
+            new Vector2(PersonalPillWidth, chipRect.sizeDelta.y));
+        var hit = pill.GetComponent<Image>();
+        modified |= SetHitBox(hit);
+        modified |= SetTapButton(pill.GetComponent<Button>(), hit);
+        modified |= SetActive(pill.gameObject, false);
+
+        RectTransform face = EnsureChild(pill, PillFaceName, ref modified);
+        modified |= SetRect(face, chipFace.anchorMin, chipFace.anchorMax, chipFace.pivot, chipFace.anchoredPosition, chipFace.sizeDelta);
+        float radius = chipFace.sizeDelta.y / 2f;
+        EnsurePillLayer(face, RingName, 0, ThemeRole.Border, radius, Vector2.zero, ref modified);
+        EnsurePillLayer(face, FillName, 1, ThemeRole.Hairline, radius - PillRingWidth, Vector2.one * (-2f * PillRingWidth), ref modified);
+
+        RectTransform content = EnsureChild(face, ContentName, ref modified, typeof(HorizontalLayoutGroup));
+        modified |= SetIndex(content, 2);
+        modified |= SetRect(content, Vector2.zero, Vector2.one, Centre, Vector2.zero, Vector2.zero);
+        modified |= SetRowLayout(content.GetComponent<HorizontalLayoutGroup>(), 0, 0, PillSpacing, TextAnchor.MiddleCenter);
+
+        RectTransform lockRect = EnsureChild(content, RowLockName, ref modified, typeof(CanvasRenderer), typeof(Image), typeof(LayoutElement),
+            typeof(ThemedColor));
+        modified |= SetIndex(lockRect, 0);
+        var lockImage = lockRect.GetComponent<Image>();
+        modified |= SetGlyph(lockImage, LoadSprite(LockIconPath), ThemeRole.InkSecondary);
+        modified |= BindTheme(lockRect.GetComponent<ThemedColor>(), ThemeRole.InkSecondary, lockImage);
+        modified |= SetLayout(lockRect.GetComponent<LayoutElement>(), PillLockSize, PillLockSize);
+
+        RectTransform wordRect = EnsureChild(content, PillWordName, ref modified, typeof(CanvasRenderer), typeof(TextMeshProUGUI), typeof(ThemedColor));
+        modified |= SetIndex(wordRect, 1);
+        var word = wordRect.GetComponent<TextMeshProUGUI>();
+        modified |= SetPillWord(word, chipWord);
+        modified |= BindTheme(wordRect.GetComponent<ThemedColor>(), ThemeRole.InkSecondary, word);
+        return (pill.GetComponent<Button>(), lockImage);
+    }
+
+    // One layer of the pill's face: a rounded, theme-tinted fill stretched over the face (inset by sizeDelta).
+    private static void EnsurePillLayer(RectTransform face, string name, int index, ThemeRole role, float radius, Vector2 inset,
+                                        ref bool modified)
+    {
+        RectTransform layer = EnsureChild(face, name, ref modified, typeof(CanvasRenderer), typeof(Image), typeof(ImageWithRoundedCorners),
+            typeof(ThemedColor));
+        modified |= SetIndex(layer, index);
+        var image = layer.GetComponent<Image>();
+        modified |= SetImage(image, null, role, raycast: false);
+        modified |= EnsureRounded(image, radius);
+        modified |= BindTheme(layer.GetComponent<ThemedColor>(), role, image);
+        modified |= SetRect(layer, Vector2.zero, Vector2.one, Centre, Vector2.zero, inset);
+    }
+
+    // The pill the header already holds, else the one beside the chip by its name, else a new one — built HIDDEN from its
+    // first moment, so nothing under it (Nobi's material, TMP) wakes while it is authored.
+    private static RectTransform FindOrCreatePill(Transform zone, Button wired, ref bool modified)
+    {
+        var pill = wired != null && wired.transform.parent == zone ? (RectTransform)wired.transform : zone.Find(PersonalPillName) as RectTransform;
+        if (pill == null)
+        {
+            var go = new GameObject(PersonalPillName, typeof(RectTransform)) { layer = zone.gameObject.layer };
+            go.SetActive(false);
+            pill = (RectTransform)go.transform;
+            pill.SetParent(zone, false);
+            modified = true;
+        }
+        AddMissing(pill, ref modified, typeof(CanvasRenderer), typeof(Image), typeof(Button));
+        return pill;
+    }
+
+    // A transparent button over the avatar and the name: from the avatar's left edge to the name column's right edge, the
+    // zone's height and <see cref="NameTapBleed"/> above and below it — the back button, left of the avatar, stays clear of
+    // it. The zone's layout group ignores it (the avatar and the name never move) and it is the zone's last child, so it wins
+    // the tap over both.
+    private static Button EnsureNameTap(MessageHeaderView header, Button wired, ref bool modified)
+    {
+        (RectTransform avatar, RectTransform text) = NameColumnsOf(header);
+        var zone = (RectTransform)avatar.parent;
+        var tap = wired != null && wired.transform.parent == zone ? (RectTransform)wired.transform : zone.Find(NameTapName) as RectTransform;
+        if (tap == null)
+        {
+            var go = new GameObject(NameTapName, typeof(RectTransform)) { layer = zone.gameObject.layer };
+            tap = (RectTransform)go.transform;
+            tap.SetParent(zone, false);
+            modified = true;
+        }
+        AddMissing(tap, ref modified, typeof(CanvasRenderer), typeof(Image), typeof(Button), typeof(LayoutElement));
+        modified |= SetIndex(tap, zone.childCount - 1);
+        modified |= SetIgnoreLayout(tap.GetComponent<LayoutElement>());
+        float left = HorizontalEdges(avatar, zone).left;
+        float right = HorizontalEdges(text, zone).right;
+        modified |= SetRect(tap, Vector2.zero, Vector2.up, LeftMiddle, new Vector2(left, 0f), new Vector2(right - left, 2f * NameTapBleed));
+        var hit = tap.GetComponent<Image>();
+        modified |= SetHitBox(hit);
+        modified |= SetTapButton(tap.GetComponent<Button>(), hit);
+        modified |= SetActive(tap.gameObject, true);
+        return tap.GetComponent<Button>();
+    }
+
+    // The avatar's column and the name's column (MessageHeaderView.avatarImage / .nameText sit inside them), one zone's two.
+    private static (RectTransform avatar, RectTransform text) NameColumnsOf(MessageHeaderView header)
+    {
+        var avatar = header.avatarImage != null ? header.avatarImage.transform.parent as RectTransform : null;
+        var text = header.nameText != null ? header.nameText.transform.parent as RectTransform : null;
+        if (avatar == null || text == null || avatar.parent == null || avatar.parent != text.parent)
+            throw new InvalidOperationException($"{Tag} {header.name}: MessageHeaderView.avatarImage and .nameText are not two columns of one zone.");
+        return (avatar, text);
+    }
+
+    // A child's horizontal edges, from its parent rect's left edge, read off its anchors, pivot, position and size — no layout
+    // pass needed (a headless build runs none).
+    private static (float left, float right) HorizontalEdges(RectTransform child, RectTransform parent)
+    {
+        float parentWidth = parent.rect.width;
+        float anchorLeft = child.anchorMin.x * parentWidth;
+        float anchorRight = child.anchorMax.x * parentWidth;
+        float width = anchorRight - anchorLeft + child.sizeDelta.x;
+        float left = anchorLeft + (anchorRight - anchorLeft) * child.pivot.x + child.anchoredPosition.x - child.pivot.x * width;
+        return (left, left + width);
+    }
+
     // ---- what a chat row looks like (ChatItem.prefab, through ChatItemView's own references) ----
 
     private sealed class RowMetrics
@@ -511,6 +729,52 @@ public static class PersonalChatsBuilder
         label.enableAutoSizing = false;
         label.raycastTarget = false;   // only the row's background takes a tap
         label.color = ink;             // opaque — the ThemedColor binding keeps the authored alpha
+        return true;
+    }
+
+    // The pill's word: «Личный» in the «Авто» chip's word font, size, style and spacing, so the two read as one control.
+    private static bool SetPillWord(TextMeshProUGUI word, TextMeshProUGUI chipWord)
+    {
+        Color ink = Theme.Light.Resolve(ThemeRole.InkSecondary);
+        if (word.text == PersonalChatsCopy.Pill && word.font == chipWord.font && Mathf.Approximately(word.fontSize, chipWord.fontSize)
+            && word.fontStyle == chipWord.fontStyle && Mathf.Approximately(word.characterSpacing, chipWord.characterSpacing)
+            && word.alignment == TextAlignmentOptions.Center && word.textWrappingMode == TextWrappingModes.NoWrap
+            && word.overflowMode == TextOverflowModes.Overflow && !word.enableAutoSizing && !word.raycastTarget && word.color == ink)
+            return false;
+        word.text = PersonalChatsCopy.Pill;
+        word.font = chipWord.font;
+        word.fontSize = chipWord.fontSize;
+        word.fontStyle = chipWord.fontStyle;
+        word.characterSpacing = chipWord.characterSpacing;
+        word.alignment = TextAlignmentOptions.Center;
+        word.textWrappingMode = TextWrappingModes.NoWrap;
+        word.overflowMode = TextOverflowModes.Overflow;
+        word.enableAutoSizing = false;
+        word.raycastTarget = false;   // only the pill's box takes the tap
+        word.color = ink;             // opaque — the ThemedColor binding keeps the authored alpha
+        return true;
+    }
+
+    // A tap target that draws nothing: the «Авто» chip's own transparent box.
+    private static bool SetHitBox(Image image)
+    {
+        var clear = new Color(0f, 0f, 0f, 0f);
+        if (image.sprite == null && image.type == Image.Type.Simple && image.raycastTarget && image.maskable && image.color == clear)
+            return false;
+        image.sprite = null;
+        image.type = Image.Type.Simple;
+        image.raycastTarget = true;
+        image.maskable = true;
+        image.color = clear;
+        return true;
+    }
+
+    // No tint on press — the header punches the pill in code, as the chip does; the name's tap shows nothing at all.
+    private static bool SetTapButton(Button button, Graphic target)
+    {
+        if (button.transition == Selectable.Transition.None && button.targetGraphic == target) return false;
+        button.transition = Selectable.Transition.None;
+        button.targetGraphic = target;
         return true;
     }
 

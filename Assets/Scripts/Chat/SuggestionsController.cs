@@ -46,6 +46,9 @@ public class SuggestionsController : MonoBehaviour
     private bool _fallbackDismissed;   // the owner hid the panel while a fallback held — for THIS chat-open
     private bool _dismissedWithoutWrite;   // round 4: that hide was a no-write HideOnly — the only one ShowOnly may undo
     private float _fallbackCheckedAt = -1f;
+    // «Личные и рабочие чаты»: the server refused the last set because the chat was not a working chat on its side yet (the
+    // owner's move to business still on its way) — asked for again on the next change of the audience.
+    private bool _audienceRefused;
 
     // Keyboard-slot tenancy. Chassis = sketch-003 A (the panel is a tenant of the keyboard's slot);
     // interaction model = sketch-005 E. _slotState is the INTENT — the panel view can be
@@ -172,6 +175,7 @@ public class SuggestionsController : MonoBehaviour
         }
         ReplyModeSyncService.OnStateChanged += HandleReplyModeSyncState;
         ReplyModeSyncService.OnServerNewer += HandleReplyModeServerNewer;
+        ChatAudienceStore.OnChanged += HandleAudienceChanged;   // in Awake: a move can land while the chat screen is closed
         if (_panel != null)
         {
             _panel.OnCardTapped += HandleCardTapped;
@@ -244,6 +248,7 @@ public class SuggestionsController : MonoBehaviour
         }
         ReplyModeSyncService.OnStateChanged -= HandleReplyModeSyncState;
         ReplyModeSyncService.OnServerNewer -= HandleReplyModeServerNewer;
+        ChatAudienceStore.OnChanged -= HandleAudienceChanged;
         if (_panel != null)
         {
             _panel.OnCardTapped -= HandleCardTapped;
@@ -324,6 +329,7 @@ public class SuggestionsController : MonoBehaviour
         _chatResolved = false;                               // M1: never re-evaluate against the previous bot's sticky chat id
         _fallbackDismissed = false;
         _dismissedWithoutWrite = false;
+        _audienceRefused = false;
         _requestSeq++;                                        // supersede any in-flight request
         _debounce.Cancel();                                  // bot switch: drop a window pending from the previous bot's chat (BATCH-03)
         _pendingIncomingText = null;
@@ -355,6 +361,7 @@ public class SuggestionsController : MonoBehaviour
         StartFreshRound();       // rounds are per-question, never per-app — a chat open starts at round 1
         _fallbackDismissed = false;   // D1: a hidden fallback panel stays hidden for ONE chat-open
         _dismissedWithoutWrite = false;
+        _audienceRefused = false;     // a refusal belongs to the chat it was made for
         _semiAutoOn = ResolveSemiAutoForOpenChat(out bool fallbackOnly);
         _chatResolved = true;
         _fallbackCheckedAt = Time.unscaledTime;
@@ -404,8 +411,14 @@ public class SuggestionsController : MonoBehaviour
     // per-chat «Авто» that outlived the night / the quota reset and detached the chat from the bot default for good. And
     // the inputs are re-read while the chat stays open (M1, RecheckFallback): on every live batch and once a minute, so a
     // night message in an open «Авто» chat gets its panel and a night panel goes away when the window opens.
+    //
+    // «Личные и рабочие чаты» (spec §5.5, §5.8): all of that holds only in a decided WORKING chat. A personal chat, or one
+    // nobody has decided yet, has no panel — whatever its stored mode, the schedule or the quota say — and the dismissal
+    // state is left as it is (nothing about the panel was decided in a chat that has none).
     private bool ResolveSemiAutoForOpenChat(out bool fallbackOnly)
     {
+        fallbackOnly = false;
+        if (!OpenChatAllowsAssistant()) return false;
         var cm = ChatManager.Instance;
         bool storedOn = SemiAutoStore.IsOn(cm.CurrentBotId, cm.CurrentChatId);
         bool fallbackOn = FallbackSemiAutoForOpenBot();
@@ -414,6 +427,31 @@ public class SuggestionsController : MonoBehaviour
         bool on = FallbackRecheckPolicy.Effective(storedOn, fallbackOn, _fallbackDismissed);
         fallbackOnly = on && !storedOn;
         return on;
+    }
+
+    /// <summary>
+    /// «Личные и рабочие чаты»: the open chat's mode with the audience left out — would the panel suggest there once the chat
+    /// is working: its stored mode, or a fallback (the schedule, the quota). What «Сделать чат рабочим?» tells the owner about a
+    /// personal chat: «Авто» (the assistant answers itself) is the negation. A panel the owner hid for this chat-open does not
+    /// count — that is no mode, and the sheet says what the assistant will do. Reads only.
+    /// </summary>
+    public bool WouldSuggestIgnoringAudience()
+    {
+        var cm = ChatManager.Instance;
+        if (cm == null) return false;
+        return FallbackRecheckPolicy.Effective(SemiAutoStore.IsOn(cm.CurrentBotId, cm.CurrentChatId), FallbackSemiAutoForOpenBot(),
+            dismissed: false);
+    }
+
+    /// <summary>
+    /// «Личные и рабочие чаты»: the assistant works only in a decided working chat — the server's business decision or the
+    /// owner's move to business on its way (<see cref="ChatAudienceStore.AllowsAssistant"/>, never the rule). Anywhere else
+    /// there is no panel, no request and no ✦ key.
+    /// </summary>
+    private static bool OpenChatAllowsAssistant()
+    {
+        var cm = ChatManager.Instance;
+        return cm != null && ChatAudienceStore.AllowsAssistant(cm.ActiveChannelProfileId(), cm.CurrentChatId);
     }
 
     private static bool FallbackSemiAutoForOpenBot()
@@ -483,7 +521,9 @@ public class SuggestionsController : MonoBehaviour
     private void HandleToggle(bool desiredOn)
     {
         var cm = ChatManager.Instance;
-        if (cm == null) return;
+        // «Личные и рабочие чаты»: the chip's tap does nothing in a chat that is not a working chat (the header hides the chip
+        // in a personal one; a chat nobody has decided yet gets its panel only once it is decided working).
+        if (cm == null || !OpenChatAllowsAssistant()) return;
         // D1: a chip lit only by a fallback is not the chat's mode — its tap hides the panel for this chat-open and writes
         // NOTHING; the tap back undoes exactly that hide (round 4: only a NO-WRITE dismissal — after a written «Авто», or
         // with nothing dismissed, the tap is the owner's «Вместе» and is written). SemiAutoToggle routes the hide past the
@@ -530,6 +570,7 @@ public class SuggestionsController : MonoBehaviour
     // stored mode, and the next chat-open (or the next fallback — FallbackRecheckPolicy.KeepDismissal) shows it again.
     private void DismissFallbackForThisOpen()
     {
+        if (!OpenChatAllowsAssistant()) return;   // the chip's quiet tap — nothing to hide outside a working chat
         _fallbackDismissed = true;
         _dismissedWithoutWrite = true;   // the one hide a tap back may undo without a write
         _semiAutoOn = false;
@@ -580,6 +621,21 @@ public class SuggestionsController : MonoBehaviour
             _pendingOpenRequest = true;
         }
         else TurnPanelOff();
+    }
+
+    // «Личные и рабочие чаты»: a decision or a move changed (any profile, any chat — the store tells them all at once). The
+    // open chat is resolved again through the same show / hide path: made personal, the panel and the ✦ key go at once; made
+    // working, they come as the chat's mode says. The minute clock is reset first, so a recheck a drag or a keyboard handoff
+    // refuses runs on the very next frame (Update) instead of a minute later. And a set the server refused because the chat
+    // was not working on its side yet — the owner's move still on its way — is asked for again once the move may have landed.
+    private void HandleAudienceChanged()
+    {
+        if (!_chatResolved) return;   // no open chat — the next chat-open resolves itself
+        _fallbackCheckedAt = -1f;
+        bool wasOn = _semiAutoOn;
+        RecheckFallback();
+        if (wasOn && _semiAutoOn && _audienceRefused && OpenChatAllowsAssistant())
+            IssueRequest(steerTowardText: _currentSteer, lastIncomingText: _pendingIncomingText);
     }
 
     // --- Server sync of the per-chat override (SUP-02, client half) ---
@@ -642,6 +698,7 @@ public class SuggestionsController : MonoBehaviour
         if (ChatManager.Instance == null || _provider == null) return;
         _answeredIdle = false;                                 // a fresh set is on its way — stale latch off
         _pendingOpenRequest = false;                           // any direct request supersedes the parked open one
+        _audienceRefused = false;                              // ...and any refusal the last one met
         long seq = ++_requestSeq;                              // newest wins (also supersedes any in-flight)
         string chatId = ChatManager.Instance.CurrentChatId;
         if (string.IsNullOrEmpty(chatId)) return;             // no open chat → nothing to scope a request to (WR-02)
@@ -667,6 +724,9 @@ public class SuggestionsController : MonoBehaviour
         string currentChatId = ChatManager.Instance != null ? ChatManager.Instance.CurrentChatId : null;
         if (!SuggestionSequenceGuard.IsCurrent(seq, _requestSeq, capturedChatId, currentChatId))
             return;                                            // superseded / chat switched → DISCARD
+        // «Личные и рабочие чаты»: the server said the chat is not a working chat (an empty panel, no error text) — when the
+        // owner's move to business is still on its way. HandleAudienceChanged asks again once it lands.
+        _audienceRefused = result != null && result.errorKind == SuggestionErrorKind.PersonalChat;
         if (_panel != null) _panel.Render(result);            // skeleton → cards | empty | error
         // Rounds: only an Ok set becomes the restorable "current round" — an error/empty render
         // leaves _currentRendered on the last good set, so a pick-after-retry still pushes it.
@@ -1003,7 +1063,8 @@ public class SuggestionsController : MonoBehaviour
     /// </summary>
     private void ShowPanel(bool claimSlotFromKeyboard, SlotDetent detent = SlotDetent.Standard)
     {
-        if (_panel == null) return;
+        // «Личные и рабочие чаты»: never over a chat that is not a working chat — not even parked for later.
+        if (_panel == null || !OpenChatAllowsAssistant()) return;
 
         // The chat-open animation owns the screen until it is done. This park is NOT conditional on
         // claimSlotFromKeyboard the way the tenant parks below are: there is no other tenant to ask

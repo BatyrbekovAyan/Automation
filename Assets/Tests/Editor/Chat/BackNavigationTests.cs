@@ -115,4 +115,58 @@ public class BackNavigationTests
         Assert.Greater(sheet, router.IndexOf("new BackTarget(\"loading\"", System.StringComparison.Ordinal),
             "a loading cover still swallows Back first");
     }
+
+    /// <summary>
+    /// «Личные и рабочие чаты» (spec §5.5, §5.6): the open chat's two sheets — «Сделать чат рабочим?» and «Сделать личным»
+    /// (runtime overlays, sortingOrder 3) — join the router above the scene popups and the chat thread they sit over, and Back
+    /// does what their quiet action does: «Оставить личным» / «Отмена» — the sheet closes and the chat stays where it is.
+    /// The source order is pinned, and the REAL router list (AndroidBackRouter.Targets) is walked over the real sheets.
+    /// </summary>
+    [Test]
+    public void Back_ClosesBothSheets()
+    {
+        string router = File.ReadAllText(Path.Combine(Application.dataPath, "Scripts/Main/AndroidBackRouter.cs"));
+        const string entry = "new BackTarget(\"personal-chat-sheets\", () => PersonalChatSheets.IsShowing, () => PersonalChatSheets.TryCloseTop())";
+        int sheets = router.IndexOf(entry, System.StringComparison.Ordinal);
+        Assert.GreaterOrEqual(sheets, 0, "the two sheets must be a Back target, closed by their own quiet action");
+        foreach (string below in new[] { "new BackTarget(\"popup\"", "new BackTarget(\"paywall\"", "new BackTarget(\"chat-thread\"", "new BackTarget(\"bot-settings\"" })
+            Assert.Less(sheets, router.IndexOf(below, System.StringComparison.Ordinal), $"the overlay sheets sit above {below}");
+        Assert.Greater(sheets, router.IndexOf("new BackTarget(\"loading\"", System.StringComparison.Ordinal),
+            "a loading cover still swallows Back first");
+
+        PersonalChatSheets.ResetForTests();
+        int moved = 0;
+        void Count(AudienceKind kind, string bot, string profile, string chat) => moved++;
+        PersonalChatSheets.Committed += Count;
+        try
+        {
+            var chat = new ChatViewModel("77000000501@c.us", "Сауле", null, "Есть розы на завтра?",
+                System.DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+
+            PersonalChatSheets.AskMakeBusiness("Bot0", "back-profile", chat, autoOn: true, null, null);
+            Assert.AreEqual("personal-chat-sheets", BackNavigation.Dispatch(RouterTargets()), "Back over «Сделать чат рабочим?»");
+            Assert.IsFalse(PersonalChatSheets.IsShowing, "Back = «Оставить личным»: the sheet closes");
+
+            PersonalChatSheets.AskMakePersonal("Bot0", "back-profile", chat, "77000000501 · новый", null, null);
+            Assert.AreEqual("personal-chat-sheets", BackNavigation.Dispatch(RouterTargets()), "Back over «Сделать личным»");
+            Assert.IsFalse(PersonalChatSheets.IsShowing, "Back = «Отмена»: the sheet closes");
+
+            Assert.AreEqual(0, moved, "Back never moves a chat");
+            Assert.AreNotEqual("personal-chat-sheets", BackNavigation.Dispatch(RouterTargets()), "nothing of the sheets is left to close");
+        }
+        finally
+        {
+            PersonalChatSheets.Committed -= Count;
+            PersonalChatSheets.ResetForTests();
+        }
+    }
+
+    // The router's live list, as one Back press reads it (its other surfaces are all closed in EditMode).
+    private static List<BackTarget> RouterTargets()
+    {
+        System.Reflection.MethodInfo targets = typeof(AndroidBackRouter).GetMethod("Targets",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+        Assert.IsNotNull(targets, "AndroidBackRouter.Targets moved — update BackNavigationTests");
+        return (List<BackTarget>)targets.Invoke(null, null);
+    }
 }

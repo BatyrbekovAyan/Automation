@@ -23,6 +23,12 @@ using static SceneYaml;
 ///   right edge right before DeleteButton (both behind the sliding content), an AccentFill fill and «Удалить»'s word style in
 ///   AccentOnFill, hidden until SwipeToDelete.SetActions shows it, wired to SwipeToDelete.moveButton and ChatItemView's
 ///   moveButton / moveLabel.</item>
+///   <item>Main.unity — the open chat's header (spec §5.5, §5.6): PersonalPill, the «Личный» pill, right after the «Авто»
+///   chip in its zone, as tall as the chip and wide enough for its word (the chip's ring-and-fill pill in Border / Hairline,
+///   the lock and «Личный» in the chip's word font, InkSecondary), authored hidden; NameTap, a transparent button over the
+///   avatar and the name — the
+///   zone's last child, ignored by its layout group, never over the back button. MessageHeaderView holds the chip, the pill,
+///   its lock, the tap and the scene's SuggestionsController.</item>
 /// </list>
 /// The builder is additive and idempotent: a second run changes nothing. The prefab is loaded with
 /// PrefabUtility.LoadPrefabContents (never saved here); the scene is read as raw YAML, so no test opens Main.unity.
@@ -308,7 +314,249 @@ public class PersonalChatsBuilderPremiseTests
         Assert.IsFalse(rows[0].gameObject.activeSelf, "authored hidden");
     }
 
+    // ---- Main.unity: the open chat's header (spec §5.5, §5.6) ----
+
+    [Test]
+    public void Scene_PersonalPill_IsInactive_RightAfterTheChip_AndWired()
+    {
+        SceneYaml scene = SceneYaml.Load(ScenePath);
+        string header = scene.Single(ScriptGuid(typeof(MessageHeaderView)), "MessageHeaderView");
+        string chip = scene.Ref(header, "semiAutoToggle");
+        Assert.IsNotNull(chip, "MessageHeaderView.semiAutoToggle is wired");
+        string controller = scene.Single(ScriptGuid(typeof(SuggestionsController)), "SuggestionsController");
+        Assert.AreEqual(scene.Ref(controller, "_toggle"), chip, "the header hides the very chip the suggestions controller drives");
+        Assert.AreEqual(controller, scene.Ref(header, "suggestions"), "MessageHeaderView.suggestions — the chat's mode for the sheet's text");
+
+        string pillButton = scene.Ref(header, "personalPill");
+        Assert.IsNotNull(pillButton, "MessageHeaderView.personalPill is wired");
+        Assert.AreEqual(ScriptGuid(typeof(Button)), scene.ScriptGuidOf(pillButton));
+        string pillGo = scene.GameObjectOf(pillButton);
+        Assert.AreEqual(PersonalChatsBuilder.PersonalPillName, scene.NameOf(pillGo));
+        Assert.IsFalse(scene.IsActive(pillGo), "hidden until the open chat is personal — MessageHeaderView shows it");
+
+        string chipRect = scene.RectOf(scene.GameObjectOf(chip));
+        string pillRect = scene.RectOf(pillGo);
+        string[] zone = scene.Children(scene.Parent(chipRect)).ToArray();
+        Assert.AreEqual(pillRect, zone[System.Array.IndexOf(zone, chipRect) + 1], "right after the chip, in the chip's zone");
+        Assert.AreEqual(scene.Vec(chipRect, "m_SizeDelta").y, scene.Vec(pillRect, "m_SizeDelta").y, 0.001f, "as tall as the chip");
+        Assert.AreEqual(PersonalChatsBuilder.PersonalPillWidth, scene.Vec(pillRect, "m_SizeDelta").x, 0.001f,
+            "wide enough for the lock and «Личный» (Scene_PersonalPill_TheLockAndTheWordFit measures them)");
+        Assert.Less(PersonalChatsBuilder.PersonalPillWidth, scene.Vec(scene.Parent(chipRect), "m_SizeDelta").x, "the pill fits the chip's zone");
+        Assert.AreEqual(1, scene.Subtree(scene.RectOf(scene.GameObjectOf(header))).Count(r => scene.NameOf(scene.GameObjectOf(r)) == PersonalChatsBuilder.PersonalPillName),
+            "one pill");
+
+        // the tap target is the pill's own transparent box, as the chip's is
+        string hit = scene.Component(pillGo, ScriptGuid(typeof(Image)));
+        Assert.AreEqual(hit, scene.Ref(pillButton, "m_TargetGraphic"));
+        Assert.AreEqual("1", scene.Field(hit, "m_RaycastTarget"));
+        StringAssert.Contains("a: 0}", scene.Field(hit, "m_Color"), "transparent — the face below is what shows");
+
+        // the face: the chip's ring-and-fill pill in Border / Hairline, the lock and «Личный» in InkSecondary
+        AssertRole(scene, scene.Named(pillGo, "Ring"), ThemeRole.Border, scene.Component(scene.Named(pillGo, "Ring"), ScriptGuid(typeof(Image))));
+        AssertRole(scene, scene.Named(pillGo, "Fill"), ThemeRole.Hairline, scene.Component(scene.Named(pillGo, "Fill"), ScriptGuid(typeof(Image))));
+        string lockImage = scene.Ref(header, "pillLock");
+        Assert.IsNotNull(lockImage, "MessageHeaderView.pillLock — the sheet's action card wears the same glyph");
+        Assert.AreEqual(scene.Named(pillGo, "Lock"), scene.GameObjectOf(lockImage));
+        Assert.AreEqual(AssetDatabase.AssetPathToGUID(LockPath), scene.SpriteGuid(lockImage), "the app's Lock.png glyph");
+        AssertRole(scene, scene.Named(pillGo, "Lock"), ThemeRole.InkSecondary, lockImage);
+        string label = scene.Component(scene.Named(pillGo, "Label"), ScriptGuid(typeof(TextMeshProUGUI)));
+        Assert.AreEqual(PersonalChatsCopy.Pill, scene.Text(label, "m_text"), "authored from PersonalChatsCopy");
+        string chipLabel = scene.Ref(chip, "label");
+        Assert.AreEqual(scene.FontGuid(chipLabel), scene.FontGuid(label), "the chip's word font");
+        Assert.AreEqual(scene.Float(chipLabel, "m_fontSize"), scene.Float(label, "m_fontSize"), 0.001f, "…its size");
+        Assert.AreEqual(scene.Field(chipLabel, "m_fontStyle"), scene.Field(label, "m_fontStyle"), "…and its style");
+        AssertRole(scene, scene.Named(pillGo, "Label"), ThemeRole.InkSecondary, label);
+        foreach (string graphic in new[] { lockImage, label })
+            Assert.AreEqual("0", scene.Field(graphic, "m_RaycastTarget"), "only the pill's box takes the tap");
+    }
+
+    [Test]
+    public void Scene_NameTap_CoversTheAvatarAndTheName_NeverTheBackButton()
+    {
+        SceneYaml scene = SceneYaml.Load(ScenePath);
+        string header = scene.Single(ScriptGuid(typeof(MessageHeaderView)), "MessageHeaderView");
+        string tapButton = scene.Ref(header, "nameTap");
+        Assert.IsNotNull(tapButton, "MessageHeaderView.nameTap is wired");
+        string tapGo = scene.GameObjectOf(tapButton);
+        string tapRect = scene.RectOf(tapGo);
+        Assert.AreEqual(PersonalChatsBuilder.NameTapName, scene.NameOf(tapGo));
+        Assert.IsTrue(scene.IsActive(tapGo), "a working chat's name is always tappable");
+
+        string avatarSlot = scene.Parent(scene.RectOf(scene.GameObjectOf(scene.Ref(header, "avatarImage"))));
+        string textColumn = scene.Parent(scene.RectOf(scene.GameObjectOf(scene.Ref(header, "nameText"))));
+        string zone = scene.Parent(tapRect);
+        Assert.AreEqual(zone, scene.Parent(avatarSlot), "in the zone of the avatar…");
+        Assert.AreEqual(zone, scene.Parent(textColumn), "…and of the name");
+        Assert.AreEqual(tapRect, scene.Children(zone).Last(), "the zone's last child: it wins the tap over the avatar and the name");
+        Assert.AreEqual("1", scene.Field(scene.Component(tapGo, ScriptGuid(typeof(LayoutElement))), "m_IgnoreLayout"),
+            "the zone's layout group never moves the avatar or the name for it");
+        string image = scene.Component(tapGo, ScriptGuid(typeof(Image)));
+        Assert.AreEqual(image, scene.Ref(tapButton, "m_TargetGraphic"));
+        Assert.AreEqual("1", scene.Field(image, "m_RaycastTarget"));
+        StringAssert.Contains("a: 0}", scene.Field(image, "m_Color"), "invisible");
+
+        float zoneWidth = scene.Vec(zone, "m_SizeDelta").x;   // the zone is point-anchored in the bar
+        (float left, float right) tap = Edges(scene, tapRect, zoneWidth);
+        (float left, float right) back = Edges(scene, scene.RectOf(scene.Named(scene.GameObjectOf(zone), "BackButton")), zoneWidth);
+        (float left, float right) avatar = Edges(scene, avatarSlot, zoneWidth);
+        (float left, float right) text = Edges(scene, textColumn, zoneWidth);
+        Assert.GreaterOrEqual(tap.left, back.right, "the name's tap never reaches into the back button");
+        Assert.LessOrEqual(tap.left, avatar.left + 0.01f, "it covers the avatar…");
+        Assert.GreaterOrEqual(tap.right, text.right - 0.01f, "…and the name");
+        Vector2 anchorMin = scene.Vec(tapRect, "m_AnchorMin"), anchorMax = scene.Vec(tapRect, "m_AnchorMax");
+        Assert.AreEqual(0f, anchorMin.y, 1e-4f, "the zone's full height…");
+        Assert.AreEqual(1f, anchorMax.y, 1e-4f);
+        Assert.AreEqual(2f * PersonalChatsBuilder.NameTapBleed, scene.Vec(tapRect, "m_SizeDelta").y, 1e-4f, "…and a little beyond it");
+        Assert.AreEqual(0f, scene.Vec(tapRect, "m_AnchoredPosition").y, 1e-4f, "centred on it");
+        Assert.GreaterOrEqual(scene.Vec(zone, "m_SizeDelta").y + 2f * PersonalChatsBuilder.NameTapBleed, 120f,
+            "at least the house touch floor tall");
+    }
+
+    [Test]
+    public void Scene_PersonalPill_TheLockAndTheWordFit()
+    {
+        SceneYaml scene = SceneYaml.Load(ScenePath);
+        string header = scene.Single(ScriptGuid(typeof(MessageHeaderView)), "MessageHeaderView");
+        string pillGo = scene.GameObjectOf(scene.Ref(header, "personalPill"));
+        float width = scene.Vec(scene.RectOf(pillGo), "m_SizeDelta").x;
+        string label = scene.Component(scene.Named(pillGo, "Label"), ScriptGuid(typeof(TextMeshProUGUI)));
+
+        var font = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(AssetDatabase.GUIDToAssetPath(scene.FontGuid(label)));
+        Assert.IsNotNull(font, "the pill's word font");
+        StringAssert.DoesNotContain("Medium", font.name, "measured only in a font whose materials do not rewrite themselves");
+        StringAssert.DoesNotContain("Bold SDF", font.name);
+        var host = new GameObject("PillMeasure", typeof(RectTransform));
+        _created.Add(host);
+        var tmp = host.AddComponent<TextMeshProUGUI>();
+        tmp.font = font;
+        tmp.fontSize = scene.Float(label, "m_fontSize");
+        tmp.fontStyle = (FontStyles)int.Parse(scene.Field(label, "m_fontStyle"), CultureInfo.InvariantCulture);
+        tmp.characterSpacing = scene.Float(label, "m_characterSpacing");
+        tmp.textWrappingMode = TextWrappingModes.NoWrap;
+        tmp.text = PersonalChatsCopy.Pill;
+        float word = tmp.GetPreferredValues().x;
+        Assert.Greater(word, 0f, "measured");
+
+        float content = PersonalChatsBuilder.PillLockSize + PersonalChatsBuilder.PillSpacing + word;
+        TestContext.Out.WriteLine($"[FIT] «{PersonalChatsCopy.Pill}» {word:F1}u + lock → {content:F1}u in a {width:F0}u pill");
+        Assert.LessOrEqual(content + 2f * PersonalChatsBuilder.PillMinPadding, width,
+            "the lock and «Личный» sit inside the pill with room on both sides");
+    }
+
+    [Test]
+    public void EnsureHeaderParts_OnACodeBuiltHeader_BuildsOnce()
+    {
+        MessageHeaderView header = CodeBuiltHeader(out SemiAutoToggle chip, out RectTransform back, out RectTransform avatarSlot,
+            out RectTransform textColumn);
+
+        Assert.IsTrue(PersonalChatsBuilder.EnsureHeaderParts(header, null), "the first run builds the pill and the name's tap");
+        Assert.IsFalse(PersonalChatsBuilder.EnsureHeaderParts(header, null), "a second run changes nothing");
+
+        Transform[] pills = header.GetComponentsInChildren<Transform>(true).Where(t => t.name == PersonalChatsBuilder.PersonalPillName).ToArray();
+        Transform[] taps = header.GetComponentsInChildren<Transform>(true).Where(t => t.name == PersonalChatsBuilder.NameTapName).ToArray();
+        Assert.AreEqual(1, pills.Length, "one pill, however many runs");
+        Assert.AreEqual(1, taps.Length, "one tap, however many runs");
+        Assert.IsFalse(pills[0].gameObject.activeSelf, "authored hidden");
+        Assert.AreSame(chip.transform.parent, pills[0].parent, "in the chip's zone…");
+        Assert.AreEqual(chip.transform.GetSiblingIndex() + 1, pills[0].GetSiblingIndex(), "…right after the chip");
+        Assert.AreEqual(new Vector2(PersonalChatsBuilder.PersonalPillWidth, ((RectTransform)chip.transform).sizeDelta.y),
+            ((RectTransform)pills[0]).sizeDelta, "as tall as the chip, wide enough for its word");
+        Assert.AreSame(avatarSlot.parent, taps[0].parent);
+        Assert.AreEqual(taps[0].parent.childCount - 1, taps[0].GetSiblingIndex(), "the zone's last child");
+
+        var zone = (RectTransform)taps[0].parent;
+        (float left, float right) tap = Edges((RectTransform)taps[0], zone);
+        Assert.GreaterOrEqual(tap.left, Edges(back, zone).right, "never over the back button");
+        Assert.LessOrEqual(tap.left, Edges(avatarSlot, zone).left + 0.01f);
+        Assert.GreaterOrEqual(tap.right, Edges(textColumn, zone).right - 0.01f);
+
+        var refs = new SerializedObject(header);
+        Assert.AreSame(chip, refs.FindProperty("semiAutoToggle").objectReferenceValue);
+        Assert.AreSame(pills[0].GetComponent<Button>(), refs.FindProperty("personalPill").objectReferenceValue);
+        Assert.AreSame(taps[0].GetComponent<Button>(), refs.FindProperty("nameTap").objectReferenceValue);
+        var pillLock = refs.FindProperty("pillLock").objectReferenceValue as Image;
+        Assert.IsNotNull(pillLock);
+        Assert.AreSame(AssetDatabase.LoadAssetAtPath<Sprite>(LockPath), pillLock.sprite);
+        var word = pills[0].GetComponentsInChildren<TextMeshProUGUI>(true).Single();
+        Assert.AreEqual(PersonalChatsCopy.Pill, word.text);
+        var chipWord = (TextMeshProUGUI)new SerializedObject(chip).FindProperty("label").objectReferenceValue;
+        Assert.AreSame(chipWord.font, word.font, "the chip's word font");
+        Assert.AreEqual(chipWord.fontSize, word.fontSize, 0.001f);
+        Assert.AreEqual(chipWord.fontStyle, word.fontStyle);
+    }
+
     // ---- helpers ----
+
+    // A header like the scene's: LeftZone [BackButton][Avatar slot/Avatar][Text/Name], RightZone [SemiAutoToggle Pill/Ring + Label].
+    private MessageHeaderView CodeBuiltHeader(out SemiAutoToggle chip, out RectTransform back, out RectTransform avatarSlot,
+        out RectTransform textColumn)
+    {
+        var top = new GameObject("TopBar", typeof(RectTransform));
+        _created.Add(top);
+        var header = top.AddComponent<MessageHeaderView>();
+
+        RectTransform left = Rect("LeftZone", top.transform, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(0f, 0.5f),
+            new Vector2(0f, -66f), new Vector2(800f, 100f));
+        left.gameObject.AddComponent<HorizontalLayoutGroup>();
+        back = Rect("BackButton", left, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(52f, 2f), new Vector2(104f, 104f));
+        avatarSlot = Rect("Avatar", left, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0.5f, 0.5f), new Vector2(230f, -50f), new Vector2(100f, 100f));
+        header.avatarImage = Rect("Avatar", avatarSlot, Centre(), Centre(), Centre(), Vector2.zero, new Vector2(100f, 100f)).gameObject.AddComponent<Image>();
+        textColumn = Rect("Text", left, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0.5f, 0.5f), new Vector2(554f, -50f), new Vector2(500f, 100f));
+        header.nameText = Rect("Name", textColumn, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 0.5f), new Vector2(0f, -50f),
+            new Vector2(500f, 60f)).gameObject.AddComponent<TextMeshProUGUI>();
+
+        RectTransform right = Rect("RightZone", top.transform, new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(1f, 0.5f),
+            new Vector2(0f, -66f), new Vector2(280f, 100f));
+        right.gameObject.AddComponent<HorizontalLayoutGroup>();
+        RectTransform chipRect = Rect("SemiAutoToggle", right, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(1f, 0.5f),
+            new Vector2(240f, -50f), new Vector2(170f, 88f));
+        chip = chipRect.gameObject.AddComponent<SemiAutoToggle>();
+        RectTransform pill = Rect("Pill", chipRect, new Vector2(0f, 0.5f), new Vector2(1f, 0.5f), Centre(), Vector2.zero, new Vector2(0f, 60f));
+        Image ring = Rect("Ring", pill, Vector2.zero, Vector2.one, Centre(), Vector2.zero, Vector2.zero).gameObject.AddComponent<Image>();
+        var label = Rect("Label", pill, Centre(), Centre(), Centre(), Vector2.zero, new Vector2(70f, 34f)).gameObject.AddComponent<TextMeshProUGUI>();
+        label.font = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>("Assets/TextMesh Pro/Fonts/SFProText-Semibold SDF.asset");
+        label.fontSize = 26f;
+        label.fontStyle = FontStyles.Bold;
+        label.characterSpacing = -2f;
+        label.text = "Авто";
+        var chipRefs = new SerializedObject(chip);
+        chipRefs.FindProperty("ringImage").objectReferenceValue = ring;
+        chipRefs.FindProperty("label").objectReferenceValue = label;
+        chipRefs.ApplyModifiedPropertiesWithoutUndo();
+        return header;
+    }
+
+    private static RectTransform Rect(string name, Transform parent, Vector2 anchorMin, Vector2 anchorMax, Vector2 pivot, Vector2 position, Vector2 size)
+    {
+        var rect = (RectTransform)new GameObject(name, typeof(RectTransform)).transform;
+        rect.SetParent(parent, false);
+        rect.anchorMin = anchorMin;
+        rect.anchorMax = anchorMax;
+        rect.pivot = pivot;
+        rect.anchoredPosition = position;
+        rect.sizeDelta = size;
+        return rect;
+    }
+
+    private static Vector2 Centre() => new Vector2(0.5f, 0.5f);
+
+    // A child's horizontal edges, from its parent rect's left edge — the anchors, the pivot, the position and the size as
+    // serialized (the test's own arithmetic, so the builder's is checked rather than reused).
+    private static (float left, float right) Edges(SceneYaml scene, string rect, float parentWidth) =>
+        Edges(scene.Vec(rect, "m_AnchorMin").x, scene.Vec(rect, "m_AnchorMax").x, scene.Vec(rect, "m_Pivot").x,
+            scene.Vec(rect, "m_AnchoredPosition").x, scene.Vec(rect, "m_SizeDelta").x, parentWidth);
+
+    private static (float left, float right) Edges(RectTransform rect, RectTransform parent) =>
+        Edges(rect.anchorMin.x, rect.anchorMax.x, rect.pivot.x, rect.anchoredPosition.x, rect.sizeDelta.x, parent.rect.width);
+
+    private static (float left, float right) Edges(float anchorMin, float anchorMax, float pivot, float position, float size, float parentWidth)
+    {
+        float anchorLeft = anchorMin * parentWidth;
+        float anchorRight = anchorMax * parentWidth;
+        float width = anchorRight - anchorLeft + size;
+        float left = anchorLeft + (anchorRight - anchorLeft) * pivot + position - pivot * width;
+        return (left, left + width);
+    }
 
     private static ChatItemView ItemPrefab()
     {

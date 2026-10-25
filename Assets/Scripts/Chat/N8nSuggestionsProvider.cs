@@ -48,6 +48,14 @@ public class N8nSuggestionsProvider : ISuggestionsProvider
             return;
         }
 
+        // «Личные и рабочие чаты» (spec §5.8): no request at all for a chat that is not a decided working chat — nothing of a
+        // personal or undecided chat may reach the server or the model. The same quiet answer the server's refusal gets.
+        if (!ChatAudienceStore.AllowsAssistant(cm.ActiveChannelProfileId(), request?.chatId ?? cm.CurrentChatId))
+        {
+            callback?.Invoke(RefusedForAudience(request));
+            return;
+        }
+
         // ChatManager is ALWAYS active — run the coroutine here, never on the controller (Pitfall 1).
         cm.StartCoroutine(Run(request, callback));
     }
@@ -71,6 +79,12 @@ public class N8nSuggestionsProvider : ISuggestionsProvider
         if (cm == null || bot == null || !cm.TryGetRecentMessages(req.chatId, MaxMessages, out var msgs))
         {
             cb?.Invoke(Empty(req));
+            yield break;
+        }
+        // «Личные и рабочие чаты»: the chat may have been made personal during the drain — asked again before the payload.
+        if (!ChatAudienceStore.AllowsAssistant(cm.ActiveChannelProfileId(), req.chatId))
+        {
+            cb?.Invoke(RefusedForAudience(req));
             yield break;
         }
 
@@ -360,7 +374,9 @@ public class N8nSuggestionsProvider : ISuggestionsProvider
     /// &gt;4 valid => the FIRST 4 (the wire contract's upper bound, enforced client-side so a
     /// misbehaving server can never overflow the fixed-footprint panel). A deliberate
     /// <c>abstain</c> envelope (empty list + abstain=true, no error) => <see cref="SuggestionStatus.Empty"/>
-    /// — the model judged the message non-business; the quiet state, never the retry nag.
+    /// — the model judged the message non-business; the quiet state, never the retry nag. So is the
+    /// refusal <c>personal_chat</c> (the chat is not a working chat on the server's side): Empty, with
+    /// <see cref="SuggestionErrorKind.PersonalChat"/> for the controller and no error text for the owner.
     /// <paramref name="requestSeq"/> is stamped from the REQUEST, not the server echo.
     /// </summary>
     /// <summary>learning A: names the SET a result came from. Only an Ok result has a set; Empty/Error stay unnamed.</summary>
@@ -377,6 +393,9 @@ public class N8nSuggestionsProvider : ISuggestionsProvider
 
         if (r == null || r.suggestions == null)
             return new SuggestionResult { items = null, requestSeq = requestSeq, status = SuggestionStatus.Error, errorKind = SuggestionErrorKind.Generation };
+        // «Личные и рабочие чаты»: the server's refusal for a chat that is not a working chat is no failure — an empty panel.
+        if (r.error == SuggestionErrorKind.PersonalChat)
+            return new SuggestionResult { items = null, requestSeq = requestSeq, status = SuggestionStatus.Empty, errorKind = SuggestionErrorKind.PersonalChat };
         if (!string.IsNullOrEmpty(r.error))
             return new SuggestionResult { items = null, requestSeq = requestSeq, status = SuggestionStatus.Error, errorKind = SuggestionErrorKind.FromServer(r.error) };
 
@@ -398,6 +417,14 @@ public class N8nSuggestionsProvider : ISuggestionsProvider
 
     private static SuggestionResult Empty(SuggestionRequest req)
         => new SuggestionResult { items = null, requestSeq = req != null ? req.requestSeq : 0L, status = SuggestionStatus.Empty };
+
+    // «Личные и рабочие чаты»: not asked — the chat is not a working chat. Empty (no error text), marked like the server's refusal.
+    private static SuggestionResult RefusedForAudience(SuggestionRequest req)
+        => new SuggestionResult
+        {
+            items = null, requestSeq = req != null ? req.requestSeq : 0L, status = SuggestionStatus.Empty,
+            errorKind = SuggestionErrorKind.PersonalChat,
+        };
 
     private static SuggestionResult Error(SuggestionRequest req, string kind = SuggestionErrorKind.Network)
         => new SuggestionResult { items = null, requestSeq = req != null ? req.requestSeq : 0L, status = SuggestionStatus.Error, errorKind = kind };

@@ -164,4 +164,18 @@ public class ChatIdFormatTests
         Assert.IsFalse(ChatIdFormat.IsForeignToChannel(null, ChatChannel.WhatsApp));
         Assert.IsFalse(ChatIdFormat.IsForeignToChannel("", ChatChannel.WhatsApp));
     }
+
+    // «Личные и рабочие чаты»: the «Сделать личным» sheet shows a phone number only where the id carries one.
+    [Test] public void PhoneNumber_OnlyAWhatsappPersonsId_CarriesOne()
+    {
+        Assert.AreEqual("77011234567", ChatIdFormat.PhoneNumber("77011234567@c.us"), "the digits DisplayFallback shows for a nameless chat");
+        Assert.AreEqual(ChatIdFormat.DisplayFallback("77011234567@c.us"), ChatIdFormat.PhoneNumber("77011234567@c.us"));
+        Assert.IsNull(ChatIdFormat.PhoneNumber("120363012345@g.us"), "a group");
+        Assert.IsNull(ChatIdFormat.PhoneNumber("123456789012345@lid"), "a WhatsApp @lid hides the number");
+        Assert.IsNull(ChatIdFormat.PhoneNumber("status@broadcast"));
+        Assert.IsNull(ChatIdFormat.PhoneNumber("123456789"), "a Telegram id is no phone number");
+        Assert.IsNull(ChatIdFormat.PhoneNumber("@c.us"), "a suffix with nothing before it");
+        Assert.IsNull(ChatIdFormat.PhoneNumber(null));
+        Assert.IsNull(ChatIdFormat.PhoneNumber(""));
+    }
 }

@@ -405,6 +405,16 @@ public class FontGlyphCoverageTests
         }
         foreach (int days in new[] { 1, ChatAudienceRule.WipeDays, 5 })
             yield return ($"PersonalChatsCopy.MakePersonalBody({days})", PersonalChatsCopy.MakePersonalBody(days));
+        foreach (NonHumanKind kind in Enum.GetValues(typeof(NonHumanKind)))
+            if (kind != NonHumanKind.None)
+                yield return ($"PersonalChatsCopy.NonHumanLine({kind})", PersonalChatsCopy.NonHumanLine(kind));
+        foreach (bool contact in new[] { true, false })
+        {
+            var chat = new ChatViewModel("77011234567@c.us", "Асем", null, "", 1,
+                facts: new AudienceFacts(false, "77011234567@c.us", "", false, false, false, contact));
+            var view = new AudienceView { Kind = AudienceKind.Business, Reason = AudienceReason.New };
+            yield return ($"PersonalChatSheets.NumberLine(contact={contact})", PersonalChatSheets.NumberLine(chat, view));
+        }
 
         foreach (OutcomeStatus s in Enum.GetValues(typeof(OutcomeStatus)))
             yield return ($"DashboardStatusInfo.Label({s})", DashboardStatusInfo.Label(s));

@@ -40,6 +40,19 @@ public static class ChatIdFormat
     }
 
     /// <summary>
+    /// The phone number of a WhatsApp one-to-one chat — its id without <c>@c.us</c>, the very digits
+    /// <see cref="DisplayFallback"/> shows for a chat without a name. Null for every id that carries no
+    /// phone number: a group, a WhatsApp <c>@lid</c> or channel, a bare Telegram id. Null/empty → null.
+    /// </summary>
+    public static string PhoneNumber(string id)
+    {
+        if (string.IsNullOrEmpty(id) || id.Length <= OneToOneSuffix.Length) return null;
+        return id.EndsWith(OneToOneSuffix, System.StringComparison.Ordinal)
+            ? id.Substring(0, id.Length - OneToOneSuffix.Length)
+            : null;
+    }
+
+    /// <summary>
     /// Suffix-only groupness check (used by per-bubble message-view checks that
     /// only have a chatId). True when the id carries the WhatsApp <c>@g.us</c> suffix.
     /// </summary>
