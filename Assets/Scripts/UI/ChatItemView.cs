@@ -29,7 +29,8 @@ public class ChatItemView : MonoBehaviour
     public ChatViewModel Vm => vm;
     private string chatId;
     private ChatListView parentList;
-    private Coroutine avatarLoadCoroutine;
+    private Coroutine avatarLoadCoroutine;   // non-null while LoadAvatar's download is in flight
+    private UnityWebRequest avatarRequest;   // that download — disposed by hand when the coroutine is cut off
     private bool pendingAvatarLoad;
 
     // LRU cache: [ChatID_RawMessage] -> [Perfectly Sliced String]. Capped to bound memory on long sessions.
@@ -105,7 +106,7 @@ public void Bind(ChatViewModel model)
 
                 if (!string.IsNullOrEmpty(vm.AvatarUrl))
                 {
-                    if (avatarLoadCoroutine != null) StopCoroutine(avatarLoadCoroutine);
+                    CancelAvatarLoad();
                     // Bind can fire while the chat list panel is inactive (initial
                     // cache load before the user has navigated to it). StartCoroutine
                     // throws on inactive GameObjects, so defer to OnEnable.
@@ -165,7 +166,11 @@ public void Bind(ChatViewModel model)
         // Use standard Get instead of GetTexture so we have access to the raw bytes for saving!
         using UnityWebRequest req = UnityWebRequest.Get(vm.AvatarUrl);
         req.timeout = 30;
+        avatarRequest = req;
         yield return req.SendWebRequest();
+        // Answered: no longer in flight, so a hide from here on owes nothing (OnDisable).
+        avatarRequest = null;
+        avatarLoadCoroutine = null;
 
         if (req.result != UnityWebRequest.Result.Success) yield break;
 
@@ -454,13 +459,41 @@ public void Bind(ChatViewModel model)
 
         if (!pendingAvatarLoad) return;
         pendingAvatarLoad = false;
-        if (vm == null || vm.AvatarSprite != null || string.IsNullOrEmpty(vm.AvatarUrl)) return;
+        if (!AvatarLoadOwed(vm)) return;
         avatarLoadCoroutine = StartCoroutine(LoadAvatar(vm));
     }
 
     private void OnDisable()
     {
         Theme.Changed -= HandleThemeChanged;
+
+        // Hiding the row (a personal chat outside a search, a chat moved to «Личные», the chats panel itself) stops its
+        // coroutines for good, and a stopped coroutine never reaches the end of its `using`. So a download cut off here is
+        // aborted and disposed by hand, and owed again: OnEnable starts it when the row is shown.
+        if (avatarLoadCoroutine == null) return;
+        avatarLoadCoroutine = null;
+        DisposeAvatarRequest();
+        if (AvatarLoadOwed(vm)) pendingAvatarLoad = true;
+    }
+
+    /// <summary>The chat's avatar is still to be downloaded: it has a URL and no sprite yet.</summary>
+    internal static bool AvatarLoadOwed(ChatViewModel model) =>
+        model != null && model.AvatarSprite == null && !string.IsNullOrEmpty(model.AvatarUrl);
+
+    // A rebind replaces the download in flight: stop it and let its request go.
+    private void CancelAvatarLoad()
+    {
+        if (avatarLoadCoroutine != null) StopCoroutine(avatarLoadCoroutine);
+        avatarLoadCoroutine = null;
+        DisposeAvatarRequest();
+    }
+
+    private void DisposeAvatarRequest()
+    {
+        if (avatarRequest == null) return;
+        avatarRequest.Abort();
+        avatarRequest.Dispose();
+        avatarRequest = null;
     }
 
     /// <summary>Re-run the runtime tint pass with the row's current unread count.</summary>

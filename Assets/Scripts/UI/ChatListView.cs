@@ -85,6 +85,12 @@ public class ChatListView : MonoBehaviour
 
         // --- THE FIX: Everything goes into the normalContent now! ---
         var item = Instantiate(prefab, content);
+
+        // Apply the active filter BEFORE the bind, so a newly-arriving chat never shows for a frame where it does
+        // not belong (a personal chat outside a search, a query still set after a bot switch) — and a row hidden here
+        // binds inactive, so its avatar waits for the row to be shown instead of starting a download the hide would
+        // cut off.
+        ApplyMatchToItem(item, vm, ChatAudienceStore.ViewOf(ActiveProfileId(), vm), SearchActive);
         item.Bind(vm);
         itemsByChatId[vm.ChatId] = item;
 
@@ -93,10 +99,6 @@ public class ChatListView : MonoBehaviour
         // mid-session would otherwise land at the bottom of the list.
         item.transform.SetAsLastSibling();
         item.transform.localScale = Vector3.one;
-
-        // Apply the active filter at once so a newly-arriving chat never shows for a frame where it does
-        // not belong — a personal chat outside a search, or a query still set after a bot switch.
-        ApplyMatchToItem(item, ChatAudienceStore.ViewOf(ActiveProfileId(), vm), SearchActive);
 
         RequestResort();
         RequestVisibilityRefresh();   // the «Личные» row may gain a chat
@@ -153,7 +155,7 @@ public class ChatListView : MonoBehaviour
         {
             if (item == null || item.Vm == null) continue;
             AudienceView view = ChatAudienceStore.ViewOf(profileId, item.Vm);
-            ApplyMatchToItem(item, view, searchActive);
+            ApplyMatchToItem(item, item.Vm, view, searchActive);
             audienceScratch.Add((view, item.Vm.UnreadCount));
         }
         ApplyPersonalRow(searchActive);
@@ -161,10 +163,10 @@ public class ChatListView : MonoBehaviour
 
     // A row is shown when it is working (or a search is on) and it matches the query; a personal one in the search results
     // wears the lock, and its unread badge is grey (personal chats are muted in the app).
-    private void ApplyMatchToItem(ChatItemView item, AudienceView view, bool searchActive)
+    private void ApplyMatchToItem(ChatItemView item, ChatViewModel vm, AudienceView view, bool searchActive)
     {
         if (item == null) return;
-        bool shown = PersonalChatsListModel.Visible(view, searchActive) && Matches(item.Vm, currentQuery);
+        bool shown = PersonalChatsListModel.Visible(view, searchActive) && Matches(vm, currentQuery);
         if (item.gameObject.activeSelf != shown)
             item.gameObject.SetActive(shown);
         item.SetAudienceMarks(PersonalChatsListModel.ShowLock(view, searchActive), PersonalChatsListModel.IsPersonal(view));

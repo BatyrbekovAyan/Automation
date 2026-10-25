@@ -1,6 +1,5 @@
 #if UNITY_EDITOR
 using System;
-using System.Linq;
 using System.Reflection;
 using TMPro;
 using UnityEditor;
@@ -8,6 +7,7 @@ using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
+using static BuilderSceneUtil;
 using Object = UnityEngine.Object;
 
 /// <summary>
@@ -144,8 +144,8 @@ public static class AutoChipLearnLayerBuilder
         WirePrefab<BotSwitcherRowView>(RowPrefabPath, WireSwitcherRow);
 
         bool modified = false;
-        WireHeader(Single<ReplyModeToggleBinder>(scene), ref modified);
-        WireConversationChip(Single<SemiAutoToggle>(scene), ref modified);
+        WireHeader(Single<ReplyModeToggleBinder>(scene, Tag), ref modified);
+        WireConversationChip(Single<SemiAutoToggle>(scene, Tag), ref modified);
         if (!modified)
         {
             Debug.Log($"{Tag} {ScenePath}: already applied — not saved.");
@@ -186,8 +186,8 @@ public static class AutoChipLearnLayerBuilder
         var face = Ref<Image>(owner, "autoPillFill");
         AutoChipProgress progress = EnsureLayer(face.rectTransform, ref modified);
         TextMeshProUGUI caption = EnsureCaption(ChipRootOf(face), Ref<TextMeshProUGUI>(owner, "autoPillLabel").font, ref modified);
-        modified |= SetRef(owner, "autoPillProgress", progress);
-        modified |= SetRef(owner, "learnCaption", caption);
+        modified |= SetRef(owner, "autoPillProgress", progress, Tag);
+        modified |= SetRef(owner, "learnCaption", caption, Tag);
     }
 
     private static void WireHeader(ReplyModeToggleBinder binder, ref bool modified)
@@ -196,8 +196,8 @@ public static class AutoChipLearnLayerBuilder
         var face = Ref<Image>(owner, "fillImage");
         AutoChipProgress progress = EnsureLayer(face.rectTransform, ref modified);
         TextMeshProUGUI caption = EnsureCaption(ChipRootOf(face), Ref<TextMeshProUGUI>(owner, "label").font, ref modified);
-        modified |= SetRef(owner, "progress", progress);
-        modified |= SetRef(owner, "learnCaption", caption);
+        modified |= SetRef(owner, "progress", progress, Tag);
+        modified |= SetRef(owner, "learnCaption", caption, Tag);
     }
 
     // The sheet row and the chat chip are too small for a caption (spec §4.4): the fill only.
@@ -205,14 +205,14 @@ public static class AutoChipLearnLayerBuilder
     {
         var owner = new SerializedObject(row);
         AutoChipProgress progress = EnsureLayer(Ref<Image>(owner, "chipFill").rectTransform, ref modified);
-        modified |= SetRef(owner, "chipProgress", progress);
+        modified |= SetRef(owner, "chipProgress", progress, Tag);
     }
 
     private static void WireConversationChip(SemiAutoToggle chip, ref bool modified)
     {
         var owner = new SerializedObject(chip);
         AutoChipProgress progress = EnsureLayer(Ref<Image>(owner, "fillImage").rectTransform, ref modified);
-        modified |= SetRef(owner, "progress", progress);
+        modified |= SetRef(owner, "progress", progress, Tag);
     }
 
     // ---- the layer ----
@@ -241,9 +241,9 @@ public static class AutoChipLearnLayerBuilder
             modified = true;
         }
         var layer = new SerializedObject(progress);
-        modified |= SetRef(layer, "clip", clip);
-        modified |= SetRef(layer, "fill", fill);
-        modified |= SetRef(layer, "baseFill", face);
+        modified |= SetRef(layer, "clip", clip, Tag);
+        modified |= SetRef(layer, "fill", fill, Tag);
+        modified |= SetRef(layer, "baseFill", face, Tag);
         return progress;
     }
 
@@ -343,22 +343,6 @@ public static class AutoChipLearnLayerBuilder
         return true;
     }
 
-    // Role, target and alpha through SerializedObject only — ThemedColor.Configure would repaint at once from whatever theme
-    // this editor happens to be in.
-    private static bool BindTheme(ThemedColor themed, ThemeRole role, Graphic target)
-    {
-        var binding = new SerializedObject(themed);
-        SerializedProperty roleProp = binding.FindProperty("role");
-        SerializedProperty targetProp = binding.FindProperty("target");
-        SerializedProperty alphaProp = binding.FindProperty("preserveAlpha");
-        if (roleProp.enumValueIndex == (int)role && targetProp.objectReferenceValue == target && alphaProp.boolValue) return false;
-        roleProp.enumValueIndex = (int)role;
-        targetProp.objectReferenceValue = target;
-        alphaProp.boolValue = true;
-        binding.ApplyModifiedPropertiesWithoutUndo();
-        return true;
-    }
-
     // ---- rounded corners ----
 
     // RoundedCorners ships in its own UPM assembly — the type is looked up across the loaded assemblies, as
@@ -407,7 +391,7 @@ public static class AutoChipLearnLayerBuilder
         return true;
     }
 
-    // ---- helpers ----
+    // ---- helpers (the shared ones — EnsureChild, PlaceAfter, SetRect, BindTheme, SetRef, Single — are BuilderSceneUtil's) ----
 
     private static RectTransform FaceOf(Transform pill)
     {
@@ -424,57 +408,6 @@ public static class AutoChipLearnLayerBuilder
         return pill.parent;
     }
 
-    private static T Single<T>(Scene scene) where T : Component
-    {
-        T[] found = Object.FindObjectsByType<T>(FindObjectsInactive.Include, FindObjectsSortMode.None)
-            .Where(component => component.gameObject.scene == scene).ToArray();
-        if (found.Length != 1)
-            throw new InvalidOperationException($"{Tag} Expected exactly one {typeof(T).Name} in {ScenePath}, found {found.Length}.");
-        return found[0];
-    }
-
-    private static RectTransform EnsureChild(Transform parent, string name, ref bool modified, params Type[] components)
-    {
-        var child = parent.Find(name) as RectTransform;
-        if (child == null)
-        {
-            var go = new GameObject(name, typeof(RectTransform)) { layer = parent.gameObject.layer };
-            child = (RectTransform)go.transform;
-            child.SetParent(parent, false);
-            modified = true;
-        }
-        foreach (Type component in components)
-        {
-            if (child.GetComponent(component) != null) continue;
-            child.gameObject.AddComponent(component);
-            modified = true;
-        }
-        return child;
-    }
-
-    // Moves item to right after anchor (both children of one parent).
-    private static bool PlaceAfter(Transform item, Transform anchor)
-    {
-        int index = item.GetSiblingIndex();
-        int target = anchor.GetSiblingIndex() + (index < anchor.GetSiblingIndex() ? 0 : 1);
-        if (index == target) return false;
-        item.SetSiblingIndex(target);
-        return true;
-    }
-
-    private static bool SetRect(RectTransform rect, Vector2 anchorMin, Vector2 anchorMax, Vector2 pivot, Vector2 position, Vector2 size)
-    {
-        if (rect.anchorMin == anchorMin && rect.anchorMax == anchorMax && rect.pivot == pivot
-            && rect.anchoredPosition == position && rect.sizeDelta == size)
-            return false;
-        rect.anchorMin = anchorMin;
-        rect.anchorMax = anchorMax;
-        rect.pivot = pivot;
-        rect.anchoredPosition = position;
-        rect.sizeDelta = size;
-        return true;
-    }
-
     private static T Ref<T>(SerializedObject owner, string field) where T : Object
     {
         SerializedProperty property = owner.FindProperty(field);
@@ -484,17 +417,6 @@ public static class AutoChipLearnLayerBuilder
             throw new InvalidOperationException(
                 $"{Tag} {owner.targetObject.name}: {owner.targetObject.GetType().Name}.{field} is not wired — the capsule's own builder must run first.");
         return value;
-    }
-
-    private static bool SetRef(SerializedObject owner, string field, Object value)
-    {
-        SerializedProperty property = owner.FindProperty(field);
-        if (property == null)
-            throw new InvalidOperationException($"{Tag} {owner.targetObject.GetType().Name} has no serialized field '{field}'.");
-        if (property.objectReferenceValue == value) return false;
-        property.objectReferenceValue = value;
-        owner.ApplyModifiedPropertiesWithoutUndo();
-        return true;
     }
 }
 #endif

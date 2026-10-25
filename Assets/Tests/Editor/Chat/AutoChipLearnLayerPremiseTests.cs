@@ -1,14 +1,12 @@
-using System.Collections.Generic;
-using System.Globalization;
 using System.IO;
 using System.Linq;
-using System.Text.RegularExpressions;
 using Nobi.UiRoundedCorners;
 using NUnit.Framework;
 using TMPro;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.UI;
+using static SceneYaml;
 
 /// <summary>
 /// Pins the learning layer that Tools/Learning/Add Progress Fill To Auto Chips (AutoChipLearnLayerBuilder) authors into the
@@ -309,134 +307,5 @@ public class AutoChipLearnLayerPremiseTests
         var image = rect.gameObject.AddComponent<Image>();
         rect.gameObject.AddComponent<ImageWithRoundedCorners>().radius = radius;
         return image;
-    }
-
-    // ---- script identity ----
-
-    private static readonly Dictionary<System.Type, string> Guids = new Dictionary<System.Type, string>();
-
-    // A component's script GUID as the scene stores it in m_Script — resolved from the type, never typed in.
-    private static string ScriptGuid(System.Type type)
-    {
-        if (Guids.TryGetValue(type, out string known)) return known;
-        MonoScript script = MonoImporter.GetAllRuntimeMonoScripts().FirstOrDefault(s => s != null && s.GetClass() == type);
-        Assert.IsNotNull(script, $"no MonoScript for {type.Name}");
-        string guid = AssetDatabase.AssetPathToGUID(AssetDatabase.GetAssetPath(script));
-        Assert.IsNotEmpty(guid, $"no GUID for {type.Name}'s script");
-        Guids[type] = guid;
-        return guid;
-    }
-
-    /// <summary>
-    /// Main.unity as raw YAML documents keyed by local fileID — enough to walk GameObjects, their components and the
-    /// RectTransform tree, and to read a component's top-level fields.
-    /// </summary>
-    private sealed class SceneYaml
-    {
-        private const string MonoBehaviourClass = "114";
-        private const string RectTransformClass = "224";
-
-        private readonly Dictionary<string, string> docs = new Dictionary<string, string>();
-        private readonly Dictionary<string, string> classes = new Dictionary<string, string>();
-
-        public static SceneYaml Load(string path)
-        {
-            var yaml = new SceneYaml();
-            string text = File.ReadAllText(path);
-            MatchCollection headers = Regex.Matches(text, @"^--- !u!(\d+) &(-?\d+)(?: stripped)?\s*$", RegexOptions.Multiline);
-            for (int i = 0; i < headers.Count; i++)
-            {
-                int start = headers[i].Index + headers[i].Length;
-                int end = i + 1 < headers.Count ? headers[i + 1].Index : text.Length;
-                string id = headers[i].Groups[2].Value;
-                yaml.docs[id] = text.Substring(start, end - start);
-                yaml.classes[id] = headers[i].Groups[1].Value;
-            }
-            Assert.Greater(yaml.docs.Count, 1000, $"{path} did not parse — every assertion below would be a false green");
-            return yaml;
-        }
-
-        public string Single(string scriptGuid, string what)
-        {
-            string[] hits = docs.Keys.Where(id => classes[id] == MonoBehaviourClass && ScriptGuidOf(id) == scriptGuid).ToArray();
-            Assert.AreEqual(1, hits.Length, $"exactly one {what} in the scene");
-            return hits[0];
-        }
-
-        /// <summary>A top-level field's raw value (two-space indent = the document's own field, never a nested one).</summary>
-        public string Field(string id, string name)
-        {
-            Assert.IsTrue(docs.ContainsKey(id), $"no document {id} in the scene");
-            Match match = Regex.Match(docs[id], $@"^  {Regex.Escape(name)}: (.*?)\s*$", RegexOptions.Multiline);
-            return match.Success ? match.Groups[1].Value : null;
-        }
-
-        /// <summary>The local fileID a reference field points at; null when it is unset ({fileID: 0}) or absent.</summary>
-        public string Ref(string id, string name)
-        {
-            string value = Field(id, name);
-            Match match = value != null ? Regex.Match(value, @"^\{fileID: (-?\d+)\}$") : Match.Empty;
-            return match.Success && match.Groups[1].Value != "0" ? match.Groups[1].Value : null;
-        }
-
-        public string ScriptGuidOf(string id)
-        {
-            Match match = Regex.Match(docs[id], @"^  m_Script: \{fileID: -?\d+, guid: ([0-9a-f]{32}), type: \d+\}", RegexOptions.Multiline);
-            return match.Success ? match.Groups[1].Value : null;
-        }
-
-        public string GameObjectOf(string componentId) => Ref(componentId, "m_GameObject");
-
-        public string NameOf(string gameObjectId) => Field(gameObjectId, "m_Name");
-
-        public bool IsActive(string gameObjectId) => Field(gameObjectId, "m_IsActive") == "1";
-
-        public string RectOf(string gameObjectId) => Components(gameObjectId).FirstOrDefault(id => classes[id] == RectTransformClass);
-
-        public string Component(string gameObjectId, string scriptGuid) =>
-            Components(gameObjectId).FirstOrDefault(id => classes[id] == MonoBehaviourClass && ScriptGuidOf(id) == scriptGuid);
-
-        public string Parent(string rectId) => Ref(rectId, "m_Father");
-
-        public IEnumerable<string> Children(string rectId)
-        {
-            string body = docs[rectId];
-            int start = body.IndexOf("  m_Children:", System.StringComparison.Ordinal);
-            int end = body.IndexOf("  m_Father:", System.StringComparison.Ordinal);
-            if (start < 0 || end < start) yield break;
-            foreach (Match match in Regex.Matches(body.Substring(start, end - start), @"\{fileID: (-?\d+)\}"))
-                yield return match.Groups[1].Value;
-        }
-
-        public IEnumerable<string> Subtree(string rectId)
-        {
-            foreach (string child in Children(rectId))
-            {
-                yield return child;
-                foreach (string below in Subtree(child)) yield return below;
-            }
-        }
-
-        public Vector2 Vec(string id, string name)
-        {
-            Match match = Regex.Match(Field(id, name) ?? "", @"^\{x: (-?[\d.eE+-]+), y: (-?[\d.eE+-]+)\}$");
-            Assert.IsTrue(match.Success, $"{name} of document {id} is not a vector: '{Field(id, name)}'");
-            return new Vector2(ParseFloat(match.Groups[1].Value), ParseFloat(match.Groups[2].Value));
-        }
-
-        public float Float(string id, string name)
-        {
-            string value = Field(id, name);
-            Assert.IsNotNull(value, $"{name} missing on document {id}");
-            return ParseFloat(value);
-        }
-
-        private IEnumerable<string> Components(string gameObjectId)
-        {
-            foreach (Match match in Regex.Matches(docs[gameObjectId], @"- component: \{fileID: (-?\d+)\}"))
-                yield return match.Groups[1].Value;
-        }
-
-        private static float ParseFloat(string value) => float.Parse(value, CultureInfo.InvariantCulture);
     }
 }

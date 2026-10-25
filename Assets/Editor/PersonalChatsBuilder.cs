@@ -8,13 +8,15 @@ using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
+using static BuilderSceneUtil;
 using Object = UnityEngine.Object;
 
 /// <summary>
 /// «Личные и рабочие чаты» (spec §5, sketch 009): the scene and prefab parts of the feature. ADDITIVE and idempotent — it
 /// authors the objects it owns and nothing else, resolves every anchor through a serialized reference (ChatListView.content
 /// and .prefab, ChatItemView's own fields), finds its own objects again by their names, and compares every value before it
-/// writes it: a second run changes nothing and saves nothing (a scene save re-mints every Nobi material in Main.unity).
+/// writes it: a second run changes nothing and saves nothing (a scene save re-mints every Nobi material in Main.unity). The
+/// building blocks it shares with AutoChipLearnLayerBuilder live in BuilderSceneUtil.
 /// Run it with the Editor closed: Tools/run-editor-builder.sh PersonalChatsBuilder.BuildHeadless.
 ///
 /// This step (the working chat list, spec §5.2):
@@ -108,7 +110,7 @@ public static class PersonalChatsBuilder
     // The chat row prefab first, then the scene; each is saved only when something in it changed.
     private static void Apply(Scene scene)
     {
-        ChatListView list = Single<ChatListView>(scene);
+        ChatListView list = Single<ChatListView>(scene, Tag);
         if (list.prefab == null) throw new InvalidOperationException($"{Tag} ChatListView.prefab is not wired.");
         WireItemPrefab(AssetDatabase.GetAssetPath(list.prefab));
 
@@ -168,7 +170,7 @@ public static class PersonalChatsBuilder
         modified |= SetRect(icon, LeftMiddle, LeftMiddle, LeftMiddle, Vector2.zero, Vector2.one * LockGlyphSize);
 
         modified |= SetActive(slot.gameObject, false);   // ChatListView shows it on a personal chat in the search results
-        modified |= SetRef(new SerializedObject(item), "audienceLock", slot.gameObject);
+        modified |= SetRef(new SerializedObject(item), "audienceLock", slot.gameObject, Tag);
     }
 
     // ---- the list: the «Личные» row ----
@@ -201,10 +203,10 @@ public static class PersonalChatsBuilder
         EnsureDivider(row, metrics, ref modified);
 
         var view = new SerializedObject(row.GetComponent<PersonalChatsRowView>());
-        modified |= SetRef(view, "button", button);
-        modified |= SetRef(view, "counter", counter);
-        modified |= SetRef(view, "counterText", count);
-        modified |= SetRef(owner, "personalRow", row.GetComponent<PersonalChatsRowView>());
+        modified |= SetRef(view, "button", button, Tag);
+        modified |= SetRef(view, "counter", counter, Tag);
+        modified |= SetRef(view, "counterText", count, Tag);
+        modified |= SetRef(owner, "personalRow", row.GetComponent<PersonalChatsRowView>(), Tag);
     }
 
     // The row ChatListView already holds, else the one in Content by its name, else a new one — built HIDDEN from its
@@ -503,22 +505,6 @@ public static class PersonalChatsBuilder
         return true;
     }
 
-    // Role, target and alpha through SerializedObject only — ThemedColor.Configure would repaint at once from whatever theme
-    // this editor happens to be in.
-    private static bool BindTheme(ThemedColor themed, ThemeRole role, Graphic target)
-    {
-        var binding = new SerializedObject(themed);
-        SerializedProperty roleProp = binding.FindProperty("role");
-        SerializedProperty targetProp = binding.FindProperty("target");
-        SerializedProperty alphaProp = binding.FindProperty("preserveAlpha");
-        if (roleProp.enumValueIndex == (int)role && targetProp.objectReferenceValue == target && alphaProp.boolValue) return false;
-        roleProp.enumValueIndex = (int)role;
-        targetProp.objectReferenceValue = target;
-        alphaProp.boolValue = true;
-        binding.ApplyModifiedPropertiesWithoutUndo();
-        return true;
-    }
-
     // Both fields through one SerializedObject — "image" is private, and Nobi's own Validate sets it only on enable.
     // The radius is 1:1 with the visual radius — never halved or doubled (CLAUDE.md).
     private static bool EnsureRounded(Image image, float radius)
@@ -540,70 +526,13 @@ public static class PersonalChatsBuilder
         return true;
     }
 
-    private static bool SetRect(RectTransform rect, Vector2 anchorMin, Vector2 anchorMax, Vector2 pivot, Vector2 position, Vector2 size)
-    {
-        if (rect.anchorMin == anchorMin && rect.anchorMax == anchorMax && rect.pivot == pivot
-            && rect.anchoredPosition == position && rect.sizeDelta == size)
-            return false;
-        rect.anchorMin = anchorMin;
-        rect.anchorMax = anchorMax;
-        rect.pivot = pivot;
-        rect.anchoredPosition = position;
-        rect.sizeDelta = size;
-        return true;
-    }
-
-    private static bool SetRef(SerializedObject owner, string field, Object value)
-    {
-        SerializedProperty property = owner.FindProperty(field);
-        if (property == null)
-            throw new InvalidOperationException($"{Tag} {owner.targetObject.GetType().Name} has no serialized field '{field}'.");
-        if (property.objectReferenceValue == value) return false;
-        property.objectReferenceValue = value;
-        owner.ApplyModifiedPropertiesWithoutUndo();
-        return true;
-    }
-
-    // ---- hierarchy helpers ----
-
-    private static RectTransform EnsureChild(Transform parent, string name, ref bool modified, params Type[] components)
-    {
-        var child = parent.Find(name) as RectTransform;
-        if (child == null)
-        {
-            var go = new GameObject(name, typeof(RectTransform)) { layer = parent.gameObject.layer };
-            child = (RectTransform)go.transform;
-            child.SetParent(parent, false);
-            modified = true;
-        }
-        AddMissing(child, ref modified, components);
-        return child;
-    }
-
-    private static void AddMissing(Component owner, ref bool modified, params Type[] components)
-    {
-        foreach (Type component in components)
-        {
-            if (owner.GetComponent(component) != null) continue;
-            owner.gameObject.AddComponent(component);
-            modified = true;
-        }
-    }
+    // ---- hierarchy helpers (the shared ones — EnsureChild, AddMissing, PlaceAfter, SetRect, BindTheme, SetRef, Single —
+    // are BuilderSceneUtil's) ----
 
     private static bool SetIndex(Transform item, int index)
     {
         if (item.GetSiblingIndex() == index) return false;
         item.SetSiblingIndex(index);
-        return true;
-    }
-
-    // Moves item to right after anchor (both children of one parent).
-    private static bool PlaceAfter(Transform item, Transform anchor)
-    {
-        int index = item.GetSiblingIndex();
-        int target = anchor.GetSiblingIndex() + (index < anchor.GetSiblingIndex() ? 0 : 1);
-        if (index == target) return false;
-        item.SetSiblingIndex(target);
         return true;
     }
 
@@ -621,15 +550,6 @@ public static class PersonalChatsBuilder
     {
         var sprite = AssetDatabase.LoadAssetAtPath<Sprite>(path);
         return sprite != null ? sprite : throw new InvalidOperationException($"{Tag} No sprite at {path}.");
-    }
-
-    private static T Single<T>(Scene scene) where T : Component
-    {
-        T[] found = Object.FindObjectsByType<T>(FindObjectsInactive.Include, FindObjectsSortMode.None)
-            .Where(component => component.gameObject.scene == scene).ToArray();
-        if (found.Length != 1)
-            throw new InvalidOperationException($"{Tag} Expected exactly one {typeof(T).Name} in {ScenePath}, found {found.Length}.");
-        return found[0];
     }
 
     private static bool Same(float a, float b) => Mathf.Approximately(a, b);

@@ -1,8 +1,6 @@
 using System.Collections.Generic;
-using System.IO;
 using System.Text.RegularExpressions;
 using NUnit.Framework;
-using UnityEngine;
 
 // Contract for the sound/vibration cue on chat-list syncs: fires only for a
 // genuinely new, incoming, unread message in a WORKING chat the user is NOT
@@ -68,65 +66,52 @@ public class IncomingNotifyPolicyTests
     }
 
     // The policy is only as good as what ChatManager hands it: BOTH sites in ParseChatsJson (a merged row and a new one) must
-    // pass the chat's audience as the list draws it — the store's view, never a literal.
+    // pass the chat's audience as the list draws it — the store's view, never a literal. A merged row passes the verdict
+    // before the message OR after it (the message itself moves an undecided chat's history estimate); a new row has no
+    // «before». PersonalChatCueTests drives the merged path for real.
     [Test]
     public void ParseChatsJson_HandsEveryNotifySiteTheChatsAudience()
     {
-        string source = File.ReadAllText(Path.Combine(Application.dataPath, "Scripts/Main/ChatManager.cs"));
-        string parse = MethodBody(source, "void ParseChatsJson(");
-        List<string> calls = Calls(parse, "IncomingNotifyPolicy.ShouldNotify(");
+        string source = SourceGuard.Read("Scripts/Main/ChatManager.cs");
+        string parse = SourceGuard.MethodBody(source, "void ParseChatsJson(");
+        List<string> calls = SourceGuard.Calls(parse, "IncomingNotifyPolicy.ShouldNotify(");
         Assert.AreEqual(2, calls.Count, "ParseChatsJson asks the policy for a merged row and for a new one");
-        foreach (string call in calls)
-            Assert.IsTrue(Regex.IsMatch(call, @"chatIsPersonal:\s*IsPersonalChat\("),
-                $"a notify site must pass the chat's audience (chatIsPersonal: IsPersonalChat(...)):\n{call}");
+        Assert.IsTrue(Regex.IsMatch(calls[0], @"chatIsPersonal:\s*personalBefore\s*\|\|\s*IsPersonalChat\("),
+            $"the merged row passes the verdict before the message or after it:\n{calls[0]}");
+        Assert.IsTrue(Regex.IsMatch(calls[1], @"chatIsPersonal:\s*IsPersonalChat\("),
+            $"a new row passes its verdict:\n{calls[1]}");
         Assert.AreEqual(2, Regex.Matches(source, @"IncomingNotifyPolicy\.ShouldNotify\(").Count, "no other notify site in ChatManager");
 
-        string helper = MethodBody(source, "bool IsPersonalChat(");
+        int before = parse.IndexOf("bool personalBefore = IsPersonalChat(", System.StringComparison.Ordinal);
+        int update = parse.IndexOf("existingVm.UpdateLastMessage(", System.StringComparison.Ordinal);
+        Assert.GreaterOrEqual(before, 0, "the merged row takes its verdict before the message");
+        Assert.Less(before, update, "…BEFORE UpdateLastMessage moves the last message past the connection moment");
+
+        string helper = SourceGuard.MethodBody(source, "bool IsPersonalChat(");
         StringAssert.Contains("ChatAudienceStore.ViewOf(", helper, "the verdict the list draws the chat by");
         StringAssert.Contains("AudienceKind.Personal", helper);
     }
 
-    // ---- source helpers ----
-
-    // The body of the method whose signature starts with marker, braces matched.
-    private static string MethodBody(string source, string marker)
+    // An incoming message in a chat the app holds no verdict for asks for a list read soon (PersonalChatCueTests drives that
+    // call site for real). The service makes a burst of such requests ONE read: one timer that later requests share, the
+    // read forced, about ListSoonSeconds after the request; the other triggers keep their once-a-minute throttle.
+    [Test]
+    public void TheReadSoon_IsOneTimerForABurst_AndLeavesTheThrottleAlone()
     {
-        int at = source.IndexOf(marker, System.StringComparison.Ordinal);
-        Assert.GreaterOrEqual(at, 0, $"«{marker}» not found in ChatManager.cs");
-        int open = source.IndexOf('{', at);
-        int arrow = source.IndexOf("=>", at, System.StringComparison.Ordinal);
-        if (arrow >= 0 && (open < 0 || arrow < open))
-        {
-            int end = source.IndexOf(';', arrow);
-            return source.Substring(arrow, end - arrow + 1);
-        }
-        int depth = 0;
-        for (int i = open; i < source.Length; i++)
-        {
-            if (source[i] == '{') depth++;
-            else if (source[i] == '}' && --depth == 0) return source.Substring(open, i - open + 1);
-        }
-        Assert.Fail($"«{marker}»: unbalanced braces");
-        return null;
-    }
+        string source = SourceGuard.Read("Scripts/Chat/ChatAudienceSyncService.cs");
+        Assert.AreEqual(3f, ChatAudienceSyncService.ListSoonSeconds, "time for the server to decide the chat on the message");
 
-    // Every call that starts with marker, its parentheses matched.
-    private static List<string> Calls(string body, string marker)
-    {
-        var calls = new List<string>();
-        int from = 0;
-        while ((from = body.IndexOf(marker, from, System.StringComparison.Ordinal)) >= 0)
-        {
-            int depth = 0;
-            int end = from + marker.Length - 1;
-            for (; end < body.Length; end++)
-            {
-                if (body[end] == '(') depth++;
-                else if (body[end] == ')' && --depth == 0) break;
-            }
-            calls.Add(body.Substring(from, end - from + 1));
-            from = end;
-        }
-        return calls;
+        string schedule = SourceGuard.MethodBody(source, "void ScheduleListSoon(");
+        StringAssert.Contains("if (_listSoon != null", schedule, "a request while a read is on its way shares it — not one timer per message");
+        StringAssert.Contains("_listSoon = StartCoroutine(ListSoonRoutine())", schedule);
+
+        string routine = SourceGuard.MethodBody(source, "IEnumerator ListSoonRoutine(");
+        int wait = routine.IndexOf("WaitForSecondsRealtime(ListSoonSeconds)", System.StringComparison.Ordinal);
+        int free = routine.IndexOf("_listSoon = null", System.StringComparison.Ordinal);
+        int read = routine.IndexOf("ReadList(force: true)", System.StringComparison.Ordinal);
+        Assert.IsTrue(wait >= 0 && wait < free && free < read,
+            "wait, free the timer (a request after it starts the next read), then read forced:\n" + routine);
+
+        StringAssert.Contains("ListFocusGapMs", SourceGuard.MethodBody(source, "void ReadList("), "an unforced read still waits out the minute");
     }
 }

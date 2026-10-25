@@ -17,6 +17,8 @@ using UnityEngine.Networking;
 ///     answer is the profile's connection moment.
 ///   • The list — <see cref="RequestList"/>: read at launch, on a bot switch, on a return to the app (at most once a
 ///     minute) and 2 s after every delivered write. A list answered while a write was delivered is stale and is dropped.
+///     And <see cref="RequestListSoon"/>: 3 s after an incoming message in a chat the app holds no verdict for — the
+///     server decides that chat on the message — one read for a whole burst.
 ///
 /// Nothing is sent before the reply-mode send gate opens (billing + the session; <see cref="ReplyModeSendGate"/>). V12
 /// mirror: while Manager.DeleteBotOnServer runs, the bot is HELD (<see cref="Hold"/>; a request already on the wire is
@@ -34,6 +36,12 @@ public class ChatAudienceSyncService : MonoBehaviour
 
     /// <summary>A return to the app reads the list at most once in this long.</summary>
     public const long ListFocusGapMs = 60_000;
+
+    /// <summary>
+    /// <see cref="RequestListSoon"/> reads the list this long after the incoming message that asked for it — time for the
+    /// server to decide the chat on that message.
+    /// </summary>
+    public const float ListSoonSeconds = 3f;
 
     private static ChatAudienceSyncService instance;
     private static bool sendGateOpen;
@@ -53,7 +61,11 @@ public class ChatAudienceSyncService : MonoBehaviour
     private int _deliveries;          // writes delivered — a list answered across one of them is stale
     private int _forgets;             // bots forgotten — a list answered across one must not bring them back
     private Coroutine _listAfterDelivery;
+    private Coroutine _listSoon;      // the one pending «read soon» — every request meanwhile shares it
     private ChatManager _chatManager;
+
+    /// <summary>Raised on every <see cref="RequestListSoon"/>, before any timer — the parse path's request, observable in tests.</summary>
+    internal static event Action ListSoonRequested;
 
     public static ChatAudienceSyncService Instance
     {
@@ -98,6 +110,18 @@ public class ChatAudienceSyncService : MonoBehaviour
 
     /// <summary>Read the server's decisions for the bots' profiles; an unforced read waits out <see cref="ListFocusGapMs"/>.</summary>
     public static void RequestList(bool force = false) => Instance?.ReadList(force);
+
+    /// <summary>
+    /// An incoming message reached a chat the app holds no verdict for (ChatManager.ParseChatsJson): the server decides
+    /// that chat on the message, so read the list once, <see cref="ListSoonSeconds"/> later, forced — the minute's throttle
+    /// belongs to the other triggers. One timer: requests while it runs share its read, so a burst of messages costs one
+    /// read, and a request after it fired starts the next one (a steady stream is read every few seconds, never starved).
+    /// </summary>
+    public static void RequestListSoon()
+    {
+        ListSoonRequested?.Invoke();
+        Instance?.ScheduleListSoon();
+    }
 
     /// <summary>
     /// V12: the bot's server deletion is in flight — send nothing for it meanwhile. Nothing is forgotten yet: if the server
@@ -503,6 +527,19 @@ public class ChatAudienceSyncService : MonoBehaviour
     {
         yield return new WaitForSecondsRealtime(ListAfterDeliverySeconds);
         _listAfterDelivery = null;
+        ReadList(force: true);
+    }
+
+    private void ScheduleListSoon()
+    {
+        if (_listSoon != null || !isActiveAndEnabled) return;   // a read is already on its way — this request shares it
+        _listSoon = StartCoroutine(ListSoonRoutine());
+    }
+
+    private IEnumerator ListSoonRoutine()
+    {
+        yield return new WaitForSecondsRealtime(ListSoonSeconds);
+        _listSoon = null;
         ReadList(force: true);
     }
 }

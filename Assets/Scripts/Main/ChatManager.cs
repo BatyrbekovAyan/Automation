@@ -323,6 +323,9 @@ public partial class ChatManager : MonoBehaviour
         // «Личные и рабочие чаты»: a personal chat never plays the cue. Judged under the channel's profile — the key the
         // audience decisions are kept under — exactly as the list draws the chat.
         string audienceProfileId = GetActiveProfileId();
+        // ...and one list read soon per pass when an incoming message reached a chat the server has not decided for the
+        // app yet: the server decides it on that very message, and the app learns the verdict only from a list read.
+        bool audienceReadSoon = false;
 
         foreach (var chat in response.dialogs)
         {
@@ -386,6 +389,12 @@ public partial class ChatManager : MonoBehaviour
                 // Capture before the id is overwritten: did the last message change?
                 bool lastIdChanged = existingVm.LastMessageId != chat.last_message_id;
 
+                // «Личные и рабочие чаты»: the chat's audience as it stood BEFORE this message. The app judges an
+                // undecided chat's history by its LAST message, and this message moves that past the connection moment —
+                // while the server decides the chat on this very message by its history. A conversation from before the
+                // connection must not ring as a new person's first message.
+                bool personalBefore = IsPersonalChat(audienceProfileId, existingVm);
+
                 existingVm.UpdateLastMessage(lastMsg, unixTime);
                 existingVm.UpdateUnreadCount(effectiveUnread);
                 existingVm.UpdateLastMessageId(chat.last_message_id);
@@ -408,7 +417,8 @@ public partial class ChatManager : MonoBehaviour
                 notifyIncoming |= IncomingNotifyPolicy.ShouldNotify(
                     isInitialLoad, lastIdChanged, mergedIsMine, effectiveUnread,
                     chatKey, currentChatId, chatPanelVisible,
-                    chatIsPersonal: IsPersonalChat(audienceProfileId, existingVm));
+                    chatIsPersonal: personalBefore || IsPersonalChat(audienceProfileId, existingVm));
+                audienceReadSoon |= AwaitsServerVerdict(isInitialLoad, lastIdChanged, mergedIsMine, audienceProfileId, chatKey);
             }
             else
             {
@@ -437,10 +447,12 @@ public partial class ChatManager : MonoBehaviour
                     unreadCount: effectiveUnread, chatId: chatKey,
                     openChatId: currentChatId, chatPanelVisible: chatPanelVisible,
                     chatIsPersonal: IsPersonalChat(audienceProfileId, chatVM));
+                audienceReadSoon |= AwaitsServerVerdict(isInitialLoad, lastIdChanged: true, isMine, audienceProfileId, chatKey);
             }
         }
 
         if (notifyIncoming) NotificationFx.OnIncomingDetected();
+        if (audienceReadSoon) ChatAudienceSyncService.RequestListSoon();   // the service coalesces a burst into one read
 
         // Drop chats deleted on the server: present in memory but absent from this full list.
         // chats/filter returns the complete set, so a missing chat was removed in WhatsApp itself.
@@ -474,6 +486,15 @@ public partial class ChatManager : MonoBehaviour
     /// </summary>
     private static bool IsPersonalChat(string profileId, ChatViewModel chat) =>
         ChatAudienceStore.ViewOf(profileId, chat).Kind == AudienceKind.Personal;
+
+    /// <summary>
+    /// «Личные и рабочие чаты»: an incoming message (not the cache load, a new last message, not ours) reached a chat the
+    /// app holds no verdict for — no server decision mirrored and no move of the owner's on its way. The server decides
+    /// the chat on this very message; the app learns that only from a list read.
+    /// </summary>
+    private static bool AwaitsServerVerdict(bool isInitialLoad, bool lastIdChanged, bool isMine, string profileId, string chatKey) =>
+        !isInitialLoad && lastIdChanged && !isMine && !string.IsNullOrEmpty(profileId)
+        && ChatAudienceStore.KindOf(profileId, chatKey) == null;
 
     /// <summary>
     /// True while a chats/filter sync is in flight. Guards RefreshActiveBotChats

@@ -22,9 +22,13 @@ public class NotificationFx : MonoBehaviour
         _source.playOnAwake = false;
     }
 
+    /// <summary>Raised on every detected incoming message, before the switches are read — the parse path's verdict, observable in tests.</summary>
+    internal static event System.Action IncomingDetected;
+
     /// <summary>Static entry so ChatManager's parse path needs no serialized ref.</summary>
     public static void OnIncomingDetected()
     {
+        IncomingDetected?.Invoke();
         if (Instance != null) Instance.PlayIncoming();
     }
 
