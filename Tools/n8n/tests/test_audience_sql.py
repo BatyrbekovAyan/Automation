@@ -575,21 +575,29 @@ with Case('list_returns_only_valid_decisions_and_the_moment: every profile asked
 
 # ================================================================================================ backfill
 def wappi_page(trigger_time=1006):
-    """A messages/get page as Wappi hands it (newest first), already in the {id, fromMe, body, type, time} shape. The ids
-    sort neither like the times nor like the array, so only an ORDER BY time puts the rows in the conversation's order:
-    time order b1 · m2 (recorded) · k3 · z4 · a5 · m6 (the trigger)."""
+    """A messages/get page exactly as Wappi returns it with order=desc — NEWEST FIRST (ruling R7: BACKFILL_SQL's input),
+    already in the {id, fromMe, body, type, time} shape. The ids sort neither like the page nor like its reverse, so only
+    storing the page reversed puts the rows in the conversation's order: b1 · m2 (recorded) · k3 · z4 · a5 · m6 (the
+    trigger)."""
     t = trigger_time
     return [
         {'id': 'm6', 'fromMe': False, 'body': 'а на завтра будет?', 'type': 'chat', 'time': t},
         {'id': 'a5', 'fromMe': True, 'body': '/9j/4AAQSkZJRgABAQ-base64-payload', 'type': 'image', 'caption': 'прайс', 'time': t - 1},
         {'id': 'z4', 'fromMe': False, 'body': 'есть розы?', 'type': 'chat', 'time': t - 2},
-        {'id': 'm2', 'fromMe': True, 'body': 'Ответ ИИ', 'type': 'chat', 'time': t - 4},
         {'id': 'k3', 'fromMe': True, 'body': 'Здравствуйте! Чем помочь?', 'type': 'chat', 'time': t - 3},
+        {'id': 'm2', 'fromMe': True, 'body': 'Ответ ИИ', 'type': 'chat', 'time': t - 4},
         {'id': 'b1', 'fromMe': False, 'body': 'привет', 'type': 'chat', 'time': t - 5},
         {'fromMe': False, 'body': 'без id', 'type': 'chat', 'time': t - 6},
         {'id': 'c0', 'body': 'без fromMe', 'type': 'chat', 'time': t - 7},
         'not-an-object',
     ]
+
+
+def stored_order(pg, pid, chat):
+    """The message ids in the order the database holds them: the history by its id, the memory by its id (what the memory
+    node reads) — both must follow the conversation."""
+    return ([r['message_id'] for r in history(pg, pid, chat)],
+            [m['message']['additional_kwargs']['message_id'] for m in memory(pg, pid, chat)])
 
 
 def history(pg, pid, chat):
@@ -604,7 +612,8 @@ def memory(pg, pid, chat):
 for ch, C in CH.items():
     P = f'{ch.lower()}-aud-p1'
     with Case(f'backfill_adds_missing_in_time_order_with_owner_mark [{ch}]: the trigger and every id already in the chat\'s '
-              'history are skipped; the rest goes in by time, owner rows with «Владелец: », both rows carry source + message_id') as c:
+              'history are skipped; the rest goes in oldest first — the newest-first page reversed, by position, never by '
+              'time — owner rows with «Владелец: », both rows carry source + message_id') as c:
         with PgSession(SETUP) as pg:
             chat = C['chat']
             decide(pg, P, chat, 'business', 'new')
@@ -642,15 +651,35 @@ for ch, C in CH.items():
         with PgSession(SETUP) as pg:
             chat = C['chat2']
             decide(pg, P, chat, 'business', 'new')
+            # a same-second burst on a newest-first page: Wappi's order breaks the tie, so «первое» (the oldest, last on the
+            # page) goes first — a time sort would keep the page's order inside the second and put «второе» before it
             page = [{'id': 'x3', 'fromMe': True, 'body': 'третье', 'type': 'chat', 'time': 2002},
                     {'id': 'x2', 'fromMe': False, 'body': 'второе', 'type': 'chat', 'time': 2001},
                     {'id': 'x9', 'fromMe': False, 'body': 'первое', 'type': 'chat', 'time': '2001'},
                     {'id': 'x9', 'fromMe': False, 'body': 'первое (повтор)', 'type': 'chat', 'time': 2001}]
             got = backfill(pg, P, chat, None, page)
             c.check(got == [{'added': 3}] and [(r['message_id'], r['body']) for r in history(pg, P, chat)]
-                    == [('x2', 'второе'), ('x9', 'первое'), ('x3', 'третье')],
-                    f'no trigger: everything new goes in, a repeated id once, equal times in the array\'s order: '
+                    == [('x9', 'первое'), ('x2', 'второе'), ('x3', 'третье')],
+                    f'no trigger: everything new goes in, a repeated id once, a same-second burst oldest first: '
                     f'{got} {history(pg, P, chat)}')
+            c.check(stored_order(pg, P, chat) == (['x9', 'x2', 'x3'], ['x9', 'x2', 'x3']),
+                    f'history ids and memory ids follow the conversation: {stored_order(pg, P, chat)}')
+        with PgSession(SETUP) as pg:
+            chat = C['chat3']
+            decide(pg, P, chat, 'business', 'new')
+            # messages whose time is missing or does not parse sit in the MIDDLE of the page: they keep their place (a
+            # time sort would move them to the front) and their sent_at stays empty
+            page = [{'id': 'y4', 'fromMe': False, 'body': 'четвёртое', 'type': 'chat', 'time': 3004},
+                    {'id': 'y3', 'fromMe': True, 'body': 'третье', 'type': 'chat'},
+                    {'id': 'y2', 'fromMe': False, 'body': 'второе', 'type': 'chat', 'time': 'вчера'},
+                    {'id': 'y1', 'fromMe': True, 'body': 'первое', 'type': 'chat', 'time': 3001}]
+            got = backfill(pg, P, chat, None, page)
+            h = history(pg, P, chat)
+            c.check(got == [{'added': 4}] and [(r['message_id'], r['source'], r['t']) for r in h]
+                    == [('y1', 'owner_phone', 3001), ('y2', 'client', None), ('y3', 'owner_phone', None), ('y4', 'client', 3004)],
+                    f'a message without a parseable time keeps its page position: {got} {h}')
+            c.check(stored_order(pg, P, chat) == (['y1', 'y2', 'y3', 'y4'], ['y1', 'y2', 'y3', 'y4']),
+                    f'history ids and memory ids follow the conversation: {stored_order(pg, P, chat)}')
             # the parameter is a JSON text (the generators JSON.stringify it): a JSON scalar or object is no array of messages
             c.check(backfill(pg, P, chat, 'x9', json.dumps('not-an-array')) == [{'added': 0}]
                     and backfill(pg, P, chat, 'x9', {'id': 'x3'}) == [{'added': 0}], 'not an array → nothing')

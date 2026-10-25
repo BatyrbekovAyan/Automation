@@ -363,20 +363,28 @@ def BACKFILL_SQL(memory_row, owner_content_sql):
     already wrote to the client first. `memory_row` / `owner_content_sql` are apply-history-handoff.py's MEMORY_ROW and
     OWNER_CONTENT_SQL (that module imports this one, so they come in as arguments): the rows have exactly the form the live
     writers store — a client message as Record Suppressed writes it (history 'client', memory 'human'), an owner message as
-    Record Outgoing writes the owner's phone message (history 'owner_phone', memory 'ai' opening with «Владелец: »)."""
+    Record Outgoing writes the owner's phone message (history 'owner_phone', memory 'ai' opening with «Владелец: »).
+
+    The input contract (ruling R7): the JSON parameter is a Wappi messages/get page exactly as returned with order=desc —
+    NEWEST FIRST. The statement stores it REVERSED (oldest first), by the page position alone and never by time: Wappi's own
+    order is what breaks equal timestamps (a same-second burst, an album), and a message without a parseable time keeps its
+    place instead of jumping to the front. The time only fills sent_at. The history ids and the memory row ids both follow
+    that order (the memory node reads memory by id)."""
     assert memory_row.count("%s") == 4 and owner_content_sql.count("%s") == 1, "MEMORY_ROW takes four values, OWNER_CONTENT_SQL one"
     client_row = memory_row % ("'human'", "m.body", "'client'", "m.id")
     owner_row = memory_row % ("'ai'", owner_content_sql % "m.body", "'owner_phone'", "m.id")
     return """-- «Личные и рабочие чаты»: the start of a conversation that just turned business. Writes ONLY while the chat's holding
 -- decision is business. Skips the trigger message (it goes on through the normal path, which records it) and every
 -- message whose id the chat's history already has (the assistant's replies, the app's and the phone's sends recorded
--- while the chat was business); elements without a string id or a boolean fromMe are skipped too. The rest goes in by
--- time (equal times keep the array's order): the owner's message (fromMe) as an owner_phone history row + an ai memory
--- row that opens with the owner mark, the client's as a client history row + a human memory row — both carrying source
--- and message_id. A media message stores its type and caption, never its payload. ALWAYS one row: added = the history
--- rows written.
+-- while the chat was business); elements without a string id or a boolean fromMe are skipped too. The page comes as
+-- Wappi's messages/get returns it with order=desc — NEWEST FIRST — and the rest is stored REVERSED, oldest first, by the
+-- page position alone (never by time: Wappi's order breaks equal timestamps, and a message without a parseable time keeps
+-- its place); history ids and memory row ids both follow it. The owner's message (fromMe) becomes an owner_phone history
+-- row + an ai memory row that opens with the owner mark, the client's a client history row + a human memory row — both
+-- carrying source and message_id. A media message stores its type and caption, never its payload. The time only fills
+-- sent_at. ALWAYS one row: added = the history rows written.
 -- Parameters, in order: profile id, chat id, the trigger message id (empty = none), JSON array of {id, fromMe, body,
--- type, time} (caption optional; time in unix seconds).
+-- type, time} = a messages/get page, newest first (caption optional; time in unix seconds).
 with aud_ok as (
   select """ + BUSINESS_SQL("$1", "$2") + """ as business
 ), src as (
@@ -400,7 +408,7 @@ with aud_ok as (
   insert into chat_history_events (profile_id, chat_id, message_id, source, body, msg_type, sent_at)
   select $1, $2, m.id, case when m.from_me then 'owner_phone' else 'client' end, m.body, m.msg_type, to_timestamp(m.t)
   from msgs m
-  order by m.t nulls first, m.ord
+  order by m.ord desc
   on conflict (profile_id, chat_id, message_id) do nothing
   returning message_id
 ), mem as (
@@ -411,7 +419,7 @@ with aud_ok as (
   where m.id in (select message_id from ev)
     and not exists (select 1 from n8n_chat_histories x
                     where x.session_id = $1 || ':' || $2 and x.message->'additional_kwargs'->>'message_id' = m.id)
-  order by m.t nulls first, m.ord
+  order by m.ord desc
   returning 1
 )
 select (select count(*) from ev)::int as added"""
