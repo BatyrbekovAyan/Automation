@@ -122,6 +122,7 @@ public static class ChatAudienceRule
     private const string WhatsappGroupSuffix = "@g.us";
     private const string TelegramChannelType = "channel";
     private const string TelegramGroupType = "chat";
+    private const string TelegramBotType = "bot";
 
     /// <summary>A WhatsApp id ends with one of these when it is not a person: a group; a channel; the status and broadcast lists.</summary>
     public static readonly IReadOnlyList<string> WhatsappNonHumanSuffixes =
@@ -131,9 +132,12 @@ public static class ChatAudienceRule
     public static readonly IReadOnlyList<string> TelegramServiceIds =
         new ReadOnlyCollection<string>(new[] { "777000" });
 
-    /// <summary>Telegram chat types that are not a person: a channel; a group.</summary>
+    /// <summary>
+    /// Telegram chat types that are not a person: a channel; a group; a bot (a bot's reply arrives with the chat type
+    /// <c>bot</c>, while the chat list shows the same bot as a <c>user</c> with the Bot flag).
+    /// </summary>
     public static readonly IReadOnlyList<string> TelegramNonHumanTypes =
-        new ReadOnlyCollection<string>(new[] { TelegramChannelType, TelegramGroupType });
+        new ReadOnlyCollection<string>(new[] { TelegramChannelType, TelegramGroupType, TelegramBotType });
 
     /// <summary>The Telegram chat type of a private dialog — the only person.</summary>
     public const string TelegramPersonType = "user";
@@ -214,6 +218,7 @@ public static class ChatAudienceRule
     {
         if (Contains(TelegramServiceIds, id)) return NonHumanKind.Service;
         if (type == TelegramGroupType) return NonHumanKind.Group;
+        if (type == TelegramBotType) return NonHumanKind.Bot;
         if (Contains(TelegramNonHumanTypes, type)) return NonHumanKind.Channel;
         if (f.Bot == true) return NonHumanKind.Bot;
         if (f.Support == true) return NonHumanKind.Service;

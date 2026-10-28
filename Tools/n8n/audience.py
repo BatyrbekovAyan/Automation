@@ -14,7 +14,9 @@ The rule — RULE_JS, `decideAudience(f)` → {kind: 'personal' | 'business', re
        WhatsApp  the chat id ends with one of WA_NONHUMAN_SUFFIXES (a group, a channel, the status and broadcast lists), or
                  flags.bot / flags.self (the chat with oneself);
        Telegram  the chat id is one of TG_SERVICE_IDS (777000, the service account), or the chat type is one of
-                 TG_NONHUMAN_TYPES ('channel', 'chat' — a channel, a group), or any of flags.bot / flags.support / flags.self;
+                 TG_NONHUMAN_TYPES ('channel', 'chat', 'bot' — a channel, a group, a bot: a bot's reply arrives with the
+                 incoming webhook's chat_type 'bot', while the chat card lists the same bot as 'user' with user.Bot), or
+                 any of flags.bot / flags.support / flags.self;
   2. Telegram without the chat card (flags null) → personal / unknown: a bot cannot be ruled out. WhatsApp has no card to
      miss, so there `flags: null` reads as all false;
   2a. Telegram with a chat type other than TG_PERSON_TYPE ('user') → personal / unknown. ANY other value counts: '' (not
@@ -28,6 +30,10 @@ The rule — RULE_JS, `decideAudience(f)` → {kind: 'personal' | 'business', re
   7. otherwise → business / new. Only a KNOWN «no» on both facts makes a new person.
 An id ending in '@lid' (a WhatsApp number that did not resolve) is a person like any other: its history tells. A channel that
 is neither 'whatsapp' nor 'telegram' is not decided at all (personal / unknown) — the C# twin cannot even say it.
+Where the facts come from is the callers' business (the server: Decide Audience, build-decide-audience.py; the app:
+ChatAudienceFacts): a WhatsApp «saved contact» is a name from the phone's address book — contact.FullName of the chat card —
+and never the incoming webhook's contact_name, which Wappi fills FullName → PushName → BusinessName → FirstName, so a
+stranger carries his own profile name there (live check, docs/audits/2026-10-25-personal-chats/live-checks.md).
 
 Twins: the n8n `Decide Audience` Code node embeds RULE_JS verbatim; the app's ChatAudienceRule.Decide repeats it in C#. Both run
 every row of FIXTURE — {constants: {settleMinutes, freshHours, wipeDays}, cases: [{name, channel, chatId, chatType, flags,
@@ -67,12 +73,9 @@ SETTLE_MINUTES = 30     # after a channel is connected, a chat without a decisio
 FRESH_HOURS = 24        # a message that waited for the owner's decision is handed to the assistant again only while younger
 WIPE_DAYS = 2           # the data of a chat the owner made personal is wiped after this many days
 WIPE_BATCH = 200        # chats the Sweep wipes per run (every 6 hours); the oldest first, the rest wait for the next run
-WA_CONTACT_SOURCE = "webhook"   # where the WhatsApp «saved contact» fact comes from: "webhook" (contact_name of the incoming
-                                # message) | "chats_filter" (contact.FullName of the chat list); live check D1,
-                                # docs/audits/2026-10-25-personal-chats/live-checks.md
 WA_NONHUMAN_SUFFIXES = ("@g.us", "@newsletter", "@broadcast")   # a group; a channel; the status and broadcast lists
 TG_SERVICE_IDS = ("777000",)                                    # the Telegram service account (login codes and the like)
-TG_NONHUMAN_TYPES = ("channel", "chat")                         # Telegram chat types that are not a person: a channel; a group
+TG_NONHUMAN_TYPES = ("channel", "chat", "bot")                  # Telegram chat types that are not a person: a channel; a group; a bot
 TG_PERSON_TYPE = "user"                                         # the Telegram chat type of a private dialog — the only person
 FIXTURE = os.path.join(HERE, "fixtures", "audience-cases.json")
 
@@ -85,8 +88,8 @@ RULE_JS = r"""// AUDIENCE RULE - is this chat PERSONAL (the assistant stays out)
 //
 // f = { channel,   'whatsapp' | 'telegram'
 //       chatId,    string
-//       chatType,  string; Telegram: 'user' = a person, 'channel' | 'chat' = not a person, anything else ('' = not given
-//                  included) = not recognised; WhatsApp: not used
+//       chatType,  string; Telegram: 'user' = a person, 'channel' | 'chat' | 'bot' = not a person, anything else ('' = not
+//                  given included) = not recognised; WhatsApp: not used
 //       flags,     { bot, support, self } | null; Telegram: null = the chat card was not received, WhatsApp: null = all false
 //       contact,   true | false | null; a saved contact, null = not known
 //       history,   true | false | null; a conversation before the connection, null = not known

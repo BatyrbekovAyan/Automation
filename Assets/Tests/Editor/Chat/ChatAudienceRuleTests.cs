@@ -206,6 +206,11 @@ public class ChatAudienceRuleTests
         Assert.AreEqual(NonHumanKind.Channel, ChatAudienceRule.NonHuman(Tg("5550100001", "channel")), "a Telegram channel");
         Assert.AreEqual(NonHumanKind.Group, ChatAudienceRule.NonHuman(Tg("5550100002", "chat")), "a Telegram group");
         Assert.AreEqual(NonHumanKind.Bot, ChatAudienceRule.NonHuman(Tg("5550000001", bot: true)), "a Telegram bot");
+        Assert.AreEqual(NonHumanKind.Bot, ChatAudienceRule.NonHuman(Tg("5550100004", "bot")),
+            "a Telegram bot by its chat type: a bot's reply arrives with chat_type bot");
+        Assert.AreEqual(NonHumanKind.Bot,
+            ChatAudienceRule.NonHuman(new AudienceFacts(true, "5550100005", "bot", null, null, null, null)),
+            "a bot's chat type needs no chat card");
         Assert.AreEqual(NonHumanKind.Bot, ChatAudienceRule.NonHuman(Wa("77000000002@c.us", bot: true)), "a WhatsApp bot");
         Assert.AreEqual(NonHumanKind.Service, ChatAudienceRule.NonHuman(Tg("777000")), "the Telegram service account by its id");
         Assert.AreEqual(NonHumanKind.Service,
@@ -225,6 +230,7 @@ public class ChatAudienceRuleTests
         Assert.AreEqual(NonHumanKind.Group, ChatAudienceRule.NonHuman(Wa("120363000000000001@g.us", bot: true, self: true)));
         Assert.AreEqual(NonHumanKind.Service, ChatAudienceRule.NonHuman(Tg("777000", bot: true)));
         Assert.AreEqual(NonHumanKind.Channel, ChatAudienceRule.NonHuman(Tg("5550100001", "channel", bot: true)));
+        Assert.AreEqual(NonHumanKind.Bot, ChatAudienceRule.NonHuman(Tg("5550100004", "bot", support: true, self: true)));
         Assert.AreEqual(NonHumanKind.Bot, ChatAudienceRule.NonHuman(Tg("5550000001", bot: true, support: true, self: true)));
     }
 
@@ -248,7 +254,8 @@ public class ChatAudienceRuleTests
     [Test]
     public void TelegramChatType_IsMatchedExactly()
     {
-        foreach (string type in new[] { "Channel", "CHANNEL", "Chat", " chat", "chat ", "channel\n", "User", " user", "user " })
+        foreach (string type in new[] { "Channel", "CHANNEL", "Chat", " chat", "chat ", "channel\n", "User", " user", "user ",
+                                        "Bot", "BOT", " bot", "bot " })
         {
             AudienceFacts f = Tg("5550100003", type);
             Assert.AreEqual(NonHumanKind.None, ChatAudienceRule.NonHuman(f), $"type '{type}' is not a known non-human type");

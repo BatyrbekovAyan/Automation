@@ -13,6 +13,8 @@ body). No database, no n8n server, no network, never prod.
 
   every_case_matches                 decideAudience answers (expectKind, expectReason) for every row — and nothing else
   constants_match_the_fixture        the module's SETTLE_MINUTES / FRESH_HOURS / WIPE_DAYS are the table's constants
+  whatsapp_contact_has_one_source    no switch to the webhook's contact_name: the WhatsApp contact is the chat card's
+                                     contact.FullName (Decide Audience reads it), never a name Wappi may fill from a profile
   cases_have_exactly_ten_keys_and_unique_names
                                      the contract's shape, and every row the plan names is there
   rule_js_is_pure                    no clock, no n8n global, no require — and no top-level name but `decideAudience`
@@ -81,8 +83,14 @@ with Case("constants_match_the_fixture: the module's SETTLE_MINUTES / FRESH_HOUR
         c.check((AUD.SETTLE_MINUTES, AUD.FRESH_HOURS, AUD.WIPE_DAYS) == (k.get('settleMinutes'), k.get('freshHours'), k.get('wipeDays')),
                 f'module {(AUD.SETTLE_MINUTES, AUD.FRESH_HOURS, AUD.WIPE_DAYS)} vs table {k}')
         c.check(all(type(v) is int and v > 0 for v in k.values()), f'constants must be positive integers: {k}')
-        c.check(AUD.WA_CONTACT_SOURCE in ('webhook', 'chats_filter'), f'WA_CONTACT_SOURCE {AUD.WA_CONTACT_SOURCE!r}')
         c.check(Path(AUD.FIXTURE).resolve() == FIXTURE.resolve(), f'FIXTURE {AUD.FIXTURE} is not {FIXTURE}')
+
+with Case('whatsapp_contact_has_one_source: no switch to the incoming webhook\'s contact_name — Wappi fills it from the '
+          'profile name too, so a stranger would read as a saved contact; the contact is the chat card\'s contact.FullName') as c:
+    c.check(AUD is not None, NO_MODULE)
+    if AUD is not None:
+        c.check(not hasattr(AUD, 'WA_CONTACT_SOURCE'), 'audience.py names a WhatsApp contact source again (WA_CONTACT_SOURCE)')
+        c.check('contact_name' not in AUD.RULE_JS, 'RULE_JS reads the webhook\'s contact_name')
 
 with Case('cases_have_exactly_ten_keys_and_unique_names: two top-level keys, ten keys per row, no duplicate name, all 24 rows of the plan') as c:
     c.check(set(DOC) == {'constants', 'cases'}, f'top-level keys {sorted(DOC)}')
