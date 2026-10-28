@@ -16,8 +16,10 @@ The Wappi token comes from $WAPPI_TOKEN or ~/.config/choosereply/wappi-token
   status   --ch wa|tg --profile P       one profile's connection state
   chats    --ch wa|tg --profile P       the newest chats: contact / user flags / type / id format
   chat     --ch wa|tg --profile P (--chat ID | --handle H)
-                                        the chat's oldest message against the connection
-                                        moment, and its newest page: order, keys, from == chatId
+                                        the chat-list request the server makes for this chat
+                                        (does it find the chat, what the card says), the chat's
+                                        oldest message against the connection moment, and its
+                                        newest page: order, keys, from == chatId
   journal  (--workflow W | --profile P) incoming webhooks of a bot workflow from the n8n
                                         execution journal (PRODUCTION, read-only); the key
                                         comes from $N8N_API_KEY or --n8n-key-file
@@ -179,6 +181,7 @@ def describe_wa_dialog(dialog, at):
     chat_id = dialog.get("id") or dialog.get("chatId") or dialog.get("chat_id")
     contact = dialog.get("contact")
     return (f"{handle(chat_id)}  id={fmt_id(chat_id)}  contact.FullName={filled(contact, 'FullName')}"
+            f"  contact.PushName={filled(contact, 'PushName')}"
             f"  name={filled(dialog, 'name')}  deleted={flag(dialog.get('isDeleted'))}"
             f"  blacklist={flag(dialog.get('is_blacklist'))}  unread={dialog.get('unread_count', '?')}"
             f"  last={rel(first_time(dialog), at)}")
@@ -287,6 +290,15 @@ def chat_rows(channel, profile_id, source):
     return wappi(channel, "sync/chats/filter", {"profile_id": profile_id})
 
 
+def card_request(channel, chat_id):
+    """The one chat-list request the server makes for a chat without a decision: Telegram reads the first page
+    of chats/get; WhatsApp filters chats/filter by the digits of the chat id (the filter also matches chat names
+    and last messages, so the caller still picks the dialog whose id equals the chat id)."""
+    if channel == "tg":
+        return "sync/chats/get", {"limit": 20, "offset": 0, "order": "desc"}
+    return "sync/chats/filter", {"client_name": re.sub(r"\D", "", str(chat_id))}
+
+
 # ---- commands ----
 
 def cmd_profiles(_args):
@@ -348,6 +360,14 @@ def cmd_chat(args):
     entry = profile_entry(args.ch, args.profile)
     connected = to_epoch(args.connected_at) if args.connected_at else to_epoch((entry or {}).get("authorized_at"))
     emit(f"chat {handle(chat_id)}  id={fmt_id(chat_id)}  connection moment known={'1' if connected else '0'}")
+
+    path, params = card_request(args.ch, chat_id)
+    _, card_payload = wappi(args.ch, path, {"profile_id": args.profile, **params})
+    dialogs = rows_of(card_payload)
+    card = next((d for d in dialogs if str(d.get("id") or d.get("chatId") or d.get("chat_id")) == str(chat_id)), None)
+    emit(f"card ({path}, the server's request): {len(dialogs)} dialog(s), this chat found={'1' if card else '0'}")
+    if card is not None:
+        emit(f"  {(describe_tg_dialog if args.ch == 'tg' else describe_wa_dialog)(card, now())}")
 
     _, oldest_payload = wappi(args.ch, "sync/messages/get",
                               {"profile_id": args.profile, "chat_id": chat_id, "limit": 1, "order": "asc"})
@@ -484,6 +504,11 @@ def cmd_selftest(_args):
         "contact name presence is told": "contact.FullName=yes" in output and "contact.FullName=empty" in output,
         "Telegram flags are told": "Contact=1" in output and "Support=1" in output,
         "from == chatId is told": "from==chatId=1" in output and "from==chatId=0" in output,
+        "a stranger's profile name is told apart from the book name": "contact.PushName=yes" in output,
+        "the WhatsApp card is filtered by the chat id's digits":
+            card_request("wa", wa_dialog["id"]) == ("sync/chats/filter", {"client_name": "77012345678"}),
+        "the Telegram card is the first chats/get page":
+            card_request("tg", tg_dialog["id"]) == ("sync/chats/get", {"limit": 20, "offset": 0, "order": "desc"}),
     }
     _emit_sink = None
     failed = [name for name, ok in expectations.items() if not ok]
