@@ -15,7 +15,10 @@ What runs — no n8n server, no network, never production:
     `undefined` is skipped, an object JSON-stringified) on session temp tables of the staging Postgres — all of a node's
     per-item statements in one transaction (the node's single query batching), bigint and numeric columns handed on as
     STRINGS (node-pg's default), json / jsonb parsed; a fault named in `faults` or a real SQL error becomes the item n8n
-    hands on for the node's onError setting;
+    hands on for the node's onError setting; no row back is answered the node's way (nothing for SELECT queries by n8n's
+    own isSelectQuery, else one {success: true} item — step_postgres cites the source);
+  * a node named in `throws` throws OUTSIDE its runner (credentials, connection setup, an expression): one that continues
+    on error hands on its INPUT items unchanged, as n8n-core does — the failure that produces no error item at all;
   * every HTTP node through a stub (`fake(call)`) that sees the request the node builds (URL, query, body, credential,
     options) and answers {statusCode, body} or {throw: message} — what the node then hands on follows its own
     fullResponse / neverError / onError;
@@ -31,6 +34,7 @@ items of that arrival; alwaysOutputData turns an empty first output into one emp
 """
 import copy
 import json
+import re
 import subprocess
 
 from rc_events_chain import pg_bind
@@ -105,6 +109,11 @@ async function handle(v) {
       return {ok: true, pass: executeFilter(Object.assign({}, f, {conditions}))};
     }
     if (v.kind === 'code') return {ok: true, items: await runCode(v)};
+    if (v.kind === 'isSelect') {
+      // the Postgres node's own classifier (n8n-nodes-base Postgres v2 helpers/utils.js): which empty answer the node gives
+      const {isSelectQuery} = require(N + '/n8n-nodes-base/dist/nodes/Postgres/v2/helpers/utils.js');
+      return {ok: true, value: isSelectQuery(String(v.query))};
+    }
     throw new Error('unknown kind ' + v.kind);
   } catch (e) { return {ok: false, error: String((e && e.message) || e)}; }
 }
@@ -178,12 +187,79 @@ def derived(items, k, name, json_):
     return {'json': json_, 'lin': {**base, name: json_}}
 
 
-def typed_q(pg, sql):
+def _strip_sql(query):
+    """The statement with its comments and the contents of its literals blanked — the scan n8n's own classifier makes
+    (n8n-nodes-base 2.36.4, Postgres v2 helpers/utils.js stripStringsAndComments): /* */ and -- comments, '…' (with ''
+    and, after E, backslash escapes), "…" and $tag$…$tag$."""
+    out, i, n = [], 0, len(query)
+    while i < n:
+        c, nxt = query[i], query[i + 1:i + 2]
+        if c == '/' and nxt == '*':
+            end = query.find('*/', i + 2)
+            i = n if end < 0 else end + 2
+            out.append(' ')
+        elif c == '-' and nxt == '-':
+            end = query.find('\n', i + 2)
+            i = n if end < 0 else end
+            out.append(' ')
+        elif c == "'":
+            escape = i > 0 and query[i - 1] in 'eE' and (i < 2 or not (query[i - 2].isalnum() or query[i - 2] == '_'))
+            i += 1
+            while i < n:
+                if escape and query[i] == '\\' and i + 1 < n:
+                    i += 2
+                elif query[i] == "'" and query[i + 1:i + 2] == "'":
+                    i += 2
+                elif query[i] == "'":
+                    i += 1
+                    break
+                else:
+                    i += 1
+            out.append("''")
+        elif c == '"':
+            end = query.find('"', i + 1)
+            i = n if end < 0 else end + 1
+            out.append('""')
+        elif c == '$' and re.match(r'\$(?:[A-Za-z_][A-Za-z0-9_]*)?\$', query[i:]):
+            tag = re.match(r'\$(?:[A-Za-z_][A-Za-z0-9_]*)?\$', query[i:]).group(0)
+            end = query.find(tag, i + len(tag))
+            i = n if end < 0 else end + len(tag)
+            out.append(' ')
+        else:
+            out.append(c)
+            i += 1
+    return ''.join(out)
+
+
+def _returns_rows(statement):
+    """A data-modifying statement hands rows back only with its own RETURNING — one at the top level (depth 0), not a
+    CTE's inside parentheses."""
+    s, depth = _strip_sql(statement), 0
+    for m in re.finditer(r'[()]|\breturning\b', s, re.I):
+        tok = m.group(0)
+        if tok == '(':
+            depth += 1
+        elif tok == ')':
+            depth = max(depth - 1, 0)
+        elif depth == 0:
+            return True
+    return False
+
+
+def typed_q(pg, sql, select=True):
     """The statement's rows the way n8n's Postgres node hands them on: bigint and numeric columns as STRINGS (node-pg's
-    default; the node's largeNumbersOutput is not 'numbers'), json / jsonb parsed, everything else as JSON gives it."""
+    default; the node's largeNumbersOutput is not 'numbers'), json / jsonb parsed, everything else as JSON gives it.
+    `select` = n8n's isSelectQuery of the node's query: anything else runs as itself — a data-modifying statement without
+    a top-level RETURNING hands back no row; one with it is read through a CTE."""
+    body = sql.strip().rstrip(';')
+    if not select:
+        if not _returns_rows(body):
+            pg._run(body + ';')
+            return []
+        body = f'with __gw_dml as ({body}) select * from __gw_dml'
     pg.n += 1
     t = f'__gw_q{pg.n}'
-    txt = pg._run(f"create temp table {t} as {sql.strip().rstrip(';')};\n"
+    txt = pg._run(f"create temp table {t} as {body};\n"
                   f"select json_build_object('types', (select coalesce(json_object_agg(attname, format_type(atttypid, atttypmod)), "
                   f"'{{}}'::json) from pg_attribute where attrelid = '{t}'::regclass and attnum > 0 and not attisdropped), "
                   f"'rows', (select coalesce(json_agg({t}), '[]'::json) from {t}));\ndrop table {t};")
@@ -207,6 +283,11 @@ def step_postgres(pg, n, items, run, faults):
             raise AssertionError(f'{name}: an undefined parameter value would shift the rest: {p}')
         stmts.append(pg_bind(n['parameters']['query'], p['values']))
     run.events.append(('sql', name))
+    query = n['parameters']['query']
+    sel = ENGINE('isSelect', query=query)
+    if not sel['ok']:
+        raise AssertionError(f'{name}: n8n\'s isSelectQuery could not be asked: {sel}')
+    select = sel['value']
     err = None
     if name in faults:
         err = faults[name]
@@ -215,7 +296,7 @@ def step_postgres(pg, n, items, run, faults):
         out = []
         try:
             for k, sql in enumerate(stmts):
-                out += [derived(items, k, name, r) for r in typed_q(pg, sql)]
+                out += [derived(items, k, name, r) for r in typed_q(pg, sql, select)]
             pg.x('commit;')
         except RuntimeError as e:
             pg.x('rollback;')
@@ -224,6 +305,17 @@ def step_postgres(pg, n, items, run, faults):
         if not cont:
             raise Halt(f'{name}: {err}')
         item = {'message': err, 'error': {'message': err}}
+        return [[derived(items, 0, name, item) if len(items) == 1 else {'json': item, 'lin': {name: item}}]]
+    if not out:
+        # No row from any statement. n8n-nodes-base 2.36.4, Postgres v2 helpers/utils.js configureQueryRunner, single
+        # batching (lines 311–337): typeVersion < 2.3 answers one {success: true} item for every executeQuery (it is not
+        # the 'select' operation); from 2.3 on, nothing when EVERY query is a SELECT by isSelectQuery (asked of n8n's own
+        # function: comments and literals stripped, the first top-level command word — `WITH … (INSERT …) SELECT` is a
+        # SELECT), else one {success: true} item paired to every input item. The query is the node's own text: the
+        # workflows under test put no expression into it.
+        if (n.get('typeVersion') or 1) >= 2.3 and select:
+            return [[]]
+        item = {'success': True}
         return [[derived(items, 0, name, item) if len(items) == 1 else {'json': item, 'lin': {name: item}}]]
     return [out]
 
@@ -317,6 +409,19 @@ def step_respond(n, items, run):
     return [[derived(items, k, n['name'], items[k]['json']) for k in range(len(items))]]
 
 
+def step_throw(n, items, run, message):
+    """A node that throws OUTSIDE its own runner. n8n-core 2.36.5 (execution-engine/workflow-execute.js, the executionError
+    branch, lines 1139–1147): a node that continues on error gets nodeSuccessData = [executionData.data.main[0]] — its INPUT
+    items, unchanged, on its first output; no error item at all. Without onError the execution ends. continueErrorOutput
+    is not modelled (no workflow under test uses it)."""
+    if n.get('onError') == 'continueErrorOutput':
+        raise NotImplementedError(f'{n["name"]}: a throw with continueErrorOutput is not modelled')
+    if n.get('onError') != 'continueRegularOutput':
+        raise Halt(f'{n["name"]}: {message}')
+    run.events.append(('throw', n['name']))
+    return [[derived(items, k, n['name'], items[k]['json']) for k in range(len(items))]]
+
+
 def step_trigger(n, items):
     """ExecuteWorkflowTrigger.execute (n8n-nodes-base 2.36) for inputSource workflowInputs: per input item every field of
     the schema — null (FALLBACK_DEFAULT_VALUE) when the caller left it out — and only those fields. The trigger itself does
@@ -333,12 +438,19 @@ def step_trigger(n, items):
     return [out]
 
 
-def walk_graph(pg, w, start, items=None, webhook=None, fake=None, env=None, faults=None):
+def walk_graph(pg, w, start, items=None, webhook=None, fake=None, env=None, faults=None, throws=None):
     """One execution of workflow `w` from node `start`: a Webhook node hands on `webhook` (the request n8n builds), an
-    Execute Workflow trigger takes `items` ([{'json': caller's item}, …]). `fake(call)` answers every HTTP node, `faults`
-    = {Postgres node: error message} fails that node's statement, `env` is the Code nodes' $env."""
+    Execute Workflow trigger takes `items` ([{'json': caller's item}, …]). `fake(call)` answers every HTTP node, `env` is
+    the Code nodes' $env. Two failure shapes, as n8n has them:
+      faults = {Postgres node: error message}  the statement fails INSIDE the query runner: the node's own error item
+                                               {message, error} (configureQueryRunner's catch);
+      throws = {node: error message}           the node throws OUTSIDE its runner — getCredentials, configurePostgres, a
+                                               parameter expression (Postgres v2 router.js / executeQuery.operation.js):
+                                               a node that continues on error then hands on its INPUT items unchanged,
+                                               any other ends the execution (step_throw)."""
     by = {n['name']: n for n in w['nodes']}
     faults = faults or {}
+    throws = throws or {}
     env = env or {}
     run = Run(by)
 
@@ -346,7 +458,9 @@ def walk_graph(pg, w, start, items=None, webhook=None, fake=None, env=None, faul
         n = by[name]
         run.trail.append(name)
         run.events.append(('node', name))
-        if n.get('disabled'):
+        if name in throws:
+            outs = step_throw(n, its, run, throws[name])
+        elif n.get('disabled'):
             outs = [[derived(its, k, name, its[k]['json']) for k in range(len(its))]]
         elif n['type'] == WEBHOOK:
             outs = [[{'json': webhook, 'lin': {name: webhook}}]]

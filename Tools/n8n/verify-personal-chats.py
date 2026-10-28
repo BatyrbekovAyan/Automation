@@ -58,8 +58,8 @@ still wired as designed».
           stop of Can Decide? reaches no Wappi call and no write; each statement is entered from its own gate alone —
           Ensure Connection only without a moment, Write Decision only through Persist?, Backfill only through Became
           Business?;
-      (4) every If judges a positive field (a number, go, needCard, needHistory, persist, the written row's kind) — never
-          «the node continued»;
+      (4) every If judges a positive field (a number, go, needCard, needHistory, persist, the written row) — never «the
+          node continued»; Became Business? reads the ROW: kind business with a source (default / owner);
       (5) the two Wappi reads only (Chat Card, Recent Messages): GET, the canonical WappiAuthToken credential, fullResponse
           + neverError, at most 10 s, continue on error, the Wappi bases; Telegram's card = chats/get limit 20 / offset 0 /
           order desc, WhatsApp's = chats/filter by client_name; the history = this chat's newest page of
@@ -67,7 +67,10 @@ still wired as designed».
       (6) Plan Facts, Read Card and Decide embed audience.RULE_JS verbatim; no Code node reads contact_name; Plan Facts
           stops for audience.SETTLE_MINUTES and asks no card for an @lid chat; Read Card takes the dialog whose id IS the
           chat id and the WhatsApp contact from contact.FullName; Decide reads the history off the one page (its trigger,
-          its code, the full-page rule) and hands it on unsorted; Shape answers business only on the written row;
+          its code, the full-page rule) and hands it on unsorted; Shape answers business only on the written row (one
+          with a source). No node before Write Decision emits kind, reason or source — the fields of its row — and
+          Decide hands its verdict on as verdictKind / verdictReason: when Write Decision throws before its statement,
+          n8n hands that input item on unchanged, and the business gates must never take it for the row;
       (7) exactly three Postgres nodes, each carrying audience.py's statement exactly, continuing on error;
       (8) crAudienceDec001 is a protected infra id everywhere (PROTECTED_IDS, ACTIVE_CANONICAL before the staging-only eval
           runner, Set Workflow State, the dependents regenerated from the list).
@@ -926,13 +929,18 @@ DECIDE_CONDITIONS = {
     "Need Card?": "={{ $json.needCard === true }}",
     "Need History?": "={{ $json.needHistory === true }}",
     "Persist?": "={{ $json.persist === true }}",
-    "Became Business?": "={{ $json.kind === 'business' }}",
+    "Became Business?": "={{ $json.kind === 'business' && ($json.source === 'default' || $json.source === 'owner') }}",
 }
+# The fields only Write Decision's ROW carries (DECIDE_WRITE_SQL answers kind, reason, source). When Write Decision throws
+# before its statement, n8n hands its INPUT item on unchanged — Decide's — so no node before it may emit any of them, or
+# the business gates (Became Business?, Shape) could take that item for the row.
+ROW_FIELDS = ("kind", "reason", "source")
+BEFORE_THE_WRITE = ("Plan Facts", "Read Card", "Decide")
 DECIDE_STATEMENTS = {
     "Ensure Connection": ("audience.ENSURE_CONNECTION_SQL", AUD.ENSURE_CONNECTION_SQL, "={{ [ $json.profileId ] }}",
                           ("Has Connection?", 1)),
     "Write Decision": ("audience.DECIDE_WRITE_SQL", AUD.DECIDE_WRITE_SQL,
-                       "={{ [ $json.profileId, $json.chatId, $json.kind, $json.reason ] }}", ("Persist?", 0)),
+                       "={{ [ $json.profileId, $json.chatId, $json.verdictKind, $json.verdictReason ] }}", ("Persist?", 0)),
     "Backfill": ("audience.BACKFILL_SQL", AUD.BACKFILL_SQL(DEC.AHH.MEMORY_ROW, DEC.AHH.OWNER_CONTENT_SQL),
                  "={{ [ $('Decide').first().json.profileId, $('Decide').first().json.chatId, "
                  "$('Decide').first().json.messageId, JSON.stringify($('Decide').first().json.page) ] }}",
@@ -1074,9 +1082,20 @@ def check_decide(bundle, sql=None):
          "a row older than the connection → true, a short page → false, a full one of new rows → unknown; persist only a known "
          "reason; hand the page on as Wappi returned it")
     sh = P["Shape"].get("jsCode", "")
-    need("const row = $('Write Decision').first().json || {};" in sh and "if (row.kind === 'business') return done('business', 'business');" in sh
+    need("const row = $('Write Decision').first().json || {};" in sh
+         and "const written = row.source === 'default' || row.source === 'owner';" in sh
+         and "if (written && row.kind === 'business') return done('business', 'business');" in sh
          and sh.count("done('business'") == 1,
-         "Shape must answer business ONLY on the row Write Decision returned saying business")
+         "Shape must answer business ONLY on the row Write Decision returned saying business — a row carries a source "
+         "(default / owner); the item Write Decision hands on when it throws before its statement does not")
+    for name in BEFORE_THE_WRITE:
+        own = _js_code(P[name].get("jsCode", "").replace(AUD.RULE_JS, ""))
+        emitted = sorted(set(re.findall(r"(?<![\w.$])(" + "|".join(ROW_FIELDS) + r")\s*:", own)))
+        need(not emitted,
+             f"{name} emits {emitted} — a field of Write Decision's row: when Write Decision throws before its statement it "
+             f"hands on its input unchanged, and the business gates must never take that item for the row")
+    need("verdictKind: verdict.kind" in dj and "verdictReason: verdict.reason" in dj,
+         "Decide must hand its verdict on as verdictKind / verdictReason (never as the row's kind / reason)")
 
     # (7) the statements
     for name, (label, text, params, gate) in DECIDE_STATEMENTS.items():
@@ -1182,8 +1201,23 @@ DECIDE_MUTATIONS = (
     ("mark_all in the card query", _dec("Chat Card", "jsonQuery", "client_name: $json.clientName", "client_name: $json.clientName, mark_all: true"),
      "mark_all"),
     ("Persist? by «the node continued»", _dec_cond("Persist?", "={{ $json !== undefined }}"), "Persist? must judge a positive field"),
-    ("Became Business? by Decide's verdict", _dec_cond("Became Business?", "={{ $('Decide').first().json.kind === 'business' }}"),
+    ("Became Business? by Decide's verdict", _dec_cond("Became Business?", "={{ $('Decide').first().json.verdictKind === 'business' }}"),
      "Became Business? must judge a positive field"),
+    ("Became Business? without the row's source", _dec_cond("Became Business?", "={{ $json.kind === 'business' }}"),
+     "Became Business? must judge a positive field"),
+    ("Became Business? on a field Decide emits", _dec_cond("Became Business?", "={{ $json.verdictKind === 'business' }}"),
+     "Became Business? must judge a positive field"),
+    ("Decide emits the row's kind again", _dec("Decide", "jsCode", "verdictKind: verdict.kind,", "kind: verdict.kind, verdictKind: verdict.kind,"),
+     "Decide emits ['kind']"),
+    ("Decide hands the verdict on as the row's fields", _dec("Decide", "jsCode", "verdictKind: verdict.kind,\n                  verdictReason: verdict.reason,",
+                                                             "kind: verdict.kind,\n                  reason: verdict.reason,"),
+     "Decide emits ['kind', 'reason']"),
+    ("Decide emits a source", _dec("Decide", "jsCode", "persist: verdict.reason !== 'unknown', page }",
+                                   "persist: verdict.reason !== 'unknown', page, source: 'default' }"), "Decide emits ['source']"),
+    ("Plan Facts emits a source", _dec("Plan Facts", "jsCode", "clientName: '', facts: null,", "clientName: '', source: 'default', facts: null,"),
+     "Plan Facts emits ['source']"),
+    ("Shape takes any kind business for the row", _dec("Shape", "jsCode", "if (written && row.kind === 'business')", "if (row.kind === 'business')"),
+     "Shape must answer business ONLY"),
     ("Has Connection? lets a string moment through", _dec_cond("Has Connection?", "={{ !!$json.connectedAtMs }}"),
      "Has Connection? must judge a positive field"),
     ("Can Decide? by «the node continued»", _dec_cond("Can Decide?", "={{ $json.go !== false }}"), "Can Decide? must judge a positive field"),

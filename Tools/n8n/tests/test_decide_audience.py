@@ -25,12 +25,17 @@ No n8n server, no network, never production. A scenario runs on both channels wh
     missing_connection_is_created_with_the_line_moment, missing_connection_of_a_young_line_is_settling,
     moment_as_text_is_read_from_the_row, malformed_input_is_unknown_no_calls
   not a person — no Wappi call at all, written as personal / nonhuman
-    wa_newsletter_nonhuman_no_calls (every WhatsApp non-person suffix), wa_self_nonhuman, tg_777000_no_calls,
-    tg_channel_type_no_calls, tg_chat_type_bot_nonhuman_no_calls, tg_is_bot_nonhuman_no_calls
+    wa_newsletter_nonhuman_no_calls (every WhatsApp non-person suffix), wa_self_nonhuman, wa_is_bot_nonhuman_no_calls,
+    tg_777000_no_calls, tg_channel_type_no_calls, tg_chat_type_bot_nonhuman_no_calls, tg_is_bot_nonhuman_no_calls
   the chat card
     wa_contact_written_without_history_call, tg_contact_written_without_history_call, tg_bot_from_chat_card,
     wa_card_picks_the_chat_among_filter_matches, wa_contact_name_is_not_read, wa_lid_chat_no_card_history_decides,
-    tg_dialog_not_on_page_is_personal_unknown_not_written, card_failure_is_unknown_not_written
+    wa_dialog_without_contact_is_unknown_not_written, tg_dialog_not_on_page_is_personal_unknown_not_written,
+    card_failure_is_unknown_not_written
+  a node that throws before its work (it hands its INPUT items on: no input may pass for the node's own answer)
+    passthrough_ensure_connection_is_unknown_not_written, passthrough_chat_card_is_unknown_not_written,
+    passthrough_recent_messages_is_unknown_not_written, passthrough_write_decision_is_unknown_no_backfill,
+    passthrough_backfill_keeps_business
   the history page (ONE messages/get, order desc, RECENT_LIMIT rows)
     wa_new_person_business_after_one_history_call, tg_new_person_business_after_one_history_call,
     wa_old_chat_personal_history, tg_old_chat_personal_history, short_page_without_old_row_is_business,
@@ -256,8 +261,9 @@ def inputs(C, moment, chat=None, mid='m-trig', chat_type=None, is_bot=False, lid
 CALLS = []                      # every request of every canonical walk: no_url_carries_mark_all reads them all
 
 
-def decide(pg, inp, fake=None, faults=None, workflow=None):
-    r = walk_graph(pg, workflow or canon(), TRIGGER, items=[{'json': inp}], fake=fake or Fake(), faults=faults or {})
+def decide(pg, inp, fake=None, faults=None, workflow=None, throws=None):
+    r = walk_graph(pg, workflow or canon(), TRIGGER, items=[{'json': inp}], fake=fake or Fake(), faults=faults or {},
+                   throws=throws or {})
     if workflow is None:
         CALLS.extend(r.calls)
     return r
@@ -325,7 +331,7 @@ def old_chat(pg, ch, workflow=None):
     return decide(pg, inputs(C, moment), fake, workflow=workflow), fake
 
 
-def conversation(pg, ch, workflow=None):
+def conversation(pg, ch, workflow=None, throws=None):
     """A new client the owner wrote to first after the connection: the page (newest first) is the trigger, the client's
     second message, the owner's reply, the client's first message. The backfill stores the three before the trigger,
     oldest first; the trigger goes on through the template's normal path."""
@@ -335,7 +341,7 @@ def conversation(pg, ch, workflow=None):
             row(C['chat'], 'm-own', True, 'Здравствуйте! Розы есть.', now_s() - 300),
             row(C['chat'], 'm-c1', False, 'есть розы?', now_s() - 600)]
     moment, fake = new_person(pg, ch, page=page)
-    return decide(pg, inputs(C, moment), fake, workflow=workflow), page
+    return decide(pg, inputs(C, moment), fake, workflow=workflow, throws=throws), page
 
 
 CONVERSATION_HISTORY = [('m-c1', 'client'), ('m-own', 'owner_phone'), ('m-c2', 'client')]
@@ -765,6 +771,80 @@ for ch, C in CH.items():
             c.check(answer(r) == BUSINESS and r.ran('Backfill'), f'{answer(r)} {r}')
             c.check(decision(pg, P, C['chat']) == {'kind': 'business', 'source': 'owner', 'reason': 'owner'}, 'the owner\'s row stays')
 
+# ================================================================================================ a node that throws before its work
+# When a node that continues on error throws OUTSIDE its runner — credentials, connection setup, a parameter expression —
+# n8n-core 2.36.5 hands its INPUT items on, unchanged (graph_walk.step_throw): the one failure without an error item. So no
+# node's input may ever pass for that node's own answer. Every continue-on-error node of Decide Audience, both channels.
+THROWN = 'getCredentials: Credentials could not be decrypted'
+for ch, C in CH.items():
+    P, row = C['pid'], row_of(ch)
+    with Case(f'passthrough_ensure_connection_is_unknown_not_written [{ch}]: Ensure Connection throws before its statement — '
+              'the trigger\'s item comes out of it, and it holds no moment: personal_unknown, no Wappi call, nothing written') as c:
+        with Session(SETUP) as pg:
+            profile(pg, P, C['channel'])
+            fake = Fake(dialogs={P: [stranger(ch, C['chat'])]}, pages={(P, C['chat']): [row(C['chat'], 'm-trig', False, 'привет', now_s() - 60)]})
+            r = decide(pg, inputs(C, None, phone=None), fake, throws={'Ensure Connection': THROWN})
+            c.check(('throw', 'Ensure Connection') in r.events, f'premise — the node threw: {r.events}')
+            c.check(answer(r) == personal('unknown') and not r.calls and not statements(r), f'{answer(r)} {r}')
+            c.check(conn(pg, P) is None and nothing_written(pg), f'{counts(pg)} {conn(pg, P)}')
+
+    with Case(f'passthrough_chat_card_is_unknown_not_written [{ch}]: Chat Card throws before its request — the plan comes out '
+              'of it, and it is no card: personal_unknown, no history call, nothing written') as c:
+        with Session(SETUP) as pg:
+            moment, fake = new_person(pg, ch)
+            r = decide(pg, inputs(C, moment), fake, throws={'Chat Card': THROWN})
+            c.check(('throw', 'Chat Card') in r.events, f'premise — the node threw: {r.events}')
+            c.check(answer(r) == personal('unknown') and not r.calls and not statements(r) and nothing_written(pg), f'{answer(r)} {r}')
+
+    with Case(f'passthrough_recent_messages_is_unknown_not_written [{ch}]: Recent Messages throws before its request — the plan '
+              'comes out of it, and it is no page: personal_unknown, nothing written') as c:
+        with Session(SETUP) as pg:
+            moment, fake = new_person(pg, ch)
+            r = decide(pg, inputs(C, moment), fake, throws={'Recent Messages': THROWN})
+            c.check(('throw', 'Recent Messages') in r.events, f'premise — the node threw: {r.events}')
+            c.check(answer(r) == personal('unknown') and wappi(r) == ['Chat Card'] and not statements(r) and nothing_written(pg),
+                    f'{answer(r)} {r}')
+
+    with Case(f'passthrough_write_decision_is_unknown_no_backfill [{ch}]: Write Decision throws before its statement — Decide\'s '
+              'item comes out of it, and it is no row: personal_unknown, no Backfill, no decision written') as c:
+        with Session(SETUP) as pg:
+            moment, fake = new_person(pg, ch)
+            r = decide(pg, inputs(C, moment), fake, throws={'Write Decision': THROWN})
+            c.check(('throw', 'Write Decision') in r.events, f'premise — the node threw: {r.events}')
+            c.check(answer(r) == personal('unknown') and not r.ran('Backfill') and not statements(r) and nothing_written(pg),
+                    f'{answer(r)} statements {statements(r)} {counts(pg)} {r}')
+
+    with Case(f'passthrough_backfill_keeps_business [{ch}]: Backfill throws before its statement — the decision row is written '
+              'and stands: business, nothing backfilled') as c:
+        with Session(SETUP) as pg:
+            r, page = conversation(pg, ch, throws={'Backfill': THROWN})
+            c.check(('throw', 'Backfill') in r.events, f'premise — the node threw: {r.events}')
+            c.check(answer(r) == BUSINESS and statements(r) == ['Write Decision'], f'{answer(r)} {statements(r)} {r}')
+            c.check(decision(pg, P, C['chat']) == {'kind': 'business', 'source': 'default', 'reason': 'new'}
+                    and history(pg, P, C['chat']) == [] and memory(pg, P, C['chat']) == [], f'{decision(pg, P, C["chat"])} {counts(pg)}')
+
+with Case('wa_dialog_without_contact_is_unknown_not_written: the chat\'s dialog is found but carries no contact object — its '
+          'absence stays unknown (reading it as «not a contact» would answer a contact on a glitch): personal_unknown, no '
+          'history call, nothing written') as c:
+    C = CH['WA']
+    with Session(SETUP) as pg:
+        card = wa_dialog(C['chat'])
+        card.pop('contact')
+        moment, fake = new_person(pg, 'WA', card=card)
+        r = decide(pg, inputs(C, moment), fake)
+        c.check(answer(r) == personal('unknown') and wappi(r) == ['Chat Card'] and not statements(r) and nothing_written(pg),
+                f'{answer(r)} {r}')
+
+with Case('wa_is_bot_nonhuman_no_calls: the incoming WhatsApp webhook says is_bot → not a person by its input alone: no Wappi '
+          'call, written personal / nonhuman like every non-person') as c:
+    C = CH['WA']
+    with Session(SETUP) as pg:
+        moment, fake = new_person(pg, 'WA')
+        r = decide(pg, inputs(C, moment, is_bot=True), fake)
+        c.check(answer(r) == personal('nonhuman') and not r.calls, f'{answer(r)} {r}')
+        c.check(decision(pg, C['pid'], C['chat']) == {'kind': 'personal', 'source': 'default', 'reason': 'nonhuman'},
+                f'{decision(pg, C["pid"], C["chat"])}')
+
 # ================================================================================================ the requests
 for ch, C in CH.items():
     P = C['pid']
@@ -900,6 +980,9 @@ SCRATCH = (
     ('order asc in an HTTP node', _query('Recent Messages', "order: 'desc'", "order: 'asc'")),
     ('a contactName input', lambda w: nd(w, TRIGGER)['parameters']['workflowInputs']['values'].append({'name': 'contactName', 'type': 'string'})),
     ('the WhatsApp card without client_name', _query('Chat Card', ", client_name: $json.clientName", "")),
+    ('Decide emits the row\'s kind (a gate could take its item for the row)', lambda w: nd(w, 'Decide')['parameters'].__setitem__(
+        'jsCode', nd(w, 'Decide')['parameters']['jsCode'].replace('verdictKind: verdict.kind,', 'kind: verdict.kind, verdictKind: verdict.kind,'))),
+    ('Became Business? without the row\'s source', _cond('Became Business?', "={{ $json.kind === 'business' }}")),
 )
 
 for label, mutate in SCRATCH:
