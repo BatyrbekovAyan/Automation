@@ -503,7 +503,9 @@ def cmd_journal(args):
                         for field in ("chatId", "from", "to", "whatsapp_chat_id")))
                     emit(f"    chatId {handle(message.get('chatId'))}: {list_match(args, message.get('chatId'), listing)}")
                     card = listing.get("dialogs_by_id", {}).get(str(message.get("chatId")))
-                    if card is not None:
+                    if card is not None and args.ch == "tg":
+                        emit(f"    card now: {describe_tg_dialog(card, now())}")
+                    elif card is not None:
                         book = (card.get("contact") or {}).get("FullName") if isinstance(card.get("contact"), dict) else None
                         emit(f"    card contact.FullName={filled(card.get('contact'), 'FullName')}"
                              f"  contact_name==card.FullName={same_value(message.get('contact_name'), book)}")
