@@ -497,12 +497,30 @@ def cmd_journal(args):
                      f"  from_where={cat(message.get('from_where'))}"
                      f"  contact_name==senderName={same_value(message.get('contact_name'), message.get('senderName'))}")
                 if args.profile:
+                    own = own_number(args, listing)
+                    emit("    own number (get/status) == " + "  ".join(
+                        f"{field}:{same_value(digits_of(message.get(field)), own)}"
+                        for field in ("chatId", "from", "to", "whatsapp_chat_id")))
                     emit(f"    chatId {handle(message.get('chatId'))}: {list_match(args, message.get('chatId'), listing)}")
                     card = listing.get("dialogs_by_id", {}).get(str(message.get("chatId")))
                     if card is not None:
                         book = (card.get("contact") or {}).get("FullName") if isinstance(card.get("contact"), dict) else None
                         emit(f"    card contact.FullName={filled(card.get('contact'), 'FullName')}"
                              f"  contact_name==card.FullName={same_value(message.get('contact_name'), book)}")
+
+
+def digits_of(value):
+    return re.sub(r"[^0-9]", "", str(value)) if value else ""
+
+
+def own_number(args, cache):
+    """The connected account's own number, digits only, from get/status (Telegram: account.phone first)."""
+    if "own" not in cache:
+        _, payload = wappi(args.ch, "sync/get/status", {"profile_id": args.profile})
+        account = payload.get("account") if isinstance(payload, dict) and isinstance(payload.get("account"), dict) else {}
+        phone = (account.get("phone") if args.ch == "tg" else None) or (payload or {}).get("phone")
+        cache["own"] = digits_of(phone)
+    return cache["own"]
 
 
 def same_value(left, right):
