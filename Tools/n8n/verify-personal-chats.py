@@ -671,7 +671,7 @@ def check_webhook(bundle, sql=None):
              f"{name} must be a Wappi read: the canonical Wappi credential, fullResponse + neverError, at most 10 s, continue on "
              f"error, only the two Wappi bases ({path})")
     rq = P["Recent Messages"].get("jsonQuery", "")
-    need(f"limit: {CRA.RECENT_LIMIT}" in rq and "order: 'desc'" in rq and "chat_id: $json.chat_id" in rq,
+    need(f"limit: {AUD.RECENT_LIMIT}" in rq and "order: 'desc'" in rq and "chat_id: $json.chat_id" in rq,
          "Recent Messages must read limit 10 and order desc of THIS chat (the page the backfill takes, newest first)")
     need("mark_all" not in json.dumps(wf, ensure_ascii=False),
          "mark_all must appear nowhere in the webhook — reading a chat must never mark it read")
