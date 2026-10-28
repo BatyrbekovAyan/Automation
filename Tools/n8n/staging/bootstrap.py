@@ -61,6 +61,7 @@ ACTIVE_CANONICAL = ["0DP79STI3pafXO9B", "2htWSV5IHO8E2CgB", "2islisFH7jjLoPQM", 
                     "crChannelWatch001",  # A4 «защита платящих» (2026-10-14): «канал отключился» notices, every 10 min (e2e pauses it around its probes)
                     "crSetSchedule001",   # B1 «расписание бота» (2026-10-14): the owner's schedule (/webhook/SetSchedule)
                     "crChatAudience01",   # «Личные и рабочие чаты» (2026-10-25): the app's chat decisions (/webhook/ChatAudience)
+                    "crAudienceDec001",   # «Личные и рабочие чаты» (2026-10-25): the bots' first-message decision (a sub-workflow)
                     "stgEvalRunner001"]   # STAGING-ONLY (stage 6): completions proxy for the eval runner
 
 

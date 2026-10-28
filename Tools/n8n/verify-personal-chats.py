@@ -49,10 +49,33 @@ still wired as designed».
           build-handoff-workflows.OWNER_PHONE_JS verbatim and needs the echo and the boolean flag;
       (7) crChatAudience01 is a protected infra id: build-client-webhooks.PROTECTED_IDS, staging/bootstrap.py
           ACTIVE_CANONICAL, Set Workflow State and the dependents regenerated from the list.
+  decide — Task 3: the bots' Decide Audience sub-workflow crAudienceDec001 (build-decide-audience.py; behaviour in
+      tests/test_decide_audience.py):
+      (1) the workflow IS the generator's output, with exactly its nodes, none disabled; successful executions not saved;
+      (2) the Execute Workflow trigger declares exactly the nine inputs with their types — no contactName (the webhook's
+          contact_name is no contact fact: Wappi fills it from the person's own profile name too);
+      (3) every edge is the designed one, so every way out ends in Shape, the last node (n8n hands the caller its items); a
+          stop of Can Decide? reaches no Wappi call and no write; each statement is entered from its own gate alone —
+          Ensure Connection only without a moment, Write Decision only through Persist?, Backfill only through Became
+          Business?;
+      (4) every If judges a positive field (a number, go, needCard, needHistory, persist, the written row's kind) — never
+          «the node continued»;
+      (5) the two Wappi reads only (Chat Card, Recent Messages): GET, the canonical WappiAuthToken credential, fullResponse
+          + neverError, at most 10 s, continue on error, the Wappi bases; Telegram's card = chats/get limit 20 / offset 0 /
+          order desc, WhatsApp's = chats/filter by client_name; the history = this chat's newest page of
+          audience.RECENT_LIMIT rows; mark_all nowhere, order asc nowhere (Telegram's tapi ignores asc);
+      (6) Plan Facts, Read Card and Decide embed audience.RULE_JS verbatim; no Code node reads contact_name; Plan Facts
+          stops for audience.SETTLE_MINUTES and asks no card for an @lid chat; Read Card takes the dialog whose id IS the
+          chat id and the WhatsApp contact from contact.FullName; Decide reads the history off the one page (its trigger,
+          its code, the full-page rule) and hands it on unsorted; Shape answers business only on the written row;
+      (7) exactly three Postgres nodes, each carrying audience.py's statement exactly, continuing on error;
+      (8) crAudienceDec001 is a protected infra id everywhere (PROTECTED_IDS, ACTIVE_CANONICAL before the staging-only eval
+          runner, Set Workflow State, the dependents regenerated from the list).
 
 Every group carries its own tripwire (WIPE_MUTATIONS for `wipe`, READER_MUTATIONS for `readers`, WEBHOOK_MUTATIONS for
-`webhook`): a list of (label, mutation, the message the checks must produce); a normal run applies each one to a copy of a
-PASSING workflow and fails if the checks accept it — a tripwire that accepts a broken sweep is no tripwire.
+`webhook`, DECIDE_MUTATIONS for `decide`): a list of (label, mutation, the message the checks must produce); a normal run
+applies each one to a copy of a PASSING workflow and fails if the checks accept it — a tripwire that accepts a broken sweep
+is no tripwire.
 
     python3 Tools/n8n/verify-personal-chats.py                 # every group
     python3 Tools/n8n/verify-personal-chats.py --only wipe     # one group
@@ -871,7 +894,395 @@ def group_webhook(directory):
                    f"{len(WEBHOOK_MUTATIONS)} mutations rejected")
 
 
-GROUPS = {"wipe": group_wipe, "readers": group_readers, "webhook": group_webhook}
+# ================================================================================================ group: decide
+# Task 3: the bots' Decide Audience sub-workflow crAudienceDec001 (build-decide-audience.py). Behaviour:
+# tests/test_decide_audience.py.
+DEC = _module("build_decide_audience", "build-decide-audience.py")
+DECIDE_FILE = DEC.WF_FILE
+DECIDE_TRIGGER = "When Executed by Another Workflow"
+# Written here on their own — not read from the generator that wrote the workflow.
+DECIDE_INPUTS = [{"name": "channel", "type": "string"}, {"name": "profileId", "type": "string"},
+                 {"name": "chatId", "type": "string"}, {"name": "chatLid", "type": "string"},
+                 {"name": "messageId", "type": "string"}, {"name": "chatType", "type": "string"},
+                 {"name": "isBot", "type": "boolean"}, {"name": "connectedAtMs", "type": "number"},
+                 {"name": "connectionPhone", "type": "string"}]
+DECIDE_NODES = (DECIDE_TRIGGER, "Has Connection?", "Ensure Connection", "Plan Facts", "Can Decide?", "Need Card?", "Chat Card",
+                "Read Card", "Need History?", "Recent Messages", "Decide", "Persist?", "Write Decision", "Became Business?",
+                "Backfill", "Shape")
+# Every edge (source, output, target): every way out of the graph ends in Shape, and nothing else is wired.
+DECIDE_EDGES = sorted([
+    (DECIDE_TRIGGER, 0, "Has Connection?"),
+    ("Has Connection?", 0, "Plan Facts"), ("Has Connection?", 1, "Ensure Connection"), ("Ensure Connection", 0, "Plan Facts"),
+    ("Plan Facts", 0, "Can Decide?"), ("Can Decide?", 0, "Need Card?"), ("Can Decide?", 1, "Shape"),
+    ("Need Card?", 0, "Chat Card"), ("Need Card?", 1, "Need History?"), ("Chat Card", 0, "Read Card"),
+    ("Read Card", 0, "Need History?"), ("Need History?", 0, "Recent Messages"), ("Need History?", 1, "Decide"),
+    ("Recent Messages", 0, "Decide"), ("Decide", 0, "Persist?"), ("Persist?", 0, "Write Decision"), ("Persist?", 1, "Shape"),
+    ("Write Decision", 0, "Became Business?"), ("Became Business?", 0, "Backfill"), ("Became Business?", 1, "Shape"),
+    ("Backfill", 0, "Shape")])
+DECIDE_CONDITIONS = {
+    "Has Connection?": "={{ typeof $json.connectedAtMs === 'number' && Number.isSafeInteger($json.connectedAtMs) "
+                       "&& $json.connectedAtMs > 0 }}",
+    "Can Decide?": "={{ $json.go === true }}",
+    "Need Card?": "={{ $json.needCard === true }}",
+    "Need History?": "={{ $json.needHistory === true }}",
+    "Persist?": "={{ $json.persist === true }}",
+    "Became Business?": "={{ $json.kind === 'business' }}",
+}
+DECIDE_STATEMENTS = {
+    "Ensure Connection": ("audience.ENSURE_CONNECTION_SQL", AUD.ENSURE_CONNECTION_SQL, "={{ [ $json.profileId ] }}",
+                          ("Has Connection?", 1)),
+    "Write Decision": ("audience.DECIDE_WRITE_SQL", AUD.DECIDE_WRITE_SQL,
+                       "={{ [ $json.profileId, $json.chatId, $json.kind, $json.reason ] }}", ("Persist?", 0)),
+    "Backfill": ("audience.BACKFILL_SQL", AUD.BACKFILL_SQL(DEC.AHH.MEMORY_ROW, DEC.AHH.OWNER_CONTENT_SQL),
+                 "={{ [ $('Decide').first().json.profileId, $('Decide').first().json.chatId, "
+                 "$('Decide').first().json.messageId, JSON.stringify($('Decide').first().json.page) ] }}",
+                 ("Became Business?", 0)),
+}
+DECIDE_READS = {"Chat Card": ("https://wappi.pro/tapi/sync/chats/get", "https://wappi.pro/api/sync/chats/filter"),
+                "Recent Messages": ("sync/messages/get",)}
+RULE_CARRIERS = ("Plan Facts", "Read Card", "Decide")
+
+
+def _edges(wf):
+    return sorted((s, i, e.get("node")) for s, c in wf["connections"].items() for i, out in enumerate((c or {}).get("main") or [])
+                  for e in (out or []))
+
+
+def _js_code(js):
+    """A Code body without its `//` comments (they explain; the code decides — the comments name contact_name on purpose)."""
+    return "\n".join(re.sub(r"(^|\s)//.*$", "", line) for line in (js or "").split("\n"))
+
+
+def check_decide(bundle, sql=None):
+    """Findings for the Decide Audience sub-workflow. `bundle` = {file name: workflow, PROTECTED_KEY: ids, ACTIVE_KEY: ids};
+    `sql` is unused (the self-check's signature)."""
+    fails = []
+
+    def need(cond, msg):
+        if not cond:
+            fails.append(msg)
+        return cond
+
+    wf = bundle.get(DECIDE_FILE) or {"nodes": [], "connections": {}}
+    N = {n.get("name"): n for n in wf.get("nodes", [])}
+    P = {k: (N[k].get("parameters") or {}) for k in N}
+    flat = json.dumps(wf, ensure_ascii=False)
+
+    # (7) first — it must be said even when the node set changed: three statements, each entered from its own gate alone
+    pg = sorted(k for k, n in N.items() if n.get("type") == "n8n-nodes-base.postgres")
+    need(pg == sorted(DECIDE_STATEMENTS),
+         f"Decide Audience must hold exactly three Postgres nodes (Ensure Connection, Write Decision, Backfill) — each costs "
+         f"≈ 1.9 s on the first message of a chat: {pg}")
+    # (1) the generator's output, exactly its nodes, none disabled, successful executions not saved
+    need(json.dumps(wf, indent=2, ensure_ascii=False) + "\n" == DEC.text(),
+         f"{DECIDE_FILE} differs from build-decide-audience.py's output — edit the generator, never the JSON")
+    need((wf.get("settings") or {}).get("saveDataSuccessExecution") == "none" and (wf.get("settings") or {}).get("executionOrder") == "v1",
+         "settings.saveDataSuccessExecution must be 'none' (a successful execution must not keep the chat list and the page it "
+         "read) and executionOrder v1")
+    if not need(sorted(N) == sorted(DECIDE_NODES), f"the node set changed: {sorted(N)}"):
+        return fails
+    for name, n in N.items():
+        need(not n.get("disabled"), f"{name} is disabled — n8n hands a disabled node's input on untouched")
+
+    # (2) the trigger and its nine inputs
+    t, tp = N[DECIDE_TRIGGER], P[DECIDE_TRIGGER]
+    values = ((tp.get("workflowInputs") or {}).get("values")) or []
+    need(t.get("type") == "n8n-nodes-base.executeWorkflowTrigger" and t.get("typeVersion", 0) >= 1.1
+         and tp.get("inputSource") == "workflowInputs" and values == DECIDE_INPUTS,
+         f"the trigger must declare exactly the nine inputs {[v['name'] for v in DECIDE_INPUTS]} with their types: {values}")
+    need(not any((v.get("name") or "").lower() in ("contactname", "contact_name") for v in values),
+         "no contactName input: the webhook's contact_name is no contact fact — Wappi fills it from the person's own profile "
+         "name too, so a stranger would read as a saved contact")
+
+    # (3) the graph: every edge, and the gates that keep calls and writes behind them
+    need(_edges(wf) == DECIDE_EDGES, f"the graph changed — every way out must end in Shape: {_edges(wf)}")
+    need(not ((wf["connections"].get("Shape") or {}).get("main") or [[]])[0],
+         "Shape must be terminal: n8n hands the calling template the LAST node's items")
+    reach = reachable(wf, DECIDE_TRIGGER, cut=("Can Decide?", 0))
+    need(not reach & {"Chat Card", "Recent Messages", "Write Decision", "Backfill"},
+         f"Can Decide?: a stop (malformed input, no moment, the settling window) reaches a Wappi call or a write: {sorted(reach)}")
+    for name, (label, text, params, gate) in DECIDE_STATEMENTS.items():
+        need(sources(wf, name) == [gate], f"{name} must be entered from {gate[0]} output {gate[1]} alone: {sources(wf, name)}")
+        need(name not in reachable(wf, DECIDE_TRIGGER, cut=gate),
+             f"{name} is reachable with {gate[0]} output {gate[1]} cut — it must run only behind that gate")
+
+    # (4) the Ifs judge positive fields
+    for name, expr in DECIDE_CONDITIONS.items():
+        conds = ((P[name].get("conditions") or {}).get("conditions")) or []
+        op = (conds[0].get("operator") or {}) if len(conds) == 1 else {}
+        need(len(conds) == 1 and conds[0].get("leftValue") == expr and op.get("type") == "boolean" and op.get("operation") == "true",
+             f"{name} must judge a positive field — exactly {expr}, never «the node continued»: {conds}")
+
+    # (5) the Wappi reads
+    https = sorted(k for k, n in N.items() if n.get("type") == "n8n-nodes-base.httpRequest")
+    need(https == sorted(DECIDE_READS), f"the only HTTP nodes must be the two Wappi reads: {https}")
+    for name, paths in DECIDE_READS.items():
+        n, p = N[name], P[name]
+        resp = ((p.get("options") or {}).get("response") or {}).get("response") or {}
+        timeout = (p.get("options") or {}).get("timeout")
+        need(n.get("type") == "n8n-nodes-base.httpRequest" and p.get("method") == "GET" and n.get("credentials") == WAPPI_CRED
+             and resp.get("fullResponse") is True and resp.get("neverError") is True
+             and isinstance(timeout, int) and 0 < timeout <= 10000 and n.get("onError") == "continueRegularOutput"
+             and n.get("alwaysOutputData") is True and _hosts(p.get("url"))
+             and all(any(h.startswith(b) for b in WAPPI_BASES) for h in _hosts(p.get("url")))
+             and all(x in (p.get("url") or "") for x in paths),
+             f"{name} must be a Wappi read: GET, the canonical WappiAuthToken credential, fullResponse + neverError, at most "
+             f"10 s, continue on error, only the Wappi bases ({', '.join(paths)})")
+        need(not re.search(r"\basc\b", json.dumps(p, ensure_ascii=False), re.I),
+             f"{name} asks order asc — never: Telegram's tapi ignores asc (it re-sorts the newest page), so the oldest message "
+             f"would be the incoming one and an old acquaintance would look new")
+    need("mark_all" not in flat.lower(), "mark_all must appear nowhere in Decide Audience — reading a chat must never mark it read")
+    card = P["Chat Card"].get("jsonQuery", "")
+    need("{ profile_id: $json.profileId, limit: 20, offset: 0, order: 'desc' }" in card,
+         "Chat Card on Telegram must read the first page of chats/get: limit 20, offset 0, order desc")
+    need("{ profile_id: $json.profileId, client_name: $json.clientName }" in card,
+         "Chat Card on WhatsApp must filter chats/filter by client_name — the digits of the chat id (Plan Facts' clientName)")
+    rq = P["Recent Messages"].get("jsonQuery", "")
+    need(f"chat_id: $json.chatId, limit: {AUD.RECENT_LIMIT}, order: 'desc'" in rq,
+         f"Recent Messages must read THIS chat's newest page: limit audience.RECENT_LIMIT ({AUD.RECENT_LIMIT}), order desc")
+
+    # (6) the Code nodes: the rule verbatim, the window, the card, the page, the answer
+    for name in RULE_CARRIERS:
+        need(P[name].get("jsCode", "").count(AUD.RULE_JS) == 1, f"{name} must embed audience.RULE_JS verbatim, once")
+    for name in RULE_CARRIERS + ("Shape",):
+        code = _js_code(P[name].get("jsCode", ""))
+        need("contact_name" not in code and "contactName" not in code,
+             f"{name} reads the webhook's contact_name — the WhatsApp contact is the chat card's contact.FullName only")
+    pf = P["Plan Facts"].get("jsCode", "")
+    need(f"const SETTLE_MINUTES = {AUD.SETTLE_MINUTES};" in pf and "if (Date.now() < plan.connectedAtMs + SETTLE_MINUTES * 60000) {" in pf,
+         f"Plan Facts must stop for audience.SETTLE_MINUTES ({AUD.SETTLE_MINUTES}) after the connection moment")
+    need("if ($('Ensure Connection').isExecuted) {" in pf and "$('When Executed by Another Workflow').first().json" in pf,
+         "Plan Facts must take the moment from the input, or from Ensure Connection only when it ran (isExecuted)")
+    need("const LID_SUFFIX = \"@lid\";" in pf and "} else if (chatId.endsWith(LID_SUFFIX)) {" in pf
+         and "plan.facts = Object.assign({}, given, { contact: false });" in pf,
+         "Plan Facts must ask no card for a chat known only by its @lid code — its contact is false, its history decides")
+    need("digits(chatId.split('@')[0]) === own" in pf and "plan.clientName = digits(chatId.split('@')[0]);" in pf,
+         "Plan Facts must know WhatsApp's chat with oneself by the digits of the connected number, and filter the card by the "
+         "digits of the chat id")
+    rc = P["Read Card"].get("jsCode", "")
+    need("idOf(d) === plan.chatId" in rc and "body.uuid !== plan.profileId" in rc and "body.status === 'done'" in rc,
+         "Read Card must take the dialog whose id IS the chat id (the filter matches names and last messages too) of a page "
+         "that is this profile's")
+    need("typeof contact.FullName === 'string' && contact.FullName.trim() !== ''" in rc,
+         "Read Card's WhatsApp contact must be contact.FullName — a name from the phone's address book")
+    dj = P["Decide"].get("jsCode", "")
+    need(f"const RECENT_LIMIT = {AUD.RECENT_LIMIT};" in dj and "String(m.id) === plan.messageId" in dj
+         and "time(m) * 1000 < plan.connectedAtMs" in dj and "facts.history = rows.length < RECENT_LIMIT ? false : null;" in dj
+         and "!(plan.chatLid !== '' && m.chatId === plan.chatLid)" in dj and "body.uuid !== plan.profileId" in dj
+         and "rows.every(ours)" in dj and "persist: verdict.reason !== 'unknown'" in dj and "page = rows;" in dj,
+         "Decide must read the history off the one page: this profile's and this chat's (its code counts), holding the trigger, "
+         "a row older than the connection → true, a short page → false, a full one of new rows → unknown; persist only a known "
+         "reason; hand the page on as Wappi returned it")
+    sh = P["Shape"].get("jsCode", "")
+    need("const row = $('Write Decision').first().json || {};" in sh and "if (row.kind === 'business') return done('business', 'business');" in sh
+         and sh.count("done('business'") == 1,
+         "Shape must answer business ONLY on the row Write Decision returned saying business")
+
+    # (7) the statements
+    for name, (label, text, params, gate) in DECIDE_STATEMENTS.items():
+        n = N[name]
+        need(P[name].get("operation") == "executeQuery" and P[name].get("query") == text,
+             f"{name}'s query differs from {label} — edit the module, never the JSON")
+        need((P[name].get("options") or {}).get("queryReplacement") == params, f"{name}'s parameters must be exactly {params}")
+        need(n.get("onError") == "continueRegularOutput" and n.get("alwaysOutputData") is True and n.get("credentials") == CANONICAL_PG,
+             f"{name} must continue on error with output on the canonical Postgres credential — Shape judges the rows")
+
+    # (8) protected everywhere
+    need(DEC.WF_ID in (bundle.get(PROTECTED_KEY) or []), f"{DEC.WF_ID} is missing from build-client-webhooks.PROTECTED_IDS (protected)")
+    active = bundle.get(ACTIVE_KEY) or []
+    need(DEC.WF_ID in active and "stgEvalRunner001" in active and active.index(DEC.WF_ID) < active.index("stgEvalRunner001"),
+         f"{DEC.WF_ID} is missing from staging/bootstrap.py ACTIVE_CANONICAL (before the staging-only eval runner)")
+    for fname, holders in PROTECTED_DEPENDENTS.items():
+        dep = bundle.get(fname) or {"nodes": []}
+        for h in holders:
+            p = (node(dep, h) or {}).get("parameters") or {}
+            need(f"'{DEC.WF_ID}'" in (p.get("query") or p.get("jsCode") or ""),
+                 f"{fname} / {h} does not carry {DEC.WF_ID} in its protected list — regenerate it from build-client-webhooks.PROTECTED_IDS")
+    return fails
+
+
+def _dec(name, key, old, new):
+    """Replace `old` by `new` in one text parameter of one Decide Audience node (the anchor must be there)."""
+    def m(bundle):
+        p = node(bundle[DECIDE_FILE], name)["parameters"]
+        target = p["options"] if key == "queryReplacement" else p
+        assert old in target[key], f"mutation anchor not found in {name}.{key}: {old[:70]!r}"
+        target[key] = target[key].replace(old, new, 1)
+    return m
+
+
+def _dec_cond(name, expr):
+    def m(bundle):
+        node(bundle[DECIDE_FILE], name)["parameters"]["conditions"]["conditions"][0]["leftValue"] = expr
+    return m
+
+
+def _dec_node(name, key, value):
+    def m(bundle):
+        n = node(bundle[DECIDE_FILE], name)
+        if value is None:
+            n.pop(key)
+        else:
+            n[key] = copy.deepcopy(value)
+    return m
+
+
+def _dec_response(name, key):
+    def m(bundle):
+        node(bundle[DECIDE_FILE], name)["parameters"]["options"]["response"]["response"].pop(key)
+    return m
+
+
+def _dec_rewire(src, out_index, dsts):
+    def m(bundle):
+        outs = bundle[DECIDE_FILE]["connections"].setdefault(src, {"main": []})["main"]
+        while len(outs) <= out_index:
+            outs.append([])
+        outs[out_index] = [{"node": d, "type": "main", "index": 0} for d in dsts]
+    return m
+
+
+def _dec_extra_postgres(bundle):
+    wf = bundle[DECIDE_FILE]
+    extra = copy.deepcopy(node(wf, "Write Decision"))
+    extra.update(name="Read Decision Again", id="00000000-0000-0000-0000-00000000dec1", position=[2420, 600])
+    wf["nodes"].append(extra)
+    wf["connections"]["Decide"] = {"main": [[{"node": "Read Decision Again", "type": "main", "index": 0}]]}
+    wf["connections"]["Read Decision Again"] = {"main": [[{"node": "Persist?", "type": "main", "index": 0}]]}
+
+
+def _dec_input(value):
+    def m(bundle):
+        node(bundle[DECIDE_FILE], DECIDE_TRIGGER)["parameters"]["workflowInputs"]["values"].append(copy.deepcopy(value))
+    return m
+
+
+def _dec_drop_id(key):
+    def m(bundle):
+        assert DEC.WF_ID in bundle[key]
+        bundle[key] = [x for x in bundle[key] if x != DEC.WF_ID]
+    return m
+
+
+def _dec_unprotect(fname, holder):
+    def m(bundle):
+        p = node(bundle[fname], holder)["parameters"]
+        k = "query" if "query" in p else "jsCode"
+        assert f"'{DEC.WF_ID}'" in p[k], f"{fname} / {holder} carries no {DEC.WF_ID}"
+        p[k] = p[k].replace(f"'{DEC.WF_ID}', ", "").replace(f",\n  '{DEC.WF_ID}'", "").replace(f", '{DEC.WF_ID}'", "")
+    return m
+
+
+_RULE_EDIT = ("if (f.contact) return personal('contact');", "if (f.contact === 'yes') return personal('contact');")
+DECIDE_MUTATIONS = (
+    ("the card read without neverError", _dec_response("Chat Card", "neverError"), "Chat Card must be a Wappi read"),
+    ("the history read without neverError", _dec_response("Recent Messages", "neverError"), "Recent Messages must be a Wappi read"),
+    ("the history read without fullResponse", _dec_response("Recent Messages", "fullResponse"), "Recent Messages must be a Wappi read"),
+    ("mark_all in the history URL", _dec("Recent Messages", "url", "'sync/messages/get'", "'sync/messages/get?mark_all=true'"), "mark_all"),
+    ("mark_all in the card query", _dec("Chat Card", "jsonQuery", "client_name: $json.clientName", "client_name: $json.clientName, mark_all: true"),
+     "mark_all"),
+    ("Persist? by «the node continued»", _dec_cond("Persist?", "={{ $json !== undefined }}"), "Persist? must judge a positive field"),
+    ("Became Business? by Decide's verdict", _dec_cond("Became Business?", "={{ $('Decide').first().json.kind === 'business' }}"),
+     "Became Business? must judge a positive field"),
+    ("Has Connection? lets a string moment through", _dec_cond("Has Connection?", "={{ !!$json.connectedAtMs }}"),
+     "Has Connection? must judge a positive field"),
+    ("Can Decide? by «the node continued»", _dec_cond("Can Decide?", "={{ $json.go !== false }}"), "Can Decide? must judge a positive field"),
+    ("an extra Postgres node", _dec_extra_postgres, "exactly three Postgres nodes"),
+    ("order asc in the history read", _dec("Recent Messages", "jsonQuery", "order: 'desc'", "order: 'asc'"), "Recent Messages asks order asc"),
+    ("the plan's oldest message (limit 1, asc)", _dec("Recent Messages", "jsonQuery", f"limit: {AUD.RECENT_LIMIT}, order: 'desc'",
+                                                      "limit: 1, order: 'asc'"), "Recent Messages asks order asc"),
+    ("order asc in the card read", _dec("Chat Card", "jsonQuery", "offset: 0, order: 'desc'", "offset: 0, order: 'asc'"),
+     "Chat Card asks order asc"),
+    ("a contactName input", _dec_input({"name": "contactName", "type": "string"}), "no contactName input"),
+    ("a tenth input", _dec_input({"name": "senderName", "type": "string"}), "exactly the nine inputs"),
+    ("isBot declared as a string", lambda b: node(b[DECIDE_FILE], DECIDE_TRIGGER)["parameters"]["workflowInputs"]["values"][6].__setitem__(
+        "type", "string"), "exactly the nine inputs"),
+    ("the WhatsApp card without client_name", _dec("Chat Card", "jsonQuery", ", client_name: $json.clientName", ""), "filter chats/filter by client_name"),
+    ("the Telegram card on another page", _dec("Chat Card", "jsonQuery", "limit: 20, offset: 0", "limit: 50, offset: 0"),
+     "first page of chats/get"),
+    ("the history page shrunk", _dec("Recent Messages", "jsonQuery", f"limit: {AUD.RECENT_LIMIT},", "limit: 5,"),
+     "limit audience.RECENT_LIMIT"),
+    ("the history read of another chat", _dec("Recent Messages", "jsonQuery", "chat_id: $json.chatId", "chat_id: $json.chatLid"),
+     "limit audience.RECENT_LIMIT"),
+    ("the card read waits 30 s", lambda b: node(b[DECIDE_FILE], "Chat Card")["parameters"]["options"].__setitem__("timeout", 30000),
+     "Chat Card must be a Wappi read"),
+    ("the history read on another credential", _dec_node("Recent Messages", "credentials", {"httpHeaderAuth": {"id": "dev0000000000000",
+                                                                                                        "name": "Wappi Dev"}}),
+     "Recent Messages must be a Wappi read"),
+    ("the card read on another host", _dec("Chat Card", "url", "https://wappi.pro/api/", "https://wappi.example/api/"), "Chat Card must be a Wappi read"),
+    ("Decide's rule edited", _dec("Decide", "jsCode", *_RULE_EDIT), "Decide must embed audience.RULE_JS"),
+    ("Plan Facts' rule edited", _dec("Plan Facts", "jsCode", *_RULE_EDIT), "Plan Facts must embed audience.RULE_JS"),
+    ("Read Card's rule edited", _dec("Read Card", "jsCode", *_RULE_EDIT), "Read Card must embed audience.RULE_JS"),
+    ("Read Card reads the webhook's contact_name", _dec("Read Card", "jsCode", "const facts = Object.assign({}, plan.facts);",
+                                                       "const facts = Object.assign({}, plan.facts, { contact: !!plan.contact_name });"),
+     "Read Card reads the webhook's contact_name"),
+    ("Read Card takes the push name for a contact", _dec("Read Card", "jsCode", "typeof contact.FullName === 'string' && contact.FullName.trim()",
+                                                        "typeof contact.PushName === 'string' && contact.PushName.trim()"),
+     "contact.FullName"),
+    ("Read Card takes the first dialog", _dec("Read Card", "jsCode", "idOf(d) === plan.chatId", "idOf(d) !== ''"),
+     "the dialog whose id IS the chat id"),
+    ("the settling window shortened", _dec("Plan Facts", "jsCode", f"const SETTLE_MINUTES = {AUD.SETTLE_MINUTES};", "const SETTLE_MINUTES = 5;"),
+     "Plan Facts must stop for audience.SETTLE_MINUTES"),
+    ("Plan Facts asks a card for a code", _dec("Plan Facts", "jsCode", "} else if (chatId.endsWith(LID_SUFFIX)) {",
+                                               "} else if (chatId.endsWith('@nothing')) {"), "no card for a chat known only by its @lid code"),
+    ("Decide counts a page without the trigger", _dec("Decide", "jsCode", "String(m.id) === plan.messageId", "true"),
+     "Decide must read the history off the one page"),
+    ("Decide calls a full page of new rows the whole chat",
+     _dec("Decide", "jsCode", "facts.history = rows.length < RECENT_LIMIT ? false : null;", "facts.history = false;"),
+     "Decide must read the history off the one page"),
+    ("Decide counts rows of any chat", _dec("Decide", "jsCode", " && rows.every(ours)", ""), "Decide must read the history off the one page"),
+    ("Decide sorts the page before the backfill", _dec("Decide", "jsCode", "page = rows;", "page = rows.slice().reverse();"),
+     "Decide must read the history off the one page"),
+    ("Decide writes an unknown", _dec("Decide", "jsCode", "persist: verdict.reason !== 'unknown'", "persist: true"),
+     "Decide must read the history off the one page"),
+    ("Shape says business on Decide's verdict", _dec("Shape", "jsCode", "const row = $('Write Decision').first().json || {};",
+                                                     "const row = $('Decide').first().json || {};"), "Shape must answer business ONLY"),
+    ("Write Decision edited by hand", _dec("Write Decision", "query", "'default', $4, now(), now()", "'owner', $4, now(), now()"),
+     "differs from audience.DECIDE_WRITE_SQL"),
+    ("Backfill handed a second read's page", _dec("Backfill", "queryReplacement", "JSON.stringify($('Decide').first().json.page)",
+                                                  "JSON.stringify($json.messages)"), "Backfill's parameters must be exactly"),
+    ("Write Decision fails closed", _dec_node("Write Decision", "onError", None), "Write Decision must continue on error"),
+    ("Ensure Connection on the true branch", lambda b: (_dec_rewire("Has Connection?", 0, ["Ensure Connection"])(b),
+                                                        _dec_rewire("Has Connection?", 1, ["Plan Facts"])(b)),
+     "Ensure Connection must be entered from Has Connection? output 1 alone"),
+    ("Write Decision reachable without Persist?", _dec_rewire("Decide", 0, ["Persist?", "Write Decision"]),
+     "Write Decision must be entered from Persist? output 0 alone"),
+    ("Backfill without Became Business?", _dec_rewire("Write Decision", 0, ["Became Business?", "Backfill"]),
+     "Backfill must be entered from Became Business? output 0 alone"),
+    ("a stop through the card", _dec_rewire("Can Decide?", 1, ["Need Card?"]), "a stop (malformed input"),
+    ("Shape not the last node", _dec_rewire("Shape", 0, ["Has Connection?"]), "Shape must be terminal"),
+    ("successful executions saved", lambda b: b[DECIDE_FILE]["settings"].__setitem__("saveDataSuccessExecution", "all"), "saveDataSuccessExecution"),
+    ("Decide disabled", _dec_node("Decide", "disabled", True), "Decide is disabled"),
+    ("the node moved by hand", lambda b: node(b[DECIDE_FILE], "Shape").__setitem__("position", [0, 0]),
+     "differs from build-decide-audience.py's output"),
+    ("dropped from PROTECTED_IDS", _dec_drop_id(PROTECTED_KEY), "missing from build-client-webhooks.PROTECTED_IDS"),
+    ("dropped from ACTIVE_CANONICAL", _dec_drop_id(ACTIVE_KEY), "missing from staging/bootstrap.py ACTIVE_CANONICAL"),
+    ("Set Workflow State no longer protects it", _dec_unprotect(SET_STATE_FILE, "Validate"), f"{SET_STATE_FILE} / Validate does not carry"),
+    ("Create WA's clone plan no longer spares it", _dec_unprotect("XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json", "Clone Plan"),
+     "XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json / Clone Plan does not carry"),
+)
+
+
+def group_decide(directory):
+    bundle = {}
+    for fname in (DECIDE_FILE,) + tuple(PROTECTED_DEPENDENTS):
+        path = os.path.join(directory, fname)
+        if not os.path.exists(path):
+            return [f"{fname} is missing"], ""
+        with open(path, encoding="utf-8") as fh:
+            bundle[fname] = json.load(fh)
+    bundle[PROTECTED_KEY] = list(BCW.PROTECTED_IDS)
+    bundle[ACTIVE_KEY] = list(BOOT.ACTIVE_CANONICAL)
+    fails = check_decide(bundle)
+    if not fails:
+        fails = self_check(bundle, check_decide, DECIDE_MUTATIONS)
+    return fails, (f"decide: {DEC.WF_ID} = build-decide-audience.py's output — nine inputs (no contactName), every edge ending in "
+                   f"Shape, positive-field gates, three statements of audience.py each behind its gate, two Wappi reads "
+                   f"(neverError, 10 s, never mark_all, never asc), RULE_JS verbatim, business only on the written row, "
+                   f"protected everywhere; tripwire self-check: {len(DECIDE_MUTATIONS)} mutations rejected")
+
+
+GROUPS = {"wipe": group_wipe, "readers": group_readers, "webhook": group_webhook, "decide": group_decide}
 
 
 def run(directory=None, only=None):
