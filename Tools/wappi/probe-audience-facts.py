@@ -117,6 +117,28 @@ def keys_of(obj):
     return ",".join(sorted(shape(k) if re.search(r"\d", k) else k for k in obj)) if isinstance(obj, dict) else "<not an object>"
 
 
+def id_forms(obj):
+    """Which fields of an object hold an id-like value (a jid or a long digit run) and in what format — never the value."""
+    if not isinstance(obj, dict):
+        return "-"
+    parts = []
+    for key, value in sorted(obj.items()):
+        if isinstance(value, bool) or not isinstance(value, (str, int)):
+            continue
+        if re.fullmatch(r"[\w.+-]*@[\w.]+|\d{5,}", str(value)):
+            parts.append(f"{shape(key) if re.search(r'[0-9]', key) else key}={fmt_id(value)}")
+    return ",".join(parts) or "none"
+
+
+def digit_count(obj, key):
+    """yes/empty/- like filled(), but a filled value is told by its digit count (11d) — never the digits."""
+    value = obj.get(key) if isinstance(obj, dict) else None
+    if value is None or value == "":
+        return filled(obj, key)
+    digits = re.sub(r"[^0-9]", "", str(value))
+    return f"{len(digits)}d"
+
+
 def handle(chat_id):
     return hmac.new(salt(), str(chat_id).encode("utf-8"), hashlib.sha256).hexdigest()[:6]
 
@@ -184,7 +206,8 @@ def describe_wa_dialog(dialog, at):
             f"  contact.PushName={filled(contact, 'PushName')}"
             f"  name={filled(dialog, 'name')}  deleted={flag(dialog.get('isDeleted'))}"
             f"  blacklist={flag(dialog.get('is_blacklist'))}  unread={dialog.get('unread_count', '?')}"
-            f"  last={rel(first_time(dialog), at)}")
+            f"  last={rel(first_time(dialog), at)}  chat.ids={id_forms(dialog.get('chat'))}"
+            f"  contact.ids={id_forms(contact)}")
 
 
 def describe_tg_dialog(dialog, at):
@@ -203,7 +226,8 @@ def describe_message(message, reference, unit="min"):
     same = "?" if sender is None or chat is None else ("1" if str(sender) == str(chat) else "0")
     return (f"t={rel(first_time(message), reference, unit)}  type={cat(message.get('type'))}"
             f"  fromMe={flag(message.get('fromMe'))}  from==chatId={same}  from={fmt_id(sender)}"
-            f"  chatId={fmt_id(chat)}  contact_name={filled(message, 'contact_name')}"
+            f"  chatId={fmt_id(chat)}  to={fmt_id(message.get('to'))}  phone={digit_count(message, 'phone')}"
+            f"  contact_name={filled(message, 'contact_name')}"
             f"  senderName={filled(message, 'senderName')}  chat_type={cat(message.get('chat_type'))}"
             f"  is_bot={cat(message.get('is_bot'))}  wh_type={cat(message.get('wh_type'))}")
 
@@ -391,6 +415,17 @@ def cmd_chat(args):
     if oldest and page and first_time(oldest[0]) is not None and known:
         emit(f"order=asc honoured (oldest not newer than the page's last row)="
              f"{'1' if first_time(oldest[0]) <= min(known) else '0'}")
+    # The chat list may name a chat by its number while its messages carry another id (an @lid): does the
+    # card request the server would build from the MESSAGE's chatId still find the chat?
+    others = sorted({str(m.get("chatId")) for m in oldest + page if m.get("chatId") and str(m.get("chatId")) != str(chat_id)})
+    for other in others[:1]:
+        other_path, other_params = card_request(args.ch, other)
+        _, other_payload = wappi(args.ch, other_path, {"profile_id": args.profile, **other_params})
+        other_rows = rows_of(other_payload)
+        hit = next((d for d in other_rows
+                    if str(d.get("id") or d.get("chatId") or d.get("chat_id")) in (str(chat_id), other)), None)
+        emit(f"card (by the messages' chatId {fmt_id(other)}): {len(other_rows)} dialog(s), this chat found="
+             f"{'1' if hit else '0'}{' as ' + fmt_id(hit.get('id')) if hit else ''}")
 
 
 def n8n_key(args):
@@ -444,6 +479,7 @@ def cmd_journal(args):
         return
     executions = (payload or {}).get("data") or []
     emit(f"{len(executions)} execution(s), newest first")
+    listing = {}
     at = now()
     for execution in executions:
         started = to_epoch(execution.get("startedAt"))
@@ -455,6 +491,43 @@ def cmd_journal(args):
             for message in webhook_messages(body):
                 emit(f"  {describe_message(message, started, 's')}")
                 emit(f"    message keys: {keys_of(message)}")
+                emit(f"    whatsapp_chat_id={fmt_id(message.get('whatsapp_chat_id'))}"
+                     f"  contact_phone={digit_count(message, 'contact_phone')}  is_me={flag(message.get('is_me'))}"
+                     f"  contact_username={filled(message, 'contact_username')}  platform={cat(message.get('platform'))}"
+                     f"  from_where={cat(message.get('from_where'))}"
+                     f"  contact_name==senderName={same_value(message.get('contact_name'), message.get('senderName'))}")
+                if args.profile:
+                    emit(f"    chatId {handle(message.get('chatId'))}: {list_match(args, message.get('chatId'), listing)}")
+                    card = listing.get("dialogs_by_id", {}).get(str(message.get("chatId")))
+                    if card is not None:
+                        book = (card.get("contact") or {}).get("FullName") if isinstance(card.get("contact"), dict) else None
+                        emit(f"    card contact.FullName={filled(card.get('contact'), 'FullName')}"
+                             f"  contact_name==card.FullName={same_value(message.get('contact_name'), book)}")
+
+
+def same_value(left, right):
+    """1 / 0 when both are non-empty strings, '-' otherwise — a comparison, never the values."""
+    if not isinstance(left, str) or not isinstance(right, str) or not left or not right:
+        return "-"
+    return "1" if left.strip() == right.strip() else "0"
+
+
+def list_match(args, chat_id, cache):
+    """Where the webhook's chatId sits in the chat list: the same id, or a row whose chat.LID is that id."""
+    if not chat_id:
+        return "no chatId"
+    if "rows" not in cache:
+        _, payload = chat_rows(args.ch, args.profile, "filter")
+        cache["rows"] = rows_of(payload)
+        cache["dialogs_by_id"] = {str(d.get("id")): d for d in cache["rows"] if d.get("id")}
+    for dialog in cache["rows"]:
+        list_id = dialog.get("id") or dialog.get("chatId") or dialog.get("chat_id")
+        lid = (dialog.get("chat") or {}).get("LID") if isinstance(dialog.get("chat"), dict) else None
+        if str(list_id) == str(chat_id):
+            return f"in the list as {handle(list_id)} (the same id)"
+        if lid and str(lid) == str(chat_id):
+            return f"in the list as {handle(list_id)} via chat.LID (list id {fmt_id(list_id)})"
+    return f"not in the list ({len(cache['rows'])} rows read)"
 
 
 # ---- selftest ----
@@ -467,7 +540,8 @@ def cmd_selftest(_args):
     _salt = b"selftest-key"
     _emit_sink = []
     wa_dialog = {"id": "77012345678@c.us", "contact": {"FullName": "Сауле Темирова", "PushName": "Secret"},
-                 "name": "Сауле", "isDeleted": False, "unread_count": 2, "last_timestamp": 1761400000}
+                 "name": "Сауле", "isDeleted": False, "unread_count": 2, "last_timestamp": 1761400000,
+                 "chat": {"id": "77012345678@c.us", "lid": "123456789012345@lid", "name": "Сауле"}}
     wa_group = {"id": "120363012345678@g.us", "name": "Семья Петров", "isDeleted": False}
     wa_lid = {"id": "123456789012345@lid", "contact": {"FullName": ""}}
     tg_dialog = {"id": "7701234567", "type": "user", "name": "Сауле",
@@ -477,7 +551,7 @@ def cmd_selftest(_args):
     message = {"id": "ABCD1234", "type": "chat", "body": "СЕКРЕТНЫЙ текст", "caption": "caption-text",
                "from": "77012345678@c.us", "chatId": "77012345678@c.us", "fromMe": False,
                "contact_name": "Сауле Темирова", "senderName": "Secret", "time": 1761400100,
-               "chat_type": "dialog", "is_bot": False}
+               "chat_type": "dialog", "is_bot": False, "phone": "77012345678", "to": "77019876543@c.us"}
     tg_message = {"id": 55, "type": "text", "body": "секрет", "from": "FL00D", "chatId": "7701234567", "time": 1761400100}
     webhook = {"messages": [dict(message, wh_type="incoming_message")]}
 
@@ -505,6 +579,8 @@ def cmd_selftest(_args):
         "Telegram flags are told": "Contact=1" in output and "Support=1" in output,
         "from == chatId is told": "from==chatId=1" in output and "from==chatId=0" in output,
         "a stranger's profile name is told apart from the book name": "contact.PushName=yes" in output,
+        "the dialog's other ids are told by format": "chat.ids=id=NNNNNNNNNNN@c.us,lid=NNNNNNNNNNNNNNN@lid" in output,
+        "a message's phone is told by its digit count": "phone=11d" in output,
         "the WhatsApp card is filtered by the chat id's digits":
             card_request("wa", wa_dialog["id"]) == ("sync/chats/filter", {"client_name": "77012345678"}),
         "the Telegram card is the first chats/get page":
@@ -539,6 +615,8 @@ def main():
     owner.add_argument("--workflow", help="the bot clone's workflow id")
     owner.add_argument("--profile", help="find the bot clone by its Webhook path (= the profile id)")
     journal.add_argument("--limit", type=int, default=10)
+    journal.add_argument("--ch", choices=("wa", "tg"), default="wa",
+                         help="with --profile: the channel whose chat list the webhook chatId is matched against")
     journal.add_argument("--n8n-key-file")
     args = parser.parse_args()
     {"profiles": cmd_profiles, "status": cmd_status, "chats": cmd_chats, "chat": cmd_chat,
