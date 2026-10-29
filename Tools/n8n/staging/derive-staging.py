@@ -14,6 +14,10 @@ could reach production or a real customer:
     binding is remapped to the credential named "Postgres Staging" and the run ABORTS if that
     credential does not exist (a staging set bound to the shared prod DB is the failure mode
     this guard exists for).
+  * the bot templates and Suggest Replies keep their successful executions (SAVE_SUCCESS_ON_STAGING; prod keeps none —
+    a webhook body there carries a client's or a personal chat's text, live check D5 of the personal chats),
+    so a staging scenario can read an execution back (the agent's tool output, the panel gate's verdict); the bot clones
+    derived from a template keep them too
   * nothing writes to the real Supabase project the staging `Supabase` credential points at: the vector-store
     INSERT becomes an insert into the staging `documents` stub, Storage uploads/deletes become NoOps
     (isolate_supabase_writers) and the run ABORTS if any writer is left (retrieval stays: read-only)
@@ -54,6 +58,9 @@ RC_API = "https://api.revenuecat.com"   # A3 (2026-10-14): Verify Identity's RC 
 # this script and by deploy-canonical.py's staging derivation (A3 fix round 2, 2026-10-15: guard parity).
 FORBIDDEN_HOSTS = (CANON_HOST, WAPPI, "wappi.pro", RC_API, "api.revenuecat.com")
 TEMPLATES = {"wa": "4wYitz5ek30SVNlT-WhatsApp_Bot.json", "tg": "4VN3gsFaC2HUYmcc-Telegram_Bot.json"}
+# The canonical workflows whose staging copies keep their successful executions — the two bot templates and Suggest
+# Replies keep none on prod (saveDataSuccessExecution "none", apply-history-handoff.py / apply-suggest-v2.py).
+SAVE_SUCCESS_ON_STAGING = ("4wYitz5ek30SVNlT", "4VN3gsFaC2HUYmcc", "9PTyYcelRQI7bGDb")
 PG_STAGING_NAME = "Postgres Staging"
 # Deliberately ABSENT on staging: the Support Message relay must never reach the owner's real support
 # chat, so its Telegram credential is left dangling (the node fails, nothing is sent).
@@ -231,7 +238,17 @@ def derive_file(text):
     text = text.replace(WAPPI + "/", MOCK + "/")
     text = text.replace(RC_API + "/", MOCK + "/revenuecat/")
     text = text.replace("/activate ", "/activate")
-    return text
+    return keep_success_executions(text)
+
+
+def keep_success_executions(text):
+    """The staging copy of a SAVE_SUCCESS_ON_STAGING workflow keeps its successful executions ("all"); any other text is
+    handed back unchanged."""
+    wf = json.loads(text)
+    if not isinstance(wf, dict) or wf.get("id") not in SAVE_SUCCESS_ON_STAGING:
+        return text
+    wf.setdefault("settings", {})["saveDataSuccessExecution"] = "all"
+    return json.dumps(wf, indent=2, ensure_ascii=False)
 
 
 def main():

@@ -5,7 +5,9 @@ any owner's bot and without losing what identifies it.
 A clone = a workflow n8n's Create WA/TG made from a template: the template's graph plus four identity
 fields (the Create workflow's `Set Fields` writes exactly these): the workflow NAME, the Webhook
 node's PATH (= the Wappi profile id; the webhookId beside it), the AI Agent's systemMessage (the
-bot's composed prompt), and the workflow SETTINGS. Everything else is the template. So an update =
+bot's composed prompt), and the workflow SETTINGS — but for TEMPLATE_SETTINGS (what n8n keeps of a successful
+execution, personal chats 2026-10-25), which come from the template and are judged like the graph: a clone that
+does not carry them is not up to date. Everything else is the template. So an update =
 the CURRENT canonical template with the clone's identity fields carried over, plus the clone's
 credential ids per credential TYPE (prod and staging bind different ids). Files, mode rows, history,
 billing and the workflow id are untouched — they live in the database and are keyed by
@@ -380,10 +382,12 @@ def refreshed_prompt(sm, channel, set_vertical=None):
     return sm
 
 
-def clone_state(full, tpl_stamp):
+def clone_state(full, tpl_stamp, tpl_settings=None):
     """One clone judged by its graphs AND its prompt head: the stored (draft) version and the published one against
     the template and today's map; what the sticky merely CLAIMS is reported beside it, never trusted. A custom head
-    is reported and never counted; a behind head (stored or published) makes the clone not up to date."""
+    is reported and never counted; a behind head (stored or published) makes the clone not up to date. `tpl_settings`
+    (template_settings of the template): a clone that does not carry them is not up to date either (a workflow's settings
+    are not versioned — the stored ones are the ones n8n applies)."""
     graph = graph_stamp(full)
     claimed = stamp_of(full)
     pub = published_graph(full)
@@ -399,14 +403,36 @@ def clone_state(full, tpl_stamp):
     else:
         pub_state = None
     judged = lambda st: None if st in (None, "custom") else st not in PROMPT_BEHIND
+    drift = settings_drift(full, tpl_settings)
     return {"graph_stamp": graph, "published_stamp": graph_stamp(pub) if pub is not None else None, "stamp": claimed,
             "stamp_consistent": claimed is None or claimed == graph, "at_canonical": graph == tpl_stamp,
             "published_at_canonical": published_ok is not False,
             "prompt_state": ps["state"], "prompt_vertical": ps["vertical"], "prompt_label": ps["label"],
             "prompt_since": ps["since"], "prompt_note": ps["note"], "prompt_at_canonical": judged(ps["state"]),
             "published_prompt_state": pub_state, "published_prompt_at_canonical": judged(pub_state),
-            "up_to_date": graph == tpl_stamp and published_ok is not False and prompt_ok and published_prompt_ok is not False,
+            "settings_at_canonical": not drift, "settings_drift": {k: list(v) for k, v in drift.items()},
+            "up_to_date": graph == tpl_stamp and published_ok is not False and prompt_ok and published_prompt_ok is not False
+                          and not drift,
             "archived": bool(full.get("isArchived"))}
+
+
+# The settings a clone takes from the TEMPLATE on every update — every other setting stays the clone's (identity). What n8n
+# keeps of a successful execution: «Личные и рабочие чаты» (2026-10-25, live check D5) — prod saved every successful bot
+# execution WITH its webhook body (a personal chat's text and name included) for 7 days, so the templates now keep none, and
+# a clone made before that must follow (Create WA/TG copy the template's settings into a new clone already).
+TEMPLATE_SETTINGS = ("saveDataSuccessExecution",)
+
+
+def template_settings(tpl):
+    """{setting: the template's value (None = not set)} for each of TEMPLATE_SETTINGS."""
+    s = tpl.get("settings") or {}
+    return {k: s.get(k) for k in TEMPLATE_SETTINGS}
+
+
+def settings_drift(wf, want):
+    """{setting: (the workflow's value, the wanted one)} for each wanted setting the workflow does not carry."""
+    s = wf.get("settings") or {}
+    return {k: (s.get(k), v) for k, v in (want or {}).items() if s.get(k) != v}
 
 
 def credentials_by_type(wf):
@@ -437,6 +463,11 @@ def build_target(clone, tpl, set_vertical=None):
         ta["parameters"].setdefault("options", {})["systemMessage"] = refreshed_prompt(sm, ch, set_vertical)
     settings = dict(clone.get("settings") or {})
     settings.setdefault("executionOrder", "v1")
+    for k, v in template_settings(tpl).items():      # the template's journal setting, the clone's own everything else
+        if v is None:
+            settings.pop(k, None)
+        else:
+            settings[k] = v
     nodes = real_nodes(target) + [stamp_node(template_stamp(tpl))]
     return {"name": clone["name"], "nodes": nodes, "connections": target["connections"], "settings": settings}
 
@@ -467,6 +498,9 @@ def verify_after(base, wid, target, clone_was_active, stamp):
         problems.append("system message changed")
     if stamp_of(got) != stamp:
         problems.append("stamp missing")
+    drift = settings_drift(got, {k: (target.get("settings") or {}).get(k) for k in TEMPLATE_SETTINGS})
+    if drift:
+        problems.append("settings differ from the template's: " + ", ".join(f"{k} {a!r} (want {b!r})" for k, (a, b) in drift.items()))
     if bool(got.get("active")) != clone_was_active:
         problems.append(f"active state {got.get('active')} != {clone_was_active}")
     av, vid = got.get("activeVersionId"), got.get("versionId")
@@ -535,6 +569,7 @@ def main():
     forced_ids = parse_set_vertical(a.set_vertical)
     tpls = {ch: canonical(ch, base) for ch in TEMPLATES}
     stamps = {ch: template_stamp(tpls[ch]) for ch in tpls}
+    tpl_settings = {ch: template_settings(tpls[ch]) for ch in tpls}
     canonical_ids = {json.load(open(os.path.join(WF, f), encoding="utf-8")).get("id") for f in os.listdir(WF) if f.endswith(".json")}
     book = prompt_book()
     print(f"base {base} · mode {'APPLY' if a.apply else 'dry-run'} · template stamps {stamps}")
@@ -554,7 +589,7 @@ def main():
         summary["clones"] += 1
         ch = channel_of(full)
         stamp = stamps[ch]
-        cs = clone_state(full, stamp)
+        cs = clone_state(full, stamp, tpl_settings[ch])
         forced = forced_ids.get(full["id"])
         if forced and ip.parse_system_message(system_message(full)) is None:
             print(f"! {full['id']} --set-vertical ignored: the prompt carries no Create/Edit grammar to put a head into")
@@ -579,6 +614,8 @@ def main():
         print(f"~ {full['id']} {full['name']!r} [{ch}] active={full.get('active')} → +{len(added)} -{len(removed)} ~{len(changed)} conn={'changed' if conn else 'same'}")
         print(f"    add: {added}\n    remove: {removed}\n    change: {changed}")
         print(f"    {prompt_plan(full, target, ch, cs, forced)}")
+        for k, (was, want) in cs["settings_drift"].items():
+            print(f"    settings: {k} {was!r} → {want!r} (the template's)")
         if cs["prompt_label"] is not None and cs["prompt_vertical"] and cs["prompt_label"] != ip.BUSINESS_TYPE_LABELS.get(cs["prompt_vertical"]):
             print(f"    label {cs['prompt_label']!r} is not the app's label for {cs['prompt_vertical']} "
                   f"({ip.BUSINESS_TYPE_LABELS.get(cs['prompt_vertical'])!r}) — informational, the head's content decides")

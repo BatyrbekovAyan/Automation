@@ -973,7 +973,8 @@
   },
   "settings": {
     "executionOrder": "v1",
-    "executionTimeout": 20
+    "executionTimeout": 20,
+    "saveDataSuccessExecution": "none"
   },
   "staticData": null,
   "pinData": {},

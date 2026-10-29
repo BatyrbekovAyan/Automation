@@ -32,7 +32,8 @@ chat's decision that holds (audience.AUDIENCE_SQL) and the profile's connection 
 (the sub-workflow's own personal outcome). Suppressed? reads Read Reply Mode's row (after Decide Audience the item is the
 sub-workflow's answer). Nothing but the Outcome stamp is reachable from the two «not business» branches. Record Outgoing
 records business chats only (ignored_personal); Cancel Label names a lease refused for a personal chat cancelled_personal
-(the lease itself is apply-reply-pipeline-v2.py's).
+(the lease itself is apply-reply-pipeline-v2.py's). The templates keep no successful execution (saveDataSuccessExecution
+none — live check D5: prod kept every webhook body for 7 days); errors are kept as before.
 
     python3 Tools/n8n/apply-history-handoff.py          # patch in place (re-runnable)
     python3 Tools/n8n/apply-history-handoff.py --check
@@ -405,6 +406,12 @@ SUPPRESSED_EXPR = "={{ $('Read Reply Mode').first().json.suppressed }}"
 _MODE_ROW = "$('Read Reply Mode').first().json"
 GATE_POSITIONS = {"Audience Known?": [-3456, 300], "Business?": [-3256, 300], "Decide Audience": [-3256, 500],
                   "Decided Business?": [-3056, 500]}
+# Live check D5 (2026-10-28): prod saved every successful bot execution WITH its webhook body for 7 days — a personal chat's
+# text and name included. The templates keep none; an error execution is kept as before (saveDataErrorExecution untouched).
+# Create WA/TG copy the template's settings into a new clone, update-clones.py brings an existing one to it
+# (TEMPLATE_SETTINGS), and the staging copies keep everything (staging/derive-staging.py). The cost: on prod the bots'
+# successful executions and their Outcome stamps are no longer visible.
+SUCCESS_EXECUTIONS = "none"
 
 _DA = None
 
@@ -603,6 +610,11 @@ def patch_bot(fname):
     ch |= set_edges(wf, "Decide Audience", [["Decided Business?"]])
     ch |= set_edges(wf, "Decided Business?", [["Suppressed?"], ["Outcome"]])
     ch |= set_condition(node(wf, "Suppressed?"), SUPPRESSED_EXPR)
+    # (3c) the journal: no successful execution kept (it would hold a personal chat's webhook body)
+    settings = wf.setdefault("settings", {})
+    if settings.get("saveDataSuccessExecution") != SUCCESS_EXECUTIONS:
+        settings["saveDataSuccessExecution"] = SUCCESS_EXECUTIONS
+        ch = True
     # (4) the tool + the rule
     ch |= ensure(wf, tool_node(fname))
     ch |= set_edges(wf, "Create Handoff", [["AI Agent"]], kind="ai_tool")
@@ -935,6 +947,7 @@ def check():
         wf = json.load(open(os.path.join(WF, f), encoding="utf-8"))
         ok = all(node(wf, n) for n in ("Is Incoming?", "Is Outgoing?", "Outgoing Bound?", "Record Outgoing", "Record Suppressed", "Create Handoff", "Stamp Draft")) \
             and gate_current(wf, f) and node(wf, "Cancel Label")["parameters"]["jsCode"] == CANCEL_LABEL_JS \
+            and (wf.get("settings") or {}).get("saveDataSuccessExecution") == SUCCESS_EXECUTIONS \
             and node(wf, "Stamp Draft")["parameters"]["query"] == STAMP_DRAFT_SQL \
             and node(wf, "Stamp Draft")["parameters"]["options"]["queryReplacement"] == STAMP_DRAFT_PARAMS \
             and wf["connections"].get("Generated?", {}).get("main", [[]])[0] == [{"node": "Stamp Draft", "type": "main", "index": 0}] \

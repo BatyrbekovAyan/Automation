@@ -12,6 +12,9 @@ statement and stands ALONE between If and Audience Known?; the fork's conditions
 Business?: the sub-workflow's own answer); Decide Audience maps exactly the inputs its sub-workflow declares; from the
 Webhook, with the two business edges cut, nothing but the routing, the gate, Record Outgoing (business-only in its own
 statement) and the Outcome stamp is reachable — no send, no Wappi call, no write; self-checked on every run.
+verify_journal (live check D5): both templates and Suggest Replies keep no successful execution on prod, their staging
+copies keep all, a new clone inherits the setting (Create's Set Fields) and update-clones.py brings an old one to it;
+self-checked on every run.
 
     python3 Tools/n8n/verify-history-handoff.py
     python3 Tools/n8n/verify-history-handoff.py --dir DIR   # another set of exports (mutation tests)
@@ -712,6 +715,82 @@ def verify_integrations():
     print("OK  integrations (Create types / Dashboard / Delete / Set State / proxy)")
 
 
+# Personal chats (live check D5, 2026-10-28): prod saved every successful bot execution WITH its webhook body for 7 days — a
+# personal chat's text and name included. Both templates and Suggest Replies keep no successful execution; errors are kept as
+# before. A clone carries its template's setting — Create WA/TG's Set Fields copies the template's settings into a new clone,
+# update-clones.py brings an existing one to it (TEMPLATE_SETTINGS) — and the staging copies keep everything
+# (staging/derive-staging.py), so a staging scenario can still read an execution back. Both sides pinned here.
+JOURNAL_OFF = (BOTS[0], BOTS[1], "9PTyYcelRQI7bGDb-Suggest_Replies.json")
+CREATES = ("XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json", "Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json")
+
+
+def check_success_journal(files):
+    """`files` = {file name: workflow} of the whole set. Raises AssertionError «<file>: journal: …»."""
+    for f in JOURNAL_OFF:
+        s = files[f].get("settings") or {}
+        assert s.get("saveDataSuccessExecution") == "none", \
+            f"{f}: journal: a successful execution must not be kept on prod (saveDataSuccessExecution 'none', got {s.get('saveDataSuccessExecution')!r})"
+        assert s.get("saveDataErrorExecution", "all") == "all", f"{f}: journal: an error execution must still be kept (saveDataErrorExecution)"
+    derive = _tool(os.path.join("staging", "derive-staging.py"), "derive_staging")
+    for f, wf in files.items():
+        staged = json.loads(derive.derive_file(json.dumps(wf, ensure_ascii=False)))
+        if f in JOURNAL_OFF:
+            got = (staged.get("settings") or {}).get("saveDataSuccessExecution")
+            assert got == "all", f"{f}: journal: its staging copy must keep its successful executions (derive-staging.py), got {got!r}"
+        else:
+            assert (staged.get("settings") or {}) == (wf.get("settings") or {}), f"{f}: journal: the staging derivation must not change its settings"
+    for f in CREATES:
+        sf = node(files[f], "Set Fields")["parameters"]
+        a = next((x for x in sf["assignments"]["assignments"] if x["name"] == "settings"), None)
+        assert a is not None and "$json.settings" in a["value"] and "settings" in [s.strip() for s in sf.get("includeFields", "").split(",")], \
+            f"{f}: journal: Create's Set Fields must hand a new clone the template's settings"
+    uc = _tool("update-clones.py", "update_clones")
+    assert "saveDataSuccessExecution" in getattr(uc, "TEMPLATE_SETTINGS", ()), \
+        "update-clones.py: journal: an existing clone must be brought to the template's saveDataSuccessExecution (TEMPLATE_SETTINGS)"
+
+
+def _journal_tripwires(files):
+    """The journal checks must reject what they exist to catch — on copies, on every run."""
+    def setting(f, k, v):
+        def m(fs):
+            s = fs[f].setdefault("settings", {})
+            if v is None:
+                s.pop(k, None)
+            else:
+                s[k] = v
+        return m
+
+    def no_settings_field(f):
+        def m(fs):
+            a = node(fs[f], "Set Fields")["parameters"]["assignments"]["assignments"]
+            a[:] = [x for x in a if x["name"] != "settings"]
+        return m
+
+    wrong = (("the WhatsApp template keeps every success", setting(BOTS[0], "saveDataSuccessExecution", "all")),
+             ("the Telegram template without the setting", setting(BOTS[1], "saveDataSuccessExecution", None)),
+             ("Suggest Replies without the setting", setting(JOURNAL_OFF[2], "saveDataSuccessExecution", None)),
+             ("a template that stops keeping its errors", setting(BOTS[0], "saveDataErrorExecution", "none")),
+             ("Create WA's Set Fields without the template's settings", no_settings_field(CREATES[0])))
+    for label, mutate in wrong:
+        bad = copy.deepcopy(files)
+        mutate(bad)
+        try:
+            check_success_journal(bad)
+        except AssertionError:
+            continue
+        fail(f"journal tripwire accepted a broken journal ({label})")
+
+
+def verify_journal():
+    files = {f: load(f) for f in sorted(os.listdir(WF)) if f.endswith(".json")}
+    try:
+        check_success_journal(files)
+    except AssertionError as e:
+        fail(str(e))
+    _journal_tripwires(files)
+    print("OK  journal (prod keeps no successful execution of the bots and the panel; staging keeps them; clones follow)")
+
+
 def main():
     global WF
     if "--dir" in sys.argv:
@@ -721,6 +800,7 @@ def main():
     verify_handoff_workflows()
     verify_test_dialog()
     verify_integrations()
+    verify_journal()
     print("ALL HISTORY/HANDOFF ASSERTS PASSED")
 
 

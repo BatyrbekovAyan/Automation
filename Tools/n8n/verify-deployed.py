@@ -13,10 +13,12 @@ Canonical workflows (Tools/n8n/workflows/*.json) — each must be:
   * active exactly when expected: everything runs except the two clone TEMPLATES (the prod inventory, and the
     same contract as staging/bootstrap.py ACTIVE_CANONICAL).
 Bot clones — judged by their REAL graphs (stored + published) against the template's graph_stamp
-(update-clones.py, one shared definition); the `Template Version` sticky is reported («sticky claims X, graph is
-Y») but never trusted. A fresh Create-made clone has no sticky and is AT-CANONICAL. ARCHIVED clones are listed
-apart and never counted: the owner retired them and n8n refuses PUT on them. An inactive, non-archived clone IS
-counted — the owner re-enables it with the channel toggles, which publishes its stored graph.
+(update-clones.py, one shared definition), and by the settings they must take from the template
+(update-clones.TEMPLATE_SETTINGS: what n8n keeps of a successful execution — SETTINGS-BEHIND otherwise; «Личные и
+рабочие чаты», 2026-10-25, live check D5); the `Template Version` sticky is reported («sticky claims X, graph is Y»)
+but never trusted. A fresh Create-made clone has no sticky and is AT-CANONICAL. ARCHIVED clones are listed apart and
+never counted: the owner retired them and n8n refuses PUT on them. An inactive, non-archived clone IS counted — the
+owner re-enables it with the channel toggles, which publishes its stored graph.
 Clone prompts (review V10, 2026-09-28) — the HEAD of the stored AND the published prompt, judged by content against
 the prompt history (update-clones.prompt_state): a head of an EARLIER Create/Edit map or template prompt is
 PROMPT-BEHIND and counts like a graph behind (exit 2) — the graph alone does not carry new shared instructions into
@@ -142,6 +144,8 @@ def clone_verdict(c):
         parts.append("BEHIND")
     elif not c["published_at_canonical"]:
         parts.append("UNPUBLISHED (stored graph canonical, published is not)")
+    if c.get("settings_drift"):
+        parts.append("SETTINGS-BEHIND (" + ", ".join(f"{k} {a!r}, the template {b!r}" for k, (a, b) in c["settings_drift"].items()) + ")")
     ps, v = c.get("prompt_state"), c.get("prompt_vertical")
     if ps in uc.PROMPT_BEHIND:
         parts.append(f"PROMPT-BEHIND ({v or 'generic template prompt'}, head of {c.get('prompt_since')})")
@@ -201,7 +205,9 @@ def main():
             row["note"] = "; ".join(problems)
             diffs += 1
         report["canonical"].append(row)
-    tpl_stamps = {ch: uc.template_stamp(uc.canonical(ch, base)) for ch in uc.TEMPLATES}
+    tpls = {ch: uc.canonical(ch, base) for ch in uc.TEMPLATES}
+    tpl_stamps = {ch: uc.template_stamp(t) for ch, t in tpls.items()}
+    tpl_settings = {ch: uc.template_settings(t) for ch, t in tpls.items()}
     for wid, w in live.items():
         if wid in canon:
             continue
@@ -211,7 +217,7 @@ def main():
         if uc.is_clone(full, set(canon)):
             ch = uc.channel_of(full)
             row = {"id": wid, "name": full.get("name"), "channel": ch, "active": bool(full.get("active")),
-                   "nodes": len(uc.real_nodes(full)), **uc.clone_state(full, tpl_stamps.get(ch))}
+                   "nodes": len(uc.real_nodes(full)), **uc.clone_state(full, tpl_stamps.get(ch), tpl_settings.get(ch))}
             (report["archived"] if row["archived"] else report["clones"]).append(row)
         else:
             report["unknown"].append({"id": wid, "name": full.get("name"), "active": bool(full.get("active")),

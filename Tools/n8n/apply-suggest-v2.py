@@ -63,6 +63,7 @@ WF = os.path.join(HERE, "workflows")
 FNAME = "9PTyYcelRQI7bGDb-Suggest_Replies.json"
 PG_CRED = {"id": "vvRrFiEXzLVqKjOx", "name": "Postgres"}
 EXECUTION_TIMEOUT_SEC = 20
+SUCCESS_EXECUTIONS = "none"     # personal chats (live check D5): prod keeps no successful execution; staging keeps all
 
 # V8 (iteration 2026-09-28): the history × burst merge of Prep. It used to be a hand-written legacy section (BATCH-03)
 # that no generator owned; it is taken over here, between markers, and anchored once on the exact legacy text.
@@ -913,6 +914,11 @@ def patch():
     if wf.get("settings", {}).get("executionTimeout") != EXECUTION_TIMEOUT_SEC:
         wf.setdefault("settings", {})["executionTimeout"] = EXECUTION_TIMEOUT_SEC
         ch = True
+    # personal chats (2026-10-25, live check D5): no successful execution is kept — its input carries the chat's messages,
+    # a personal chat's too (the gate refuses it, the request stays); errors are kept as before
+    if wf.get("settings", {}).get("saveDataSuccessExecution") != SUCCESS_EXECUTIONS:
+        wf.setdefault("settings", {})["saveDataSuccessExecution"] = SUCCESS_EXECUTIONS
+        ch = True
     if ch:
         with open(path, "w", encoding="utf-8") as fh:
             json.dump(wf, fh, indent=2, ensure_ascii=False)
@@ -929,6 +935,7 @@ def check():
         and node(wf, "Gate Decision")["parameters"]["jsCode"].count(GATE_DECISION_BLOCK) == 1 \
         and node(wf, "Exact Match")["parameters"]["query"] == EXACT_SQL and "STAGE5-ASSEMBLE-BEGIN" in node(wf, "Assemble")["parameters"]["jsCode"] and CATALOG_LINE_V2 in node(wf, "Assemble")["parameters"]["jsCode"] \
         and node(wf, "Build Response")["parameters"]["jsCode"].count(BUILD_NEW) == 1 and wf.get("settings", {}).get("executionTimeout") == EXECUTION_TIMEOUT_SEC \
+        and wf.get("settings", {}).get("saveDataSuccessExecution") == SUCCESS_EXECUTIONS \
         and TRIVIAL_TAIL_NEW in node(wf, "Assemble")["parameters"]["jsCode"] and ASSEMBLE_LANG in node(wf, "Assemble")["parameters"]["jsCode"] \
         and ASSEMBLE_RAG_NEW in node(wf, "Assemble")["parameters"]["jsCode"] and PRICE_RULE_ANCHOR + PRICE_RULE in node(wf, "Assemble")["parameters"]["jsCode"] \
         and VALIDATE_NEW in node(wf, "Validate")["parameters"]["jsCode"] and VALIDATE2_NEW in node(wf, "Validate 2")["parameters"]["jsCode"] \

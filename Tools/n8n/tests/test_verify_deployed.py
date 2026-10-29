@@ -245,7 +245,7 @@ with Case('D1 fresh TG clone (re-ided nodes, instance credential ids) + edited W
     inst['tgFresh000000001'] = deployed(create_style_clone('telegram', 'tgFresh000000001', 'tg', 'profT', fresh_ids=True), active=True)
     edited = create_style_clone('whatsapp', 'waEdited00000001', 'ed', 'profE')
     nd(edited, 'AI Agent')['parameters']['options']['systemMessage'] = '=Business Type: Автозапчасти\n\n(edited in Bot Settings)'
-    edited['settings'] = {'executionOrder': 'v1', 'callerPolicy': 'workflowsFromSameOwner'}
+    edited['settings'] = dict(edited['settings'], callerPolicy='workflowsFromSameOwner')     # a setting of the clone's own
     inst['waEdited00000001'] = deployed(edited, active=True)
     inst['waOff00000000001'] = deployed(create_style_clone('whatsapp', 'waOff00000000001', 'off', 'profO'), active=False)
     code, out, rep = verify(inst)
@@ -278,6 +278,8 @@ with Case('D1 staging base: derived set, Support Message left unbound ON PURPOSE
     inst = {wid: deployed(staged(d, w), active=wid not in TEMPLATE_IDS.values())
             for wid, w in CANON.items()}
     bot = create_style_clone('whatsapp', 'stgwa1234567890a', 'Staging WA', 'stgwa001')
+    # staging's Create copies the STAGING template's settings (which keep every successful execution, derive-staging.py)
+    bot['settings'] = {k: v for k, v in staged(d, CANON[TEMPLATE_IDS['whatsapp']])['settings'].items() if k != 'binaryMode'}
     inst[bot['id']] = deployed(json.loads(d.derive_file(json.dumps(bot, ensure_ascii=False))), active=True)
     code, out, rep = verify(inst, base='http://localhost:5678')
     c.check(code == 0, f'exit {code}: {brief(rep)}')
@@ -756,6 +758,69 @@ for publish_on_put in (True, False):
         w = inst[wid]
         c.check(w['active'] and w['activeVersionId'] == w['versionId'], 'the updated version is the published one')
         c.check(sm_of(w) == created_sm('whatsapp', AP) and sm_of(w['activeVersion']) == created_sm('whatsapp', AP), 'stored and published prompt refreshed')
+
+
+
+# ---------------------------------------------------------------------------------------------- personal chats: the journal
+# Live check D5 (2026-10-28): prod saved every successful bot execution with its webhook body for 7 days — a personal chat's
+# text and name included. The templates now keep none (saveDataSuccessExecution "none"): a NEW clone takes it from the
+# template (Create's Set Fields copies the template's settings), an EXISTING clone is brought to it by update-clones.py (the
+# owner's test bot has two live clones on prod that predate it), and verify-deployed counts a clone without it as behind.
+SAVE = 'saveDataSuccessExecution'
+
+with Case('D5 premise: both templates keep no successful execution, and Create WA/TG hand a NEW clone the template\'s settings '
+          '— the journal setting included (Set Fields through n8n\'s engine, then POST with exactly name, nodes, connections, settings)') as c:
+    for ch, tid in TEMPLATE_IDS.items():
+        tpl = CANON[tid]
+        c.check((tpl.get('settings') or {}).get(SAVE) == 'none', f'{ch} template settings: {tpl.get("settings")}')
+        sf = nd(at_ref(None, CREATE_FILES[ch]), 'Set Fields')['parameters']
+        a = next((x for x in sf['assignments']['assignments'] if x['name'] == 'settings'), None)
+        got = expr(a['value'], tpl) if a else None
+        c.check(isinstance(got, dict) and got.get(SAVE) == 'none' and 'binaryMode' not in got
+                and 'settings' in [s.strip() for s in sf.get('includeFields', '').split(',')],
+                f'{ch}: the clone would carry {got!r}')
+
+for ch in CHANNELS:
+    with Case(f'D5 [{ch}] a clone made before the journal rule (its own settings, no {SAVE}) → SETTINGS-BEHIND, exit 2; '
+              'update-clones plans it and names the setting; build_target takes the template\'s value and keeps the clone\'s own '
+              'settings; the apply PUTs it and reads it back; afterwards the clone is up to date') as c:
+        wid = f'd5set{ch[:2]}0000000001'
+        clone = create_style_clone(ch, wid, 'd5', 'profD5')
+        clone['settings'] = {'executionOrder': 'v1', 'callerPolicy': 'workflowsFromSameOwner'}
+        inst = healthy()
+        inst[wid] = deployed(clone, active=True)
+        code, out, rep = verify(inst)
+        row = clone_row(rep, wid)
+        c.check(code == 2 and row is not None and clone_ok(row) is False and row.get('settings_drift') == {SAVE: [None, 'none']}
+                and 'SETTINGS-BEHIND' in out, f'exit {code}: {row and row.get("settings_drift")}\n{out[-500:]}')
+        code, out, s = update_dry_run({wid: deployed(clone, active=True)})
+        c.check(s.get('would_update') == 1 and f'settings: {SAVE} None → \'none\'' in out, f'{s}\n{out[-500:]}')
+        target = built(clone, ch)
+        c.check(target['settings'] == {'executionOrder': 'v1', 'callerPolicy': 'workflowsFromSameOwner', SAVE: 'none'}, target['settings'])
+        live = {wid: deployed(clone, active=True)}
+        uc = share_book(module('update-clones.py'))
+        uc.list_workflows, uc.call, calls = fake_api_rw(live, True)
+        code, out = run_main(uc, ['update-clones.py', '--base', BASE, '--only', wid, '--apply', '--yes'])
+        s = json.loads(out.strip().splitlines()[-1])
+        c.check(code == 0 and s.get('updated') == 1 and 'read-back: ok' in out and live[wid]['settings'].get(SAVE) == 'none'
+                and live[wid]['settings'].get('callerPolicy') == 'workflowsFromSameOwner', f'{s}\n{out[-600:]}')
+        code, out, s = update_dry_run({wid: live[wid]})
+        c.check(s.get('up_to_date') == 1 and s.get('would_update') == 0, f'after the apply: {s}')
+
+    with Case(f'D5 [{ch}] a clone that keeps every successful execution ({SAVE} all) is behind as well, and a read-back that does '
+              'not carry the template\'s value fails') as c:
+        wid = f'd5all{ch[:2]}0000000001'
+        clone = create_style_clone(ch, wid, 'd5all', 'profD5all')
+        clone['settings'] = dict(clone['settings'], **{SAVE: 'all'})
+        code, out, rep = verify(dict(healthy(), **{wid: deployed(clone, active=True)}))
+        row = clone_row(rep, wid)
+        c.check(code == 2 and row is not None and row.get('settings_drift') == {SAVE: ['all', 'none']}, f'exit {code}: {row}')
+        uc = share_book(module('update-clones.py'))
+        target = uc.build_target(clone, CANON[TEMPLATE_IDS[ch]])
+        stuck = dict(target, id=wid, settings=dict(target['settings'], **{SAVE: 'all'}))
+        uc.call = lambda base, method, path, body=None: (200, deployed(stuck, active=True))
+        ok, why = uc.verify_after(BASE, wid, target, True, uc.template_stamp(CANON[TEMPLATE_IDS[ch]]))
+        c.check(ok is False and SAVE in why, f'read-back of a PUT that did not take: {ok} {why}')
 
 
 report()
