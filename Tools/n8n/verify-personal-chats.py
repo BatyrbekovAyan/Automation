@@ -39,13 +39,19 @@ still wired as designed».
           its Shape node judges the rows' positive fields;
       (4) the owner's answer goes out BEFORE the tail: Replay Items is entered from Respond Set alone, and with that one edge
           cut nothing of the tail is reachable;
-      (5) the Wappi reads (Recent Messages, Status): the canonical Wappi credential, fullResponse + neverError, at most 10 s,
-          only the two Wappi bases, messages/get with limit 10 / order desc, continue on error; mark_all nowhere;
+      (5) the Wappi reads (Chat Card, Recent Messages, Status): the canonical Wappi credential, fullResponse + neverError,
+          at most 10 s, continue on error; Recent Messages and Status only on the two Wappi bases, messages/get with limit
+          10 / order desc; the chat card only WhatsApp's chats/filter by the digits of the chat id, asked only for a
+          WhatsApp chat known by its number (Need Card?); mark_all nowhere; the tail runs Has Channel? → Need Card? →
+          [Chat Card →] Chat Code → Recent Messages → Replay Plan → Backfill;
       (6) the replay: only through Replay? (the backfill's committed row AND the plan's positive word), POST to the bot's own
-          webhook on localhost, no credential, neverError, at most 10 s; Replay Plan runs per item, takes FRESH_HOURS from
-          audience.py, checks the page is this profile's and chat's, hands on only a row whose own `from` is the chat (never a
-          group member's message — the templates' group guard «If» from == chatId must still see the real sender, so the
-          message keeps that `from`), never replays a voice message, builds the message in ONE function; Phone embeds
+          webhook on localhost, no credential, neverError, at most 10 s; Chat Code runs per item and takes the code (chat.LID)
+          only off a card it was handed, from an answer that counts and the dialog whose id IS the chat id, and only an @lid
+          code; Replay Plan runs per item, reads the chat off Chat Code, takes FRESH_HOURS from audience.py, counts a row as
+          the chat's when its chatId is the chat id or its code, checks the page is this profile's and chat's, hands on only
+          a row whose own `from` is the chat by the same rule (never a group member's message — the templates' group guard
+          «If» from == chatId drops it), names the chat by the decision's id (chatId = from) with the code beside it on
+          WhatsApp (whatsapp_chat_id), never replays a voice message, builds the message in ONE function; Phone embeds
           build-handoff-workflows.OWNER_PHONE_JS verbatim and needs the echo and the boolean flag;
       (7) crChatAudience01 is a protected infra id: build-client-webhooks.PROTECTED_IDS, staging/bootstrap.py
           ACTIVE_CANONICAL, Set Workflow State and the dependents regenerated from the list.
@@ -554,12 +560,15 @@ PROTECTED_DEPENDENTS = {SET_STATE_FILE: ("Validate",),
                         SWEEP_FILE: ("Clone Retirements",)}
 WEBHOOK_NODES = ("Webhook", "Auth Gate", "Authorized?", "Respond 401", "Validate", "Valid?", "Respond 400", "Is List?", "Is Set?",
                  "Is Connected?", "List", "Shape List", "Respond", "Set", "Shape Set", "Respond Set", "Replay Items", "Chat Channel",
-                 "Has Channel?", "Recent Messages", "Replay Plan", "Backfill", "Replay?", "Replay", "Channel", "Channel Known?",
-                 "Status", "Phone", "Phone OK?", "Connected", "Shape Connected")
-TAIL = ("Replay Items", "Chat Channel", "Has Channel?", "Recent Messages", "Replay Plan", "Backfill", "Replay?", "Replay")
+                 "Has Channel?", "Need Card?", "Chat Card", "Chat Code", "Recent Messages", "Replay Plan", "Backfill", "Replay?",
+                 "Replay", "Channel", "Channel Known?", "Status", "Phone", "Phone OK?", "Connected", "Shape Connected")
+TAIL = ("Replay Items", "Chat Channel", "Has Channel?", "Need Card?", "Chat Card", "Chat Code", "Recent Messages", "Replay Plan",
+        "Backfill", "Replay?", "Replay")
 # Written here on their own — not read from the generator that wrote the nodes.
 WAPPI_CRED = {"httpHeaderAuth": {"id": "EuhhqAaV56DpoqAN", "name": "WappiAuthToken"}}
 WAPPI_BASES = {"https://wappi.pro/api/", "https://wappi.pro/tapi/"}
+WA_CARD_URL = "https://wappi.pro/api/sync/chats/filter"
+CHAT_DIGITS = "String($json.chat_id).split('@')[0].replace(/[^0-9]/g, '')"
 REPLAY_HOST = "http://localhost:5678/webhook/"
 STATEMENTS = {"List": ("audience.LIST_SQL", AUD.LIST_SQL), "Set": ("audience.OWNER_SET_SQL", AUD.OWNER_SET_SQL),
               "Connected": ("audience.CONNECTED_SQL", AUD.CONNECTED_SQL),
@@ -699,11 +708,30 @@ def check_webhook(bundle, sql=None):
     rq = P["Recent Messages"].get("jsonQuery", "")
     need(f"limit: {AUD.RECENT_LIMIT}" in rq and "order: 'desc'" in rq and "chat_id: $json.chat_id" in rq,
          "Recent Messages must read limit 10 and order desc of THIS chat (the page the backfill takes, newest first)")
+    cn, cp = N["Chat Card"], P["Chat Card"]
+    cresp = ((cp.get("options") or {}).get("response") or {}).get("response") or {}
+    ctimeout = (cp.get("options") or {}).get("timeout")
+    need(cn.get("type") == "n8n-nodes-base.httpRequest" and cn.get("credentials") == WAPPI_CRED and cp.get("method") == "GET"
+         and cresp.get("fullResponse") is True and cresp.get("neverError") is True
+         and isinstance(ctimeout, int) and 0 < ctimeout <= 10000 and cn.get("onError") == "continueRegularOutput",
+         "Chat Card must be a Wappi read: GET, the canonical Wappi credential, fullResponse + neverError, at most 10 s, continue on error")
+    need(cp.get("url") == WA_CARD_URL
+         and cp.get("jsonQuery") == "={{ JSON.stringify({ profile_id: $json.profile_id, client_name: " + CHAT_DIGITS + " }) }}",
+         f"Chat Card must ask WhatsApp's chat list ({WA_CARD_URL}) of THIS profile, filtered by the digits of the chat id — "
+         "nothing else (the filter never searches a code)")
+    need(_condition(wf, "Need Card?") == "={{ $json.channel === 'whatsapp' && !String($json.chat_id).endsWith('@lid') && "
+         + CHAT_DIGITS + " !== '' }}",
+         "Need Card? must ask the card only for a WhatsApp chat known by its number (never Telegram, never a chat whose id is "
+         "its @lid code, never an id without digits)")
     need("mark_all" not in json.dumps(wf, ensure_ascii=False),
          "mark_all must appear nowhere in the webhook — reading a chat must never mark it read")
-    need(sources(wf, "Recent Messages") == [("Has Channel?", 0)] and sources(wf, "Replay Plan") == [("Recent Messages", 0)]
+    need(sources(wf, "Need Card?") == [("Has Channel?", 0)] and targets(wf, "Has Channel?") == [["Need Card?"]]
+         and targets(wf, "Need Card?") == [["Chat Card"], ["Chat Code"]] and sources(wf, "Chat Card") == [("Need Card?", 0)]
+         and sources(wf, "Chat Code") == [("Chat Card", 0), ("Need Card?", 1)] and targets(wf, "Chat Card") == [["Chat Code"]]
+         and sources(wf, "Recent Messages") == [("Chat Code", 0)] and sources(wf, "Replay Plan") == [("Recent Messages", 0)]
          and sources(wf, "Backfill") == [("Replay Plan", 0)],
-         "the tail must run Has Channel? → Recent Messages → Replay Plan → Backfill in this order")
+         "the tail must run Has Channel? → Need Card? → [Chat Card →] Chat Code → Recent Messages → Replay Plan → Backfill "
+         "in this order")
 
     # (6) the replay, the plan, the phone
     rp = N["Replay"]
@@ -730,12 +758,31 @@ def check_webhook(bundle, sql=None):
     need(P["Replay Plan"].get("mode") == "runOnceForEachItem" and f"const FRESH_HOURS = {AUD.FRESH_HOURS};" in plan
          and "FRESH_HOURS * 3600" in plan and "function replayMessage(" in plan and plan.count("function replayMessage(") == 1
          and "newest.fromMe !== false" in plan and {"chat", "text"} <= set(types) and "ptt" not in types
-         and "body.uuid !== profileId" in plan and "m.chatId !== chatId" in plan and "body.status === 'done'" in plan,
+         and "body.uuid !== profileId" in plan and "body.status === 'done'" in plan,
          "Replay Plan must run per item, take FRESH_HOURS from audience.py, check the page is this profile's and chat's, hand on "
          "only the client's fresh message (never a voice message) and build it in ONE function")
-    need("else if (String(newest.from) !== chatId) why = 'not_from_chat';" in plan and "    from: String(row.from),\n" in plan,
-         "Replay Plan must hand on only a row whose own `from` is the chat and keep that `from` in the message — the templates' "
-         "only group guard («If» from == chatId) must still see the real sender: a group member's message is never replayed")
+    need("const req = $('Chat Code').item.json;" in plan
+         and "const chatLid = typeof req.chat_lid === 'string' ? req.chat_lid : '';" in plan
+         and "const ours = (id) => id === chatId || (chatLid !== '' && id === chatLid);" in plan
+         and "m.chatId !== '' && !ours(m.chatId)" in plan and "!rows.some(foreign)" in plan,
+         "Replay Plan must read the chat off Chat Code and count a row as the chat's when its chatId is the chat id or its code "
+         "— a row is the chat's by those two ids only, any other makes the page nothing")
+    need("else if (!ours(String(newest.from))) why = 'not_from_chat';" in plan,
+         "Replay Plan must hand on only a row whose own `from` is the chat (its id or its code) — a group member's message "
+         "names the member there and is never replayed (the templates' only group guard «If» from == chatId)")
+    need("    from: chatId,\n" in plan and "    chatId: chatId,\n" in plan
+         and "  if (channel === 'whatsapp') message.whatsapp_chat_id = chatLid;\n" in plan,
+         "the replayed message names the chat by the decision's id (chatId = from — the key of the templates' group guard and "
+         "mode read), and on WhatsApp carries the code as whatsapp_chat_id, as the incoming webhook does")
+    cc = P["Chat Code"].get("jsCode", "")
+    need(P["Chat Code"].get("mode") == "runOnceForEachItem" and "const req = $('Chat Channel').item.json;" in cc
+         and "if ($prevNode.name === 'Chat Card') {" in cc and "idOf(d) === req.chat_id" in cc
+         and "body.uuid !== req.profile_id" in cc and "body.status === 'done'" in cc and "Number(res.statusCode) === 200" in cc
+         and "card.chat.LID" in cc and 'const LID_SUFFIX = "@lid";' in cc
+         and "lid.length > LID_SUFFIX.length && lid.endsWith(LID_SUFFIX) && lid !== req.chat_id" in cc
+         and "chat_lid: chatLid" in cc,
+         "Chat Code must run per item and take the code only off the card it was handed (Chat Card), from an answer that counts "
+         "(200, done, this profile's) and the dialog whose id IS the chat id, and only an @lid code — anything else is no code")
     ph = P["Phone"].get("jsCode", "")
     need(CRA.HW.OWNER_PHONE_JS in ph and "phone: error ? '' : ownerPhone(wapi, status)" in ph and "status.profile_id !== v.profileId" in ph
          and "status.authorized === false) error = 'not_authorized'" in ph and "status.authorized !== true" in ph,
@@ -832,7 +879,7 @@ WEBHOOK_MUTATIONS = (
     ("the tail hung off Shape Set", _rewire("Shape Set", 0, ["Respond Set", "Replay Items"]), "before the answer"),
     ("the tail moved before the answer", lambda b: (_rewire("Shape Set", 0, ["Replay Items"])(b), _rewire("Replay Plan", 0, ["Respond Set"])(b)),
      "before the answer"),
-    ("the replay skips the backfill", _rewire("Replay Plan", 0, ["Replay?"]), "Has Channel? → Recent Messages → Replay Plan → Backfill"),
+    ("the replay skips the backfill", _rewire("Replay Plan", 0, ["Replay?"]), "the tail must run"),
     ("the replay sent to the public host", _wh("Replay", "url", "http://localhost:5678/webhook/", "https://n8n.choosereply.com/webhook/"),
      "localhost"),
     ("the replay carries the Wappi token", _wh_node("Replay", "credentials", WAPPI_CRED), "no credential"),
@@ -855,10 +902,42 @@ WEBHOOK_MUTATIONS = (
                                                  "phone: error ? '' : String(status.phone || '').replace(/\\D/g, '')"),
      "Phone must embed"),
     ("Replay Plan replays a voice message", _wh("Replay Plan", "jsCode", '"chat", "text", ', '"chat", "text", "ptt", '), "Replay Plan must"),
-    ("Replay Plan replays a group member's message", _wh("Replay Plan", "jsCode", "else if (String(newest.from) !== chatId) why = 'not_from_chat';\n", ""),
+    ("Replay Plan replays a group member's message", _wh("Replay Plan", "jsCode", "else if (!ours(String(newest.from))) why = 'not_from_chat';\n", ""),
      "own `from` is the chat"),
-    ("the replay rewrites the sender to the chat", _wh("Replay Plan", "jsCode", "    from: String(row.from),\n", "    from: chatId,\n"),
-     "own `from` is the chat"),
+    ("the replay hands on the row's own sender", _wh("Replay Plan", "jsCode", "    from: chatId,\n", "    from: String(row.from),\n"),
+     "names the chat by the decision's id"),
+    ("the replay leaves the code out", _wh("Replay Plan", "jsCode", "  if (channel === 'whatsapp') message.whatsapp_chat_id = chatLid;\n", ""),
+     "names the chat by the decision's id"),
+    ("Replay Plan counts any row as the chat's", _wh("Replay Plan", "jsCode",
+                                                     "const ours = (id) => id === chatId || (chatLid !== '' && id === chatLid);",
+                                                     "const ours = (id) => true;"), "count a row as the chat's"),
+    ("Replay Plan ignores the code", _wh("Replay Plan", "jsCode", " || (chatLid !== '' && id === chatLid)", ""), "count a row as the chat's"),
+    ("Replay Plan reads the chat off Chat Channel", _wh("Replay Plan", "jsCode", "const req = $('Chat Code').item.json;",
+                                                         "const req = $('Chat Channel').item.json;"), "read the chat off Chat Code"),
+    ("Chat Code takes any dialog", _wh("Chat Code", "jsCode", "idOf(d) === req.chat_id", "idOf(d) !== ''"), "Chat Code must"),
+    ("Chat Code takes a crossed card", _wh("Chat Code", "jsCode",
+                                           " && !(typeof body.uuid === 'string' && body.uuid !== '' && body.uuid !== req.profile_id)", ""),
+     "Chat Code must"),
+    ("Chat Code takes a LID that is no code", _wh("Chat Code", "jsCode", "lid.length > LID_SUFFIX.length && lid.endsWith(LID_SUFFIX) && ", ""),
+     "Chat Code must"),
+    ("Chat Code reads any input as a card", _wh("Chat Code", "jsCode", "if ($prevNode.name === 'Chat Card') {", "if (true) {"),
+     "Chat Code must"),
+    ("Chat Code runs once for all items", _wh_node("Chat Code", "parameters", {"jsCode": CRA.CHAT_CODE_JS}), "Chat Code must"),
+    ("the card asked on Telegram", _cond("Need Card?", "$json.channel === 'whatsapp' && ", ""), "Need Card? must"),
+    ("the card asked for a code", _cond("Need Card?", "!String($json.chat_id).endsWith('@lid') && ", ""), "Need Card? must"),
+    ("the card asked by the whole chat id", _wh("Chat Card", "jsonQuery", "client_name: " + CHAT_DIGITS, "client_name: $json.chat_id"),
+     "Chat Card must ask"),
+    ("the card asked of Telegram's list", _wh("Chat Card", "url", "https://wappi.pro/api/", "https://wappi.pro/tapi/"), "Chat Card must ask"),
+    ("Chat Card without neverError", lambda b: node(b[WEBHOOK_FILE], "Chat Card")["parameters"]["options"]["response"]["response"]
+     .__setitem__("neverError", False), "Chat Card must be a Wappi read"),
+    ("Chat Card on another credential", _wh_node("Chat Card", "credentials", {"httpHeaderAuth": {"id": "dev0000000000000",
+                                                                                                "name": "Wappi Dev"}}),
+     "Chat Card must be a Wappi read"),
+    ("Chat Card marks the chat read", _wh("Chat Card", "jsonQuery", "profile_id: $json.profile_id, ", "profile_id: $json.profile_id, mark_all: true, "),
+     "mark_all"),
+    ("the card skipped", _rewire("Has Channel?", 0, ["Recent Messages"]), "the tail must run"),
+    ("Chat Code skipped on the card's way", _rewire("Chat Card", 0, ["Recent Messages"]), "the tail must run"),
+    ("Chat Code disabled", _wh_node("Chat Code", "disabled", True), "Chat Code is disabled"),
     ("Replay Plan without the freshness", _wh("Replay Plan", "jsCode", " && time >= Math.floor(Date.now() / 1000) - FRESH_HOURS * 3600", ""),
      "Replay Plan must"),
     ("Replay Plan takes a crossed page", _wh("Replay Plan", "jsCode", " && !(typeof body.uuid === 'string' && body.uuid !== '' && body.uuid !== profileId)", ""),
@@ -892,9 +971,9 @@ def group_webhook(directory):
     if not fails:
         fails = self_check(bundle, check_webhook, WEBHOOK_MUTATIONS)
     return fails, (f"webhook: {CRA.WF_ID} = build-chat-audience.py's output — token-only gate, Validate (wildcard, limits), the op "
-                   f"fork, audience.py's statements, the answer before the tail, Wappi reads without mark_all, the replay to "
-                   f"localhost only after the backfill, the A5 phone rule, protected everywhere; tripwire self-check: "
-                   f"{len(WEBHOOK_MUTATIONS)} mutations rejected")
+                   f"fork, audience.py's statements, the answer before the tail, Wappi reads without mark_all, the WhatsApp "
+                   f"chat card's @lid code, the replay to localhost only after the backfill, the A5 phone rule, protected "
+                   f"everywhere; tripwire self-check: {len(WEBHOOK_MUTATIONS)} mutations rejected")
 
 
 # ================================================================================================ group: decide
