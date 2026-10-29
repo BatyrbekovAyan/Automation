@@ -502,7 +502,7 @@ RULE = {"profiles": ["profileIds", "profileId"], "workflows": [], "appUser": [],
 Решение владельца 2026-10-29: исправить в этой ветке, отдельной задачей до выкладки.
 
 Дефект (существовал до этой ветки, `docs/audits/2026-10-25-personal-chats/live-checks.md`, D6): у части чатов WhatsApp (2 из 4 прочитанных) строки `messages/get` несут `chatId`, `from` и `to` в виде кода `@lid`, а webhook того же чата — `chatId` номером (тем же id, что в списке чатов и в решениях), код отдельно в `whatsapp_chat_id`. Три проверки шаблонов считают такие строки чужим чатом, поэтому «Авто» в таких чатах не отвечает никогда:
-- `Latest+Combine` (`Tools/n8n/apply-message-batching.py`, `isForeign`) — всё отброшено → `newestIncoming` нет → abort → `superseded`;
+- `Latest+Combine` (фильтр `isForeign` в каноне шаблонов) — всё отброшено → `newestIncoming` нет → abort → `superseded`;
 - `Final Check` и `Reconcile Check` (`Tools/n8n/apply-reply-pipeline-v2.py`) — тот же фильтр.
 
 **Правило.** Строка `messages/get` принадлежит чату, если её `chatId`:
@@ -512,7 +512,7 @@ RULE = {"profiles": ["profileIds", "profileId"], "workflows": [], "appUser": [],
 Строка без `chatId` остаётся, как сейчас. Строка с любым другим `chatId` (другой номер, другой код) по-прежнему чужая: защита от перекрёстных ответов Wappi не ослабляется. Там, где сравнивается `from` строки с id чата, действует то же правило; чьё сообщение — по `fromMe`, как сейчас. Всё остальное в этих проверках не меняется: сортировка, «последнее входящее», правило владельца, «окно держит триггер», единственность эха, правила V5 / V7 / R10.
 
 **Files:**
-- Modify: `Tools/n8n/apply-message-batching.py` (`Latest+Combine`) и `Tools/n8n/apply-reply-pipeline-v2.py` (`Final Check`, `Reconcile Check`). Правило «чья строка» — один фрагмент JS в одном модуле генераторов; остальные его импортируют (как `RECONCILE_JS`), копий нет.
+- Modify: генератор, который владеет `Latest+Combine` сегодня (его правит `Tools/n8n/apply-reply-pipeline-v2.py`; `Tools/n8n/apply-message-batching.py` ВЫВЕДЕН из работы — его не запускать и не править, см. заметку RETIRED в нём и `tests/test_legacy_generators.py`), и `Tools/n8n/apply-reply-pipeline-v2.py` (`Final Check`, `Reconcile Check`). Правило «чья строка» — один фрагмент JS в одном модуле генераторов; остальные его импортируют (как `RECONCILE_JS`), копий нет.
 - Modify: оба шаблона, `4wYitz5ek30SVNlT-WhatsApp_Bot.json` и `4VN3gsFaC2HUYmcc-Telegram_Bot.json`, — только регенерацией, в каноническом порядке генераторов. Код у Telegram тот же; `whatsapp_chat_id` там нет, поведение прежнее, `verify-telegram-parity.py` зелёный.
 - Modify: `Tools/n8n/verify-message-batching.py`, `Tools/n8n/verify-reply-pipeline.py` — правило запинено. Каждая мутация роняет проверку: код не принят; принят любой код; принят на Telegram; принят код без `@lid`.
 - Test: офлайн-тесты по реальному коду узлов из канона — существующие драйверы `Tools/n8n/tests/test_reply_order.py`, `Tools/n8n/tests/test_reply_reconcile.py` и тесты `Latest+Combine`.
@@ -586,7 +586,46 @@ RULE = {"profiles": ["profileIds", "profileId"], "workflows": [], "appUser": [],
   - После прогона `git status` чист на `Assets/TextMesh Pro/Fonts/`.
 - [ ] **Step 4: Commit** — `fix(personal-chats): приложение показывает чаты WhatsApp, строки которых приходят под кодом @lid`.
 
-Порядок после решения владельца 2026-10-29: Task 9b и 9c выполняются после Task 17; затем финальное ревью ветки с одной волной правок; Task 18 (пакет выкладки и репетиция) — последней, на окончательном каноне.
+### Task 9d: Чат, ставший личным по правилу, забывает прежнюю рабочую переписку (сервер)
+
+Найдено ревью Task 17 (2026-10-29). Спека §4.6 считает, что у чатов, личных «по умолчанию», удалять нечего: их никто не записывал. После нового подключения это неверно:
+- `CONNECTED_SQL` двигает `connected_at`, и вычисленные решения прежнего подключения перестают действовать (`Tools/n8n/audience.py`, около :341-368);
+- следующее сообщение пишет `DECIDE_WRITE_SQL`: вычисленное `business` заменяется вычисленным `personal` (например, `contact` — человек есть в книге нового номера), а `personal_since` остаётся пустым (около :246-273);
+- `WIPE_SQL` берёт только `source = 'owner'` (около :480).
+
+Итог: история, память и итоги, записанные, пока чат был рабочим, остаются навсегда. То же бывает при переподключении с новым профилем: решения переезжают по линии и тоже перестают действовать.
+
+**Правило.**
+- Когда вычисленное решение `personal` заменяет строку, у которой `kind` был `business`, ставится `personal_since = now()`.
+- Шаг стирания берёт строки с `personal_since` старше `WIPE_DAYS`, ещё не стёртые, — и решения владельца, и такие вычисленные.
+- Вычисленное `business`, заменяющее `personal`, очищает `personal_since` — как `OWNER_SET_SQL` при «личный → рабочий».
+- Вычисленное `personal` поверх `personal` ничего не меняет.
+
+Остальное в стирании не меняется: те же таблицы, `dialog_counts` не трогается, `wiped_at`, пакет `WIPE_BATCH`, `skip locked`.
+
+**Files:**
+- Modify: `Tools/n8n/audience.py` — `DECIDE_WRITE_SQL`, `WIPE_SQL` и их комментарии.
+- Modify: регенерировать `crAudienceDec001` (`build-decide-audience.py`), Sweep (`apply-personal-wipe.py`) и всё, что импортирует эти запросы (поиск по генераторам). Каждый генератор `--check` → rc 0.
+- Test: реальный SQL на Postgres стенда, в существующих тестах `DECIDE_WRITE_SQL` и `WIPE_SQL` в `Tools/n8n/tests/`.
+- Modify: `Tools/n8n/staging/e2e-audience.py` — сценарий «новый номер»:
+  1. чат был рабочим на старом номере, с историей и памятью;
+  2. новое подключение;
+  3. сообщение из чата — решение `personal` по правилу;
+  4. `personal_since` сдвигается назад больше чем на `WIPE_DAYS`;
+  5. шаг стирания: данных чата нет, `dialog_counts` на месте.
+- Modify: спека `docs/superpowers/specs/2026-10-25-personal-chats-design.md`, §4.6 — абзац «удалять нечего». `CLAUDE.md` — исключение, которое Task 17 записала как открытое, заменить правилом.
+
+- [ ] **Step 1: Тесты SQL** — должны упасть на текущем коде.
+- [ ] **Step 2: Правило.** После него:
+  - тесты зелёные;
+  - каждый генератор `--check` → rc 0;
+  - `Tools/n8n/staging/pg.sh start; python3 Tools/n8n/tests/run_all.py` → OK;
+  - все офлайн `Tools/n8n/verify-*.py` → OK.
+- [ ] **Step 3: Стенд.** Сценарий падает на каноне до задачи и проходит на рабочем; `e2e-audience.py` целиком зелёный.
+- [ ] **Step 4: Документы.**
+- [ ] **Step 5: Commit** — `fix(personal-chats): чат, ставший личным по правилу, забывает прежнюю рабочую переписку через 2 дня`.
+
+Порядок после решений 2026-10-29: Task 9b, 9d и 9c выполняются после Task 17; затем финальное ревью ветки с одной волной правок; Task 18 (пакет выкладки и репетиция) — последней, на окончательном каноне.
 
 ### Task 10: Приложение — факты чата и правило
 
