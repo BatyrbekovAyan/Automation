@@ -40,6 +40,14 @@ every row of FIXTURE — {constants: {settleMinutes, freshHours, wipeDays}, case
 contact, history, owner, expectKind, expectReason}]} — so a new case goes into that one file and nowhere else.
 tests/test_audience_rule.py guards the rule, the table and the constants.
 
+The chat's own rows — CHAT_IDENTITY_JS, `chatIdentity(channel, chatId, code)`: a messages/get row is THIS chat's when it
+names the chat by its id or, on WhatsApp only, by the chat's @lid code (CHAT_CODE_SUFFIX; some WhatsApp chats are listed under
+it while the webhook and the chat list name them by their number). Every Code node that reads a chat's page against the chat it
+asked for embeds it verbatim: the bot templates' Latest+Combine / Final Check / Reconcile Check (apply-reply-pipeline-v2.py;
+the code is the webhook's whatsapp_chat_id), Decide Audience's Decide (the same code, its input chatLid) and the ChatAudience
+webhook's Chat Code / Replay Plan (the code from the chat card's chat.LID). tests/test_audience_rule.py guards its truth table;
+verify-message-batching.py, verify-reply-pipeline.py and verify-personal-chats.py pin it where it is embedded.
+
 The decisions in SQL (plan Task 2; schema sql/2026-10-25-chat-audience.sql: chat_audience, audience_connections). The
 statements the n8n nodes run over the two tables are written here once — except the two that belong to the bot's line:
 the move on a reconnect is part of clone_lineage.py's BIND_WORKFLOW_SQL (Create WA/TG's Bind Workflow Id), the delete
@@ -63,7 +71,7 @@ paste them, never copy them:
 tests/test_audience_sql.py runs every one of them but the last on real SQL (staging Postgres), the race of two first messages
 included; tests/test_personal_wipe.py runs WIPE_SQL (and the Sweep node that carries it) the same way.
 
-    python3 Tools/n8n/audience.py              # print RULE_JS
+    python3 Tools/n8n/audience.py              # print RULE_JS and CHAT_IDENTITY_JS
 """
 import json
 import os
@@ -137,6 +145,38 @@ function decideAudience(f) {
 for _name, _value in (("WA_NONHUMAN_SUFFIXES", list(WA_NONHUMAN_SUFFIXES)), ("TG_SERVICE_IDS", list(TG_SERVICE_IDS)),
                       ("TG_NONHUMAN_TYPES", list(TG_NONHUMAN_TYPES)), ("TG_PERSON_TYPE", TG_PERSON_TYPE)):
     RULE_JS = RULE_JS.replace("__" + _name + "__", json.dumps(_value))
+
+
+# ================================================================================================ the chat's own rows
+# Which messages/get rows are THIS chat's — ONE function, embedded verbatim (between its BEGIN / END lines) by every Code node
+# that reads a chat's messages/get page against the chat it asked for: the bot templates' Latest+Combine, Final Check and
+# Reconcile Check (apply-reply-pipeline-v2.py), Decide Audience's Decide (build-decide-audience.py), the ChatAudience
+# webhook's Chat Code and Replay Plan (build-chat-audience.py). Never copied.
+# The live checks (docs/audits/2026-10-25-personal-chats/live-checks.md, «@lid и номер — один id») found WhatsApp chats whose
+# every messages/get row carries the chat's @lid code in chatId, from and to, while the chat list names the chat by its number
+# (the code in chat.LID) and so does the webhook (chatId = the number, the code in whatsapp_chat_id) — the id the decisions,
+# the reply mode and the history are kept under. So a row names the chat by the chat's id or, on WhatsApp only, by that code.
+# A code counts only when it is a string that ends in CHAT_CODE_SUFFIX with something before it, and is not the chat id
+# itself. Any other id — another number, another code — names another chat: Wappi crosses concurrent answers, and such a row
+# is never this chat's. A row WITHOUT a chatId stays each caller's own rule, as before. Whose message it is, is fromMe's to say.
+# ASCII only and pure (no clock, no network, no n8n global); the only top-level name it leaves is `chatIdentity`.
+CHAT_CODE_SUFFIX = "@lid"
+CHAT_IDENTITY_BEGIN, CHAT_IDENTITY_END = "// CHAT-IDENTITY-BEGIN", "// CHAT-IDENTITY-END"
+CHAT_IDENTITY_JS = r"""// CHAT-IDENTITY-BEGIN (Tools/n8n/audience.py CHAT_IDENTITY_JS - one home, embedded verbatim, never copied)
+// The ids a messages/get row may name THIS chat by: the chat's own id - the webhook's chatId, the id the chat list, the
+// decisions and the reply mode use - and, on WhatsApp only, the chat's @lid code: Wappi lists every row of some WhatsApp
+// chats under it (chatId, from and to), while the webhook names the chat by its number and carries the code in
+// whatsapp_chat_id (the chat list: chat.LID). A code counts only when it is a string that ends in @lid with something before
+// it and is not the chat id itself. Any other id - another number, another code - names another chat (Wappi crosses
+// concurrent answers): such a row is never this chat's. A row without a chatId is the caller's own rule.
+//   chatIdentity(channel, chatId, code) -> { code: the code that counts, or '', names(id): id is the chat id or that code }
+function chatIdentity(channel, chatId, code) {
+  const CODE_SUFFIX = __CHAT_CODE_SUFFIX__;
+  const lid = (channel === 'whatsapp' && typeof code === 'string' && code.length > CODE_SUFFIX.length
+    && code.endsWith(CODE_SUFFIX) && code !== chatId) ? code : '';
+  return { code: lid, names: (id) => id === chatId || (lid !== '' && id === lid) };
+}
+// CHAT-IDENTITY-END""".replace("__CHAT_CODE_SUFFIX__", json.dumps(CHAT_CODE_SUFFIX))
 
 
 # ================================================================================================ the decisions, in SQL
@@ -528,3 +568,4 @@ select (select count(*) from marked)::int as wiped_chats,
 
 if __name__ == "__main__":
     print(RULE_JS)
+    print(CHAT_IDENTITY_JS)

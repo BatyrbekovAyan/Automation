@@ -19,6 +19,11 @@ Chain after this migration (the pre-existing nodes keep their names; new ones ar
   → Outcome.  Every refusal/cancel → *Cancel Label → *Record Cancel (event
   state + drop the AI history rows a cancelled generation wrote) → Outcome.
 Pauses are clamped (reading ≤ 8 s, typing ≤ 12 s, listening ≤ 12 s).
+The three readers of a messages/get page — Latest+Combine, Final Check, Reconcile Check — drop every row naming another
+chat (Wappi crosses concurrent answers); a row names THIS chat by the webhook's chatId or, on WhatsApp only, by the chat's
+@lid code from the webhook's whatsapp_chat_id (some WhatsApp chats are listed under it): audience.CHAT_IDENTITY_JS, embedded
+verbatim, with the template's channel on the one line that differs between the two templates. Latest+Combine's filter was
+first written by the RETIRED apply-message-batching.py; this generator owns it now.
 
     python3 Tools/n8n/apply-reply-pipeline-v2.py            # patch workflows/ in place (re-runnable)
     python3 Tools/n8n/apply-reply-pipeline-v2.py --check
@@ -56,6 +61,26 @@ DEBOUNCE_SECONDS = _module("apply-message-batching.py").DEBOUNCE_SECONDS
 MEMORY_MARKS_LEAD_RE = _module("apply-history-handoff.py").MEMORY_MARKS_LEAD_RE
 # «Личные и рабочие чаты» (2026-10-25): «is this a business chat», one home — the lease re-reads the decision.
 AUDIENCE = _module("audience.py")
+# Which messages/get rows are THIS chat's — audience.CHAT_IDENTITY_JS, one home: the chat id or, on WhatsApp only, the
+# chat's @lid code (some WhatsApp chats are listed under it while the webhook names them by their number). Latest+Combine,
+# Final Check and Reconcile Check embed the same function in both templates; the one line that differs between the two is
+# the template's channel (a code counts on WhatsApp only).
+CHAT_IDENTITY_JS = AUDIENCE.CHAT_IDENTITY_JS
+CHANNEL = {"4wYitz5ek30SVNlT-WhatsApp_Bot.json": "whatsapp", "4VN3gsFaC2HUYmcc-Telegram_Bot.json": "telegram"}
+
+
+def channel_line(channel):
+    """The template's channel — the one line of the three row readers that differs between the WhatsApp and the Telegram
+    template (verify-reply-pipeline.py / verify-message-batching.py compare the rest byte for byte)."""
+    return "const CHANNEL = '" + channel + "';"
+
+
+def chat_identity_block(channel):
+    """What every row reader of a template embeds: the function, then the template's channel."""
+    return (CHAT_IDENTITY_JS + "\n// This template's channel (Tools/n8n/apply-reply-pipeline-v2.py writes it): the only line here that differs between\n"
+            "// the WhatsApp and the Telegram template - a chat's @lid code counts on WhatsApp only.\n" + channel_line(channel))
+
+
 FETCH_RECENT_BUDGET_SECONDS = 2
 PG_NODE_BUDGET_SECONDS = 2
 PEER_RECHECK_SECONDS = DEBOUNCE_SECONDS + FETCH_RECENT_BUDGET_SECONDS + PG_NODE_BUDGET_SECONDS
@@ -177,7 +202,7 @@ with ev as (
 )
 select $4::text as outcome, (select count(*) from hist)::int as dropped_ai_rows, exists(select 1 from ev) as recorded;"""
 
-FINAL_CHECK_JS = r"""// FINAL CHECK (A3, stage 3): re-read the chat RIGHT BEFORE sending. Same rules as Latest+Combine, on a
+_FINAL_CHECK_JS = r"""// FINAL CHECK (A3, stage 3): re-read the chat RIGHT BEFORE sending. Same rules as Latest+Combine, on a
 // fresh snapshot: a client message newer than the trigger → this text is stale (superseded — the newer
 // event's own run answers); an owner message newer than the trigger → the owner took over (cancelled).
 // A snapshot that does not even contain the trigger (crossed/short fetch) is never sent on.
@@ -194,7 +219,11 @@ try { text = String($('Retrieve Answer').first().json.text || ''); } catch (e) {
 // reconcile and the history row all read this text; a reply that is nothing but marks is no reply (generation_failed).
 text = text.replace(new RegExp(__MARKS_RE__), '');
 const fetchedAll = ($json.messages || []).slice();
-const fetched = fetchedAll.filter(m => !(m && m.chatId && trig.chatId && m.chatId !== trig.chatId));
+// A row is this chat's when it names the chat by its id or — WhatsApp only — by the chat's @lid code (chatIdentity below);
+// a row without a chatId is kept, a row naming any other chat is dropped (Wappi crosses concurrent answers).
+__CHAT_IDENTITY__
+const thisChat = chatIdentity(CHANNEL, trig.chatId, trig.whatsapp_chat_id);
+const fetched = fetchedAll.filter(m => !(m && m.chatId && trig.chatId && !thisChat.names(m.chatId)));
 fetched.forEach((m, i) => { if (m) m.__i = i; });
 fetched.sort((a, b) => ((b.time || 0) - (a.time || 0)) || ((a.__i || 0) - (b.__i || 0)));   // newest first, Wappi order breaks ties
 const trigIdx = fetched.findIndex(m => m && m.id === trig.id);
@@ -215,6 +244,11 @@ return [{ json: { ok, outcome, text, generation: Number(claim.generation) || 0, 
                   sendStartedAt: Math.floor(Date.now() / 1000), seenIds, seenComplete, recheck }, pairedItem: { item: 0 } }];
 """.replace("__LIMIT__", str(FETCH_LIMIT)).replace("__MARKS_RE__", json.dumps(MEMORY_MARKS_LEAD_RE, ensure_ascii=False))
 
+
+def final_check_js(channel):
+    return _FINAL_CHECK_JS.replace("__CHAT_IDENTITY__", chat_identity_block(channel))
+
+
 SETTLE_JS = r"""// SETTLE SEND (A7): classify the transport call — never assume delivery from a missing answer.
 const r = $input.first().json || {};
 const body = (r.body && typeof r.body === 'object') ? r.body : {};
@@ -228,11 +262,12 @@ const fc = $('Final Check').first().json;
 return [{ json: { state, unknown: state === 'send_unknown', transportMessageId, error, text: fc.text, sendStartedAt: fc.sendStartedAt }, pairedItem: { item: 0 } }];
 """
 
-RECONCILE_JS = r"""// RECONCILE (A7): the transport may have accepted the message although its answer was lost. Look for
+_RECONCILE_JS = r"""// RECONCILE (A7): the transport may have accepted the message although its answer was lost. Look for
 // OUR text as an outgoing row after the send started; found ⇒ sent (adopt its id), else the state stays
 // send_unknown for the owner to see. Never resend here.
 // R10: Final Check's rules, stricter — here a false «sent» hides a lost reply. Rows naming a FOREIGN chat are
-// dropped (Wappi/tapi cross concurrent responses); the window must hold the TRIGGER (a crossed window without
+// dropped (Wappi/tapi cross concurrent responses; a row names THIS chat by its id or — WhatsApp only — by the
+// chat's @lid code, chatIdentity below); the window must hold the TRIGGER (a crossed window without
 // chatId fields fails here); the echo must be newer than the trigger in the window's order (time desc, Wappi
 // order on ties); a row the transport marks as sent from the phone (tapi from_where) is the owner's, not ours;
 // and EXACTLY ONE distinct row may match — none or several (the owner typed the same text) stay send_unknown.
@@ -254,7 +289,9 @@ const pid = norm(trig.profile_id);
 const scope = norm(fetch.uuid);
 const foreignScope = pid !== '' && scope !== '' && scope !== pid;
 const fetchedAll = (Array.isArray(fetch.messages) ? fetch.messages : []).filter(m => m && typeof m === 'object');
-const fetched = foreignScope ? [] : fetchedAll.filter(m => !(m.chatId && trig.chatId && m.chatId !== trig.chatId)
+__CHAT_IDENTITY__
+const thisChat = chatIdentity(CHANNEL, trig.chatId, trig.whatsapp_chat_id);
+const fetched = foreignScope ? [] : fetchedAll.filter(m => !(m.chatId && trig.chatId && !thisChat.names(m.chatId))
                                                      && !(pid && m.profile_id && norm(m.profile_id) !== pid));
 fetched.forEach((m, i) => { m.__i = i; });
 fetched.sort((a, b) => ((b.time || 0) - (a.time || 0)) || ((a.__i || 0) - (b.__i || 0)));
@@ -279,6 +316,11 @@ return [{ json: { state: hit ? 'sent' : 'send_unknown', transportMessageId: hit 
                   foreignFetched: fetchedAll.length - fetched.length, candidateId: one ? String(one.id || '') : '',
                   candidateSource: known }, pairedItem: { item: 0 } }];
 """
+
+
+def reconcile_js(channel):
+    return _RECONCILE_JS.replace("__CHAT_IDENTITY__", chat_identity_block(channel))
+
 
 # V7: what the ONE history already knows about the rows of the reconcile window — read-only, one row always (an
 # aggregate), so the Code node after it decides; a failed read leaves `sources` absent there, i.e. no facts.
@@ -341,6 +383,39 @@ let combinedText = null;
 if (!newestIncoming || newestIncoming.id !== triggeringId || ownerReplied) {
   abort = true;
 } else if (isText(newestIncoming)) {"""
+
+# Latest+Combine's crossed-response filter (first written by the RETIRED apply-message-batching.py; this generator owns it
+# now): the region from the first anchor through the line that filters the fetch is replaced whole. Both anchors survive in
+# the new text, so a re-run is a no-op and a change of audience.CHAT_IDENTITY_JS reaches the node.
+LC_FILTER_START = "// Wappi/tapi CROSS concurrent same-endpoint responses (project-confirmed; the Unity client\n"
+LC_FILTER_STOP = "const fetched = fetchedAll.filter(m => !isForeign(m));\n"
+
+
+def latest_combine_filter(channel):
+    return (LC_FILTER_START
+            + "// defends with CrossChatResponseGuard). Two chats bursting at once now issue messages/get\n"
+              "// concurrently from n8n too, so drop any row naming a FOREIGN chat before it can drive the\n"
+              "// is-latest decision or leak another chat's text into the combine. A row names THIS chat by\n"
+              "// the chat id or - WhatsApp only - by the chat's @lid code: Wappi lists every row of some\n"
+              "// WhatsApp chats under the code, while the webhook names the chat by its number and carries\n"
+              "// the code in whatsapp_chat_id (chatIdentity below). Conservative, mirroring\n"
+              "// CrossChatResponseGuard: a row with no chatId is KEPT (never discard on missing data), so a\n"
+              "// non-crossed fetch filters to itself and behavior is unchanged. A fully crossed payload\n"
+              "// filters to empty -> newestIncoming undefined -> abort (the pre-existing id-mismatch\n"
+              "// outcome: this fragment dead-ends; never a second reply).\n"
+              "const fetchedAll = ($json.messages || []).slice();\n"
+            + chat_identity_block(channel) + "\n"
+            + "const thisChat = chatIdentity(CHANNEL, triggeringChatId, wh.body.messages[0].whatsapp_chat_id);\n"
+              "const isForeign = (m) => m && m.chatId && triggeringChatId && !thisChat.names(m.chatId);\n"
+            + LC_FILTER_STOP)
+
+
+def latest_combine_region(js):
+    """(start, end) of the filter region in a Latest+Combine body; None unless each anchor occurs exactly once, in order."""
+    if js.count(LC_FILTER_START) != 1 or js.count(LC_FILTER_STOP) != 1:
+        return None
+    start, stop = js.index(LC_FILTER_START), js.index(LC_FILTER_STOP)
+    return (start, stop + len(LC_FILTER_STOP)) if start < stop else None
 
 
 def nid(*parts):
@@ -440,6 +515,14 @@ def patch(fname, base):
         ch = True
     else:
         assert LATEST_COMBINE_PATCH_NEW in js, f"{fname}: Latest+Combine has an unexpected shape"
+    # --- Latest+Combine: the chat's own rows (the chat id, or WhatsApp's @lid code) ---
+    js = lc["parameters"]["jsCode"]
+    region = latest_combine_region(js)
+    assert region is not None, f"{fname}: Latest+Combine has no crossed-response filter region (an unexpected shape)"
+    new_js = js[:region[0]] + latest_combine_filter(CHANNEL[fname]) + js[region[1]:]
+    if new_js != js:
+        lc["parameters"]["jsCode"] = new_js
+        ch = True
 
     # --- cancel/refusal paths ---
     ch |= ensure(wf, code("Cancel Label", CANCEL_LABEL_JS, [-2500, 620], fname))
@@ -491,7 +574,7 @@ def patch(fname, base):
 
     # --- final check + lease + send + settle ---
     ch |= ensure(wf, fetch("Final Fetch", base, [-64, -160], fname))
-    ch |= ensure(wf, code("Final Check", FINAL_CHECK_JS, [128, -160], fname))
+    ch |= ensure(wf, code("Final Check", final_check_js(CHANNEL[fname]), [128, -160], fname))
     ch |= ensure(wf, if_true("Final OK?", "={{ $json.ok }}", [320, -160], fname))
     ch |= ensure(wf, pg("Acquire Send Lease", ACQUIRE_SQL, key + ACQUIRE_PARAMS_TAIL, [512, -160], fname))
     ch |= ensure(wf, if_true("Send Allowed?", "={{ $json.allowed }}", [704, -160], fname))
@@ -514,7 +597,7 @@ def patch(fname, base):
     ch |= ensure(wf, {"parameters": {"amount": 3}, "id": nid(fname, "Wait Reconcile"), "name": "Wait Reconcile", "type": "n8n-nodes-base.wait",
                       "typeVersion": 1.1, "position": [1472, 420], "webhookId": nid(fname, "Wait Reconcile", "wh")})
     ch |= ensure(wf, fetch("Reconcile Fetch", base, [1664, 420], fname))
-    ch |= ensure(wf, code("Reconcile Check", RECONCILE_JS, [1856, 420], fname))
+    ch |= ensure(wf, code("Reconcile Check", reconcile_js(CHANNEL[fname]), [1856, 420], fname))
     ch |= ensure(wf, pg("Owner Row?", OWNER_ROW_SQL, OWNER_ROW_PARAMS, [1760, 620], fname))   # V7, appended
     ch |= ensure(wf, pg("Record Send", RECORD_SEND_SQL, key + ", $json.state, $json.transportMessageId, $json.error, $execution.id ] }}", [2048, 288], fname))
     ch |= set_edges(wf, "Retrieve Answer", [["Final Fetch"]])
@@ -556,11 +639,17 @@ def check():
                 "Send Allowed?", "Settle Send", "Send Unknown?", "Wait Reconcile", "Reconcile Fetch", "Reconcile Check",
                 "Record Send", "Cancel Label", "Record Cancel", "Peer Recheck?", "Wait Peer Recheck", "Recheck Fetch", "Owner Row?")
             # Claim / Record Send / Record Cancel / Cancel Label are re-shaped by apply-history-handoff.py (stage 4) — not compared here.
-        if any(node(wf, n) is None for n in need) or LATEST_COMBINE_PATCH_NEW not in node(wf, "Latest+Combine")["parameters"]["jsCode"] \
-                or node(wf, "Acquire Send Lease")["parameters"]["query"] != ACQUIRE_SQL or node(wf, "Final Check")["parameters"]["jsCode"] != FINAL_CHECK_JS \
+        if any(node(wf, n) is None for n in need):
+            bad.append(f)
+            continue
+        lc_js = node(wf, "Latest+Combine")["parameters"]["jsCode"]
+        region = latest_combine_region(lc_js)
+        if LATEST_COMBINE_PATCH_NEW not in lc_js or region is None or lc_js[region[0]:region[1]] != latest_combine_filter(CHANNEL[f]) \
+                or node(wf, "Acquire Send Lease")["parameters"]["query"] != ACQUIRE_SQL \
+                or node(wf, "Final Check")["parameters"]["jsCode"] != final_check_js(CHANNEL[f]) \
                 or not node(wf, "Acquire Send Lease")["parameters"]["options"]["queryReplacement"].endswith(ACQUIRE_PARAMS_TAIL) \
                 or node(wf, "Wait Peer Recheck")["parameters"].get("amount") != PEER_RECHECK_SECONDS \
-                or node(wf, "Reconcile Check")["parameters"]["jsCode"] != RECONCILE_JS \
+                or node(wf, "Reconcile Check")["parameters"]["jsCode"] != reconcile_js(CHANNEL[f]) \
                 or node(wf, "Owner Row?")["parameters"]["query"] != OWNER_ROW_SQL \
                 or node(wf, "Owner Row?")["parameters"]["options"]["queryReplacement"] != OWNER_ROW_PARAMS:
             bad.append(f)

@@ -18,6 +18,10 @@ attribution — the transport's API mark (from_where 'api' / outgoing_message_ap
 the one history's `outgoing_api` row (Owner Row?) — and never when the history gives it to the owner (owner_app /
 owner_phone) or to another reply (ai). Anything else stays send_unknown.
 
+LID: a WhatsApp chat Wappi lists under its @lid code (the window's rows carry the code, the webhook names the chat by its
+number and carries the code in whatsapp_chat_id) — the echo under the code is found; a window under another code stays
+foreign; a code that is empty, has no @lid suffix or is the chat id itself changes nothing; Telegram has no code.
+
 Executes the REAL Reconcile Check body of BOTH templates (fed like Owner Row? feeds it: the Reconcile Fetch window
 as a named node, the history's sources as the input), and end to end Settle Send → Reconcile Fetch → Owner Row? →
 Reconcile Check → Record Send on staging-PG temp tables.
@@ -28,15 +32,20 @@ import time
 
 from harness import Case, PgSession, code, has_node, report
 # the test chats are business chats (the owner's decision): the templates answer and record only there («Личные и рабочие чаты»)
-from reply_chain import CHATS, SETUP_BUSINESS as SETUP, TEMPLATES, Run, history, ledger, msg, record_outgoing
+from reply_chain import CHATS, SETUP_BUSINESS as SETUP, TEMPLATES, Run, history, ledger, msg, record_outgoing, under_code
 
 TEXT = 'Напишите, пожалуйста, текстом — так я быстрее отвечу.'
 T0 = 1_790_000_000
 API = dict(from_where='api', task_id='9f2c4a7e1b0d4c3a8e6f5a2b1c0d9e8f')   # how the transport marks an API send (tapi rows, WA webhook)
 
 
-def reconcile(T, ch, rows, error=None, trig_time=T0, uuid=None, sources=None):
+CODE, OTHER_CODE = '100000000000123@lid', '100000000000999@lid'      # a WhatsApp chat's @lid code, another chat's
+
+
+def reconcile(T, ch, rows, error=None, trig_time=T0, uuid=None, sources=None, lid=None):
     trig = msg(ch, 'TRIG', trig_time, 'https://mock/photo.jpg', mtype='image')
+    if lid is not None:                       # the webhook's whatsapp_chat_id: the chat's @lid code (WhatsApp)
+        trig['whatsapp_chat_id'] = lid
     settle = {'state': 'send_unknown', 'unknown': True, 'transportMessageId': '', 'error': 'socket hang up', 'text': TEXT,
               'sendStartedAt': T0 + 30}
     fetch = {'error': error} if error else dict({'status': 'done', 'messages': rows}, **({'uuid': uuid} if uuid is not None else {}))
@@ -59,9 +68,10 @@ for ch, T in TEMPLATES.items():
     OTHER = C.replace('3', '4') if ch == 'WA' else C + '9'
     trig = row(ch, 'TRIG', T0, 'https://mock/photo.jpg', from_me=False, type='image')
 
-    def case(title, rows, want_state, want_id=None, error=None, trig_time=T0, uuid=None, sources=None, want_error=None, want_foreign=None, tag='R10'):
+    def case(title, rows, want_state, want_id=None, error=None, trig_time=T0, uuid=None, sources=None, want_error=None, want_foreign=None, tag='R10',
+             lid=None):
         with Case(f'{tag} [{ch}] {title}') as c:
-            out = reconcile(T, ch, rows, error, trig_time, uuid, sources)
+            out = reconcile(T, ch, rows, error, trig_time, uuid, sources, lid)
             c.check(out.get('state') == want_state and (want_id is None or out.get('transportMessageId') == want_id)
                     and (want_error is None or want_error in (out.get('error') or ''))
                     and (want_foreign is None or out.get('foreignFetched') == want_foreign),
@@ -173,5 +183,60 @@ for ch, T in TEMPLATES.items():
             h = sorted((x['message_id'], x['source']) for x in history(pg, ch))
             c.check(r.outcome == 'sent' and ledger(pg, ch).get('TRIG') == 'sent', f'outcome={r.outcome}')
             c.check(h == [('OUT-API', 'ai'), ('TRIG', 'client')], f'history={h}')
+
+    # --- LID: a WhatsApp chat Wappi lists under its @lid code (docs/audits/2026-10-25-personal-chats/live-checks.md) -------
+    # The webhook names the chat by its number and carries the code in whatsapp_chat_id; the window's rows carry the code.
+    # A row is the chat's by its id or — WhatsApp only — that code; every rule above holds unchanged on such a window.
+    wa = ch == 'WA'
+    echo, trig_c = under_code(row(ch, 'ECHO', T0 + 31, **API), CODE), under_code(trig, CODE)
+    case('the window lists the chat under its @lid code, the webhook carries it → '
+         + ('our echo under the code: sent with the echo\'s id' if wa else 'Telegram has no code: no trigger in the window, send_unknown'),
+         [echo, trig_c], 'sent' if wa else 'send_unknown', 'ECHO' if wa else None, lid=CODE, want_foreign=0 if wa else 2, tag='LID')
+    case('the window lists ANOTHER code (a crossed answer) → send_unknown, every row foreign',
+         [under_code(row(ch, 'ECHO', T0 + 31, **API), OTHER_CODE), under_code(trig, OTHER_CODE)], 'send_unknown', lid=CODE,
+         want_error='window without the trigger', want_foreign=2, tag='LID')
+    case('our echo under the code below a crossed same-text row under another code → '
+         + ('sent with OUR id, the crossed row dropped' if wa else 'send_unknown (as before)'),
+         [under_code(row(ch, 'FOREIGN', T0 + 33, **API), OTHER_CODE), echo, trig_c], 'sent' if wa else 'send_unknown',
+         'ECHO' if wa else None, lid=CODE, want_foreign=1 if wa else 3, tag='LID')
+    case('two same-text echoes under the code → ambiguous → send_unknown (exactly one candidate, as before)',
+         [under_code(row(ch, 'ECHO1', T0 + 32, **API), CODE), under_code(row(ch, 'ECHO2', T0 + 31, **API), CODE), trig_c], 'send_unknown',
+         lid=CODE, tag='LID')
+    case('the owner\'s app send under the code (owner_app in the history) → send_unknown (V7 holds under the code)',
+         [under_code(row(ch, 'OWNER-APP', T0 + 32, **API), CODE), trig_c], 'send_unknown', lid=CODE, sources={'OWNER-APP': 'owner_app'}, tag='LID')
+    for value, label in (('', 'empty'), ('100000000000123', 'without the @lid suffix'), ('@lid', 'the suffix alone'), (C, 'the chat id itself')):
+        case(f'whatsapp_chat_id {label}: the window under a code → send_unknown (the rule changes nothing)',
+             [echo, trig_c], 'send_unknown', lid=value, want_foreign=2, tag='LID')
+        case(f'whatsapp_chat_id {label}: the window under the chat id → sent (as before)',
+             [row(ch, 'ECHO', T0 + 31, **API), trig], 'sent', 'ECHO', lid=value, tag='LID')
+        if value not in ('', C):
+            case(f'whatsapp_chat_id {label}: the window under that very value → send_unknown (it is no code)',
+                 [under_code(row(ch, 'ECHO', T0 + 31, **API), value), under_code(trig, value)], 'send_unknown', lid=value, want_foreign=2, tag='LID')
+
+    with Case(f'LID [{ch}] end to end: every read lists the chat under its @lid code and the send\'s answer is lost → '
+              + ('Latest+Combine, Final Check and the reconcile take the rows: sent with the echo\'s id' if wa
+                 else 'Telegram has no code: the run stops at Latest+Combine (superseded), nothing is sent')) as c:
+        with PgSession(SETUP) as pg:
+            now = int(time.time())
+            m = dict(msg(ch, 'TRIG', now - 30, 'https://mock/photo.jpg', mtype='image'), whatsapp_chat_id=CODE)
+            r = Run(T, pg, m, 'exec-LID')
+            r.claim()
+            r.latest([under_code(m, CODE)])
+            if not r.done:
+                r.ask_for_text(TEXT)
+                r.final([under_code(m, CODE)])
+            if not r.done:
+                r.lease()
+            if not r.done:
+                st = r.named['Final Check']['sendStartedAt']
+                r.send({'error': {'message': 'socket hang up'}},
+                       reconcile_snapshot=[under_code(row(ch, 'ECHO', st + 2, **API), CODE), under_code(m, CODE)])
+            led = ledger(pg, ch)
+            rc = r.named.get('Reconcile Check') or {}
+            if wa:
+                c.check(r.outcome == 'sent' and led.get('TRIG') == 'sent' and rc.get('transportMessageId') == 'ECHO',
+                        f'outcome={r.outcome} ledger={led} reconcile={rc}')
+            else:
+                c.check(r.outcome == 'superseded' and led.get('TRIG') == 'superseded' and not rc, f'outcome={r.outcome} ledger={led}')
 
 report()

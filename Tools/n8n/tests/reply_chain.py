@@ -65,6 +65,20 @@ def msg(ch, mid, t, body=None, from_me=False, chat=None, mtype='chat'):
     return m
 
 
+OWN_CODE = '100000000000001@lid'        # the owner's own WhatsApp @lid code
+
+
+def under_code(m, code, own=OWN_CODE):
+    """A messages/get row as Wappi lists it for a WhatsApp chat kept under its @lid code
+    (docs/audits/2026-10-25-personal-chats/live-checks.md): chatId is the code, the client's `from` is the code, the owner's
+    `from` his own code — while the webhook of that chat names it by its number and carries the code in whatsapp_chat_id
+    (a row never carries that field)."""
+    r = dict(m, chatId=code)
+    r['from'] = own if r.get('fromMe') else code
+    r.pop('whatsapp_chat_id', None)
+    return r
+
+
 def _cond(w, name, j, named=None):
     return bool(expr(node(w, name)['parameters']['conditions']['conditions'][0]['leftValue'], j, named))
 

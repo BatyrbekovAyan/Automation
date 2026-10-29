@@ -24,6 +24,9 @@ body). No database, no n8n server, no network, never prod.
                                      earlier one wins — so a twin that orders the steps differently fails the table
   rule_js_carries_the_modules_constants   the suffix list, the service ids and the Telegram chat types in RULE_JS are the module's
   missing_facts_fail_closed          a fact that is not given is unknown, never a known «no»; an unknown channel is not decided
+  chat_identity_truth_table          CHAT_IDENTITY_JS: a messages/get row names the chat by its id or, on WhatsApp only, by its
+                                     @lid code (something before the suffix, not the chat id itself); any other id is another chat
+  chat_identity_js_is_pure           ASCII, no clock / n8n global, no placeholder, the module's suffix, one top-level name
 
     python3 Tools/n8n/tests/test_audience_rule.py
 """
@@ -221,5 +224,63 @@ with Case('missing_facts_fail_closed: a fact that is not given reads as unknown,
         ]
         for (title, _), g in zip(probes, decide([f for _, f in probes])):
             c.check(g == unknown, f'{title}: expected personal/unknown, got {g}')
+
+# ---------------------------------------------------------------------------------------------- the chat's own rows
+WA_CHAT, WA_CODE, OTHER_CODE, TG_CHAT = '77001112233@c.us', '100000000000123@lid', '100000000000999@lid', '5550001112'
+# (title, channel, chat id, the code given, the code that counts, {id: names this chat?})
+IDENTITY = (
+    ('whatsapp, the chat\'s @lid code', 'whatsapp', WA_CHAT, WA_CODE, WA_CODE,
+     {WA_CHAT: True, WA_CODE: True, OTHER_CODE: False, '77009998877@c.us': False, '': False}),
+    ('whatsapp, no code', 'whatsapp', WA_CHAT, '', '', {WA_CHAT: True, WA_CODE: False}),
+    ('whatsapp, the code not given', 'whatsapp', WA_CHAT, None, '', {WA_CHAT: True, WA_CODE: False}),
+    ('whatsapp, a code that is not a string', 'whatsapp', WA_CHAT, 100000000000123, '', {WA_CHAT: True, WA_CODE: False}),
+    ('whatsapp, digits without the @lid suffix', 'whatsapp', WA_CHAT, '100000000000123', '', {WA_CHAT: True, '100000000000123': False}),
+    ('whatsapp, the suffix alone', 'whatsapp', WA_CHAT, '@lid', '', {WA_CHAT: True, '@lid': False}),
+    ('whatsapp, the suffix in another case', 'whatsapp', WA_CHAT, '100000000000123@LID', '', {'100000000000123@LID': False}),
+    ('whatsapp, a number is no code', 'whatsapp', WA_CHAT, '77009998877@c.us', '', {WA_CHAT: True, '77009998877@c.us': False}),
+    ('whatsapp, the code is the chat id itself', 'whatsapp', WA_CHAT, WA_CHAT, '', {WA_CHAT: True, WA_CODE: False}),
+    ('whatsapp, a chat known only by its code', 'whatsapp', WA_CODE, WA_CODE, '', {WA_CODE: True, OTHER_CODE: False}),
+    ('telegram has no code', 'telegram', TG_CHAT, WA_CODE, '', {TG_CHAT: True, WA_CODE: False}),
+    ('an unknown channel', 'sms', WA_CHAT, WA_CODE, '', {WA_CHAT: True, WA_CODE: False}),
+    ('the channel spelled otherwise', 'WhatsApp', WA_CHAT, WA_CODE, '', {WA_CODE: False}),
+)
+
+
+def identity(rows):
+    """chatIdentity (CHAT_IDENTITY_JS, in node) for each (channel, chatId, code, ids) → {code, names: [bool per id]}."""
+    runner = ("\nreturn $input.all().map((i) => { const x = chatIdentity(i.json.channel, i.json.chatId, i.json.code);\n"
+              "  return { json: { code: x.code, names: i.json.ids.map((id) => x.names(id)) } }; });")
+    w = {'nodes': [{'name': 'Identity', 'parameters': {'jsCode': AUD.CHAT_IDENTITY_JS + runner}}]}
+    items = [{'json': dict({'channel': ch, 'chatId': chat, 'ids': list(ids)}, **({} if code_ is None else {'code': code_}))}
+             for ch, chat, code_, ids in rows]
+    return [o['json'] for o in code(w, 'Identity', items=items)]
+
+
+with Case('chat_identity_truth_table: a row names the chat by its id or, on WhatsApp only, by its @lid code (a string ending in '
+          'the suffix with something before it, not the chat id itself); any other id is another chat') as c:
+    c.check(AUD is not None, NO_MODULE)
+    if AUD is not None:
+        got = identity([(ch, chat, code_, ids) for _, ch, chat, code_, _, ids in IDENTITY])
+        for (title, _, _, _, want_code, ids), g in zip(IDENTITY, got):
+            want = {'code': want_code, 'names': list(ids.values())}
+            c.check(g == want, f'{title}: got {g}, want {want}')
+
+with Case('chat_identity_js_is_pure: ASCII, no clock / n8n global / require, no placeholder left, the module\'s suffix; one '
+          'top-level name, chatIdentity, between its BEGIN and END lines') as c:
+    c.check(AUD is not None, NO_MODULE)
+    if AUD is not None:
+        js = AUD.CHAT_IDENTITY_JS
+        for needle in ('$(', 'require(', 'Date', 'Math.random'):
+            c.check(needle not in js, f'CHAT_IDENTITY_JS contains {needle!r}')
+        c.check(not re.search(r'\$[A-Za-z_]', js), 'CHAT_IDENTITY_JS names an n8n global ($json, $input, $env …)')
+        c.check(js.isascii(), 'CHAT_IDENTITY_JS must be ASCII')
+        c.check(not re.search(r'__[A-Z_]+__', js), 'CHAT_IDENTITY_JS still carries a template placeholder')
+        c.check(f'const CODE_SUFFIX = {json.dumps(AUD.CHAT_CODE_SUFFIX)};' in js and AUD.CHAT_CODE_SUFFIX == '@lid',
+                f'the suffix inside CHAT_IDENTITY_JS must be the module\'s CHAT_CODE_SUFFIX ({AUD.CHAT_CODE_SUFFIX!r})')
+        c.check(js.startswith(AUD.CHAT_IDENTITY_BEGIN) and js.endswith(AUD.CHAT_IDENTITY_END)
+                and js.count(AUD.CHAT_IDENTITY_BEGIN) == 1 and js.count(AUD.CHAT_IDENTITY_END) == 1,
+                'CHAT_IDENTITY_JS must open with its BEGIN line and close with its END line, once each')
+        top = re.findall(r'^(?:async\s+)?(?:function|const|let|var|class)\s+(\w+)', js, re.M)
+        c.check(top == ['chatIdentity'], f'top-level names {top}: a Code node that embeds it must not meet another one')
 
 report()

@@ -762,24 +762,25 @@ def check_webhook(bundle, sql=None):
          "Replay Plan must run per item, take FRESH_HOURS from audience.py, check the page is this profile's and chat's, hand on "
          "only the client's fresh message (never a voice message) and build it in ONE function")
     need("const req = $('Chat Code').item.json;" in plan
-         and "const chatLid = typeof req.chat_lid === 'string' ? req.chat_lid : '';" in plan
-         and "const ours = (id) => id === chatId || (chatLid !== '' && id === chatLid);" in plan
+         and "const chat = chatIdentity(channel, chatId, req.chat_lid);" in plan and "const ours = chat.names;" in plan
+         and plan.count(AUD.CHAT_IDENTITY_JS) == 1 and plan.count(AUD.CHAT_IDENTITY_BEGIN) == 1
          and "m.chatId !== '' && !ours(m.chatId)" in plan and "!rows.some(foreign)" in plan,
          "Replay Plan must read the chat off Chat Code and count a row as the chat's when its chatId is the chat id or its code "
-         "— a row is the chat's by those two ids only, any other makes the page nothing")
+         "(audience.CHAT_IDENTITY_JS verbatim) — a row is the chat's by those two ids only, any other makes the page nothing")
     need("else if (!ours(String(newest.from))) why = 'not_from_chat';" in plan,
          "Replay Plan must hand on only a row whose own `from` is the chat (its id or its code) — a group member's message "
          "names the member there and is never replayed (the templates' only group guard «If» from == chatId)")
     need("    from: chatId,\n" in plan and "    chatId: chatId,\n" in plan
-         and "  if (channel === 'whatsapp') message.whatsapp_chat_id = chatLid;\n" in plan,
+         and "  if (channel === 'whatsapp') message.whatsapp_chat_id = chatLid;\n" in plan
+         and "replayMessage(channel, profileId, chatId, chat.code, newest)" in plan,
          "the replayed message names the chat by the decision's id (chatId = from — the key of the templates' group guard and "
          "mode read), and on WhatsApp carries the code as whatsapp_chat_id, as the incoming webhook does")
     cc = P["Chat Code"].get("jsCode", "")
     need(P["Chat Code"].get("mode") == "runOnceForEachItem" and "const req = $('Chat Channel').item.json;" in cc
          and "if ($prevNode.name === 'Chat Card') {" in cc and "idOf(d) === req.chat_id" in cc
          and "body.uuid !== req.profile_id" in cc and "body.status === 'done'" in cc and "Number(res.statusCode) === 200" in cc
-         and "card.chat.LID" in cc and 'const LID_SUFFIX = "@lid";' in cc
-         and "lid.length > LID_SUFFIX.length && lid.endsWith(LID_SUFFIX) && lid !== req.chat_id" in cc
+         and "card.chat.LID" in cc and "chatLid = chatIdentity(req.channel, req.chat_id, lid).code;" in cc
+         and cc.count(AUD.CHAT_IDENTITY_JS) == 1 and cc.count(AUD.CHAT_IDENTITY_BEGIN) == 1
          and "chat_lid: chatLid" in cc,
          "Chat Code must run per item and take the code only off the card it was handed (Chat Card), from an answer that counts "
          "(200, done, this profile's) and the dialog whose id IS the chat id, and only an @lid code — anything else is no code")
@@ -908,18 +909,24 @@ WEBHOOK_MUTATIONS = (
      "names the chat by the decision's id"),
     ("the replay leaves the code out", _wh("Replay Plan", "jsCode", "  if (channel === 'whatsapp') message.whatsapp_chat_id = chatLid;\n", ""),
      "names the chat by the decision's id"),
-    ("Replay Plan counts any row as the chat's", _wh("Replay Plan", "jsCode",
-                                                     "const ours = (id) => id === chatId || (chatLid !== '' && id === chatLid);",
-                                                     "const ours = (id) => true;"), "count a row as the chat's"),
-    ("Replay Plan ignores the code", _wh("Replay Plan", "jsCode", " || (chatLid !== '' && id === chatLid)", ""), "count a row as the chat's"),
+    ("Replay Plan counts any row as the chat's", _wh("Replay Plan", "jsCode", "const ours = chat.names;", "const ours = (id) => true;"),
+     "count a row as the chat's"),
+    ("Replay Plan ignores the code", _wh("Replay Plan", "jsCode", "chatIdentity(channel, chatId, req.chat_lid)", "chatIdentity(channel, chatId, '')"),
+     "count a row as the chat's"),
+    ("Replay Plan takes any code", _wh("Replay Plan", "jsCode", "id === chatId || (lid !== '' && id === lid)",
+                                       "id === chatId || String(id).endsWith(CODE_SUFFIX)"), "count a row as the chat's"),
+    ("the replay carries no code", _wh("Replay Plan", "jsCode", "replayMessage(channel, profileId, chatId, chat.code, newest)",
+                                       "replayMessage(channel, profileId, chatId, '', newest)"), "names the chat by the decision's id"),
     ("Replay Plan reads the chat off Chat Channel", _wh("Replay Plan", "jsCode", "const req = $('Chat Code').item.json;",
                                                          "const req = $('Chat Channel').item.json;"), "read the chat off Chat Code"),
     ("Chat Code takes any dialog", _wh("Chat Code", "jsCode", "idOf(d) === req.chat_id", "idOf(d) !== ''"), "Chat Code must"),
     ("Chat Code takes a crossed card", _wh("Chat Code", "jsCode",
                                            " && !(typeof body.uuid === 'string' && body.uuid !== '' && body.uuid !== req.profile_id)", ""),
      "Chat Code must"),
-    ("Chat Code takes a LID that is no code", _wh("Chat Code", "jsCode", "lid.length > LID_SUFFIX.length && lid.endsWith(LID_SUFFIX) && ", ""),
-     "Chat Code must"),
+    ("Chat Code takes a LID that is no code", _wh("Chat Code", "jsCode", "chatLid = chatIdentity(req.channel, req.chat_id, lid).code;",
+                                                  "chatLid = lid;"), "Chat Code must"),
+    ("Chat Code takes a code without @lid", _wh("Chat Code", "jsCode", "\n    && code.endsWith(CODE_SUFFIX)", ""), "Chat Code must"),
+    ("Chat Code takes a code on Telegram", _wh("Chat Code", "jsCode", "channel === 'whatsapp' && ", ""), "Chat Code must"),
     ("Chat Code reads any input as a card", _wh("Chat Code", "jsCode", "if ($prevNode.name === 'Chat Card') {", "if (true) {"),
      "Chat Code must"),
     ("Chat Code runs once for all items", _wh_node("Chat Code", "parameters", {"jsCode": CRA.CHAT_CODE_JS}), "Chat Code must"),
@@ -1155,11 +1162,14 @@ def check_decide(bundle, sql=None):
     dj = P["Decide"].get("jsCode", "")
     need(f"const RECENT_LIMIT = {AUD.RECENT_LIMIT};" in dj and "String(m.id) === plan.messageId" in dj
          and "time(m) * 1000 < plan.connectedAtMs" in dj and "facts.history = rows.length < RECENT_LIMIT ? false : null;" in dj
-         and "!(plan.chatLid !== '' && m.chatId === plan.chatLid)" in dj and "body.uuid !== plan.profileId" in dj
+         and "const chat = chatIdentity(plan.channel, plan.chatId, plan.chatLid);" in dj
+         and "typeof m.chatId === 'string' && m.chatId !== '' && !chat.names(m.chatId));" in dj and "body.uuid !== plan.profileId" in dj
          and "rows.every(ours)" in dj and "persist: verdict.reason !== 'unknown'" in dj and "page = rows;" in dj,
          "Decide must read the history off the one page: this profile's and this chat's (its code counts), holding the trigger, "
          "a row older than the connection → true, a short page → false, a full one of new rows → unknown; persist only a known "
          "reason; hand the page on as Wappi returned it")
+    need(dj.count(AUD.CHAT_IDENTITY_JS) == 1 and dj.count(AUD.CHAT_IDENTITY_BEGIN) == 1,
+         "Decide must embed audience.CHAT_IDENTITY_JS verbatim, once — a row is the chat's by its id or WhatsApp's @lid code")
     sh = P["Shape"].get("jsCode", "")
     need("const row = $('Write Decision').first().json || {};" in sh
          and "const written = row.source === 'default' || row.source === 'owner';" in sh
@@ -1344,6 +1354,13 @@ DECIDE_MUTATIONS = (
      _dec("Decide", "jsCode", "facts.history = rows.length < RECENT_LIMIT ? false : null;", "facts.history = false;"),
      "Decide must read the history off the one page"),
     ("Decide counts rows of any chat", _dec("Decide", "jsCode", " && rows.every(ours)", ""), "Decide must read the history off the one page"),
+    ("Decide ignores the code", _dec("Decide", "jsCode", "chatIdentity(plan.channel, plan.chatId, plan.chatLid)",
+                                     "chatIdentity(plan.channel, plan.chatId, '')"), "Decide must read the history off the one page"),
+    ("Decide takes any code", _dec("Decide", "jsCode", "id === chatId || (lid !== '' && id === lid)",
+                                   "id === chatId || String(id).endsWith(CODE_SUFFIX)"), "Decide must embed audience.CHAT_IDENTITY_JS"),
+    ("Decide takes a code on Telegram", _dec("Decide", "jsCode", "channel === 'whatsapp' && ", ""), "Decide must embed audience.CHAT_IDENTITY_JS"),
+    ("Decide takes a code without @lid", _dec("Decide", "jsCode", "\n    && code.endsWith(CODE_SUFFIX)", ""),
+     "Decide must embed audience.CHAT_IDENTITY_JS"),
     ("Decide sorts the page before the backfill", _dec("Decide", "jsCode", "page = rows;", "page = rows.slice().reverse();"),
      "Decide must read the history off the one page"),
     ("Decide writes an unknown", _dec("Decide", "jsCode", "persist: verdict.reason !== 'unknown'", "persist: true"),

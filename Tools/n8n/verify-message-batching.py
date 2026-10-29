@@ -18,6 +18,11 @@ Usage:
 script). Point it at a prod re-export so the SAME structural asserts gate a prod import.
 Absent --dir, behavior is byte-identical to before.
 
+Latest+Combine's crossed-response filter keeps a row of THIS chat — the webhook's chatId or, on WhatsApp only, the chat's
+@lid code from the webhook's whatsapp_chat_id (audience.CHAT_IDENTITY_JS, with the template's channel on ONE line); a
+tripwire proves the checks reject the code not accepted, any code accepted, the code accepted on Telegram and a code
+without @lid accepted.
+
 Exits 0 and prints "ALL BATCHING ASSERTS PASSED" when every assert holds.
 Exits 1 with "BATCHING FAIL: <reason>" naming the first violated assert.
 """
@@ -25,6 +30,7 @@ import argparse
 import copy
 import json
 import os
+import re
 import sys
 import uuid
 
@@ -52,6 +58,85 @@ TEXT_VALUE = "={{ $json.combinedText ?? $json.body.messages[0].body }}"
 # bare dead-end now ends at this single Code node, and NOTHING else may hang off those branches.
 OUTCOME_EDGE = {"node": "Outcome", "type": "main", "index": 0}
 OUTCOME_LABELS = ("filtered", "suppressed", "superseded", "quota_denied", "sent")
+
+# The chat's own rows (2026-10-29): Latest+Combine drops a row only when it names ANOTHER chat — a row of THIS chat names it
+# by the webhook's chatId or, on WhatsApp only, by the chat's @lid code (the webhook's whatsapp_chat_id; Wappi lists every
+# row of some WhatsApp chats under it). audience.CHAT_IDENTITY_JS, embedded verbatim, with the template's channel on ONE
+# line; the rule's own clauses are pinned here as well.
+TEMPLATE_CHANNEL = {WA_BOT: "whatsapp", TG_BOT: "telegram"}
+IDENTITY_CLAUSES = ('const CODE_SUFFIX = "@lid";',
+                    "const lid = (channel === 'whatsapp' && typeof code === 'string' && code.length > CODE_SUFFIX.length\n"
+                    "    && code.endsWith(CODE_SUFFIX) && code !== chatId) ? code : '';",
+                    "return { code: lid, names: (id) => id === chatId || (lid !== '' && id === lid) };")
+LC_IDENTITY_LINES = ("const thisChat = chatIdentity(CHANNEL, triggeringChatId, wh.body.messages[0].whatsapp_chat_id);",
+                     "const isForeign = (m) => m && m.chatId && triggeringChatId && !thisChat.names(m.chatId);",
+                     "const fetched = fetchedAll.filter(m => !isForeign(m));",
+                     "const foreignFetched = fetchedAll.length - fetched.length;")
+# (label, old, new, the templates the mutation applies to) — the tripwire's own list
+LC_IDENTITY_MUTATIONS = (
+    ("the code not accepted: the code not handed in", "wh.body.messages[0].whatsapp_chat_id);", "'');", (WA_BOT, TG_BOT)),
+    ("the code not accepted: the old filter", "!thisChat.names(m.chatId)", "m.chatId !== triggeringChatId", (WA_BOT, TG_BOT)),
+    ("any code accepted", "id === chatId || (lid !== '' && id === lid)", "id === chatId || String(id).endsWith(CODE_SUFFIX)",
+     (WA_BOT, TG_BOT)),
+    ("any id accepted", "names: (id) => id === chatId || (lid !== '' && id === lid)", "names: (id) => true", (WA_BOT, TG_BOT)),
+    ("accepted on Telegram: the channel guard dropped", "channel === 'whatsapp' && ", "", (WA_BOT, TG_BOT)),
+    ("accepted on Telegram: the template says whatsapp", "const CHANNEL = 'telegram';", "const CHANNEL = 'whatsapp';", (TG_BOT,)),
+    ("not accepted on WhatsApp: the template says telegram", "const CHANNEL = 'whatsapp';", "const CHANNEL = 'telegram';", (WA_BOT,)),
+    ("a code without @lid accepted", "\n    && code.endsWith(CODE_SUFFIX)", "", (WA_BOT, TG_BOT)),
+    ("the chat id taken for a code", " && code !== chatId)", ")", (WA_BOT, TG_BOT)),
+)
+
+
+_AUD = []
+
+
+def _audience():
+    """audience.py — the ONE home of CHAT_IDENTITY_JS (loaded once)."""
+    if not _AUD:
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("audience", os.path.join(HERE, "audience.py"))
+        m = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(m)
+        _AUD.append(m)
+    return _AUD[0]
+
+
+def latest_combine_identity_problems(js, f):
+    """What is wrong with the chat-identity rule in one template's Latest+Combine body — [] when nothing."""
+    aud = _audience()
+    out = []
+    b, e = js.find(aud.CHAT_IDENTITY_BEGIN), js.find(aud.CHAT_IDENTITY_END)
+    embedded = js[b:e + len(aud.CHAT_IDENTITY_END)] if 0 <= b < e else ""
+    if js.count(aud.CHAT_IDENTITY_BEGIN) != 1 or embedded != aud.CHAT_IDENTITY_JS:
+        out.append(f"{f}: Latest+Combine must embed audience.CHAT_IDENTITY_JS verbatim, once")
+    missing = [c for c in IDENTITY_CLAUSES if c not in embedded]
+    if missing:
+        out.append(f"{f}: Latest+Combine's chatIdentity does not state the rule (the chat id, or WhatsApp's @lid code that is "
+                   f"not the chat id; nothing else): missing {missing[0]!r}")
+    channels = re.findall(r"^const CHANNEL = '([a-z]*)';$", js, re.M)
+    if channels != [TEMPLATE_CHANNEL[f]]:
+        out.append(f"{f}: Latest+Combine must say the template's channel on ONE line, const CHANNEL = '{TEMPLATE_CHANNEL[f]}' "
+                   f"(a code counts on WhatsApp only): {channels}")
+    lacking = [x for x in LC_IDENTITY_LINES if js.count(x) != 1]
+    if lacking:
+        out.append(f"{f}: Latest+Combine must drop a row only when it names another chat (a row without a chatId kept): "
+                   f"lacks {lacking[0]!r}")
+    if "m.chatId !== triggeringChatId" in js:
+        out.append(f"{f}: Latest+Combine still compares a row's chatId with the webhook's chatId alone (the @lid code is dropped)")
+    return out
+
+
+def latest_combine_identity_tripwire(js, f):
+    """Every mutation of LC_IDENTITY_MUTATIONS must be rejected by latest_combine_identity_problems; returns how many."""
+    rejected = 0
+    for label, old, new, files in LC_IDENTITY_MUTATIONS:
+        if f not in files:
+            continue
+        assert_that(old in js, f"{f}: tripwire anchor of {label!r} not found in Latest+Combine")
+        assert_that(latest_combine_identity_problems(js.replace(old, new), f),
+                    f"{f}: chat identity tripwire accepted a broken Latest+Combine ({label})")
+        rejected += 1
+    return rejected
 
 
 def load(fname):
@@ -143,9 +228,11 @@ def check_bot(f, base):
     assert_that(r"combinedText = parts.length > 0 ? parts.join('\n') : null;" in js,
                 f"{f}: Latest+Combine joins an empty run to '' (defeats the Text node ?? fallback)")
     # Crossed-response guard: rows naming a FOREIGN chat are dropped before the is-latest /
-    # combine computation, so a crossed messages/get can never decide either (review WR-03).
-    assert_that("m.chatId !== triggeringChatId" in js and "fetchedAll.filter" in js,
-                f"{f}: Latest+Combine does not filter the fetch down to the requested chat")
+    # combine computation, so a crossed messages/get can never decide either (review WR-03) — and a row
+    # of THIS chat names it by the webhook's chatId or, on WhatsApp only, by its @lid code (2026-10-29).
+    problems = latest_combine_identity_problems(js, f)
+    assert_that(not problems, problems[0] if problems else "")
+    rejected = latest_combine_identity_tripwire(js, f)
     assert_that("foreignFetched" in js,
                 f"{f}: Latest+Combine does not emit foreignFetched (crossing observability)")
     # Explicit paired-item linkage: every node below the splice resolves $('Webhook').item
@@ -283,16 +370,17 @@ def check_bot(f, base):
     assert_that("Outcome" not in conns or conns["Outcome"].get("main", [[]])[0] == [],
                 f"{f}: Outcome must be terminal (it feeds {conns.get('Outcome')})")
 
-    print(f"OK  {f}")
+    print(f"OK  {f} (Latest+Combine's own rows: chat identity tripwire, {rejected} mutations rejected)")
     return wf
 
 
 def check_cross_template(wa, tg):
     # (7) Cross-template identity: the Latest+Combine jsCode is byte-identical (channel-agnostic)
     #     and Fetch Recent differs ONLY in the base (api/sync vs tapi/sync).
-    js_wa = node(wa["nodes"], "Latest+Combine")["parameters"]["jsCode"]
-    js_tg = node(tg["nodes"], "Latest+Combine")["parameters"]["jsCode"]
-    assert_that(js_wa == js_tg, "Latest+Combine jsCode differs between templates (must be channel-agnostic)")
+    #     The one exception is the line that names the template's channel (each template's own is pinned in check_bot).
+    js_wa = node(wa["nodes"], "Latest+Combine")["parameters"]["jsCode"].replace("const CHANNEL = 'whatsapp';", "const CHANNEL = '__CH__';")
+    js_tg = node(tg["nodes"], "Latest+Combine")["parameters"]["jsCode"].replace("const CHANNEL = 'telegram';", "const CHANNEL = '__CH__';")
+    assert_that(js_wa == js_tg, "Latest+Combine jsCode differs between templates beyond the channel line (must be channel-agnostic)")
 
     fr_wa = copy.deepcopy(node(wa["nodes"], "Fetch Recent")["parameters"])
     fr_tg = copy.deepcopy(node(tg["nodes"], "Fetch Recent")["parameters"])

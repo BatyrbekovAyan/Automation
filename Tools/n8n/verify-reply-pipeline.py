@@ -2,7 +2,10 @@
 """Stage-3 (A3/A4/A7) semantic verifier for BOTH bot templates — what verify-message-batching.py's
 edge asserts do not cover: the SQL contracts of the four ledger statements, the Code-node rules of
 the final check / settle / reconcile / cancel label, the Outcome stamp reading the recorded state,
-and byte-identity of every new node across WhatsApp and Telegram (only the transport base differs).
+and byte-identity of every new node across WhatsApp and Telegram (only the transport base differs — and, in the row
+readers, the one line that names the template's channel). The chat's own rows: Final Check and Reconcile Check take a row
+as the chat's by the webhook's chatId or, on WhatsApp only, by its @lid code (audience.CHAT_IDENTITY_JS); a tripwire proves
+the checks reject the code not accepted, any code accepted, the code accepted on Telegram and a code without @lid accepted.
 
     python3 Tools/n8n/verify-reply-pipeline.py
 """
@@ -40,13 +43,18 @@ def node(wf, name):
     return n
 
 
+_AUD = []
+
+
 def _audience():
-    """audience.py — «is this a business chat», one home (the lease re-reads it)."""
-    import importlib.util
-    spec = importlib.util.spec_from_file_location("audience", os.path.join(HERE, "audience.py"))
-    m = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(m)
-    return m
+    """audience.py — «is this a business chat» and «which rows are this chat's», one home (loaded once)."""
+    if not _AUD:
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("audience", os.path.join(HERE, "audience.py"))
+        m = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(m)
+        _AUD.append(m)
+    return _AUD[0]
 
 
 def _history_handoff():
@@ -56,6 +64,82 @@ def _history_handoff():
     m = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(m)
     return m
+
+
+# The chat's own rows (2026-10-29): a messages/get row is THIS chat's when it names the chat by the webhook's chatId or, on
+# WhatsApp only, by the chat's @lid code (the webhook's whatsapp_chat_id) — audience.CHAT_IDENTITY_JS, embedded verbatim
+# in the row readers with the template's channel on ONE line. Some WhatsApp chats are listed under that code; any other id
+# is a crossed answer. The rule's own clauses are pinned here too, so a weakened function fails even when the module and the
+# workflow agree.
+TEMPLATE_CHANNEL = {BOTS[0]: "whatsapp", BOTS[1]: "telegram"}
+CHANNEL_LINE_RE = re.compile(r"^const CHANNEL = '([a-z]*)';$", re.M)
+IDENTITY_CLAUSES = ('const CODE_SUFFIX = "@lid";',
+                    "const lid = (channel === 'whatsapp' && typeof code === 'string' && code.length > CODE_SUFFIX.length\n"
+                    "    && code.endsWith(CODE_SUFFIX) && code !== chatId) ? code : '';",
+                    "return { code: lid, names: (id) => id === chatId || (lid !== '' && id === lid) };")
+IDENTITY_CALL = "const thisChat = chatIdentity(CHANNEL, trig.chatId, trig.whatsapp_chat_id);"
+ROW_FILTERS = {"Final Check": "const fetched = fetchedAll.filter(m => !(m && m.chatId && trig.chatId && !thisChat.names(m.chatId)));",
+               "Reconcile Check": "const fetched = foreignScope ? [] : fetchedAll.filter(m => !(m.chatId && trig.chatId && !thisChat.names(m.chatId))\n"}
+
+
+def chat_rows_problems(wf, f):
+    """What is wrong with the chat-identity rule in Final Check and Reconcile Check of one template — [] when nothing."""
+    aud = _audience()
+    out = []
+    for name, filt in ROW_FILTERS.items():
+        n = next((x for x in wf["nodes"] if x["name"] == name), None)
+        js = ((n or {}).get("parameters") or {}).get("jsCode") or ""
+        b, e = js.find(aud.CHAT_IDENTITY_BEGIN), js.find(aud.CHAT_IDENTITY_END)
+        embedded = js[b:e + len(aud.CHAT_IDENTITY_END)] if 0 <= b < e else ""
+        if js.count(aud.CHAT_IDENTITY_BEGIN) != 1 or embedded != aud.CHAT_IDENTITY_JS:
+            out.append(f"{f}: {name} must embed audience.CHAT_IDENTITY_JS verbatim, once")
+        missing = [c for c in IDENTITY_CLAUSES if c not in embedded]
+        if missing:
+            out.append(f"{f}: {name}'s chatIdentity does not state the rule (the chat id, or WhatsApp's @lid code that is not the "
+                       f"chat id; nothing else): missing {missing[0]!r}")
+        channels = CHANNEL_LINE_RE.findall(js)
+        if channels != [TEMPLATE_CHANNEL[f]]:
+            out.append(f"{f}: {name} must say the template's channel on ONE line, const CHANNEL = '{TEMPLATE_CHANNEL[f]}' "
+                       f"(a code counts on WhatsApp only): {channels}")
+        if js.count(IDENTITY_CALL) != 1 or filt not in js:
+            out.append(f"{f}: {name} must drop a row only when it names another chat — thisChat = chatIdentity(CHANNEL, the "
+                       f"webhook's chatId, its whatsapp_chat_id), the filter keeping a row without a chatId")
+        if "m.chatId !== trig.chatId" in js:
+            out.append(f"{f}: {name} still compares a row's chatId with the webhook's chatId alone (the @lid code is dropped)")
+    return out
+
+
+# The rule's mutations the tripwire must reject in both nodes: (label, old, new, templates the mutation applies to).
+CHAT_ROWS_MUTATIONS = (
+    ("the code not accepted: the code not handed in", IDENTITY_CALL, IDENTITY_CALL.replace("trig.whatsapp_chat_id", "''"), BOTS),
+    ("the code not accepted: the old filter", "!thisChat.names(m.chatId)", "m.chatId !== trig.chatId", BOTS),
+    ("any code accepted", "id === chatId || (lid !== '' && id === lid)", "id === chatId || String(id).endsWith(CODE_SUFFIX)", BOTS),
+    ("any id accepted", "names: (id) => id === chatId || (lid !== '' && id === lid)", "names: (id) => true", BOTS),
+    ("accepted on Telegram: the channel guard dropped", "channel === 'whatsapp' && ", "", BOTS),
+    ("accepted on Telegram: the template says whatsapp", "const CHANNEL = 'telegram';", "const CHANNEL = 'whatsapp';", (BOTS[1],)),
+    ("not accepted on WhatsApp: the template says telegram", "const CHANNEL = 'whatsapp';", "const CHANNEL = 'telegram';", (BOTS[0],)),
+    ("a code without @lid accepted", "\n    && code.endsWith(CODE_SUFFIX)", "", BOTS),
+    ("the chat id taken for a code", " && code !== chatId)", ")", BOTS),
+)
+
+
+def chat_rows_tripwire(wf, f):
+    """Every mutation of CHAT_ROWS_MUTATIONS, in each node alone, must be rejected by chat_rows_problems."""
+    import copy
+    check(not chat_rows_problems(wf, f), f"{f}: chat identity: {chat_rows_problems(wf, f)}")
+    rejected = 0
+    for label, old, new, files in CHAT_ROWS_MUTATIONS:
+        if f not in files:
+            continue
+        for name in ROW_FILTERS:
+            w = copy.deepcopy(wf)
+            n = next(x for x in w["nodes"] if x["name"] == name)
+            js = n["parameters"]["jsCode"]
+            check(old in js, f"{f}: tripwire anchor of {label!r} not found in {name}")
+            n["parameters"]["jsCode"] = js.replace(old, new)
+            check(chat_rows_problems(w, f), f"{f}: chat identity tripwire accepted a broken {name} ({label})")
+            rejected += 1
+    return rejected
 
 
 def verify(fname):
@@ -216,7 +300,7 @@ def verify(fname):
     #     dropped, the trigger must be in the window, the echo newer than it, exactly one distinct candidate.
     js = node(wf, "Reconcile Check")["parameters"]["jsCode"]
     for frag in ("fromMe === true", "m.body.trim() === String(s.text).trim()", "sendStartedAt", "'send_unknown'",
-                 "m.chatId && trig.chatId && m.chatId !== trig.chatId", "fetched.findIndex(m => m.id === trig.id)",
+                 "m.chatId && trig.chatId && !thisChat.names(m.chatId)", "fetched.findIndex(m => m.id === trig.id)",
                  "trigIdx < 0 ? [] : fetched.slice(0, trigIdx)", "const one = cands.length === 1 ? cands[0] : null;", "m.from_where !== 'phone'",
                  # V7: positive attribution — the window's profile (uuid), the row's profile, the webhook phone type, the
                  # transport's API mark, and the one history's verdict on the candidate (Owner Row? → $json.sources)
@@ -252,6 +336,9 @@ def verify(fname):
     wait = node(wf, "Wait Reconcile")
     check(wait["type"] == "n8n-nodes-base.wait" and wait["parameters"].get("amount") == 3 and wait.get("webhookId"),
           f"{f}: Wait Reconcile must be a 3-s wait with a webhookId")
+    # (7b) The chat's own rows in Final Check and Reconcile Check: the webhook's chatId or — WhatsApp only — its @lid code
+    #      (audience.CHAT_IDENTITY_JS); any other id is foreign. The tripwire proves the checks reject a weakened rule.
+    chat_rows_tripwire(wf, f)
     # (8) Cancel Label names every refusal; only a generated run drops AI memory.
     js = node(wf, "Cancel Label")["parameters"]["jsCode"]
     for frag in ("prev === 'Is Latest?'", "prev === 'If Quota Allows'", "prev === 'Generated?'", "prev === 'Final OK?'", "prev === 'Send Allowed?'",
@@ -305,14 +392,18 @@ def main():
         if isinstance(x, dict):
             return {k: strip(v) for k, v in x.items() if k not in ("id", "position", "webhookId", "credentials")}
         return [strip(v) for v in x] if isinstance(x, list) else x
+
+    def same_channel(text, channel):   # the one line the row readers may differ in (each template's own is pinned above)
+        return text.replace(f"const CHANNEL = '{channel}';", "const CHANNEL = '__CHANNEL__';")
     for name in NEW:
-        a = json.dumps(strip(node(wa, name)), sort_keys=True).replace("https://wappi.pro/api/sync/", "__BASE__")
-        b = json.dumps(strip(node(tg, name)), sort_keys=True).replace("https://wappi.pro/tapi/sync/", "__BASE__")
-        check(a == b, f"node {name!r} differs between templates beyond the transport base")
-    lc_wa = node(wa, "Latest+Combine")["parameters"]["jsCode"]
-    lc_tg = node(tg, "Latest+Combine")["parameters"]["jsCode"]
-    check(lc_wa == lc_tg, "Latest+Combine differs between templates")
-    print("OK  cross-template identity of the stage-3 nodes")
+        a = same_channel(json.dumps(strip(node(wa, name)), sort_keys=True).replace("https://wappi.pro/api/sync/", "__BASE__"), "whatsapp")
+        b = same_channel(json.dumps(strip(node(tg, name)), sort_keys=True).replace("https://wappi.pro/tapi/sync/", "__BASE__"), "telegram")
+        check(a == b, f"node {name!r} differs between templates beyond the transport base and the channel line")
+    lc_wa = same_channel(node(wa, "Latest+Combine")["parameters"]["jsCode"], "whatsapp")
+    lc_tg = same_channel(node(tg, "Latest+Combine")["parameters"]["jsCode"], "telegram")
+    check(lc_wa == lc_tg, "Latest+Combine differs between templates beyond the channel line")
+    print(f"OK  cross-template identity of the stage-3 nodes; chat identity tripwire: "
+          f"{sum(1 for _, _, _, files in CHAT_ROWS_MUTATIONS for f in files) * len(ROW_FILTERS)} mutations rejected")
     print("ALL REPLY PIPELINE ASSERTS PASSED")
 
 
