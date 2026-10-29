@@ -301,6 +301,9 @@ def run_auto(sc, know, mp, prompts, max_tokens, effort=None, drop=(), marks=None
             "transport_retries": retries}
 
 
+PANEL_PROFILE, PANEL_CHAT = "eval", "eval@c.us"   # the staging panel's fixture chat (made a business chat for the run)
+
+
 def run_panel(sc, know, app_user_id):
     items = []
     for block, kind in ((know["products"], "product"), (know["services"], "service")):
@@ -316,7 +319,7 @@ def run_panel(sc, know, app_user_id):
         if m: contacts[key] = m.group(1).strip()
     desc = know["business"].split("\n\nКонтакты:")[0].replace("About Business:\n", "")
     msgs = [{"role": "client" if r == "client" else "business", "text": t, "ts": 1754800000 + i} for i, (r, t) in enumerate(sc["messages"])]
-    payload = {"v": 1, "requestSeq": 1, "profileId": "eval", "chatId": "eval@c.us", "botWaId": "-1", "botTgId": "-1", "channel": "whatsapp",
+    payload = {"v": 1, "requestSeq": 1, "profileId": PANEL_PROFILE, "chatId": PANEL_CHAT, "botWaId": "-1", "botTgId": "-1", "channel": "whatsapp",
                "businessTypeId": sc["vertical"], "businessName": know.get("businessName", know["businessType"]), "ownerPrompt": sc.get("owner_prompt", ""),
                "catalog": "\n".join(f"• {i['name']} — {i['price']}" for i in items), "steerTowardText": None, "lastIncomingText": None,
                "messages": msgs, "businessKnowledge": know["business"], "now": "", "pickStats": "", "appUserId": app_user_id,
@@ -1138,6 +1141,9 @@ def main(argv=None):
     if not skip_panel and any_panel:
         app_user_id = subprocess.run([sys.executable, os.path.join(N8N, "staging", "fixtures.py"), "create-subscriber", "--run-id", f"eval{int(time.time())}"],
                                      capture_output=True, text=True, check=True).stdout.strip()
+        # the panel answers only in a business chat (personal chats, 2026-10-25): the eval's chat is one, the owner's way
+        subprocess.run([sys.executable, os.path.join(N8N, "staging", "fixtures.py"), "set-audience", "--profile-id", PANEL_PROFILE,
+                        "--chat-id", PANEL_CHAT, "--kind", "business"], capture_output=True, text=True, check=True)
     ex = ThreadPoolExecutor(max_workers=max(1, a.workers))
     futures = [ex.submit(run_one, seq, key, rep, side) for seq, (key, rep, side) in enumerate(order)]
     try:
@@ -1150,7 +1156,8 @@ def main(argv=None):
     finally:
         ex.shutdown(wait=True)
         if app_user_id:
-            subprocess.run([sys.executable, os.path.join(N8N, "staging", "fixtures.py"), "delete", "--app-user-id", app_user_id], capture_output=True)
+            subprocess.run([sys.executable, os.path.join(N8N, "staging", "fixtures.py"), "delete", "--app-user-id", app_user_id,
+                            "--profile-id", PANEL_PROFILE], capture_output=True)
     seconds = round(time.time() - t0)
     os.makedirs(a.results_dir, exist_ok=True)
     outputs = {}

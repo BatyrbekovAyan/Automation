@@ -19,7 +19,8 @@ import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
-from e2e import (Ctx, api, execution, fixture, http, latest_executions, node_output, wait_executions_settle, BASE, MOCK)  # noqa: E402
+from e2e import (Ctx, api, business_chat, execution, fixture, http, latest_executions, node_output, wait_executions_settle,  # noqa: E402
+                 BASE, MOCK)
 _spec = importlib.util.spec_from_file_location("e2e_auth", os.path.join(HERE, "e2e-auth.py"))
 e2e_auth = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(e2e_auth)
@@ -40,8 +41,11 @@ def knowledge(items, contacts=None, description="", timezone="Asia/Almaty", docu
             "description": description, "contacts": contacts or {}, "items": items, "documents": documents}
 
 
+CHAT = "77010001234@c.us"     # the panel's chat in every scenario; owner_for makes it a business chat of the owner's profile
+
+
 def payload(owner, pid, msgs, know=None, catalog="", request_key=None, steer=None, last=None, bot_wa=STG_WA, vertical="auto_parts"):
-    return {"v": 1, "requestSeq": 1, "profileId": pid, "chatId": "77010001234@c.us", "botWaId": bot_wa, "botTgId": "-1", "channel": "whatsapp",
+    return {"v": 1, "requestSeq": 1, "profileId": pid, "chatId": CHAT, "botWaId": bot_wa, "botTgId": "-1", "channel": "whatsapp",
             "businessTypeId": vertical, "businessName": "Запчасти Астана", "ownerPrompt": "", "catalog": catalog,
             "steerTowardText": steer, "lastIncomingText": last, "messages": msgs, "businessKnowledge": "", "now": "1999-01-01 00:00, среда",
             "pickStats": "", "appUserId": owner.app_user_id, "knowledge": know, "requestKey": request_key}
@@ -65,6 +69,7 @@ def owner_for(ctx, status="trialing"):
         psql(f"update subscribers set status = '{status}' where app_user_id = '{o.app_user_id}';")
     pid = o.add_profile("whatsapp")
     psql(f"update bot_profiles set workflow_id = '{STG_WA}' where profile_id = '{pid}';")
+    business_chat(pid, CHAT)                  # the panel works only in a business chat
     o.refresh()
     return o, pid
 
@@ -276,9 +281,11 @@ def idempotent_count(ctx):
 def refusals(ctx):
     owner, pid = owner_for(ctx, status="expired")
     st1, d1, _ = call(owner, payload(owner, pid, [m("client", "цена?")], bot_wa="-1"))
-    other = e2e_auth.Owner("sx", ctx.run_id)
+    # the panel names the chat before the account (nothing is counted outside a business chat): the unknown account asks
+    # in a business chat of its own profile, so the account is what refuses
+    other, other_pid = owner_for(ctx)
     psql(f"delete from subscribers where app_user_id = '{other.app_user_id}';")
-    st2, d2, _ = call(other, payload(other, "-1", [m("client", "цена?")], bot_wa="-1"))
+    st2, d2, _ = call(other, payload(other, other_pid, [m("client", "цена?")], bot_wa="-1"))
     st3, d3, _ = call(owner, {"v": 1, "appUserId": owner.app_user_id})
     ok = (st1 == 200 and d1.get("error") == "subscription" and st2 == 200 and d2.get("error") == "unknown_account" and st3 == 200 and d3.get("error") == "bad_request")
     return ok, f"expired={d1.get('error')} unknown={d2.get('error')} bad={d3.get('error')}"

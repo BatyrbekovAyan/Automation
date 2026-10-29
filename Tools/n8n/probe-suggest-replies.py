@@ -29,10 +29,16 @@ id). Without it every card probe would be refused with `generation_failed` befor
 (exactly what execution 3069 of the first smoke run showed) — so the probe REFUSES to start
 instead of reporting model quality on refusals. The `IDENTITY_no_app_user_id_refused` probe is
 the explicit negative: no identity ⇒ the refusal envelope, never an LLM answer.
+
+Personal chats (2026-10-25): the panel answers only in a BUSINESS chat. With a staging fixture identity (`probe-…`, the
+only id staging/fixtures.py mints) the probe makes its own chat (profile `probe`, chat `probe@c.us`) a business chat on the
+staging stand before the card probes — the owner's way (`fixtures.py set-audience`); delete it with the identity:
+`fixtures.py delete --app-user-id <id> --profile-id probe`. Any other identity changes nothing anywhere.
 """
 import json
 import os
 import re
+import subprocess
 import sys
 import time
 import urllib.request
@@ -53,10 +59,22 @@ AUTO_CAT = ("• Колодки тормозные передние, арт. 044
 
 APP_USER_ID = os.environ.get("PROBE_APP_USER_ID", "").strip()
 REFUSAL_ONLY = "--refusal-only" in sys.argv
+PROBE_PROFILE, PROBE_CHAT = "probe", "probe@c.us"
+STAGING_FIXTURES = os.path.join(os.path.dirname(os.path.abspath(__file__)), "staging", "fixtures.py")
+
+
+def staging_business_chat():
+    """The probe's chat as a business chat on the staging stand — only for a staging fixture identity (see the docstring)."""
+    if not APP_USER_ID.startswith("probe-"):
+        return
+    subprocess.run([sys.executable, STAGING_FIXTURES, "set-audience", "--profile-id", PROBE_PROFILE, "--chat-id", PROBE_CHAT,
+                    "--kind", "business"], check=True, capture_output=True, text=True)
+    print(f"staging: {PROBE_CHAT} of profile {PROBE_PROFILE} is a business chat (fixtures.py delete --app-user-id {APP_USER_ID} "
+          f"--profile-id {PROBE_PROFILE} removes it)")
 
 
 def base(vertical, name, catalog, msgs, know="", now="", last=None, steer=None, app_user_id=None):
-    payload = {"v": 1, "requestSeq": 1, "profileId": "probe", "chatId": "probe@c.us",
+    payload = {"v": 1, "requestSeq": 1, "profileId": PROBE_PROFILE, "chatId": PROBE_CHAT,
                "botWaId": "-1", "botTgId": "-1", "channel": "whatsapp",
                "businessTypeId": vertical, "businessName": name, "ownerPrompt": "",
                "catalog": catalog, "steerTowardText": steer, "lastIncomingText": last,
@@ -221,6 +239,7 @@ def main():
         print("\nREFUSED: PROBE_APP_USER_ID is not set — the quality probes would all be gate refusals, "
               "not model output. Create a staging fixture identity first (staging/fixtures.py).")
         sys.exit(2)
+    staging_business_chat()
     for name, payload, checks in PROBES:
         t0 = time.time()
         try:

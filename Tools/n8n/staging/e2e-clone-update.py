@@ -30,7 +30,8 @@ N8N = os.path.dirname(HERE)
 REPO = os.path.dirname(os.path.dirname(N8N))
 sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.join(N8N, "tests"))
-from e2e import (Ctx, execution, http, latest_executions, mock, mock_total, node_output, wait_executions_settle, BASE)  # noqa: E402
+from e2e import (Ctx, business_chat, execution, http, latest_executions, mock, mock_total, node_output,  # noqa: E402
+                 wait_executions_settle, BASE)
 from harness import expr  # noqa: E402  (n8n's own expression engine — the staging install = the prod version)
 _spec = importlib.util.spec_from_file_location("derive", os.path.join(HERE, "derive-staging.py"))
 derive = importlib.util.module_from_spec(_spec)
@@ -102,6 +103,7 @@ def run_update(ctx, channel, ref, profile, prompt, chat, question, planned_marke
     st, _ = rest("POST", f"/workflows/{wid}/activate")
     assert st == 200, f"activate: {st}"
     ctx.bot(profile, channel)
+    business_chat(profile, chat)        # the client's chat is a business chat: the bot answers only there
     results = {"created": wid}
     dry = updater("--only", wid)
     results["dry_run"] = dry.stdout.strip().splitlines()[-1]

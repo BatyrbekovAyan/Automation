@@ -14,7 +14,7 @@ import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
-from e2e import (Ctx, http, node_output, BASE)  # noqa: E402
+from e2e import (Ctx, business_chat, http, node_output, BASE)  # noqa: E402
 
 
 def _load(name):
@@ -61,6 +61,10 @@ def scenario(id_, title):
 
 
 def send(owner, pid, extra=None, recipient="77010001234"):
+    # the proxy records the owner's send only in a business chat: every client chat here is one (a group never is — its
+    # send must never count)
+    if not recipient.endswith("@g.us"):
+        business_chat(pid, recipient if "@" in recipient else recipient + "@c.us")
     body = {"op": "message.send", "channel": "whatsapp", "profile_id": pid, "recipient": recipient, "body": "Здравствуйте! Есть в наличии."}
     body.update(extra or {})
     return e2e_auth.proxy(owner.token, body)
@@ -91,6 +95,7 @@ def wait_sends(pid, n, timeout=30):
 @scenario("origin_recorded_on_tg_reply", "A: Telegram message.reply carries origin + chat_id in meta → owner_app row has origin_* AND chat_id, memory session = pid:chat; Wappi body has neither")
 def tg_reply(ctx):
     owner, pid = owner_and_profile(ctx, channel="telegram")
+    business_chat(pid, "123456")               # the proxy records the owner's reply only in a business chat
     _, since = e2e_auth.mock_calls(0, "message/reply")
     body = {"op": "message.reply", "channel": "telegram", "profile_id": pid, "chat_id": "123456", "body": "Да, есть.", "message_id": "m1"}
     body.update(ORIGIN)

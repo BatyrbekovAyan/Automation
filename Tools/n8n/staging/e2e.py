@@ -67,6 +67,14 @@ def fixture(*args):
     return out.stdout.strip()
 
 
+def business_chat(profile_id, chat_id):
+    """«Личные и рабочие чаты» (2026-10-25): the bots answer, suggest and store only in a BUSINESS chat, and a chat without
+    a decision is decided on its first message from Wappi facts and the connection moment. A scenario that talks to a chat
+    for another reason makes it business the way the owner does (an owner decision always holds), so it depends on neither
+    the first-minutes window nor the mock's chat list. The profile's fixture cleanup (`delete --profile-id`) removes it."""
+    fixture("set-audience", "--profile-id", profile_id, "--chat-id", chat_id, "--kind", "business")
+
+
 def latest_executions(workflow_id, since_id=0, limit=20):
     st, page = api("/executions", workflowId=workflow_id, limit=limit, includeData="false")
     rows = [e for e in (page or {}).get("data", []) if int(e["id"]) > since_id]
@@ -162,6 +170,7 @@ def run_bot_scenario(ctx, name, history, trigger, post_times=1, expect_sends=1, 
         return False, "staging WA bot not imported"
     chat = f"chat-{ctx.run_id}@c.us"
     ctx.bot(WA_PROFILE)
+    business_chat(WA_PROFILE, chat)
     fixture("set-mode", "--profile-id", WA_PROFILE, "--suppressed", "true" if suppressed else "false")
     hist = [dict(h, chatId=chat, **({"from": chat} if not h.get("fromMe") else {"from": "me"})) for h in history]
     mock("POST", "/__mock/messages", {"profile_id": WA_PROFILE, "chat_id": chat, "messages": hist})
@@ -229,6 +238,9 @@ def sr_unknown(ctx):
 @scenario("sr_identity_gets_cards", "SuggestReplies with a fixture subscriber → 1–4 cards (real LLM call)")
 def sr_cards(ctx):
     uid = ctx.identity()
+    business_chat("p", "probe@c.us")          # the panel answers only in a business chat
+    if "p" not in ctx.profiles:
+        ctx.profiles.append("p")
     payload = {"v": 1, "requestSeq": 1, "profileId": "p", "chatId": "probe@c.us", "botWaId": "-1", "botTgId": "-1",
                "channel": "whatsapp", "businessTypeId": "flowers", "businessName": "Цветы Астана", "catalog": "• Букет 25 роз — 25000 тг",
                "appUserId": uid, "messages": [{"role": "client", "text": "сколько стоит букет из 25 роз?", "ts": 1}]}

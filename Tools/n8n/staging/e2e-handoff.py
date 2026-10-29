@@ -20,7 +20,7 @@ import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
-from e2e import (Ctx, execution, fixture, http, latest_executions, mock, mock_total, node_output,  # noqa: E402
+from e2e import (Ctx, business_chat, execution, fixture, http, latest_executions, mock, mock_total, node_output,  # noqa: E402
                  wait_executions_settle, workflow_id_by_name, BASE, WA_PROFILE, TG_PROFILE)
 _spec = importlib.util.spec_from_file_location("e2e_auth", os.path.join(HERE, "e2e-auth.py"))
 e2e_auth = importlib.util.module_from_spec(_spec)
@@ -66,6 +66,7 @@ class Bot:
         self.chat = f"7701{int(time.time()) % 100000:05d}{suffix}" if ch == "wa" else f"5{int(time.time()) % 100000000:08d}"
         self.chat = f"chat{tag}{ctx.run_id[:6]}{suffix}" if ch == "tg" else self.chat
         ctx.bot(self.pid, self.channel)
+        business_chat(self.pid, self.chat)       # a client's chat: the history, the memory and «Сводка» keep only business chats
         fixture("set-mode", "--profile-id", self.pid, "--suppressed", "false")
         self.since_exec = max([int(e["id"]) for e in latest_executions(self.wf_id, 0, 50)] or [0])
         self.since_calls = mock_total()

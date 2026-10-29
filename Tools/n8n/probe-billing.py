@@ -1794,7 +1794,8 @@ def reserve_cleanup_sql():
     return ("delete from dialog_counts where app_user_id like 'probe17a\\_%';\n"
             "delete from bot_profiles  where app_user_id like 'probe17a\\_%';\n"
             "delete from subscribers   where app_user_id like 'probe17a\\_%';\n"
-            "delete from suggestion_counts where app_user_id like 'probe17a\\_%';")
+            "delete from suggestion_counts where app_user_id like 'probe17a\\_%';\n"
+            "delete from chat_audience where profile_id = 'probe17a-profile';")
 
 
 # name, plan, status, topup, used, chat, (allowed, reserve_used, topup_after, rows_delta)
@@ -1933,11 +1934,21 @@ def run_reserve_probe():
 # lives: Gate Decision's output in the execution log.
 SUGGEST_URL = BASE + "/webhook/SuggestReplies"
 SUGGESTION_DAILY_CAP = 100
+SUGGEST_PROFILE, SUGGEST_CHAT = "probe17a-profile", "probe17a@c.us"
+
+
+def suggestions_business_chat_sql():
+    """«Личные и рабочие чаты» (2026-10-25): the panel answers — and the gate counts — only in a BUSINESS chat, and names a
+    chat that is not one before any account reason. The probe's chat is made one the owner's way (an owner decision always
+    holds); reserve_cleanup_sql removes it."""
+    return (f"insert into chat_audience (profile_id, chat_id, kind, source, reason, version) values "
+            f"({_lit(SUGGEST_PROFILE)}, {_lit(SUGGEST_CHAT)}, 'business', 'owner', 'owner', 1) "
+            f"on conflict (profile_id, chat_id) do update set kind = 'business', source = 'owner', reason = 'owner';")
 
 
 def suggest(app_user_id, text="сколько стоит доставка?", timeout=90, **extra):
     """POST a minimal valid SuggestReplies request. Returns (status, parsed_json)."""
-    body = {"v": 1, "chatId": "probe17a@c.us", "profileId": "probe17a-profile",
+    body = {"v": 1, "chatId": SUGGEST_CHAT, "profileId": SUGGEST_PROFILE,
             "botWaId": "", "botTgId": "", "channel": "whatsapp",
             "messages": [{"role": "client", "text": text, "ts": int(time.time() * 1000)}]}
     if app_user_id is not None:
@@ -1998,6 +2009,7 @@ def run_suggestions_probe():
         print("=== suggestions gate -- procedure + SQL (set TASK16_SQL_URL to run it) ===\n")
         print("Seed one subscriber per status, then POST /webhook/SuggestReplies with that "
               "appUserId and read the envelope:\n")
+        print(suggestions_business_chat_sql())
         print(suggestions_seed_sql(RESERVE_PREFIX + "sg_active", "active"))
         print(f"\n  active/trialing/grace -> suggestions (or abstain); every refusal returns the\n"
               f"  SAME wire envelope {{error:'generation_failed'}} with NO reason key. The reason\n"
@@ -2029,6 +2041,9 @@ def run_suggestions_probe():
             print(f"    raw: {str(body)[:400]}")
             failures.append(label)
         return body
+
+    # the probe's chat is a business chat: every reason below is the account's (the gate names a non-business chat first)
+    _harness_sql(suggestions_business_chat_sql())
 
     # --- refusals: zero LLM spend, and the CHEAP asserts first
     _harness_sql(suggestions_seed_sql(RESERVE_PREFIX + "sg_expired", "expired"))

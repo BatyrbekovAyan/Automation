@@ -776,12 +776,15 @@ def s_sql_comment_values(ctx):
         res["delete_tokenless"] = {"http": st, "deletedChunks": (d or {}).get("deletedChunks"), "marker": made(m)}
         ok &= legacy(st, st == 200 and (d or {}).get("deletedChunks") == 1) and not made(m)
         # Suggest Replies (token-less): an entitled id at the daily cap — the gate counts the value (100 → 101) and refuses
-        # before any LLM call
+        # before any LLM call. The gate counts only in a business chat («Личные и рабочие чаты»): the request names the
+        # owner's profile, whose chat the owner made business.
         m, v = payload("suggest")
         pg(f"insert into subscribers (app_user_id, plan, status) values ('{v}', 'business', 'active'); "
            f"insert into suggestion_counts (app_user_id, d, n) values ('{v}', (now() at time zone 'Asia/Almaty')::date, 100);")
-        st, d = hook("SuggestReplies", None, {"v": 1, "requestSeq": 1, "chatId": "77010001234@c.us", "channel": "whatsapp",
-                                             "messages": [{"role": "client", "text": "цена?", "ts": 1754800000}], "appUserId": v})
+        fixture("set-audience", "--profile-id", o.profiles[0], "--chat-id", "77010001234@c.us", "--kind", "business")
+        st, d = hook("SuggestReplies", None, {"v": 1, "requestSeq": 1, "profileId": o.profiles[0], "chatId": "77010001234@c.us",
+                                             "channel": "whatsapp", "messages": [{"role": "client", "text": "цена?", "ts": 1754800000}],
+                                             "appUserId": v})
         n = pg(f"select n from suggestion_counts where app_user_id = '{v}';")
         res["suggest_tokenless"] = {"http": st, "body": d, "count_after": n, "marker": made(m)}
         ok &= legacy(st, st == 200 and n == "101") and not made(m)
@@ -1533,6 +1536,9 @@ def s_line_reconnect(ctx, ch):
         res["new_clone"] = wf_state(w2) if w2 else None
         res["old"] = (wf_state(w1)[0], row_of(p1), booking(w1))
         res["moved"] = (line_rows(p1, chat), line_rows(p2, chat), file_home(fid, ch))
+        # the clients' chats are business chats of the bot (the owner's decision): the bot records and answers only there
+        for c_ in (chat, chat2):
+            fixture("set-audience", "--profile-id", p2, "--chat-id", c_, "--kind", "business")
         # the new profile's webhook reaches the new clone («Вместе»: recorded, nothing generated)
         since = newest_execution_id(w2) if w2 else 0
         t = int(time.time())

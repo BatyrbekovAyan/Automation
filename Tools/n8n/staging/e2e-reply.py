@@ -20,7 +20,7 @@ import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
-from e2e import (Ctx, execution, fixture, http, latest_executions, mock, mock_total, node_output, ran,  # noqa: E402
+from e2e import (Ctx, business_chat, execution, fixture, http, latest_executions, mock, mock_total, node_output, ran,  # noqa: E402
                  send_calls, wait_executions_settle, workflow_id_by_name, BASE, WA_PROFILE, TG_PROFILE)
 
 CHANNELS = {"wa": ("whatsapp", WA_PROFILE, f"STAGING WA {WA_PROFILE}", "@c.us"),
@@ -127,6 +127,7 @@ class Bot:
             raise RuntimeError(f"{wf_name} not imported on staging")
         self.chat = f"chat-{tag}-{ctx.run_id}{suffix}"
         ctx.bot(self.pid, self.channel)
+        business_chat(self.pid, self.chat)       # a client's chat: the scenarios here are about the reply, not the decision
         fixture("set-mode", "--profile-id", self.pid, "--suppressed", "false")
         clear_schedule(self.pid)
         self.since_exec = max([int(e["id"]) for e in latest_executions(self.wf_id, 0, 50)] or [0])
