@@ -1,0 +1,39 @@
+start 01:50:19
+   before: clone TsDtAK1wmttUxA1b on profile-000110
+   C2: clone OISRaM2MIbQMfktt on profile-000111 patched (core)
+   before    0 searched=True  tokens=4916 outcome=sent | 'По этой позиции цены в каталоге и прайсе расходятся:\nв каталоге — 3200 тг\nв прайсе — 3900 '
+   C2        0 searched=True  tokens=4965 outcome=sent | 'По этой позиции цены в каталоге и прайсе расходятся:\nв каталоге — 3200 тг\nв прайсе — 3900 '
+   before    1 searched=True  tokens=4916 outcome=sent | 'По этой позиции цены в каталоге и прайсе расходятся:\nв каталоге — 3200 тг\nв прайсе — 3900 '
+   C2        1 searched=True  tokens=4965 outcome=sent | 'По этой позиции цены в каталоге и прайсе расходятся:\nв каталоге — 3200 тг\nв прайсе — 3900 '
+   before    2 searched=True  tokens=4916 outcome=sent | 'По этой позиции цены в каталоге и прайсе расходятся:\nв каталоге — 3200 тг\nв прайсе — 3900 '
+   C2        2 searched=True  tokens=4965 outcome=sent | 'По этой позиции цены в каталоге и прайсе расходятся:\nв каталоге — 3200 тг\nв прайсе — 3900 '
+   before    3 searched=True  tokens=4916 outcome=sent | 'По этой позиции цены в каталоге и прайсе расходятся:\nв каталоге — 3200 тг\nв прайсе — 3900 '
+   C2        3 searched=True  tokens=4965 outcome=sent | 'По этой позиции цены в каталоге и прайсе расходятся:\nв каталоге — 3200 тг\nв прайсе — 3900 '
+   before    4 searched=True  tokens=4916 outcome=sent | 'По этой позиции цены в каталоге и прайсе расходятся:\nв каталоге — 3200 тг\nв прайсе — 3900 '
+   C2        4 searched=True  tokens=4965 outcome=sent | 'По этой позиции цены в каталоге и прайсе расходятся:\nв каталоге — 3200 тг\nв прайсе — 3900 '
+   before    5 searched=True  tokens=4916 outcome=sent | 'По этой позиции цены в каталоге и прайсе расходятся: в каталоге 3200 тг, в прайсе 3900 тг.'
+   C2        5 searched=True  tokens=4965 outcome=sent | 'По этой позиции цены в каталоге и прайсе расходятся:\nв каталоге — 3200 тг\nв прайсе — 3900 '
+   before    6 searched=True  tokens=4916 outcome=sent | 'По этой позиции цены в каталоге и прайсе расходятся:\nв каталоге — 3200 тг\nв прайсе — 3900 '
+   C2        6 searched=True  tokens=4965 outcome=sent | 'По этой позиции цены в каталоге и прайсе расходятся:\nв каталоге — 3200 тг\nв прайсе — 3900 '
+   before    7 searched=True  tokens=4916 outcome=sent | 'По этой позиции цены в каталоге и прайсе расходятся:\nв каталоге — 3200 тг\nв прайсе — 3900 '
+   C2        7 searched=True  tokens=4965 outcome=sent | 'По этой позиции цены в каталоге и прайсе расходятся:\nв каталоге — 3200 тг\nв прайсе — 3900 '
+   before    8 searched=True  tokens=4916 outcome=sent | 'По этой позиции цены в каталоге и прайсе расходятся:\nв каталоге — 3200 тг\nв прайсе — 3900 '
+   C2        8 searched=True  tokens=4965 outcome=sent | 'По этой позиции цены в каталоге и прайсе расходятся:\nв каталоге — 3200 тг\nв прайсе — 3900 '
+   before    9 searched=True  tokens=4916 outcome=sent | 'По этой позиции цены в каталоге и прайсе расходятся:\nв каталоге — 3200 тг\nв прайсе — 3900 '
+   C2        9 searched=True  tokens=4965 outcome=sent | 'По этой позиции цены в каталоге и прайсе расходятся:\nв каталоге — 3200 тг\nв прайсе — 3900 '
+   before   10 searched=True  tokens=4916 outcome=sent | 'По этой позиции цены в каталоге и прайсе расходятся:\nв каталоге — 3200 тг\nв прайсе — 3900 '
+   C2       10 searched=True  tokens=4965 outcome=sent | 'По этой позиции цены в каталоге и прайсе расходятся:\nв каталоге — 3200 тг\nв прайсе — 3900 '
+   before   11 searched=True  tokens=4916 outcome=sent | 'По этой позиции цены в каталоге и прайсе расходятся:\nв каталоге — 3200 тг\nв прайсе — 3900 '
+   C2       11 searched=True  tokens=4965 outcome=sent | 'По этой позиции цены в каталоге и прайсе расходятся:\nв каталоге — 3200 тг\nв прайсе — 3900 '
+   before   12 searched=True  tokens=4916 outcome=sent | 'По этой позиции цены в каталоге и прайсе расходятся:\nв каталоге — 3200 тг\nв прайсе — 3900 '
+   C2       12 searched=True  tokens=4965 outcome=sent | 'По этой позиции цены в каталоге и прайсе расходятся:\nв каталоге — 3200 тг\nв прайсе — 3900 '
+   before   13 searched=True  tokens=4916 outcome=sent | 'По этой позиции цены в каталоге и прайсе расходятся:\nв каталоге — 3200 тг\nв прайсе — 3900 '
+   C2       13 searched=True  tokens=4965 outcome=sent | 'По этой позиции цены в каталоге и прайсе расходятся:\nв каталоге — 3200 тг\nв прайсе — 3900 '
+   C2       14 searched=True  tokens=4965 outcome=sent | 'По этой позиции цены в каталоге и прайсе расходятся:\nв каталоге — 3200 тг\nв прайсе — 3900 '
+   before   14 searched=True  tokens=4916 outcome=sent | 'По этой позиции цены в каталоге и прайсе расходятся:\nв каталоге — 3200 тг\nв прайсе — 3900 '
+   before   15 searched=True  tokens=4916 outcome=sent | 'По этой позиции цены в каталоге и прайсе расходятся:\nв каталоге — 3200 тг\nв прайсе — 3900 '
+   C2       15 searched=True  tokens=4965 outcome=sent | 'По этой позиции цены в каталоге и прайсе расходятся:\nв каталоге — 3200 тг\nв прайсе — 3900 '
+   waiting 30s before deleting 4 workflow(s) that ran (n8n insights flush, ≥ 35 s rule)
+before: searched 16/16, outcome sent 16/16, price-list price alone 0/16
+C2: searched 16/16, outcome sent 16/16, price-list price alone 0/16
+exit 0 01:59:54
