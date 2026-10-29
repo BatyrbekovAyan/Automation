@@ -3,7 +3,9 @@
 states) — real n8n runs of the migrated bot templates against the private Postgres and the Wappi MOCK.
 Every scenario states the CORRECT behaviour and reads the ledger (reply_events / chat_reply_state), the
 Outcome stamp and the mock's recorded transport calls. B1 (2026-10-14): the bot's schedule decided at message
-entry — off_hours_suppressed_recorded / in_hours_replies (each scenario's Bot starts with no schedule row).
+entry — off_hours_suppressed_recorded / in_hours_replies (each scenario's Bot starts with no schedule row). A WhatsApp chat
+whose messages/get rows Wappi lists under its @lid code (2026-10-29, the mock's lid_rows): lid_rows_chat_replies_once (the
+webhook carries the code — one reply) and foreign_lid_rows_not_answered (the rows under another code — none).
 
     python3 Tools/n8n/staging/e2e-reply.py                  # all (WA + TG)
     python3 Tools/n8n/staging/e2e-reply.py --only owner     # substring filter
@@ -12,6 +14,7 @@ entry — off_hours_suppressed_recorded / in_hours_replies (each scenario's Bot 
 Requires the same environment as e2e.py (bootstrap.py with --bot wa:stgwa001 --bot tg:stgtg001).
 """
 import argparse
+import hashlib
 import os
 import subprocess
 import sys
@@ -140,8 +143,8 @@ class Bot:
     def incoming(self, row):
         mock("POST", "/__mock/incoming", {"profile_id": self.pid, "chat_id": self.chat, "message": dict(row, chatId=self.chat)})
 
-    def post(self, mid, body, t, times=1, parallel=True, mtype="chat"):
-        ev = event(self.pid, self.chat, mid, body, t, mtype=mtype)
+    def post(self, mid, body, t, times=1, parallel=True, mtype="chat", **fields):
+        ev = event(self.pid, self.chat, mid, body, t, mtype=mtype, **fields)
         results = []
         if parallel:
             ts = [threading.Thread(target=lambda: results.append(post(self.pid, ev))) for _ in range(times)]
@@ -533,6 +536,55 @@ def media_ask(ctx, ch):
     ok = len(rows) == 1 and len(sends) == 1 and body.startswith("Напишите, пожалуйста, текстом") and "Мәтінмен" in body and "Please send" not in body \
         and led.startswith("sent|")
     return ok, {"executions": [(r["id"], r["status"], r["outcome"], r["last"]) for r in rows], "sends": len(sends), "body": body[:80], "ledger": led}
+
+
+def lid_code(ctx, tag):
+    """A run-scoped WhatsApp @lid code, in the shape the live checks saw (digits, then @lid)."""
+    n = int(hashlib.sha1(("lid" + tag + ctx.run_id).encode()).hexdigest(), 16) % 10 ** 11
+    return f"1000{n:011d}@lid"
+
+
+def _lid_chat_run(ctx, tag, listed_under):
+    """One client message of a WhatsApp chat whose webhook carries the chat's @lid code (whatsapp_chat_id), while the mock
+    lists the chat's messages/get rows under `listed_under(code)` (the chat's own code, or another) — the shape the live
+    checks found (docs/audits/2026-10-25-personal-chats/live-checks.md). → (bot, message id, code, the rows' chatId, run)."""
+    b = Bot(ctx, "wa", tag)
+    code = lid_code(ctx, tag)
+    under = listed_under(code)
+    mock("POST", "/__mock/audience", {"profile_id": b.pid, "lid_rows": {b.chat: under}})
+    t = int(time.time())
+    mid = f"{tag}-{ctx.run_id}"
+    body = "Сколько стоит букет из 25 роз?"
+    b.history([{"id": mid, "body": body, "time": t, "fromMe": False, "type": "chat"}])
+    b.post(mid, body, t, whatsapp_chat_id=code)
+    ex = b.settle(1)
+    data = ex[0]["data"] if ex else {}
+    run = {"executions": len(ex), "outcome": ex[0]["outcome"] if ex else None,
+           "fetched_chat_ids": sorted({m.get("chatId") for m in ((node_output(data, "Fetch Recent") or {}).get("messages") or [])}),
+           "latest_combine": {k: (node_output(data, "Latest+Combine") or {}).get(k) for k in ("abort", "foreignFetched")},
+           "ledger": ledger(b.pid, b.chat, mid), "send_calls": len(b.all_send_calls())}
+    return b, mid, code, under, run
+
+
+@scenario("lid_rows_chat_replies_once[wa]", "a WhatsApp chat Wappi lists under its @lid code — every messages/get row carries "
+          "chatId = the code (the client's from too), the webhook names the chat by its number and carries the code in "
+          "whatsapp_chat_id → the bot takes the rows as the chat's: exactly one reply, the ledger says sent")
+def lid_rows_replies_once(ctx):
+    b, mid, code, under, run = _lid_chat_run(ctx, "lidr", lambda code: code)
+    ok = (run["fetched_chat_ids"] == [code] and run["latest_combine"] == {"abort": False, "foreignFetched": 0}
+          and run["executions"] == 1 and run["outcome"] == "sent" and run["send_calls"] == 1 and len(b.sends()) == 1
+          and run["ledger"].startswith("sent|"))
+    return ok, dict(run, code=code)
+
+
+@scenario("foreign_lid_rows_not_answered[wa]", "the webhook carries the chat's @lid code but messages/get lists the rows under "
+          "ANOTHER code (a crossed answer) → no reply at all: Latest+Combine drops every row, the run ends superseded, nothing is sent")
+def foreign_lid_rows(ctx):
+    b, mid, code, under, run = _lid_chat_run(ctx, "lidf", lambda code: lid_code(ctx, "lidf-other"))
+    ok = (under != code and run["fetched_chat_ids"] == [under] and run["latest_combine"]["abort"] is True
+          and (run["latest_combine"]["foreignFetched"] or 0) >= 1 and run["executions"] == 1 and run["outcome"] == "superseded"
+          and run["send_calls"] == 0 and run["ledger"].startswith("superseded|"))
+    return ok, dict(run, code=code, rows_under=under)
 
 
 _td = None

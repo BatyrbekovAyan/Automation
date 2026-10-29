@@ -558,9 +558,9 @@ def make_business_fresh(ctx, ch):
           "entry under the number with chat.LID = the code, every messages/get row under the code, the webhook with chatId = "
           "the number and whatsapp_chat_id = the code), decided personal (a saved contact), made business by the owner → "
           "ChatAudience reads the card, backfills the conversation under the NUMBER (history + memory, nothing under the code), "
-          "sends exactly one replay with chatId = from = the number and whatsapp_chat_id = the code, the replayed run claims the "
-          "message under the number, no second reply. The replayed run's final state is printed, not asserted: the templates' "
-          "own reads drop rows under the code (a known issue outside this feature)")
+          "sends exactly one replay with chatId = from = the number and whatsapp_chat_id = the code, and the replayed run — whose "
+          "reads list the chat under the code, which the bot takes as the chat's — answers exactly once: outcome sent, one send, "
+          "the ledger under the number says sent")
 def lid_rows(ctx):
     s = Stand(ctx, "wa", "lid")
     o = own_profile(ctx, s.pid)
@@ -587,13 +587,12 @@ def lid_rows(ctx):
           and mem.startswith("human:client,ai:owner_phone") and mem_code == ""
           and len(replays) == 1 and len(ex) == 1
           and msg.get("chatId") == chat and msg.get("from") == chat and msg.get("whatsapp_chat_id") == code
-          and led != "" and len(s.sends(chat)) <= 1)
+          and replays[0].get("outcome") == "sent" and led == "sent" and len(s.sends(chat)) == 1)
     last = ((replays[0]["data"].get("data") or {}).get("resultData") or {}).get("lastNodeExecuted") if replays else None
     return ok, {"first": summary(e0), "set": st, "card_reads": cards, "history": hist, "history_under_code": hist_code,
                 "memory": mem, "memory_under_code": mem_code, "replays": len(replays), "executions": len(ex),
                 "replayed": {k: msg.get(k) for k in ("id", "chatId", "from", "whatsapp_chat_id")},
-                "replayed_run_final_state(not asserted)": {"outcome": replays[0].get("outcome") if replays else None,
-                                                          "ledger": led, "last_node": last},
+                "replayed_run": {"outcome": replays[0].get("outcome") if replays else None, "ledger": led, "last_node": last},
                 "sends": len(s.sends(chat))}
 
 
