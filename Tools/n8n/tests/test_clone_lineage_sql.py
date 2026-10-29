@@ -24,7 +24,7 @@ current ids»: every existing deletion path must reach everything after a move, 
           L19 — a clone booked for deletion is never offered for reuse (no live row ever drives a booked clone);
   L20     B1 (2026-10-14): the bot's schedule follows its line — the predecessor's row moves (values and version kept),
           the new profile's own row wins, among two predecessors the freshest; nothing is left under an old id;
-  L21–L27 «Личные и рабочие чаты» (2026-10-25): the chat decisions (chat_audience) and the connection moment
+  L21–L28 «Личные и рабочие чаты» (2026-10-25): the chat decisions (chat_audience) and the connection moment
           (audience_connections), written by the real audience.py statements, follow the line — L21 a reconnect carries
           them and the moved computed decisions keep holding; L22 per chat the owner's row beats a computed one (the new
           profile's own row is replaced IN PLACE, one row per key), among equals the new profile's own row, among
@@ -32,7 +32,10 @@ current ids»: every existing deletion path must reach everything after a move, 
           another number keeps the new profile's own row (the moved computed decisions stop holding, the owner's stay);
           L25 a number change never yields an older moment than the newest predecessor's; L26 an earliest row without
           a number keeps the new profile's own known number; L27 a recorded non-human decision beats everything, the
-          owner's row included;
+          owner's row included; L28 a chat that was business on the predecessor, decided personal by the rule on the new
+          profile once another number voided the moved row (reported before the bind, or after it), starts the wipe clock
+          and the moved business period is wiped two days later (audience.WIPE_SQL), dialog_counts untouched — the same
+          number keeps the moved business row holding, so nothing starts and nothing is wiped;
   C1–C3   races on TWO real connections over a shared fixture schema (the V6-concurrent pattern): the second bind's
           snapshot predates the first's commit. C1 — two Creates of the same profile: the loser answers bound = false
           (no clone lost, the price lists follow the bound one, the retry reuses the winner). C2 — two new profiles adopt
@@ -1247,6 +1250,69 @@ def nonhuman_beats_everything(ch):
                     c.check((b.get('moved_audience'), b.get('dropped_rows')) == counters, f'moved_audience / dropped_rows {b}')
 
 
+def line_move_then_rule_personal_starts_the_clock(ch):
+    P1, P2, WF1, WF2 = P(ch, 'P1'), P(ch, 'P2'), W(ch, 'old'), W(ch, 'new')
+    A = '77071@c.us'
+    hours = AUD.WIPE_DAYS * 24
+    for v, title in (('own', 'the new profile reported ANOTHER number before the bind (its own connection row stays)'),
+                     ('after', 'the new profile reported another number only AFTER the bind (the moved moment restarts)'),
+                     ('same', 'control — the same number: the moved business row keeps holding, the next computed decision '
+                              'answers it, no clock starts and nothing is wiped')):
+        with Case(tagged(f'L28 [{ch}] line_move_then_rule_personal_starts_the_clock: a chat that was business on the predecessor '
+                         '(its memory, history and the rest moved with the line) is decided personal by the rule on the new '
+                         f'profile — the wipe clock starts and two days later the moved business period is wiped; {title}')) as c:
+            with PgSession(SETUP) as pg:
+                pg.x(LIKE.format('dialog_counts'))
+                row(pg, ch, P1, wfid=WF1, reason='trial_expiry')
+                connect(pg, P1, '77010000001', created_ago='10 days')
+                decide(pg, P1, A, 'business', 'new', ago='5 days')        # a client of the old number…
+                chat_data(pg, P1, A, 'business-period', age=60 * 24 * 4)  # …whose conversation the writers stored
+                pg.x(f"insert into dialog_counts (app_user_id, chat_id, d) values ({L(U)}, {L(A)}, current_date), "
+                     f"({L(U)}, {L(A)}, current_date - 3);")
+                proxy_row(pg, ch, P2)
+                register(pg, ch, P2)
+                seed_star(pg, P2)
+                if v == 'own':
+                    connect(pg, P2, '+7 702 000 00 02')
+                plan, b, _ = create(pg, ch, P2, WF2, prev=P1)
+                c.check(b.get('bound') is True or HEAD_MODE, f'bind {b}')
+                if v == 'after':
+                    pg.x('select pg_sleep(0.003);')
+                    report_ = connect(pg, P2, '77020000002')
+                    c.check(report_['restarted'] is True, f'premise: the report restarts the moved moment: {report_}')
+                moved = decision(pg, P2, A)
+                c.check(moved is not None and (moved['kind'], moved['source'], moved['personal_since']) == ('business', 'default', None),
+                        f'premise: the business row moved onto the new profile: {moved}')
+                c.check(holds(pg, P2, A) == ('business' if v == 'same' else None), f'what holds after the move: {holds(pg, P2, A)}')
+                data = counts(pg, P2)
+                c.check(data == {'mem': 2, 'hist': 1, 'outc': 1, 'hand': 1, 'ev': 1, 'st': 1, 'fl': 1, 'star': 1},
+                        f'premise: the business period moved with the line: {data}')
+                pg.x('select pg_sleep(0.003);')
+                got = decide(pg, P2, A, 'personal', 'contact')            # the next message: a contact of the new number
+                after = decision(pg, P2, A)
+                if v == 'same':
+                    c.check(got == {'kind': 'business', 'reason': 'new', 'source': 'default'} and after == moved,
+                            f'a holding business row is never replaced, so no clock starts: {got} {after}')
+                else:
+                    c.check(got == {'kind': 'personal', 'reason': 'contact', 'source': 'default'}, f'the rule decides personal: {got}')
+                    c.check(after['personal_since'] is not None and after['personal_since'] == after['decided_at']
+                            and after['wiped_at'] is None, f'the clock must start at that decision: {after}')
+                pg.x(f"update chat_audience set personal_since = personal_since - interval '{hours} hours 1 minute' "
+                     f"where profile_id = {L(P2)} and personal_since is not null;")   # two days on (a clock that runs only)
+                w = pg.q(AUD.WIPE_SQL)[0]
+                left = counts(pg, P2)
+                if v == 'same':
+                    c.check(w == {'wiped_chats': 0, 'deleted_rows': 0} and left == data,
+                            f'a business chat is never wiped: {w} {left}')
+                else:
+                    c.check(w == {'wiped_chats': 1, 'deleted_rows': 8}, f'the wipe: {w}')
+                    c.check(left == dict(ZERO, star=1), f'the moved business period must be gone (the bot-wide flag stays): {left}')
+                    c.check(decision(pg, P2, A)['wiped_at'] is not None, 'the decision is marked wiped')
+                c.check(counts(pg, P1) == ZERO and decisions(pg, P1) == [], f'left under the old id: {counts(pg, P1)}')
+                usage = pg.q(f"select count(*)::int as n from dialog_counts where chat_id = {L(A)}")[0]['n']
+                c.check(usage == 2, f'dialog_counts (the tariff usage) must never be touched: {usage}')
+
+
 def race_lazy_rows_during_the_bind(ch):
     P1, P2, WF1, WF2 = P(ch, 'P1'), P(ch, 'P2'), W(ch, 'old'), W(ch, 'new')
     A = '77051@c.us'
@@ -1289,7 +1355,8 @@ CREATE_MATRIX = (reconnect_after_purchase, same_profile_clone_gone, same_profile
                  race_same_profile, race_two_new_profiles, schedule_follows_line, reconnect_moves_decisions_and_keeps_the_moment,
                  owner_on_predecessor_beats_default_on_new, earliest_connection_wins_over_a_lazy_row_of_the_new_profile,
                  own_row_wins_when_the_number_changed, number_change_never_yields_an_older_moment,
-                 own_number_survives_an_unknown_earliest_number, nonhuman_beats_everything, race_lazy_rows_during_the_bind)
+                 own_number_survives_an_unknown_earliest_number, nonhuman_beats_everything,
+                 line_move_then_rule_personal_starts_the_clock, race_lazy_rows_during_the_bind)
 
 
 # ---------------------------------------------------------------- module-only statements (no pre-F1 counterpart)

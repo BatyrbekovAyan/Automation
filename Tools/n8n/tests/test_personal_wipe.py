@@ -1,15 +1,19 @@
 #!/usr/bin/env python3
 """«Личные и рабочие чаты» (2026-10-25; spec docs/superpowers/specs/2026-10-25-personal-chats-design.md §4.6 and decision 12,
-plan docs/superpowers/plans/2026-10-25-personal-chats.md Task 8): the Profile Lifecycle Sweep's step that, TWO DAYS after the
-OWNER made a chat personal, deletes what the assistant remembered about that chat — and nothing else.
+plan docs/superpowers/plans/2026-10-25-personal-chats.md Task 8): the Profile Lifecycle Sweep's step that, TWO DAYS
+after a chat that was business turned personal, deletes what the assistant remembered about that chat — and nothing else.
+A chat turns personal by the owner's decision, or by the rule: after another number (or a re-pair that brings one) the
+computed business row stops holding, and the next message's computed personal decision (a contact or history of the new
+number) replaces it — both start the clock personal_since.
 
 What runs — audience.WIPE_SQL, executed on REAL SQL against session temp tables of the staging Postgres (`like public.X
 including all`: the migration must be applied — pg.sh migrate), the way n8n runs it (no parameters, nothing to bind); the
-chats are made personal by the module's OWN OWNER_SET_SQL, so the dates the wipe counts from are the ones the webhook writes.
-Time is moved by writing personal_since into the past (a test cannot wait two days). The race case runs on TWO real
-connections over a uniquely named fixture schema (a temp table is invisible to the other connection), dropped afterwards.
-The workflow cases read the canonical Sweep JSON and apply-personal-wipe.py's patch on copies; the verifier runs for real. No
-n8n server, no network, never prod.
+chats are made personal by the module's OWN statements — OWNER_SET_SQL for the owner, CONNECTED_SQL + DECIDE_WRITE_SQL for the
+rule —, so the dates the wipe counts from are the ones the webhook and Decide Audience write.
+Time is moved by writing personal_since into the past (a test cannot wait two days); the rule's cases only move a clock that
+runs, never start one. The race case runs on TWO real connections over a uniquely named fixture schema (a temp table is
+invisible to the other connection), dropped afterwards. The workflow cases read the canonical Sweep JSON and
+apply-personal-wipe.py's patch on copies; the verifier runs for real. No n8n server, no network, never prod.
 
   not_before_two_days                       47 h 59 min is untouched, 48 h 1 min is wiped (the boundary, both sides)
   wipes_after_two_days_keeps_dialog_counts  all eight per-chat tables are emptied for the chat; the decision row stays (the
@@ -22,10 +26,18 @@ n8n server, no network, never prod.
   other_chats_and_star_flag_untouched       another chat, a longer chat id (no prefix match), another profile's same chat id,
                                             the bot-wide '*' flag
   star_chat_row_never_touches_the_star_flag a decision row whose chat id is '*' never deletes the bot-wide flag row
-  default_personal_rows_never_selected      only source 'owner' + kind 'personal' + personal_since set counts
+  computed_clock_counts_business_never      kind 'personal' + a clock old enough counts, the owner's and a computed one alike;
+                                            no clock, or a business row (whatever personal_since says), never
+  number_change_then_rule_personal_wipes_the_business_period   business on the old number (data stored) → another number →
+                                            the rule decides personal: the clock starts, the data stays two days, then goes;
+                                            dialog_counts never (WhatsApp and Telegram)
+  rearmed_by_the_rule_after_a_wipe          wiped → business by the rule (clock and mark cleared) → personal by the rule: a
+                                            new clock, wiped again two days after the LAST «personal»
+  a_holding_business_row_is_never_wiped     a business decision of the current connection stays business and keeps its data
   limit_200_oldest_first                    one run wipes the 200 oldest; the rest wait for the next run
   locked_row_is_skipped_never_waited_for    the owner takes a chat back (uncommitted) while the wipe runs: the wipe skips it
                                             (no wait, no delete), still wipes the others, and finds nothing there afterwards
+  the_work_list_can_use_the_partial_index   the planner can take the batch from the migration's chat_audience_wipe_idx
   statement_shape                           no parameters, one delete per table, never dialog_counts / the line's other
                                             tables / the decision itself, passes verify-sql-comments (V1)
   sweep_node_is_wired_and_independent       one node, Every 6 Hours → it directly (not behind Sweep Config / any dry-run
@@ -62,7 +74,8 @@ STAR = '*'
 # audience_connections) and the decision itself (chat_audience).
 CHAT_TABLES = ('n8n_chat_histories', 'chat_history_events', 'conversation_outcomes', 'handoff_requests', 'reply_events',
                'chat_reply_state', 'suggestion_sets', 'reply_mode_flags')
-TABLES = ('chat_audience', 'audience_connections', 'dialog_counts') + CHAT_TABLES
+# bot_profiles: CONNECTED_SQL dates a profile's first connection by its line (audience.LINE_CONNECTED_AT_SQL)
+TABLES = ('chat_audience', 'audience_connections', 'dialog_counts', 'bot_profiles') + CHAT_TABLES
 SERIAL = ('n8n_chat_histories', 'chat_history_events', 'handoff_requests')
 # LIKE copies the PUBLIC sequence as the id default: the temp copies get their own, so nothing shared moves
 SETUP = (''.join(f'create temp table {t} (like public.{t} including all);\n' for t in TABLES)
@@ -135,6 +148,39 @@ def wipe(pg):
 
 def dialog_rows(pg, chat):
     return pg.q(f"select count(*)::int as n from dialog_counts where chat_id = {L(chat)}")[0]['n']
+
+
+def usage(pg, chat):
+    """Two days of the tariff usage for the chat (dialog_counts), today's and an older one."""
+    pg.x(f"insert into dialog_counts (app_user_id, chat_id, d) values ('u-wipe', {L(chat)}, current_date), "
+         f"('u-wipe', {L(chat)}, current_date - 3);")
+
+
+def profile(pg, pid, channel, age):
+    pg.x(f"insert into bot_profiles (profile_id, app_user_id, channel, created_at) values "
+         f"({L(pid)}, 'u-wipe', {L(channel)}, now() - interval {L(age)});")
+
+
+def connected(pg, pid, phone):
+    """The app's report of a confirmed connection (audience.CONNECTED_SQL): another number restarts it, so the computed
+    decisions taken before stop holding. A short sleep keeps it strictly after the statement before."""
+    pg.x('select pg_sleep(0.003);')
+    return pg.q(bind(AUD.CONNECTED_SQL, [pid, phone]))[0]
+
+
+def decide(pg, pid, chat, kind, reason):
+    """Decide Audience's write of the computed decision (audience.DECIDE_WRITE_SQL) — what the chat's next message decides."""
+    pg.x('select pg_sleep(0.003);')
+    return pg.q(bind(AUD.DECIDE_WRITE_SQL, [pid, chat, kind, reason]))[0]
+
+
+def shift(pg, pid, chat, interval):
+    """The chat's clock moved back by `interval` — only a clock that runs: the test never starts one itself."""
+    pg.x(f"update chat_audience set personal_since = personal_since - interval {L(interval)} "
+         f"where profile_id = {L(pid)} and chat_id = {L(chat)} and personal_since is not null;")
+
+
+ZERO = {'wiped_chats': 0, 'deleted_rows': 0}
 
 
 # ------------------------------------------------------------------------------------------------ the race fixture
@@ -305,21 +351,94 @@ with PgSession(SETUP) as pg:
                 "the bot-wide '*' row must survive")
         c.check(decision(pg, pid, STAR)['wiped'] is True, "the bogus row leaves the work list instead of sitting in it forever")
 
-    with Case('default_personal_rows_never_selected: only source owner + kind personal + personal_since set is a candidate') as c:
+    with Case('computed_clock_counts_business_never: a personal decision whose clock is old enough is a candidate WHATEVER its '
+              'source — the owner\'s and a computed one that replaced a business row alike; a personal decision without a clock '
+              'and a business decision (whatever personal_since says) are never selected') as c:
         reset(pg)
         pid = 'p-def'
-        rows = (('d-contact', 'personal', 'default', '10 days'),    # pathological: a computed row carrying a stale personal_since
-                ('d-history', 'personal', 'default', None),        # the normal computed «personal»
-                ('d-new', 'business', 'default', None),
-                ('o-plain', 'personal', 'owner', None),            # the owner confirmed a chat that was personal already: no clock
-                ('o-biz', 'business', 'owner', '10 days'))         # pathological: a business row with a stale personal_since
-        for chat, kind, source, since in rows:
+        rows = (('d-clock', 'personal', 'default', '10 days', True),      # a computed personal that replaced a business row
+                ('d-young', 'personal', 'default', '1 day', False),       # …whose clock is still inside the two days
+                ('d-history', 'personal', 'default', None, False),        # the normal computed «personal»: never business, no clock
+                ('d-new', 'business', 'default', None, False),
+                ('d-biz', 'business', 'default', '10 days', False),       # pathological: a business row with a stale personal_since
+                ('o-plain', 'personal', 'owner', None, False),            # the owner confirmed a chat that was personal already
+                ('o-biz', 'business', 'owner', '10 days', False))         # pathological: a business row with a stale personal_since
+        for chat, kind, source, since, _ in rows:
             insert_decision(pg, pid, chat, kind, source, since)
             seed(pg, pid, chat)
         r = wipe(pg)
-        c.check(r == {'wiped_chats': 0, 'deleted_rows': 0}, f'nothing qualifies: {r}')
-        for chat, *_ in rows:
-            c.check(held(pg, pid, chat) == SEEDED and decision(pg, pid, chat)['wiped'] is False, f'{chat} must be untouched')
+        c.check(r == {'wiped_chats': 1, 'deleted_rows': SEEDED_TOTAL}, f'only the computed personal with an old clock: {r}')
+        for chat, kind, source, since, gone in rows:
+            if gone:
+                c.check(held(pg, pid, chat) == NOTHING and decision(pg, pid, chat)['wiped'] is True,
+                        f'{chat} must be wiped: {held(pg, pid, chat)} {decision(pg, pid, chat)}')
+            else:
+                c.check(held(pg, pid, chat) == SEEDED and decision(pg, pid, chat)['wiped'] is False, f'{chat} must be untouched')
+
+    for ch, channel, chat in (('WA', 'whatsapp', '77010000020@c.us'), ('TG', 'telegram', '5510000020')):
+        with Case(f'number_change_then_rule_personal_wipes_the_business_period [{ch}]: a chat that was business on the old number '
+                  '(history and memory stored), another number connected, the next message decided personal by the rule (a '
+                  'contact of the new number) — the clock starts at that decision, the data stays for two days, then every '
+                  'per-chat table is emptied; dialog_counts never') as c:
+            reset(pg)
+            pid = f'p-num-{ch.lower()}'
+            profile(pg, pid, channel, '5 days')
+            connected(pg, pid, '77010000001')                              # the old number, the line's moment
+            got = decide(pg, pid, chat, 'business', 'new')
+            c.check(got == {'kind': 'business', 'reason': 'new', 'source': 'default'}, f'premise: a new client of the old number: {got}')
+            seed(pg, pid, chat)                                            # what the writers stored while the chat was business
+            usage(pg, chat)
+            moved = connected(pg, pid, '77020000002')                      # «Сменить номер»: another number
+            c.check(moved['restarted'] is True, f'premise: another number restarts the connection: {moved}')
+            got = decide(pg, pid, chat, 'personal', 'contact')             # a contact of the new number
+            c.check(got == {'kind': 'personal', 'reason': 'contact', 'source': 'default'}, f'the rule decides personal: {got}')
+            c.check(decision(pg, pid, chat) == {'kind': 'personal', 'source': 'default', 'has_since': True, 'wiped': False},
+                    f'the clock must start at that decision: {decision(pg, pid, chat)}')
+            c.check(wipe(pg) == ZERO and held(pg, pid, chat) == SEEDED, 'the business period stays for two days')
+            shift(pg, pid, chat, f'{HOURS - 1} hours 59 minutes')
+            c.check(wipe(pg) == ZERO and held(pg, pid, chat) == SEEDED, 'still inside the two days')
+            shift(pg, pid, chat, '2 minutes')
+            r = wipe(pg)
+            c.check(r == {'wiped_chats': 1, 'deleted_rows': SEEDED_TOTAL}, f'two days on: {r}')
+            c.check(held(pg, pid, chat) == NOTHING, f'every per-chat table emptied: {held(pg, pid, chat)}')
+            c.check(dialog_rows(pg, chat) == 2, 'dialog_counts (the tariff usage) must never be touched')
+            c.check(decision(pg, pid, chat) == {'kind': 'personal', 'source': 'default', 'has_since': True, 'wiped': True},
+                    f'the decision stays personal, marked wiped: {decision(pg, pid, chat)}')
+
+        with Case(f'rearmed_by_the_rule_after_a_wipe [{ch}]: wiped → another number → business by the rule (the clock and the '
+                  'mark cleared) → stored again → another number → personal by the rule: a NEW clock — nothing before two days, '
+                  'everything after') as c:
+            connected(pg, pid, '77030000003')
+            decide(pg, pid, chat, 'business', 'new')
+            c.check(decision(pg, pid, chat) == {'kind': 'business', 'source': 'default', 'has_since': False, 'wiped': False},
+                    f'business again clears the clock and the mark: {decision(pg, pid, chat)}')
+            if held(pg, pid, chat) == NOTHING:                             # (a failed wipe above left the old rows in place)
+                seed(pg, pid, chat)                                        # a business chat is remembered again
+            connected(pg, pid, '77040000004')
+            decide(pg, pid, chat, 'personal', 'history')
+            c.check(decision(pg, pid, chat) == {'kind': 'personal', 'source': 'default', 'has_since': True, 'wiped': False},
+                    f'personal again: a new clock, not wiped: {decision(pg, pid, chat)}')
+            c.check(wipe(pg) == ZERO and held(pg, pid, chat) == SEEDED, 'not before two days again')
+            shift(pg, pid, chat, f'{HOURS} hours 1 minute')
+            c.check(wipe(pg) == {'wiped_chats': 1, 'deleted_rows': SEEDED_TOTAL} and held(pg, pid, chat) == NOTHING,
+                    'two days after the LAST «personal» the new memory is wiped too')
+            c.check(dialog_rows(pg, chat) == 2, 'dialog_counts still untouched')
+
+    with Case('a_holding_business_row_is_never_wiped: a computed business decision of the current connection meets a computed '
+              'personal one (the decision is written once): it stays business, no clock, nothing deleted however long it waits') as c:
+        reset(pg)
+        pid, chat = 'p-hold', '77010000030@c.us'
+        profile(pg, pid, 'whatsapp', '5 days')
+        connected(pg, pid, '77010000001')
+        decide(pg, pid, chat, 'business', 'new')
+        seed(pg, pid, chat)
+        got = decide(pg, pid, chat, 'personal', 'contact')
+        c.check(got == {'kind': 'business', 'reason': 'new', 'source': 'default'}, f'the holding business decision answers: {got}')
+        pg.x(f"update chat_audience set decided_at = decided_at - interval '10 days' where profile_id = {L(pid)};")
+        pg.x(f"update audience_connections set connected_at = connected_at - interval '20 days' where profile_id = {L(pid)};")
+        c.check(wipe(pg) == ZERO and held(pg, pid, chat) == SEEDED
+                and decision(pg, pid, chat) == {'kind': 'business', 'source': 'default', 'has_since': False, 'wiped': False},
+                f'a business chat keeps everything: {decision(pg, pid, chat)}')
 
     with Case('limit_200_oldest_first: one run wipes the 200 oldest; the rest wait for the next run') as c:
         reset(pg)
@@ -363,6 +482,29 @@ with Case('locked_row_is_skipped_never_waited_for: the owner takes a chat back (
         row = s.main.q(f"select kind, personal_since is null as clear, wiped_at is null as open from chat_audience "
                        f"where profile_id = {L(P)} and chat_id = {L(A)}")[0]
         c.check(row == {'kind': 'business', 'clear': True, 'open': True}, f'the owner\'s decision stands: {row}')
+
+# ------------------------------------------------------------------------------------------------ the work list's index
+MIGRATION = N8N / 'sql' / '2026-10-25-chat-audience.sql'
+
+
+def migration_tables():
+    """The migration's OWN table block (chat_audience with its partial index, audience_connections), aimed at temp tables —
+    the index that ships, not whatever the staging table carries."""
+    text = MIGRATION.read_text(encoding='utf-8')
+    block = text.split('-- TABLE-BEGIN')[1].split('\n', 1)[1].split('-- TABLE-END')[0]
+    return block.replace('create table if not exists public.', 'create temp table ').replace(' on public.', ' on ')
+
+
+with Case('the_work_list_can_use_the_partial_index: the planner can take the batch from chat_audience_wipe_idx, the index the '
+          'migration builds for exactly this list — the index\'s predicate stays implied by the statement\'s work list') as c:
+    with PgSession(migration_tables() + ''.join(f'create temp table {t} (like public.{t} including all);\n' for t in CHAT_TABLES)) as pg:
+        pg.x("insert into chat_audience (profile_id, chat_id, kind, source, reason, personal_since) "
+             "select 'p-idx', 'c' || i, case when i % 3 = 0 then 'business' else 'personal' end, "
+             "case when i % 2 = 0 then 'owner' else 'default' end, case when i % 2 = 0 then 'owner' else 'contact' end, "
+             "case when i % 5 = 0 then now() - i * interval '1 hour' end from generate_series(1, 2000) as i;")
+        pg.x('analyze chat_audience;')
+        plan = pg.x('set enable_seqscan = off;\nexplain ' + AUD.WIPE_SQL + ';')
+        c.check('chat_audience_wipe_idx' in plan, f'the batch does not go through the partial index:\n{plan[:1500]}')
 
 # ------------------------------------------------------------------------------------------------ the statement as text
 with Case('statement_shape: no parameters, one delete per per-chat table, never dialog_counts / the line\'s other tables / the '

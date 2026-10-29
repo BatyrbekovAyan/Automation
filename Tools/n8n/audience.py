@@ -61,13 +61,15 @@ paste them, never copy them:
                              the templates' Read Reply Mode hands Decide Audience;
   LINE_CONNECTED_AT_SQL(p)   the line's moment: the earliest created_at along the superseded_by chain, now() without a row;
   ENSURE_CONNECTION_SQL      the profile's connection row, created with the line's moment when the app has not reported one;
-  DECIDE_WRITE_SQL           a computed decision, written once (it replaces only a computed row that no longer holds);
+  DECIDE_WRITE_SQL           a computed decision, written once (it replaces only a computed row that no longer holds; a
+                             personal one replacing a BUSINESS row starts the wipe clock, as the owner's «личный» does);
   OWNER_SET_SQL              the owner's decisions, version-guarded, refused for a chat that is not a person;
   CONNECTED_SQL              the app reports a connection: another number restarts the moment (and says so: restarted);
   LIST_SQL                   what the app mirrors: the moment and the holding decisions of each profile;
   BACKFILL_SQL(row, owner)   when a chat turns business, the recent messages it lacks go into the history and the memory.
-  WIPE_SQL                   the Sweep's step: WIPE_DAYS after the OWNER made a chat personal, what the assistant stored
-                             about it is deleted (never dialog_counts) and the decision is marked wiped.
+  WIPE_SQL                   the Sweep's step: WIPE_DAYS after a business chat turned personal — the owner made it
+                             personal, or the rule did after another number (DECIDE_WRITE_SQL's clock) —, what the
+                             assistant stored about it is deleted (never dialog_counts) and the decision is marked wiped.
 tests/test_audience_sql.py runs every one of them but the last on real SQL (staging Postgres), the race of two first messages
 included; tests/test_personal_wipe.py runs WIPE_SQL (and the Sweep node that carries it) the same way.
 
@@ -81,7 +83,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 SETTLE_MINUTES = 30     # after a channel is connected, a chat without a decision gets no reply, no suggestion and no decision
                         # for this long (what Wappi can read of the account's history may be incomplete at first)
 FRESH_HOURS = 24        # a message that waited for the owner's decision is handed to the assistant again only while younger
-WIPE_DAYS = 2           # the data of a chat the owner made personal is wiped after this many days
+WIPE_DAYS = 2           # the data of a business chat that turned personal (the owner's decision, or the rule after another
+                        # number) is wiped after this many days
 WIPE_BATCH = 200        # chats the Sweep wipes per run (every 6 hours); the oldest first, the rest wait for the next run
 RECENT_LIMIT = 10       # the page of a chat's NEWEST messages the server reads from Wappi (messages/get, order desc): Decide
                         # Audience's history fact (a page of fewer rows is the whole chat) and the start of the conversation
@@ -292,6 +295,12 @@ DECIDE_WRITE_SQL = """-- «Личные и рабочие чаты»: write the 
 -- column back unchanged, then hands them back. That is how the second of two first messages racing here reads the FIRST
 -- one's decision: the conflict waits for the first insert to commit and returns the committed row — a re-read in the same
 -- statement could not see it (one snapshot per statement), and a conflict that updates nothing returns nothing.
+-- The wipe clock, when a row is replaced (the owner's own rules, OWNER_SET_SQL): a personal decision over a BUSINESS row
+-- starts it — personal_since = the moment of this decision, wiped_at cleared —, because what the assistant stored while the
+-- chat was business is still there (after another number, a client of the old number who is a contact of the new one, or
+-- has history there); WIPE_SQL deletes it WIPE_DAYS later. Personal over personal keeps the clock and the wiped mark as they
+-- were, an empty clock included; a business decision clears both. A new row starts no clock: nothing of a chat without a
+-- decision is ever stored.
 -- ALWAYS one row: kind, reason, source of the decision that holds after the write.
 -- Parameters, in order: profile id, chat id, kind, reason.
 with aud_conn as (
@@ -303,10 +312,18 @@ with aud_conn as (
     and (($3 = 'business' and $4 = 'new') or ($3 = 'personal' and $4 in ('nonhuman', 'contact', 'history')))
     and not ($3 = 'business' and """ + _nonhuman_id_sql("$2") + """)
   on conflict (profile_id, chat_id) do update set
-    kind       = case when """ + _DECIDE_STALE + """ then excluded.kind else a.kind end,
-    reason     = case when """ + _DECIDE_STALE + """ then excluded.reason else a.reason end,
-    decided_at = case when """ + _DECIDE_STALE + """ then excluded.decided_at else a.decided_at end,
-    updated_at = case when """ + _DECIDE_STALE + """ then excluded.updated_at else a.updated_at end
+    kind           = case when """ + _DECIDE_STALE + """ then excluded.kind else a.kind end,
+    reason         = case when """ + _DECIDE_STALE + """ then excluded.reason else a.reason end,
+    decided_at     = case when """ + _DECIDE_STALE + """ then excluded.decided_at else a.decided_at end,
+    personal_since = case when """ + _DECIDE_STALE + """
+                          then case when excluded.kind = 'business' then null
+                                    when a.kind = 'business' then excluded.decided_at
+                                    else a.personal_since end
+                          else a.personal_since end,
+    wiped_at       = case when """ + _DECIDE_STALE + """
+                          then case when excluded.kind = 'personal' and a.kind = 'personal' then a.wiped_at end
+                          else a.wiped_at end,
+    updated_at     = case when """ + _DECIDE_STALE + """ then excluded.updated_at else a.updated_at end
   returning a.kind, a.reason, a.source
 )
 select (select kind from decided) as kind, (select reason from decided) as reason, (select source from decided) as source"""
@@ -501,12 +518,17 @@ select (select count(*) from ev)::int as added"""
 # the statement's own comment as well, so the node reads on its own in the n8n editor. Unqualified table names, as in every
 # statement of this module (the tests run them against temp tables first on the search path).
 WIPE_SQL = """-- «Личные и рабочие чаты»: the Profile Lifecycle Sweep's step «Wipe Personal Chats» (every 6 hours; it does not depend on a
--- dry-run flag). """ + str(WIPE_DAYS) + """ days after the OWNER made a chat personal, what the assistant stored about that chat is deleted —
--- the protection against a mis-tap: a chat the owner takes back sooner keeps everything.
--- The work list is chat_audience: source 'owner' (a computed decision never has data to wipe), kind 'personal', the clock
--- personal_since set and old enough, not wiped yet — the oldest first, """ + str(WIPE_BATCH) + """ at most per run (the partial index
--- chat_audience_wipe_idx is built for exactly this). The rows are locked, and a row another statement holds is skipped, never
--- waited for: the owner's write that takes a chat back may be in flight, and that chat is left alone (it is business by the
+-- dry-run flag). """ + str(WIPE_DAYS) + """ days after a business chat turned personal, what the assistant stored about that chat is deleted
+-- — the protection against a mis-tap: a chat that is business again sooner keeps everything.
+-- A chat turns personal by the owner's decision (OWNER_SET_SQL), or by the rule: after another number, a computed personal
+-- decision replaces the stale business row of a client of the old number (DECIDE_WRITE_SQL). Both start the clock
+-- personal_since; a chat that becomes business again clears it. A computed personal decision for a chat that was never
+-- business starts none: nothing of it was ever stored.
+-- The work list is chat_audience: kind 'personal' (never a business row, whatever personal_since says), the clock
+-- personal_since set and old enough, not wiped yet — the owner's decisions and the computed ones alike —, the oldest first,
+-- """ + str(WIPE_BATCH) + """ at most per run (the partial index chat_audience_wipe_idx is built for exactly this). The rows are locked, and a
+-- row another statement holds is skipped, never waited for: a write that takes the chat back to business may be in flight
+-- (the owner's, or a computed business decision after another number), and that chat is left alone (it is business by the
 -- next run, so it is not selected again).
 -- For each chat: its rows in n8n_chat_histories (session_id = profile id, a colon, chat id), chat_history_events,
 -- conversation_outcomes, handoff_requests, reply_events, chat_reply_state, suggestion_sets and its OWN row of reply_mode_flags
@@ -517,7 +539,7 @@ WIPE_SQL = """-- «Личные и рабочие чаты»: the Profile Lifecy
 with batch as (
   select a.profile_id, a.chat_id
   from chat_audience a
-  where a.source = 'owner' and a.kind = 'personal' and a.wiped_at is null
+  where a.kind = 'personal' and a.wiped_at is null and a.personal_since is not null
     and a.personal_since <= now() - interval '""" + str(WIPE_DAYS * 24) + """ hours'
   order by a.personal_since, a.profile_id, a.chat_id
   limit """ + str(WIPE_BATCH) + """

@@ -32,6 +32,13 @@ as the generators will compose it. No n8n server, no network, never prod.
   owner_set_refuses_nonhuman              by '@g.us' / '@newsletter' / '@broadcast', by 777000, by a recorded reason
   personal_since_rules                    business → personal stamps now, personal → personal keeps, → business clears;
                                           wiped_at clears with them
+  computed_personal_over_business_starts_the_clock   a number change voids a computed business row; the next computed
+                                          personal decision replaces it and starts the wipe clock (personal_since = the
+                                          decision's moment); a first decision and a holding business row start none
+  owner_business_never_replaced_by_a_computed_decision   after a number change the owner's rows still answer; nothing moves
+  computed_business_clears_the_clock      computed business over a stale personal row with a clock clears it (and wiped_at)
+  computed_personal_over_personal_keeps_the_clock   empty stays empty, a running clock is not restarted, a wiped mark stays
+  computed_clock_rearms_after_a_wipe      personal → wiped → business → personal: a new, later clock and no wiped mark
   owner_set_became_business               true only for an APPLIED business whose previous holding kind was not business
   line_moment_follows_superseded_by       the earliest created_at along the superseded_by chain (same channel), now() without
                                           a row, a cycle terminates
@@ -165,6 +172,22 @@ def dec(kind, reason, source):
 
 
 NULL_DEC = {'kind': None, 'reason': None, 'source': None}
+_NUMBERS = iter(range(77030000001, 77039999999))
+
+
+def new_number(pg, pid):
+    """Another number reported for the profile (CONNECTED_SQL, the app's `connected` after «Сменить номер»): the moment becomes
+    now, so every computed decision taken before stops holding."""
+    tick(pg)
+    got = connected(pg, pid, str(next(_NUMBERS)))[0]
+    tick(pg)
+    assert got['restarted'] is True, f'premise: another number must restart the connection: {got}'
+    return got
+
+
+def wiped_by_sweep(pg, pid, chat):
+    """The Sweep's wipe ran for the chat (only its mark matters here; tests/test_personal_wipe.py runs the statement)."""
+    pg.x(f"update chat_audience set wiped_at = now() where profile_id = {L(pid)} and chat_id = {L(chat)};")
 
 
 # ------------------------------------------------------------------------------------------------ the race fixture
@@ -598,6 +621,129 @@ for ch, C in CH.items():
                 c.check(ensure(pg, sentinel) == [{'connected_at_ms': None, 'phone': None}], f'{sentinel!r}: one row of nulls')
             c.check(n_rows(pg, 'audience_connections', '-1') == 0 and n_rows(pg, 'audience_connections', '') == 0, 'nothing written')
 
+# ================================================================================================ the clock of a computed decision
+# A chat that was business has its history and memory stored. After another number (or a re-pair that brings one) its
+# computed row stops holding, and the next message's computed decision replaces it: when that decision is personal (the
+# person is a contact of the new number, or has history there), the wipe clock starts — personal_since, exactly like the
+# owner's «рабочий → личный»; tests/test_personal_wipe.py runs the wipe itself.
+for ch, C in CH.items():
+    P = f'{ch.lower()}-aud-clock'
+    with Case(f'computed_personal_over_business_starts_the_clock [{ch}]: a number change voids a computed BUSINESS row; the next '
+              'computed personal decision (a contact, a conversation before the connection) replaces it and starts the wipe '
+              'clock — personal_since = the moment of the decision, wiped_at empty; a first computed decision and a computed '
+              'decision that meets a HOLDING business row start none') as c:
+        with PgSession(SETUP) as pg:
+            profile(pg, P, C['channel'], '3 days')
+            connected(pg, P, '77010000001')
+            for chat in (C['chat'], C['chat2']):
+                decide(pg, P, chat, 'business', 'new')
+            decide(pg, P, C['chat3'], 'personal', 'contact')            # a first decision: the chat was never business
+            c.check(all(row(pg, P, x)['personal_since'] is None for x in (C['chat'], C['chat2'], C['chat3'])),
+                    f'a first computed decision never starts a clock: {[row(pg, P, x) for x in (C["chat"], C["chat3"])]}')
+            new_number(pg, P)
+            for chat, reason in ((C['chat'], 'contact'), (C['chat2'], 'history')):
+                got = decide(pg, P, chat, 'personal', reason)
+                r = row(pg, P, chat)
+                c.check(got == [dec('personal', reason, 'default')], f'{reason}: the stale business row must be replaced: {got}')
+                c.check(r['personal_since'] is not None and r['personal_since'] == r['decided_at'] and r['wiped_at'] is None,
+                        f'{reason}: the clock must start at the decision: {r}')
+            c.check(audience(pg, P, C['chat']) == 'personal' and business(pg, P, C['chat']) is False, 'the new decision holds')
+            decide(pg, P, C['chat4'], 'business', 'new')               # taken on the new number: holds
+            before = row(pg, P, C['chat4'])
+            tick(pg)
+            got = decide(pg, P, C['chat4'], 'personal', 'contact')
+            c.check(got == [dec('business', 'new', 'default')] and row(pg, P, C['chat4']) == before,
+                    f'a HOLDING business row is never replaced, so no clock starts there: {got} {row(pg, P, C["chat4"])}')
+
+    with Case(f'owner_business_never_replaced_by_a_computed_decision [{ch}]: after a number change the owner\'s rows still hold — '
+              'a computed decision answers them and changes nothing: the owner\'s business gets no clock, the owner\'s personal '
+              'keeps its own') as c:
+        with PgSession(SETUP) as pg:
+            profile(pg, P, C['channel'], '3 days')
+            connected(pg, P, '77010000001')
+            owner_set(pg, P, [{'chatId': C['chat'], 'kind': 'business', 'version': 10},
+                              {'chatId': C['chat2'], 'kind': 'personal', 'version': 10}])
+            mine = (row(pg, P, C['chat']), row(pg, P, C['chat2']))
+            c.check(mine[0]['personal_since'] is None and mine[1]['personal_since'] is not None, f'premise: {mine}')
+            new_number(pg, P)
+            for reason in ('contact', 'history', 'nonhuman'):
+                got = decide(pg, P, C['chat'], 'personal', reason)
+                c.check(got == [dec('business', 'owner', 'owner')], f'{reason}: the owner\'s business decision must answer: {got}')
+            c.check(decide(pg, P, C['chat2'], 'business', 'new') == [dec('personal', 'owner', 'owner')],
+                    'the owner\'s personal decision must answer a computed business one')
+            c.check((row(pg, P, C['chat']), row(pg, P, C['chat2'])) == mine,
+                    f'the owner\'s rows must stay exactly as they were: {mine} → {(row(pg, P, C["chat"]), row(pg, P, C["chat2"]))}')
+            c.check(business(pg, P, C['chat']) is True and audience(pg, P, C['chat2']) == 'personal', 'both still hold')
+
+    with Case(f'computed_business_clears_the_clock [{ch}]: a computed BUSINESS decision that replaces a stale personal row with a '
+              'running clock clears personal_since (and wiped_at), as the owner\'s «личный → рабочий» does') as c:
+        with PgSession(SETUP) as pg:
+            profile(pg, P, C['channel'], '3 days')
+            connected(pg, P, '77010000001')
+            decide(pg, P, C['chat'], 'business', 'new')
+            # chat2: a computed personal row carrying a clock and a wiped mark written in directly — the clearing on its own,
+            # whatever started that clock
+            decide(pg, P, C['chat2'], 'personal', 'history')
+            pg.x(f"update chat_audience set personal_since = now() - interval '3 days', wiped_at = now() - interval '1 day' "
+                 f"where profile_id = {L(P)} and chat_id = {L(C['chat2'])};")
+            new_number(pg, P)
+            decide(pg, P, C['chat'], 'personal', 'contact')
+            c.check(row(pg, P, C['chat'])['personal_since'] is not None, f'premise: the clock runs: {row(pg, P, C["chat"])}')
+            new_number(pg, P)
+            for chat in (C['chat'], C['chat2']):
+                got = decide(pg, P, chat, 'business', 'new')
+                r = row(pg, P, chat)
+                c.check(got == [dec('business', 'new', 'default')] and r['personal_since'] is None and r['wiped_at'] is None,
+                        f'{chat}: → business must clear the clock and the mark: {got} {r}')
+                c.check(business(pg, P, chat) is True, f'{chat}: the business decision holds')
+
+    with Case(f'computed_personal_over_personal_keeps_the_clock [{ch}]: a computed personal decision that replaces a stale '
+              'PERSONAL row keeps the earlier clock exactly — an empty one stays empty, a running one is not restarted, a wiped '
+              'mark stays') as c:
+        with PgSession(SETUP) as pg:
+            profile(pg, P, C['channel'], '3 days')
+            connected(pg, P, '77010000001')
+            decide(pg, P, C['chat'], 'personal', 'contact')            # never business: no clock
+            decide(pg, P, C['chat2'], 'business', 'new')
+            decide(pg, P, C['chat3'], 'business', 'new')
+            new_number(pg, P)
+            decide(pg, P, C['chat2'], 'personal', 'history')           # business → personal: a running clock
+            decide(pg, P, C['chat3'], 'personal', 'history')
+            wiped_by_sweep(pg, P, C['chat3'])                           # …which already ran out: the chat is wiped
+            before = {x: row(pg, P, x) for x in (C['chat'], C['chat2'], C['chat3'])}
+            c.check(before[C['chat']]['personal_since'] is None and before[C['chat2']]['personal_since'] is not None
+                    and before[C['chat3']]['wiped_at'] is not None, f'premise: {before}')
+            new_number(pg, P)
+            for chat, reason in ((C['chat'], 'history'), (C['chat2'], 'contact'), (C['chat3'], 'contact')):
+                got = decide(pg, P, chat, 'personal', reason)
+                r = row(pg, P, chat)
+                c.check(got == [dec('personal', reason, 'default')] and r['decided_at'] > before[chat]['decided_at'],
+                        f'{chat}: the stale row must be replaced: {got} {r}')
+                c.check((r['personal_since'], r['wiped_at']) == (before[chat]['personal_since'], before[chat]['wiped_at']),
+                        f'{chat}: the clock and the mark must stay as they were: {before[chat]} → {r}')
+
+    with Case(f'computed_clock_rearms_after_a_wipe [{ch}]: business → personal (a clock) → wiped → business again (the clock and '
+              'the mark cleared) → personal again: a NEW clock, later than the first, and no wiped mark') as c:
+        with PgSession(SETUP) as pg:
+            profile(pg, P, C['channel'], '3 days')
+            connected(pg, P, '77010000001')
+            chat = C['chat']
+            decide(pg, P, chat, 'business', 'new')
+            new_number(pg, P)
+            decide(pg, P, chat, 'personal', 'contact')
+            first = row(pg, P, chat)['personal_since']
+            wiped_by_sweep(pg, P, chat)
+            new_number(pg, P)
+            decide(pg, P, chat, 'business', 'new')
+            r = row(pg, P, chat)
+            c.check(first is not None and r['kind'] == 'business' and r['personal_since'] is None and r['wiped_at'] is None,
+                    f'business again clears the clock and the mark: {first} {r}')
+            new_number(pg, P)
+            decide(pg, P, chat, 'personal', 'history')
+            r = row(pg, P, chat)
+            c.check(r['personal_since'] is not None and r['personal_since'] > first and r['wiped_at'] is None,
+                    f'personal again starts a new clock: {first} → {r}')
+
 with Case('list_returns_only_valid_decisions_and_the_moment: every profile asked, once, in the order asked; the moment (null '
           'without a row); only the decisions that hold, as {chatId, kind, source, reason, version}') as c:
     with PgSession(SETUP) as pg:
@@ -797,8 +943,10 @@ with Case('migration_postchecks: RLS on, no grants to anon/authenticated, the st
         c.check(priv == [{'any': False}], f'has_table_privilege: {priv}')
         idx = pg.q("select pg_get_indexdef(indexrelid) as d from pg_index where indrelid = 'public.chat_audience'::regclass "
                    "and not indisprimary")
-        c.check(len(idx) == 1 and '(personal_since)' in idx[0]['d'] and "source = 'owner'" in idx[0]['d']
-                and "kind = 'personal'" in idx[0]['d'] and 'wiped_at IS NULL' in idx[0]['d'], f'the wipe index: {idx}')
+        c.check(len(idx) == 1 and '(personal_since)' in idx[0]['d'] and 'source' not in idx[0]['d']
+                and "kind = 'personal'" in idx[0]['d'] and 'wiped_at IS NULL' in idx[0]['d']
+                and 'personal_since IS NOT NULL' in idx[0]['d'],
+                f'the wipe index: every personal decision with a running clock, the owner\'s and a computed one alike: {idx}')
         chk = pg.q("select conname, pg_get_constraintdef(oid) as d from pg_constraint where conrelid = 'public.reply_events'::regclass "
                    "and contype = 'c'")
         c.check(len(chk) == 1 and chk[0]['conname'] == 'reply_events_state_check'

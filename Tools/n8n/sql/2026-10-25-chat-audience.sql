@@ -16,7 +16,10 @@
 --   decided_at      when the row's decision was taken: a computed decision HOLDS only while decided_at >= the
 --                   profile's connected_at (another number restarts the connection and voids the older computed rows
 --                   without touching them); the owner's decision always holds (audience.VALID_SQL);
---   personal_since  when the OWNER made the chat personal (the 2-day wipe of the Profile Lifecycle Sweep counts from it);
+--   personal_since  when the chat turned personal after it was business — the owner made it personal, or a computed
+--                   personal decision replaced a business row (after another number: the old number's client is a contact
+--                   of the new one) — the 2-day wipe of the Profile Lifecycle Sweep counts from it; null = no clock (a chat
+--                   that was never business has nothing stored);
 --   wiped_at        when that wipe ran (the partial index below is the wipe's work list).
 -- audience_connections — one row per profile: the moment its channel counts as connected (the earliest created_at of the
 --   bot's line, or now() when another number was connected) and the connected number's digits (null = not known yet).
@@ -42,7 +45,7 @@ create table if not exists public.chat_audience (
   primary key (profile_id, chat_id)
 );
 create index if not exists chat_audience_wipe_idx on public.chat_audience (personal_since)
-  where source = 'owner' and kind = 'personal' and wiped_at is null;
+  where kind = 'personal' and wiped_at is null and personal_since is not null;
 create table if not exists public.audience_connections (
   profile_id   text primary key,                   -- the Wappi profile
   phone        text,                               -- the connected number's digits (null = not known yet)
@@ -79,7 +82,7 @@ revoke all on table public.audience_connections from anon, authenticated;
 -- Post-checks:
 --   \d public.chat_audience                                                          -- the ten columns above
 --   \d public.audience_connections                                                   -- the four columns above
---   select indexdef from pg_indexes where indexname = 'chat_audience_wipe_idx';     -- (personal_since) WHERE source = 'owner' …
+--   select indexdef from pg_indexes where indexname = 'chat_audience_wipe_idx';     -- (personal_since) WHERE kind = 'personal' …
 --   select relname, relrowsecurity from pg_class
 --   where oid in ('public.chat_audience'::regclass, 'public.audience_connections'::regclass);       -- expect t, t
 --   select grantee, privilege_type from information_schema.role_table_grants

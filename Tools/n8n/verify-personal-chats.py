@@ -12,12 +12,14 @@ still wired as designed».
       (2) the sweep's own Postgres credential (the canonical one), fail-open (onError continueRegularOutput), not disabled — a
           disabled node hands its input on untouched, i.e. silently does nothing;
       (3) exactly one such node, a target of Every 6 Hours exactly once and entered from NOTHING else (not behind Sweep Config,
-          not behind a dry-run If: the step deletes by the age of the owner's decision, not by the state of a profile), terminal,
-          unreachable from Sweep Config;
+          not behind a dry-run If: the step deletes by the age of a chat's personal clock, not by the state of a profile),
+          terminal, unreachable from Sweep Config;
       (4) the statement keeps its safety shape: it deletes from the eight per-chat tables and from nothing else (never
           dialog_counts — the tariff usage —, never the per-bot rows, never the decision itself), the chat's own reply_mode_flags
           row only (never the bot-wide '*' row), takes the work list locked and skipping what is locked, at most WIPE_BATCH
-          oldest first, owner decisions only, not yet wiped, older than WIPE_DAYS written as hours, and marks wiped_at.
+          oldest first, personal decisions only (never a business row) with a clock — the owner's and a computed one that
+          replaced a business row alike, never narrowed by source —, not yet wiped, older than WIPE_DAYS written as hours, and
+          marks wiped_at.
   readers — Task 5: the three server places outside the bot templates that write or read a chat pass only a BUSINESS chat
       (audience.BUSINESS_SQL — never «not personal»):
       (1) the Wappi Proxy's Record Owner Send opens with the business word keyed on its profile and chat parameters, both
@@ -215,8 +217,13 @@ def check_wipe(sweep, sql=None):
          "the work list must be taken `for update skip locked` — a row the owner's write holds is left alone, never waited for and never wiped")
     need(f"limit {AUD.WIPE_BATCH}" in flat and "order by a.personal_since" in flat,
          f"the batch must be the {AUD.WIPE_BATCH} oldest decisions (order by personal_since, limit {AUD.WIPE_BATCH})")
-    need("a.source = 'owner'" in flat and "a.kind = 'personal'" in flat and "a.wiped_at is null" in flat and "a.personal_since <=" in flat,
-         "the work list must be the OWNER's personal decisions with a clock, not wiped yet, old enough (source / kind / wiped_at / personal_since)")
+    need("a.kind = 'personal'" in flat and "a.wiped_at is null" in flat and "a.personal_since <=" in flat,
+         "the work list must be the PERSONAL decisions with a clock, not wiped yet, old enough (kind / wiped_at / personal_since) — "
+         "never a business row")
+    batch = re.search(r"with batch as \(.*?\), hist as \(", flat)
+    need(bool(batch) and "source" not in batch.group(0),
+         "the work list must not be narrowed by source: a computed personal decision that replaced a business row (after another "
+         "number) carries the clock too, and its stored business period must be wiped like the owner's")
     need(f"now() - interval '{AUD.WIPE_DAYS * 24} hours'" in flat,
          f"the delay must be WIPE_DAYS ({AUD.WIPE_DAYS}) written as {AUD.WIPE_DAYS * 24} hours")
     need(flat.count("update chat_audience") == 1 and "set wiped_at = now()" in flat,
@@ -316,8 +323,15 @@ WIPE_MUTATIONS = (
     ("the work list locked but waited for", _sql("for update skip locked", "for update"), "for update skip locked"),
     ("the batch limit removed", _sql(f"  limit {AUD.WIPE_BATCH}\n", "\n"), "the batch must be"),
     ("the oldest-first order removed", _sql("  order by a.personal_since, a.profile_id, a.chat_id\n", "\n"), "the batch must be"),
-    ("the owner filter removed", _sql("a.source = 'owner' and ", ""), "the work list must be the OWNER's"),
-    ("the already-wiped filter removed", _sql(" and a.wiped_at is null", ""), "the work list must be the OWNER's"),
+    ("the personal filter removed (a business row would be wiped)", _sql("a.kind = 'personal' and ", ""),
+     "the work list must be the PERSONAL decisions"),
+    ("the work list narrowed to the owner's decisions", _sql("where a.kind = 'personal'", "where a.source = 'owner' and a.kind = 'personal'"),
+     "must not be narrowed by source"),
+    ("the work list narrowed to the computed decisions", _sql("where a.kind = 'personal'", "where a.source <> 'owner' and a.kind = 'personal'"),
+     "must not be narrowed by source"),
+    ("the already-wiped filter removed", _sql(" and a.wiped_at is null", ""), "the work list must be the PERSONAL decisions"),
+    ("the clock filter removed", _sql("    and a.personal_since <= now() - interval", "    and now() > now() - interval"),
+     "the work list must be the PERSONAL decisions"),
     ("the delay shortened", _sql(f"interval '{AUD.WIPE_DAYS * 24} hours'", "interval '24 hours'"), "the delay must be WIPE_DAYS"),
     ("the update no longer marks the chats wiped", _sql("set wiped_at = now(), updated_at = now()", "set updated_at = now()"),
      "must mark the decisions wiped"),

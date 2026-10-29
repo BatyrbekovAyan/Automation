@@ -1,17 +1,18 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """«Личные и рабочие чаты» (2026-10-25; spec docs/superpowers/specs/2026-10-25-personal-chats-design.md §4.6 and decision 12,
-plan docs/superpowers/plans/2026-10-25-personal-chats.md Task 8) — the Profile Lifecycle Sweep's step that, WIPE_DAYS (two)
-days after the OWNER made a chat personal, deletes what the assistant stored about it. Idempotent patch of the canonical
-workflow; this file OWNS the node «Wipe Personal Chats»:
+plan docs/superpowers/plans/2026-10-25-personal-chats.md Task 8) — the Profile Lifecycle Sweep's step that, WIPE_DAYS
+(two) days after a business chat turned personal (the owner made it personal, or the rule did after another number — the
+clock personal_since, audience.DECIDE_WRITE_SQL / OWNER_SET_SQL), deletes what the assistant stored about it. Idempotent
+patch of the canonical workflow; this file OWNS the node «Wipe Personal Chats»:
 
   Profile Lifecycle Sweep (fXYpCXPKw92EzRz8):
     Every 6 Hours ──> Wipe Personal Chats      one Postgres node = audience.WIPE_SQL (no parameters)
 
   * It hangs straight on the trigger, like «Expire Learning Rows» (apply-learning-a.py), and sits right under it on the
     canvas, above branch A (apply-sweep-clone-deactivate.py keeps that one the lowest). It is NOT behind «Sweep Config» and
-    no dry-run flag gates it: the step deletes by the age of the OWNER's decision, not by the state of a profile, and a
-    dry run would only postpone a deletion the owner already waited two days for.
+    no dry-run flag gates it: the step deletes by the age of a chat's personal clock, not by the state of a profile, and a
+    dry run would only postpone a deletion that has already waited two days.
   * It is terminal and fail-open (onError continueRegularOutput): a failed run changes nothing (the statement is one
     transaction) and the next run, six hours later, takes the same work list again.
   * The statement, the delay and the batch are audience.py's (WIPE_SQL, WIPE_DAYS, WIPE_BATCH); tests/test_personal_wipe.py
