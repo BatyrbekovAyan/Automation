@@ -661,8 +661,9 @@ CONTENT_OLD = "coalesce(m.message->>'content', m.message->'data'->>'content', ''
 CONTENT_NEW = "regexp_replace(" + CONTENT_OLD + ", " + MARKS_LEAD_SQL + ", '')"
 # «Личные и рабочие чаты» (2026-10-25, spec §4.3, §5.8): «Сводка» passes only BUSINESS chats — a decision that holds and says
 # business (audience.BUSINESS_SQL; a personal chat, a chat without a decision and a computed decision another number voided
-# are not). In the classifier's input: a chat the owner made personal keeps its memory for WIPE_DAYS (the mis-tap guard), and
-# that memory must not reach the classifier LLM meanwhile — nor the memory of anything else that is not business. The filter
+# are not). In the classifier's input: a business chat that turned personal — by the owner, or by the rule after another
+# number or a reconnect — keeps its memory for WIPE_DAYS (the clock personal_since), and that memory must not reach the
+# classifier LLM meanwhile — nor the memory of anything else that is not business. The filter
 # stands before the LIMIT, so the classifier's batch and the total (the app's drain loop) count business sessions only. A
 # session's profile and chat are its session_id split at the FIRST colon (the sessions CTE computes both that way).
 SESSION_PROFILE_SQL = "split_part(%s, ':', 1)"

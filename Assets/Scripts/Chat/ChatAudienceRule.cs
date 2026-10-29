@@ -115,7 +115,7 @@ public static class ChatAudienceRule
     /// <summary>A message that waited for the owner's decision is handed to the assistant again only while it is younger than this.</summary>
     public const int FreshHours = 24;
 
-    /// <summary>The data of a chat the owner made personal is wiped after this many days.</summary>
+    /// <summary>The data of a business chat that turned personal is wiped this many days later — the owner made it personal, or the server's rule did after another number or a reconnect.</summary>
     public const int WipeDays = 2;
 
     // The module's literals (Tools/n8n/audience.py), compared with its text by ChatAudienceRuleTests.
