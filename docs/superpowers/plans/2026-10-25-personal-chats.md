@@ -497,6 +497,97 @@ RULE = {"profiles": ["profileIds", "profileId"], "workflows": [], "appUser": [],
 - [ ] **Step 3: Прежние наборы зелёные:** `e2e-reply.py`, `e2e-handoff.py`, `e2e-auth.py`, `e2e-suggest.py`, `e2e-learning.py`.
 - [ ] **Step 4: Commit** — `test(personal-chats): мок Wappi и сценарии e2e для двух каналов`.
 
+### Task 9b: Ответ в чатах WhatsApp, строки которых Wappi отдаёт под кодом `@lid` (сервер)
+
+Решение владельца 2026-10-29: исправить в этой ветке, отдельной задачей до выкладки.
+
+Дефект (существовал до этой ветки, `docs/audits/2026-10-25-personal-chats/live-checks.md`, D6): у части чатов WhatsApp (2 из 4 прочитанных) строки `messages/get` несут `chatId`, `from` и `to` в виде кода `@lid`, а webhook того же чата — `chatId` номером (тем же id, что в списке чатов и в решениях), код отдельно в `whatsapp_chat_id`. Три проверки шаблонов считают такие строки чужим чатом, поэтому «Авто» в таких чатах не отвечает никогда:
+- `Latest+Combine` (`Tools/n8n/apply-message-batching.py`, `isForeign`) — всё отброшено → `newestIncoming` нет → abort → `superseded`;
+- `Final Check` и `Reconcile Check` (`Tools/n8n/apply-reply-pipeline-v2.py`) — тот же фильтр.
+
+**Правило.** Строка `messages/get` принадлежит чату, если её `chatId`:
+- id чата из webhook (`messages[0].chatId`);
+- или его код: `whatsapp_chat_id` того же webhook — только на WhatsApp, только непустая строка с окончанием `@lid`, отличная от id чата.
+
+Строка без `chatId` остаётся, как сейчас. Строка с любым другим `chatId` (другой номер, другой код) по-прежнему чужая: защита от перекрёстных ответов Wappi не ослабляется. Там, где сравнивается `from` строки с id чата, действует то же правило; чьё сообщение — по `fromMe`, как сейчас. Всё остальное в этих проверках не меняется: сортировка, «последнее входящее», правило владельца, «окно держит триггер», единственность эха, правила V5 / V7 / R10.
+
+**Files:**
+- Modify: `Tools/n8n/apply-message-batching.py` (`Latest+Combine`) и `Tools/n8n/apply-reply-pipeline-v2.py` (`Final Check`, `Reconcile Check`). Правило «чья строка» — один фрагмент JS в одном модуле генераторов; остальные его импортируют (как `RECONCILE_JS`), копий нет.
+- Modify: оба шаблона, `4wYitz5ek30SVNlT-WhatsApp_Bot.json` и `4VN3gsFaC2HUYmcc-Telegram_Bot.json`, — только регенерацией, в каноническом порядке генераторов. Код у Telegram тот же; `whatsapp_chat_id` там нет, поведение прежнее, `verify-telegram-parity.py` зелёный.
+- Modify: `Tools/n8n/verify-message-batching.py`, `Tools/n8n/verify-reply-pipeline.py` — правило запинено. Каждая мутация роняет проверку: код не принят; принят любой код; принят на Telegram; принят код без `@lid`.
+- Test: офлайн-тесты по реальному коду узлов из канона — существующие драйверы `Tools/n8n/tests/test_reply_order.py`, `Tools/n8n/tests/test_reply_reconcile.py` и тесты `Latest+Combine`.
+- Modify: `Tools/n8n/staging/e2e-reply.py` и `Tools/n8n/staging/e2e-audience.py` — сценарии ниже.
+- Modify: `CLAUDE.md` — запись «known, open» про `@lid` (её пишет Task 17) заменить правилом с указанием, где оно живёт и чем запинено. `docs/audits/2026-10-19-device-pass-new-build.md` — пункт «чат WhatsApp, строки которого приходят под кодом `@lid`, получает один ответ».
+
+Найти и другие места шаблонов, где строка `messages/get` сравнивается с id чата из webhook (поиск по генераторам). Перечислить их в отчёте с решением по каждому.
+
+Сценарии:
+- Офлайн (WhatsApp, если не сказано иное):
+  - все строки чата под его кодом: `Latest+Combine` находит триггер и склеивает очередь, `Final Check` пропускает, `Reconcile Check` находит эхо под кодом;
+  - строки под ДРУГИМ кодом — исход как сейчас (`superseded` / `cancelled_fetch` / `send_unknown`);
+  - `whatsapp_chat_id` пустой, без `@lid` или равный id чата — правило ничего не меняет;
+  - Telegram — без изменений.
+- Стенд (WhatsApp):
+  - `lid_rows_chat_replies_once` — мок отдаёт строки чата под кодом (`lid_rows`), webhook несёт `whatsapp_chat_id` → ровно один ответ, в журнале ответов `sent`;
+  - `foreign_lid_rows_not_answered` — строки под чужим кодом → ни одного ответа;
+  - сценарий `@lid` в `e2e-audience.py` (повторная подача после «Сделать рабочим») теперь проверяет ровно один ответ повторной подачи.
+
+- [ ] **Step 1: Офлайн-тесты — должны упасть на текущем каноне.**
+- [ ] **Step 2: Правило.** После него:
+  - офлайн-тесты зелёные;
+  - каждый генератор `--check` → rc 0;
+  - `Tools/n8n/staging/pg.sh start; python3 Tools/n8n/tests/run_all.py` → OK;
+  - все офлайн `Tools/n8n/verify-*.py` → OK.
+- [ ] **Step 3: Стенд.**
+  1. На каноне до этой задачи (`python3 Tools/n8n/staging/bootstrap.py --canon-ref <HEAD до Task 9b> --bot wa:stgwa001 --bot tg:stgtg001`) новые сценарии падают.
+  2. На рабочем каноне — зелёные.
+  3. `e2e-reply.py` и `e2e-audience.py` целиком зелёные.
+- [ ] **Step 4: Документы** — `CLAUDE.md` и пункт проверки на устройстве.
+- [ ] **Step 5: Commit** — `fix(personal-chats): ИИ-сотрудник отвечает в чатах WhatsApp, строки которых приходят под кодом @lid`.
+
+### Task 9c: Приложение показывает чаты WhatsApp, строки которых приходят под кодом `@lid`
+
+Решение владельца 2026-10-29 — чинить молчание в чатах под кодом `@lid` в этой ветке. Task 9b чинит сервер, эта задача — тот же дефект в приложении.
+
+Дефект (существовал до этой ветки; данные — `docs/audits/2026-10-25-personal-chats/live-checks.md`, D6 и «@lid и номер — один id»):
+- Список чатов (`chats/filter`) называет чат номером (`id` — `@c.us`) и держит код в `chat.LID`.
+- Строки `messages/get` у части чатов несут `chatId`, `from` и `to` в виде кода `@lid`.
+- `CrossChatResponseGuard.IsForDifferentChat(messages, chatId)` считает страницу чужой, если ни одна строка не называет запрошенный id и хотя бы одна называет другой. Этот вызов стоит в трёх местах `Assets/Scripts/Main/ChatManager.cs`: `SyncLatestMessages`, `ValidateCachePageAgainstServer` и загрузка страницы с повторами `MaxCrossChatRetries`.
+- Для такого чата каждая страница «чужая»: история не грузится, живые сообщения не приходят, панель подсказок получает пустые `messages`.
+
+**Правило** — то же, что на сервере (Task 9b). Строка — этого чата, если её `chatId`:
+- id чата;
+- или его код `chat.LID` из строки списка чатов — только WhatsApp, только непустой, с окончанием `@lid`, отличный от id чата.
+
+Строка без `chatId` — как сейчас. Строка с любым другим `chatId` — по-прежнему чужая. Ключ чата везде остаётся номером: `ChatManager.CurrentChatId`, кэш истории, `reply_mode_flags` и решения «личный/рабочий». Код нигде не становится ключом.
+
+**Files:**
+- Modify: `Assets/Scripts/Chat/ChatDialog.cs` — разбирать `chat.LID`. JsonUtility, вложенный `[Serializable]` класс; у Telegram поле пустое.
+- Modify: путь кода от строки списка до открытого чата — `ChatViewModel` и выбор чата в `ChatManager`. Перед правкой прочитать skill `chat-data-flow`: слои RawMessage → NormalizedMessage → MessageViewModel и два разных разборщика JSON.
+- Modify: `Assets/Scripts/Chat/CrossChatResponseGuard.cs` — код чата учитывается как «этот чат». И каждое другое место клиента, где `chatId` строки `messages/get` сравнивается с id открытого чата: поиск по `ChatManager*.cs`, живой опрос, кэш. Перечислить их в отчёте с решением по каждому.
+- Test: EditMode — `CrossChatResponseGuardTests` и тесты затронутых мест (каталог `Assets/Tests/Editor/Chat/`).
+- Modify: `docs/audits/2026-10-19-device-pass-new-build.md` — пункт «чат WhatsApp, строки которого приходят под кодом `@lid`: история, живые сообщения и подсказки».
+
+Сценарии (EditMode):
+- Страница, все строки которой несут код этого чата, — его страница:
+  - история показывается;
+  - живое сообщение под кодом доходит до открытого чата;
+  - загрузка страницы не уходит в повторы «чужого» ответа.
+- Страница под ДРУГИМ кодом — по-прежнему чужая.
+- Код без `@lid`, пустой или равный id чата — правило ничего не меняет.
+- Telegram — без изменений.
+- Строки под кодом лежат в кэше под номером чата.
+
+- [ ] **Step 1: Тесты — должны упасть на текущем коде.**
+- [ ] **Step 2: Правило и путь кода.** Тесты зелёные.
+- [ ] **Step 3: Полный EditMode.**
+  - Run: `Tools/run-tests-headless.sh`.
+  - Единственный допустимый отказ — `BillingServiceTests.AppUserId_falls_back_to_device_id_when_backend_reports_empty`: в этой рабочей копии нет `secrets.json`.
+  - После прогона `git status` чист на `Assets/TextMesh Pro/Fonts/`.
+- [ ] **Step 4: Commit** — `fix(personal-chats): приложение показывает чаты WhatsApp, строки которых приходят под кодом @lid`.
+
+Порядок после решения владельца 2026-10-29: Task 9b и 9c выполняются после Task 17; затем финальное ревью ветки с одной волной правок; Task 18 (пакет выкладки и репетиция) — последней, на окончательном каноне.
+
 ### Task 10: Приложение — факты чата и правило
 
 **Files:**
