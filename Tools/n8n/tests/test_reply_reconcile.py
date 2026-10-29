@@ -27,7 +27,8 @@ Reconcile Check → Record Send on staging-PG temp tables.
 import time
 
 from harness import Case, PgSession, code, has_node, report
-from reply_chain import CHATS, SETUP, TEMPLATES, Run, history, ledger, msg, record_outgoing
+# the test chats are business chats (the owner's decision): the templates answer and record only there («Личные и рабочие чаты»)
+from reply_chain import CHATS, SETUP_BUSINESS as SETUP, TEMPLATES, Run, history, ledger, msg, record_outgoing
 
 TEXT = 'Напишите, пожалуйста, текстом — так я быстрее отвечу.'
 T0 = 1_790_000_000

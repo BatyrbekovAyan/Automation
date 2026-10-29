@@ -27,6 +27,7 @@ and requires each to fail a check naming that file. Exit 0 only when every case 
 """
 import argparse
 import contextlib
+import copy
 import io
 import json
 import os
@@ -96,6 +97,9 @@ TG_BOT_NODE_NAMES = {
     "Stamp Draft",
     # iteration 2026-09-28 V7 (apply-reply-pipeline-v2.py): the one history's verdict on the reconcile window — +1
     "Owner Row?",
+    # personal chats 2026-10-25 (apply-history-handoff.py): the audience gate at message entry, between Read Reply Mode and
+    # Suppressed? — +4
+    "Audience Known?", "Business?", "Decide Audience", "Decided Business?",
 }
 
 
@@ -206,8 +210,9 @@ def check_reply_mode_gate():
     for f, wf in ((WA_BOT, wa), (TG_BOT, tg)):
         names = [n["name"] for n in wf["nodes"]]
         assert len(names) == len(TG_BOT_NODE_NAMES) and set(names) == TG_BOT_NODE_NAMES, \
-            f"{f}: node set changed (B1 adds no node — the schedule is a term of Read Reply Mode): " \
-            f"extra={sorted(set(names) - TG_BOT_NODE_NAMES)} missing={sorted(TG_BOT_NODE_NAMES - set(names))} count={len(names)}"
+            f"{f}: node set changed (B1 adds no node — the schedule is a term of Read Reply Mode; every node of the gate is " \
+            f"in TG_BOT_NODE_NAMES): extra={sorted(set(names) - TG_BOT_NODE_NAMES)} " \
+            f"missing={sorted(TG_BOT_NODE_NAMES - set(names))} count={len(names)}"
         q = sql_code(node(wf["nodes"], "Read Reply Mode")["parameters"]["query"])
         assert "from bot_schedule s where s.profile_id = $1 and s.enabled), false)" in q and " as off_hours;" in q, \
             f"{f}: Read Reply Mode lacks the schedule term / the off_hours column (B1)"
@@ -218,6 +223,45 @@ def check_reply_mode_gate():
         assert {k: a.get(k) for k in GATE_BEHAVIOUR_KEYS} == {k: b.get(k) for k in GATE_BEHAVIOUR_KEYS}, \
             f"{name}: behaviour keys differ between the templates: WA {[a.get(k) for k in GATE_BEHAVIOUR_KEYS]} TG {[b.get(k) for k in GATE_BEHAVIOUR_KEYS]}"
     print("OK  reply mode gate (B1: the schedule term, WA == TG, no node added)")
+
+
+# «Личные и рабочие чаты» (2026-10-25): the audience gate is the SAME in both templates — a gate that drifted on one channel
+# would answer (or store) a personal chat on that messenger only. Its Ifs and Suppressed? carry identical parameters; Decide
+# Audience differs in exactly two inputs — the channel constant and the WhatsApp chat code (whatsapp_chat_id on WhatsApp, ''
+# on Telegram, where tapi sends none); the gate's edges are the same.
+AUDIENCE_FORK = ("Audience Known?", "Business?", "Decided Business?", "Suppressed?")
+AUDIENCE_EDGES = ("Read Reply Mode", "Audience Known?", "Business?", "Decide Audience", "Decided Business?")
+DECIDE_CHANNEL_INPUTS = {WA_BOT: {"channel": "whatsapp", "chatLid": "={{ String($('Webhook').first().json.body.messages[0].whatsapp_chat_id || '') }}"},
+                         TG_BOT: {"channel": "telegram", "chatLid": ""}}
+
+
+def _without_ids(x):
+    """Parameters with the per-workflow ids (an If condition's `id`) dropped — what differs between two files by construction."""
+    if isinstance(x, dict):
+        return {k: _without_ids(v) for k, v in x.items() if k != "id"}
+    return [_without_ids(v) for v in x] if isinstance(x, list) else x
+
+
+def check_audience_fork():
+    wa, tg = load(WA_BOT), load(TG_BOT)
+    for name in AUDIENCE_FORK:
+        a, b = node(wa["nodes"], name), node(tg["nodes"], name)
+        assert _without_ids(a["parameters"]) == _without_ids(b["parameters"]), \
+            f"{name} differs between the WhatsApp and the Telegram template (one audience gate)"
+        assert {k: a.get(k) for k in GATE_BEHAVIOUR_KEYS} == {k: b.get(k) for k in GATE_BEHAVIOUR_KEYS}, \
+            f"{name}: behaviour keys differ between the templates"
+    da, db = copy.deepcopy(node(wa["nodes"], "Decide Audience")), copy.deepcopy(node(tg["nodes"], "Decide Audience"))
+    for f, d in ((WA_BOT, da), (TG_BOT, db)):
+        vals = d["parameters"]["workflowInputs"]["value"]
+        for k, want in DECIDE_CHANNEL_INPUTS[f].items():
+            assert vals.get(k) == want, f"{f}: Decide Audience's {k} must be {want!r}, got {vals.get(k)!r}"
+            vals[k] = "__CHANNEL__"
+    assert da["parameters"] == db["parameters"], "Decide Audience differs between the templates beyond the channel and the chat code"
+    assert {k: da.get(k) for k in GATE_BEHAVIOUR_KEYS} == {k: db.get(k) for k in GATE_BEHAVIOUR_KEYS}, \
+        "Decide Audience: behaviour keys differ between the templates"
+    for src in AUDIENCE_EDGES:
+        assert wa["connections"].get(src) == tg["connections"].get(src), f"{src}: the gate's edges differ between the templates"
+    print("OK  audience gate (personal chats: WA == TG but the channel and the chat code)")
 
 
 def check_bind_orchestrator(f, channel, jsonb_key, opposite_key, opposite_field):
@@ -1165,6 +1209,7 @@ def checks():
     return [
         ("telegram bot template", check_telegram_bot),
         ("reply mode gate", check_reply_mode_gate),
+        ("audience gate", check_audience_fork),
         ("bind TG", lambda: check_bind_orchestrator(CREATE_TG, "telegram", "{botTgId}", "botWaId", "WhatsappWorkflowId")),
         ("bind WA", lambda: check_bind_orchestrator(CREATE_WA, "whatsapp", "{botWaId}", "botTgId", "TelegramWorkflowId")),
         ("canonical export WA", lambda: check_canonical_export_invariant(CREATE_WA)),

@@ -23,6 +23,16 @@ T6 (Q1 B + V6-unknown, follow-ups 2026-10-11): the memory marks — owner rows o
 here, Record Owner Send in the Wappi Proxy), the bot's reply of unknown delivery with «[доставка не подтверждена] »
 (Record Send); Stamp Draft cuts a leading run of marks the model itself wrote; the «Сводка» transcript reads the
 content without them; the templates' own prompt ends with the ##memory_marks## rule (_core.md carries the same text).
+«Личные и рабочие чаты» (2026-10-25; spec §4.2, §4.3; plan Task 4) — the templates decide at message entry, before anything is
+written or sent, whether the chat is a client's: Read Reply Mode (still ONE statement, still fail-closed) also reads the
+chat's decision that holds (audience.AUDIENCE_SQL) and the profile's connection (audience.CONNECTION_SQL) →
+*Audience Known? →[personal | business] *Business? →[business] Suppressed? … |[personal] Outcome «personal»;
+→[no decision] *Decide Audience (Execute Workflow crAudienceDec001, build-decide-audience.py: the nine inputs it declares) →
+*Decided Business? (the sub-workflow's OWN answer — audience and outcome business) →[business] Suppressed? … |[else] Outcome
+(the sub-workflow's own personal outcome). Suppressed? reads Read Reply Mode's row (after Decide Audience the item is the
+sub-workflow's answer). Nothing but the Outcome stamp is reachable from the two «not business» branches. Record Outgoing
+records business chats only (ignored_personal); Cancel Label names a lease refused for a personal chat cancelled_personal
+(the lease itself is apply-reply-pipeline-v2.py's).
 
     python3 Tools/n8n/apply-history-handoff.py          # patch in place (re-runnable)
     python3 Tools/n8n/apply-history-handoff.py --check
@@ -40,6 +50,7 @@ import bot_schedule as bs  # noqa: E402  (B1: the schedule's window predicate, o
 import audience as au  # noqa: E402  (personal chats: «is this a business chat», one home — the «Сводка» reads; never imported back)
 PG_CRED = {"id": "vvRrFiEXzLVqKjOx", "name": "Postgres"}
 BOTS = ("4wYitz5ek30SVNlT-WhatsApp_Bot.json", "4VN3gsFaC2HUYmcc-Telegram_Bot.json")
+CHANNEL = {BOTS[0]: "whatsapp", BOTS[1]: "telegram"}
 CREATES = ("XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json", "Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json")
 DASHBOARD = "2htWSV5IHO8E2CgB-Dashboard_Outcomes.json"
 DELETE_BOT = "lmjYsdNcQA2IE5rl-Delete_Bot_Files.json"
@@ -175,10 +186,15 @@ RECORD_OUTGOING_SQL = """-- A6: what the business side sent. outgoing_message_ph
 -- their memory rows are written by those writers, never here. Group chats are not recorded.
 -- T6 (Q1 B): the owner's memory row opens with the owner mark (the model sees role + content only); the history keeps
 -- the text as sent.
-with ev as (
+-- «Личные и рабочие чаты»: only a BUSINESS chat is recorded — a decision that holds and says business (audience.BUSINESS_SQL).
+-- What the owner writes in a personal chat, or in a chat that has no decision yet, enters neither the history nor the
+-- memory (ignored_personal); a group keeps its own label.
+with aud as (
+  select __BUSINESS__ as business
+), ev as (
   insert into chat_history_events (profile_id, chat_id, message_id, source, body, msg_type, sent_at, execution_id)
   select $1, $2, $3, case when $7 = 'outgoing_message_phone' then 'owner_phone' else 'outgoing_api' end, $4, $5, to_timestamp($6::bigint), $8
-  where $2 not like '%@g.us'
+  where $2 not like '%@g.us' and (select business from aud)
   on conflict (profile_id, chat_id, message_id) do nothing
   returning source
 ), mem as (
@@ -189,8 +205,10 @@ with ev as (
   returning 1
 )
 select case when exists (select 1 from ev) then 'recorded_' || (select source from ev limit 1)
-            when $2 like '%@g.us' then 'ignored_group' else 'outgoing_known' end as outcome,
-       exists(select 1 from mem) as remembered;""".replace("__ROW__", MEMORY_ROW % ("'ai'", OWNER_CONTENT_SQL % "$4", "'owner_phone'", "$3"))
+            when $2 like '%@g.us' then 'ignored_group'
+            when not (select business from aud) then 'ignored_personal' else 'outgoing_known' end as outcome,
+       exists(select 1 from mem) as remembered;""".replace("__ROW__", MEMORY_ROW % ("'ai'", OWNER_CONTENT_SQL % "$4", "'owner_phone'", "$3")) \
+    .replace("__BUSINESS__", au.BUSINESS_SQL("$1", "$2"))
 RECORD_OUTGOING_PARAMS = "={{ (m => [ m.profile_id, String(m.chatId || m.to || ''), String(m.id || ''), " + BODY_TEXT + ", String(m.type || ''), Number(m.time) || Math.floor(Date.now() / 1000), String(m.wh_type || ''), $execution.id ])(" + M + ") }}"
 
 RECORD_SEND_SQL = """-- A7: the event's final transport state and the lease release. send_unknown stays send_unknown —
@@ -317,7 +335,10 @@ if (prev === 'Is Latest?') outcome = 'superseded';
 else if (prev === 'If Quota Allows') outcome = 'quota_denied';
 else if (prev === 'Generated?') outcome = 'generation_failed';
 else if (prev === 'Final OK?') outcome = j.outcome || 'cancelled_fetch';
-else if (prev === 'Send Allowed?') outcome = j.suppressed === true ? 'cancelled_mode' : (j.lock_busy === true ? 'cancelled_busy' : 'superseded');
+// «Личные и рабочие чаты»: the lease found the chat no longer a business chat (the owner made it personal, or another number
+// voided a computed decision) — that reason first: whatever else the lease saw, the chat is not the bot's to answer.
+else if (prev === 'Send Allowed?') outcome = j.personal === true ? 'cancelled_personal'
+  : (j.suppressed === true ? 'cancelled_mode' : (j.lock_busy === true ? 'cancelled_busy' : 'superseded'));
 else outcome = 'cancelled_fetch';
 let watermark = 0;
 try { watermark = Number($('Claim Event').first().json.history_watermark) || 0; } catch (e) { watermark = 0; }
@@ -349,6 +370,9 @@ return [{ json: { outcome, historyWatermark: watermark, dropAiHistory: generated
 # `false` (the LOCKED «absence ⇒ reply» is unchanged). The same term is answered as `off_hours` for the Outcome stamp.
 # The node stays fail-closed (no onError, like the whole pipeline since stage 3): the migration goes first. The predicate
 # lives in bot_schedule.py; Acquire Send Lease never reads it (decided at message entry only).
+# «Личные и рабочие чаты» (2026-10-25, spec §4.2): the same statement reads the chat's decision that holds (audience — personal /
+# business, NULL = no decision yet) and the profile's connection (its moment, its number) — never a second node on the hot
+# path (each Postgres node costs ≈ 1.9 s on prod). The migration sql/2026-10-25-chat-audience.sql goes before the templates.
 READ_MODE_SQL = """select (
   coalesce(
     (select suppressed from reply_mode_flags
@@ -361,7 +385,73 @@ READ_MODE_SQL = """select (
   -- B1: outside the bot's schedule window (an enabled row) the bot behaves as in «Вместе»
   or __OFF_HOURS__
 ) as suppressed,
-__OFF_HOURS__ as off_hours;""".replace("__OFF_HOURS__", bs.OFF_HOURS_SQL())
+-- personal chats: the decision that holds (null = none yet: Decide Audience decides), then the profile's connection
+__AUDIENCE__ as audience,
+__CONNECTION__,
+__OFF_HOURS__ as off_hours;""".replace("__OFF_HOURS__", bs.OFF_HOURS_SQL()).replace(
+    "__AUDIENCE__", au.AUDIENCE_SQL("$1", "$2")).replace("__CONNECTION__", au.CONNECTION_SQL("$1"))
+
+# ---------------------------------------------------------------------------------------------- the audience gate (2026-10-25)
+# «Личные и рабочие чаты» (plan Task 4): the fork at message entry. The gate's nodes are appended to the templates (Create /
+# Edit patch nodes[0] and nodes[5] by index); nothing but the Outcome stamp is reachable from the two «not business» branches
+# (verify-history-handoff.check_audience_gate proves it by reachability, for every send, Wappi call and write).
+AUDIENCE_KNOWN_EXPR = "={{ $json.audience === 'personal' || $json.audience === 'business' }}"
+BUSINESS_EXPR = "={{ $json.audience === 'business' }}"
+# Only Decide Audience's own answer carries `outcome`: the Execute Workflow node continues on error, and when it throws
+# outside its runner n8n hands its INPUT item on — Read Reply Mode's row, which has an audience column of its own.
+DECIDED_BUSINESS_EXPR = "={{ $json.audience === 'business' && $json.outcome === 'business' }}"
+# After Decide Audience the item is the sub-workflow's answer: the mode is read off Read Reply Mode's own row.
+SUPPRESSED_EXPR = "={{ $('Read Reply Mode').first().json.suppressed }}"
+_MODE_ROW = "$('Read Reply Mode').first().json"
+GATE_POSITIONS = {"Audience Known?": [-3456, 300], "Business?": [-3256, 300], "Decide Audience": [-3256, 500],
+                  "Decided Business?": [-3056, 500]}
+
+_DA = None
+
+
+def decide_audience():
+    """build-decide-audience.py — the ONE declaration of Decide Audience's id (WF_ID) and inputs (INPUTS). Loaded lazily: that
+    generator loads this file for MEMORY_ROW / OWNER_CONTENT_SQL, so a load at import time would recurse."""
+    global _DA
+    if _DA is None:
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("build_decide_audience", os.path.join(HERE, "build-decide-audience.py"))
+        _DA = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(_DA)
+    return _DA
+
+
+def decide_inputs(channel):
+    """What the template hands Decide Audience — its nine declared inputs, from the incoming message and Read Reply Mode's row:
+    the strings as strings (a message id may come as a number; the sub-workflow reads strings only); the chat = the message's
+    `from`, the reply-mode key; the code = WhatsApp's whatsapp_chat_id (none on Telegram); isBot the boolean the webhook
+    says; connectedAtMs a NUMBER — Postgres hands the bigint on as text and the node checks the declared types without
+    converting them — or null without a connection row; the number as text or null. One item per incoming message."""
+    return {"channel": channel,
+            "profileId": "={{ String(" + M + ".profile_id ?? '') }}",
+            "chatId": "={{ String(" + M + ".from ?? '') }}",
+            "chatLid": ("={{ String(" + M + ".whatsapp_chat_id || '') }}") if channel == "whatsapp" else "",
+            "messageId": "={{ String(" + M + ".id ?? '') }}",
+            "chatType": "={{ String(" + M + ".chat_type ?? '') }}",
+            "isBot": "={{ " + M + ".is_bot === true }}",
+            "connectedAtMs": "={{ ((v) => v === null || v === undefined ? null : Number(v))(" + _MODE_ROW + ".connected_at_ms) }}",
+            "connectionPhone": "={{ ((v) => typeof v === 'string' ? v : null)(" + _MODE_ROW + ".connection_phone) }}"}
+
+
+def decide_node(fname):
+    """The Execute Workflow node: crAudienceDec001, its declared inputs mapped by decide_inputs (types checked as declared,
+    nothing converted), waiting for the answer (the default); it continues on error — whatever it hands on then, only the
+    sub-workflow's own business answer passes Decided Business? — and always hands on an item, so the run ends at the stamp."""
+    da = decide_audience()
+    schema = [{"id": k, "displayName": k, "required": False, "defaultMatch": False, "display": True, "canBeUsedToMatch": True,
+               "type": t, "removed": False} for k, t in da.INPUTS]
+    return {"parameters": {"workflowId": {"__rl": True, "value": da.WF_ID, "mode": "id"},
+                           "workflowInputs": {"mappingMode": "defineBelow", "value": decide_inputs(CHANNEL[fname]), "matchingColumns": [],
+                                              "schema": schema, "attemptToConvertTypes": False, "convertFieldsToString": False},
+                           "options": {}},
+            "id": nid(fname, "Decide Audience"), "name": "Decide Audience", "type": "n8n-nodes-base.executeWorkflow",
+            "typeVersion": 1.2, "position": GATE_POSITIONS["Decide Audience"], "alwaysOutputData": True,
+            "onError": "continueRegularOutput"}
 
 TOOL_RULE = ("\n\n##create_handoff##\n"
              "Передача владельцу — это ДЕЙСТВИЕ, не фраза. Когда клиент готов к заказу/брони, просит связаться, или вопрос надо передать человеку — "
@@ -417,6 +507,16 @@ def set_edges(wf, src, outputs, kind="main"):
     cur = wf["connections"].setdefault(src, {})
     if cur.get(kind) != want:
         cur[kind] = want
+        return True
+    return False
+
+
+def set_condition(n, expr):
+    """The one condition of a hand-authored If node, set to `expr` (operator and type validation left as they are)."""
+    conds = n["parameters"]["conditions"]["conditions"]
+    assert len(conds) == 1, f"{n['name']}: expected one condition, found {len(conds)}"
+    if conds[0]["leftValue"] != expr:
+        conds[0]["leftValue"] = expr
         return True
     return False
 
@@ -490,8 +590,19 @@ def patch_bot(fname):
     if cl["parameters"]["jsCode"] != CANCEL_LABEL_JS:
         cl["parameters"]["jsCode"] = CANCEL_LABEL_JS
         ch = True
-    # (3) handoff pause in the mode gate
+    # (3) handoff pause in the mode gate (+ the chat's audience and the profile's connection, personal chats)
     ch |= set_query(node(wf, "Read Reply Mode"), READ_MODE_SQL)
+    # (3b) personal chats: the audience gate between the mode read and Suppressed? (appended nodes: nodes[0]/[5] stay put)
+    ch |= ensure(wf, if_true("Audience Known?", AUDIENCE_KNOWN_EXPR, GATE_POSITIONS["Audience Known?"], fname))
+    ch |= ensure(wf, if_true("Business?", BUSINESS_EXPR, GATE_POSITIONS["Business?"], fname))
+    ch |= ensure(wf, decide_node(fname))
+    ch |= ensure(wf, if_true("Decided Business?", DECIDED_BUSINESS_EXPR, GATE_POSITIONS["Decided Business?"], fname))
+    ch |= set_edges(wf, "Read Reply Mode", [["Audience Known?"]])
+    ch |= set_edges(wf, "Audience Known?", [["Business?"], ["Decide Audience"]])
+    ch |= set_edges(wf, "Business?", [["Suppressed?"], ["Outcome"]])
+    ch |= set_edges(wf, "Decide Audience", [["Decided Business?"]])
+    ch |= set_edges(wf, "Decided Business?", [["Suppressed?"], ["Outcome"]])
+    ch |= set_condition(node(wf, "Suppressed?"), SUPPRESSED_EXPR)
     # (4) the tool + the rule
     ch |= ensure(wf, tool_node(fname))
     ch |= set_edges(wf, "Create Handoff", [["AI Agent"]], kind="ai_tool")
@@ -802,11 +913,28 @@ def patch_set_state():
     return ch
 
 
+def gate_current(wf, fname):
+    """The audience gate as patch_bot writes it: the four nodes, their edges, Suppressed? reading the mode row."""
+    edges = lambda src: [[e["node"] for e in out] for out in (wf["connections"].get(src) or {}).get("main", [])]
+    cond = lambda name: node(wf, name)["parameters"]["conditions"]["conditions"][0]["leftValue"]
+    if not all(node(wf, n) for n in ("Audience Known?", "Business?", "Decide Audience", "Decided Business?")):
+        return False
+    d = decide_node(fname)
+    dn = node(wf, "Decide Audience")
+    return cond("Audience Known?") == AUDIENCE_KNOWN_EXPR and cond("Business?") == BUSINESS_EXPR \
+        and cond("Decided Business?") == DECIDED_BUSINESS_EXPR and cond("Suppressed?") == SUPPRESSED_EXPR \
+        and all(dn.get(k) == d[k] for k in ("parameters", "type", "typeVersion", "alwaysOutputData", "onError")) \
+        and edges("Read Reply Mode") == [["Audience Known?"]] and edges("Audience Known?") == [["Business?"], ["Decide Audience"]] \
+        and edges("Business?") == [["Suppressed?"], ["Outcome"]] and edges("Decide Audience") == [["Decided Business?"]] \
+        and edges("Decided Business?") == [["Suppressed?"], ["Outcome"]]
+
+
 def check():
     bad = []
     for f in BOTS:
         wf = json.load(open(os.path.join(WF, f), encoding="utf-8"))
         ok = all(node(wf, n) for n in ("Is Incoming?", "Is Outgoing?", "Outgoing Bound?", "Record Outgoing", "Record Suppressed", "Create Handoff", "Stamp Draft")) \
+            and gate_current(wf, f) and node(wf, "Cancel Label")["parameters"]["jsCode"] == CANCEL_LABEL_JS \
             and node(wf, "Stamp Draft")["parameters"]["query"] == STAMP_DRAFT_SQL \
             and node(wf, "Stamp Draft")["parameters"]["options"]["queryReplacement"] == STAMP_DRAFT_PARAMS \
             and wf["connections"].get("Generated?", {}).get("main", [[]])[0] == [{"node": "Stamp Draft", "type": "main", "index": 0}] \

@@ -39,7 +39,8 @@ import subprocess
 import tempfile
 
 from harness import N8N, Case, PgSession, bind, code, expr, module, node, report, wf
-from reply_chain import CHATS, SETUP, TEMPLATES, Run, _lit, business, history, msg, record_outgoing
+# the test chats are business chats (the owner's decision): the templates answer and record only there («Личные и рабочие чаты»)
+from reply_chain import CHATS, SETUP_BUSINESS as SETUP, TEMPLATES, Run, _lit, business, history, msg, record_outgoing
 
 OWNER = 'Владелец: '                         # the contract (plan §4.1) — the generator's constants must equal it
 UNDELIVERED = '[доставка не подтверждена] '

@@ -14,6 +14,13 @@ stands in for n8n, it must answer what n8n 2.36 answers — each rule below is r
                                         first() throws; a node that is not in the workflow throws at $()
   trigger_keeps_only_the_declared_fields     an Execute Workflow trigger hands on the declared fields — null when left out
                                         — and nothing else
+  execute_workflow_like_n8n             an Execute Workflow node type-checks its mapped inputs with n8n's own validateFieldType
+                                        (a numeric string for a number field throws outside the runner: the INPUT is handed on,
+                                        the sub-workflow never starts), runs the sub-workflow once, hands on its last node's
+                                        items; a failing sub-workflow is an {error} item; a Code node sees $prevNode.name
+  postgres_string_form_params           queryReplacement in n8n's string form (`={{ a }},{{ b }}`): each {{ }} on its own,
+                                        JSON kept whole, anything else split at commas
+  stop_ends_the_walk                    a node named in `stop` ends the walk where it stands, unexecuted
 
     python3 Tools/n8n/tests/test_graph_walk.py
 """
@@ -115,5 +122,87 @@ with Case('trigger_keeps_only_the_declared_fields: an Execute Workflow trigger h
     with Session(SETUP) as pg:
         r = walk(pg, chain(trigger('a', 'b')), {'a': 1, 'extra': 'dropped'})
         c.check(out(r, TRIGGER) == [{'a': 1, 'b': None}], f'{out(r, TRIGGER)}')
+
+
+def execute(name, values, types, convert=False, on_error='continueRegularOutput', always=False):
+    """An Execute Workflow node (typeVersion 1.2, the shape the bot templates' Decide Audience has) calling 'subWorkflow01'."""
+    n = {'name': name, 'type': 'n8n-nodes-base.executeWorkflow', 'typeVersion': 1.2, 'position': [200, 0],
+         'parameters': {'workflowId': {'__rl': True, 'value': 'subWorkflow01', 'mode': 'id'},
+                        'workflowInputs': {'mappingMode': 'defineBelow', 'value': values, 'matchingColumns': [],
+                                           'schema': [{'id': k, 'displayName': k, 'required': False, 'defaultMatch': False, 'display': True,
+                                                       'canBeUsedToMatch': True, 'type': t, 'removed': False} for k, t in types],
+                                           'attemptToConvertTypes': convert, 'convertFieldsToString': False},
+                        'options': {}}}
+    if on_error:
+        n['onError'] = on_error
+    if always:
+        n['alwaysOutputData'] = True
+    return n
+
+
+def sub_workflow(js='return [{ json: { got: $input.first().json } }];'):
+    """The called workflow: a trigger declaring n (number) and s (string), then one Code node — its LAST node."""
+    t = trigger('n', 's')
+    t['parameters']['workflowInputs']['values'] = [{'name': 'n', 'type': 'number'}, {'name': 's', 'type': 'string'}]
+    return chain(t, code('Echo', js))
+
+
+with Case('execute_workflow_like_n8n: the mapped inputs are type-checked by n8n\'s own validateFieldType (strict unless '
+          'attemptToConvertTypes) — a number passes, null passes, a numeric STRING for a number field throws outside the node\'s '
+          'runner (it hands its INPUT on, the sub-workflow never starts), with conversion it passes as a number; the '
+          'sub-workflow\'s trigger keeps its declared fields, its LAST node\'s items come back; a failing sub-workflow is an '
+          '{error} item; $prevNode names the node that called a Code node') as c:
+    with Session(SETUP) as pg:
+        subs = {'subWorkflow01': sub_workflow()}
+        after = code('After', 'return [{ json: { prev: $prevNode.name, item: $input.first().json } }];', x=600)
+        mapping = {'n': '={{ $json.n }}', 's': 'literal'}
+        types = (('n', 'number'), ('s', 'string'))
+
+        def run_with(item, **kw):
+            w = chain(trigger('n', 'extra'), execute('Call', mapping, types, **kw), after)
+            return walk_graph(pg, w, TRIGGER, items=[{'json': item}], subs=subs)
+
+        r = run_with({'n': 12, 'extra': 'x'})
+        c.check(out(r, 'Call') == [{'got': {'n': 12, 's': 'literal'}}] and out(r, 'After') == [{'prev': 'Call', 'item': {'got': {'n': 12, 's': 'literal'}}}]
+                and ('sub', 'Call') in r.events and r.subs.get('Call'), f'a number: {out(r, "Call")} {out(r, "After")} {r}')
+        r = run_with({'n': None, 'extra': 'x'})
+        c.check(out(r, 'Call') == [{'got': {'n': None, 's': 'literal'}}], f'null: {out(r, "Call")}')
+        r = run_with({'n': '12', 'extra': 'x'})
+        c.check(out(r, 'Call') == [{'n': '12', 'extra': 'x'}] and ('throw', 'Call') in r.events and not r.subs.get('Call'),
+                f'a numeric string, strict: {out(r, "Call")} {r.events}')
+        r = run_with({'n': '12', 'extra': 'x'}, convert=True)
+        c.check(out(r, 'Call') == [{'got': {'n': 12, 's': 'literal'}}], f'a numeric string, converted: {out(r, "Call")}')
+        r = run_with({'n': '12', 'extra': 'x'}, on_error=None)
+        c.check(r.halt is not None and not r.ran('After'), f'without onError the execution ends: {r}')
+        failing = {'subWorkflow01': sub_workflow("throw new Error('the sub-workflow failed');")}
+        w = chain(trigger('n'), execute('Call', mapping, types), after)
+        r = walk_graph(pg, w, TRIGGER, items=[{'json': {'n': 1}}], subs=failing)
+        got = out(r, 'Call')
+        c.check(len(got) == 1 and 'failed' in str(got[0].get('error')), f'a failing sub-workflow: {got} {r}')
+
+with Case('postgres_string_form_params: a queryReplacement in n8n\'s string form (`={{ a }},{{ b }}`, typeVersion ≥ 2.5) — '
+          'each {{ }} on its own, a JSON value kept whole, anything else split at commas') as c:
+    with Session(SETUP) as pg:
+        n = postgres('Q', 'select $1::text as a, $2::text as b, $3::text as c')
+        n['parameters']['options']['queryReplacement'] = '={{ $json.x }},{{ $json.y }}'
+        r = walk(pg, chain(trigger('x', 'y'), n), {'x': 'one', 'y': 'two,three'})
+        c.check(out(r, 'Q') == [{'a': 'one', 'b': 'two', 'c': 'three'}], f'a comma inside a value splits (n8n\'s own rule): {out(r, "Q")}')
+        two = postgres('Q', 'select $1::text as a, $2::text as b')
+        two['parameters']['options']['queryReplacement'] = '={{ $json.x }},{{ $json.y }}'
+        r = walk(pg, chain(trigger('x', 'y'), two), {'x': 'wa-prof', 'y': '5550001112'})
+        c.check(out(r, 'Q') == [{'a': 'wa-prof', 'b': '5550001112'}], f'a number-like value stays whole: {out(r, "Q")}')
+        old = postgres('Q', 'select $1::text as a', version=2.2)
+        old['parameters']['options']['queryReplacement'] = '={{ $json.x }}'
+        try:
+            walk(pg, chain(trigger('x'), old), {'x': 'one'})
+            c.check(False, 'the text form before typeVersion 2.5 (another rule in n8n) must be refused, not guessed')
+        except NotImplementedError:
+            pass
+
+with Case('stop_ends_the_walk: a node named in `stop` is recorded where the walk ends and does not run') as c:
+    with Session(SETUP) as pg:
+        w = chain(trigger('x'), code('A', 'return $input.all();'), code('B', "throw new Error('must not run');"))
+        r = walk_graph(pg, w, TRIGGER, items=[{'json': {'x': 1}}], stop=('B',))
+        c.check(r.halt is None and r.trail == [TRIGGER, 'A', 'B'] and ('stop', 'B') in r.events and 'B' not in r.outputs, f'{r} {r.events}')
 
 report()

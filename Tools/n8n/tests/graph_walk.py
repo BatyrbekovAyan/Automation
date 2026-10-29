@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Walks ONE execution through the REAL graph of a canonical n8n workflow, edge by edge, in n8n's executionOrder v1 —
 shared by the tests of the «Личные и рабочие чаты» workflows: tests/test_chat_audience.py (the ChatAudience webhook,
-crChatAudience01, entered at its Webhook) and tests/test_decide_audience.py (the Decide Audience sub-workflow,
-crAudienceDec001, entered at its Execute Workflow trigger). Lifted out of test_chat_audience.py on 2026-10-29: that file
-runs its scenarios when imported, so the walker had to move to be shared.
+crChatAudience01, entered at its Webhook), tests/test_decide_audience.py (the Decide Audience sub-workflow,
+crAudienceDec001, entered at its Execute Workflow trigger) and tests/test_reply_audience.py (the two bot templates, entered
+at their Webhook, calling Decide Audience; tests/reply_chain.py's Run.mode() calls it the same way). Lifted out of
+test_chat_audience.py on 2026-10-29: that file runs its scenarios when imported, so the walker had to move to be shared.
 
 What runs — no n8n server, no network, never production:
   * every Code body, If and parameter expression through n8n's OWN engine (n8n-workflow from the staging install = prod's
@@ -24,13 +25,24 @@ What runs — no n8n server, no network, never production:
     fullResponse / neverError / onError;
   * a Webhook node hands on the request it is given; an Execute Workflow trigger (typeVersion ≥ 1.1, inputSource
     workflowInputs) hands on, per input item, every declared field — null when the caller left it out (n8n's
-    FALLBACK_DEFAULT_VALUE) — and nothing else (ExecuteWorkflowTrigger.execute trims the item to the schema).
+    FALLBACK_DEFAULT_VALUE) — and nothing else (ExecuteWorkflowTrigger.execute trims the item to the schema);
+  * an Execute Workflow node (typeVersion ≥ 1.2, source database, mode once, waiting for the sub-workflow) maps each item's
+    inputs (workflowInputs.value through n8n's engine) and checks them against its schema with n8n's own validateFieldType
+    (step_execute cites the source) — a value that fails the check, or a mapping that throws, throws OUTSIDE the node's
+    runner; then it walks the sub-workflow named in `subs` (its id → its JSON) from its Execute Workflow trigger with all the
+    items at once, the same Postgres session, stub, faults and throws, and hands on the LAST executed node's outputs (a
+    sub-workflow that ends in an error: one {error} item when the node continues on error);
+  * a Code node sees `$prevNode.name` — the node whose output it was called with;
+  * a Postgres node's queryReplacement in n8n's string form (typeVersion ≥ 2.5, `={{ a }},{{ b }}`) is read the way
+    executeQuery.operation.js reads it — every {{ }} of the raw parameter on its own, split at commas unless it is JSON.
 Order: depth-first; a node's children (all outputs) by canvas position (y, then x); a node runs once per arrival with all the
-items of that arrival; alwaysOutputData turns an empty first output into one empty item. The first Respond node answers.
+items of that arrival; alwaysOutputData turns an empty first output into one empty item. The first Respond node answers. A node
+named in `stop` ends the walk where it stands (it is recorded in the trail, it does not run).
 
     run = walk_graph(pg, workflow, 'Webhook', webhook=request, fake=stub)
     run = walk_graph(pg, workflow, 'When Executed by Another Workflow', items=[{'json': {...}}], fake=stub)
-    run.answer, run.trail, run.calls, run.events, run.outputs['Node'], run.halt
+    run = walk_graph(pg, template, 'Webhook', webhook=request, fake=stub, subs={'crAudienceDec001': sub}, stop=('Debounce Wait',))
+    run.answer, run.trail, run.calls, run.events, run.outputs['Node'], run.subs['Execute Node'], run.halt
 """
 import copy
 import json
@@ -72,8 +84,9 @@ function dollar(nodes) {
 const ev = (expr, json, nodes) => evaluateExpression(String(expr).replace(/^=/, ''),
   Object.assign({}, GLOBALS, {$json: json, $: dollar(nodes), $execution: {id: 'synthetic-exec'}}));
 async function runCode(v) {
-  const fn = new Function('$input', '$', '$env', 'require', 'Buffer', '$json', '$execution', v.js);
+  const fn = new Function('$input', '$', '$env', 'require', 'Buffer', '$json', '$execution', '$prevNode', v.js);
   const exec = {id: 'synthetic-exec'};
+  const prev = {name: v.prevNode || ''};
   const items = v.items.map((x) => ({json: x.json}));
   const list = (r) => (Array.isArray(r) ? r : [r]).filter((x) => x !== undefined && x !== null)
     .map((x) => ((x && typeof x === 'object' && 'json' in x) ? {json: x.json, pairedItem: x.pairedItem === undefined ? null : x.pairedItem} : {json: x, pairedItem: null}));
@@ -81,27 +94,59 @@ async function runCode(v) {
     const out = [];
     for (let k = 0; k < v.items.length; k++) {
       const inp = {item: items[k], first: () => items[0], all: () => items, last: () => items[items.length - 1]};
-      const r = await fn(inp, dollar(v.items[k].nodes), v.env || {}, require, Buffer, v.items[k].json, exec);
+      const r = await fn(inp, dollar(v.items[k].nodes), v.env || {}, require, Buffer, v.items[k].json, exec, prev);
       if (r === undefined || r === null) throw new Error('runOnceForEachItem: nothing returned for item ' + k);
       out.push({json: (r && typeof r === 'object' && 'json' in r) ? r.json : r, pairedItem: {item: k}});
     }
     return out;
   }
   const inp = {first: () => items[0], all: () => items, last: () => items[items.length - 1], item: items[0]};
-  return list(await fn(inp, dollar(v.nodes), v.env || {}, require, Buffer, (items[0] || {}).json, exec));
+  return list(await fn(inp, dollar(v.nodes), v.env || {}, require, Buffer, (items[0] || {}).json, exec, prev));
 }
+// The Postgres node's own text helpers (n8n-nodes-base 2.36, Postgres v2 helpers/utils.js): evaluateExpression, isJSON,
+// stringToArray — what the string form of queryReplacement goes through.
+const pgText = (x) => (x === undefined ? '' : x === null ? 'null' : (typeof x === 'object' ? JSON.stringify(x) : x.toString()));
+const isJSON = (s) => { try { JSON.parse(String(s).trim()); return true; } catch (e) { return false; } };
+const toArray = (s) => (s === undefined ? [] : String(s).split(',').filter((e) => e).map((e) => e.trim()));
 async function handle(v) {
   try {
     if (v.kind === 'expr') return {ok: true, value: ev(v.expr, v.json, v.nodes)};
     if (v.kind === 'params') {
-      // executeQuery.operation.js (n8n-nodes-base 2.36, typeVersion >= 2.5), the array branch: an undefined value is SKIPPED
-      // (the following parameters shift), an object is JSON-stringified, anything else goes to pg-promise as is
+      // executeQuery.operation.js (n8n-nodes-base 2.36, typeVersion >= 2.5). The array branch: an undefined value is SKIPPED
+      // (the following parameters shift), an object is JSON-stringified, anything else goes to pg-promise as is. The string
+      // branch (the parameter evaluates to text, e.g. `={{ a }},{{ b }}`): every {{ }} of the RAW parameter is evaluated on
+      // its own (getResolvables) — an array spreads as above, anything else becomes the Postgres helpers' text (null →
+      // 'null'), kept whole when it is JSON, else split at commas; a raw parameter without {{ }} is split at commas as is
       const r = ev(v.expr, v.json, v.nodes);
-      if (!Array.isArray(r)) throw new Error('queryReplacement did not evaluate to an array: ' + JSON.stringify(r));
       const values = [], skipped = [];
-      r.forEach((x, i) => { if (x === undefined) { skipped.push(i); return; }
-                            values.push(typeof x === 'object' && x !== null ? JSON.stringify(x) : x); });
+      if (Array.isArray(r)) {
+        r.forEach((x, i) => { if (x === undefined) { skipped.push(i); return; }
+                              values.push(typeof x === 'object' && x !== null ? JSON.stringify(x) : x); });
+        return {ok: true, values, skipped};
+      }
+      if (typeof r !== 'string' && typeof r !== 'number') throw new Error('queryReplacement is neither an array nor text: ' + JSON.stringify(r));
+      if (!((v.version || 0) >= 2.5)) throw new Error('NOT MODELLED: the text form of queryReplacement before typeVersion 2.5 (' + v.version + ')');
+      const raw = String(v.expr).replace(/^=+/, '');
+      const resolvables = raw.match(/({{[\s\S]*?}})/g) || [];
+      if (!resolvables.length) values.push(...toArray(raw));
+      for (const one of resolvables) {
+        const x = ev('=' + one, v.json, v.nodes);
+        if (Array.isArray(x)) {
+          for (const item of x) { if (item !== undefined) values.push(typeof item === 'object' && item !== null ? JSON.stringify(item) : item); }
+          continue;
+        }
+        const text = pgText(x);
+        values.push(...(isJSON(text) ? [text] : toArray(text)));
+      }
       return {ok: true, values, skipped};
+    }
+    if (v.kind === 'validate') {
+      // validate-value-against-schema.js (n8n-core 2.36.5) for a resource mapper value: n8n-workflow's validateFieldType per
+      // field of the schema — strict = showTypeConversionOptions (the Execute Workflow node shows them) && !attemptToConvertTypes,
+      // parseStrings = … && convertFieldsToString; the field then takes the validated value (undefined when the value is null)
+      const {validateFieldType} = require(N + '/n8n-workflow/dist/cjs/type-validation.js');
+      const res = validateFieldType(v.key, v.value, v.type, {strict: v.strict, parseStrings: v.parseStrings});
+      return {ok: true, valid: res.valid, value: res.valid ? res.newValue : null, error: res.valid ? null : (res.errorMessage || 'invalid')};
     }
     if (v.kind === 'if') {
       const f = v.filter, res = (x) => (typeof x === 'string' && x.startsWith('=') ? ev(x, v.json, v.nodes) : x);
@@ -144,9 +189,9 @@ class _Engine:
 
 ENGINE = _Engine()
 
-WEBHOOK, TRIGGER, CODE, IF, POSTGRES, HTTP, RESPOND = (
+WEBHOOK, TRIGGER, CODE, IF, POSTGRES, HTTP, RESPOND, EXECUTE = (
     'n8n-nodes-base.webhook', 'n8n-nodes-base.executeWorkflowTrigger', 'n8n-nodes-base.code', 'n8n-nodes-base.if',
-    'n8n-nodes-base.postgres', 'n8n-nodes-base.httpRequest', 'n8n-nodes-base.respondToWebhook')
+    'n8n-nodes-base.postgres', 'n8n-nodes-base.httpRequest', 'n8n-nodes-base.respondToWebhook', 'n8n-nodes-base.executeWorkflow')
 
 
 # ---------------------------------------------------------------------------------------------------- the walker
@@ -158,6 +203,7 @@ class Run:
     def __init__(self, names=()):
         self.answer, self.trail, self.calls, self.events, self.outputs, self.halt = None, [], [], [], {}, None
         self.names = tuple(names)        # every node of the workflow: `$('Node')` of one that has not run is not an error
+        self.subs = {}                   # Execute Workflow node → [the Run of each sub-workflow it called]
 
     def ran(self, name):
         return name in self.trail
@@ -274,7 +320,9 @@ def step_postgres(pg, n, items, run, faults):
     stmts = []
     for it in items:
         p = ENGINE('params', expr=(n['parameters'].get('options') or {}).get('queryReplacement', '={{ [] }}'),
-                   json=it['json'], nodes=nodes_for(run, it['lin']))
+                   json=it['json'], nodes=nodes_for(run, it['lin']), version=n.get('typeVersion') or 1)
+        if not p['ok'] and p['error'].startswith('NOT MODELLED'):
+            raise NotImplementedError(f'{name}: {p["error"]}')
         if not p['ok']:                  # thrown outside the query runner: a continuing node hands its INPUT items on
             if cont:
                 return [[derived(items, k, name, items[k]['json']) for k in range(len(items))]]
@@ -357,9 +405,9 @@ def step_http(n, items, run, fake):
     return [out]
 
 
-def step_code(n, items, run, env):
+def step_code(n, items, run, env, prev=''):
     name, mode = n['name'], ('each' if n['parameters'].get('mode') == 'runOnceForEachItem' else 'all')
-    payload = dict(js=n['parameters']['jsCode'], mode=mode, env=env)
+    payload = dict(js=n['parameters']['jsCode'], mode=mode, env=env, prevNode=prev)
     if mode == 'each':
         payload['items'] = [{'json': it['json'], 'nodes': nodes_for(run, it['lin'])} for it in items]
     else:
@@ -422,6 +470,82 @@ def step_throw(n, items, run, message):
     return [[derived(items, k, n['name'], items[k]['json']) for k in range(len(items))]]
 
 
+def execute_inputs(n, item_json, nodes):
+    """What an Execute Workflow node (n8n-nodes-base 2.36.4, typeVersion ≥ 1.2) hands its sub-workflow for ONE input item —
+    getWorkflowInputValues: every workflowInputs.value through n8n's engine (a value without a leading '=' is a literal),
+    merged OVER the item's own json, each field first checked against the node's schema by validateResourceMapperValue
+    (n8n-core 2.36.5, validate-value-against-schema.js: validateFieldType, strict unless attemptToConvertTypes — the node
+    shows the conversion options —, strings checked only with convertFieldsToString; a field takes the validated value);
+    the schema's removed fields left out (getCurrentWorkflowInputData). `nodes` = what `$('Node')` sees (nodes_for). Returns
+    (json, None), or (None, the error) when a value does not evaluate or does not pass — n8n throws that from
+    getNodeParameter, outside the node's try."""
+    mapping = n['parameters'].get('workflowInputs') or {}
+    schema = {s.get('id'): s for s in (mapping.get('schema') or [])}
+    strict, parse_strings = not mapping.get('attemptToConvertTypes'), bool(mapping.get('convertFieldsToString'))
+    values = {}
+    for key, raw in (mapping.get('value') or {}).items():
+        if isinstance(raw, str) and raw.startswith('='):
+            r = ENGINE('expr', expr=raw, json=item_json, nodes=nodes)
+            if not r['ok']:
+                return None, f'{key}: {r["error"]}'
+            value = r['value']
+        else:
+            value = raw
+        typ = (schema.get(key) or {}).get('type')
+        if typ:
+            v = ENGINE('validate', key=key, value=value, type=typ, strict=strict, parseStrings=parse_strings)
+            if not v['ok']:
+                raise AssertionError(f'{n["name"]}: n8n\'s validateFieldType could not be asked: {v}')
+            if not v['valid']:
+                return None, f"Invalid input for '{key}': {v['error']}"
+            value = v['value']
+        values[key] = value
+    removed = {s.get('displayName') for s in schema.values() if s.get('removed')}
+    return {k: x for k, x in {**item_json, **values}.items() if k not in removed}, None
+
+
+def step_execute(pg, n, items, run, subs, fake, env, faults, throws):
+    """n8n-nodes-base 2.36.4 ExecuteWorkflow.execute — typeVersion ≥ 1.2, source database, mode once, waiting for the
+    sub-workflow (anything else raises NotImplementedError, and so does continueErrorOutput). getCurrentWorkflowInputData
+    (execute_inputs) runs BEFORE the node's try: a value that does not evaluate or does not pass its check throws outside the
+    runner (step_throw — a node that continues on error hands its INPUT items on, the sub-workflow never starts). Then the
+    sub-workflow subs[workflowId] runs ONCE with all the items (walk_graph from its Execute Workflow trigger; the same session,
+    stub, faults and throws — the node names are the sub-workflow's own); the outputs of its LAST executed node come back,
+    each item paired to its input when the lengths match. A sub-workflow that ends in an error is caught INSIDE the try: one
+    {error} item when the node continues on error, else the execution ends."""
+    p, name = n['parameters'], n['name']
+    if (n.get('typeVersion') or 1) < 1.2 or p.get('source', 'database') != 'database' or p.get('mode', 'once') != 'once' \
+            or (p.get('options') or {}).get('waitForSubWorkflow', True) is not True or n.get('onError') == 'continueErrorOutput':
+        raise NotImplementedError(f'{name}: only typeVersion ≥ 1.2, source database, mode once, waiting, no error output is modelled')
+    wid = p.get('workflowId')
+    wid = wid.get('value') if isinstance(wid, dict) else wid
+    sub = (subs or {}).get(wid)
+    if sub is None:
+        raise AssertionError(f'{name}: the sub-workflow {wid!r} was not handed to the walker (subs)')
+    merged = []
+    for it in items:
+        j, err = execute_inputs(n, it['json'], nodes_for(run, it['lin']))
+        if err is not None:
+            return step_throw(n, items, run, err)
+        merged.append({'json': j})
+    run.events.append(('sub', name))
+    trigger = next(x['name'] for x in sub['nodes'] if x['type'] == TRIGGER)
+    r = walk_graph(pg, sub, trigger, items=merged, fake=fake, env=env, faults=faults, throws=throws, subs=subs)
+    run.subs.setdefault(name, []).append(r)
+    run.calls += r.calls
+    if r.halt:
+        if n.get('onError') != 'continueRegularOutput':
+            raise Halt(f'{name}: the sub-workflow {wid} failed: {r.halt}')
+        item = {'error': f'the sub-workflow {wid} failed: {r.halt}'}
+        return [[derived(items, 0, name, item) if len(items) == 1 else {'json': item, 'lin': {name: item}}]]
+    outs = r.outputs.get(r.trail[-1]) if r.trail else None
+    result = []
+    for o in (outs or [[]]):
+        same = len(o) == len(items)
+        result.append([derived(items, k if same else (0 if len(items) == 1 else -1), name, x['json']) for k, x in enumerate(o)])
+    return result
+
+
 def step_trigger(n, items):
     """ExecuteWorkflowTrigger.execute (n8n-nodes-base 2.36) for inputSource workflowInputs: per input item every field of
     the schema — null (FALLBACK_DEFAULT_VALUE) when the caller left it out — and only those fields. The trigger itself does
@@ -438,10 +562,11 @@ def step_trigger(n, items):
     return [out]
 
 
-def walk_graph(pg, w, start, items=None, webhook=None, fake=None, env=None, faults=None, throws=None):
+def walk_graph(pg, w, start, items=None, webhook=None, fake=None, env=None, faults=None, throws=None, subs=None, stop=()):
     """One execution of workflow `w` from node `start`: a Webhook node hands on `webhook` (the request n8n builds), an
     Execute Workflow trigger takes `items` ([{'json': caller's item}, …]). `fake(call)` answers every HTTP node, `env` is
-    the Code nodes' $env. Two failure shapes, as n8n has them:
+    the Code nodes' $env, `subs` = {workflow id: workflow JSON} the sub-workflows an Execute Workflow node may call, `stop`
+    = nodes where the walk ends (recorded, not run). Two failure shapes, as n8n has them (a sub-workflow's nodes included):
       faults = {Postgres node: error message}  the statement fails INSIDE the query runner: the node's own error item
                                                {message, error} (configureQueryRunner's catch);
       throws = {node: error message}           the node throws OUTSIDE its runner — getCredentials, configurePostgres, a
@@ -454,9 +579,12 @@ def walk_graph(pg, w, start, items=None, webhook=None, fake=None, env=None, faul
     env = env or {}
     run = Run(by)
 
-    def execute(name, its):
+    def execute(name, its, prev=''):
         n = by[name]
         run.trail.append(name)
+        if name in stop:
+            run.events.append(('stop', name))
+            return
         run.events.append(('node', name))
         if name in throws:
             outs = step_throw(n, its, run, throws[name])
@@ -467,7 +595,9 @@ def walk_graph(pg, w, start, items=None, webhook=None, fake=None, env=None, faul
         elif n['type'] == TRIGGER:
             outs = step_trigger(n, its)
         elif n['type'] == CODE:
-            outs = step_code(n, its, run, env)
+            outs = step_code(n, its, run, env, prev)
+        elif n['type'] == EXECUTE:
+            outs = step_execute(pg, n, its, run, subs, fake, env, faults, throws)
         elif n['type'] == IF:
             outs = step_if(n, its, run)
         elif n['type'] == POSTGRES:
@@ -487,7 +617,7 @@ def walk_graph(pg, w, start, items=None, webhook=None, fake=None, env=None, faul
                 kids += [(e['node'], outs[o]) for e in targets or []]
         kids.sort(key=lambda kid: (by[kid[0]]['position'][1], by[kid[0]]['position'][0]))
         for kid, nxt in kids:
-            execute(kid, [{'json': copy.deepcopy(i['json']), 'lin': i['lin']} for i in nxt])
+            execute(kid, [{'json': copy.deepcopy(i['json']), 'lin': i['lin']} for i in nxt], name)
 
     try:
         execute(start, [{'json': copy.deepcopy(i.get('json') or {}), 'lin': {}} for i in (items or [])])

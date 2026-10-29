@@ -10,7 +10,8 @@ Chain after this migration (the pre-existing nodes keep their names; new ones ar
   → *Final Fetch → *Final Check (newer client msg → superseded; owner replied → cancelled_owner; trigger
   missing from the fetch → cancelled_fetch) → *Final OK? → *Acquire Send Lease (ONE statement: current mode,
   incoming generation, 90-s per-chat lease, event → send_pending; V5: a claimed SAME-second message missing from
-  the snapshot refuses it) → *Peer Recheck? →[once] *Wait Peer Recheck → *Recheck Fetch → Final Check (again)
+  the snapshot refuses it; personal chats, 2026-10-25: a chat that is no longer a business chat refuses it, no re-read)
+  → *Peer Recheck? →[once] *Wait Peer Recheck → *Recheck Fetch → Final Check (again)
   | → *Send Allowed? → HTTP Request (send,
   fullResponse, never throws) → *Settle Send (sent | send_failed | send_unknown) → [*Send Unknown? → *Wait
   Reconcile → *Reconcile Fetch → *Owner Row? (V7: what the one history knows about the window's rows) →
@@ -53,6 +54,8 @@ DEBOUNCE_SECONDS = _module("apply-message-batching.py").DEBOUNCE_SECONDS
 # T6 (Q1 B + V6-unknown, follow-ups 2026-10-11): the memory marks («Владелец: », «[доставка не подтверждена] ») and the
 # pattern of a leading run of them live in ONE place — apply-history-handoff.py (stage 4 owns the memory writers).
 MEMORY_MARKS_LEAD_RE = _module("apply-history-handoff.py").MEMORY_MARKS_LEAD_RE
+# «Личные и рабочие чаты» (2026-10-25): «is this a business chat», one home — the lease re-reads the decision.
+AUDIENCE = _module("audience.py")
 FETCH_RECENT_BUDGET_SECONDS = 2
 PG_NODE_BUDGET_SECONDS = 2
 PEER_RECHECK_SECONDS = DEBOUNCE_SECONDS + FETCH_RECENT_BUDGET_SECONDS + PG_NODE_BUDGET_SECONDS
@@ -93,10 +96,15 @@ ACQUIRE_SQL = """-- A3/A4: the last word before the transport call, in ONE state
 -- snapshot was complete for the second (a full page of one second proves nothing), never for a strictly newer
 -- or older second, never for a peer whose run already ended without a reply. On the first pass the run re-reads
 -- the chat once (recheck); on the second the refusal stands. No lock is taken while that happens.
+-- «Личные и рабочие чаты»: the chat must still be a BUSINESS chat — the decision that holds NOW (audience.BUSINESS_SQL). The
+-- owner may have made it personal, or another number voided a computed decision, while the reply was prepared: then the
+-- lease is refused (personal), and no re-read is asked for.
 with mode as (
   select coalesce((select suppressed from reply_mode_flags
                    where profile_id = $1 and chat_id in ($2, '*')
                    order by (chat_id = '*') limit 1), false) as suppressed
+), aud as (
+  select not __BUSINESS__ as personal
 ), cur as (
   select incoming_generation, lock_token, lock_expires_at from chat_reply_state where profile_id = $1 and chat_id = $2
 ), peer as (
@@ -115,6 +123,7 @@ with mode as (
     and (c.lock_token is null or c.lock_expires_at < now() or c.lock_token = $5)
     and c.incoming_generation = $4::bigint
     and not (select suppressed from mode)
+    and not (select personal from aud)
     and not (select unseen from peer)
   returning 1
 ), ev as (
@@ -124,13 +133,15 @@ with mode as (
 )
 select exists(select 1 from lease) as allowed,
        (select suppressed from mode) as suppressed,
+       (select personal from aud) as personal,
        (select incoming_generation from cur)::bigint as generation_now,
        (select lock_token from cur) is not null and (select lock_expires_at from cur) > now() and (select lock_token from cur) <> $5 as lock_busy,
        (select unseen from peer) as peer_unseen,
-       (select unseen from peer) and not $8::boolean and not (select suppressed from mode)
+       (select unseen from peer) and not $8::boolean and not (select suppressed from mode) and not (select personal from aud)
          and coalesce((select incoming_generation from cur) = $4::bigint, false)
          and not coalesce((select lock_token from cur) is not null and (select lock_expires_at from cur) > now()
-                          and (select lock_token from cur) <> $5, false) as recheck;""".replace("__LEASE__", str(LEASE_SECONDS))
+                          and (select lock_token from cur) <> $5, false) as recheck;""".replace("__LEASE__", str(LEASE_SECONDS)).replace(
+    "__BUSINESS__", AUDIENCE.BUSINESS_SQL("$1", "$2"))
 # $6 = the ids the Final Check saw, $7 = the trigger's own Wappi time (0 = unknown → the rule is off), $8 = this is
 # the pass after the one re-read, $9 = that snapshot was complete for the trigger's second. Every element always
 # has a value: n8n drops an undefined one and shifts every later placeholder.

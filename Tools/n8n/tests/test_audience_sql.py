@@ -838,6 +838,7 @@ with Case('statements_pass_the_sql_guard: verify-sql-comments finds nothing in a
              'OWNER_SET_SQL': AUD.OWNER_SET_SQL, 'CONNECTED_SQL': AUD.CONNECTED_SQL, 'LIST_SQL': AUD.LIST_SQL,
              'BACKFILL_SQL': backfill_sql(), 'AUDIENCE_SQL': 'select ' + AUD.AUDIENCE_SQL(),
              'BUSINESS_SQL': 'select ' + AUD.BUSINESS_SQL(), 'LINE_CONNECTED_AT_SQL': 'select ' + AUD.LINE_CONNECTED_AT_SQL(),
+             'CONNECTION_SQL': 'select ' + AUD.CONNECTION_SQL(),
              'VALID_SQL': 'select 1 from chat_audience a, audience_connections c where ' + AUD.VALID_SQL()}
     for name, q in stmts.items():
         found = VSC.check_query(q)

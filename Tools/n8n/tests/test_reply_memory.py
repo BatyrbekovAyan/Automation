@@ -31,7 +31,8 @@ temp tables of the staging Postgres. Memory rows are written in the memory node'
     python3 Tools/n8n/tests/test_reply_memory.py
 """
 from harness import Case, PgSession, report
-from reply_chain import CHATS, SETUP, TEMPLATES, Run, _sql, history, memory, msg, record_outgoing
+# the test chats are business chats (the owner's decision): the templates answer and record only there («Личные и рабочие чаты»)
+from reply_chain import CHATS, SETUP_BUSINESS as SETUP, TEMPLATES, Run, _sql, history, memory, msg, record_outgoing
 
 OLD_TEXT = 'Букет из 25 роз стоит 25 000 ₸.'
 NEW_TEXT = 'Букет из 25 роз стоит 25 000 ₸, доставка по городу бесплатно.'

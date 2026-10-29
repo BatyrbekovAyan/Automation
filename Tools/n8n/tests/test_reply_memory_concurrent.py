@@ -45,10 +45,11 @@ import time
 import uuid
 
 from harness import Case, PgSession, module, report
-from reply_chain import TEMPLATES, Run, _sql, memory, msg
+from reply_chain import CHATS, TEMPLATES, Run, _business_row, _sql, memory, msg
 
 TEXT = 'Точная цена — после диагностики.'
-TABLES = ('reply_events', 'chat_reply_state', 'chat_history_events', 'n8n_chat_histories', 'reply_mode_flags')
+TABLES = ('reply_events', 'chat_reply_state', 'chat_history_events', 'n8n_chat_histories', 'reply_mode_flags', 'chat_audience',
+          'audience_connections')
 
 
 class Fixture:
@@ -63,6 +64,8 @@ class Fixture:
             self.main.x(f'create table {t} (like public.{t} including all);')
         for t in ('chat_history_events', 'n8n_chat_histories'):        # LIKE copies the PUBLIC sequence as default
             self.main.x(f"create sequence {t}_fixture_id; alter table {t} alter column id set default nextval('{t}_fixture_id');")
+        for ch in CHATS:                     # the test chats are business chats (the owner's decision): the lease reads it
+            self.main.x(_business_row(ch))
         for conn in (self.first, self.second):
             conn.x(f"set search_path = {s}; set statement_timeout = '15s';")
         return self

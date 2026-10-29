@@ -49,6 +49,8 @@ paste them, never copy them:
                              connection (decided_at >= connected_at; another number moves connected_at);
   AUDIENCE_SQL(p, c)         the kind of the decision that holds, else NULL (no decision) — a scalar subquery;
   BUSINESS_SQL(p, c)         true only for a holding BUSINESS decision — what every writer and reader asks;
+  CONNECTION_SQL(p)          the profile's connection as two select-list columns (connected_at_ms, connection_phone) — what
+                             the templates' Read Reply Mode hands Decide Audience;
   LINE_CONNECTED_AT_SQL(p)   the line's moment: the earliest created_at along the superseded_by chain, now() without a row;
   ENSURE_CONNECTION_SQL      the profile's connection row, created with the line's moment when the app has not reported one;
   DECIDE_WRITE_SQL           a computed decision, written once (it replaces only a computed row that no longer holds);
@@ -141,7 +143,7 @@ for _name, _value in (("WA_NONHUMAN_SUFFIXES", list(WA_NONHUMAN_SUFFIXES)), ("TG
 # Every statement below is pasted into an n8n Postgres node, whose query pg-promise formats on the client: the V1 rule holds
 # (verify-sql-comments.py) — no dollar sign followed by a digit inside a comment or a literal, no double braces, no
 # pg-promise modifier; the parameters are named in words. The fragments take the caller's SQL expressions (a placeholder, a
-# column) and keep aliases of their own (aud, aud_conn, aud_line, aud_lp, aud_lq) so they never capture a caller's alias.
+# column) and keep aliases of their own (aud, aud_conn, aud_cn, aud_line, aud_lp, aud_lq) so they never capture a caller's alias.
 # A JSON parameter is a JSON text (the generators JSON.stringify it); anything that is not an array of the expected
 # elements is no element. Times leave as unix ms (`connected_at_ms`, a bigint — n8n's Postgres node may hand it over as a
 # string, so a consumer reads it with Number()).
@@ -196,6 +198,15 @@ def BUSINESS_SQL(profile="$1", chat="$2"):
     """True only for a holding BUSINESS decision; a personal, a missing or a voided decision is false. Every writer of the
     history and the memory and every reader that feeds the AI asks this — never «not personal»."""
     return "coalesce(" + AUDIENCE_SQL(profile, chat) + " = 'business', false)"
+
+
+def CONNECTION_SQL(profile="$1"):
+    """The profile's connection as two columns of a select list: connected_at_ms — its moment in unix ms, a bigint (n8n's
+    Postgres node hands it on as text), null without a row — and connection_phone — the connected number's digits, null
+    when not known. What the templates' Read Reply Mode reads beside the decision and hands Decide Audience (which creates
+    the row with the line's moment when there is none)."""
+    one = "(select %s from audience_connections aud_cn where aud_cn.profile_id = " + profile + ")"
+    return one % _ms("aud_cn.connected_at") + " as connected_at_ms,\n" + one % "aud_cn.phone" + " as connection_phone"
 
 
 def LINE_CONNECTED_AT_SQL(profile="$1"):

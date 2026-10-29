@@ -24,7 +24,8 @@ rows written before T6.
 import json
 
 from harness import N8N, Case, PgSession, bind, expr, module, report, wf
-from reply_chain import CHATS, SETUP, TEMPLATES, Run, history, ledger, memory, msg, record_outgoing
+# the test chats are business chats (the owner's decision): the templates answer and record only there («Личные и рабочие чаты»)
+from reply_chain import CHATS, SETUP_BUSINESS as SETUP, TEMPLATES, Run, business, history, ledger, memory, msg, record_outgoing
 
 NTFY = wf('crHandoffNtfy001-Handoff_Notifier.json')
 TRIGGER = next(n['name'] for n in NTFY['nodes'] if n['type'] == 'n8n-nodes-base.scheduleTrigger')
@@ -76,6 +77,7 @@ for ch, T in TEMPLATES.items():
 
     with Case(f'R9 [{ch}] send_pending older than 10 min → send_unknown (execution id kept); a live one, a stale claim and the live lease untouched') as c:
         with PgSession(SETUP) as pg:
+            business(pg, ch, chat=OTHER)                                                            # the second chat is a client's too
             lost = Run(T, pg, msg(ch, 'LOST', 100), 'exec-dead')
             lost.claim(); lost.latest([lost.m]); lost.generate(); lost.final([lost.m]); lost.lease()     # the run dies here
             live = Run(T, pg, msg(ch, 'LIVE', 100, chat=OTHER), 'exec-live')
@@ -192,6 +194,7 @@ for ch, T in TEMPLATES.items():
 
     with Case(f'T7 [{ch}] negatives: a live run\'s draft, a sent row, an unknown row, another execution\'s fresh draft, owner rows — untouched') as c:
         with PgSession(SETUP) as pg:
+            business(pg, ch, chat=OTHER)                                                            # the second chat is a client's too
             sent = Run(T, pg, msg(ch, 'S', 100, 'Цена?'), 'exec-s')
             sent.claim(); sent.latest([sent.m]); sent.generate('Цена — 25 000 ₸.'); sent.final([sent.m]); sent.lease(); sent.send_ok('sent-S')
             unk = Run(T, pg, msg(ch, 'U', 110, 'Есть доставка?', chat=OTHER), 'exec-u')

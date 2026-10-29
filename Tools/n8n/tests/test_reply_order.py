@@ -16,7 +16,8 @@ session temp tables of the staging Postgres; the runs are interleaved as paralle
     python3 Tools/n8n/tests/test_reply_order.py
 """
 from harness import Case, PgSession, report
-from reply_chain import CHATS, SETUP, TEMPLATES, Run, ledger, msg
+# the test chats are business chats (the owner's decision): the templates answer only there («Личные и рабочие чаты»)
+from reply_chain import CHATS, SETUP_BUSINESS as SETUP, TEMPLATES, Run, business, ledger, msg
 
 
 def walk(run, snapshot):
@@ -114,6 +115,7 @@ for ch, T in TEMPLATES.items():
     with Case(f'R6 [{ch}] two independent chats: chat 1 reordered B→A, chat 2 one message claimed between them → one reply each') as c:
         with PgSession(SETUP) as pg:
             other = C.replace('3', '4') if ch == 'WA' else C + '9'
+            business(pg, ch, chat=other)                              # the second chat is a client's too
             ma, mb, md = msg(ch, 'A', 100), msg(ch, 'B', 101), msg(ch, 'D', 50, 'другой чат', chat=other)
             rb, rd, ra = Run(T, pg, mb, 'e-b'), Run(T, pg, md, 'e-d'), Run(T, pg, ma, 'e-a')
             rb.claim(); rd.claim(); ra.claim()

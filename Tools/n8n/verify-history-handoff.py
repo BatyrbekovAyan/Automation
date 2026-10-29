@@ -6,7 +6,12 @@ account.phone first), the app webhook's owner scoping, and the integrations (Cre
 Dashboard event override, Delete Bot Files wipe, Set Workflow State protection, proxy recorder after
 the response). B1 «расписание бота» (2026-10-14): the schedule is one more term of the mode gate —
 check_schedule_gate (the term and its absence rule, Read Reply Mode fail-closed and enabled, off_hours
-handed on and stamped, the lease never reading it), self-checked on every run.
+handed on and stamped, the lease never reading it), self-checked on every run. «Личные и рабочие чаты»
+(2026-10-25): check_audience_gate — Read Reply Mode reads the chat's decision and the connection in the same
+statement and stands ALONE between If and Audience Known?; the fork's conditions read positive fields (Decided
+Business?: the sub-workflow's own answer); Decide Audience maps exactly the inputs its sub-workflow declares; from the
+Webhook, with the two business edges cut, nothing but the routing, the gate, Record Outgoing (business-only in its own
+statement) and the Outcome stamp is reachable — no send, no Wappi call, no write; self-checked on every run.
 
     python3 Tools/n8n/verify-history-handoff.py
     python3 Tools/n8n/verify-history-handoff.py --dir DIR   # another set of exports (mutation tests)
@@ -179,6 +184,161 @@ def check_owner_phone_rule(ntf):
 
 NO_DOUBLE = "x.message->'additional_kwargs'->>'message_id' = $3"
 
+_AU = None
+
+
+def au():
+    """audience.py — the ONE home of «is this a business chat» (the decision that holds) and the connection columns."""
+    global _AU
+    if _AU is None:
+        _AU = _tool("audience.py", "audience")
+    return _AU
+
+
+# «Личные и рабочие чаты» (2026-10-25, spec §4.2 / §4.3, plan Task 4): the templates decide at message entry whether the chat
+# is a client's. Read Reply Mode — still ONE Postgres node, still fail-closed — reads the decision that holds and the
+# connection; it alone stands between the group filter If and Audience Known?. Audience Known? / Business? / Decided
+# Business? are single boolean conditions on positive fields; Decided Business? needs the sub-workflow's OWN answer (its
+# outcome too: Decide Audience continues on error, and n8n then hands Read Reply Mode's row — with an audience column — on).
+# Decide Audience calls crAudienceDec001 with exactly the inputs that sub-workflow declares (types checked, nothing
+# converted), and Suppressed? reads Read Reply Mode's row. Reachability, the property itself: from the Webhook, with
+# Business?[true] and Decided Business?[true] cut, only the routing Ifs, the gate, Record Outgoing (business-only in its own
+# statement) and the Outcome stamp are reachable — no send, typing, Mark Read or other Wappi call, no Postgres write, no
+# memory write, no agent.
+AUDIENCE_GATE = ("Read Reply Mode", "Audience Known?", "Business?", "Decide Audience", "Decided Business?")
+DECIDE_FILE = "crAudienceDec001-Decide_Audience.json"
+NOT_BUSINESS_REACH = {"Webhook", "Is Incoming?", "If", "Is Outgoing?", "Outgoing Bound?", "Record Outgoing", "Outcome"} | set(AUDIENCE_GATE)
+BOOLEAN_TRUE = {"type": "boolean", "operation": "true", "singleValue": True}
+
+
+def callee_inputs(directory):
+    """[(name, type)] the Decide Audience sub-workflow's trigger declares — read off its canonical JSON in `directory`."""
+    with open(os.path.join(directory, DECIDE_FILE), encoding="utf-8") as fh:
+        sub = json.load(fh)
+    trig = next(n for n in sub["nodes"] if n["type"] == "n8n-nodes-base.executeWorkflowTrigger")
+    return [(v["name"], v["type"]) for v in trig["parameters"]["workflowInputs"]["values"]]
+
+
+def check_audience_gate(wf, f, declared):
+    """See above. `declared` = the sub-workflow's [(input, type)]. Raises AssertionError «<file>: audience gate: …»
+    (tests/test_reply_audience.py holds the scratch negatives and the behaviour on real SQL)."""
+    names = {n["name"]: n for n in wf["nodes"]}
+    tag = f"{f}: audience gate:"
+    for name in AUDIENCE_GATE + ("Suppressed?", "Outcome", "If", "Record Outgoing"):
+        assert name in names, f"{tag} missing node {name!r}"
+        assert not names[name].get("disabled"), f"{tag} {name} is disabled — n8n hands a disabled node's input on, the gate stops gating"
+    rm = names["Read Reply Mode"]
+    q = rm["parameters"].get("query", "")
+    assert rm["type"] == "n8n-nodes-base.postgres" and "\n" + au().AUDIENCE_SQL("$1", "$2") + " as audience,\n" in q, \
+        f"{tag} Read Reply Mode lacks the audience column (audience.AUDIENCE_SQL of the profile and the chat) — the decision is read in the mode read itself"
+    assert "\n" + au().CONNECTION_SQL("$1") + ",\n" in q, f"{tag} Read Reply Mode lacks the connection columns (audience.CONNECTION_SQL)"
+    assert rm.get("onError") is None and not rm.get("alwaysOutputData"), f"{tag} Read Reply Mode must stay fail-closed (no onError / alwaysOutputData)"
+    feeders = lambda dst: sorted((s, i) for s, c in wf["connections"].items() for i, out in enumerate((c or {}).get("main") or [])
+                                 for e in (out or []) if e["node"] == dst)
+    edges = lambda src: [[e["node"] for e in (out or [])] for out in (wf["connections"].get(src) or {}).get("main") or []]
+    assert edges("If")[:1] == [["Read Reply Mode"]] and feeders("Read Reply Mode") == [("If", 0)] \
+        and edges("Read Reply Mode") == [["Audience Known?"]] and feeders("Audience Known?") == [("Read Reply Mode", 0)], \
+        f"{tag} between If and Audience Known? stands Read Reply Mode alone — ONE Postgres node (If → {edges('If')[:1]}, " \
+        f"Read Reply Mode → {edges('Read Reply Mode')}, Audience Known? fed by {feeders('Audience Known?')})"
+    reach = _reachable(wf, "Webhook", cut={("Business?", 0), ("Decided Business?", 0)})
+    assert reach <= NOT_BUSINESS_REACH, \
+        f"{tag} {sorted(reach - NOT_BUSINESS_REACH)} reachable from the Webhook without passing Business?[true] or Decided Business?[true] — " \
+        "a personal or undecided chat would get a send, a Wappi call or a write"
+    assert set(AUDIENCE_GATE) | {"Outcome"} <= reach, f"{tag} the gate is not on the path from the Webhook: {sorted(reach)}"
+    hh_ = hh()
+    for name, want in (("Audience Known?", hh_.AUDIENCE_KNOWN_EXPR), ("Business?", hh_.BUSINESS_EXPR),
+                       ("Decided Business?", hh_.DECIDED_BUSINESS_EXPR), ("Suppressed?", hh_.SUPPRESSED_EXPR)):
+        n = names[name]
+        conds = n["parameters"].get("conditions") or {}
+        cl = conds.get("conditions") or []
+        assert n["type"] == "n8n-nodes-base.if" and len(cl) == 1 and cl[0].get("leftValue") == want \
+            and cl[0].get("operator") == BOOLEAN_TRUE and conds.get("combinator") == "and", \
+            f"{tag} {name} must be the one boolean condition {want!r}: {cl}"
+    for src, want in (("Audience Known?", [["Business?"], ["Decide Audience"]]), ("Business?", [["Suppressed?"], ["Outcome"]]),
+                      ("Decide Audience", [["Decided Business?"]]), ("Decided Business?", [["Suppressed?"], ["Outcome"]])):
+        assert edges(src) == want, f"{tag} {src} must lead to {want}: {edges(src)}"
+    assert feeders("Suppressed?") == [("Business?", 0), ("Decided Business?", 0)], \
+        f"{tag} Suppressed? must be entered from Business?[true] and Decided Business?[true] alone: {feeders('Suppressed?')}"
+    assert feeders("Decide Audience") == [("Audience Known?", 1)], f"{tag} Decide Audience must be entered from Audience Known?[false] alone"
+    da = names["Decide Audience"]
+    p = da["parameters"]
+    mapping = p.get("workflowInputs") or {}
+    assert da["type"] == "n8n-nodes-base.executeWorkflow" and (da.get("typeVersion") or 1) >= 1.2 \
+        and (p.get("workflowId") or {}).get("value") == "crAudienceDec001" and (p.get("workflowId") or {}).get("mode") == "id" \
+        and p.get("source", "database") == "database" and p.get("mode", "once") == "once" \
+        and (p.get("options") or {}).get("waitForSubWorkflow", True) is True, \
+        f"{tag} Decide Audience must call crAudienceDec001 from the database, once per run, waiting for its answer: {p.get('workflowId')}"
+    assert da.get("onError") == "continueRegularOutput" and da.get("alwaysOutputData") is True, \
+        f"{tag} Decide Audience must continue on error and always hand an item on (the run ends at the stamp, never at an error)"
+    assert [(s.get("id"), s.get("type")) for s in mapping.get("schema") or []] == declared \
+        and not any(s.get("removed") for s in mapping.get("schema") or []), \
+        f"{tag} Decide Audience's schema must be exactly the inputs crAudienceDec001 declares {declared}: {mapping.get('schema')}"
+    assert mapping.get("mappingMode") == "defineBelow" and mapping.get("attemptToConvertTypes") is False \
+        and mapping.get("convertFieldsToString") is False, f"{tag} Decide Audience must check the declared types, converting nothing"
+    want = hh_.decide_inputs(hh_.CHANNEL.get(os.path.basename(f), ""))
+    assert mapping.get("value") == want, f"{tag} Decide Audience must map apply-history-handoff.decide_inputs: {mapping.get('value')}"
+    js = names["Outcome"]["parameters"].get("jsCode", "")
+    for frag in ("'Business?': 'personal'", "'Decided Business?': 'personal_unknown'",
+                 "(prev === 'Decided Business?' ? (DECIDE_PERSONAL.includes(resp.outcome) ? resp.outcome : byPrev[prev]) : null)",
+                 "const outcome = personal !== null ? personal\n"):
+        assert frag in js, f"{tag} the Outcome stamp lacks {frag!r} (a personal chat is stamped by the branch that ended it)"
+
+
+def _audience_tripwires(wf, f, declared):
+    """The audience-gate checks must reject what they exist to catch — on copies, on every run."""
+    def link(*targets):
+        return [{"node": t, "type": "main", "index": 0} for t in targets]
+
+    def rewire(src, out, *targets):
+        def m(w):
+            w["connections"][src]["main"][out] = link(*targets)
+        return m
+
+    def cond(name, expr):
+        def m(w):
+            next(n for n in w["nodes"] if n["name"] == name)["parameters"]["conditions"]["conditions"][0]["leftValue"] = expr
+        return m
+
+    def key(name, k, v):
+        def m(w):
+            next(n for n in w["nodes"] if n["name"] == name)[k] = v
+        return m
+
+    def no_audience(w):
+        p = next(n for n in w["nodes"] if n["name"] == "Read Reply Mode")["parameters"]
+        p["query"] = p["query"].replace(au().AUDIENCE_SQL("$1", "$2") + " as audience,", "null::text as audience,")
+
+    def extra_postgres(w):
+        extra = copy.deepcopy(next(n for n in w["nodes"] if n["name"] == "Read Reply Mode"))
+        extra["name"], extra["id"] = "Extra Read", "tripwire-extra-read"
+        w["nodes"].append(extra)
+        w["connections"]["Read Reply Mode"]["main"][0] = link("Extra Read")
+        w["connections"]["Extra Read"] = {"main": [link("Audience Known?")]}
+
+    def raw_bigint(w):
+        v = next(n for n in w["nodes"] if n["name"] == "Decide Audience")["parameters"]["workflowInputs"]["value"]
+        v["connectedAtMs"] = "={{ $('Read Reply Mode').first().json.connected_at_ms }}"
+
+    wrong = (("a write reachable from Audience Known?[false] around Decided Business?[true]",
+              rewire("Decide Audience", 0, "Decided Business?", "Record Suppressed")),
+             ("Mark Read on the personal branch", rewire("Business?", 1, "Outcome", "Mark Read")),
+             ("a claim around the gate from the incoming branch", rewire("Is Incoming?", 0, "If", "Claim Event")),
+             ("Read Reply Mode without the audience column", no_audience),
+             ("an extra Postgres node between If and Audience Known?", extra_postgres),
+             ("Decided Business? without the outcome guard", cond("Decided Business?", "={{ $json.audience === 'business' }}")),
+             ("Suppressed? reading $json", cond("Suppressed?", "={{ $json.suppressed }}")),
+             ("Decide Audience failing the run", key("Decide Audience", "onError", None)),
+             ("the bigint handed on as text", raw_bigint),
+             ("Read Reply Mode failing open", key("Read Reply Mode", "onError", "continueRegularOutput")))
+    for label, mutate in wrong:
+        bad = copy.deepcopy(wf)
+        mutate(bad)
+        try:
+            check_audience_gate(bad, f, declared)
+        except AssertionError:
+            continue
+        fail(f"personal chats tripwire accepted a broken audience gate ({label}) in {f}")
+
 _BS = None
 
 
@@ -200,8 +360,9 @@ def bs():
 SCHEDULE_GATE_NODES = ("Read Reply Mode", "Suppressed?", "Record Suppressed", "Outcome")
 OFF_HOURS_PASSTHROUGH = "$('Read Reply Mode').first().json.off_hours === true"
 # the stamp names off_hours only on Record Suppressed's OWN row: a failure outside the query runner hands the mode read's
-# row on (R8), off_hours true but never recorded — that keeps the old label
-OFF_HOURS_STAMP = "const outcome = (resp.outcome === 'suppressed' && resp.off_hours === true) ? 'off_hours'"
+# row on (R8), off_hours true but never recorded — that keeps the old label (personal chats come first: their stamp is the
+# branch that ended them)
+OFF_HOURS_STAMP = "const outcome = personal !== null ? personal\n  : (resp.outcome === 'suppressed' && resp.off_hours === true) ? 'off_hours'"
 
 
 def check_schedule_gate(wf, f):
@@ -221,8 +382,9 @@ def check_schedule_gate(wf, f):
     assert rm.get("onError") is None and not rm.get("alwaysOutputData"), \
         f"{f}: Read Reply Mode must stay fail-closed — no onError / alwaysOutputData (got onError={rm.get('onError')!r}): a failed read must stop the run, never read as «reply» (B1)"
     edges = lambda src, i=0: [e["node"] for e in ((wf["connections"].get(src, {}).get("main") or [[]])[i] or [])]
-    assert edges("Read Reply Mode") == ["Suppressed?"] and edges("Suppressed?") == ["Record Suppressed"] and edges("Record Suppressed") == ["Outcome"], \
-        f"{f}: the mode gate must be Read Reply Mode → Suppressed?[true] → Record Suppressed → Outcome (B1)"
+    # what leads from Read Reply Mode to Suppressed? is the audience gate's (check_audience_gate)
+    assert edges("Suppressed?") == ["Record Suppressed"] and edges("Record Suppressed") == ["Outcome"], \
+        f"{f}: the mode gate must be Suppressed?[true] → Record Suppressed → Outcome (B1)"
     rs = names["Record Suppressed"]["parameters"]
     assert rs.get("query", "").rstrip().endswith("$8::boolean as off_hours;") \
         and (rs.get("options") or {}).get("queryReplacement", "").endswith(", " + OFF_HOURS_PASSTHROUGH + " ])($('Webhook').first().json.body.messages[0]) }}"), \
@@ -263,7 +425,7 @@ def _gate_tripwires(wf, f):
              ("a disabled read", key("Read Reply Mode", "disabled", True)),
              ("a stamp without the recorded-suppression guard",
               js("Outcome", "(resp.outcome === 'suppressed' && resp.off_hours === true) ? 'off_hours'", "resp.off_hours === true ? 'off_hours'")),
-             ("the lease reads the schedule", q("Acquire Send Lease", "as suppressed\n), cur as (", "or " + off + " as suppressed\n), cur as (")))
+             ("the lease reads the schedule", q("Acquire Send Lease", "as suppressed\n), aud as (", "or " + off + " as suppressed\n), aud as (")))
     for label, mutate in wrong:
         bad = copy.deepcopy(wf)
         mutate(bad)
@@ -313,6 +475,16 @@ def check_lost_send_sweep(q):
 
 def verify_bot(f):
     wf = load(f)
+    # personal chats first: the gate at message entry decides whether anything below runs at all
+    try:
+        declared = callee_inputs(WF)
+    except (OSError, StopIteration, KeyError, ValueError) as e:
+        fail(f"{f}: audience gate: the Decide Audience sub-workflow ({DECIDE_FILE}) is unreadable: {type(e).__name__}: {e}")
+    try:
+        check_audience_gate(wf, f, declared)
+    except AssertionError as e:
+        fail(str(e))
+    _audience_tripwires(wf, f, declared)
     q = node(wf, "Claim Event")["parameters"]["query"]
     check("insert into chat_history_events" in q and "'client'" in q and "do nothing" in q, f"{f}: Claim Event must record the client row (idempotent)")
     check("n8n_chat_histories (session_id, message)" not in q, f"{f}: Claim Event must NOT write memory (the memory node does on a normal run)")
@@ -322,6 +494,12 @@ def verify_bot(f):
     q = node(wf, "Record Outgoing")["parameters"]["query"]
     for frag in ("'owner_phone'", "'outgoing_api'", "do nothing", "where exists (select 1 from ev where source = 'owner_phone')", NO_DOUBLE, "$2 not like '%@g.us'"):
         check(frag in q, f"{f}: Record Outgoing lacks {frag!r}")
+    # personal chats: only a business chat is recorded — the history row stands behind the business word, so the memory
+    # row (behind the history row) does too; anything else is named ignored_personal
+    check(q.startswith("--") and "with aud as (\n  select " + au().BUSINESS_SQL("$1", "$2") + " as business\n)" in q
+          and "  where $2 not like '%@g.us' and (select business from aud)\n" in q
+          and "when not (select business from aud) then 'ignored_personal'" in q,
+          f"{f}: Record Outgoing must record business chats only (audience.BUSINESS_SQL) and name the rest ignored_personal")
     # T6 (Q1 B): the owner's phone reply enters memory as «Владелец: <text>» — the model reads role + content only
     check(hh().MEMORY_ROW % ("'ai'", hh().OWNER_CONTENT_SQL % "$4", "'owner_phone'", "$3") in q,
           f"{f}: Record Outgoing must write the owner_phone memory row with the owner mark (T6 / Q1 B)")

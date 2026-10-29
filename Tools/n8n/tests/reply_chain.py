@@ -8,14 +8,22 @@ query — against the session temp tables of a harness.PgSession. Nothing here r
 synthetic parts are the transport (a snapshot a test hands in as `messages/get`, a send response) and the AI Agent
 (its output text, and the two memory rows the Chat Memory node writes at the end of the agent's run).
 
-    with PgSession(SETUP) as pg:
+    with PgSession(SETUP_BUSINESS) as pg:
         a = Run(TEMPLATES['WA'], pg, msg('A', 100), 'exec-A')
-        a.claim(); a.latest(snapshot); a.generate('…'); a.final(snapshot); a.lease(); a.send_ok()
+        a.mode(); a.claim(); a.latest(snapshot); a.generate('…'); a.final(snapshot); a.lease(); a.send_ok()
+
+«Личные и рабочие чаты» (2026-10-25): the templates answer, record and send only in a BUSINESS chat — mode() follows the
+audience gate the templates carry (Read Reply Mode → Audience Known? → Business? | Decide Audience → Decided Business?), and
+the lease re-reads the decision. A test of a client's chat runs on SETUP_BUSINESS (the owner made both test chats business
+chats) or seeds its own chats with business(); a chat without a decision goes through the REAL Decide Audience sub-workflow
+(tests/graph_walk.py) with the Wappi stub handed to mode().
 """
+import graph_walk as gw
 from harness import code, expr, bind, has_node, node, wf
 
 TEMPLATES = {'WA': wf('4wYitz5ek30SVNlT-WhatsApp_Bot.json'), 'TG': wf('4VN3gsFaC2HUYmcc-Telegram_Bot.json')}
 CHATS = {'WA': ('wa-prof-rc', '77001112233@c.us'), 'TG': ('tg-prof-rc', '5550001112')}
+DECIDE_AUDIENCE = {'crAudienceDec001': wf('crAudienceDec001-Decide_Audience.json')}
 
 SETUP = """create temp table reply_events (like public.reply_events including all);
 create temp table chat_reply_state (like public.chat_reply_state including all);
@@ -26,12 +34,24 @@ create temp table chat_audience (like public.chat_audience including all);
 create temp table audience_connections (like public.audience_connections including all);"""
 
 
+def _lit(v):
+    return "'" + str(v).replace("'", "''") + "'"
+
+
+def _business_row(ch, chat=None):
+    pid, c = CHATS[ch]
+    return ("insert into chat_audience (profile_id, chat_id, kind, source, reason, version) values "
+            f"({_lit(pid)}, {_lit(chat or c)}, 'business', 'owner', 'owner', 1) on conflict do nothing;")
+
+
 def business(pg, ch, chat=None):
     """«Личные и рабочие чаты» (2026-10-25): the owner made channel `ch`'s test chat (or `chat`) a BUSINESS chat — an owner
     decision, which always holds. The writers and readers that pass only a business chat (audience.BUSINESS_SQL) need it."""
-    pid, c = CHATS[ch]
-    pg.x("insert into chat_audience (profile_id, chat_id, kind, source, reason, version) values "
-         f"({_lit(pid)}, {_lit(chat or c)}, 'business', 'owner', 'owner', 1) on conflict do nothing;")
+    pg.x(_business_row(ch, chat))
+
+
+# SETUP with both test chats made business chats by the owner: what every test of the reply to a CLIENT runs on.
+SETUP_BUSINESS = SETUP + '\n' + '\n'.join(_business_row(ch) for ch in CHATS)
 
 
 def msg(ch, mid, t, body=None, from_me=False, chat=None, mtype='chat'):
@@ -45,17 +65,20 @@ def msg(ch, mid, t, body=None, from_me=False, chat=None, mtype='chat'):
     return m
 
 
-def _cond(w, name, j):
-    return bool(expr(node(w, name)['parameters']['conditions']['conditions'][0]['leftValue'], j))
+def _cond(w, name, j, named=None):
+    return bool(expr(node(w, name)['parameters']['conditions']['conditions'][0]['leftValue'], j, named))
 
 
-def _sql(w, pg, name, json_, named, exec_id):
+def _sql(w, pg, name, json_, named, exec_id, n8n_types=False):
+    """The node's statement bound from its own queryReplacement. `n8n_types`: the row as n8n's Postgres node hands it on —
+    bigint and numeric columns as TEXT (node-pg's default; graph_walk.typed_q) — for a row a later node maps by type."""
     n = node(w, name)
     params = expr(n['parameters']['options']['queryReplacement'], json_, named, exec_id)
     if isinstance(params, str):      # the legacy comma form (Read Reply Mode): the node splits it, empty entries dropped
         params = [p.strip() for p in params.split(',') if p]
     assert isinstance(params, list), f'{name}: queryReplacement did not evaluate to a list: {params!r}'
-    rows = pg.q(bind(n['parameters']['query'], params))
+    sql = bind(n['parameters']['query'], params)
+    rows = gw.typed_q(pg, sql) if n8n_types else pg.q(sql)
     return rows[0] if rows else {}
 
 
@@ -71,19 +94,55 @@ class Run:
         self.cancel = None
         self.agent_ran = False      # False on the media branch: $('AI Agent') then THROWS in n8n (unexecuted node)
 
-    # --- Read Reply Mode → Suppressed? → [Record Suppressed → Outcome] (B1: the schedule is one more term of the read) ---
-    def mode(self):
-        """The mode gate at message entry. A suppressed run («Вместе», a handoff pause, outside the bot's schedule) ends
-        here — Record Suppressed, then the Outcome stamp (its real Code body) — and is never claimed; otherwise the
-        test goes on with claim()."""
-        row = _sql(self.w, self.pg, 'Read Reply Mode', {}, self.named, self.exec_id)
+    # --- Read Reply Mode → [the audience gate] → Suppressed? → [Record Suppressed → Outcome] ---------------------------
+    def mode(self, fake=None):
+        """The gates at message entry. «Личные и рабочие чаты»: Read Reply Mode's row carries the chat's decision — a
+        personal chat ends at the Outcome stamp (Business? false); a chat without one goes to Decide Audience: the REAL
+        sub-workflow (crAudienceDec001, walked by graph_walk with `fake` as Wappi, on the inputs the template maps and
+        n8n type-checks), and only its business answer goes on (Decided Business?). A suppressed run («Вместе», a handoff
+        pause, outside the bot's schedule) ends at Record Suppressed, then the Outcome stamp (its real Code body), and is
+        never claimed; otherwise the test goes on with claim()."""
+        row = _sql(self.w, self.pg, 'Read Reply Mode', {}, self.named, self.exec_id, n8n_types=True)
         self.named['Read Reply Mode'] = row
-        if _cond(self.w, 'Suppressed?', row):
-            self.suppressed_row = _sql(self.w, self.pg, 'Record Suppressed', row, self.named, self.exec_id)
+        gate = row
+        if has_node(self.w, 'Audience Known?'):
+            if _cond(self.w, 'Audience Known?', row, self.named):
+                if not _cond(self.w, 'Business?', row, self.named):
+                    return self._entry_stamp('Business?', row)
+            else:
+                gate = self._decide(row, fake)
+                self.named['Decide Audience'] = gate
+                if not _cond(self.w, 'Decided Business?', gate, self.named):
+                    return self._entry_stamp('Decided Business?', gate)
+        if _cond(self.w, 'Suppressed?', gate, self.named):
+            self.suppressed_row = _sql(self.w, self.pg, 'Record Suppressed', gate, self.named, self.exec_id)
             self.named['Record Suppressed'] = self.suppressed_row
-            self.stamp = code(self.w, 'Outcome', {'json': self.suppressed_row}, self.named, prev_node='Record Suppressed')[0]['json']
-            self.outcome = self.stamp.get('outcome')
+            self._entry_stamp('Record Suppressed', self.suppressed_row)
         return row
+
+    def _entry_stamp(self, prev, item):
+        self.stamp = code(self.w, 'Outcome', {'json': item}, self.named, prev_node=prev)[0]['json']
+        self.outcome = self.stamp.get('outcome')
+        return self.named['Read Reply Mode']
+
+    def _decide(self, row, fake):
+        """What the template's Decide Audience node hands on: n8n maps and type-checks its inputs first — a failure there
+        is thrown outside the node's runner and it (continuing on error) hands its INPUT on, Read Reply Mode's row; then
+        the sub-workflow's answer (its last node's item), or an {error} item when the sub-workflow failed."""
+        n = node(self.w, 'Decide Audience')
+        nodes = {k: {'all': [v], 'pair': {'json': v}} for k, v in self.named.items()}
+        merged, err = gw.execute_inputs(n, row, nodes)
+        self.decide_error = err
+        if err is not None:
+            return dict(row)
+        sub = DECIDE_AUDIENCE[n['parameters']['workflowId']['value']]
+        trigger = next(x for x in sub['nodes'] if x['type'] == gw.TRIGGER)
+        r = gw.walk_graph(self.pg, sub, trigger['name'], items=[{'json': merged}], fake=fake or _no_wappi)
+        self.decide_run = r
+        if r.halt:
+            return {'error': r.halt}
+        out = (r.outputs.get(r.trail[-1]) or [[]])[0] if r.trail else []
+        return out[0]['json'] if out else {}
 
     # --- claim ---------------------------------------------------------------------------
     def claim(self):
@@ -194,8 +253,9 @@ class Run:
         return self.outcome is not None
 
 
-def _lit(v):
-    return "'" + str(v).replace("'", "''") + "'"
+def _no_wappi(call):
+    raise AssertionError(f'Decide Audience asked Wappi ({call["node"]} {call["url"]}): seed the chat\'s decision '
+                         '(SETUP_BUSINESS / business()) or hand mode() a Wappi stub (fake=)')
 
 
 def record_outgoing(w, pg, ch, mid, body, t, wh_type='outgoing_message_api', exec_id='exec-echo'):

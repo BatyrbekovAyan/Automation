@@ -38,7 +38,9 @@ import tempfile
 from pathlib import Path
 
 from harness import N8N, WF, Case, PgSession, bind, code, module, node, report, sql_literal as L, wf
-from reply_chain import CHATS, SETUP as CHAIN_SETUP, TEMPLATES, Run, history, ledger, memory, msg
+# the test chats are business chats (the owner's decision): the schedule gate stands behind the audience gate
+# («Личные и рабочие чаты» — a chat that is not a client's never reaches Suppressed?)
+from reply_chain import CHATS, SETUP_BUSINESS as CHAIN_SETUP, TEMPLATES, Run, history, ledger, memory, msg
 
 CASES = json.loads((N8N / 'fixtures' / 'schedule-cases.json').read_text(encoding='utf-8'))
 FIELDS = ('name', 'tz', 'nowIso', 'daysMask', 'startMin', 'endMin', 'enabled', 'expectOpen')
@@ -107,6 +109,11 @@ def reachable(w, start, out=None):
 
 def snapshot_of(m):
     return [dict(m)]
+
+
+def gate(row):
+    """The mode read's two schedule columns — the row also carries the chat's audience and the connection (personal chats)."""
+    return {k: row.get(k) for k in ('suppressed', 'off_hours')}
 
 
 # ------------------------------------------------------------------------------------------------ W: the module predicate
@@ -244,9 +251,9 @@ for ch, T in TEMPLATES.items():
             pg.x(f"insert into reply_mode_flags (profile_id, chat_id, suppressed, version) values ({L(P)}, '*', true, 5);")
             run = Run(T, pg, msg(ch, 'G3c', 102), 'exec-G3c')
             r2 = run.mode()
-            c.check(r0 == {'suppressed': False, 'off_hours': False} and r1 == {'suppressed': False, 'off_hours': False},
+            c.check(gate(r0) == {'suppressed': False, 'off_hours': False} and gate(r1) == {'suppressed': False, 'off_hours': False},
                     f'no row {r0} / disabled {r1}')
-            c.check(r2 == {'suppressed': True, 'off_hours': False} and run.outcome == 'suppressed', f'«Вместе» {r2} → {run.outcome}')
+            c.check(gate(r2) == {'suppressed': True, 'off_hours': False} and run.outcome == 'suppressed', f'«Вместе» {r2} → {run.outcome}')
 
     with Case(f'B1 G4 [{ch}] «Вместе» inside the window keeps its label; outside it the stamp says off_hours; the schedule '
               'outranks a chat\'s explicit «Авто»; a handoff pause inside the window stays «suppressed»') as c:
@@ -265,8 +272,8 @@ for ch, T in TEMPLATES.items():
             pg.x(f"insert into chat_reply_state (profile_id, chat_id, incoming_generation, handoff_paused) values ({L(P)}, {L(C)}, 1, true);")
             h = Run(T, pg, msg(ch, 'G4h', 103), 'exec-G4h'); rh = h.mode()
             c.check(a.outcome == 'suppressed' and b.outcome == 'off_hours', f'«Вместе» inside → {a.outcome}, outside → {b.outcome}')
-            c.check(rd == {'suppressed': True, 'off_hours': True} and d.outcome == 'off_hours', f'chat «Авто» outside the window: {rd} → {d.outcome}')
-            c.check(rh == {'suppressed': True, 'off_hours': False} and h.outcome == 'suppressed', f'handoff pause inside: {rh} → {h.outcome}')
+            c.check(gate(rd) == {'suppressed': True, 'off_hours': True} and d.outcome == 'off_hours', f'chat «Авто» outside the window: {rd} → {d.outcome}')
+            c.check(gate(rh) == {'suppressed': True, 'off_hours': False} and h.outcome == 'suppressed', f'handoff pause inside: {rh} → {h.outcome}')
 
     with Case(f'B1 G5 [{ch}] the stamp says off_hours ONLY for a RECORDED suppression: a Record Suppressed that n8n failed '
               'outside the query runner hands its INPUT on (R8: the mode read\'s row, off_hours true, no outcome) and keeps the '
@@ -282,7 +289,7 @@ for ch, T in TEMPLATES.items():
 
             passed_on = stamp(dict(row))
             error_item = stamp({'message': 'Connection terminated unexpectedly', 'error': {'message': 'Connection terminated unexpectedly'}})
-            c.check(row == {'suppressed': True, 'off_hours': True}, f'premise: the mode read outside the window {row}')
+            c.check(gate(row) == {'suppressed': True, 'off_hours': True}, f'premise: the mode read outside the window {row}')
             c.check(run.outcome == 'off_hours' and run.suppressed_row.get('outcome') == 'suppressed',
                     f'the recorded suppression {run.suppressed_row} → {run.outcome}')
             c.check(passed_on == 'other:Record Suppressed', f'the passed-on mode-read row was stamped {passed_on!r} — the message was never recorded')
@@ -348,7 +355,7 @@ def m_disabled(name):
 
 def m_lease_reads_schedule(w):
     p = nd(w, 'Acquire Send Lease')['parameters']
-    p['query'] = p['query'].replace("as suppressed\n), cur as (", "or " + BS.OFF_HOURS_SQL() + " as suppressed\n), cur as (", 1)
+    p['query'] = p['query'].replace("as suppressed\n), aud as (", "or " + BS.OFF_HOURS_SQL() + " as suppressed\n), aud as (", 1)
 
 
 STAMP_GUARD = "(resp.outcome === 'suppressed' && resp.off_hours === true) ? 'off_hours'"

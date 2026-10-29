@@ -18,7 +18,10 @@ NEW = ("Claim Event", "Claimed?", "Generated?", "Final Fetch", "Final Check", "F
        "Send Allowed?", "Settle Send", "Send Unknown?", "Wait Reconcile", "Reconcile Fetch", "Reconcile Check",
        "Record Send", "Cancel Label", "Record Cancel", "Peer Recheck?", "Wait Peer Recheck", "Recheck Fetch", "Stamp Draft", "Owner Row?")
 STATES = ("claimed", "generated", "send_pending", "sent", "send_failed", "send_unknown", "superseded", "cancelled_owner",
-          "cancelled_mode", "cancelled_busy", "cancelled_fetch", "generation_failed", "quota_denied", "suppressed")
+          "cancelled_mode", "cancelled_busy", "cancelled_fetch", "generation_failed", "quota_denied", "suppressed",
+          "cancelled_personal")
+# The migrations that define reply_events.state, oldest first (a later one rebuilds the CHECK with the states it adds).
+LEDGER_MIGRATIONS = ("2026-09-17-reply-events.sql", "2026-10-25-chat-audience.sql")
 
 
 def fail(msg):
@@ -35,6 +38,15 @@ def node(wf, name):
     n = next((n for n in wf["nodes"] if n["name"] == name), None)
     check(n is not None, f"missing node {name!r}")
     return n
+
+
+def _audience():
+    """audience.py — «is this a business chat», one home (the lease re-reads it)."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("audience", os.path.join(HERE, "audience.py"))
+    m = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    return m
 
 
 def _history_handoff():
@@ -77,7 +89,12 @@ def verify(fname):
                  "from reply_events r", "h.source = 'client'", "h.sent_at = to_timestamp($7::bigint)", "$7::bigint > 0",
                  "jsonb_array_elements_text($6::jsonb)", "r.message_id <> $3", "$9::boolean",
                  "r.state in ('claimed', 'generated', 'send_pending', 'sent', 'send_unknown')",
-                 "and not (select unseen from peer)", "as peer_unseen", "not $8::boolean", "as recheck"):
+                 "and not (select unseen from peer)", "as peer_unseen", "not $8::boolean", "as recheck",
+                 # personal chats: the chat must still be a business chat (the decision that holds NOW); a personal one
+                 # refuses the lease and asks for no re-read
+                 "), aud as (\n  select not " + _audience().BUSINESS_SQL("$1", "$2") + " as personal\n), cur as (",
+                 "    and not (select personal from aud)\n", "(select personal from aud) as personal,",
+                 "and not (select suppressed from mode) and not (select personal from aud)\n"):
         check(frag in q, f"{f}: Acquire Send Lease lacks {frag!r}")
     # negative (V5): the same second, never a range — a strictly newer message is the generation's job, and a '>='
     # against a server clock (a webhook without a time) would refuse on unrelated rows
@@ -239,6 +256,9 @@ def verify(fname):
     js = node(wf, "Cancel Label")["parameters"]["jsCode"]
     for frag in ("prev === 'Is Latest?'", "prev === 'If Quota Allows'", "prev === 'Generated?'", "prev === 'Final OK?'", "prev === 'Send Allowed?'",
                  "'cancelled_mode'", "'cancelled_busy'", "dropAiHistory: generated && aiText !== null",
+                 # personal chats: a lease refused for a personal chat is named that, before any other reason
+                 "else if (prev === 'Send Allowed?') outcome = j.personal === true ? 'cancelled_personal'\n"
+                 "  : (j.suppressed === true ? 'cancelled_mode'",
                  "$('AI Agent').first().json.output", "aiText: aiText || ''"):
         check(frag in js, f"{f}: Cancel Label lacks {frag!r}")
     # (9) Outcome reads the recorded state first; every ledger state has a label.
@@ -249,11 +269,14 @@ def verify(fname):
     send = node(wf, "HTTP Request")
     check(send["parameters"]["options"]["timeout"] == 30000 and send.get("alwaysOutputData") is True, f"{f}: send timeout/alwaysOutputData")
     # (11) Ledger states in SQL and in the state check list agree.
-    sql = open(os.path.join(HERE, "sql", "2026-09-17-reply-events.sql"), encoding="utf-8").read()
+    #      The CHECK in force is the latest migration's: sql/2026-10-25-chat-audience.sql rebuilds it with cancelled_personal.
+    sql = "".join(open(os.path.join(HERE, "sql", name), encoding="utf-8").read() for name in LEDGER_MIGRATIONS)
     for st in STATES:
         check(f"'{st}'" in sql, f"reply-events SQL lacks state {st!r}")
+    latest = open(os.path.join(HERE, "sql", LEDGER_MIGRATIONS[-1]), encoding="utf-8").read()
+    check(all(f"'{st}'" in latest for st in STATES), f"{LEDGER_MIGRATIONS[-1]}: the rebuilt reply_events CHECK must list every state")
     used = {"claimed", "send_pending", "sent", "send_failed", "send_unknown", "superseded", "cancelled_owner", "cancelled_mode",
-            "cancelled_busy", "cancelled_fetch", "generation_failed", "quota_denied"}
+            "cancelled_busy", "cancelled_fetch", "generation_failed", "quota_denied", "cancelled_personal"}
     check(used <= set(STATES), "workflow states outside the SQL check list")
     # (12) Fetches are bounded and retried; they go to the same chat as the trigger.
     for name in ("Final Fetch", "Reconcile Fetch"):

@@ -270,8 +270,10 @@ def check_bot(f, base):
                 and send["parameters"]["options"]["response"]["response"].get("fullResponse") is True,
                 f"{f}: the send must never throw and must expose the full response (Settle Send classifies it)")
     lease = node(ns, "Acquire Send Lease")["parameters"]["query"]
-    for frag in ("from reply_mode_flags", "incoming_generation = $4::bigint", "lock_expires_at = now() + interval", "state = 'send_pending'"):
-        assert_that(frag in lease, f"{f}: Acquire Send Lease lacks {frag!r} (mode re-read / generation / lease / event state must be ONE statement)")
+    # personal chats (2026-10-25): the same statement re-reads whether the chat is still a business chat
+    for frag in ("from reply_mode_flags", "incoming_generation = $4::bigint", "lock_expires_at = now() + interval", "state = 'send_pending'",
+                 "from chat_audience", "and not (select personal from aud)"):
+        assert_that(frag in lease, f"{f}: Acquire Send Lease lacks {frag!r} (mode / audience re-read, generation, lease and event state must be ONE statement)")
     for name in ("Mark Read", "Typing"):
         assert_that(node(ns, name).get("onError") == "continueRegularOutput", f"{f}: {name} must fail open (decorative action)")
     assert_that(node(ns, "AI Agent").get("onError") == "continueRegularOutput", f"{f}: AI Agent must not abort the run (Generated? records generation_failed)")

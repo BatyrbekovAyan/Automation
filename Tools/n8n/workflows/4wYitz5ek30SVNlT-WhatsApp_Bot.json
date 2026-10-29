@@ -674,7 +674,7 @@
       "parameters": {
         "resource": "database",
         "operation": "executeQuery",
-        "query": "select (\n  coalesce(\n    (select suppressed from reply_mode_flags\n     where profile_id = $1 and chat_id in ($2, '*')\n     order by (chat_id = '*')   -- specific chat_id sorts before the '*' default\n     limit 1),\n    false)\n  -- A5: a chat with a pending handoff is paused until the owner acts (done / explicit «Авто» for the chat)\n  or coalesce((select handoff_paused from chat_reply_state where profile_id = $1 and chat_id = $2), false)\n  -- B1: outside the bot's schedule window (an enabled row) the bot behaves as in «Вместе»\n  or coalesce((select not ((((s.days_mask >> (extract(isodow from ((now() at time zone s.tz) - case when s.start_min > s.end_min and (extract(hour from (now() at time zone s.tz))::int * 60 + extract(minute from (now() at time zone s.tz))::int) < s.end_min then interval '1 day' else interval '0 days' end))::int - 1)) & 1) = 1)\n      and (s.start_min = s.end_min\n        or (s.start_min < s.end_min and (extract(hour from (now() at time zone s.tz))::int * 60 + extract(minute from (now() at time zone s.tz))::int) >= s.start_min and (extract(hour from (now() at time zone s.tz))::int * 60 + extract(minute from (now() at time zone s.tz))::int) < s.end_min)\n        or (s.start_min > s.end_min and ((extract(hour from (now() at time zone s.tz))::int * 60 + extract(minute from (now() at time zone s.tz))::int) >= s.start_min or (extract(hour from (now() at time zone s.tz))::int * 60 + extract(minute from (now() at time zone s.tz))::int) < s.end_min))))\n    from bot_schedule s where s.profile_id = $1 and s.enabled), false)\n) as suppressed,\ncoalesce((select not ((((s.days_mask >> (extract(isodow from ((now() at time zone s.tz) - case when s.start_min > s.end_min and (extract(hour from (now() at time zone s.tz))::int * 60 + extract(minute from (now() at time zone s.tz))::int) < s.end_min then interval '1 day' else interval '0 days' end))::int - 1)) & 1) = 1)\n      and (s.start_min = s.end_min\n        or (s.start_min < s.end_min and (extract(hour from (now() at time zone s.tz))::int * 60 + extract(minute from (now() at time zone s.tz))::int) >= s.start_min and (extract(hour from (now() at time zone s.tz))::int * 60 + extract(minute from (now() at time zone s.tz))::int) < s.end_min)\n        or (s.start_min > s.end_min and ((extract(hour from (now() at time zone s.tz))::int * 60 + extract(minute from (now() at time zone s.tz))::int) >= s.start_min or (extract(hour from (now() at time zone s.tz))::int * 60 + extract(minute from (now() at time zone s.tz))::int) < s.end_min))))\n    from bot_schedule s where s.profile_id = $1 and s.enabled), false) as off_hours;",
+        "query": "select (\n  coalesce(\n    (select suppressed from reply_mode_flags\n     where profile_id = $1 and chat_id in ($2, '*')\n     order by (chat_id = '*')   -- specific chat_id sorts before the '*' default\n     limit 1),\n    false)\n  -- A5: a chat with a pending handoff is paused until the owner acts (done / explicit «Авто» for the chat)\n  or coalesce((select handoff_paused from chat_reply_state where profile_id = $1 and chat_id = $2), false)\n  -- B1: outside the bot's schedule window (an enabled row) the bot behaves as in «Вместе»\n  or coalesce((select not ((((s.days_mask >> (extract(isodow from ((now() at time zone s.tz) - case when s.start_min > s.end_min and (extract(hour from (now() at time zone s.tz))::int * 60 + extract(minute from (now() at time zone s.tz))::int) < s.end_min then interval '1 day' else interval '0 days' end))::int - 1)) & 1) = 1)\n      and (s.start_min = s.end_min\n        or (s.start_min < s.end_min and (extract(hour from (now() at time zone s.tz))::int * 60 + extract(minute from (now() at time zone s.tz))::int) >= s.start_min and (extract(hour from (now() at time zone s.tz))::int * 60 + extract(minute from (now() at time zone s.tz))::int) < s.end_min)\n        or (s.start_min > s.end_min and ((extract(hour from (now() at time zone s.tz))::int * 60 + extract(minute from (now() at time zone s.tz))::int) >= s.start_min or (extract(hour from (now() at time zone s.tz))::int * 60 + extract(minute from (now() at time zone s.tz))::int) < s.end_min))))\n    from bot_schedule s where s.profile_id = $1 and s.enabled), false)\n) as suppressed,\n-- personal chats: the decision that holds (null = none yet: Decide Audience decides), then the profile's connection\n(select aud.kind from chat_audience aud\n      left join audience_connections aud_conn on aud_conn.profile_id = aud.profile_id\n      where aud.profile_id = $1 and aud.chat_id = $2\n        and (aud.source = 'owner' or aud.decided_at >= coalesce(aud_conn.connected_at, '-infinity'))) as audience,\n(select (extract(epoch from aud_cn.connected_at) * 1000)::bigint from audience_connections aud_cn where aud_cn.profile_id = $1) as connected_at_ms,\n(select aud_cn.phone from audience_connections aud_cn where aud_cn.profile_id = $1) as connection_phone,\ncoalesce((select not ((((s.days_mask >> (extract(isodow from ((now() at time zone s.tz) - case when s.start_min > s.end_min and (extract(hour from (now() at time zone s.tz))::int * 60 + extract(minute from (now() at time zone s.tz))::int) < s.end_min then interval '1 day' else interval '0 days' end))::int - 1)) & 1) = 1)\n      and (s.start_min = s.end_min\n        or (s.start_min < s.end_min and (extract(hour from (now() at time zone s.tz))::int * 60 + extract(minute from (now() at time zone s.tz))::int) >= s.start_min and (extract(hour from (now() at time zone s.tz))::int * 60 + extract(minute from (now() at time zone s.tz))::int) < s.end_min)\n        or (s.start_min > s.end_min and ((extract(hour from (now() at time zone s.tz))::int * 60 + extract(minute from (now() at time zone s.tz))::int) >= s.start_min or (extract(hour from (now() at time zone s.tz))::int * 60 + extract(minute from (now() at time zone s.tz))::int) < s.end_min))))\n    from bot_schedule s where s.profile_id = $1 and s.enabled), false) as off_hours;",
         "options": {
           "queryReplacement": "={{ $('Webhook').item.json.body.messages[0].profile_id }},{{ $('Webhook').item.json.body.messages[0].from }}"
         }
@@ -706,7 +706,7 @@
           "conditions": [
             {
               "id": "2bb07c1a-0c55-4ea7-a2b8-4efbac21fd1d",
-              "leftValue": "={{ $json.suppressed }}",
+              "leftValue": "={{ $('Read Reply Mode').first().json.suppressed }}",
               "rightValue": "",
               "operator": {
                 "type": "boolean",
@@ -1031,7 +1031,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// OUTCOME STAMP (audit stage 0.5, Tools/n8n/apply-outcome-stamps.py). One structured row per\n// execution end, no dialog text: the label is derived from WHICH branch reached this node.\nconst byPrev = { 'If': 'filtered', 'Suppressed?': 'suppressed', 'Is Latest?': 'superseded',\n                 'If Quota Allows': 'quota_denied', 'HTTP Request': 'sent', 'Claimed?': 'duplicate',\n                 'Is Outgoing?': 'ignored', 'Outgoing Bound?': 'filtered' };\nconst prev = $prevNode.name;\nlet wh = {};\ntry { wh = $('Webhook').first().json || {}; } catch (e) { wh = {}; }\nconst m = (wh.body && Array.isArray(wh.body.messages) && wh.body.messages[0]) || {};\nconst resp = $input.first() ? ($input.first().json || {}) : {};\n// Stage 3: the record rows (Record Send / Record Cancel) carry the event's final state explicitly.\n// B1: Record Suppressed hands on the mode read's off_hours — the schedule, not the owner, kept this message from the bot.\n// Only its OWN row counts (outcome 'suppressed'): a failure outside the query runner hands the mode read's row on.\nconst outcome = (resp.outcome === 'suppressed' && resp.off_hours === true) ? 'off_hours'\n  : ((typeof resp.outcome === 'string' && resp.outcome) ? resp.outcome : (byPrev[prev] || ('other:' + prev)));\nreturn [{ json: {\n  outcome,\n  correlationId: $execution.id,\n  stage: prev,\n  messageId: m.id ?? null,\n  profileId: m.profile_id ?? null,\n  chatId: m.chatId ?? null,\n  channel: 'whatsapp',\n  transportMessageId: resp.transport_message_id ?? ((prev === 'HTTP Request' && resp && resp.message_id) ? resp.message_id : null),\n  transportStatus: (prev === 'HTTP Request' && resp) ? (resp.status ?? null) : null,\n  stampedAt: new Date().toISOString(),\n}, pairedItem: { item: 0 } }];\n"
+        "jsCode": "// OUTCOME STAMP (audit stage 0.5, Tools/n8n/apply-outcome-stamps.py). One structured row per\n// execution end, no dialog text: the label is derived from WHICH branch reached this node.\nconst byPrev = { 'If': 'filtered', 'Suppressed?': 'suppressed', 'Is Latest?': 'superseded',\n                 'If Quota Allows': 'quota_denied', 'HTTP Request': 'sent', 'Claimed?': 'duplicate',\n                 'Is Outgoing?': 'ignored', 'Outgoing Bound?': 'filtered',\n                 'Business?': 'personal', 'Decided Business?': 'personal_unknown' };\nconst prev = $prevNode.name;\nlet wh = {};\ntry { wh = $('Webhook').first().json || {}; } catch (e) { wh = {}; }\nconst m = (wh.body && Array.isArray(wh.body.messages) && wh.body.messages[0]) || {};\nconst resp = $input.first() ? ($input.first().json || {}) : {};\n// Personal chats: a chat that is not business ends at the entry — after Business? the mode read's row (personal); after\n// Decided Business? Decide Audience's answer, named by the sub-workflow's own personal outcome; anything else that reaches\n// it (an error item, the mode read's row handed on when the node failed, a missing or unknown value) is personal_unknown.\nconst DECIDE_PERSONAL = [\"personal_settling\", \"personal_unknown\", \"personal_nonhuman\", \"personal_contact\", \"personal_history\"];\nconst personal = prev === 'Business?' ? byPrev[prev]\n  : (prev === 'Decided Business?' ? (DECIDE_PERSONAL.includes(resp.outcome) ? resp.outcome : byPrev[prev]) : null);\n// Stage 3: the record rows (Record Send / Record Cancel) carry the event's final state explicitly.\n// B1: Record Suppressed hands on the mode read's off_hours — the schedule, not the owner, kept this message from the bot.\n// Only its OWN row counts (outcome 'suppressed'): a failure outside the query runner hands the mode read's row on.\nconst outcome = personal !== null ? personal\n  : (resp.outcome === 'suppressed' && resp.off_hours === true) ? 'off_hours'\n  : ((typeof resp.outcome === 'string' && resp.outcome) ? resp.outcome : (byPrev[prev] || ('other:' + prev)));\nreturn [{ json: {\n  outcome,\n  correlationId: $execution.id,\n  stage: prev,\n  messageId: m.id ?? null,\n  profileId: m.profile_id ?? null,\n  chatId: m.chatId ?? null,\n  channel: 'whatsapp',\n  transportMessageId: resp.transport_message_id ?? ((prev === 'HTTP Request' && resp && resp.message_id) ? resp.message_id : null),\n  transportStatus: (prev === 'HTTP Request' && resp) ? (resp.status ?? null) : null,\n  stampedAt: new Date().toISOString(),\n}, pairedItem: { item: 0 } }];\n"
       },
       "id": "0c0b0e0a-5ba1-4a7e-9f0e-0000000000ff",
       "name": "Outcome",
@@ -1103,7 +1103,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// CANCEL LABEL: one place that names why a reply did not go out, from whichever gate refused it.\nconst j = $input.first().json || {};\nconst prev = $prevNode.name;\nlet outcome;\nif (prev === 'Is Latest?') outcome = 'superseded';\nelse if (prev === 'If Quota Allows') outcome = 'quota_denied';\nelse if (prev === 'Generated?') outcome = 'generation_failed';\nelse if (prev === 'Final OK?') outcome = j.outcome || 'cancelled_fetch';\nelse if (prev === 'Send Allowed?') outcome = j.suppressed === true ? 'cancelled_mode' : (j.lock_busy === true ? 'cancelled_busy' : 'superseded');\nelse outcome = 'cancelled_fetch';\nlet watermark = 0;\ntry { watermark = Number($('Claim Event').first().json.history_watermark) || 0; } catch (e) { watermark = 0; }\n// Only a run that reached the generator can have written an AI memory row to drop — and it drops ONLY ITS OWN\n// row (R7/V6): Record Cancel deletes the row Stamp Draft tied to this execution id; aiText is the gate (no agent\n// output, nothing to drop). The media branch (Ask to Send Text) reaches the same gates without running the agent —\n// there $('AI Agent') throws, aiText stays null and nothing is dropped.\nconst generated = prev === 'Final OK?' || prev === 'Send Allowed?';\nlet aiText = null;\nif (generated) {\n  try { const o = $('AI Agent').first().json.output; aiText = (typeof o === 'string' && o.trim()) ? o : null; } catch (e) { aiText = null; }\n}\n// A6: when the agent never ran, the client's message still has to reach memory (it is the memory\n// node that writes it on a normal run).\nconst recordHuman = prev === 'If Quota Allows' || prev === 'Generated?';\nlet humanText = '';\nif (recordHuman) {\n  try { humanText = String($('Audio').first().json.text || ''); } catch (e) { humanText = ''; }\n  if (!humanText) { try { humanText = String($('Text').first().json.text || ''); } catch (e) { humanText = ''; } }\n  if (!humanText) { try { humanText = String($('Latest+Combine').first().json.combinedText || ''); } catch (e) { humanText = ''; } }\n  if (!humanText) { try { const m = $('Webhook').first().json.body.messages[0]; humanText = ['chat', 'text'].includes(String(m.type)) ? String(m.body || '') : '[' + String(m.type || 'media') + ']'; } catch (e) { humanText = ''; } }\n}\nreturn [{ json: { outcome, historyWatermark: watermark, dropAiHistory: generated && aiText !== null, aiText: aiText || '', recordHuman,\n                  humanText: humanText.slice(0, 4000) }, pairedItem: { item: 0 } }];\n"
+        "jsCode": "// CANCEL LABEL: one place that names why a reply did not go out, from whichever gate refused it.\nconst j = $input.first().json || {};\nconst prev = $prevNode.name;\nlet outcome;\nif (prev === 'Is Latest?') outcome = 'superseded';\nelse if (prev === 'If Quota Allows') outcome = 'quota_denied';\nelse if (prev === 'Generated?') outcome = 'generation_failed';\nelse if (prev === 'Final OK?') outcome = j.outcome || 'cancelled_fetch';\n// «Личные и рабочие чаты»: the lease found the chat no longer a business chat (the owner made it personal, or another number\n// voided a computed decision) — that reason first: whatever else the lease saw, the chat is not the bot's to answer.\nelse if (prev === 'Send Allowed?') outcome = j.personal === true ? 'cancelled_personal'\n  : (j.suppressed === true ? 'cancelled_mode' : (j.lock_busy === true ? 'cancelled_busy' : 'superseded'));\nelse outcome = 'cancelled_fetch';\nlet watermark = 0;\ntry { watermark = Number($('Claim Event').first().json.history_watermark) || 0; } catch (e) { watermark = 0; }\n// Only a run that reached the generator can have written an AI memory row to drop — and it drops ONLY ITS OWN\n// row (R7/V6): Record Cancel deletes the row Stamp Draft tied to this execution id; aiText is the gate (no agent\n// output, nothing to drop). The media branch (Ask to Send Text) reaches the same gates without running the agent —\n// there $('AI Agent') throws, aiText stays null and nothing is dropped.\nconst generated = prev === 'Final OK?' || prev === 'Send Allowed?';\nlet aiText = null;\nif (generated) {\n  try { const o = $('AI Agent').first().json.output; aiText = (typeof o === 'string' && o.trim()) ? o : null; } catch (e) { aiText = null; }\n}\n// A6: when the agent never ran, the client's message still has to reach memory (it is the memory\n// node that writes it on a normal run).\nconst recordHuman = prev === 'If Quota Allows' || prev === 'Generated?';\nlet humanText = '';\nif (recordHuman) {\n  try { humanText = String($('Audio').first().json.text || ''); } catch (e) { humanText = ''; }\n  if (!humanText) { try { humanText = String($('Text').first().json.text || ''); } catch (e) { humanText = ''; } }\n  if (!humanText) { try { humanText = String($('Latest+Combine').first().json.combinedText || ''); } catch (e) { humanText = ''; } }\n  if (!humanText) { try { const m = $('Webhook').first().json.body.messages[0]; humanText = ['chat', 'text'].includes(String(m.type)) ? String(m.body || '') : '[' + String(m.type || 'media') + ']'; } catch (e) { humanText = ''; } }\n}\nreturn [{ json: { outcome, historyWatermark: watermark, dropAiHistory: generated && aiText !== null, aiText: aiText || '', recordHuman,\n                  humanText: humanText.slice(0, 4000) }, pairedItem: { item: 0 } }];\n"
       },
       "id": "30f64a24-1b5d-5e26-8c12-69216bffd01b",
       "name": "Cancel Label",
@@ -1269,7 +1269,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "-- A3/A4: the last word before the transport call, in ONE statement: the CURRENT mode (a «Вместе» flip\n-- during generation cancels), the incoming generation captured at claim time (a newer claimed event\n-- supersedes), and a 90-s per-chat lease (two runs of the same chat cannot send at once; other chats are\n-- untouched). Only a run that holds the lease marks its event send_pending. Nothing here spans the LLM or\n-- the transport call — the lease is what covers the send itself.\n-- V5: a client message of the trigger's OWN second, claimed by its own run but absent from the snapshot the\n-- Final Check decided on, is seen by neither freshness signal (the generation counts strictly newer seconds,\n-- the snapshot's order only orders the rows it holds). It refuses the lease (peer_unseen) — only when that\n-- snapshot was complete for the second (a full page of one second proves nothing), never for a strictly newer\n-- or older second, never for a peer whose run already ended without a reply. On the first pass the run re-reads\n-- the chat once (recheck); on the second the refusal stands. No lock is taken while that happens.\nwith mode as (\n  select coalesce((select suppressed from reply_mode_flags\n                   where profile_id = $1 and chat_id in ($2, '*')\n                   order by (chat_id = '*') limit 1), false) as suppressed\n), cur as (\n  select incoming_generation, lock_token, lock_expires_at from chat_reply_state where profile_id = $1 and chat_id = $2\n), peer as (\n  select exists (\n    select 1 from reply_events r\n    join chat_history_events h on h.profile_id = r.profile_id and h.chat_id = r.chat_id\n                              and h.message_id = r.message_id and h.source = 'client'\n    where r.profile_id = $1 and r.chat_id = $2 and r.message_id <> $3\n      and r.state in ('claimed', 'generated', 'send_pending', 'sent', 'send_unknown')\n      and $9::boolean and $7::bigint > 0 and h.sent_at = to_timestamp($7::bigint)\n      and not exists (select 1 from jsonb_array_elements_text($6::jsonb) s(id) where s.id = r.message_id)\n  ) as unseen\n), lease as (\n  update chat_reply_state c set lock_token = $5, lock_expires_at = now() + interval '90 seconds'\n  where c.profile_id = $1 and c.chat_id = $2\n    and (c.lock_token is null or c.lock_expires_at < now() or c.lock_token = $5)\n    and c.incoming_generation = $4::bigint\n    and not (select suppressed from mode)\n    and not (select unseen from peer)\n  returning 1\n), ev as (\n  update reply_events set state = 'send_pending', updated_at = now()\n  where profile_id = $1 and chat_id = $2 and message_id = $3 and exists (select 1 from lease)\n  returning 1\n)\nselect exists(select 1 from lease) as allowed,\n       (select suppressed from mode) as suppressed,\n       (select incoming_generation from cur)::bigint as generation_now,\n       (select lock_token from cur) is not null and (select lock_expires_at from cur) > now() and (select lock_token from cur) <> $5 as lock_busy,\n       (select unseen from peer) as peer_unseen,\n       (select unseen from peer) and not $8::boolean and not (select suppressed from mode)\n         and coalesce((select incoming_generation from cur) = $4::bigint, false)\n         and not coalesce((select lock_token from cur) is not null and (select lock_expires_at from cur) > now()\n                          and (select lock_token from cur) <> $5, false) as recheck;",
+        "query": "-- A3/A4: the last word before the transport call, in ONE statement: the CURRENT mode (a «Вместе» flip\n-- during generation cancels), the incoming generation captured at claim time (a newer claimed event\n-- supersedes), and a 90-s per-chat lease (two runs of the same chat cannot send at once; other chats are\n-- untouched). Only a run that holds the lease marks its event send_pending. Nothing here spans the LLM or\n-- the transport call — the lease is what covers the send itself.\n-- V5: a client message of the trigger's OWN second, claimed by its own run but absent from the snapshot the\n-- Final Check decided on, is seen by neither freshness signal (the generation counts strictly newer seconds,\n-- the snapshot's order only orders the rows it holds). It refuses the lease (peer_unseen) — only when that\n-- snapshot was complete for the second (a full page of one second proves nothing), never for a strictly newer\n-- or older second, never for a peer whose run already ended without a reply. On the first pass the run re-reads\n-- the chat once (recheck); on the second the refusal stands. No lock is taken while that happens.\n-- «Личные и рабочие чаты»: the chat must still be a BUSINESS chat — the decision that holds NOW (audience.BUSINESS_SQL). The\n-- owner may have made it personal, or another number voided a computed decision, while the reply was prepared: then the\n-- lease is refused (personal), and no re-read is asked for.\nwith mode as (\n  select coalesce((select suppressed from reply_mode_flags\n                   where profile_id = $1 and chat_id in ($2, '*')\n                   order by (chat_id = '*') limit 1), false) as suppressed\n), aud as (\n  select not coalesce((select aud.kind from chat_audience aud\n      left join audience_connections aud_conn on aud_conn.profile_id = aud.profile_id\n      where aud.profile_id = $1 and aud.chat_id = $2\n        and (aud.source = 'owner' or aud.decided_at >= coalesce(aud_conn.connected_at, '-infinity'))) = 'business', false) as personal\n), cur as (\n  select incoming_generation, lock_token, lock_expires_at from chat_reply_state where profile_id = $1 and chat_id = $2\n), peer as (\n  select exists (\n    select 1 from reply_events r\n    join chat_history_events h on h.profile_id = r.profile_id and h.chat_id = r.chat_id\n                              and h.message_id = r.message_id and h.source = 'client'\n    where r.profile_id = $1 and r.chat_id = $2 and r.message_id <> $3\n      and r.state in ('claimed', 'generated', 'send_pending', 'sent', 'send_unknown')\n      and $9::boolean and $7::bigint > 0 and h.sent_at = to_timestamp($7::bigint)\n      and not exists (select 1 from jsonb_array_elements_text($6::jsonb) s(id) where s.id = r.message_id)\n  ) as unseen\n), lease as (\n  update chat_reply_state c set lock_token = $5, lock_expires_at = now() + interval '90 seconds'\n  where c.profile_id = $1 and c.chat_id = $2\n    and (c.lock_token is null or c.lock_expires_at < now() or c.lock_token = $5)\n    and c.incoming_generation = $4::bigint\n    and not (select suppressed from mode)\n    and not (select personal from aud)\n    and not (select unseen from peer)\n  returning 1\n), ev as (\n  update reply_events set state = 'send_pending', updated_at = now()\n  where profile_id = $1 and chat_id = $2 and message_id = $3 and exists (select 1 from lease)\n  returning 1\n)\nselect exists(select 1 from lease) as allowed,\n       (select suppressed from mode) as suppressed,\n       (select personal from aud) as personal,\n       (select incoming_generation from cur)::bigint as generation_now,\n       (select lock_token from cur) is not null and (select lock_expires_at from cur) > now() and (select lock_token from cur) <> $5 as lock_busy,\n       (select unseen from peer) as peer_unseen,\n       (select unseen from peer) and not $8::boolean and not (select suppressed from mode) and not (select personal from aud)\n         and coalesce((select incoming_generation from cur) = $4::bigint, false)\n         and not coalesce((select lock_token from cur) is not null and (select lock_expires_at from cur) > now()\n                          and (select lock_token from cur) <> $5, false) as recheck;",
         "options": {
           "queryReplacement": "={{ [ $('Webhook').first().json.body.messages[0].profile_id, $('Webhook').first().json.body.messages[0].from, $('Webhook').first().json.body.messages[0].id, $json.generation, $execution.id, JSON.stringify($json.seenIds || []), Number($('Webhook').first().json.body.messages[0].time) || 0, $json.recheck === true, $json.seenComplete === true ] }}"
         }
@@ -1575,7 +1575,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "-- A6: what the business side sent. outgoing_message_phone = the owner from the phone (history +\n-- memory, so the bot knows the agreement); outgoing_message_api = fallback history row only — the\n-- AI's own sends (Record Send) and the app's sends (Wappi Proxy) upgrade it to their real source, and\n-- their memory rows are written by those writers, never here. Group chats are not recorded.\n-- T6 (Q1 B): the owner's memory row opens with the owner mark (the model sees role + content only); the history keeps\n-- the text as sent.\nwith ev as (\n  insert into chat_history_events (profile_id, chat_id, message_id, source, body, msg_type, sent_at, execution_id)\n  select $1, $2, $3, case when $7 = 'outgoing_message_phone' then 'owner_phone' else 'outgoing_api' end, $4, $5, to_timestamp($6::bigint), $8\n  where $2 not like '%@g.us'\n  on conflict (profile_id, chat_id, message_id) do nothing\n  returning source\n), mem as (\n  insert into n8n_chat_histories (session_id, message)\n  select $1 || ':' || $2, jsonb_build_object('type', 'ai', 'content', 'Владелец: ' || $4, 'additional_kwargs', jsonb_build_object('source', 'owner_phone', 'message_id', $3), 'response_metadata', '{}'::jsonb)\n  where exists (select 1 from ev where source = 'owner_phone')\n    and not exists (select 1 from n8n_chat_histories x where x.session_id = $1 || ':' || $2 and x.message->'additional_kwargs'->>'message_id' = $3)\n  returning 1\n)\nselect case when exists (select 1 from ev) then 'recorded_' || (select source from ev limit 1)\n            when $2 like '%@g.us' then 'ignored_group' else 'outgoing_known' end as outcome,\n       exists(select 1 from mem) as remembered;",
+        "query": "-- A6: what the business side sent. outgoing_message_phone = the owner from the phone (history +\n-- memory, so the bot knows the agreement); outgoing_message_api = fallback history row only — the\n-- AI's own sends (Record Send) and the app's sends (Wappi Proxy) upgrade it to their real source, and\n-- their memory rows are written by those writers, never here. Group chats are not recorded.\n-- T6 (Q1 B): the owner's memory row opens with the owner mark (the model sees role + content only); the history keeps\n-- the text as sent.\n-- «Личные и рабочие чаты»: only a BUSINESS chat is recorded — a decision that holds and says business (audience.BUSINESS_SQL).\n-- What the owner writes in a personal chat, or in a chat that has no decision yet, enters neither the history nor the\n-- memory (ignored_personal); a group keeps its own label.\nwith aud as (\n  select coalesce((select aud.kind from chat_audience aud\n      left join audience_connections aud_conn on aud_conn.profile_id = aud.profile_id\n      where aud.profile_id = $1 and aud.chat_id = $2\n        and (aud.source = 'owner' or aud.decided_at >= coalesce(aud_conn.connected_at, '-infinity'))) = 'business', false) as business\n), ev as (\n  insert into chat_history_events (profile_id, chat_id, message_id, source, body, msg_type, sent_at, execution_id)\n  select $1, $2, $3, case when $7 = 'outgoing_message_phone' then 'owner_phone' else 'outgoing_api' end, $4, $5, to_timestamp($6::bigint), $8\n  where $2 not like '%@g.us' and (select business from aud)\n  on conflict (profile_id, chat_id, message_id) do nothing\n  returning source\n), mem as (\n  insert into n8n_chat_histories (session_id, message)\n  select $1 || ':' || $2, jsonb_build_object('type', 'ai', 'content', 'Владелец: ' || $4, 'additional_kwargs', jsonb_build_object('source', 'owner_phone', 'message_id', $3), 'response_metadata', '{}'::jsonb)\n  where exists (select 1 from ev where source = 'owner_phone')\n    and not exists (select 1 from n8n_chat_histories x where x.session_id = $1 || ':' || $2 and x.message->'additional_kwargs'->>'message_id' = $3)\n  returning 1\n)\nselect case when exists (select 1 from ev) then 'recorded_' || (select source from ev limit 1)\n            when $2 like '%@g.us' then 'ignored_group'\n            when not (select business from aud) then 'ignored_personal' else 'outgoing_known' end as outcome,\n       exists(select 1 from mem) as remembered;",
         "options": {
           "queryReplacement": "={{ (m => [ m.profile_id, String(m.chatId || m.to || ''), String(m.id || ''), (['chat','text'].includes(String(m.type)) ? String(m.body || '').slice(0, 4000) : ('[' + String(m.type || 'media') + ']' + (m.caption ? ' ' + String(m.caption).slice(0, 1000) : ''))), String(m.type || ''), Number(m.time) || Math.floor(Date.now() / 1000), String(m.wh_type || ''), $execution.id ])($('Webhook').first().json.body.messages[0]) }}"
         }
@@ -1868,6 +1868,237 @@
       },
       "alwaysOutputData": true,
       "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "4b219fc6-bd11-5cde-b132-f720f5e6d5f4",
+              "leftValue": "={{ $json.audience === 'personal' || $json.audience === 'business' }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "5a416572-1d69-5aaa-adc4-d2d1e61cde6f",
+      "name": "Audience Known?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -3456,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "8b8b2058-1cfc-5764-86d4-86e8d7fb83f9",
+              "leftValue": "={{ $json.audience === 'business' }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "2ec76516-1ce9-5b1e-8295-10231807d300",
+      "name": "Business?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -3256,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "crAudienceDec001",
+          "mode": "id"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "channel": "whatsapp",
+            "profileId": "={{ String($('Webhook').first().json.body.messages[0].profile_id ?? '') }}",
+            "chatId": "={{ String($('Webhook').first().json.body.messages[0].from ?? '') }}",
+            "chatLid": "={{ String($('Webhook').first().json.body.messages[0].whatsapp_chat_id || '') }}",
+            "messageId": "={{ String($('Webhook').first().json.body.messages[0].id ?? '') }}",
+            "chatType": "={{ String($('Webhook').first().json.body.messages[0].chat_type ?? '') }}",
+            "isBot": "={{ $('Webhook').first().json.body.messages[0].is_bot === true }}",
+            "connectedAtMs": "={{ ((v) => v === null || v === undefined ? null : Number(v))($('Read Reply Mode').first().json.connected_at_ms) }}",
+            "connectionPhone": "={{ ((v) => typeof v === 'string' ? v : null)($('Read Reply Mode').first().json.connection_phone) }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "channel",
+              "displayName": "channel",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "profileId",
+              "displayName": "profileId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "chatId",
+              "displayName": "chatId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "chatLid",
+              "displayName": "chatLid",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "messageId",
+              "displayName": "messageId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "chatType",
+              "displayName": "chatType",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "isBot",
+              "displayName": "isBot",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "boolean",
+              "removed": false
+            },
+            {
+              "id": "connectedAtMs",
+              "displayName": "connectedAtMs",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "number",
+              "removed": false
+            },
+            {
+              "id": "connectionPhone",
+              "displayName": "connectionPhone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "3c364d44-b0da-5077-bf74-4ad44b42dd60",
+      "name": "Decide Audience",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        -3256,
+        500
+      ],
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "4cb88d05-d358-5215-9236-77b0c20b6bf1",
+              "leftValue": "={{ $json.audience === 'business' && $json.outcome === 'business' }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "8fad1d35-e88e-5370-ac0d-b190e7270dbf",
+      "name": "Decided Business?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -3056,
+        500
+      ]
     }
   ],
   "connections": {
@@ -2126,7 +2357,7 @@
       "main": [
         [
           {
-            "node": "Suppressed?",
+            "node": "Audience Known?",
             "type": "main",
             "index": 0
           }
@@ -2640,6 +2871,71 @@
         [
           {
             "node": "Reconcile Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Audience Known?": {
+      "main": [
+        [
+          {
+            "node": "Business?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Decide Audience",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Business?": {
+      "main": [
+        [
+          {
+            "node": "Suppressed?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Outcome",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Decide Audience": {
+      "main": [
+        [
+          {
+            "node": "Decided Business?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Decided Business?": {
+      "main": [
+        [
+          {
+            "node": "Suppressed?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Outcome",
             "type": "main",
             "index": 0
           }
