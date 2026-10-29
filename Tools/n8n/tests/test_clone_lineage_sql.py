@@ -24,18 +24,24 @@ current ids»: every existing deletion path must reach everything after a move, 
           L19 — a clone booked for deletion is never offered for reuse (no live row ever drives a booked clone);
   L20     B1 (2026-10-14): the bot's schedule follows its line — the predecessor's row moves (values and version kept),
           the new profile's own row wins, among two predecessors the freshest; nothing is left under an old id;
-  L21–L28 «Личные и рабочие чаты» (2026-10-25): the chat decisions (chat_audience) and the connection moment
+  L21–L29 «Личные и рабочие чаты» (2026-10-25): the chat decisions (chat_audience) and the connection moment
           (audience_connections), written by the real audience.py statements, follow the line — L21 a reconnect carries
           them and the moved computed decisions keep holding; L22 per chat the owner's row beats a computed one (the new
-          profile's own row is replaced IN PLACE, one row per key), among equals the new profile's own row, among
-          predecessors the freshest; L23 the predecessors' earliest connection beats the new profile's lazy row; L24
-          another number keeps the new profile's own row (the moved computed decisions stop holding, the owner's stay);
-          L25 a number change never yields an older moment than the newest predecessor's; L26 an earliest row without
-          a number keeps the new profile's own known number; L27 a recorded non-human decision beats everything, the
-          owner's row included; L28 a chat that was business on the predecessor, decided personal by the rule on the new
-          profile once another number voided the moved row (reported before the bind, or after it), starts the wipe clock
-          and the moved business period is wiped two days later (audience.WIPE_SQL), dialog_counts untouched — the same
-          number keeps the moved business row holding, so nothing starts and nothing is wiped;
+          profile's own row is replaced IN PLACE, one row per key), of two owner rows the new profile's own, of two
+          computed rows on the same connection the predecessors' (the line decides once), among predecessors the
+          freshest; L23 the predecessors' earliest connection beats the new profile's lazy row; L24 another number keeps
+          the new profile's own row (the moved computed decisions stop holding, the owner's stay); L25 a number change
+          never yields an older moment than the newest predecessor's; L26 an earliest row without a number keeps the new
+          profile's own known number; L27 a recorded non-human decision beats everything, the owner's row included — over
+          a business row with a running clock; L28 a chat that was business on the predecessor, decided personal by the
+          rule on the new profile once another number voided the moved row (reported before the bind, or after it),
+          starts the wipe clock and the moved business period is wiped two days later (audience.WIPE_SQL), dialog_counts
+          untouched — the same number keeps the moved business row holding, so nothing starts and nothing is wiped; L29
+          the merge itself keeps the wipe clock: the same number lands the moved computed row over a pre-bind own one;
+          another number keeps the own computed row, and a personal row that lands over a business period (a business
+          row, or a running clock, among the chat's taken rows) carries a running clock — the earliest running one, else
+          the bind's moment — and its period is wiped two days later; a business row never gets one, an owner row keeps
+          winning;
   C1–C3   races on TWO real connections over a shared fixture schema (the V6-concurrent pattern): the second bind's
           snapshot predates the first's commit. C1 — two Creates of the same profile: the loser answers bound = false
           (no clone lost, the price lists follow the bound one, the retry reuses the winner). C2 — two new profiles adopt
@@ -994,6 +1000,48 @@ def ms(pg, ts):
     return pg.q(f"select (extract(epoch from {L(ts)}::timestamptz) * 1000)::bigint as v")[0]['v']
 
 
+def now_ms(pg):
+    return pg.q("select (extract(epoch from clock_timestamp()) * 1000)::bigint as v")[0]['v']
+
+
+def without_clock(d):
+    """A decision row without its wipe clock (personal_since, wiped_at): what a clock started by the bind leaves as it was."""
+    return None if d is None else {k: v for k, v in d.items() if k not in ('personal_since', 'wiped_at')}
+
+
+def clocked_at_the_bind(pg, d, t0):
+    """The decision carries a running clock that the bind started: set, not before `t0` (taken just before the bind), and
+    not wiped."""
+    return d is not None and d['personal_since'] is not None and d['wiped_at'] is None and ms(pg, d['personal_since']) >= t0
+
+
+def chat_counts(pg, pid, chat):
+    """How many rows of each per-chat table ONE chat of a profile holds (chat_data seeds one of each, two memory rows)."""
+    p, c, s = L(pid), L(chat), L(pid + ':' + chat)
+    return pg.q(f"""select (select count(*) from n8n_chat_histories where session_id = {s})::int as mem,
+        (select count(*) from chat_history_events where profile_id = {p} and chat_id = {c})::int as hist,
+        (select count(*) from conversation_outcomes where profile_id = {p} and chat_id = {c})::int as outc,
+        (select count(*) from handoff_requests where profile_id = {p} and chat_id = {c})::int as hand,
+        (select count(*) from reply_events where profile_id = {p} and chat_id = {c})::int as ev,
+        (select count(*) from chat_reply_state where profile_id = {p} and chat_id = {c})::int as st,
+        (select count(*) from reply_mode_flags where profile_id = {p} and chat_id = {c})::int as fl""")[0]
+
+
+STORED_CHAT = {'mem': 2, 'hist': 1, 'outc': 1, 'hand': 1, 'ev': 1, 'st': 1, 'fl': 1}     # what chat_data leaves for one chat
+GONE_CHAT = dict.fromkeys(STORED_CHAT, 0)
+
+
+def clocks_back(pg, pid, interval):
+    """The profile's running clocks moved back by `interval` — a clock that does not run is never started here."""
+    pg.x(f"update chat_audience set personal_since = personal_since - interval {L(interval)} "
+         f"where profile_id = {L(pid)} and personal_since is not null;")
+
+
+def sweep_wipe(pg):
+    """One run of the Sweep's «Wipe Personal Chats» (audience.WIPE_SQL) over the session's tables."""
+    return pg.q(AUD.WIPE_SQL)[0]
+
+
 def reconnect_moves_decisions_and_keeps_the_moment(ch):
     P1, P2, WF1, WF2 = P(ch, 'P1'), P(ch, 'P2'), W(ch, 'old'), W(ch, 'new')
     A, B, C = '77011@c.us', '77012@c.us', '77013@c.us'
@@ -1033,8 +1081,9 @@ def owner_on_predecessor_beats_default_on_new(ch):
     A, B, D = '77021@c.us', '77022@c.us', '77024@c.us'
     for v, title in (('a', 'owner_on_predecessor_beats_default_on_new: the predecessor\'s owner row replaces the new profile\'s '
                            'computed row IN PLACE — one row per key, no key clash; a chat only the new profile has stays as it was'),
-                     ('b', 'among equals the new profile\'s own row stays — computed against computed, and owner against a '
-                           'FRESHER owner row of the predecessor'),
+                     ('b', 'computed against computed on the same connection the MOVED row lands (the line decides once: the '
+                           'new profile\'s own row was decided against its own created_at, not the line\'s moment); owner '
+                           'against a FRESHER owner row of the predecessor the new profile\'s own row stays'),
                      ('c', 'two predecessors: the owner\'s row beats a fresher computed one; between two owner rows the fresher')):
         with Case(tagged(f'L22 [{ch}] {title}')) as c:
             with PgSession(SETUP) as pg:
@@ -1054,7 +1103,7 @@ def owner_on_predecessor_beats_default_on_new(ch):
                     decide(pg, P2, A, 'personal', 'history')
                     owner_decides(pg, P1, B, 'personal', 1760000000009, ago='1 minute')    # fresher than the new one's own
                     owner_decides(pg, P2, B, 'business', 1760000000002, ago='1 day')
-                    want, counters = {A: decision(pg, P2, A), B: decision(pg, P2, B)}, (0, 2)
+                    want, counters = {A: decision(pg, P1, A), B: decision(pg, P2, B)}, (1, 1)
                 else:
                     owner_decides(pg, P0, A, 'business', 1760000000003, ago='9 days')
                     decide(pg, P1, A, 'personal', 'history', ago='1 day')
@@ -1219,7 +1268,8 @@ def nonhuman_beats_everything(ch):
                              'over the predecessor\'s OWNER row'),
                      ('pred', 'the mirror: the predecessor\'s personal/nonhuman row replaces the new profile\'s own OWNER row'),
                      ('two', 'two predecessors: the older non-human row beats a fresher owner row')):
-        with Case(tagged(f'L27 [{ch}] {title} (non-human is permanent; the owner\'s set refuses it too)')) as c:
+        with Case(tagged(f'L27 [{ch}] {title} (non-human is permanent; the owner\'s set refuses it too) — over the business '
+                         'row it lands with a running clock (the bind\'s moment)')) as c:
             with PgSession(SETUP) as pg:
                 row(pg, ch, P1, wfid=WF1, reason='trial_expiry')
                 if v == 'two':
@@ -1240,10 +1290,13 @@ def nonhuman_beats_everything(ch):
                     owner_decides(pg, P1, X, 'business', 1760000000013, ago='1 day')
                     want, counters = decision(pg, P0, X), (1, 1)
                 c.check(want is not None and want['reason'] == 'nonhuman', f'premise: the non-human row {want}')
+                t0 = now_ms(pg)
                 plan, b, _ = create(pg, ch, P2, WF2, prev=P1)
                 c.check(v != 'two' or plan.get('pred_profiles') == [P0, P1], f'premise: plan {plan}')
                 c.check(b.get('bound') is True or HEAD_MODE, f'bind {b}')
-                c.check(decision(pg, P2, X) == want, f'the new profile holds {decision(pg, P2, X)}, expected {want}')
+                got = decision(pg, P2, X)
+                c.check(without_clock(got) == without_clock(want), f'the new profile holds {got}, expected {want}')
+                c.check(clocked_at_the_bind(pg, got, t0), f'the personal row over a business row must carry a running clock: {got}')
                 c.check(holds(pg, P2, X) == 'personal', f'what holds for the chat: {holds(pg, P2, X)}')
                 c.check(decisions(pg, P1) == [] and decisions(pg, P0) == [], f'left: {decisions(pg, P0)} {decisions(pg, P1)}')
                 if not HEAD_MODE:
@@ -1313,6 +1366,118 @@ def line_move_then_rule_personal_starts_the_clock(ch):
                 c.check(usage == 2, f'dialog_counts (the tariff usage) must never be touched: {usage}')
 
 
+def bind_merge_keeps_the_wipe_clock(ch):
+    P0, P1, P2 = P(ch, 'P0'), P(ch, 'P1'), P(ch, 'P2')
+    WF0, WF1, WF2 = W(ch, 'p0'), W(ch, 'old'), W(ch, 'new')
+    A, K, B = '77091@c.us', '77092@c.us', '77093@c.us'
+    two_days = f"{AUD.WIPE_DAYS * 24} hours 1 minute"
+    for v, title in (
+            ('same', 'the SAME number: the new profile\'s own pre-bind computed personal row (decided against its own created_at, '
+                     'not the line\'s moment) meets the moved computed BUSINESS row — the moved row lands as it was and holds, '
+                     'no clock, nothing wiped'),
+            ('new', 'ANOTHER number: the new profile\'s own computed personal row keeps winning over the moved business period '
+                    'and lands with a running clock (the bind\'s moment) — two days later the moved period is wiped; its own '
+                    'computed BUSINESS row keeps winning too, with no clock and nothing wiped'),
+            ('clock', 'a moved RUNNING clock is kept: another number, the own personal row without a clock meets the moved '
+                      'personal row whose clock runs (its business period not wiped yet) — the own row lands with THAT clock'),
+            ('two', 'two predecessors: the fresher computed personal row lands over the older one\'s business period with a '
+                    'running clock (the bind\'s moment) — wiped two days later'),
+            ('control', 'control — business lands, no clock: the same number, the own pre-bind computed BUSINESS row meets the '
+                        'moved computed business row; the moved one lands, no clock, nothing wiped'),
+            ('owner', 'an owner row keeps winning: the own OWNER personal row (no clock — the owner confirmed a computed one) '
+                      'stays over the moved computed business period and takes a running clock — wiped two days later; a '
+                      'moved owner row still beats the own computed one')):
+        with Case(tagged(f'L29 [{ch}] bind_merge_keeps_the_wipe_clock: {title}')) as c:
+            with PgSession(SETUP) as pg:
+                pg.x(LIKE.format('dialog_counts'))
+                row(pg, ch, P1, wfid=WF1, reason='trial_expiry')
+                if v == 'two':
+                    row(pg, ch, P0, wfid=WF0, retired=True)               # Retire Same Bot Slot long ago (NULL reason)
+                proxy_row(pg, ch, P2)
+                register(pg, ch, P2)
+                seed_star(pg, P2)
+                if v != 'two':
+                    connect(pg, P1, '77010000001', created_ago='10 days')
+                    connect(pg, P2, '+7 702 000 00 02' if v in ('new', 'clock') else '+7 701 000 00 01')
+                home = P0 if v == 'two' else P1                           # the profile the chat's business period is under
+                if v == 'clock':                                          # its period turned personal there: a running clock
+                    decide(pg, P1, A, 'personal', 'contact', ago='5 days')
+                    pg.x(f"update chat_audience set personal_since = now() - interval '1 day' "
+                         f"where profile_id = {L(P1)} and chat_id = {L(A)};")
+                else:
+                    decide(pg, home, A, 'business', 'new', ago='9 days' if v == 'two' else '5 days')
+                chat_data(pg, home, A, 'business-period', age=60 * 24 * 4)
+                pg.x(f"insert into dialog_counts (app_user_id, chat_id, d) values ({L(U)}, {L(A)}, current_date), "
+                     f"({L(U)}, {L(A)}, current_date - 3);")
+                if v == 'same':
+                    decide(pg, P2, A, 'personal', 'history')              # the new profile's own pre-bind decision
+                elif v in ('new', 'clock'):
+                    decide(pg, P2, A, 'personal', 'contact')
+                elif v == 'two':
+                    decide(pg, P1, A, 'personal', 'history', ago='1 day') # the fresher predecessor, no clock
+                elif v == 'control':
+                    decide(pg, P2, A, 'business', 'new')
+                else:
+                    decide(pg, P2, A, 'personal', 'contact')
+                    owner_decides(pg, P2, A, 'personal', 1760000000021)   # the owner confirms it: personal → personal, no clock
+                if v == 'new':                                            # K: the own computed BUSINESS row on a new connection
+                    decide(pg, P1, K, 'personal', 'history', ago='5 days')
+                    pg.x(f"update chat_audience set personal_since = now() - interval '1 day' "
+                         f"where profile_id = {L(P1)} and chat_id = {L(K)};")
+                    chat_data(pg, P1, K, 'k-period', age=60 * 24 * 4)
+                    decide(pg, P2, K, 'business', 'new')
+                if v == 'owner':                                          # B: a moved owner row beats the own computed one
+                    owner_decides(pg, P1, B, 'business', 1760000000022, ago='2 days')
+                    decide(pg, P2, B, 'personal', 'contact')
+                moved, own = decision(pg, P1, A), decision(pg, P2, A)
+                moved_k, own_k, moved_b = decision(pg, P1, K), decision(pg, P2, K), decision(pg, P1, B)
+                c.check(v != 'owner' or (own['source'] == 'owner' and own['personal_since'] is None), f'premise: own {own}')
+                c.check(v != 'clock' or moved['personal_since'] is not None, f'premise: the moved clock runs: {moved}')
+                t0 = now_ms(pg)
+                plan, b, _ = create(pg, ch, P2, WF2, prev=P1)
+                c.check(v != 'two' or plan.get('pred_profiles') == [P0, P1], f'premise: plan {plan}')
+                c.check(b.get('bound') is True or HEAD_MODE, f'bind {b}')
+                got = decision(pg, P2, A)
+                c.check(chat_counts(pg, P2, A) == STORED_CHAT, f'premise: the business period moved: {chat_counts(pg, P2, A)}')
+                if v in ('same', 'control'):
+                    c.check(got == moved and got['personal_since'] is None, f'the moved business row must land as it was: {got} / {moved}')
+                    c.check(holds(pg, P2, A) == 'business', f'and hold on the line\'s moment: {holds(pg, P2, A)}')
+                elif v == 'clock':
+                    c.check(without_clock(got) == without_clock(own) and got['wiped_at'] is None
+                            and got['personal_since'] == moved['personal_since'],
+                            f'the own row must land with the moved running clock {moved["personal_since"]}: {got}')
+                elif v == 'two':
+                    c.check(without_clock(got) == without_clock(moved) and clocked_at_the_bind(pg, got, t0),
+                            f'the fresher personal row must land with a clock started at the bind: {got} / {moved}')
+                else:                                                     # new, owner: the own personal row stays, clocked
+                    c.check(without_clock(got) == without_clock(own) and clocked_at_the_bind(pg, got, t0),
+                            f'the own personal row must stay and carry a clock started at the bind: {got} / {own}')
+                if v == 'new':
+                    c.check(decision(pg, P2, K) == own_k and own_k['personal_since'] is None,
+                            f'K: the own business row keeps winning, unclocked: {decision(pg, P2, K)} / {own_k} (moved {moved_k})')
+                if v == 'owner':
+                    c.check(decision(pg, P2, B) == moved_b, f'B: the moved owner row must land: {decision(pg, P2, B)} / {moved_b}')
+                c.check(sweep_wipe(pg)['wiped_chats'] == 0 and chat_counts(pg, P2, A) == STORED_CHAT,
+                        'nothing is wiped at the bind: the clock only starts')
+                clocks_back(pg, P2, '1 day 1 minute' if v == 'clock' else two_days)
+                w, left = sweep_wipe(pg), chat_counts(pg, P2, A)
+                if v in ('same', 'control'):
+                    c.check(w['wiped_chats'] == 0 and left == STORED_CHAT, f'a business chat is never wiped: {w} {left}')
+                else:
+                    c.check(w['wiped_chats'] == 1 and left == GONE_CHAT, f'the moved business period must be wiped: {w} {left}')
+                    c.check(decision(pg, P2, A)['wiped_at'] is not None, 'the decision is marked wiped')
+                if v == 'new':
+                    c.check(chat_counts(pg, P2, K) == STORED_CHAT, f'K (business) keeps everything: {chat_counts(pg, P2, K)}')
+                usage = pg.q(f"select count(*)::int as n from dialog_counts where chat_id = {L(A)}")[0]['n']
+                c.check(usage == 2, f'dialog_counts (the tariff usage) must never be touched: {usage}')
+                c.check(decisions(pg, P1) == [] and decisions(pg, P0) == [], f'left: {decisions(pg, P0)} {decisions(pg, P1)}')
+                if not HEAD_MODE:
+                    # dropped_rows also counts the predecessors' '*' flag (chat_data seeds one on the chat's home) and, on a
+                    # new connection, the predecessor's connection row (the new profile's own one stays)
+                    want = {'same': (1, 1), 'new': (0, 4), 'clock': (0, 3), 'two': (1, 2), 'control': (1, 1), 'owner': (1, 2)}[v]
+                    c.check((b.get('moved_audience'), b.get('dropped_rows')) == want, f'moved_audience / dropped_rows {b}')
+
+
 def race_lazy_rows_during_the_bind(ch):
     P1, P2, WF1, WF2 = P(ch, 'P1'), P(ch, 'P2'), W(ch, 'old'), W(ch, 'new')
     A = '77051@c.us'
@@ -1356,7 +1521,7 @@ CREATE_MATRIX = (reconnect_after_purchase, same_profile_clone_gone, same_profile
                  owner_on_predecessor_beats_default_on_new, earliest_connection_wins_over_a_lazy_row_of_the_new_profile,
                  own_row_wins_when_the_number_changed, number_change_never_yields_an_older_moment,
                  own_number_survives_an_unknown_earliest_number, nonhuman_beats_everything,
-                 line_move_then_rule_personal_starts_the_clock, race_lazy_rows_during_the_bind)
+                 line_move_then_rule_personal_starts_the_clock, bind_merge_keeps_the_wipe_clock, race_lazy_rows_during_the_bind)
 
 
 # ---------------------------------------------------------------- module-only statements (no pre-F1 counterpart)

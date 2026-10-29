@@ -16,10 +16,11 @@
 --   decided_at      when the row's decision was taken: a computed decision HOLDS only while decided_at >= the
 --                   profile's connected_at (another number restarts the connection and voids the older computed rows
 --                   without touching them); the owner's decision always holds (audience.VALID_SQL);
---   personal_since  when the chat turned personal after it was business — the owner made it personal, or a computed
+--   personal_since  when the chat turned personal after it was business — the owner made it personal, a computed
 --                   personal decision replaced a business row (after another number: the old number's client is a contact
---                   of the new one) — the 2-day wipe of the Profile Lifecycle Sweep counts from it; null = no clock (a chat
---                   that was never business has nothing stored);
+--                   of the new one), or a reconnect's merge landed a personal row over a business period — the 2-day wipe
+--                   of the Profile Lifecycle Sweep counts from it; null = no clock (a computed personal decision of a chat
+--                   that was never business: nothing of it was stored — the owner's «личный» stamps a clock either way);
 --   wiped_at        when that wipe ran (the partial index below is the wipe's work list).
 -- audience_connections — one row per profile: the moment its channel counts as connected (the earliest created_at of the
 --   bot's line, or now() when another number was connected) and the connected number's digits (null = not known yet).
@@ -53,6 +54,24 @@ create table if not exists public.audience_connections (
   updated_at   timestamptz not null default now()
 );
 -- TABLE-END
+
+-- The wipe's work list (audience.WIPE_SQL) is every personal decision with a running clock, the owner's and a computed one
+-- alike. An index an earlier copy of this file built named the owner's source in its predicate, which that list cannot use
+-- (a sequential scan): it is dropped and built again with the predicate above — only while it still names the source, so a
+-- re-run (pg.sh migrate re-applies every file) changes nothing.
+-- WIPE-INDEX-BEGIN
+do $do$
+begin
+  if exists (select 1 from pg_catalog.pg_index i
+             where i.indexrelid = to_regclass('public.chat_audience_wipe_idx')
+               and pg_catalog.pg_get_indexdef(i.indexrelid) like '%source%') then
+    drop index public.chat_audience_wipe_idx;
+    create index chat_audience_wipe_idx on public.chat_audience (personal_since)
+      where kind = 'personal' and wiped_at is null and personal_since is not null;
+  end if;
+end
+$do$;
+-- WIPE-INDEX-END
 
 -- The reply ledger learns the new refusal. Rebuilt only while the CHECK lacks it, so a re-run (pg.sh migrate re-applies
 -- every file) is a no-op and a later migration that widens the list again is never narrowed back. The old list is the

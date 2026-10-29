@@ -35,6 +35,7 @@ as the generators will compose it. No n8n server, no network, never prod.
   computed_personal_over_business_starts_the_clock   a number change voids a computed business row; the next computed
                                           personal decision replaces it and starts the wipe clock (personal_since = the
                                           decision's moment); a first decision and a holding business row start none
+  computed_personal_over_business_clears_wiped_at   the replacing personal decision clears a mark left on the business row
   owner_business_never_replaced_by_a_computed_decision   after a number change the owner's rows still answer; nothing moves
   computed_business_clears_the_clock      computed business over a stale personal row with a clock clears it (and wiped_at)
   computed_personal_over_personal_keeps_the_clock   empty stays empty, a running clock is not restarted, a wiped mark stays
@@ -49,7 +50,10 @@ as the generators will compose it. No n8n server, no network, never prod.
   backfill_writes_nothing_for_a_personal_or_undecided_chat
   migration_postchecks                    RLS on, no anon/authenticated grants, the staging tables = the file's DDL,
                                           reply_events takes 'cancelled_personal' and still refuses 'bogus', a re-run is a
-                                          no-op, pg.sh migrates the file after the bot schedule
+                                          no-op (the CHECK, the tables, the wipe index), pg.sh migrates the file after the bot
+                                          schedule
+  migration_replaces_an_old_wipe_index    an older copy's wipe index (it named the owner's source) is rebuilt with the work
+                                          list's predicate, once (a fixture schema)
   statements_pass_the_sql_guard           verify-sql-comments finds nothing in any statement (V1)
   audience_module_never_imports_apply_history_handoff   (that module imports audience.py — an import back is a cycle)
   fixtures_clean_both_tables              staging/fixtures.py delete clears both tables of a fixture profile; the mock sweep
@@ -655,6 +659,20 @@ for ch, C in CH.items():
             c.check(got == [dec('business', 'new', 'default')] and row(pg, P, C['chat4']) == before,
                     f'a HOLDING business row is never replaced, so no clock starts there: {got} {row(pg, P, C["chat4"])}')
 
+    with Case(f'computed_personal_over_business_clears_wiped_at [{ch}]: the personal decision that replaces a stale BUSINESS row '
+              'clears wiped_at by itself — a mark left on the business row (written in directly here: the owner\'s path clears it '
+              'whenever a chat turns business) never travels into the new clock') as c:
+        with PgSession(SETUP) as pg:
+            profile(pg, P, C['channel'], '3 days')
+            connected(pg, P, '77010000001')
+            decide(pg, P, C['chat'], 'business', 'new')
+            wiped_by_sweep(pg, P, C['chat'])                            # a stray mark on the business row
+            new_number(pg, P)
+            decide(pg, P, C['chat'], 'personal', 'contact')
+            r = row(pg, P, C['chat'])
+            c.check(r['wiped_at'] is None and r['personal_since'] is not None and r['personal_since'] == r['decided_at'],
+                    f'the clock starts clean — wiped_at cleared, personal_since = the decision\'s moment: {r}')
+
     with Case(f'owner_business_never_replaced_by_a_computed_decision [{ch}]: after a number change the owner\'s rows still hold — '
               'a computed decision answers them and changes nothing: the owner\'s business gets no clock, the owner\'s personal '
               'keeps its own') as c:
@@ -970,13 +988,48 @@ with Case('migration_postchecks: RLS on, no grants to anon/authenticated, the st
                 f'the chat_audience checks: {pg.q("select msg from aud_err")}')
     snap = ("select json_build_object('oid', (select oid from pg_constraint where conrelid = 'public.reply_events'::regclass and "
             "conname = 'reply_events_state_check'), 'tables', (select json_agg(c.oid order by c.relname) from pg_class c where "
-            "c.oid in ('public.chat_audience'::regclass, 'public.audience_connections'::regclass)))::text;\n")
+            "c.oid in ('public.chat_audience'::regclass, 'public.audience_connections'::regclass)), "
+            "'index', to_regclass('public.chat_audience_wipe_idx')::oid)::text;\n")
     out = sql_run(snap + MIGRATION.read_text(encoding='utf-8') + '\n' + snap)          # inside BEGIN … ROLLBACK
     marks = [json.loads(l) for l in out.splitlines() if l.strip().startswith('{')]
     c.check(len(marks) == 2 and marks[0] == marks[1], f'a re-run must change nothing (the CHECK not re-created): {marks}')
     pg_text = PG_SH.read_text(encoding='utf-8')
     c.check(MIGRATION.name in pg_text and pg_text.index(MIGRATION.name) > pg_text.index('2026-10-14-bot-schedule.sql'),
             'staging/pg.sh must migrate the file after the bot schedule')
+
+
+def wipe_index_block():
+    """The migration's block that replaces an old wipe index (between its WIPE-INDEX-BEGIN / END lines)."""
+    text = MIGRATION.read_text(encoding='utf-8')
+    return text.split('-- WIPE-INDEX-BEGIN')[1].split('\n', 1)[1].split('-- WIPE-INDEX-END')[0]
+
+
+with Case('migration_replaces_an_old_wipe_index: an index an earlier copy of the file built (its predicate named the owner\'s '
+          'source, which the work list cannot use) is dropped and built again with the work list\'s predicate; a second run '
+          'changes nothing (the same index) — run on a fixture schema, never on the shared public tables') as c:
+    schema = 't_aud_idx_' + uuid.uuid4().hex[:16]
+    block = wipe_index_block().replace('public.', schema + '.')
+    idx = (f"select i.indexrelid::bigint as oid, pg_get_indexdef(i.indexrelid) as d from pg_index i "
+           f"where i.indexrelid = to_regclass('{schema}.chat_audience_wipe_idx')")
+    try:
+        with PgSession() as pg:
+            pg.x(f"create schema {schema}; create table {schema}.chat_audience (like public.chat_audience); "
+                 f"create index chat_audience_wipe_idx on {schema}.chat_audience (personal_since) "
+                 f"where source = 'owner' and kind = 'personal' and wiped_at is null;")
+            old = pg.q(idx)
+            pg.x(block)
+            new = pg.q(idx)
+            pg.x(block)
+            again = pg.q(idx)
+        c.check('public.' in wipe_index_block() and len(old) == 1 and "source = 'owner'" in old[0]['d'],
+                f'premise: the old index {old}')
+        c.check(len(new) == 1 and 'source' not in new[0]['d'] and "kind = 'personal'" in new[0]['d']
+                and 'wiped_at IS NULL' in new[0]['d'] and 'personal_since IS NOT NULL' in new[0]['d'],
+                f'the index must be rebuilt with the work list\'s predicate: {new}')
+        c.check(again == new, f'a second run must change nothing (the same index): {new} → {again}')
+    finally:
+        with PgSession() as pg:
+            pg.x(f'drop schema if exists {schema} cascade;')
 
 
 # ================================================================================================ guards
