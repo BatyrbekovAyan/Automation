@@ -1,0 +1,16 @@
+{
+  "label": "pt-fix",
+  "note": "2026-10-30, candidate T of the price-tool fix (docs/audits/2026-10-29-price-tool/README.md) — REJECTED: the price-list tool's description rewritten («Call it BEFORE you answer whenever … Never answer that a price will be confirmed later without calling it first», fix-tool-description.txt) against the old one, every auto scenario of set v1.8 ×3, one interleaved schedule, the n8n request shape. Run while the working tree carried T (the results pt-fix-auto-*.json are T's); T searched 16/16 on real clones but opened a spurious create_handoff on ws_discount_policy_known 10/10 (pt-fix-focus) — the fix that shipped is C2, measured by pt-fix2. Re-running this plan today measures whatever the working tree carries.",
+  "sides": {
+    "before": "f0c81168@n8n",
+    "after": "worktree@n8n"
+  },
+  "skip_panel": true,
+  "blocks": [
+    {
+      "name": "auto",
+      "only": null,
+      "repeat": 3
+    }
+  ]
+}

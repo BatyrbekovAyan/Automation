@@ -60,7 +60,7 @@ def rescore_results(J, scenarios, src="<results>"):
     carried = recomputed_panel = truncated = 0
     for x in J["results"]:
         sc = sc_by_id[x["id"]]
-        know = scenarios["knowledge"][sc["vertical"]]
+        know = M.scenario_knowledge(scenarios, sc)
         runs = []
         for i, run in enumerate(x["runs"]):
             old = run["verdicts"]

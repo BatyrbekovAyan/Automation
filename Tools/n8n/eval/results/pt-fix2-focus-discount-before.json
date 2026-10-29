@@ -1,0 +1,329 @@
+{
+ "summary": {
+  "label": "pt-fix2-focus-discount-before",
+  "prompts_ref": "f0c81168",
+  "search_ref": "f0c81168",
+  "side": "before",
+  "block": "discount",
+  "plan": "Tools/n8n/eval/plans/pt-fix2-focus.json",
+  "scenario_version": "v1.8 (2026-10-29: the price that lives ONLY in the price list — 8 auto scenarios pl_* (products_override / services_override, harness h11; pl_empty_reask_flowers = the e2e-auth retired_bot_reconnects_after_purchase model step); every v1.7 scenario and check unchanged)",
+  "harness": "h11 (2026-10-29: scenario fields products_override / services_override (scenario_knowledge) for the price that lives ONLY in the price list — set v1.8 adds the pl_* scenarios, every v1.7 scenario composes byte for byte; --request n8n / a side «REF@n8n» sends the request the bot's n8n sends (developer message, the template's tools as n8n builds them, strict:false, response_format text), every run records the snapshot that answered; AMOUNT never spans a line break («SK20R11⏎4200 тг» is 4200) — rescored, it moves no saved verdict of v1.3–v1.7; on top of h10 (2026-10-13: three off-topic classes — names_scope (рамка + имя бизнеса), no_refusal_on_greeting, honest_assistant, spam_minimal; panel cards_eq_1_refusal, cards_name_business; set v1.7 adds the scenarios for them, knowledge.<vertical>.businessName rides into About Business as «Название:» like the app writes it; every earlier check unchanged; on top of h9 (2026-10-13: panel checks cards_first_no_decision:<topic> — card 1 neither grants nor refuses a condition the data does not state — cards_absent:<regex> — no card states a rule absent from the data — and cards_first_matches:<regex>; auto check matches:<regex>; set v1.6 adds the scenarios for them; every earlier check unchanged; on top of h8 (2026-10-12, T11b: interleaved schedule — every scenario's repeats spread over the whole run, round-robin over the scenarios, the sides of one repeat back to back with the first side rotating (--side / --plan run the sides of a comparison as ONE schedule); set v1.5 adds no_tool:create_handoff wherever the scenario does not call for a handoff; no check function changed; on top of h7 (2026-10-12, T11 Q1 B + V6-unknown: scenario roles `owner` / `bot_unknown` rendered with the memory marks the writers store at --prompts-ref (apply-history-handoff.py; none before T6); no_marker_leak, no_tool:<name>, not_says_already, no_delivery_doubt; on top of h6 2026-10-09, Q1: not_mentions:X — X stated in no un-refused clause and not merely quoted as the client's words, for the client-time echo; mentions:H:MM reads a time of day; on top of h5 2026-10-08, V9-r2: no_conflict_claim / no_price_caveat for a price list that AGREES with the catalog; on top of h4 2026-10-07 V9: «расхождение» + negated conflict, zero-price / elliptical free delivery, «итого по N позициям» partial, «нужен» / the car or device by name, a word inside the installment claim, Kazakh = no Russian sentence, «18,000»; h3 2026-09-27 R14; checks pinned by test_checks.py)))",
+  "model": "gpt-5.4-mini",
+  "reasoning_effort": null,
+  "dropped_params": [],
+  "panel_model": null,
+  "max_tokens": 200,
+  "request": "n8n",
+  "temperature": 0.2,
+  "headers": [],
+  "models_served": [
+   "gpt-5.4-mini-2026-03-17"
+  ],
+  "search_simulation": "Price List Search sub-workflow (Reconcile Prices at f0c81168)",
+  "memory_marks": {
+   "owner": "Владелец: ",
+   "bot_unknown": "[доставка не подтверждена] "
+  },
+  "workers": 2,
+  "scenarios": 1,
+  "runs": 10,
+  "pass_all": 1,
+  "flaky": 0,
+  "fail": 0,
+  "error_runs": 0,
+  "transport_retries": 0,
+  "finish_reason_length_runs": 0,
+  "prompt_tokens": 49220,
+  "cached_tokens": 48640,
+  "completion_tokens": 522,
+  "reasoning_tokens": 0,
+  "cost_usd_auto_path": 0.0064,
+  "prices_usd_per_1m": [
+   0.75,
+   0.075,
+   4.5
+  ],
+  "latency_ms": {
+   "auto": {
+    "n": 10,
+    "median": 1777,
+    "p90": 2289,
+    "max": 2289
+   },
+   "panel": null
+  },
+  "seconds": 76,
+  "by_check": {
+   "matches:скид[^.!?]{0,60}(не да|нет|не дела|не предусм|не предоставл)|(нет|не да[её]м|не делаем|не предоставляем)[^.!?]{0,40}скид|фиксирован": "10/10",
+   "no_discount": "10/10",
+   "no_marker_leak": "10/10",
+   "no_tool:create_handoff": "10/10"
+  }
+ },
+ "results": [
+  {
+   "id": "ws_discount_policy_known",
+   "vertical": "wholesale",
+   "mode": "auto",
+   "lang": "ru",
+   "tags": [
+    "condition",
+    "key"
+   ],
+   "repeats": 10,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "matches:скид[^.!?]{0,60}(не да|нет|не дела|не предусм|не предоставл)|(нет|не да[её]м|не делаем|не предоставляем)[^.!?]{0,40}скид|фиксирован": true,
+      "no_discount": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Скидок не даём ни на какой объём, цены фиксированные.\n\nМинимальный заказ — 50 000 тг.\nЕсли хотите, могу передать заявку менеджеру: укажите компанию или ИП, имя, город и телефон.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4922,
+      "completion_tokens": 54,
+      "cached_tokens": 4864,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1833,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 8,
+     "t": 5.9,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "matches:скид[^.!?]{0,60}(не да|нет|не дела|не предусм|не предоставл)|(нет|не да[её]м|не делаем|не предоставляем)[^.!?]{0,40}скид|фиксирован": true,
+      "no_discount": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Скидок не даём ни на какой объём — цены фиксированные.\n\nМинимальный заказ 50 000 тг.\nЕсли хотите, могу передать заявку менеджеру: компания/ИП, имя, город, телефон.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4922,
+      "completion_tokens": 51,
+      "cached_tokens": 4864,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1571,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 19,
+     "t": 13.5,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "matches:скид[^.!?]{0,60}(не да|нет|не дела|не предусм|не предоставл)|(нет|не да[её]м|не делаем|не предоставляем)[^.!?]{0,40}скид|фиксирован": true,
+      "no_discount": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Скидок не даём ни на какой объём — цены фиксированные.\n\nМинимальный заказ 50 000 тг\nОплата: безнал с НДС, счёт и накладные\n\nЕсли хотите, могу передать заявку менеджеру: укажите компанию или ИП, имя, город и телефон.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4922,
+      "completion_tokens": 69,
+      "cached_tokens": 4864,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2289,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 28,
+     "t": 20.1,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "matches:скид[^.!?]{0,60}(не да|нет|не дела|не предусм|не предоставл)|(нет|не да[её]м|не делаем|не предоставляем)[^.!?]{0,40}скид|фиксирован": true,
+      "no_discount": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Скидок не даём ни на какой объём — цены фиксированные.\n\nМинимальный заказ 50 000 тг\nОплата: безнал с НДС, счёт и накладные\n\nЕсли нужен расчёт по 100 коробкам, могу передать заявку менеджеру.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4922,
+      "completion_tokens": 63,
+      "cached_tokens": 4864,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1824,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 39,
+     "t": 27.8,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "matches:скид[^.!?]{0,60}(не да|нет|не дела|не предусм|не предоставл)|(нет|не да[её]м|не делаем|не предоставляем)[^.!?]{0,40}скид|фиксирован": true,
+      "no_discount": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Скидок не даём ни на какой объём, цены фиксированные.\n\nМинимальный заказ — 50 000 тг.\nЕсли хотите, могу передать заявку менеджеру: укажите компанию или ИП, имя, город и телефон.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4922,
+      "completion_tokens": 54,
+      "cached_tokens": 4864,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1618,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 48,
+     "t": 34.3,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "matches:скид[^.!?]{0,60}(не да|нет|не дела|не предусм|не предоставл)|(нет|не да[её]м|не делаем|не предоставляем)[^.!?]{0,40}скид|фиксирован": true,
+      "no_discount": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Скидок не даём ни на какой объём — цены фиксированные.\n\nМинимальный заказ 50 000 тг.\nЕсли нужен расчёт по 100 коробкам, могу передать заявку менеджеру.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4922,
+      "completion_tokens": 47,
+      "cached_tokens": 4864,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1540,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 59,
+     "t": 42.4,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "matches:скид[^.!?]{0,60}(не да|нет|не дела|не предусм|не предоставл)|(нет|не да[её]м|не делаем|не предоставляем)[^.!?]{0,40}скид|фиксирован": true,
+      "no_discount": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Скидок не даём ни на какой объём — цены фиксированные.\n\nЕсли нужен расчёт по 100 коробкам, могу передать заявку менеджеру.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4922,
+      "completion_tokens": 36,
+      "cached_tokens": 4864,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1372,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 68,
+     "t": 51.1,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "matches:скид[^.!?]{0,60}(не да|нет|не дела|не предусм|не предоставл)|(нет|не да[её]м|не делаем|не предоставляем)[^.!?]{0,40}скид|фиксирован": true,
+      "no_discount": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Скидок не даём ни на какой объём — цены фиксированные.\n\nМинимальный заказ 50 000 тг.\nЕсли нужен расчёт по 100 коробкам, могу передать заявку менеджеру.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4922,
+      "completion_tokens": 47,
+      "cached_tokens": 4864,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2097,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 79,
+     "t": 59.9,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "matches:скид[^.!?]{0,60}(не да|нет|не дела|не предусм|не предоставл)|(нет|не да[её]м|не делаем|не предоставляем)[^.!?]{0,40}скид|фиксирован": true,
+      "no_discount": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Скидок не даём ни на какой объём — цены фиксированные.\n\nЕсли нужен заказ, напишите:\nкомпания или ИП\nимя\nгород\nчто и в каком объёме нужно\nтелефон\n\nПередам менеджеру.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4922,
+      "completion_tokens": 54,
+      "cached_tokens": 4864,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1777,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 88,
+     "t": 66.4,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "matches:скид[^.!?]{0,60}(не да|нет|не дела|не предусм|не предоставл)|(нет|не да[её]м|не делаем|не предоставляем)[^.!?]{0,40}скид|фиксирован": true,
+      "no_discount": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Скидок не даём ни на какой объём — цены фиксированные.\n\nМинимальный заказ 50 000 тг.\nЕсли нужен расчёт по 100 коробкам, могу передать заявку менеджеру.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4922,
+      "completion_tokens": 47,
+      "cached_tokens": 4864,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1719,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 99,
+     "t": 74.3,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    }
+   ]
+  }
+ ]
+}

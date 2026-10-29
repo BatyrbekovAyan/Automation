@@ -1,0 +1,2444 @@
+{
+ "summary": {
+  "label": "pt-now-pl-n8n",
+  "prompts_ref": "f0c81168",
+  "search_ref": "f0c81168",
+  "side": "n8n",
+  "block": "pl",
+  "plan": "Tools/n8n/eval/plans/pt-now.json",
+  "scenario_version": "v1.8 (2026-10-29: the price that lives ONLY in the price list — 8 auto scenarios pl_* (products_override / services_override, harness h11; pl_empty_reask_flowers = the e2e-auth retired_bot_reconnects_after_purchase model step); every v1.7 scenario and check unchanged)",
+  "harness": "h11 (2026-10-29: scenario fields products_override / services_override (scenario_knowledge) for the price that lives ONLY in the price list — set v1.8 adds the pl_* scenarios; no check function changed, every v1.7 scenario composes and scores byte for byte; on top of h10 (2026-10-13: three off-topic classes — names_scope (рамка + имя бизнеса), no_refusal_on_greeting, honest_assistant, spam_minimal; panel cards_eq_1_refusal, cards_name_business; set v1.7 adds the scenarios for them, knowledge.<vertical>.businessName rides into About Business as «Название:» like the app writes it; every earlier check unchanged; on top of h9 (2026-10-13: panel checks cards_first_no_decision:<topic> — card 1 neither grants nor refuses a condition the data does not state — cards_absent:<regex> — no card states a rule absent from the data — and cards_first_matches:<regex>; auto check matches:<regex>; set v1.6 adds the scenarios for them; every earlier check unchanged; on top of h8 (2026-10-12, T11b: interleaved schedule — every scenario's repeats spread over the whole run, round-robin over the scenarios, the sides of one repeat back to back with the first side rotating (--side / --plan run the sides of a comparison as ONE schedule); set v1.5 adds no_tool:create_handoff wherever the scenario does not call for a handoff; no check function changed; on top of h7 (2026-10-12, T11 Q1 B + V6-unknown: scenario roles `owner` / `bot_unknown` rendered with the memory marks the writers store at --prompts-ref (apply-history-handoff.py; none before T6); no_marker_leak, no_tool:<name>, not_says_already, no_delivery_doubt; on top of h6 2026-10-09, Q1: not_mentions:X — X stated in no un-refused clause and not merely quoted as the client's words, for the client-time echo; mentions:H:MM reads a time of day; on top of h5 2026-10-08, V9-r2: no_conflict_claim / no_price_caveat for a price list that AGREES with the catalog; on top of h4 2026-10-07 V9: «расхождение» + negated conflict, zero-price / elliptical free delivery, «итого по N позициям» partial, «нужен» / the car or device by name, a word inside the installment claim, Kazakh = no Russian sentence, «18,000»; h3 2026-09-27 R14; checks pinned by test_checks.py)))",
+  "model": "gpt-5.4-mini",
+  "reasoning_effort": null,
+  "dropped_params": [],
+  "panel_model": null,
+  "max_tokens": 200,
+  "request": "n8n",
+  "models_served": [
+   "gpt-5.4-mini-2026-03-17"
+  ],
+  "search_simulation": "Price List Search sub-workflow (Reconcile Prices at f0c81168)",
+  "memory_marks": {
+   "owner": "Владелец: ",
+   "bot_unknown": "[доставка не подтверждена] "
+  },
+  "workers": 2,
+  "scenarios": 8,
+  "runs": 64,
+  "pass_all": 6,
+  "flaky": 2,
+  "fail": 0,
+  "error_runs": 0,
+  "transport_retries": 0,
+  "finish_reason_length_runs": 0,
+  "prompt_tokens": 628864,
+  "cached_tokens": 588160,
+  "completion_tokens": 4294,
+  "reasoning_tokens": 0,
+  "cost_usd_auto_path": 0.094,
+  "prices_usd_per_1m": [
+   0.75,
+   0.075,
+   4.5
+  ],
+  "latency_ms": {
+   "auto": {
+    "n": 64,
+    "median": 3136,
+    "p90": 3502,
+    "max": 4225
+   },
+   "panel": null
+  },
+  "seconds": 484,
+  "by_check": {
+   "lang_kz": "8/8",
+   "lang_ru": "56/56",
+   "mentions:12000": "8/8",
+   "mentions:18500": "24/24",
+   "mentions:18:00": "7/8",
+   "mentions:4200": "8/8",
+   "mentions:48000": "16/16",
+   "mentions:52000": "8/8",
+   "mentions_diagnostics_caveat": "8/8",
+   "no_closing_offer": "64/64",
+   "no_markdown": "64/64",
+   "no_marker_leak": "64/64",
+   "no_tool:create_handoff": "64/64",
+   "numbers_grounded": "61/64"
+  }
+ },
+ "results": [
+  {
+   "id": "pl_51_roses_flowers",
+   "vertical": "flowers",
+   "mode": "auto",
+   "lang": "ru",
+   "tags": [
+    "price_list",
+    "key"
+   ],
+   "repeats": 8,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "mentions:48000": true,
+      "numbers_grounded": true,
+      "lang_ru": true,
+      "no_markdown": true,
+      "no_closing_offer": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Букет 51 роза — 48000 тг.\n\nНаличие подтвердит флорист при оформлении.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "букет из 51 розы цена 51 роза прайс"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9833,
+      "completion_tokens": 61,
+      "cached_tokens": 7296,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3933,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 1,
+     "t": 0.0,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "mentions:48000": true,
+      "numbers_grounded": true,
+      "lang_ru": true,
+      "no_markdown": true,
+      "no_closing_offer": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Букет 51 роза — 48000 тг.\n\nНаличие подтвердит флорист при оформлении.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "букет 51 роза цена 51 роза прайс"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9832,
+      "completion_tokens": 60,
+      "cached_tokens": 9472,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3144,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 64,
+     "t": 117.1,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "mentions:48000": true,
+      "numbers_grounded": true,
+      "lang_ru": true,
+      "no_markdown": true,
+      "no_closing_offer": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Букет из 51 розы — 48000 тг.\n\nНаличие подтвердит флорист при оформлении.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "букет 51 розы цена 51 роза"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9830,
+      "completion_tokens": 59,
+      "cached_tokens": 7296,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3311,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 81,
+     "t": 148.0,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "mentions:48000": true,
+      "numbers_grounded": true,
+      "lang_ru": true,
+      "no_markdown": true,
+      "no_closing_offer": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Букет 51 роза — 48000 тг.\n\nНаличие подтвердит флорист при оформлении.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "букет из 51 розы цена 51 роза"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9831,
+      "completion_tokens": 59,
+      "cached_tokens": 9344,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2860,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 96,
+     "t": 173.1,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "mentions:48000": true,
+      "numbers_grounded": true,
+      "lang_ru": true,
+      "no_markdown": true,
+      "no_closing_offer": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Букет из 51 розы — 48000 тг.\n\nНаличие подтвердит флорист при оформлении.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "букет из 51 розы цена"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9827,
+      "completion_tokens": 56,
+      "cached_tokens": 9472,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2817,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 161,
+     "t": 295.3,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "mentions:48000": true,
+      "numbers_grounded": true,
+      "lang_ru": true,
+      "no_markdown": true,
+      "no_closing_offer": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Букет из 51 розы — 48000 тг.\n\nНаличие подтвердит флорист при оформлении.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "букет 51 розы цена 51 роза прайс"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9832,
+      "completion_tokens": 61,
+      "cached_tokens": 9344,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3466,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 176,
+     "t": 316.9,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "mentions:48000": true,
+      "numbers_grounded": true,
+      "lang_ru": true,
+      "no_markdown": true,
+      "no_closing_offer": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Букет из 51 розы — 48000 тг.\n\nНаличие подтвердит флорист при оформлении.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "букет 51 розы цена 51 роза"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9830,
+      "completion_tokens": 59,
+      "cached_tokens": 9472,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3153,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 193,
+     "t": 344.6,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "mentions:48000": true,
+      "numbers_grounded": true,
+      "lang_ru": true,
+      "no_markdown": true,
+      "no_closing_offer": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Букет 51 роза — 48000 тг.\n\nНаличие подтвердит флорист при оформлении.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "букет из 51 розы цена"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9827,
+      "completion_tokens": 55,
+      "cached_tokens": 9472,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3144,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 256,
+     "t": 456.3,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    }
+   ]
+  },
+  {
+   "id": "pl_51_roses_kz_flowers",
+   "vertical": "flowers",
+   "mode": "auto",
+   "lang": "kz",
+   "tags": [
+    "price_list",
+    "lang",
+    "key"
+   ],
+   "repeats": 8,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "mentions:48000": true,
+      "numbers_grounded": true,
+      "lang_kz": true,
+      "no_markdown": true,
+      "no_closing_offer": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "51 раушаннан тұратын гүл шоғы — 48000 тг.\n\nҚаласаңыз, жеткізуін де есептеп беремін: Астанада жеткізу 2000 тг.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "51 раушан букет цена 51 роза 51 раушан"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9843,
+      "completion_tokens": 81,
+      "cached_tokens": 9344,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3361,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 2,
+     "t": 2.9,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "mentions:48000": true,
+      "numbers_grounded": true,
+      "lang_kz": true,
+      "no_markdown": true,
+      "no_closing_offer": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "51 раушаннан тұратын гүл шоғы — 48000 тг.\n\nҚаласаңыз, жеткізуін де ұйымдастырамын.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "51 раушан букет цена 51 роза прайс"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9840,
+      "completion_tokens": 67,
+      "cached_tokens": 9472,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2976,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 67,
+     "t": 123.0,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "mentions:48000": true,
+      "numbers_grounded": true,
+      "lang_kz": true,
+      "no_markdown": true,
+      "no_closing_offer": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "51 раушаннан тұратын гүл шоғы — 48000 тг.\n\nҚаласаңыз, жеткізуін де рәсімдеп беремін.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "51 раушан букет цена 51 роза прайс-лист"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9842,
+      "completion_tokens": 70,
+      "cached_tokens": 9600,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3117,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 82,
+     "t": 149.7,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "mentions:48000": true,
+      "numbers_grounded": true,
+      "lang_kz": true,
+      "no_markdown": true,
+      "no_closing_offer": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "51 раушаннан тұратын гүл шоғы — 48 000 тг.\n\nҚаласаңыз, жеткізуге де рәсімдеп беремін.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "51 раушаннан тұратын гүл шоғы цена, 51 роза букет, прайс"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9848,
+      "completion_tokens": 77,
+      "cached_tokens": 9344,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3276,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 99,
+     "t": 177.1,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "mentions:48000": true,
+      "numbers_grounded": true,
+      "lang_kz": true,
+      "no_markdown": true,
+      "no_closing_offer": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "51 раушаннан тұратын гүл шоғы — 48000 тг.\n\nҚаласаңыз, жеткізуін де ұйымдастырамын.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "51 раушан букет цена 51 роза"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9838,
+      "completion_tokens": 65,
+      "cached_tokens": 9344,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2958,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 162,
+     "t": 295.6,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "mentions:48000": true,
+      "numbers_grounded": true,
+      "lang_kz": true,
+      "no_markdown": true,
+      "no_closing_offer": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "51 раушаннан тұратын гүл шоғы — 48000 тг.\n\nНақты қалдығын флорист тапсырысты рәсімдегенде растайды.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "51 раушан букет цена 51 роза 51 раушан"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9843,
+      "completion_tokens": 75,
+      "cached_tokens": 9472,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3160,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 179,
+     "t": 322.9,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "mentions:48000": true,
+      "numbers_grounded": true,
+      "lang_kz": true,
+      "no_markdown": true,
+      "no_closing_offer": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "51 раушаннан тұратын гүл шоғы — 48 000 тг.\n\nНақты бар-жоғын флорист тапсырыс рәсімдегенде растайды.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "51 раушаннан тұратын гүл шоғы, 51 роза, цена, прайс-лист"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9849,
+      "completion_tokens": 82,
+      "cached_tokens": 9472,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2930,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 194,
+     "t": 345.5,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "mentions:48000": true,
+      "numbers_grounded": true,
+      "lang_kz": true,
+      "no_markdown": true,
+      "no_closing_offer": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "51 раушаннан тұратын гүл шоғы — 48000 тг.\n\nНақты қалдығын флорист тапсырыс рәсімдегенде растайды.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "51 раушан букет цена, 51 роза, прайс-лист"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9844,
+      "completion_tokens": 75,
+      "cached_tokens": 9472,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3643,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 259,
+     "t": 461.4,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    }
+   ]
+  },
+  {
+   "id": "pl_iphone13_screen_phone_repair",
+   "vertical": "phone_repair",
+   "mode": "auto",
+   "lang": "ru",
+   "tags": [
+    "price_list",
+    "key"
+   ],
+   "repeats": 8,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "mentions:52000": true,
+      "mentions_diagnostics_caveat": true,
+      "numbers_grounded": true,
+      "lang_ru": true,
+      "no_markdown": true,
+      "no_closing_offer": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Замена экрана iPhone 13 — 52000 тг.\n\nДиагностика бесплатная, точная цена — после диагностики, мастер подтвердит её до начала работ.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "iPhone 13 разбит экран замена экрана цена"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 10102,
+      "completion_tokens": 73,
+      "cached_tokens": 7424,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3158,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 5,
+     "t": 8.1,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "mentions:52000": true,
+      "mentions_diagnostics_caveat": true,
+      "numbers_grounded": true,
+      "lang_ru": true,
+      "no_markdown": true,
+      "no_closing_offer": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Замена экрана iPhone 13 — 52000 тг.\n\nДиагностика бесплатная.\nТочная цена — после диагностики, мастер подтвердит её до начала работ.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "iPhone 13 разбит экран замена экрана цена"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 10102,
+      "completion_tokens": 73,
+      "cached_tokens": 9856,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3411,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 68,
+     "t": 125.6,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "mentions:52000": true,
+      "mentions_diagnostics_caveat": true,
+      "numbers_grounded": true,
+      "lang_ru": true,
+      "no_markdown": true,
+      "no_closing_offer": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Замена экрана iPhone 13 — 52000 тг.\n\nДиагностика бесплатная.\nТочная цена — после диагностики, мастер подтвердит её до начала работ.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "iPhone 13 разбит экран замена экрана цена"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 10102,
+      "completion_tokens": 73,
+      "cached_tokens": 9856,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3151,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 85,
+     "t": 154.7,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "mentions:52000": true,
+      "mentions_diagnostics_caveat": true,
+      "numbers_grounded": true,
+      "lang_ru": true,
+      "no_markdown": true,
+      "no_closing_offer": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Замена экрана iPhone 13 — 52000 тг.\n\nТочная цена — после диагностики, мастер подтвердит её до начала работ.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "iPhone 13 замена экрана цена"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 10099,
+      "completion_tokens": 63,
+      "cached_tokens": 9856,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3421,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 100,
+     "t": 179.2,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "mentions:52000": true,
+      "mentions_diagnostics_caveat": true,
+      "numbers_grounded": true,
+      "lang_ru": true,
+      "no_markdown": true,
+      "no_closing_offer": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Замена экрана iPhone 13 — 52000 тг.\n\nДиагностика бесплатная.\nТочная цена — после диагностики, мастер подтвердит её до начала работ.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "iPhone 13 разбит экран замена экрана цена"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 10102,
+      "completion_tokens": 73,
+      "cached_tokens": 9856,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3654,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 165,
+     "t": 301.3,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "mentions:52000": true,
+      "mentions_diagnostics_caveat": true,
+      "numbers_grounded": true,
+      "lang_ru": true,
+      "no_markdown": true,
+      "no_closing_offer": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Замена экрана iPhone 13 — 52000 тг.\n\nТочная цена — после диагностики, мастер подтвердит её до начала работ.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "iPhone 13 разбит экран замена экрана цена"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 10102,
+      "completion_tokens": 66,
+      "cached_tokens": 9856,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3073,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 180,
+     "t": 323.7,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "mentions:52000": true,
+      "mentions_diagnostics_caveat": true,
+      "numbers_grounded": true,
+      "lang_ru": true,
+      "no_markdown": true,
+      "no_closing_offer": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Замена экрана iPhone 13 — 52000 тг.\n\nДиагностика бесплатная.\nТочная цена — после диагностики, мастер подтвердит её до начала работ.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "iPhone 13 разбит экран замена экрана цена"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 10102,
+      "completion_tokens": 73,
+      "cached_tokens": 9856,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3134,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 197,
+     "t": 351.0,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "mentions:52000": true,
+      "mentions_diagnostics_caveat": true,
+      "numbers_grounded": true,
+      "lang_ru": true,
+      "no_markdown": true,
+      "no_closing_offer": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Замена экрана iPhone 13 — 52000 тг.\n\nДиагностика бесплатная.\nТочная цена — после диагностики, мастер подтвердит её до начала работ.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "iPhone 13 разбит экран замена экрана цена"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 10102,
+      "completion_tokens": 73,
+      "cached_tokens": 9728,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2912,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 260,
+     "t": 464.1,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    }
+   ]
+  },
+  {
+   "id": "pl_ielts_individual_education",
+   "vertical": "education",
+   "mode": "auto",
+   "lang": "ru",
+   "tags": [
+    "price_list",
+    "key"
+   ],
+   "repeats": 8,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "mentions:12000": true,
+      "numbers_grounded": true,
+      "lang_ru": true,
+      "no_markdown": true,
+      "no_closing_offer": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Индивидуальные занятия IELTS — 12 000 тг за занятие.\n\nПробный урок бесплатный. Если хотите, могу передать заявку администратору — он свяжется и подберёт время.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "индивидуальные занятия IELTS взрослый цена индивидуально"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9747,
+      "completion_tokens": 79,
+      "cached_tokens": 4736,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3407,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 6,
+     "t": 9.5,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "mentions:12000": true,
+      "numbers_grounded": true,
+      "lang_ru": true,
+      "no_markdown": true,
+      "no_closing_offer": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Индивидуальные занятия IELTS — 12 000 тг за занятие.\n\nПробный урок бесплатный. Если хотите, могу передать заявку администратору — он свяжется и подскажет по записи.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "индивидуальные занятия IELTS взрослый цена"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9745,
+      "completion_tokens": 78,
+      "cached_tokens": 9344,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3681,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 71,
+     "t": 130.9,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "mentions:12000": true,
+      "numbers_grounded": true,
+      "lang_ru": true,
+      "no_markdown": true,
+      "no_closing_offer": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Индивидуальные занятия IELTS — 12 000 тг за занятие.\n\nПробный урок бесплатный. Если хотите, могу передать заявку администратору — он свяжется и подскажет по записи.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "IELTS индивидуальные занятия взрослый цена"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9745,
+      "completion_tokens": 78,
+      "cached_tokens": 9344,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3274,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 86,
+     "t": 155.7,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "mentions:12000": true,
+      "numbers_grounded": true,
+      "lang_ru": true,
+      "no_markdown": true,
+      "no_closing_offer": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Индивидуальные занятия IELTS — 12000 тг за занятие.\n\nПробный урок бесплатный. Если хотите, могу передать заявку администратору — он свяжется и подскажет время.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "индивидуальные занятия IELTS взрослый цена"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9745,
+      "completion_tokens": 76,
+      "cached_tokens": 7168,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3072,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 103,
+     "t": 183.5,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "mentions:12000": true,
+      "numbers_grounded": true,
+      "lang_ru": true,
+      "no_markdown": true,
+      "no_closing_offer": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Индивидуальные занятия IELTS — 12 000 тг за занятие.\n\nПробный урок бесплатный. Если хотите, могу передать заявку администратору — он свяжется и подберёт время.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "индивидуальные занятия IELTS взрослый цена индивидуально"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9747,
+      "completion_tokens": 79,
+      "cached_tokens": 9344,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2850,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 166,
+     "t": 301.6,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "mentions:12000": true,
+      "numbers_grounded": true,
+      "lang_ru": true,
+      "no_markdown": true,
+      "no_closing_offer": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Индивидуальные занятия IELTS — 12 000 тг за занятие.\n\nПробный урок бесплатный. Если хотите, могу записать вас: напишите имя и возраст ученика.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "IELTS индивидуальные занятия цена взрослый"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9745,
+      "completion_tokens": 71,
+      "cached_tokens": 9344,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3376,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 183,
+     "t": 329.3,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "mentions:12000": true,
+      "numbers_grounded": true,
+      "lang_ru": true,
+      "no_markdown": true,
+      "no_closing_offer": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Индивидуальные занятия IELTS — 12 000 тг за занятие.\n\nПробный урок бесплатный. Если хотите, могу передать заявку администратору — он свяжется и подберёт удобное время.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "индивидуальные занятия IELTS взрослый цена"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9745,
+      "completion_tokens": 79,
+      "cached_tokens": 9344,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3499,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 198,
+     "t": 351.2,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "mentions:12000": true,
+      "numbers_grounded": true,
+      "lang_ru": true,
+      "no_markdown": true,
+      "no_closing_offer": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Индивидуальные занятия IELTS — 12 000 тг за занятие.\n\nПробный урок бесплатный. Если хотите, могу передать заявку администратору — он свяжется и подскажет время.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "индивидуальные занятия IELTS взрослый цена"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9745,
+      "completion_tokens": 77,
+      "cached_tokens": 9216,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3315,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 263,
+     "t": 468.2,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    }
+   ]
+  },
+  {
+   "id": "pl_spark_plugs_auto_parts",
+   "vertical": "auto_parts",
+   "mode": "auto",
+   "lang": "ru",
+   "tags": [
+    "price_list",
+    "key"
+   ],
+   "repeats": 8,
+   "pass_rate": 0.625,
+   "runs": [
+    {
+     "verdicts": {
+      "mentions:4200": true,
+      "numbers_grounded": false,
+      "lang_ru": true,
+      "no_markdown": true,
+      "no_closing_offer": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Да, есть.\n\nСвечи зажигания Denso SK20R11\n4200 тг/шт",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "свечи зажигания Toyota Camry 2019"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 10294,
+      "completion_tokens": 60,
+      "cached_tokens": 7552,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2969,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 9,
+     "t": 14.4,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "mentions:4200": true,
+      "numbers_grounded": true,
+      "lang_ru": true,
+      "no_markdown": true,
+      "no_closing_offer": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Свечи зажигания есть.\n\nDenso SK20R11 — 4200 тг/шт.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "свечи зажигания Toyota Camry 2019"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 10294,
+      "completion_tokens": 60,
+      "cached_tokens": 10112,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 4225,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 72,
+     "t": 132.3,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "mentions:4200": true,
+      "numbers_grounded": true,
+      "lang_ru": true,
+      "no_markdown": true,
+      "no_closing_offer": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Свечи зажигания есть.\nDenso SK20R11 — 4200 тг/шт.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "свечи зажигания Toyota Camry 2019"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 10294,
+      "completion_tokens": 60,
+      "cached_tokens": 10112,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3051,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 89,
+     "t": 161.5,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "mentions:4200": true,
+      "numbers_grounded": true,
+      "lang_ru": true,
+      "no_markdown": true,
+      "no_closing_offer": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Свечи зажигания есть.\n\nDenso SK20R11 — 4200 тг/шт.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "свечи зажигания Toyota Camry 2019"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 10294,
+      "completion_tokens": 60,
+      "cached_tokens": 10112,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3100,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 104,
+     "t": 185.5,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "mentions:4200": true,
+      "numbers_grounded": true,
+      "lang_ru": true,
+      "no_markdown": true,
+      "no_closing_offer": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Свечи зажигания есть.\n\nDenso SK20R11 — 4200 тг/шт.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "свечи зажигания Toyota Camry 2019"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 10294,
+      "completion_tokens": 60,
+      "cached_tokens": 10112,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3136,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 169,
+     "t": 307.6,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "mentions:4200": true,
+      "numbers_grounded": false,
+      "lang_ru": true,
+      "no_markdown": true,
+      "no_closing_offer": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Да, есть.\n\nСвечи зажигания Denso SK20R11\n4200 тг/шт",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "свечи зажигания Toyota Camry 2019"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 10294,
+      "completion_tokens": 60,
+      "cached_tokens": 10112,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2890,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 184,
+     "t": 330.1,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "mentions:4200": true,
+      "numbers_grounded": true,
+      "lang_ru": true,
+      "no_markdown": true,
+      "no_closing_offer": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Свечи зажигания есть.\nDenso SK20R11 — 4200 тг/шт\n\nТочное наличие подтвердит менеджер.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "свечи зажигания Toyota Camry 2019 цена наличие"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 10296,
+      "completion_tokens": 70,
+      "cached_tokens": 9984,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3287,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 201,
+     "t": 357.6,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "mentions:4200": true,
+      "numbers_grounded": false,
+      "lang_ru": true,
+      "no_markdown": true,
+      "no_closing_offer": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Да, есть.\n\nСвечи зажигания Denso SK20R11\n4200 тг/шт",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "свечи зажигания Toyota Camry 2019"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 10294,
+      "completion_tokens": 60,
+      "cached_tokens": 9984,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3010,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 264,
+     "t": 470.4,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    }
+   ]
+  },
+  {
+   "id": "pl_empty_plain_flowers",
+   "vertical": "flowers",
+   "mode": "auto",
+   "lang": "ru",
+   "tags": [
+    "price_list",
+    "key"
+   ],
+   "repeats": 8,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "mentions:18500": true,
+      "numbers_grounded": true,
+      "lang_ru": true,
+      "no_markdown": true,
+      "no_closing_offer": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Букет «Нежность» — 18 500 ₸.\nСостав может немного отличаться, замену флорист согласует с вами.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "букет «Нежность» цена"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9511,
+      "completion_tokens": 63,
+      "cached_tokens": 9216,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3010,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 10,
+     "t": 16.6,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "mentions:18500": true,
+      "numbers_grounded": true,
+      "lang_ru": true,
+      "no_markdown": true,
+      "no_closing_offer": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Букет «Нежность» — 18 500 ₸.\nСостав может немного отличаться, замену флорист согласует с вами.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "букет «Нежность» цена"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9511,
+      "completion_tokens": 63,
+      "cached_tokens": 9216,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3672,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 75,
+     "t": 138.0,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "mentions:18500": true,
+      "numbers_grounded": true,
+      "lang_ru": true,
+      "no_markdown": true,
+      "no_closing_offer": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Букет «Нежность» — 18 500 ₸.\nСостав может немного отличаться, замену флорист согласует с вами.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "букет «Нежность» цена"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9511,
+      "completion_tokens": 63,
+      "cached_tokens": 9344,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3209,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 90,
+     "t": 163.2,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "mentions:18500": true,
+      "numbers_grounded": true,
+      "lang_ru": true,
+      "no_markdown": true,
+      "no_closing_offer": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Букет «Нежность» — 18 500 ₸.\nСостав может немного отличаться, замену флорист согласует с вами.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "букет «Нежность» цена"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9511,
+      "completion_tokens": 63,
+      "cached_tokens": 4736,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2915,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 107,
+     "t": 189.7,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "mentions:18500": true,
+      "numbers_grounded": true,
+      "lang_ru": true,
+      "no_markdown": true,
+      "no_closing_offer": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Букет «Нежность» — 18 500 ₸\n15 роз. Наличие подтвердит флорист при оформлении.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "букет «Нежность» цена"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9511,
+      "completion_tokens": 60,
+      "cached_tokens": 9344,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3083,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 170,
+     "t": 307.6,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "mentions:18500": true,
+      "numbers_grounded": true,
+      "lang_ru": true,
+      "no_markdown": true,
+      "no_closing_offer": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Букет «Нежность» — 18 500 ₸.\nСостав может немного отличаться, замену флорист согласует с вами.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "букет «Нежность» цена"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9511,
+      "completion_tokens": 63,
+      "cached_tokens": 9344,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2904,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 187,
+     "t": 336.1,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "mentions:18500": true,
+      "numbers_grounded": true,
+      "lang_ru": true,
+      "no_markdown": true,
+      "no_closing_offer": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Букет «Нежность» — 18 500 ₸.\nСостав может немного отличаться, замену флорист согласует с вами.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "букет «Нежность» цена"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9511,
+      "completion_tokens": 63,
+      "cached_tokens": 9344,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2818,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 202,
+     "t": 357.7,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "mentions:18500": true,
+      "numbers_grounded": true,
+      "lang_ru": true,
+      "no_markdown": true,
+      "no_closing_offer": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Букет «Нежность» — 18 500 ₸.\nСостав может немного отличаться, замену флорист согласует с вами.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "букет «Нежность» цена"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9511,
+      "completion_tokens": 63,
+      "cached_tokens": 9344,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2866,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 267,
+     "t": 475.1,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    }
+   ]
+  },
+  {
+   "id": "pl_empty_memory_flowers",
+   "vertical": "flowers",
+   "mode": "auto",
+   "lang": "ru",
+   "tags": [
+    "price_list",
+    "memory",
+    "key"
+   ],
+   "repeats": 8,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "mentions:18500": true,
+      "numbers_grounded": true,
+      "lang_ru": true,
+      "no_markdown": true,
+      "no_closing_offer": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Букет «Нежность» — 18 500 ₸\n\nСостав может немного отличаться, замену флорист согласует с вами.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "букет «Нежность» цена"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9627,
+      "completion_tokens": 63,
+      "cached_tokens": 9472,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3114,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 13,
+     "t": 20.3,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "mentions:18500": true,
+      "numbers_grounded": true,
+      "lang_ru": true,
+      "no_markdown": true,
+      "no_closing_offer": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Букет «Нежность» — 18 500 ₸\n\nСостав может немного отличаться, замену флорист согласует с вами.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "букет «Нежность» цена"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9627,
+      "completion_tokens": 63,
+      "cached_tokens": 9472,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2916,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 76,
+     "t": 139.3,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "mentions:18500": true,
+      "numbers_grounded": true,
+      "lang_ru": true,
+      "no_markdown": true,
+      "no_closing_offer": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Букет «Нежность» — 18 500 ₸\n\nСостав может немного отличаться, замену флорист согласует с вами.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "букет «Нежность» цена"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9627,
+      "completion_tokens": 63,
+      "cached_tokens": 7296,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3053,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 93,
+     "t": 167.7,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "mentions:18500": true,
+      "numbers_grounded": true,
+      "lang_ru": true,
+      "no_markdown": true,
+      "no_closing_offer": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Букет «Нежность» — 18 500 ₸.\n\nСостав может немного отличаться, замену флорист согласует с вами.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "букет «Нежность» цена"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9627,
+      "completion_tokens": 63,
+      "cached_tokens": 9472,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3157,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 108,
+     "t": 191.4,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "mentions:18500": true,
+      "numbers_grounded": true,
+      "lang_ru": true,
+      "no_markdown": true,
+      "no_closing_offer": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Букет «Нежность» — 18 500 ₸\n\nСостав может немного отличаться, замену флорист согласует с вами.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "букет «Нежность» цена"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9627,
+      "completion_tokens": 63,
+      "cached_tokens": 9472,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3164,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 173,
+     "t": 313.4,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "mentions:18500": true,
+      "numbers_grounded": true,
+      "lang_ru": true,
+      "no_markdown": true,
+      "no_closing_offer": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Букет «Нежность» — 18 500 ₸\n\nСостав может немного отличаться, замену флорист согласует с вами.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "букет «Нежность» цена"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9627,
+      "completion_tokens": 63,
+      "cached_tokens": 9472,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3126,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 188,
+     "t": 336.1,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "mentions:18500": true,
+      "numbers_grounded": true,
+      "lang_ru": true,
+      "no_markdown": true,
+      "no_closing_offer": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Букет «Нежность» — 18 500 ₸\n\nНаличие подтвердит флорист при оформлении.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "букет «Нежность» цена"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9627,
+      "completion_tokens": 57,
+      "cached_tokens": 9472,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2816,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 205,
+     "t": 363.4,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "mentions:18500": true,
+      "numbers_grounded": true,
+      "lang_ru": true,
+      "no_markdown": true,
+      "no_closing_offer": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Букет «Нежность» — 18 500 ₸\n\nСостав может немного отличаться, замену флорист согласует с вами.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "букет «Нежность» цена"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9627,
+      "completion_tokens": 63,
+      "cached_tokens": 9472,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3106,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 268,
+     "t": 477.3,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    }
+   ]
+  },
+  {
+   "id": "pl_empty_reask_flowers",
+   "vertical": "flowers",
+   "mode": "auto",
+   "lang": "ru",
+   "tags": [
+    "price_list",
+    "memory",
+    "key"
+   ],
+   "repeats": 8,
+   "pass_rate": 0.875,
+   "runs": [
+    {
+     "verdicts": {
+      "mentions:18500": true,
+      "mentions:18:00": false,
+      "numbers_grounded": true,
+      "lang_ru": true,
+      "no_markdown": true,
+      "no_closing_offer": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Букет «Нежность» — 18 500 ₸\n\nПо времени в пятницу: точное время доставки подтвердит флорист.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "букет Нежность цена"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9655,
+      "completion_tokens": 60,
+      "cached_tokens": 9472,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3502,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 14,
+     "t": 23.0,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "mentions:18500": true,
+      "mentions:18:00": true,
+      "numbers_grounded": true,
+      "lang_ru": true,
+      "no_markdown": true,
+      "no_closing_offer": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Букет «Нежность» — 18 500 ₸\n\nПо времени в пятницу: вы просили к 18:00, точное время доставки флорист подтвердит при оформлении.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "букет Нежность цена"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9655,
+      "completion_tokens": 72,
+      "cached_tokens": 9472,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3260,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 79,
+     "t": 144.7,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "mentions:18500": true,
+      "mentions:18:00": true,
+      "numbers_grounded": true,
+      "lang_ru": true,
+      "no_markdown": true,
+      "no_closing_offer": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Букет «Нежность» — 18 500 ₸\n\nПо времени в пятницу: вы просили к 18:00, точное время доставки флорист подтвердит при оформлении.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "букет Нежность цена"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9655,
+      "completion_tokens": 72,
+      "cached_tokens": 9472,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3385,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 94,
+     "t": 169.7,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "mentions:18500": true,
+      "mentions:18:00": true,
+      "numbers_grounded": true,
+      "lang_ru": true,
+      "no_markdown": true,
+      "no_closing_offer": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Букет «Нежность» — 18 500 ₸.\n\nПо времени в пятницу у вас было указано к 18:00, точное время доставки флорист подтвердит.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "букет Нежность цена"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9655,
+      "completion_tokens": 70,
+      "cached_tokens": 9472,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2933,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 111,
+     "t": 195.9,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "mentions:18500": true,
+      "mentions:18:00": true,
+      "numbers_grounded": true,
+      "lang_ru": true,
+      "no_markdown": true,
+      "no_closing_offer": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Букет «Нежность» — 18 500 ₸.\n\nПо времени: пятницу к 18:00 уже зафиксировали, точное время доставки флорист подтвердит.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "букет Нежность цена"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9655,
+      "completion_tokens": 69,
+      "cached_tokens": 9472,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3163,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 174,
+     "t": 313.7,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "mentions:18500": true,
+      "mentions:18:00": true,
+      "numbers_grounded": true,
+      "lang_ru": true,
+      "no_markdown": true,
+      "no_closing_offer": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Букет «Нежность» — 18 500 ₸\n\nПо времени в пятницу: к 18:00, как вы и просили. Точное время доставки флорист подтвердит при оформлении.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "букет Нежность цена"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9655,
+      "completion_tokens": 75,
+      "cached_tokens": 9472,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2900,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 191,
+     "t": 341.7,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "mentions:18500": true,
+      "mentions:18:00": true,
+      "numbers_grounded": true,
+      "lang_ru": true,
+      "no_markdown": true,
+      "no_closing_offer": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Букет «Нежность» — 18 500 ₸\n\nПо времени в пятницу было указано к 18:00, точное время доставки флорист подтвердит отдельно.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "букет Нежность цена"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9655,
+      "completion_tokens": 69,
+      "cached_tokens": 9472,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2974,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 206,
+     "t": 363.6,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "mentions:18500": true,
+      "mentions:18:00": true,
+      "numbers_grounded": true,
+      "lang_ru": true,
+      "no_markdown": true,
+      "no_closing_offer": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Букет «Нежность» — 18 500 ₸\n\nПо времени в пятницу: вы просили к 18:00, точное время доставки флорист подтвердит при оформлении.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "букет Нежность цена"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9655,
+      "completion_tokens": 72,
+      "cached_tokens": 9472,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2840,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 271,
+     "t": 481.1,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    }
+   ]
+  }
+ ]
+}

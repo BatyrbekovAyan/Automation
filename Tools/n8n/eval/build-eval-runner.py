@@ -20,6 +20,16 @@ auth = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(auth)
 WF_ID, WF_NAME = "stgEvalRunner001", "STAGING Eval Runner"
 OPENAI_CRED = {"id": "WNHwKWlO2E9OClkA", "name": "OpenAi account"}   # remapped by name on staging
+# h11 (2026-10-29): the request headers a run may ask the proxy to add — ONLY the client-identity headers the bot's own call
+# carries: the one n8n's lmChatOpenAi adds (AiConfig.openAiDefaultHeaders) and the ones @langchain/openai's SDK client sends
+# (user agent «langchainjs-openai/…», x-stainless-*, accept-language, sec-fetch-mode — capture-langchain-request.js), so a
+# measurement can send the bot's request with the bot's transport too. Never a credential: anything else in `headers` is
+# dropped; no `headers` (every earlier run) = the request exactly as before.
+FORWARDED_HEADERS = ["openai-platform", "user-agent", "accept-language", "sec-fetch-mode", "x-stainless-arch", "x-stainless-lang",
+                     "x-stainless-os", "x-stainless-package-version", "x-stainless-retry-count", "x-stainless-runtime",
+                     "x-stainless-runtime-version"]
+JSON_HEADERS = ("={{ JSON.stringify(Object.fromEntries(Object.entries($json.body.headers || {})"
+                ".filter(([k, v]) => " + json.dumps(FORWARDED_HEADERS) + ".includes(String(k).toLowerCase()) && typeof v === 'string'))) }}")
 
 
 def nid(*p):
@@ -32,6 +42,7 @@ def main():
     n.append({"parameters": {"method": "POST", "url": "https://api.openai.com/v1/chat/completions", "authentication": "predefinedCredentialType",
                              "nodeCredentialType": "openAiApi", "sendBody": True, "specifyBody": "json",
                              "jsonBody": "={{ JSON.stringify($json.body.request || {}) }}",
+                             "sendHeaders": True, "specifyHeaders": "json", "jsonHeaders": JSON_HEADERS,
                              "options": {"timeout": 90000, "response": {"response": {"fullResponse": True, "neverError": True, "responseFormat": "json"}}}},
               "id": nid("forward"), "name": "Forward", "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [260, 200],
               "credentials": {"openAiApi": dict(OPENAI_CRED)}, "alwaysOutputData": True, "onError": "continueRegularOutput"})
