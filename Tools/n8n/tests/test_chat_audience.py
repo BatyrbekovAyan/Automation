@@ -54,7 +54,9 @@ network, never production. Every scenario runs for a WhatsApp and a Telegram pro
       rows ARE this chat — backfilled under the number, the fresh client message replayed with chatId = from = the number and
       whatsapp_chat_id = the code; without the code (no card, a failed or crossed card, a LID that is no code) the rows stay
       another chat's and nothing is written or replayed; a row under a third id still voids the page; a chat known only by
-      its code asks no card
+      its code asks no card; a card read that throws OUTSIDE its runner hands its input on — no code, the code rows stay
+      another chat's, a replay carries no code; one set mixing a chat known by its code and one known by its number — each
+      run of Chat Code, Recent Messages and Replay Plan pairs with its own chat
   V   verify-personal-chats.py --only webhook passes the canon and fails scratch copies that break the webhook
 
     python3 Tools/n8n/tests/test_chat_audience.py
@@ -108,14 +110,15 @@ def gen():
 
 # ---------------------------------------------------------------------------------------------------- the walker
 # n8n's engine and the graph walker are shared with tests/test_decide_audience.py: tests/graph_walk.py.
-def walk(pg, body, token, env=None, fake=None, workflow=None, faults=None):
+def walk(pg, body, token, env=None, fake=None, workflow=None, faults=None, throws=None):
     """One POST /webhook/ChatAudience through the graph of `workflow` (default: the canon), n8n executionOrder v1 —
-    graph_walk.walk_graph from the Webhook node with the request n8n builds for this body and token."""
+    graph_walk.walk_graph from the Webhook node with the request n8n builds for this body and token; `throws` = the nodes
+    that throw OUTSIDE their runner (graph_walk.step_throw)."""
     headers = {'content-type': 'application/json', **({'authorization': f'Bearer {token}'} if token else {})}
     wh = {'headers': headers, 'params': {}, 'query': {}, 'body': body,
           'webhookUrl': 'http://localhost:5678/webhook/ChatAudience', 'executionMode': 'production'}
     return walk_graph(pg, workflow or canon(), 'Webhook', webhook=wh, fake=fake or Fake(), env=env or CLOSED,
-                      faults=faults or {})
+                      faults=faults or {}, throws=throws or {})
 
 
 # ---------------------------------------------------------------------------------------------------- Wappi + the bot
@@ -939,6 +942,57 @@ with Case('G21 wa_lid_chat_asks_no_card: a chat known only by its code (its id e
         c.check([h['message_id'] for h in history(pg, P, code)] == ['c-first'] and len(fake.replays) == 1
                 and sent.get('chatId') == code and sent.get('from') == code and sent.get('whatsapp_chat_id') == '',
                 f'{history(pg, P, code)} {[rp["body"] for rp in fake.replays]}')
+
+with Case('G21 wa_lid_card_throws_outside_its_runner: Chat Card throws OUTSIDE its runner (credentials, connection setup) — '
+          'it continues on error, so it hands its INPUT on and Chat Code takes no code off it: the chat whose rows carry the '
+          'code stays another chat\'s (nothing backfilled, nothing replayed), the set\'s other chat — rows under its number, a '
+          'fresh client message — is replayed with whatsapp_chat_id \'\', never a code; the run goes on to its end') as c:
+    code, code2 = '100000000000555@lid', '100000000000556@lid'
+    with Session(SETUP) as pg:
+        profile(pg, P, C['channel'])
+        fake = Fake(pages={(P, C['chat']): lid_page(C['chat'], code),
+                           (P, C['chat2']): [wa_row(C['chat2'], 'n-trig', False, 'есть пионы?', 120),
+                                             wa_row(C['chat2'], 'n-first', False, 'здравствуйте', 900)]},
+                    dialogs={P: [wa_dialog(C['chat'], lid=code), wa_dialog(C['chat2'], lid=code2)]})
+        r = call(pg, set_body(P, (C['chat'], 'business', 4), (C['chat2'], 'business', 4)), [P], fake=fake,
+                 throws={'Chat Card': 'Credentials could not be decrypted'})
+        took = [(o['json']['chat_id'], o['json']['chat_lid']) for o in (r.outputs.get('Chat Code') or [[]])[0]]
+        c.check(answer(r)[0] == 200 and r.halt is None and ('throw', 'Chat Card') in r.events
+                and not any(x['node'] == 'Chat Card' for x in r.calls) and took == [(C['chat'], ''), (C['chat2'], '')],
+                f'the input passed on, no code taken: {took} halt={r.halt} {r.trail[-8:]}')
+        c.check(history(pg, P, C['chat']) == [] and memory(pg, P, C['chat']) == [] and history(pg, P, code) == []
+                and memory(pg, P, code) == [] and decision(pg, P, C['chat'])['kind'] == 'business',
+                f'the code rows stay another chat\'s: {history(pg, P, C["chat"])} {history(pg, P, code)}')
+        sent = [rp['body']['messages'][0] for rp in fake.replays]
+        c.check([(m['chatId'], m['from'], m['id'], m.get('whatsapp_chat_id')) for m in sent] == [(C['chat2'], C['chat2'], 'n-trig', '')]
+                and [h['message_id'] for h in history(pg, P, C['chat2'])] == ['n-first'],
+                f'one replay — the number chat\'s, without a code: {sent} {history(pg, P, C["chat2"])}')
+
+with Case('G21 wa_mixed_set_pairs_each_chat: one set turns business a chat known only by its code AND a chat known by its '
+          'number whose rows carry the code its card names — they reach Chat Code by two paths (Need Card? false / Chat '
+          'Card), so Chat Code, Recent Messages and Replay Plan each run twice, and every run pairs with its OWN chat: its own '
+          'read, its own backfill, its own replay (the number chat\'s with its card\'s code, the code chat\'s with \'\')') as c:
+    num_code, only = '100000000000555@lid', '100000000000444@lid'
+    with Session(SETUP) as pg:
+        profile(pg, P, C['channel'])
+        fake = Fake(pages={(P, C['chat']): lid_page(C['chat'], num_code),
+                           (P, only): [wa_lid_row(only, only, 'o-trig', False, 'добрый день', 60),
+                                       wa_lid_row(only, only, 'o-first', False, 'алло', 300)]},
+                    dialogs={P: [wa_dialog(C['chat'], lid=num_code), wa_dialog(only, lid=only)]})
+        # the code chat first in the set: Chat Channel's FIRST item is not the number chat, whose run goes first
+        r = call(pg, set_body(P, (only, 'business', 4), (C['chat'], 'business', 4)), [P], fake=fake)
+        cards = [x['query'] for x in r.calls if x['node'] == 'Chat Card']
+        reads = sorted(x['query']['chat_id'] for x in r.calls if x['node'] == 'Recent Messages')
+        c.check(answer(r)[0] == 200 and r.halt is None and cards == [{'profile_id': P, 'client_name': C['chat'].split('@')[0]}]
+                and reads == sorted([C['chat'], only]) and r.trail.count('Chat Code') == 2 and r.trail.count('Replay Plan') == 2,
+                f'one card (the number chat\'s), one read per chat: {cards} {reads} {r.trail[-14:]}')
+        sent = {rp['body']['messages'][0]['chatId']: rp['body']['messages'][0] for rp in fake.replays}
+        mine = {k: (m.get('from'), m.get('id'), m.get('whatsapp_chat_id')) for k, m in sent.items()}
+        c.check(len(fake.replays) == 2 and mine == {C['chat']: (C['chat'], 'l-trig', num_code), only: (only, 'o-trig', '')},
+                f'each replay its own chat: {mine}')
+        c.check([h['message_id'] for h in history(pg, P, C['chat'])] == ['l-old', 'l-first', 'l-own']
+                and [h['message_id'] for h in history(pg, P, only)] == ['o-first'] and history(pg, P, num_code) == [],
+                f'each backfill under its own chat: {history(pg, P, C["chat"])} / {history(pg, P, only)}')
 
 
 # ================================================================================================ G19: numbers

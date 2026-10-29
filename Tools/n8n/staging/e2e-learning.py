@@ -180,7 +180,8 @@ def set_not_recorded(ctx):
     st, d, _ = call(owner, body)
     time.sleep(2)
     n = psql(f"select count(*) from suggestion_sets where profile_id = '{pid}';")
-    ok = (d or {}).get("error") and n == "0"
+    # the refusal the scenario is named for — the subscription's (any error would also pass for a chat that is not business)
+    ok = (d or {}).get("error") == "subscription" and n == "0"
     return ok, f"http={st} error={(d or {}).get('error')!r} sets={n}"
 
 

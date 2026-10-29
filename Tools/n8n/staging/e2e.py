@@ -164,7 +164,8 @@ def post_event(profile_id, event):
     return http("POST", f"{BASE}/webhook/{profile_id}", event, timeout=30)
 
 
-def run_bot_scenario(ctx, name, history, trigger, post_times=1, expect_sends=1, wait_s=120, extra_history_after_post=None, suppressed=False):
+def run_bot_scenario(ctx, name, history, trigger, post_times=1, expect_sends=1, wait_s=120, extra_history_after_post=None, suppressed=False,
+                     expect_outcome=None):
     wf_id = workflow_id_by_name(f"STAGING WA {WA_PROFILE}")
     if not wf_id:
         return False, "staging WA bot not imported"
@@ -189,12 +190,15 @@ def run_bot_scenario(ctx, name, history, trigger, post_times=1, expect_sends=1, 
             mock("POST", "/__mock/incoming", {"profile_id": WA_PROFILE, "chat_id": chat, "message": dict(h, chatId=chat)})
     rows = wait_executions_settle(wf_id, since_exec, post_times, wait_s)
     sends, _ = send_calls(since_calls)
-    lasts = []
+    lasts, outcomes = [], []
     for r in rows:
         d = execution(r["id"])
         lasts.append(((d.get("data") or {}).get("resultData", {}).get("lastNodeExecuted"), d.get("status")))
-    ok = len(sends) == expect_sends
-    return ok, f"sends={len(sends)} (expected {expect_sends}); executions={[(r['id'], l) for r, l in zip(rows, lasts)]}; webhook={[s for s, _ in results]}"
+        outcomes.append((node_output(d, "Outcome") or {}).get("outcome"))
+    # a scenario named for one branch also says which: the Outcome stamp of every run (no send alone could be any refusal)
+    ok = len(sends) == expect_sends and (expect_outcome is None or (bool(rows) and all(o == expect_outcome for o in outcomes)))
+    return ok, (f"sends={len(sends)} (expected {expect_sends}); outcomes={outcomes}{f' (expected {expect_outcome})' if expect_outcome else ''}; "
+                f"executions={[(r['id'], l) for r, l in zip(rows, lasts)]}; webhook={[s for s, _ in results]}")
 
 
 SCENARIOS = []
@@ -223,16 +227,23 @@ def sr_no_identity(ctx):
 
 @scenario("sr_unknown_identity_refused", "SuggestReplies with an unknown appUserId → refusal, LLM never runs")
 def sr_unknown(ctx):
+    # the gate names a chat that is not business BEFORE the account: the request asks in a business chat of this run's own
+    # profile, so the refusal is the account's — unknown_account on Gate Decision, the opaque envelope on the wire
+    ctx.identity()                      # the run's fixture identity: its cleanup removes the chat's decision too
+    pid = f"sru-{ctx.run_id}"
+    business_chat(pid, "probe@c.us")
+    ctx.profiles.append(pid)
     since = max([int(e["id"]) for e in latest_executions("9PTyYcelRQI7bGDb", 0, 50)] or [0])
-    payload = {"v": 1, "requestSeq": 1, "profileId": "p", "chatId": "probe@c.us", "botWaId": "-1", "botTgId": "-1",
+    payload = {"v": 1, "requestSeq": 1, "profileId": pid, "chatId": "probe@c.us", "botWaId": "-1", "botTgId": "-1",
                "channel": "whatsapp", "businessTypeId": "flowers", "businessName": "Цветы", "catalog": "• Букет — 1000 тг",
                "appUserId": f"probe-unknown-{ctx.run_id}",
                "messages": [{"role": "client", "text": "сколько стоит букет?", "ts": 1}]}
     st, body = http("POST", f"{BASE}/webhook/SuggestReplies", payload)
     rows = wait_executions_settle("9PTyYcelRQI7bGDb", since, 1, 30)
     d = execution(rows[-1]["id"]) if rows else {}
-    ok = st == 200 and body.get("error") == "generation_failed" and rows and not ran(d, "LLM")
-    return ok, f"http={st} body={body} gate={(node_output(d, 'Gate Decision') or {}).get('gateReason') if rows else 'n/a'}"
+    gate = (node_output(d, "Gate Decision") or {}).get("gateReason") if rows else None
+    ok = st == 200 and body.get("error") == "generation_failed" and bool(rows) and not ran(d, "LLM") and gate == "unknown_account"
+    return ok, f"http={st} body={body} gate={gate}"
 
 
 @scenario("sr_identity_gets_cards", "SuggestReplies with a fixture subscriber → 1–4 cards (real LLM call)")
@@ -286,7 +297,8 @@ def bot_human(ctx):
     t = int(time.time())
     return run_bot_scenario(ctx, "human", [{"id": f"h-{ctx.run_id}", "body": "Вы работаете?", "time": t, "fromMe": False, "type": "chat"}],
                             {"id": f"h-{ctx.run_id}", "body": "Вы работаете?", "time": t}, post_times=1, expect_sends=0,
-                            extra_history_after_post=[{"id": f"own-{ctx.run_id}", "body": "Да, до 20:00", "time": t + 1, "fromMe": True, "type": "chat", "from": "me"}])
+                            extra_history_after_post=[{"id": f"own-{ctx.run_id}", "body": "Да, до 20:00", "time": t + 1, "fromMe": True, "type": "chat", "from": "me"}],
+                            expect_outcome="superseded")         # Latest+Combine saw the owner's row: Is Latest? false
 
 
 @scenario("bot_newer_incoming_supersedes", "a newer client message inside the window → the old fragment does not send by itself")
@@ -296,7 +308,8 @@ def bot_newer(ctx):
     # fragment's own webhook, which would send, is deliberately not posted here.)
     return run_bot_scenario(ctx, "newer", [{"id": f"n1-{ctx.run_id}", "body": "Привет", "time": t, "fromMe": False, "type": "chat"}],
                             {"id": f"n1-{ctx.run_id}", "body": "Привет", "time": t}, post_times=1, expect_sends=0,
-                            extra_history_after_post=[{"id": f"n2-{ctx.run_id}", "body": "Сколько стоит?", "time": t + 1, "fromMe": False, "type": "chat"}])
+                            extra_history_after_post=[{"id": f"n2-{ctx.run_id}", "body": "Сколько стоит?", "time": t + 1, "fromMe": False, "type": "chat"}],
+                            expect_outcome="superseded")
 
 
 @scenario("bot_callback_profile_mismatch_filtered", "a callback naming ANOTHER profile than the registered webhook → filtered, no gate read, no send (A1 binding)")
@@ -320,7 +333,8 @@ def bot_callback_binding(ctx):
 def bot_suppressed(ctx):
     t = int(time.time())
     return run_bot_scenario(ctx, "suppressed", [{"id": f"s-{ctx.run_id}", "body": "Цена?", "time": t, "fromMe": False, "type": "chat"}],
-                            {"id": f"s-{ctx.run_id}", "body": "Цена?", "time": t}, post_times=1, expect_sends=0, wait_s=30, suppressed=True)
+                            {"id": f"s-{ctx.run_id}", "body": "Цена?", "time": t}, post_times=1, expect_sends=0, wait_s=30, suppressed=True,
+                            expect_outcome="suppressed")
 
 
 def main():

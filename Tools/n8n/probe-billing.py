@@ -283,11 +283,15 @@ at VALUE level, running the EXACT Count Dialog statement read out of the canonic
 template against real rows through the Part 7 SQL harness. Includes a genuine
 lock-contention race (two new chats, one reserve unit) that the balance must survive at 0.
 
-## Part 9 -- «Вместе» suggestions gate (Task 17a, opt-in)
+## Part 9 -- «Вместе» suggestions gate (Task 17a, opt-in, staging only)
 
 Run with `--suggestions`. Fires the real /webhook/SuggestReplies endpoint: expired/unknown/
 missing-id refusals (zero LLM spend -- the gate sits before retrieval), trialing and
-over-quota allowed, dialog_counts provably untouched, and the daily cap.
+over-quota allowed, dialog_counts provably untouched, and the daily cap. Staging only
+(2026-10-29): the panel answers only in a business chat, so the probe first makes its
+chat one by a direct chat_audience row -- on production a chat becomes business only
+through the ChatAudience webhook, by its owner's decision, and the probe's profile has no
+owner. It refuses when N8N_BASE_URL or TASK16_SQL_URL names choosereply.com.
 
 ## Part 11 -- app-delete slot retire (Task 20, opt-in)
 
@@ -1937,10 +1941,21 @@ SUGGESTION_DAILY_CAP = 100
 SUGGEST_PROFILE, SUGGEST_CHAT = "probe17a-profile", "probe17a@c.us"
 
 
+def suggestions_prod_refusal():
+    """Part 9 is staging only: the reason it refuses, or None when neither N8N_BASE_URL nor TASK16_SQL_URL names
+    choosereply.com."""
+    if "choosereply.com" not in (BASE + " " + TASK16_SQL_URL).lower():
+        return None
+    return ("REFUSED: --suggestions is staging only. The panel answers only in a business chat, so this probe makes its chat one "
+            "with a direct chat_audience row; on production a chat becomes business only through the ChatAudience webhook, by "
+            "its owner's decision -- and the probe's profile has no owner. Point N8N_BASE_URL and TASK16_SQL_URL at the staging "
+            "stand.")
+
+
 def suggestions_business_chat_sql():
     """«Личные и рабочие чаты» (2026-10-25): the panel answers — and the gate counts — only in a BUSINESS chat, and names a
     chat that is not one before any account reason. The probe's chat is made one the owner's way (an owner decision always
-    holds); reserve_cleanup_sql removes it."""
+    holds) — staging only (suggestions_prod_refusal); reserve_cleanup_sql removes it."""
     return (f"insert into chat_audience (profile_id, chat_id, kind, source, reason, version) values "
             f"({_lit(SUGGEST_PROFILE)}, {_lit(SUGGEST_CHAT)}, 'business', 'owner', 'owner', 1) "
             f"on conflict (profile_id, chat_id) do update set kind = 'business', source = 'owner', reason = 'owner';")
@@ -2005,6 +2020,10 @@ def suggestions_seed_sql(uid, status, plan="business"):
 
 
 def run_suggestions_probe():
+    refusal = suggestions_prod_refusal()
+    if refusal:
+        print(refusal)
+        return 2
     if not TASK16_SQL_URL:
         print("=== suggestions gate -- procedure + SQL (set TASK16_SQL_URL to run it) ===\n")
         print("Seed one subscriber per status, then POST /webhook/SuggestReplies with that "
@@ -2042,71 +2061,72 @@ def run_suggestions_probe():
             failures.append(label)
         return body
 
-    # the probe's chat is a business chat: every reason below is the account's (the gate names a non-business chat first)
-    _harness_sql(suggestions_business_chat_sql())
+    try:
+        # the probe's chat is a business chat: every reason below is the account's (the gate names a non-business chat first)
+        _harness_sql(suggestions_business_chat_sql())
 
-    # --- refusals: zero LLM spend, and the CHEAP asserts first
-    _harness_sql(suggestions_seed_sql(RESERVE_PREFIX + "sg_expired", "expired"))
-    check("expired_refused", RESERVE_PREFIX + "sg_expired", True, "subscription_expired")
-    check("unknown_refused", RESERVE_PREFIX + "sg_neverseen", True, "unknown_account")
-    check("missing_id_refused", None, True, "missing_app_user_id")
-    check("empty_id_refused", "", True, "missing_app_user_id")
+        # --- refusals: zero LLM spend, and the CHEAP asserts first
+        _harness_sql(suggestions_seed_sql(RESERVE_PREFIX + "sg_expired", "expired"))
+        check("expired_refused", RESERVE_PREFIX + "sg_expired", True, "subscription_expired")
+        check("unknown_refused", RESERVE_PREFIX + "sg_neverseen", True, "unknown_account")
+        check("missing_id_refused", None, True, "missing_app_user_id")
+        check("empty_id_refused", "", True, "missing_app_user_id")
 
-    # a refused caller must not even get a counter row -- an unauthenticated endpoint must
-    # not let an unknown id grow a table
-    ghost = _scalar("select count(*) from suggestion_counts where app_user_id = "
-                    + _lit(RESERVE_PREFIX + "sg_neverseen"))
-    ok = ghost == 0
-    print(f"[{'OK' if ok else 'FAIL'}] unknown_writes_nothing: suggestion_counts rows for an "
-          f"unknown id = {ghost} (want 0)")
-    if not ok:
-        failures.append("unknown_writes_nothing")
+        # a refused caller must not even get a counter row -- an unauthenticated endpoint must
+        # not let an unknown id grow a table
+        ghost = _scalar("select count(*) from suggestion_counts where app_user_id = "
+                        + _lit(RESERVE_PREFIX + "sg_neverseen"))
+        ok = ghost == 0
+        print(f"[{'OK' if ok else 'FAIL'}] unknown_writes_nothing: suggestion_counts rows for an "
+              f"unknown id = {ghost} (want 0)")
+        if not ok:
+            failures.append("unknown_writes_nothing")
 
-    # --- allowed: trialing, and an OVER-QUOTA account (deliberately allowed -- the panel is
-    # the fallback the quota gate routes people into). These two DO spend LLM tokens.
-    _harness_sql(suggestions_seed_sql(RESERVE_PREFIX + "sg_trialing", "trialing", "trial"))
-    check("trialing_allowed", RESERVE_PREFIX + "sg_trialing", False)
+        # --- allowed: trialing, and an OVER-QUOTA account (deliberately allowed -- the panel is
+        # the fallback the quota gate routes people into). These two DO spend LLM tokens.
+        _harness_sql(suggestions_seed_sql(RESERVE_PREFIX + "sg_trialing", "trialing", "trial"))
+        check("trialing_allowed", RESERVE_PREFIX + "sg_trialing", False)
 
-    over = RESERVE_PREFIX + "sg_overquota"
-    _harness_sql(suggestions_seed_sql(over, "active"))
-    _harness_sql(f"insert into dialog_counts (app_user_id, chat_id, d) select {_lit(over)}, "
-                 f"'c' || g, (now() at time zone 'Asia/Almaty')::date from "
-                 f"generate_series(1, 1200) g on conflict do nothing;")
-    dialogs_before = _scalar(f"select count(*) from dialog_counts where app_user_id = {_lit(over)}")
-    check("over_quota_allowed", over, False)
-    dialogs_after = _scalar(f"select count(*) from dialog_counts where app_user_id = {_lit(over)}")
-    ok = dialogs_after == dialogs_before
-    print(f"[{'OK' if ok else 'FAIL'}] suggestions_are_free: dialog_counts {dialogs_before} -> "
-          f"{dialogs_after} (a suggestion must never consume a dialog)")
-    if not ok:
-        failures.append("suggestions_are_free")
+        over = RESERVE_PREFIX + "sg_overquota"
+        _harness_sql(suggestions_seed_sql(over, "active"))
+        _harness_sql(f"insert into dialog_counts (app_user_id, chat_id, d) select {_lit(over)}, "
+                     f"'c' || g, (now() at time zone 'Asia/Almaty')::date from "
+                     f"generate_series(1, 1200) g on conflict do nothing;")
+        dialogs_before = _scalar(f"select count(*) from dialog_counts where app_user_id = {_lit(over)}")
+        check("over_quota_allowed", over, False)
+        dialogs_after = _scalar(f"select count(*) from dialog_counts where app_user_id = {_lit(over)}")
+        ok = dialogs_after == dialogs_before
+        print(f"[{'OK' if ok else 'FAIL'}] suggestions_are_free: dialog_counts {dialogs_before} -> "
+              f"{dialogs_after} (a suggestion must never consume a dialog)")
+        if not ok:
+            failures.append("suggestions_are_free")
 
-    # --- daily cap: jump the counter to the cap, then walk over the edge. No LLM is spent
-    # on the refused call, which is the whole point of the cap.
-    cap = RESERVE_PREFIX + "sg_cap"
-    _harness_sql(suggestions_seed_sql(cap, "active"))
-    _harness_sql(f"insert into suggestion_counts (app_user_id, d, n) values ({_lit(cap)}, "
-                 f"(now() at time zone 'Asia/Almaty')::date, {SUGGESTION_DAILY_CAP}) "
-                 f"on conflict (app_user_id, d) do update set n = {SUGGESTION_DAILY_CAP};")
-    check(f"request_{SUGGESTION_DAILY_CAP + 1}_refused", cap, True, "daily_cap")
-    n = _scalar(f"select n from suggestion_counts where app_user_id = {_lit(cap)} "
-                f"and d = (now() at time zone 'Asia/Almaty')::date")
-    ok = n == SUGGESTION_DAILY_CAP + 1
-    print(f"[{'OK' if ok else 'FAIL'}] cap_counts_the_refused_request: n = {n} "
-          f"(want {SUGGESTION_DAILY_CAP + 1} -- the counter is incremented in the same "
-          f"statement that decides, so hammering cannot slip between read and write)")
-    if not ok:
-        failures.append("cap_counts_the_refused_request")
-    # one row per (account, day): yesterday's exhaustion must not gate today
-    rows = _scalar(f"select count(*) from suggestion_counts where app_user_id = {_lit(cap)}")
-    ok = rows == 1
-    print(f"[{'OK' if ok else 'FAIL'}] cap_is_per_day: suggestion_counts rows = {rows} (want 1)")
-    if not ok:
-        failures.append("cap_is_per_day")
-
-    print("\n--- cleanup ---")
-    for stmt in reserve_cleanup_sql().split("\n"):
-        _harness_sql(stmt)
+        # --- daily cap: jump the counter to the cap, then walk over the edge. No LLM is spent
+        # on the refused call, which is the whole point of the cap.
+        cap = RESERVE_PREFIX + "sg_cap"
+        _harness_sql(suggestions_seed_sql(cap, "active"))
+        _harness_sql(f"insert into suggestion_counts (app_user_id, d, n) values ({_lit(cap)}, "
+                     f"(now() at time zone 'Asia/Almaty')::date, {SUGGESTION_DAILY_CAP}) "
+                     f"on conflict (app_user_id, d) do update set n = {SUGGESTION_DAILY_CAP};")
+        check(f"request_{SUGGESTION_DAILY_CAP + 1}_refused", cap, True, "daily_cap")
+        n = _scalar(f"select n from suggestion_counts where app_user_id = {_lit(cap)} "
+                    f"and d = (now() at time zone 'Asia/Almaty')::date")
+        ok = n == SUGGESTION_DAILY_CAP + 1
+        print(f"[{'OK' if ok else 'FAIL'}] cap_counts_the_refused_request: n = {n} "
+              f"(want {SUGGESTION_DAILY_CAP + 1} -- the counter is incremented in the same "
+              f"statement that decides, so hammering cannot slip between read and write)")
+        if not ok:
+            failures.append("cap_counts_the_refused_request")
+        # one row per (account, day): yesterday's exhaustion must not gate today
+        rows = _scalar(f"select count(*) from suggestion_counts where app_user_id = {_lit(cap)}")
+        ok = rows == 1
+        print(f"[{'OK' if ok else 'FAIL'}] cap_is_per_day: suggestion_counts rows = {rows} (want 1)")
+        if not ok:
+            failures.append("cap_is_per_day")
+    finally:   # whatever failed above, the probe's rows (and its business chat) go
+        print("\n--- cleanup ---")
+        for stmt in reserve_cleanup_sql().split("\n"):
+            _harness_sql(stmt)
 
     if failures:
         print(f"\n{len(failures)} assertion(s) FAILED: {failures}")
@@ -2660,7 +2680,8 @@ def main():
              "with the existing generation_failed envelope + a diagnostic reason, "
              "trialing and OVER-QUOTA allowed (the panel is the quota fallback), "
              "suggestions never touch dialog_counts, and the daily cap refuses request "
-             "101. Needs TASK16_SQL_URL to seed subscriber rows. See Part 9.")
+             "101. Staging only: it refuses when N8N_BASE_URL or TASK16_SQL_URL names "
+             "choosereply.com. Needs TASK16_SQL_URL to seed subscriber rows. See Part 9.")
     ap.add_argument(
         "--refused-delete", action="store_true",
         help="Run the Task 19 probe: a Create refused for lack of a channel slot must DELETE "

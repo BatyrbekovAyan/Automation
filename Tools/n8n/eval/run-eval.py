@@ -1138,15 +1138,17 @@ def main(argv=None):
                 where = "/".join(x for x in (key[0], side) if x)
                 print(f"{flag:5} {key[1]:36} {rate:.2f}  {(where + '  ') if where else ''}{('failed: ' + ', '.join(failed)) if failed else ''}", flush=True)
 
-    if not skip_panel and any_panel:
-        app_user_id = subprocess.run([sys.executable, os.path.join(N8N, "staging", "fixtures.py"), "create-subscriber", "--run-id", f"eval{int(time.time())}"],
-                                     capture_output=True, text=True, check=True).stdout.strip()
-        # the panel answers only in a business chat (personal chats, 2026-10-25): the eval's chat is one, the owner's way
-        subprocess.run([sys.executable, os.path.join(N8N, "staging", "fixtures.py"), "set-audience", "--profile-id", PANEL_PROFILE,
-                        "--chat-id", PANEL_CHAT, "--kind", "business"], capture_output=True, text=True, check=True)
     ex = ThreadPoolExecutor(max_workers=max(1, a.workers))
-    futures = [ex.submit(run_one, seq, key, rep, side) for seq, (key, rep, side) in enumerate(order)]
+    futures = []
     try:
+        if not skip_panel and any_panel:
+            app_user_id = subprocess.run([sys.executable, os.path.join(N8N, "staging", "fixtures.py"), "create-subscriber", "--run-id", f"eval{int(time.time())}"],
+                                         capture_output=True, text=True, check=True).stdout.strip()
+            # the panel answers only in a business chat (personal chats, 2026-10-25): the eval's chat is one, the owner's way —
+            # inside the try, so a failure here still removes the subscriber just created
+            subprocess.run([sys.executable, os.path.join(N8N, "staging", "fixtures.py"), "set-audience", "--profile-id", PANEL_PROFILE,
+                            "--chat-id", PANEL_CHAT, "--kind", "business"], capture_output=True, text=True, check=True)
+        futures = [ex.submit(run_one, seq, key, rep, side) for seq, (key, rep, side) in enumerate(order)]
         for f in futures:   # in schedule order: the first failure (an exhausted quota) stops the run, nothing is written
             f.result()
     except BaseException:

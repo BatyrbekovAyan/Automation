@@ -293,10 +293,16 @@ def refusals(ctx):
 
 @scenario("legacy_caller_keeps_opaque_error", "S8/N-4: a token-less legacy call (compat window) still gets only generation_failed — no account oracle")
 def legacy_opaque(ctx):
-    st, d = http("POST", f"{BASE}/webhook/SuggestReplies", {"v": 1, "requestSeq": 1, "profileId": "p", "chatId": "c", "botWaId": "-1", "botTgId": "-1", "channel": "whatsapp",
+    # the panel names a chat that is not business before the account: the token-less call asks in a business chat of a real
+    # profile (owner_for), so what refuses is the unknown account — named on Gate Decision, never on this caller's wire
+    _, pid = owner_for(ctx)
+    since = max([int(e["id"]) for e in latest_executions(SUGGEST_WF, 0, 50)] or [0])
+    st, d = http("POST", f"{BASE}/webhook/SuggestReplies", {"v": 1, "requestSeq": 1, "profileId": pid, "chatId": CHAT, "botWaId": "-1", "botTgId": "-1", "channel": "whatsapp",
                                                             "businessTypeId": "flowers", "businessName": "x", "catalog": "", "messages": [m("client", "цена?")], "appUserId": f"probe-nope-{ctx.run_id}"})
-    ok = st in (200, 401) and ((st == 200 and d.get("error") == "generation_failed") or st == 401)
-    return ok, f"http={st} error={(d or {}).get('error') if isinstance(d, dict) else d}"
+    rows = wait_executions_settle(SUGGEST_WF, since, 1, 90) if st == 200 else []
+    gate = (node_output(execution(rows[-1]["id"]), "Gate Decision") or {}).get("gateReason") if rows else None
+    ok = st in (200, 401) and ((st == 200 and d.get("error") == "generation_failed" and gate == "unknown_account") or st == 401)
+    return ok, f"http={st} error={(d or {}).get('error') if isinstance(d, dict) else d} gate={gate}"
 
 
 @scenario("execution_deadline_is_set", "S3: the workflow carries a 20-s server deadline shorter than the client's 22 s")

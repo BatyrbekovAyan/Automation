@@ -35,8 +35,10 @@ import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
+sys.path.insert(1, os.path.dirname(HERE))
 from e2e import (Ctx, execution, http, latest_executions, mock, mock_total, node_output, ran,  # noqa: E402
                  wait_executions_settle, workflow_id_by_name, BASE, MOCK, WA_PROFILE, TG_PROFILE)
+import audience  # noqa: E402  (the rule's own numbers: the first minutes, a waiting message's freshness, the wipe)
 
 
 def _load(name):
@@ -462,7 +464,8 @@ def settle_window(ctx, ch):
     s.post(chat, m1, "Здравствуйте, есть пионы?", t)
     e1 = s.one(60)
     reads1, conn1, dec1, stored1 = fact_reads(s.since_calls, s.pid), connection(s.pid), decision(s.pid, chat), stored(s.pid, chat)
-    psql(f"update audience_connections set connected_at = now() - interval '31 minutes' where profile_id = '{s.pid}';")
+    psql(f"update audience_connections set connected_at = now() - interval '{audience.SETTLE_MINUTES + 1} minutes' "
+         f"where profile_id = '{s.pid}';")
     s.mark()
     s.incoming(chat, [row(ch, chat, m2, False, "А сколько стоят?", t + 2)])
     s.post(chat, m2, "А сколько стоят?", t + 2)
@@ -594,13 +597,13 @@ def lid_rows(ctx):
                 "sends": len(s.sends(chat))}
 
 
-@for_channels("make_business_stale_no_reply", "a personal chat whose client wrote 25 hours ago: the owner makes it business → the "
-              "conversation is backfilled (the old message included), nothing is handed to the bot, no reply")
+@for_channels("make_business_stale_no_reply", f"a personal chat whose client wrote {audience.FRESH_HOURS + 1} hours ago: the owner "
+              "makes it business → the conversation is backfilled (the old message included), nothing is handed to the bot, no reply")
 def make_business_stale(ctx, ch):
     s = Stand(ctx, ch, "ms")
     o = own_profile(ctx, s.pid)
     chat = s.chat("c")
-    trig, rows = conversation(ch, chat, ctx, "ms", trig_age_s=25 * 3600)
+    trig, rows = conversation(ch, chat, ctx, "ms", trig_age_s=(audience.FRESH_HOURS + 1) * 3600)
     s.cards(saved_contact(ch, chat))
     s.history(chat, rows)
     s.post(chat, trig, rows[0]["body"], rows[0]["time"])
@@ -806,13 +809,14 @@ def dashboard(ctx, ch):
 
 
 @for_channels("wipe_after_two_days", "the Sweep's «Wipe Personal Chats» (the derived node, run on the real n8n): a chat the owner "
-              "made personal more than 2 days ago loses what the assistant stored about it (memory, history, «Сводка», handoffs, "
-              "ledger, chat state, shown sets, its own reply-mode row) and is marked wiped; one made personal a day ago keeps "
-              "everything; the bot-wide reply-mode row and the tariff usage stay")
+              f"made personal more than {audience.WIPE_DAYS} days ago loses what the assistant stored about it (memory, history, "
+              "«Сводка», handoffs, ledger, chat state, shown sets, its own reply-mode row) and is marked wiped; one still inside "
+              "that limit keeps everything; the bot-wide reply-mode row and the tariff usage stay")
 def wipe(ctx, ch):
     s = dedicated(ctx, ch, "wp")
     old, recent = s.chat("old"), s.chat("new")
-    for label, chat, since in (("old", old, "3 days"), ("new", recent, "1 day")):
+    # a day past the limit and a day inside it
+    for label, chat, since in (("old", old, f"{audience.WIPE_DAYS + 1} days"), ("new", recent, f"{audience.WIPE_DAYS - 1} days")):
         fixture("set-audience", "--profile-id", s.pid, "--chat-id", chat, "--kind", "personal")
         psql(f"update chat_audience set personal_since = now() - interval '{since}' where profile_id = '{s.pid}' and chat_id = '{chat}';")
         tag = f"wp{label}{ctx.run_id[:6]}"
@@ -975,13 +979,21 @@ def number_change(ctx, ch):
 READY_PATHS = ("ChatAudience", WA_PROFILE, TG_PROFILE)
 
 
+def registered(path):
+    """Whether n8n serves the POST webhook `path` now: a GET answers «Did you mean to make a POST request?» (no execution).
+    n8n still starting — a refused connection, a timeout, a page that is not JSON — is «not yet», never the end of the run."""
+    try:
+        return "Did you mean" in str(http("GET", f"{BASE}/webhook/{path}", timeout=10)[1] or {})
+    except (OSError, ValueError):
+        return False
+
+
 def wait_ready(timeout=120):
     """bootstrap.py reports «ready» while n8n is still registering the production webhooks: wait until the ChatAudience
-    webhook and both staging bots answer a GET with «Did you mean to make a POST request?» (registered, no execution).
-    Returns the paths still not registered."""
+    webhook and both staging bots are registered. Returns the paths still not registered."""
     deadline = time.time() + timeout
     while True:
-        missing = [p for p in READY_PATHS if "Did you mean" not in str((http("GET", f"{BASE}/webhook/{p}", timeout=10)[1] or {}))]
+        missing = [p for p in READY_PATHS if not registered(p)]
         if not missing or time.time() > deadline:
             return missing
         time.sleep(2)
