@@ -807,6 +807,38 @@ def dashboard(ctx, ch):
     return ok, {"personal": (st1, rows1), "made_business": (st2, rows2)}
 
 
+def store_chat(ctx, pid, chat, tag):
+    """What the assistant stores about a BUSINESS chat, one row in each per-chat table (two memory rows), plus a day of the
+    tariff usage — a stand-in for a conversation the writers recorded."""
+    psql(f"insert into n8n_chat_histories (session_id, message) values ('{pid}:{chat}', '{{\"type\": \"human\", \"content\": \"x\"}}'::jsonb), "
+         f"('{pid}:{chat}', '{{\"type\": \"ai\", \"content\": \"y\"}}'::jsonb);"
+         f"insert into chat_history_events (profile_id, chat_id, message_id, source, body) values ('{pid}', '{chat}', '{tag}', 'client', 'x');"
+         f"insert into conversation_outcomes (session_id, profile_id, chat_id, outcome, summary, last_history_id, last_message_at, outcome_at) "
+         f"values ('{pid}:{chat}', '{pid}', '{chat}', 'in_dialog', 's', 0, now(), now());"
+         f"insert into handoff_requests (profile_id, chat_id, source_message_id, reason) values ('{pid}', '{chat}', '{tag}', 'question');"
+         f"insert into reply_events (profile_id, chat_id, message_id, state) values ('{pid}', '{chat}', '{tag}', 'sent');"
+         f"insert into chat_reply_state (profile_id, chat_id, incoming_generation) values ('{pid}', '{chat}', 1);"
+         f"insert into suggestion_sets (request_key, profile_id, chat_id, items) values ('{tag}', '{pid}', '{chat}', '[]'::jsonb);"
+         f"insert into reply_mode_flags (profile_id, chat_id, suppressed, version) values ('{pid}', '{chat}', true, 3);"
+         f"insert into dialog_counts (app_user_id, chat_id, d) values ('{ctx.app_user_id}', '{chat}', (now() at time zone 'Asia/Almaty')::date) "
+         f"on conflict do nothing;")
+
+
+STORED = dict(dict.fromkeys(CHAT_TABLES, 1), memory=2)       # what store_chat leaves, table by table
+
+
+def run_wipe(ctx, ch, tag):
+    """One run of the Sweep's «Wipe Personal Chats» — the derived node on the real n8n. Returns the node's answer."""
+    wid = None
+    try:
+        wid, url = e2e_auth.probe_workflow(ctx.run_id, e2e_auth.SWEEP_FILE, ("Wipe Personal Chats",), "Wipe Personal Chats",
+                                           f"{tag}{ch}{int(time.time())}")
+        ex = e2e_auth.run_probe(wid, url)
+    finally:
+        e2e_auth.drop_probe(wid)
+    return (e2e_auth.node_items(ex, "Wipe Personal Chats") or [{}])[0]
+
+
 @for_channels("wipe_after_two_days", "the Sweep's «Wipe Personal Chats» (the derived node, run on the real n8n): a chat the owner "
               f"made personal more than {audience.WIPE_DAYS} days ago loses what the assistant stored about it (memory, history, "
               "«Сводка», handoffs, ledger, chat state, shown sets, its own reply-mode row) and is marked wiped; one still inside "
@@ -818,28 +850,9 @@ def wipe(ctx, ch):
     for label, chat, since in (("old", old, f"{audience.WIPE_DAYS + 1} days"), ("new", recent, f"{audience.WIPE_DAYS - 1} days")):
         fixture("set-audience", "--profile-id", s.pid, "--chat-id", chat, "--kind", "personal")
         psql(f"update chat_audience set personal_since = now() - interval '{since}' where profile_id = '{s.pid}' and chat_id = '{chat}';")
-        tag = f"wp{label}{ctx.run_id[:6]}"
-        psql(f"insert into n8n_chat_histories (session_id, message) values ('{s.pid}:{chat}', '{{\"type\": \"human\", \"content\": \"x\"}}'::jsonb), "
-             f"('{s.pid}:{chat}', '{{\"type\": \"ai\", \"content\": \"y\"}}'::jsonb);"
-             f"insert into chat_history_events (profile_id, chat_id, message_id, source, body) values ('{s.pid}', '{chat}', '{tag}', 'client', 'x');"
-             f"insert into conversation_outcomes (session_id, profile_id, chat_id, outcome, summary, last_history_id, last_message_at, outcome_at) "
-             f"values ('{s.pid}:{chat}', '{s.pid}', '{chat}', 'in_dialog', 's', 0, now(), now());"
-             f"insert into handoff_requests (profile_id, chat_id, source_message_id, reason) values ('{s.pid}', '{chat}', '{tag}', 'question');"
-             f"insert into reply_events (profile_id, chat_id, message_id, state) values ('{s.pid}', '{chat}', '{tag}', 'sent');"
-             f"insert into chat_reply_state (profile_id, chat_id, incoming_generation) values ('{s.pid}', '{chat}', 1);"
-             f"insert into suggestion_sets (request_key, profile_id, chat_id, items) values ('{tag}', '{s.pid}', '{chat}', '[]'::jsonb);"
-             f"insert into reply_mode_flags (profile_id, chat_id, suppressed, version) values ('{s.pid}', '{chat}', true, 3);"
-             f"insert into dialog_counts (app_user_id, chat_id, d) values ('{ctx.app_user_id}', '{chat}', (now() at time zone 'Asia/Almaty')::date) "
-             f"on conflict do nothing;")
+        store_chat(ctx, s.pid, chat, f"wp{label}{ctx.run_id[:6]}")
     before = (stored(s.pid, old), stored(s.pid, recent))
-    wid = None
-    try:
-        wid, url = e2e_auth.probe_workflow(ctx.run_id, e2e_auth.SWEEP_FILE, ("Wipe Personal Chats",), "Wipe Personal Chats",
-                                           f"wp{ch}{int(time.time())}")
-        ex = e2e_auth.run_probe(wid, url)
-    finally:
-        e2e_auth.drop_probe(wid)
-    out = (e2e_auth.node_items(ex, "Wipe Personal Chats") or [{}])[0]
+    out = run_wipe(ctx, ch, "wp")
     wiped = psql(f"select chat_id || ':' || (wiped_at is not null) from chat_audience where profile_id = '{s.pid}' order by chat_id;")
     bot_wide = psql(f"select count(*) from reply_mode_flags where profile_id = '{s.pid}' and chat_id = '*';")
     usage = psql(f"select count(*) from dialog_counts where app_user_id = '{ctx.app_user_id}' and chat_id in ('{old}', '{recent}');")
@@ -972,6 +985,54 @@ def number_change(ctx, ch):
     return ok, {"connected": (st, d), "connection(phone|fresh)": conn, "list(this scenario's chats)": mine,
                 "list_sources": sorted({x[2] for x in lst[2]}), "voided_chat_next_message": summary(e1),
                 "owners_chat": summary(e2), "sends": (len(s.sends(computed)), len(s.sends(owners)))}
+
+
+@for_channels("number_change_rule_personal_wipes_business_history", "a client of the OLD number (decided business, its history, "
+              "memory and the rest stored), then another number connected (the app's connected report; the server reads it from "
+              "get/status): the chat's next message, after the new first minutes, is decided personal by the rule — the person "
+              "is a saved contact of the new number — so no reply and the wipe clock starts at that decision; with the clock "
+              f"moved back past {audience.WIPE_DAYS} days, the Sweep's «Wipe Personal Chats» deletes the business period and "
+              "marks the chat wiped; the tariff usage stays")
+def number_change_wipe(ctx, ch):
+    s = Stand(ctx, ch, "nw", connected="3 days")
+    o = own_profile(ctx, s.pid)
+    chat = s.chat("c")
+    # 1. a client of the old number: decided business (a day ago, on the old connection) and its conversation stored
+    psql(f"insert into chat_audience (profile_id, chat_id, kind, source, reason, decided_at) values "
+         f"('{s.pid}', '{chat}', 'business', 'default', 'new', now() - interval '1 day');")
+    store_chat(ctx, s.pid, chat, f"nw{ctx.run_id[:6]}")
+    before = stored(s.pid, chat)
+    # 2. the new connection: another number paired, the app reports it
+    other_number = "77020000066"
+    paired(s.pid, ch, other_number)
+    st, d = audience_connected(o, s.pid)
+    psql(f"update audience_connections set connected_at = connected_at - interval '{audience.SETTLE_MINUTES + 30} minutes' "
+         f"where profile_id = '{s.pid}';")          # past the new first minutes: the next message is decided, not waited out
+    # 3. the chat's next message: the person is a saved contact of the new number
+    s.cards(stranger(ch, s.chat("other")), saved_contact(ch, chat))
+    s.mark()
+    mid, t = f"nw-{ctx.run_id}", int(time.time())
+    s.history(chat, [row(ch, chat, mid, False, "Добрый день, это снова я", t)])
+    s.post(chat, mid, "Добрый день, это снова я", t, **({"contact_name": "Айгерим Сохранённая"} if ch == "wa" else {}))
+    e = s.one(60)
+    clock = psql(f"select kind || '|' || source || '|' || reason || '|' || (personal_since is not null) || '|' "
+                 f"|| coalesce((personal_since = decided_at)::text, '-') || '|' || (wiped_at is null) "
+                 f"from chat_audience where profile_id = '{s.pid}' and chat_id = '{chat}';")
+    kept = stored(s.pid, chat)
+    # 4. two days on: the clock moved back — only a clock that runs (nothing is set where the decision left none)
+    psql(f"update chat_audience set personal_since = personal_since - interval '{audience.WIPE_DAYS + 1} days' "
+         f"where profile_id = '{s.pid}' and chat_id = '{chat}' and personal_since is not null;")
+    # 5. the wipe
+    out = run_wipe(ctx, ch, "nw")
+    wiped = psql(f"select (wiped_at is not null)::text || '|' || kind from chat_audience where profile_id = '{s.pid}' and chat_id = '{chat}';")
+    usage = psql(f"select count(*) from dialog_counts where app_user_id = '{ctx.app_user_id}' and chat_id = '{chat}';")
+    ok = (before == STORED and st == 200 and (d or {}).get("restarted") is True
+          and e.get("outcome") == "personal_contact" and e.get("decide") == {"audience": "personal", "outcome": "personal_contact"}
+          and not s.sends(chat) and clock == "personal|default|contact|true|true|true" and kept == STORED
+          and int(out.get("wiped_chats") or 0) >= 1 and stored(s.pid, chat) == NOTHING and wiped == "true|personal" and usage == "1")
+    return ok, {"before": before, "connected": (st, d), **summary(e), "sends": len(s.sends(chat)),
+                "decision(kind|source|reason|clock|clock=decided_at|not wiped)": clock, "kept_until_the_wipe": kept,
+                "node": out, "after": stored(s.pid, chat), "wiped|kind": wiped, "usage_rows": usage}
 
 
 # ================================================================================================ run
