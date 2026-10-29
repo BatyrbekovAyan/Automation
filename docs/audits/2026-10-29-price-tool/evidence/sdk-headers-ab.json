@@ -1,0 +1,245 @@
+{
+ "headers_sent_in_sdk_arm": [
+  "accept-language",
+  "openai-platform",
+  "sec-fetch-mode",
+  "user-agent",
+  "x-stainless-arch",
+  "x-stainless-lang",
+  "x-stainless-os",
+  "x-stainless-package-version",
+  "x-stainless-retry-count",
+  "x-stainless-runtime",
+  "x-stainless-runtime-version"
+ ],
+ "runs": {
+  "sdk_headers": [
+   {
+    "t": 1.8,
+    "tool": true,
+    "finish": "tool_calls",
+    "text": "",
+    "served": "gpt-5.4-mini-2026-03-17"
+   },
+   {
+    "t": 6.3,
+    "tool": true,
+    "finish": "tool_calls",
+    "text": "",
+    "served": "gpt-5.4-mini-2026-03-17"
+   },
+   {
+    "t": 7.9,
+    "tool": true,
+    "finish": "tool_calls",
+    "text": "",
+    "served": "gpt-5.4-mini-2026-03-17"
+   },
+   {
+    "t": 12.4,
+    "tool": true,
+    "finish": "tool_calls",
+    "text": "",
+    "served": "gpt-5.4-mini-2026-03-17"
+   },
+   {
+    "t": 14.1,
+    "tool": true,
+    "finish": "tool_calls",
+    "text": "",
+    "served": "gpt-5.4-mini-2026-03-17"
+   },
+   {
+    "t": 18.9,
+    "tool": true,
+    "finish": "tool_calls",
+    "text": "",
+    "served": "gpt-5.4-mini-2026-03-17"
+   },
+   {
+    "t": 20.6,
+    "tool": true,
+    "finish": "tool_calls",
+    "text": "",
+    "served": "gpt-5.4-mini-2026-03-17"
+   },
+   {
+    "t": 25.1,
+    "tool": true,
+    "finish": "tool_calls",
+    "text": "",
+    "served": "gpt-5.4-mini-2026-03-17"
+   },
+   {
+    "t": 26.6,
+    "tool": true,
+    "finish": "tool_calls",
+    "text": "",
+    "served": "gpt-5.4-mini-2026-03-17"
+   },
+   {
+    "t": 31.3,
+    "tool": true,
+    "finish": "tool_calls",
+    "text": "",
+    "served": "gpt-5.4-mini-2026-03-17"
+   },
+   {
+    "t": 32.5,
+    "tool": true,
+    "finish": "tool_calls",
+    "text": "",
+    "served": "gpt-5.4-mini-2026-03-17"
+   },
+   {
+    "t": 36.6,
+    "tool": true,
+    "finish": "tool_calls",
+    "text": "",
+    "served": "gpt-5.4-mini-2026-03-17"
+   },
+   {
+    "t": 38.0,
+    "tool": true,
+    "finish": "tool_calls",
+    "text": "",
+    "served": "gpt-5.4-mini-2026-03-17"
+   },
+   {
+    "t": 42.3,
+    "tool": true,
+    "finish": "tool_calls",
+    "text": "",
+    "served": "gpt-5.4-mini-2026-03-17"
+   },
+   {
+    "t": 43.7,
+    "tool": true,
+    "finish": "tool_calls",
+    "text": "",
+    "served": "gpt-5.4-mini-2026-03-17"
+   },
+   {
+    "t": 47.9,
+    "tool": true,
+    "finish": "tool_calls",
+    "text": "",
+    "served": "gpt-5.4-mini-2026-03-17"
+   }
+  ],
+  "proxy_headers": [
+   {
+    "t": 3.0,
+    "tool": true,
+    "finish": "tool_calls",
+    "text": "",
+    "served": "gpt-5.4-mini-2026-03-17"
+   },
+   {
+    "t": 4.5,
+    "tool": true,
+    "finish": "tool_calls",
+    "text": "",
+    "served": "gpt-5.4-mini-2026-03-17"
+   },
+   {
+    "t": 9.5,
+    "tool": true,
+    "finish": "tool_calls",
+    "text": "",
+    "served": "gpt-5.4-mini-2026-03-17"
+   },
+   {
+    "t": 10.9,
+    "tool": true,
+    "finish": "tool_calls",
+    "text": "",
+    "served": "gpt-5.4-mini-2026-03-17"
+   },
+   {
+    "t": 15.7,
+    "tool": true,
+    "finish": "tool_calls",
+    "text": "",
+    "served": "gpt-5.4-mini-2026-03-17"
+   },
+   {
+    "t": 17.4,
+    "tool": true,
+    "finish": "tool_calls",
+    "text": "",
+    "served": "gpt-5.4-mini-2026-03-17"
+   },
+   {
+    "t": 22.2,
+    "tool": true,
+    "finish": "tool_calls",
+    "text": "",
+    "served": "gpt-5.4-mini-2026-03-17"
+   },
+   {
+    "t": 23.7,
+    "tool": true,
+    "finish": "tool_calls",
+    "text": "",
+    "served": "gpt-5.4-mini-2026-03-17"
+   },
+   {
+    "t": 28.6,
+    "tool": true,
+    "finish": "tool_calls",
+    "text": "",
+    "served": "gpt-5.4-mini-2026-03-17"
+   },
+   {
+    "t": 29.9,
+    "tool": true,
+    "finish": "tool_calls",
+    "text": "",
+    "served": "gpt-5.4-mini-2026-03-17"
+   },
+   {
+    "t": 33.8,
+    "tool": true,
+    "finish": "tool_calls",
+    "text": "",
+    "served": "gpt-5.4-mini-2026-03-17"
+   },
+   {
+    "t": 35.3,
+    "tool": true,
+    "finish": "tool_calls",
+    "text": "",
+    "served": "gpt-5.4-mini-2026-03-17"
+   },
+   {
+    "t": 39.3,
+    "tool": true,
+    "finish": "tool_calls",
+    "text": "",
+    "served": "gpt-5.4-mini-2026-03-17"
+   },
+   {
+    "t": 40.6,
+    "tool": true,
+    "finish": "tool_calls",
+    "text": "",
+    "served": "gpt-5.4-mini-2026-03-17"
+   },
+   {
+    "t": 45.0,
+    "tool": true,
+    "finish": "tool_calls",
+    "text": "",
+    "served": "gpt-5.4-mini-2026-03-17"
+   },
+   {
+    "t": 46.4,
+    "tool": true,
+    "finish": "tool_calls",
+    "text": "",
+    "served": "gpt-5.4-mini-2026-03-17"
+   }
+  ]
+ }
+}

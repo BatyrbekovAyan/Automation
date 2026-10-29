@@ -1,0 +1,41 @@
+### replica 1 23:29:52
+PASS  pl_empty_reask_flowers               1.00  n  
+
+ix-1-n: pass 1 · flaky 0 · fail 0 · runs 2 · errors 0 · retries 0 · $0.0023
+wrote docs/audits/2026-10-29-price-tool/evidence/interleave/ix-1-n.md
+### replica 2 23:30:40
+PASS  pl_empty_reask_flowers               1.00  n  
+
+ix-2-n: pass 1 · flaky 0 · fail 0 · runs 2 · errors 0 · retries 0 · $0.0024
+wrote docs/audits/2026-10-29-price-tool/evidence/interleave/ix-2-n.md
+### replica 3 23:31:27
+PASS  pl_empty_reask_flowers               1.00  n  
+
+ix-3-n: pass 1 · flaky 0 · fail 0 · runs 2 · errors 0 · retries 0 · $0.0055
+wrote docs/audits/2026-10-29-price-tool/evidence/interleave/ix-3-n.md
+### replica 4 23:32:14
+PASS  pl_empty_reask_flowers               1.00  n  
+
+ix-4-n: pass 1 · flaky 0 · fail 0 · runs 2 · errors 0 · retries 0 · $0.0024
+wrote docs/audits/2026-10-29-price-tool/evidence/interleave/ix-4-n.md
+### replica 5 23:33:02
+PASS  pl_empty_reask_flowers               1.00  n  
+
+ix-5-n: pass 1 · flaky 0 · fail 0 · runs 2 · errors 0 · retries 0 · $0.0023
+wrote docs/audits/2026-10-29-price-tool/evidence/interleave/ix-5-n.md
+### replica 6 23:33:49
+PASS  pl_empty_reask_flowers               1.00  n  
+
+ix-6-n: pass 1 · flaky 0 · fail 0 · runs 2 · errors 0 · retries 0 · $0.0023
+wrote docs/audits/2026-10-29-price-tool/evidence/interleave/ix-6-n.md
+### replica 7 23:34:36
+PASS  pl_empty_reask_flowers               1.00  n  
+
+ix-7-n: pass 1 · flaky 0 · fail 0 · runs 2 · errors 0 · retries 0 · $0.0024
+wrote docs/audits/2026-10-29-price-tool/evidence/interleave/ix-7-n.md
+### replica 8 23:35:23
+PASS  pl_empty_reask_flowers               1.00  n  
+
+ix-8-n: pass 1 · flaky 0 · fail 0 · runs 2 · errors 0 · retries 0 · $0.0024
+wrote docs/audits/2026-10-29-price-tool/evidence/interleave/ix-8-n.md
+### replica done 23:36:12

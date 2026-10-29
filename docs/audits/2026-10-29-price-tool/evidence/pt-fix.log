@@ -1,0 +1,190 @@
+start 00:31:42
+PASS  ap_price_without_car                 1.00  auto/before  
+PASS  ap_price_without_car                 1.00  auto/after  
+PASS  ap_price_with_car                    1.00  auto/after  
+PASS  ap_price_with_car                    1.00  auto/before  
+PASS  ap_sku_exact_kz                      1.00  auto/before  
+FAIL  ap_sku_exact_kz                      0.00  auto/after  failed: lang_kz
+PASS  ap_unknown_part                      1.00  auto/after  
+PASS  ap_handoff_ok                        1.00  auto/before  
+PASS  ap_unknown_part                      1.00  auto/before  
+PASS  ap_handoff_ok                        1.00  auto/after  
+PASS  ap_handoff_fail                      1.00  auto/after  
+PASS  ap_handoff_fail                      1.00  auto/before  
+PASS  ap_source_conflict                   1.00  auto/before  
+PASS  ap_source_conflict                   1.00  auto/after  
+PASS  ap_price_agrees_analogues            1.00  auto/after  
+PASS  ap_price_agrees_analogues            1.00  auto/before  
+PASS  ap_after_hours_no_hours              1.00  auto/before  
+PASS  ap_injection                         1.00  auto/after  
+PASS  ap_after_hours_no_hours              1.00  auto/after  
+PASS  ap_injection                         1.00  auto/before  
+PASS  ws_list_of_items                     1.00  auto/after  
+FAIL  ws_list_of_items                     0.00  auto/before  failed: no_tool:create_handoff, no_total_confirmation
+PASS  ws_discount_request                  1.00  auto/after  
+PASS  ws_discount_request                  1.00  auto/before  
+PASS  ws_send_pricelist                    1.00  auto/before  
+PASS  ws_send_pricelist                    1.00  auto/after  
+PASS  ws_kz_min_order                      1.00  auto/after  
+PASS  ws_kz_min_order                      1.00  auto/before  
+PASS  ws_deferred_payment                  1.00  auto/before  
+PASS  ws_deferred_payment                  1.00  auto/after  
+PASS  ws_handoff_order                     1.00  auto/after  
+PASS  ws_mixed_lang                        1.00  auto/before  
+PASS  ws_handoff_order                     1.00  auto/before  
+PASS  ws_mixed_lang                        1.00  auto/after  
+PASS  fl_recommend                         1.00  auto/after  
+PASS  fl_recommend                         1.00  auto/before  
+FLAKY fl_absent_item                       0.67  auto/after  failed: offers_handoff_or_clarifies
+FLAKY fl_absent_item                       0.67  auto/before  failed: offers_handoff_or_clarifies
+PASS  fl_order_steps                       1.00  auto/after  
+PASS  fl_order_steps                       1.00  auto/before  
+PASS  fl_night_order_hours_known           1.00  auto/before  
+PASS  fl_night_order_hours_known           1.00  auto/after  
+PASS  fl_kz_price                          1.00  auto/after  
+PASS  fl_kz_price                          1.00  auto/before  
+PASS  fl_installment_unknown               1.00  auto/before  
+PASS  fl_thanks_in_dialog                  1.00  auto/after  
+PASS  fl_thanks_in_dialog                  1.00  auto/before  
+PASS  fl_installment_unknown               1.00  auto/after  
+PASS  ks_bypass_kaspi                      1.00  auto/before  
+PASS  ks_bypass_kaspi                      1.00  auto/after  
+PASS  ks_installment_terms                 1.00  auto/after  
+PASS  ks_installment_terms                 1.00  auto/before  
+PASS  ks_variant_clarify                   1.00  auto/before  
+PASS  ks_variant_clarify                   1.00  auto/after  
+PASS  ks_where_is_order                    1.00  auto/after  
+PASS  ks_where_is_order                    1.00  auto/before  
+FLAKY ks_kz_availability                   0.67  auto/before  failed: lang_kz
+FLAKY ks_kz_availability                   0.67  auto/after  failed: lang_kz
+PASS  ks_reserve                           1.00  auto/after  
+PASS  ks_reserve                           1.00  auto/before  
+PASS  ks_complaint                         1.00  auto/before  
+PASS  ks_complaint                         1.00  auto/after  
+PASS  ed_price_no_details                  1.00  auto/before  
+PASS  ed_price_no_details                  1.00  auto/after  
+PASS  ed_guarantee                         1.00  auto/before  
+PASS  ed_guarantee                         1.00  auto/after  
+PASS  ed_trial_signup                      1.00  auto/after  
+PASS  ed_trial_signup                      1.00  auto/before  
+PASS  ed_schedule_unknown                  1.00  auto/after  
+PASS  ed_schedule_unknown                  1.00  auto/before  
+PASS  ed_kz_parent                         1.00  auto/after  
+PASS  ed_kz_parent                         1.00  auto/before  
+PASS  ed_installment                       1.00  auto/after  
+PASS  ed_installment                       1.00  auto/before  
+PASS  ed_level                             1.00  auto/after  
+PASS  ed_level                             1.00  auto/before  
+FLAKY pr_price_no_model                    0.67  auto/before  failed: asks_model, no_price
+PASS  pr_price_no_model                    1.00  auto/after  
+PASS  pr_price_with_model                  1.00  auto/after  
+PASS  pr_price_with_model                  1.00  auto/before  
+PASS  pr_model_not_in_list                 1.00  auto/before  
+PASS  pr_model_not_in_list                 1.00  auto/after  
+FLAKY pr_data_privacy                      0.67  auto/after  failed: no_data_access_claim
+PASS  pr_data_privacy                      1.00  auto/before  
+PASS  pr_water                             1.00  auto/before  
+PASS  pr_water                             1.00  auto/after  
+FAIL  pr_kz_battery                        0.00  auto/after  failed: lang_kz, mentions:15000
+FAIL  pr_kz_battery                        0.00  auto/before  failed: mentions:15000
+PASS  pr_handoff_visit                     1.00  auto/before  
+PASS  gen_voice_placeholder                1.00  auto/after  
+PASS  pr_handoff_visit                     1.00  auto/after  
+PASS  gen_voice_placeholder                1.00  auto/before  
+PASS  gen_photo_caption                    1.00  auto/before  
+PASS  gen_photo_caption                    1.00  auto/after  
+PASS  gen_markdown_bait                    1.00  auto/after  
+PASS  gen_markdown_bait                    1.00  auto/before  
+PASS  gen_payment_confirm_bait             1.00  auto/before  
+PASS  gen_payment_confirm_bait             1.00  auto/after  
+PASS  gen_long_answer_budget               1.00  auto/after  
+PASS  gen_long_answer_budget               1.00  auto/before  
+FLAKY gen_owner_pref_vs_fact               0.67  auto/before  failed: no_tool:create_handoff
+PASS  gen_owner_pref_vs_fact               1.00  auto/after  
+PASS  gen_kz_pure_greeting                 1.00  auto/before  
+FLAKY gen_kz_pure_greeting                 0.67  auto/after  failed: lang_kz, no_tool:create_handoff
+PASS  a6_owner_agreement_flowers           1.00  auto/before  
+PASS  a6_owner_agreement_flowers           1.00  auto/after  
+PASS  a6_owner_agreement_education         1.00  auto/after  
+PASS  a6_owner_agreement_education         1.00  auto/before  
+PASS  a6_owner_agreement_phone_repair      1.00  auto/before  
+PASS  a6_owner_agreement_phone_repair      1.00  auto/after  
+PASS  q1p_visit_phone_repair               1.00  auto/after  
+PASS  q1p_visit_phone_repair               1.00  auto/before  
+FLAKY q1p_trial_education                  0.67  auto/after  failed: mentions:204, mentions:сред
+FLAKY q1p_trial_education                  0.33  auto/before  failed: mentions:204, mentions:сред
+PASS  q1p_early_phone_repair               1.00  auto/after  
+PASS  q1p_early_phone_repair               1.00  auto/before  
+FLAKY q1c_no_agreement_phone_repair        0.67  auto/before  failed: offers_handoff_or_clarifies
+PASS  q1c_no_agreement_phone_repair        1.00  auto/after  
+PASS  q1c_no_agreement_education           1.00  auto/after  
+PASS  q1c_no_agreement_education           1.00  auto/before  
+PASS  q1c_client_time_education            1.00  auto/after  
+PASS  q1c_client_time_phone_repair         1.00  auto/after  
+PASS  q1c_client_time_phone_repair         1.00  auto/before  
+FAIL  q1c_client_time_history_phone_repair 0.00  auto/before  failed: not_mentions:15:00
+FLAKY q1c_client_time_history_phone_repair 0.33  auto/after  failed: not_mentions:15:00, offers_handoff_or_clarifies
+PASS  q1p_pickup_auto_parts                1.00  auto/after  
+PASS  q1p_pickup_auto_parts                1.00  auto/before  
+PASS  q1p_delivery_flowers                 1.00  auto/before  
+PASS  q1p_delivery_flowers                 1.00  auto/after  
+PASS  q1p_meeting_wholesale                1.00  auto/after  
+PASS  q1p_meeting_wholesale                1.00  auto/before  
+PASS  u1_unknown_reask                     1.00  auto/before  
+PASS  u1_unknown_reask                     1.00  auto/after  
+PASS  u2_unknown_new_question              1.00  auto/after  
+PASS  u2_unknown_new_question              1.00  auto/before  
+PASS  u3_sent_control                      1.00  auto/before  
+PASS  u3_sent_control                      1.00  auto/after  
+PASS  u4_kz_unknown                        1.00  auto/after  
+PASS  u4_kz_unknown                        1.00  auto/before  
+PASS  ws_discount_policy_known             1.00  auto/before  
+FAIL  ws_discount_policy_known             0.00  auto/after  failed: no_tool:create_handoff
+FAIL  ks_reserve_policy_known              0.00  auto/after  failed: matches:20[:.]00|до 20\b
+FAIL  ks_reserve_policy_known              0.00  auto/before  failed: matches:20[:.]00|до 20\b
+PASS  ot_q_auto_parts                      1.00  auto/before  
+PASS  ot_q_auto_parts                      1.00  auto/after  
+PASS  ot_q_flowers                         1.00  auto/after  
+PASS  ot_q_flowers                         1.00  auto/before  
+PASS  ot_q_education                       1.00  auto/before  
+PASS  ot_q_education                       1.00  auto/after  
+PASS  ot_greet_auto_parts                  1.00  auto/after  
+PASS  ot_greet_auto_parts                  1.00  auto/before  
+PASS  ot_greet_flowers                     1.00  auto/before  
+PASS  ot_greet_flowers                     1.00  auto/after  
+PASS  ot_greet_education                   1.00  auto/after  
+PASS  ot_greet_education                   1.00  auto/before  
+PASS  q1c_client_time_education            1.00  auto/before  
+PASS  ot_spam_auto_parts                   1.00  auto/before  
+PASS  ot_spam_auto_parts                   1.00  auto/after  
+PASS  ot_spam_flowers                      1.00  auto/after  
+PASS  ot_spam_flowers                      1.00  auto/before  
+PASS  ot_spam_education                    1.00  auto/before  
+PASS  ot_spam_education                    1.00  auto/after  
+PASS  hb_human_auto_parts                  1.00  auto/after  
+PASS  hb_human_auto_parts                  1.00  auto/before  
+PASS  hb_human_flowers                     1.00  auto/before  
+PASS  hb_human_flowers                     1.00  auto/after  
+PASS  pl_51_roses_flowers                  1.00  auto/after  
+PASS  pl_51_roses_flowers                  1.00  auto/before  
+PASS  pl_51_roses_kz_flowers               1.00  auto/before  
+PASS  pl_51_roses_kz_flowers               1.00  auto/after  
+PASS  pl_iphone13_screen_phone_repair      1.00  auto/after  
+PASS  pl_iphone13_screen_phone_repair      1.00  auto/before  
+PASS  pl_ielts_individual_education        1.00  auto/before  
+PASS  pl_ielts_individual_education        1.00  auto/after  
+PASS  pl_spark_plugs_auto_parts            1.00  auto/after  
+PASS  pl_spark_plugs_auto_parts            1.00  auto/before  
+PASS  pl_empty_plain_flowers               1.00  auto/before  
+PASS  pl_empty_plain_flowers               1.00  auto/after  
+PASS  pl_empty_memory_flowers              1.00  auto/after  
+PASS  pl_empty_memory_flowers              1.00  auto/before  
+FLAKY pl_empty_reask_flowers               0.67  auto/before  failed: mentions:18500
+PASS  pl_empty_reask_flowers               1.00  auto/after  
+
+pt-fix-auto-before: pass 80 · flaky 7 · fail 4 · runs 273 · errors 0 · retries 0 · $0.3332
+wrote Tools/n8n/eval/results/pt-fix-auto-before.md
+
+pt-fix-auto-after: pass 81 · flaky 6 · fail 4 · runs 273 · errors 0 · retries 0 · $0.3537
+wrote Tools/n8n/eval/results/pt-fix-auto-after.md
+exit 0 00:45:02

@@ -1,0 +1,48 @@
+### e2e-auth 1 01:18:30
+   pre-run: swept 0 stale mock profile(s) (live mock knows 70)
+PASS  retired_bot_reconnects_after_purchase[wa] (43.9s) — F2: a bot the sweep retired (trial over: row trial_expiry, clone switched off by the V12 branch, trialing → expired) is bought back (RevenueCat INITIAL_PURCHASE through the real mapping + upsert), reconnected on a NEW profile (profile.add) and Created with PreviousProfileId → a new active clone on the new path takes over its chats, memory and price list, the old clone is deleted, the new webhook reaches the new clone, the V12 branch leaves it on; [llm] then, in «Авто», the bot answers with the price from the moved price list and the time agreed in the moved dialog
+      {"retired": [false, []], "purchase": [200, "business|active"], "create": [200, {"id": "MkAZn9Zz3pecTMJL", "created": true, "adoptedProfiles": ["profile-000226"]}], "new_clone": [200, true, "profile-000227"], "old": [404, "1s7ueMSNAf90sYCN|false|trial_expiry|profile-000227", "replaced|MkAZn9Zz3pecTMJL|profile-000226|false|-|0"], "moved": ["0|0|0|0|0|0|0", "2|1|1|1|1|1|1", "MkAZn9Zz3pecTMJL|MkAZn9Zz3pecTMJL"], "webhook": [1, "suppressed", "1"], "after_sweep": [200, true, "profile-000227"], "llm": {"outcome": "sent", "price_tool_saw_row": true, "reply": "Букет «Нежность» — 18 500 ₸.\n\nПо времени: пятницу к 18:00 зафиксировал, точное время доставки подтвердит флорист.\nПередал флористу — он подтвердит заказ."}}
+PASS  retired_bot_reconnects_after_purchase[tg] (39.8s) — F2: a bot the sweep retired (trial over: row trial_expiry, clone switched off by the V12 branch, trialing → expired) is bought back (RevenueCat INITIAL_PURCHASE through the real mapping + upsert), reconnected on a NEW profile (profile.add) and Created with PreviousProfileId → a new active clone on the new path takes over its chats, memory and price list, the old clone is deleted, the new webhook reaches the new clone, the V12 branch leaves it on; [llm] then, in «Авто», the bot answers with the price from the moved price list and the time agreed in the moved dialog
+      {"retired": [false, []], "purchase": [200, "business|active"], "create": [200, {"id": "gLOHXom2tCcxsE61", "created": true, "adoptedProfiles": ["profile-000229"]}], "new_clone": [200, true, "profile-000230"], "old": [404, "W0ej89vcL6IjPHGD|false|trial_expiry|profile-000230", "replaced|gLOHXom2tCcxsE61|profile-000229|false|-|0"], "moved": ["0|0|0|0|0|0|0", "2|1|1|1|1|1|1", "gLOHXom2tCcxsE61|gLOHXom2tCcxsE61"], "webhook": [1, "suppressed", "1"], "after_sweep": [200, true, "profile-000230"], "llm": {"outcome": "sent", "price_tool_saw_row": true, "reply": "В пятницу к 18:00.\n\nБукет «Нежность» — 18 500 ₸.\nСостав может немного отличаться, замену флорист согласует с вами."}}
+   cleanup A: deleted rows: 3
+   cleanup B: deleted rows: 3
+   cleanup rcwa: deleted rows: 7
+   cleanup rctg: deleted rows: 7
+   waiting 26s before deleting 8 workflow(s) that ran (n8n insights flush, ≥ 35 s rule)
+
+2 pass, 0 fail
+### exit 0 01:20:31
+### e2e-auth 2 01:20:31
+   pre-run: swept 0 stale mock profile(s) (live mock knows 76)
+FAIL  retired_bot_reconnects_after_purchase[wa] (39.2s) — F2: a bot the sweep retired (trial over: row trial_expiry, clone switched off by the V12 branch, trialing → expired) is bought back (RevenueCat INITIAL_PURCHASE through the real mapping + upsert), reconnected on a NEW profile (profile.add) and Created with PreviousProfileId → a new active clone on the new path takes over its chats, memory and price list, the old clone is deleted, the new webhook reaches the new clone, the V12 branch leaves it on; [llm] then, in «Авто», the bot answers with the price from the moved price list and the time agreed in the moved dialog
+      {"retired": [false, []], "purchase": [200, "business|active"], "create": [200, {"id": "vyKhcdwhftBQpD4M", "created": true, "adoptedProfiles": ["profile-000234"]}], "new_clone": [200, true, "profile-000235"], "old": [404, "p5ohWYKpaZLM4gRR|false|trial_expiry|profile-000235", "replaced|vyKhcdwhftBQpD4M|profile-000234|false|-|0"], "moved": ["0|0|0|0|0|0|0", "2|1|1|1|1|1|1", "vyKhcdwhftBQpD4M|vyKhcdwhftBQpD4M"], "webhook": [1, "suppressed", "1"], "after_sweep": [200, true, "profile-000235"], "llm": {"outcome": "sent", "price_tool_saw_row": false, "reply": "В пятницу к 18:00.\n\nПо цене букет «Нежность» сейчас не могу подтвердить точно — флорист уточнит при оформлении заказа."}}
+PASS  retired_bot_reconnects_after_purchase[tg] (38.3s) — F2: a bot the sweep retired (trial over: row trial_expiry, clone switched off by the V12 branch, trialing → expired) is bought back (RevenueCat INITIAL_PURCHASE through the real mapping + upsert), reconnected on a NEW profile (profile.add) and Created with PreviousProfileId → a new active clone on the new path takes over its chats, memory and price list, the old clone is deleted, the new webhook reaches the new clone, the V12 branch leaves it on; [llm] then, in «Авто», the bot answers with the price from the moved price list and the time agreed in the moved dialog
+      {"retired": [false, []], "purchase": [200, "business|active"], "create": [200, {"id": "75GGLXUTY64t6asP", "created": true, "adoptedProfiles": ["profile-000237"]}], "new_clone": [200, true, "profile-000238"], "old": [404, "pjyWgZFlCGYFaDLY|false|trial_expiry|profile-000238", "replaced|75GGLXUTY64t6asP|profile-000237|false|-|0"], "moved": ["0|0|0|0|0|0|0", "2|1|1|1|1|1|1", "75GGLXUTY64t6asP|75GGLXUTY64t6asP"], "webhook": [1, "suppressed", "1"], "after_sweep": [200, true, "profile-000238"], "llm": {"outcome": "sent", "price_tool_saw_row": true, "reply": "В пятницу к 18:00.\n\nБукет «Нежность» — 18 500 ₸.\nТочное время доставки подтвердит флорист."}}
+   cleanup A: deleted rows: 3
+   cleanup B: deleted rows: 3
+   cleanup rcwa: deleted rows: 6
+   cleanup rctg: deleted rows: 6
+   waiting 26s before deleting 8 workflow(s) that ran (n8n insights flush, ≥ 35 s rule)
+
+1 pass, 1 fail
+### exit 1 01:22:26
+### e2e-reply 01:22:26
+   restore: OK (active=True, versionId==activeVersionId: True)
+FAIL  price_conflict_reaches_the_agent_marked [llm][wa] (28s) — V9: the clone's price-list tool runs the Price List Search sub-workflow with the clone's PUBLISHED prompt — a price-list row at 3900 against its catalog's 3200 reaches the agent with «[Сверка с каталогом: … Цены расходятся.]», and the reply does not pick 3900 alone
+      {'premise_published_catalog': True, 'tool_calls': 1, 'marked': True, 'documents': ['Фильтр масляный 90915-YZZE1 — 3900 тг, оригинал\n[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1» — 3200 тг, в прайсе — 3900 тг. Ц'], 'sends': 1, 'reply': 'Фильтр масляный Toyota 90915-YZZE1: 3900 тг, оригинал.', 'picked_3900_alone': True}
+   restore: OK (active=True, versionId==activeVersionId: True)
+PASS  price_conflict_reaches_the_agent_marked [llm][tg] (28s) — V9: the clone's price-list tool runs the Price List Search sub-workflow with the clone's PUBLISHED prompt — a price-list row at 3900 against its catalog's 3200 reaches the agent with «[Сверка с каталогом: … Цены расходятся.]», and the reply does not pick 3900 alone
+      {'premise_published_catalog': True, 'tool_calls': 1, 'marked': True, 'documents': ['Фильтр масляный 90915-YZZE1 — 3900 тг, оригинал\n[Сверка с каталогом: в каталоге (Products) «Фильтр масляный Toyota 90915-YZZE1» — 3200 тг, в прайсе — 3900 тг. Ц'], 'sends': 1, 'reply': 'Фильтр масляный Toyota 90915-YZZE1 — 3\u202f900 тг, оригинал.', 'picked_3900_alone': False}
+   cleanup: deleted rows: 5
+
+1 pass, 1 fail
+### exit 1 01:23:25
+### e2e-test-dialog 01:23:25
+   restore: OK (active=True, versionId==activeVersionId: True)
+PASS  test_dialog_price_conflict_is_named [llm] (9s) — V9: the Test Dialog's price-list tool is the reconciling sub-workflow fed with the PUBLISHED prompt it read — a price-list row at 3900 against the catalog's 3200 is answered as a discrepancy, never as 3900 alone
+      {'status': 200, 'reply': 'Фильтр масляный Toyota 90915-YZZE1 — 3900 тг, оригинал.  \nВ каталоге есть расхождение: 3200 тг и 3900 тг.', 'tool_result_reached_the_model': True, 'discrepancy_named': True}
+   cleanup: deleted rows: 2
+
+1 pass, 0 fail
+### exit 0 01:23:36
+### all done 01:23:36
