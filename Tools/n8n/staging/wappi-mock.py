@@ -11,7 +11,21 @@ send-idempotency scenarios of stage 3 (accepted-but-response-lost, HTTP 5xx, slo
     WAPPI_MOCK_PORT=8765 WAPPI_MOCK_LOG=/path/calls.jsonl python3 Tools/n8n/staging/wappi-mock.py
 
 Transport routes (both /api/sync/ + /tapi/sync/, and /api/ + /tapi/ for profile ops):
-    GET  messages/get?profile_id&chat_id&limit   -> {status:"done", messages:[newest first], count}
+    GET  messages/get?profile_id&chat_id&limit[&order]
+                                                 -> {status:"done", messages:[newest first], count}; order=asc as each
+                                                    transport really answers it (live checks of the personal chats,
+                                                    docs/audits/2026-10-25-personal-chats/live-checks.md, D4): WhatsApp
+                                                    honours it — the OLDEST `limit` rows, oldest first — but answers an
+                                                    EMPTY page for a brand-new chat for a while (its first message younger
+                                                    than the asc lag, 60 s); Telegram's tapi ignores it — the NEWEST `limit`
+                                                    rows, merely re-sorted oldest first. A WhatsApp chat given a code
+                                                    (/__mock/audience lid_rows) is listed under it: every row carries
+                                                    chatId = the code, the client's from = the code, the owner's from = his
+                                                    own code; asking by the code serves the same chat
+    GET  chats/filter?profile_id[&client_name]   -> WhatsApp: {status:"done", detail, dialogs:[the profile's chat cards whose
+                                                    id, name or last message holds client_name], total_count}
+    GET  chats/get?profile_id[&limit&offset&order] -> Telegram: {status:"done", detail, dialogs:[a page of the profile's chat
+                                                    cards, newest first], total_count}
     GET  messages/id/get?profile_id&message_id    -> {status:"done", message:{...}}
     POST message/send?profile_id  {body,recipient}-> {status:"done", message_id, time}  (+ appends echo row, marked
     POST message/reply?profile_id {body,message_id[,recipient]} -> {status:"done", message_id, time}
@@ -43,6 +57,16 @@ Control routes (never exist on the real transport):
                            `channel` is known (profile/add records it); one without a channel is listed on both; `listed:
                            false` drops it from profile/all/get while get/status still answers (A4 fix round 2: a profile Wappi
                            no longer lists); an empty list is `profiles: null`, as Wappi answers it
+    POST /__mock/audience  {profile_id, dialogs?, lid_rows?, own_lid?, phone?, account_phone?, fail?, clear_faults?, asc_lag_s?}   what the
+                           personal chats' facts read (Decide Audience, the ChatAudience webhook): `dialogs` replaces the
+                           profile's chat list (WhatsApp chats/filter cards — id, contact {Found, FirstName, FullName, PushName,
+                           BusinessName, RedactedPhone}, chat {LID}; Telegram chats/get cards — id, type, user {Contact, Bot,
+                           Support, Self, …}); `lid_rows` = {chat id: its @lid code} — that chat's messages are listed under the
+                           code; `own_lid` = the owner's own code (default 100000000000001@lid); `phone` / `account_phone` go to
+                           get/status like /__mock/profile; `fail` = {route: times} answers HTTP 500 to that many calls of the
+                           route FOR THIS PROFILE (e.g. {"chats/filter": 1}); `clear_faults` drops every fault scoped to the
+                           profile first (a scenario that minted profiles cannot reset the mock: its id counter would restart);
+                           `asc_lag_s` sets the WhatsApp asc lag (global)
     POST /__mock/rc_aliases {customer_id, aliases:[ids] | null, status?, body?}   the RevenueCat customer the mock knows
                            (A3 identity-heal): derive-staging.py rewrites https://api.revenuecat.com/ to <mock>/revenuecat/,
                            and GET /revenuecat/v2/projects/<p>/customers/<id>/aliases answers like RevenueCat v2 (fact-check
@@ -66,11 +90,74 @@ HOST = os.environ.get("WAPPI_MOCK_HOST", "127.0.0.1")
 LOG = os.environ.get("WAPPI_MOCK_LOG", "")
 
 LOCK = threading.Lock()
-STATE = {"messages": {}, "calls": [], "faults": [], "seq": 0, "profiles": {}, "rc_aliases": {}}
+ASC_LAG_S = 60            # WhatsApp: an asc page of a chat whose first message is younger than this comes back empty
+OWN_LID = "100000000000001@lid"
+
+
+def _fresh_state():
+    return {"messages": {}, "calls": [], "faults": [], "seq": 0, "profiles": {}, "rc_aliases": {},
+            "dialogs": {}, "lid_rows": {}, "own_lid": {}, "asc_lag_s": ASC_LAG_S}
+
+
+STATE = _fresh_state()
 
 
 def _key(profile_id, chat_id):
     return f"{profile_id}|{chat_id}"
+
+
+def _lid_chat(pid, chat_id):
+    """(the chat id the rows are kept under, its @lid code or '') — asking a listed-under-code chat by its code serves it."""
+    codes = STATE["lid_rows"].get(pid) or {}
+    if chat_id in codes:
+        return chat_id, codes[chat_id]
+    for number, code in codes.items():
+        if code == chat_id:
+            return number, code
+    return chat_id, ""
+
+
+def _under_code(row, code, own):
+    """A row as Wappi lists it for a chat kept under its @lid code: chatId and the client's from are the code, the owner's
+    from is his own code."""
+    out = dict(row)
+    out["chatId"] = code
+    if row.get("fromMe") is True:
+        out["from"], out["to"] = own, code
+    else:
+        out["from"], out["to"] = code, own
+    return out
+
+
+def _messages_page(pid, chat_id, channel, limit, order):
+    """messages/get as the transport answers it: newest first by default; order=asc per channel (see the docstring)."""
+    kept, code = _lid_chat(pid, chat_id)
+    rows = list(STATE["messages"].get(_key(pid, kept), []))
+    rows.sort(key=lambda m: -(m.get("time") or 0))
+    if code:
+        own = STATE["own_lid"].get(pid) or OWN_LID
+        rows = [_under_code(r, code, own) for r in rows]
+    if order == "asc":
+        if channel == "telegram":                 # tapi: the newest page, re-sorted oldest first
+            return list(reversed(rows[:limit]))
+        oldest = min((m.get("time") or 0 for m in rows), default=0)
+        if rows and oldest >= _now() - STATE["asc_lag_s"]:
+            return []                             # WhatsApp: a brand-new chat is not indexed for asc yet
+        return list(reversed(rows))[:limit]
+    return rows[:limit]
+
+
+def _dialogs(pid, channel, q):
+    """The profile's chat cards: WhatsApp chats/filter matches client_name in a card's id, name or last message; Telegram
+    chats/get pages them (offset, limit), newest first."""
+    ds = [d for d in STATE["dialogs"].get(pid, []) if isinstance(d, dict)]
+    if channel == "whatsapp":
+        needle = str(q.get("client_name") or "")
+        return [d for d in ds if needle in " ".join(str(d.get(k) or "") for k in ("id", "name", "last_message_data"))]
+    if q.get("order") == "asc":
+        ds = list(reversed(ds))
+    off, lim = int(q.get("offset") or 0), int(q.get("limit") or 20)
+    return ds[off:off + lim]
 
 
 def _now():
@@ -203,10 +290,9 @@ class Handler(BaseHTTPRequestHandler):
         pid = q.get("profile_id") or b.get("profile_id") or ""
         with LOCK:
             if tail == "messages/get":
-                rows = list(STATE["messages"].get(_key(pid, q.get("chat_id", "")), []))
-                rows.sort(key=lambda m: -(m.get("time") or 0))
-                lim = int(q.get("limit") or 15)
-                return 200, {"status": "done", "messages": rows[:lim], "count": len(rows), "uuid": pid}
+                page = _messages_page(pid, q.get("chat_id", ""), channel, int(q.get("limit") or 15), q.get("order") or "desc")
+                kept, _ = _lid_chat(pid, q.get("chat_id", ""))
+                return 200, {"status": "done", "messages": page, "count": len(STATE["messages"].get(_key(pid, kept), [])), "uuid": pid}
             if tail == "messages/id/get":
                 mid = q.get("message_id")
                 for rows in STATE["messages"].values():
@@ -269,8 +355,10 @@ class Handler(BaseHTTPRequestHandler):
                 return 200, {"status": "done", "qr": "MOCK"}
             if tail in ("auth/code", "auth/phone", "auth/2fa"):
                 return 200, {"status": "done", "code": "MOCK-CODE", "detail": "auth_success"}
-            if tail == "chats/filter":
-                return 200, {"status": "done", "dialogs": []}
+            if tail in ("chats/filter", "chats/get"):
+                ds = _dialogs(pid, channel, q)
+                return 200, {"status": "done", "timestamp": _now(), "detail": "Chats fetched", "dialogs": ds,
+                             "total_count": len(ds) if channel == "whatsapp" else len(STATE["dialogs"].get(pid, []))}
         return 404, {"status": "error", "detail": f"mock: unknown route {tail}"}
 
     # ---- RevenueCat API v2 (A3 identity-heal) -----------------------------------------------
@@ -297,7 +385,7 @@ class Handler(BaseHTTPRequestHandler):
     def _control(self, method, path, q, b):
         with LOCK:
             if path == "/__mock/reset" and method == "POST":
-                STATE.update({"messages": {}, "calls": [], "faults": [], "seq": 0, "profiles": {}, "rc_aliases": {}})
+                STATE.update(_fresh_state())
                 return self._send(200, {"ok": True})
             if path == "/__mock/messages" and method == "POST":
                 STATE["messages"][_key(b["profile_id"], b["chat_id"])] = list(b.get("messages") or [])
@@ -337,10 +425,33 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/__mock/profile" and method == "POST":
                 STATE["profiles"].setdefault(b["profile_id"], {}).update({k: v for k, v in b.items() if k != "profile_id"})
                 return self._send(200, {"ok": True, "profile": STATE["profiles"][b["profile_id"]]})
+            if path == "/__mock/audience" and method == "POST":
+                pid = b["profile_id"]
+                if b.get("clear_faults"):
+                    STATE["faults"] = [f for f in STATE["faults"] if f.get("profile_id") != pid]
+                if "dialogs" in b:
+                    STATE["dialogs"][pid] = list(b.get("dialogs") or [])
+                if "lid_rows" in b:
+                    STATE["lid_rows"][pid] = dict(b.get("lid_rows") or {})
+                if b.get("own_lid"):
+                    STATE["own_lid"][pid] = b["own_lid"]
+                for k in ("phone", "account_phone"):
+                    if k in b:
+                        STATE["profiles"].setdefault(pid, {})[k] = b[k]
+                for route, times in (b.get("fail") or {}).items():
+                    STATE["faults"].append({"match": route, "mode": "status", "status": 500, "body": None, "times": int(times),
+                                            "delay": 0.0, "profile_id": pid, "after": "", "cross_chat": "",
+                                            "armed_at": len(STATE["calls"]), "echo": None})
+                if "asc_lag_s" in b:
+                    STATE["asc_lag_s"] = float(b["asc_lag_s"])
+                return self._send(200, {"ok": True, "dialogs": len(STATE["dialogs"].get(pid, [])),
+                                        "lid_rows": STATE["lid_rows"].get(pid, {}), "profile": STATE["profiles"].get(pid)})
             if path == "/__mock/state" and method == "GET":
                 return self._send(200, {"chats": {k: len(v) for k, v in STATE["messages"].items()},
                                         "calls": len(STATE["calls"]), "faults": STATE["faults"],
-                                        "profiles": STATE["profiles"], "rc_aliases": STATE["rc_aliases"]})
+                                        "profiles": STATE["profiles"], "rc_aliases": STATE["rc_aliases"],
+                                        "dialogs": {k: len(v) for k, v in STATE["dialogs"].items()},
+                                        "lid_rows": STATE["lid_rows"], "asc_lag_s": STATE["asc_lag_s"]})
         return self._send(404, {"error": "unknown control route"})
 
 

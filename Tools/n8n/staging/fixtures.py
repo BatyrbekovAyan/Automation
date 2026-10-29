@@ -9,6 +9,10 @@ exact id — never a broad prefix, never another run's rows (instruction: «уд
         -> prints the new app_user_id  (probe-<runid>)
     python3 Tools/n8n/staging/fixtures.py register-profile --app-user-id <id> --profile-id <pid> --channel whatsapp|telegram
     python3 Tools/n8n/staging/fixtures.py set-mode --profile-id <pid> [--chat-id '*'] --suppressed true|false
+    python3 Tools/n8n/staging/fixtures.py set-audience --profile-id <pid> --chat-id <chat> [--kind business|personal]
+        -> the owner's own decision for that chat (source owner, which always holds) — what a chat a scenario talks to needs
+           since «Личные и рабочие чаты»: the bots answer, suggest and store only in a BUSINESS chat; `delete` with the same
+           --profile-id removes it
     python3 Tools/n8n/staging/fixtures.py show --app-user-id <id>
     python3 Tools/n8n/staging/fixtures.py delete --app-user-id <id> [--profile-id <pid> ...]
     python3 Tools/n8n/staging/fixtures.py sweep-mock-profiles [--live <pid> ...]
@@ -55,6 +59,8 @@ def main():
     c.add_argument("--app-user-id", help="an explicit fixture RevenueCat id ($RCAnonymousID:e2e0e2e0<24 hex>) instead of probe-<runid>")
     r = sub.add_parser("register-profile"); r.add_argument("--app-user-id", required=True); r.add_argument("--profile-id", required=True); r.add_argument("--channel", default="whatsapp")
     m = sub.add_parser("set-mode"); m.add_argument("--profile-id", required=True); m.add_argument("--chat-id", default="*"); m.add_argument("--suppressed", required=True)
+    au = sub.add_parser("set-audience"); au.add_argument("--profile-id", required=True); au.add_argument("--chat-id", required=True)
+    au.add_argument("--kind", choices=("business", "personal"), default="business")
     s = sub.add_parser("show"); s.add_argument("--app-user-id", required=True)
     d = sub.add_parser("delete"); d.add_argument("--app-user-id", required=True); d.add_argument("--profile-id", action="append", default=[])
     w = sub.add_parser("sweep-mock-profiles"); w.add_argument("--live", action="append", default=[])
@@ -78,6 +84,15 @@ def main():
         sup = "true" if str(a.suppressed).lower() in ("1", "true", "yes") else "false"
         psql("insert into reply_mode_flags (profile_id, chat_id, suppressed, updated_at) values (:'p0', :'p1', :'p2'::boolean, now()) on conflict (profile_id, chat_id) do update set suppressed = excluded.suppressed, updated_at = now();",
              a.profile_id, a.chat_id, sup)
+        print("ok")
+    elif a.cmd == "set-audience":
+        # The owner's decision (source owner, reason owner): it holds whatever the connection moment says, and the bots'
+        # computed decisions never overwrite it. personal_since follows the kind, as the owner's own write sets it.
+        psql("insert into chat_audience (profile_id, chat_id, kind, source, reason, version, decided_at, personal_since, updated_at) "
+             "values (:'p0', :'p1', :'p2', 'owner', 'owner', 1, now(), case when :'p2' = 'personal' then now() end, now()) "
+             "on conflict (profile_id, chat_id) do update set kind = excluded.kind, source = 'owner', reason = 'owner', "
+             "decided_at = excluded.decided_at, personal_since = excluded.personal_since, wiped_at = null, updated_at = now();",
+             a.profile_id, a.chat_id, a.kind)
         print("ok")
     elif a.cmd == "show":
         print(json.dumps({

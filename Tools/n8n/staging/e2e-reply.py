@@ -34,9 +34,17 @@ def psql(sql):
     return out.stdout.strip()
 
 
-def event(profile_id, chat, mid, body, t, from_me=False, mtype="chat"):
-    return {"messages": [{"id": mid, "chatId": chat, "from": chat, "profile_id": profile_id, "body": body, "type": mtype,
-                          "time": t, "fromMe": from_me, "senderName": "client"}]}
+def event(profile_id, chat, mid, body, t, from_me=False, mtype="chat", contact_name=None, chat_type=None, is_bot=None,
+          whatsapp_chat_id=None):
+    """An incoming webhook. The four keyword fields are what the personal chats read off it (live check D6: the webhook
+    carries chat_type, is_bot, whatsapp_chat_id — the WhatsApp chat's @lid code — and contact_name); left out unless given,
+    so the payloads of the older scenarios stay as they were."""
+    m = {"id": mid, "chatId": chat, "from": chat, "profile_id": profile_id, "body": body, "type": mtype,
+         "time": t, "fromMe": from_me, "senderName": "client"}
+    for k, v in (("contact_name", contact_name), ("chat_type", chat_type), ("is_bot", is_bot), ("whatsapp_chat_id", whatsapp_chat_id)):
+        if v is not None:
+            m[k] = v
+    return {"messages": [m]}
 
 
 def post(profile_id, ev):
