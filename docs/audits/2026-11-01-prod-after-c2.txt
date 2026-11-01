@@ -1,0 +1,36 @@
+# verify-deployed.py --base https://n8n.choosereply.com — run by the owner after the C2 deploy (main 7a7a40a0), 2026-11-01 ~10:55Z
+base https://n8n.choosereply.com: canonical 30 (diff 0), clones 2 (behind template 0, of them prompt head behind 0; custom prompts 0, not counted), archived clones 1 (not counted), other 0
+  prompt map = Create/Edit Vertical Prompt as introduced in fce9987b (sha256 e027b4b39537)
+  OK      0DP79STI3pafXO9B 0DP79STI3pafXO9B-Set_Workflow_State.json  active=True names=True graph=True published=True
+  OK      2htWSV5IHO8E2CgB 2htWSV5IHO8E2CgB-Dashboard_Outcomes.json  active=True names=True graph=True published=True
+  OK      2islisFH7jjLoPQM 2islisFH7jjLoPQM-Delete_Orphan_Profiles.json  active=True names=True graph=True published=True
+  OK      3qax5J9u2qsT9Vao 3qax5J9u2qsT9Vao-Edit_Whatsapp_Workflow.json  active=True names=True graph=True published=True
+  OK      4VN3gsFaC2HUYmcc 4VN3gsFaC2HUYmcc-Telegram_Bot.json  active=False names=True graph=True published=None
+  OK      4wYitz5ek30SVNlT 4wYitz5ek30SVNlT-WhatsApp_Bot.json  active=False names=True graph=True published=None
+  OK      9PTyYcelRQI7bGDb 9PTyYcelRQI7bGDb-Suggest_Replies.json  active=True names=True graph=True published=True
+  OK      KoTuIlk4LMrlvnWI KoTuIlk4LMrlvnWI-Upload_File.json  active=True names=True graph=True published=True
+  OK      SCLcpn6DMDG3Z4VN SCLcpn6DMDG3Z4VN-Set_Reply_Mode.json  active=True names=True graph=True published=True
+  OK      TwWPW3gIyjZS3foR TwWPW3gIyjZS3foR-Edit_Telegram_Workflow.json  active=True names=True graph=True published=True
+  OK      Uz6HBBUpAiUqVysB Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json  active=True names=True graph=True published=True
+  OK      XuvOp7TxOImOAmlj XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json  active=True names=True graph=True published=True
+  OK      ZGYr6srzS3rSSXHp ZGYr6srzS3rSSXHp-RevenueCat_Events.json  active=True names=True graph=True published=True
+  OK      ZTqpumOpL1rNDOp6 ZTqpumOpL1rNDOp6-Delete_File.json  active=True names=True graph=True published=True
+  OK      crAuthSession001 crAuthSession001-Auth_Session.json  active=True names=True graph=True published=True
+  OK      crChannelWatch001 crChannelWatch001-Channel_Watch.json  active=True names=True graph=True published=True
+  OK      crHandoffDry0001 crHandoffDry0001-Handoff_Request_Dry.json  active=True names=True graph=True published=True
+  OK      crHandoffNtfy001 crHandoffNtfy001-Handoff_Notifier.json  active=True names=True graph=True published=True
+  OK      crHandoffReq0001 crHandoffReq0001-Handoff_Request.json  active=True names=True graph=True published=True
+  OK      crHandoffsApi001 crHandoffsApi001-Handoffs.json  active=True names=True graph=True published=True
+  OK      crPriceSearch001 crPriceSearch001-Price_List_Search.json  active=True names=True graph=True published=True
+  OK      crSetSchedule001 crSetSchedule001-Set_Schedule.json  active=True names=True graph=True published=True
+  OK      crTestDialog0001 crTestDialog0001-Test_Dialog.json  active=True names=True graph=True published=True
+  OK      crVerifyIdent001 crVerifyIdent001-Verify_Identity.json  active=True names=True graph=True published=True
+  OK      crWappiProxy0001 crWappiProxy0001-Wappi_Proxy.json  active=True names=True graph=True published=True
+  OK      fXYpCXPKw92EzRz8 fXYpCXPKw92EzRz8-Profile_Lifecycle_Sweep.json  active=True names=True graph=True published=True
+  OK      hHwvfOvTCS42pXnq hHwvfOvTCS42pXnq-Landing_Lead.json  active=True names=True graph=True published=True
+  OK      jtbssfzXbOxwTK4k jtbssfzXbOxwTK4k-Get_Usage.json  active=True names=True graph=True published=True
+  OK      lmjYsdNcQA2IE5rl lmjYsdNcQA2IE5rl-Delete_Bot_Files.json  active=True names=True graph=True published=True
+  OK      olmqWMfcFpCEcpiE olmqWMfcFpCEcpiE-Support_Message.json  active=True names=True graph=True published=True
+  clone   TbQaKxJaBJkKN2nA '2' [telegram] active=True nodes=60 graph=62e09511fc94 published=62e09511fc94 sticky=62e09511fc94 AT-CANONICAL  prompt=at_canonical/auto_parts
+  clone   aND1y2ktZoNlszAW '2' [whatsapp] active=True nodes=60 graph=c0a7c5186fb2 published=c0a7c5186fb2 sticky=c0a7c5186fb2 AT-CANONICAL  prompt=at_canonical/auto_parts
+  archived tqGXmiT6aJu7vUIG '13' [whatsapp] graph=19b0e4675a8b — retired by the owner, not counted

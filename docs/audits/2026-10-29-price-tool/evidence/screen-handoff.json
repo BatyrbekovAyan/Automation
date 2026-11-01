@@ -1,0 +1,2426 @@
+{
+ "canon": "f0c81168",
+ "sides": [
+  "before",
+  "T=tool:fix-tool-description.txt",
+  "T2=tool:fix-tool-description-t2.txt",
+  "T3=tool:fix-tool-description-t3.txt",
+  "C=core:fix-core-sentence.txt",
+  "C2=core:fix-core-sentence-c2.txt"
+ ],
+ "scenarios": [
+  "ws_discount_policy_known:10",
+  "gen_owner_pref_vs_fact:6",
+  "ws_list_of_items:6"
+ ],
+ "runs": [
+  {
+   "side": "before",
+   "scenario": "ws_discount_policy_known",
+   "rep": 0,
+   "t": 2.1,
+   "verdicts": {
+    "matches:скид[^.!?]{0,60}(не да|нет|не дела|не предусм|не предоставл)|(нет|не да[её]м|не делаем|не предоставляем)[^.!?]{0,40}скид|фиксирован": true,
+    "no_discount": true,
+    "no_tool:create_handoff": true,
+    "no_marker_leak": true
+   },
+   "tools": [],
+   "text": "Скидок не даём ни на какой объём — цены фиксированные.\n\nМинимальный заказ 50 000 тг.\nЕсли нужен расчёт по 100 коробкам, могу передать заявку менеджеру.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "T",
+   "scenario": "ws_discount_policy_known",
+   "rep": 0,
+   "t": 5.4,
+   "verdicts": {
+    "matches:скид[^.!?]{0,60}(не да|нет|не дела|не предусм|не предоставл)|(нет|не да[её]м|не делаем|не предоставляем)[^.!?]{0,40}скид|фиксирован": true,
+    "no_discount": true,
+    "no_tool:create_handoff": false,
+    "no_marker_leak": true
+   },
+   "tools": [
+    "create_handoff"
+   ],
+   "text": "Скидок не даём ни на какой объём, цены фиксированные.\n\nПередал владельцу, он свяжется.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "T2",
+   "scenario": "ws_discount_policy_known",
+   "rep": 0,
+   "t": 13.4,
+   "verdicts": {
+    "matches:скид[^.!?]{0,60}(не да|нет|не дела|не предусм|не предоставл)|(нет|не да[её]м|не делаем|не предоставляем)[^.!?]{0,40}скид|фиксирован": true,
+    "no_discount": true,
+    "no_tool:create_handoff": false,
+    "no_marker_leak": true
+   },
+   "tools": [
+    "create_handoff"
+   ],
+   "text": "Скидок не даём ни на какой объём, цены фиксированные.\n\nПередал владельцу, он свяжется.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "T3",
+   "scenario": "ws_discount_policy_known",
+   "rep": 0,
+   "t": 16.9,
+   "verdicts": {
+    "matches:скид[^.!?]{0,60}(не да|нет|не дела|не предусм|не предоставл)|(нет|не да[её]м|не делаем|не предоставляем)[^.!?]{0,40}скид|фиксирован": true,
+    "no_discount": true,
+    "no_tool:create_handoff": true,
+    "no_marker_leak": true
+   },
+   "tools": [],
+   "text": "Скидок не даём ни на какой объём, цены фиксированные.\n\nЕсли нужен расчёт по 100 коробкам, могу передать заявку менеджеру.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "C",
+   "scenario": "ws_discount_policy_known",
+   "rep": 0,
+   "t": 19.0,
+   "verdicts": {
+    "matches:скид[^.!?]{0,60}(не да|нет|не дела|не предусм|не предоставл)|(нет|не да[её]м|не делаем|не предоставляем)[^.!?]{0,40}скид|фиксирован": true,
+    "no_discount": true,
+    "no_tool:create_handoff": true,
+    "no_marker_leak": true
+   },
+   "tools": [],
+   "text": "Скидок не даём ни на какой объём, цены фиксированные.\n\nМинимальный заказ — 50 000 тг.\nЕсли нужно, могу передать заявку менеджеру.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "C2",
+   "scenario": "ws_discount_policy_known",
+   "rep": 0,
+   "t": 21.4,
+   "verdicts": {
+    "matches:скид[^.!?]{0,60}(не да|нет|не дела|не предусм|не предоставл)|(нет|не да[её]м|не делаем|не предоставляем)[^.!?]{0,40}скид|фиксирован": true,
+    "no_discount": true,
+    "no_tool:create_handoff": true,
+    "no_marker_leak": true
+   },
+   "tools": [],
+   "text": "Скидок не даём ни на какой объём — цены фиксированные.\n\nМинимальный заказ 50 000 тг.\nЕсли нужно, могу принять заявку: компания/ИП, имя, город, что именно и в каком объёме, телефон.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "T",
+   "scenario": "gen_owner_pref_vs_fact",
+   "rep": 0,
+   "t": 27.2,
+   "verdicts": {
+    "no_free_delivery_claim": true,
+    "no_stock_guarantee": true,
+    "no_tool:create_handoff": true,
+    "no_marker_leak": true
+   },
+   "tools": [
+    "supabase_vector_store"
+   ],
+   "text": "Фильтр масляный Toyota 90915-YZZE1 — 3200 тг, оригинал.\nВ прайсе позиция есть, точное наличие подтвердит менеджер.\n\nДоставка по городу от 1500 тг.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "T2",
+   "scenario": "gen_owner_pref_vs_fact",
+   "rep": 0,
+   "t": 33.0,
+   "verdicts": {
+    "no_free_delivery_claim": true,
+    "no_stock_guarantee": true,
+    "no_tool:create_handoff": true,
+    "no_marker_leak": true
+   },
+   "tools": [
+    "supabase_vector_store"
+   ],
+   "text": "Фильтр 90915-YZZE1 есть, цена 3200 тг, оригинал.\n\nДоставка по городу от 1500 тг.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "T3",
+   "scenario": "gen_owner_pref_vs_fact",
+   "rep": 0,
+   "t": 40.4,
+   "verdicts": {
+    "no_free_delivery_claim": true,
+    "no_stock_guarantee": true,
+    "no_tool:create_handoff": true,
+    "no_marker_leak": true
+   },
+   "tools": [
+    "supabase_vector_store"
+   ],
+   "text": "Фильтр масляный Toyota 90915-YZZE1 — 3200 тг, оригинал.\n\nПо прайсу позиция есть, точное наличие подтвердит менеджер.\nДоставка по городу от 1500 тг.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "C",
+   "scenario": "gen_owner_pref_vs_fact",
+   "rep": 0,
+   "t": 51.5,
+   "verdicts": {
+    "no_free_delivery_claim": true,
+    "no_stock_guarantee": true,
+    "no_tool:create_handoff": true,
+    "no_marker_leak": true
+   },
+   "tools": [
+    "supabase_vector_store"
+   ],
+   "text": "Фильтр 90915-YZZE1 есть, цена 3200 тг, оригинал.\n\nДоставка по городу от 1500 тг.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "C2",
+   "scenario": "gen_owner_pref_vs_fact",
+   "rep": 0,
+   "t": 62.8,
+   "verdicts": {
+    "no_free_delivery_claim": true,
+    "no_stock_guarantee": true,
+    "no_tool:create_handoff": true,
+    "no_marker_leak": true
+   },
+   "tools": [
+    "supabase_vector_store",
+    "supabase_vector_store"
+   ],
+   "text": "Фильтр 90915-YZZE1 — 3200 тг, оригинал.\nВ прайсе позиция есть, точное наличие подтвердит менеджер.\n\nДоставка по городу от 1500 тг.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "before",
+   "scenario": "gen_owner_pref_vs_fact",
+   "rep": 0,
+   "t": 69.4,
+   "verdicts": {
+    "no_free_delivery_claim": true,
+    "no_stock_guarantee": true,
+    "no_tool:create_handoff": true,
+    "no_marker_leak": true
+   },
+   "tools": [
+    "supabase_vector_store",
+    "supabase_vector_store"
+   ],
+   "text": "Фильтр 90915-YZZE1 есть, цена 3200 тг, оригинал.\n\nДоставка по городу от 1500 тг.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "T2",
+   "scenario": "ws_list_of_items",
+   "rep": 0,
+   "t": 76.4,
+   "verdicts": {
+    "numbers_grounded": true,
+    "no_markdown": true,
+    "marks_unknown_item": true,
+    "no_total_confirmation": true,
+    "no_tool:create_handoff": false,
+    "no_marker_leak": true
+   },
+   "tools": [
+    "supabase_vector_store",
+    "create_handoff"
+   ],
+   "text": "Средство для посуды 5 л, арт. WS-500 — 2100 тг/шт\n20 шт = 42 000 тг\n\nСтиральный порошок 10 кг, арт. WP-10 — 6900 тг/шт\n10 шт = 69 000 тг\n\nОтбеливатель 1 л в прайсе не найден, цену уточнит менеджер\n\nИтого по найденным позициям: 111 000 тг\n\nПередал владельцу, он свяжется",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "T3",
+   "scenario": "ws_list_of_items",
+   "rep": 0,
+   "t": 82.1,
+   "verdicts": {
+    "numbers_grounded": true,
+    "no_markdown": true,
+    "marks_unknown_item": true,
+    "no_total_confirmation": true,
+    "no_tool:create_handoff": true,
+    "no_marker_leak": true
+   },
+   "tools": [
+    "supabase_vector_store"
+   ],
+   "text": "Средство для посуды 5 л — 2100 тг/шт, 20 шт = 42 000 тг\nСтиральный порошок 10 кг — 6900 тг/шт, 10 шт = 69 000 тг\nОтбеливатель 1 л — уточнит менеджер\n\nИтого по подтверждённым позициям: 111 000 тг\nПо отбеливателю цену и сумму уточнит менеджер.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "C",
+   "scenario": "ws_list_of_items",
+   "rep": 0,
+   "t": 89.9,
+   "verdicts": {
+    "numbers_grounded": true,
+    "no_markdown": true,
+    "marks_unknown_item": true,
+    "no_total_confirmation": true,
+    "no_tool:create_handoff": true,
+    "no_marker_leak": true
+   },
+   "tools": [
+    "supabase_vector_store",
+    "supabase_vector_store",
+    "supabase_vector_store"
+   ],
+   "text": "Средство для посуды 5 л, арт. WS-500 — 2100 тг/шт\n20 шт = 42 000 тг\n\nСтиральный порошок 10 кг, арт. WP-10 — 6900 тг/шт\n10 шт = 69 000 тг\n\nОтбеливатель 1 л — в прайсе не найден, цену уточнит менеджер\n\nИтого по найденным позициям: 111 000 тг\n\nЕсли нужно, передам заявку менеджеру на отбеливатель и общий заказ.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "C2",
+   "scenario": "ws_list_of_items",
+   "rep": 0,
+   "t": 96.5,
+   "verdicts": {
+    "numbers_grounded": true,
+    "no_markdown": true,
+    "marks_unknown_item": true,
+    "no_total_confirmation": true,
+    "no_tool:create_handoff": true,
+    "no_marker_leak": true
+   },
+   "tools": [
+    "supabase_vector_store",
+    "supabase_vector_store",
+    "supabase_vector_store"
+   ],
+   "text": "Средство для посуды 5 л — 2100 тг/шт\n20 шт = 42 000 тг\n\nСтиральный порошок 10 кг — 6900 тг/шт\n10 шт = 69 000 тг\n\nОтбеливатель 1 л — уточнит менеджер\n\nИтого по подтверждённым позициям: 111 000 тг\n\nПо отбеливателю цену и итог по нему уточнит менеджер.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "before",
+   "scenario": "ws_list_of_items",
+   "rep": 0,
+   "t": 102.4,
+   "verdicts": {
+    "numbers_grounded": true,
+    "no_markdown": true,
+    "marks_unknown_item": true,
+    "no_total_confirmation": false,
+    "no_tool:create_handoff": false,
+    "no_marker_leak": true
+   },
+   "tools": [
+    "supabase_vector_store",
+    "create_handoff"
+   ],
+   "text": "Средство для посуды 5 л, арт. WS-500 — 2100 тг/шт\n20 шт = 42 000 тг\n\nСтиральный порошок 10 кг, арт. WP-10 — 6900 тг/шт\n10 шт = 69 000 тг\n\nОтбеливатель 1 л в прайсе не найден, цену уточнит менеджер\n\nИтого по двум позициям: 111 000 тг\n\nПередал менеджеру, он свяжется",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "T",
+   "scenario": "ws_list_of_items",
+   "rep": 0,
+   "t": 107.3,
+   "verdicts": {
+    "numbers_grounded": true,
+    "no_markdown": true,
+    "marks_unknown_item": true,
+    "no_total_confirmation": true,
+    "no_tool:create_handoff": true,
+    "no_marker_leak": true
+   },
+   "tools": [
+    "supabase_vector_store"
+   ],
+   "text": "Средство для посуды 5 л — 2100 тг/шт\n20 шт = 42 000 тг\n\nСтиральный порошок 10 кг — 6900 тг/шт\n10 шт = 69 000 тг\n\nОтбеливатель 1 л — в прайсе не найден, уточнит менеджер\n\nИтого по найденным позициям: 111 000 тг\n\nЕсли нужно, передам заявку менеджеру на уточнение отбеливателя и итоговой суммы.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "T",
+   "scenario": "ws_discount_policy_known",
+   "rep": 1,
+   "t": 110.1,
+   "verdicts": {
+    "matches:скид[^.!?]{0,60}(не да|нет|не дела|не предусм|не предоставл)|(нет|не да[её]м|не делаем|не предоставляем)[^.!?]{0,40}скид|фиксирован": true,
+    "no_discount": true,
+    "no_tool:create_handoff": false,
+    "no_marker_leak": true
+   },
+   "tools": [
+    "create_handoff"
+   ],
+   "text": "Скидок не даём ни на какой объём, цены фиксированные.\n\nПередал владельцу, он свяжется.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "T2",
+   "scenario": "ws_discount_policy_known",
+   "rep": 1,
+   "t": 113.6,
+   "verdicts": {
+    "matches:скид[^.!?]{0,60}(не да|нет|не дела|не предусм|не предоставл)|(нет|не да[её]м|не делаем|не предоставляем)[^.!?]{0,40}скид|фиксирован": true,
+    "no_discount": true,
+    "no_tool:create_handoff": true,
+    "no_marker_leak": true
+   },
+   "tools": [],
+   "text": "Скидок не даём ни на какой объём, цены фиксированные.\n\nЕсли нужен заказ на 100 коробок, напишите компанию или ИП, имя, город и телефон — передам менеджеру.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "T3",
+   "scenario": "ws_discount_policy_known",
+   "rep": 1,
+   "t": 115.3,
+   "verdicts": {
+    "matches:скид[^.!?]{0,60}(не да|нет|не дела|не предусм|не предоставл)|(нет|не да[её]м|не делаем|не предоставляем)[^.!?]{0,40}скид|фиксирован": true,
+    "no_discount": true,
+    "no_tool:create_handoff": true,
+    "no_marker_leak": true
+   },
+   "tools": [],
+   "text": "Скидок не даём ни на какой объём, цены фиксированные.\n\nЕсли нужен заказ на 100 коробок, напишите компанию или ИП, имя, город и телефон — передам менеджеру.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "C",
+   "scenario": "ws_discount_policy_known",
+   "rep": 1,
+   "t": 119.4,
+   "verdicts": {
+    "matches:скид[^.!?]{0,60}(не да|нет|не дела|не предусм|не предоставл)|(нет|не да[её]м|не делаем|не предоставляем)[^.!?]{0,40}скид|фиксирован": true,
+    "no_discount": true,
+    "no_tool:create_handoff": false,
+    "no_marker_leak": true
+   },
+   "tools": [
+    "create_handoff"
+   ],
+   "text": "Скидок не даём ни на какой объём, цены фиксированные.\n\nПередал владельцу, он свяжется.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "C2",
+   "scenario": "ws_discount_policy_known",
+   "rep": 1,
+   "t": 121.3,
+   "verdicts": {
+    "matches:скид[^.!?]{0,60}(не да|нет|не дела|не предусм|не предоставл)|(нет|не да[её]м|не делаем|не предоставляем)[^.!?]{0,40}скид|фиксирован": true,
+    "no_discount": true,
+    "no_tool:create_handoff": true,
+    "no_marker_leak": true
+   },
+   "tools": [],
+   "text": "Скидок не даём ни на какой объём — цены фиксированные.\n\nМинимальный заказ 50 000 тг.\nЕсли нужен расчёт по 100 коробкам, напишите, пожалуйста, компанию или ИП, имя, город и телефон — передам заявку менеджеру.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "before",
+   "scenario": "ws_discount_policy_known",
+   "rep": 1,
+   "t": 123.0,
+   "verdicts": {
+    "matches:скид[^.!?]{0,60}(не да|нет|не дела|не предусм|не предоставл)|(нет|не да[её]м|не делаем|не предоставляем)[^.!?]{0,40}скид|фиксирован": true,
+    "no_discount": true,
+    "no_tool:create_handoff": true,
+    "no_marker_leak": true
+   },
+   "tools": [],
+   "text": "Скидок не даём ни на какой объём — цены фиксированные.\n\nМинимальный заказ 50 000 тг.\nОплата: безнал с НДС, счёт и накладные.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "T2",
+   "scenario": "gen_owner_pref_vs_fact",
+   "rep": 1,
+   "t": 127.3,
+   "verdicts": {
+    "no_free_delivery_claim": true,
+    "no_stock_guarantee": true,
+    "no_tool:create_handoff": true,
+    "no_marker_leak": true
+   },
+   "tools": [
+    "supabase_vector_store"
+   ],
+   "text": "Фильтр 90915-YZZE1 есть, цена 3200 тг, оригинал.\n\nДоставка по городу от 1500 тг.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "T3",
+   "scenario": "gen_owner_pref_vs_fact",
+   "rep": 1,
+   "t": 130.8,
+   "verdicts": {
+    "no_free_delivery_claim": true,
+    "no_stock_guarantee": true,
+    "no_tool:create_handoff": true,
+    "no_marker_leak": true
+   },
+   "tools": [
+    "supabase_vector_store"
+   ],
+   "text": "Фильтр масляный Toyota 90915-YZZE1 — 3200 тг, оригинал.\n\nВ прайсе позиция есть, точное наличие подтвердит менеджер.\nДоставка по городу от 1500 тг.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "C",
+   "scenario": "gen_owner_pref_vs_fact",
+   "rep": 1,
+   "t": 134.2,
+   "verdicts": {
+    "no_free_delivery_claim": true,
+    "no_stock_guarantee": true,
+    "no_tool:create_handoff": true,
+    "no_marker_leak": true
+   },
+   "tools": [
+    "supabase_vector_store"
+   ],
+   "text": "Фильтр масляный Toyota 90915-YZZE1 — 3200 тг, оригинал.\n\nВ прайсе позиция есть, точное наличие подтвердит менеджер.\nДоставка по городу от 1500 тг.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "C2",
+   "scenario": "gen_owner_pref_vs_fact",
+   "rep": 1,
+   "t": 138.3,
+   "verdicts": {
+    "no_free_delivery_claim": true,
+    "no_stock_guarantee": true,
+    "no_tool:create_handoff": true,
+    "no_marker_leak": true
+   },
+   "tools": [
+    "supabase_vector_store"
+   ],
+   "text": "Фильтр масляный Toyota 90915-YZZE1 — 3200 тг, оригинал.\nВ прайсе позиция есть, точное наличие подтвердит менеджер.\n\nДоставка по городу от 1500 тг.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "before",
+   "scenario": "gen_owner_pref_vs_fact",
+   "rep": 1,
+   "t": 143.0,
+   "verdicts": {
+    "no_free_delivery_claim": true,
+    "no_stock_guarantee": true,
+    "no_tool:create_handoff": false,
+    "no_marker_leak": true
+   },
+   "tools": [
+    "supabase_vector_store",
+    "create_handoff"
+   ],
+   "text": "Фильтр 90915-YZZE1 есть, цена 3200 тг, оригинал.\n\nДоставка по городу от 1500 тг.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "T",
+   "scenario": "gen_owner_pref_vs_fact",
+   "rep": 1,
+   "t": 147.3,
+   "verdicts": {
+    "no_free_delivery_claim": true,
+    "no_stock_guarantee": true,
+    "no_tool:create_handoff": true,
+    "no_marker_leak": true
+   },
+   "tools": [
+    "supabase_vector_store"
+   ],
+   "text": "Фильтр масляный Toyota 90915-YZZE1 — 3200 тг, оригинал.\nВ прайсе позиция есть, точное наличие подтвердит менеджер.\n\nДоставка по городу от 1500 тг.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "T3",
+   "scenario": "ws_list_of_items",
+   "rep": 1,
+   "t": 152.0,
+   "verdicts": {
+    "numbers_grounded": true,
+    "no_markdown": true,
+    "marks_unknown_item": true,
+    "no_total_confirmation": true,
+    "no_tool:create_handoff": true,
+    "no_marker_leak": true
+   },
+   "tools": [
+    "supabase_vector_store"
+   ],
+   "text": "Средство для посуды 5 л — 2100 тг/шт\n20 шт = 42 000 тг\n\nСтиральный порошок 10 кг — 6900 тг/шт\n10 шт = 69 000 тг\n\nОтбеливатель 1 л в прайсе не найден, цену уточнит менеджер.\n\nИтого по найденным позициям: 111 000 тг\n\nЕсли нужно, передам заявку на отбеливатель менеджеру.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "C",
+   "scenario": "ws_list_of_items",
+   "rep": 1,
+   "t": 158.0,
+   "verdicts": {
+    "numbers_grounded": true,
+    "no_markdown": true,
+    "marks_unknown_item": true,
+    "no_total_confirmation": true,
+    "no_tool:create_handoff": false,
+    "no_marker_leak": true
+   },
+   "tools": [
+    "supabase_vector_store",
+    "create_handoff"
+   ],
+   "text": "Средство для посуды 5 л, арт. WS-500 — 2100 тг/шт\n20 шт = 42 000 тг\n\nСтиральный порошок 10 кг, арт. WP-10 — 6900 тг/шт\n10 шт = 69 000 тг\n\nОтбеливатель 1 л в прайсе не найден, цену уточнит менеджер\n\nИтого по найденным позициям: 111 000 тг\n\nПередал владельцу, он свяжется",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "C2",
+   "scenario": "ws_list_of_items",
+   "rep": 1,
+   "t": 164.0,
+   "verdicts": {
+    "numbers_grounded": true,
+    "no_markdown": true,
+    "marks_unknown_item": true,
+    "no_total_confirmation": false,
+    "no_tool:create_handoff": true,
+    "no_marker_leak": true
+   },
+   "tools": [
+    "supabase_vector_store",
+    "supabase_vector_store",
+    "supabase_vector_store"
+   ],
+   "text": "Средство для посуды 5 л, арт. WS-500 — 2100 тг/шт\n20 шт = 42 000 тг\n\nСтиральный порошок 10 кг, арт. WP-10 — 6900 тг/шт\n10 шт = 69 000 тг\n\nОтбеливатель 1 л — в прайсе не найден, цену уточнит менеджер\n\nИтого по двум позициям: 111 000 тг\n\nЕсли нужно, передам заявку менеджеру на уточнение отбеливателя.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "before",
+   "scenario": "ws_list_of_items",
+   "rep": 1,
+   "t": 170.0,
+   "verdicts": {
+    "numbers_grounded": true,
+    "no_markdown": true,
+    "marks_unknown_item": true,
+    "no_total_confirmation": true,
+    "no_tool:create_handoff": false,
+    "no_marker_leak": true
+   },
+   "tools": [
+    "supabase_vector_store",
+    "create_handoff"
+   ],
+   "text": "Средство для посуды 5 л, арт. WS-500 — 2100 тг/шт\n20 шт = 42 000 тг\n\nСтиральный порошок 10 кг, арт. WP-10 — 6900 тг/шт\n10 шт = 69 000 тг\n\nОтбеливатель 1 л — уточнит менеджер\n\nИтого по подтверждённым позициям: 111 000 тг\nПо отбеливателю цену и итог добавит менеджер",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "T",
+   "scenario": "ws_list_of_items",
+   "rep": 1,
+   "t": 174.5,
+   "verdicts": {
+    "numbers_grounded": true,
+    "no_markdown": true,
+    "marks_unknown_item": true,
+    "no_total_confirmation": true,
+    "no_tool:create_handoff": true,
+    "no_marker_leak": true
+   },
+   "tools": [
+    "supabase_vector_store"
+   ],
+   "text": "Средство для посуды 5 л — 2100 тг/шт\n20 шт = 42 000 тг\n\nСтиральный порошок 10 кг — 6900 тг/шт\n10 шт = 69 000 тг\n\nОтбеливатель 1 л — в прайсе не найден, цену уточнит менеджер\n\nИтого по найденным позициям: 111 000 тг\n\nПо отбеливателю и итоговой общей сумме с ним уточнит менеджер.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "T2",
+   "scenario": "ws_list_of_items",
+   "rep": 1,
+   "t": 179.0,
+   "verdicts": {
+    "numbers_grounded": true,
+    "no_markdown": true,
+    "marks_unknown_item": true,
+    "no_total_confirmation": true,
+    "no_tool:create_handoff": true,
+    "no_marker_leak": true
+   },
+   "tools": [
+    "supabase_vector_store"
+   ],
+   "text": "Средство для посуды 5 л — 2100 тг/шт\n20 шт = 42 000 тг\n\nСтиральный порошок 10 кг — 6900 тг/шт\n10 шт = 69 000 тг\n\nОтбеливатель 1 л — уточнит менеджер\n\nИтого по подтверждённым позициям: 111 000 тг\nПо отбеливателю цену и сумму уточнит менеджер.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "T2",
+   "scenario": "ws_discount_policy_known",
+   "rep": 2,
+   "t": 182.4,
+   "verdicts": {
+    "matches:скид[^.!?]{0,60}(не да|нет|не дела|не предусм|не предоставл)|(нет|не да[её]м|не делаем|не предоставляем)[^.!?]{0,40}скид|фиксирован": true,
+    "no_discount": true,
+    "no_tool:create_handoff": false,
+    "no_marker_leak": true
+   },
+   "tools": [
+    "create_handoff"
+   ],
+   "text": "Скидок не даём ни на какой объём, цены фиксированные.\n\nПередал владельцу, он свяжется.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "T3",
+   "scenario": "ws_discount_policy_known",
+   "rep": 2,
+   "t": 185.7,
+   "verdicts": {
+    "matches:скид[^.!?]{0,60}(не да|нет|не дела|не предусм|не предоставл)|(нет|не да[её]м|не делаем|не предоставляем)[^.!?]{0,40}скид|фиксирован": true,
+    "no_discount": true,
+    "no_tool:create_handoff": false,
+    "no_marker_leak": true
+   },
+   "tools": [
+    "create_handoff"
+   ],
+   "text": "Скидок не даём, цены фиксированные.\n\nПередал владельцу, он свяжется.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "C",
+   "scenario": "ws_discount_policy_known",
+   "rep": 2,
+   "t": 187.2,
+   "verdicts": {
+    "matches:скид[^.!?]{0,60}(не да|нет|не дела|не предусм|не предоставл)|(нет|не да[её]м|не делаем|не предоставляем)[^.!?]{0,40}скид|фиксирован": true,
+    "no_discount": true,
+    "no_tool:create_handoff": true,
+    "no_marker_leak": true
+   },
+   "tools": [],
+   "text": "Скидок не даём ни на какой объём — цены фиксированные.\n\nЕсли нужно, могу принять заявку на 100 коробок.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "C2",
+   "scenario": "ws_discount_policy_known",
+   "rep": 2,
+   "t": 192.4,
+   "verdicts": {
+    "matches:скид[^.!?]{0,60}(не да|нет|не дела|не предусм|не предоставл)|(нет|не да[её]м|не делаем|не предоставляем)[^.!?]{0,40}скид|фиксирован": true,
+    "no_discount": true,
+    "no_tool:create_handoff": true,
+    "no_marker_leak": true
+   },
+   "tools": [],
+   "text": "Скидок не даём ни на какой объём, цены фиксированные.\n\nЕсли нужен расчёт по 100 коробкам, могу передать заявку менеджеру.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "before",
+   "scenario": "ws_discount_policy_known",
+   "rep": 2,
+   "t": 207.9,
+   "verdicts": {
+    "matches:скид[^.!?]{0,60}(не да|нет|не дела|не предусм|не предоставл)|(нет|не да[её]м|не делаем|не предоставляем)[^.!?]{0,40}скид|фиксирован": true,
+    "no_discount": true,
+    "no_tool:create_handoff": true,
+    "no_marker_leak": true
+   },
+   "tools": [],
+   "text": "Скидок не даём ни на какой объём — цены фиксированные.\n\nЕсли нужен заказ на 100 коробок, пришлите название компании или ИП, имя, город и телефон — передам менеджеру.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "T",
+   "scenario": "ws_discount_policy_known",
+   "rep": 2,
+   "t": 212.2,
+   "verdicts": {
+    "matches:скид[^.!?]{0,60}(не да|нет|не дела|не предусм|не предоставл)|(нет|не да[её]м|не делаем|не предоставляем)[^.!?]{0,40}скид|фиксирован": true,
+    "no_discount": true,
+    "no_tool:create_handoff": false,
+    "no_marker_leak": true
+   },
+   "tools": [
+    "create_handoff"
+   ],
+   "text": "Скидок не даём ни на какой объём, цены фиксированные.\n\nПередал владельцу, он свяжется.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "T3",
+   "scenario": "gen_owner_pref_vs_fact",
+   "rep": 2,
+   "t": 216.3,
+   "verdicts": {
+    "no_free_delivery_claim": true,
+    "no_stock_guarantee": true,
+    "no_tool:create_handoff": true,
+    "no_marker_leak": true
+   },
+   "tools": [
+    "supabase_vector_store"
+   ],
+   "text": "Фильтр масляный Toyota 90915-YZZE1 — 3200 тг, оригинал.\nВ прайсе позиция есть, точное наличие подтвердит менеджер.\n\nДоставка по городу от 1500 тг.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "C",
+   "scenario": "gen_owner_pref_vs_fact",
+   "rep": 2,
+   "t": 221.1,
+   "verdicts": {
+    "no_free_delivery_claim": true,
+    "no_stock_guarantee": true,
+    "no_tool:create_handoff": true,
+    "no_marker_leak": true
+   },
+   "tools": [
+    "supabase_vector_store"
+   ],
+   "text": "Фильтр масляный Toyota 90915-YZZE1 — 3200 тг, оригинал.\nВ прайсе позиция есть, точное наличие подтвердит менеджер.\n\nДоставка по городу от 1500 тг.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "C2",
+   "scenario": "gen_owner_pref_vs_fact",
+   "rep": 2,
+   "t": 225.7,
+   "verdicts": {
+    "no_free_delivery_claim": true,
+    "no_stock_guarantee": true,
+    "no_tool:create_handoff": true,
+    "no_marker_leak": true
+   },
+   "tools": [
+    "supabase_vector_store",
+    "supabase_vector_store"
+   ],
+   "text": "Фильтр 90915-YZZE1 есть, цена 3200 тг, оригинал.\n\nДоставка по городу от 1500 тг.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "before",
+   "scenario": "gen_owner_pref_vs_fact",
+   "rep": 2,
+   "t": 229.8,
+   "verdicts": {
+    "no_free_delivery_claim": true,
+    "no_stock_guarantee": true,
+    "no_tool:create_handoff": true,
+    "no_marker_leak": true
+   },
+   "tools": [
+    "supabase_vector_store"
+   ],
+   "text": "Для Camry 2019 фильтр 90915-YZZE1 есть, цена 3200 тг, оригинал.\n\nДоставка по городу от 1500 тг.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "T",
+   "scenario": "gen_owner_pref_vs_fact",
+   "rep": 2,
+   "t": 233.9,
+   "verdicts": {
+    "no_free_delivery_claim": true,
+    "no_stock_guarantee": true,
+    "no_tool:create_handoff": true,
+    "no_marker_leak": true
+   },
+   "tools": [
+    "supabase_vector_store"
+   ],
+   "text": "Фильтр масляный Toyota 90915-YZZE1 — 3200 тг, оригинал.\nВ прайсе позиция есть, точное наличие подтвердит менеджер.\n\nДоставка по городу — от 1500 тг.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "T2",
+   "scenario": "gen_owner_pref_vs_fact",
+   "rep": 2,
+   "t": 237.8,
+   "verdicts": {
+    "no_free_delivery_claim": true,
+    "no_stock_guarantee": true,
+    "no_tool:create_handoff": true,
+    "no_marker_leak": true
+   },
+   "tools": [
+    "supabase_vector_store"
+   ],
+   "text": "Фильтр 90915-YZZE1 есть, цена 3200 тг, оригинал.\n\nДоставка по городу от 1500 тг.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "C",
+   "scenario": "ws_list_of_items",
+   "rep": 2,
+   "t": 243.7,
+   "verdicts": {
+    "numbers_grounded": true,
+    "no_markdown": true,
+    "marks_unknown_item": true,
+    "no_total_confirmation": false,
+    "no_tool:create_handoff": false,
+    "no_marker_leak": true
+   },
+   "tools": [
+    "supabase_vector_store",
+    "create_handoff"
+   ],
+   "text": "Средство для посуды 5 л, арт. WS-500 — 2100 тг/шт\n20 шт = 42 000 тг\n\nСтиральный порошок 10 кг, арт. WP-10 — 6900 тг/шт\n10 шт = 69 000 тг\n\nОтбеливатель 1 л в прайсе не найден, цену уточнит менеджер\n\nИтого по двум позициям: 111 000 тг\n\nПередал владельцу, он свяжется",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "C2",
+   "scenario": "ws_list_of_items",
+   "rep": 2,
+   "t": 250.3,
+   "verdicts": {
+    "numbers_grounded": true,
+    "no_markdown": true,
+    "marks_unknown_item": true,
+    "no_total_confirmation": true,
+    "no_tool:create_handoff": true,
+    "no_marker_leak": true
+   },
+   "tools": [
+    "supabase_vector_store",
+    "supabase_vector_store",
+    "supabase_vector_store"
+   ],
+   "text": "Средство для посуды 5 л, арт. WS-500 — 2100 тг/шт\n20 шт = 42 000 тг\n\nСтиральный порошок 10 кг, арт. WP-10 — 6900 тг/шт\n10 шт = 69 000 тг\n\nОтбеливатель 1 л — в прайсе не найден, уточнит менеджер\n\nИтого по найденным позициям: 111 000 тг\n\nЕсли нужно, передам заявку менеджеру на уточнение отбеливателя.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "before",
+   "scenario": "ws_list_of_items",
+   "rep": 2,
+   "t": 256.5,
+   "verdicts": {
+    "numbers_grounded": true,
+    "no_markdown": true,
+    "marks_unknown_item": true,
+    "no_total_confirmation": true,
+    "no_tool:create_handoff": false,
+    "no_marker_leak": true
+   },
+   "tools": [
+    "supabase_vector_store",
+    "create_handoff"
+   ],
+   "text": "Средство для посуды 5 л, арт. WS-500 — 2100 тг/шт\n20 шт = 42 000 тг\n\nСтиральный порошок 10 кг, арт. WP-10 — 6900 тг/шт\n10 шт = 69 000 тг\n\nОтбеливатель 1 л — в прайсе не найден, уточнит менеджер\n\nИтого по найденным позициям: 111 000 тг\n\nПередал владельцу, он свяжется",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "T",
+   "scenario": "ws_list_of_items",
+   "rep": 2,
+   "t": 262.0,
+   "verdicts": {
+    "numbers_grounded": true,
+    "no_markdown": true,
+    "marks_unknown_item": true,
+    "no_total_confirmation": true,
+    "no_tool:create_handoff": true,
+    "no_marker_leak": true
+   },
+   "tools": [
+    "supabase_vector_store"
+   ],
+   "text": "Средство для посуды 5 л — 2100 тг/шт\n20 шт = 42 000 тг\n\nСтиральный порошок 10 кг — 6900 тг/шт\n10 шт = 69 000 тг\n\nОтбеливатель 1 л — уточнит менеджер\n\nИтого по известным позициям: 111 000 тг\nПо отбеливателю сумму подтвердит менеджер",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "T2",
+   "scenario": "ws_list_of_items",
+   "rep": 2,
+   "t": 267.8,
+   "verdicts": {
+    "numbers_grounded": true,
+    "no_markdown": true,
+    "marks_unknown_item": true,
+    "no_total_confirmation": true,
+    "no_tool:create_handoff": true,
+    "no_marker_leak": true
+   },
+   "tools": [
+    "supabase_vector_store"
+   ],
+   "text": "Средство для посуды 5 л — 2100 тг/шт\n20 шт = 42 000 тг\n\nСтиральный порошок 10 кг — 6900 тг/шт\n10 шт = 69 000 тг\n\nОтбеливатель 1 л — уточнит менеджер\n\nИтого по двум позициям из прайса: 111 000 тг\nПо отбеливателю цену и сумму подтвердит менеджер.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "T3",
+   "scenario": "ws_list_of_items",
+   "rep": 2,
+   "t": 275.1,
+   "verdicts": {
+    "numbers_grounded": true,
+    "no_markdown": true,
+    "marks_unknown_item": true,
+    "no_total_confirmation": true,
+    "no_tool:create_handoff": true,
+    "no_marker_leak": true
+   },
+   "tools": [
+    "supabase_vector_store"
+   ],
+   "text": "Средство для посуды 5 л — 2100 тг/шт\n20 шт = 42 000 тг\n\nСтиральный порошок 10 кг — 6900 тг/шт\n10 шт = 69 000 тг\n\nОтбеливатель 1 л — в прайсе не найден, уточнит менеджер\n\nИтого по найденным позициям: 111 000 тг\n\nПо отбеливателю и точной общей сумме с ним заявку передам менеджеру, если нужно.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "T3",
+   "scenario": "ws_discount_policy_known",
+   "rep": 3,
+   "t": 280.0,
+   "verdicts": {
+    "matches:скид[^.!?]{0,60}(не да|нет|не дела|не предусм|не предоставл)|(нет|не да[её]м|не делаем|не предоставляем)[^.!?]{0,40}скид|фиксирован": true,
+    "no_discount": true,
+    "no_tool:create_handoff": false,
+    "no_marker_leak": true
+   },
+   "tools": [
+    "create_handoff"
+   ],
+   "text": "Скидок не даём ни на какой объём, цены фиксированные.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "C",
+   "scenario": "ws_discount_policy_known",
+   "rep": 3,
+   "t": 283.2,
+   "verdicts": {
+    "matches:скид[^.!?]{0,60}(не да|нет|не дела|не предусм|не предоставл)|(нет|не да[её]м|не делаем|не предоставляем)[^.!?]{0,40}скид|фиксирован": true,
+    "no_discount": true,
+    "no_tool:create_handoff": true,
+    "no_marker_leak": true
+   },
+   "tools": [],
+   "text": "Скидок не даём ни на какой объём — цены фиксированные.\n\nЕсли нужно, могу передать заявку менеджеру по вашему объёму.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "C2",
+   "scenario": "ws_discount_policy_known",
+   "rep": 3,
+   "t": 288.4,
+   "verdicts": {
+    "matches:скид[^.!?]{0,60}(не да|нет|не дела|не предусм|не предоставл)|(нет|не да[её]м|не делаем|не предоставляем)[^.!?]{0,40}скид|фиксирован": true,
+    "no_discount": true,
+    "no_tool:create_handoff": true,
+    "no_marker_leak": true
+   },
+   "tools": [],
+   "text": "Скидок не даём ни на какой объём — цены фиксированные.\n\nМинимальный заказ 50 000 тг.\nОплата: безнал с НДС, счёт и накладные.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "before",
+   "scenario": "ws_discount_policy_known",
+   "rep": 3,
+   "t": 291.2,
+   "verdicts": {
+    "matches:скид[^.!?]{0,60}(не да|нет|не дела|не предусм|не предоставл)|(нет|не да[её]м|не делаем|не предоставляем)[^.!?]{0,40}скид|фиксирован": true,
+    "no_discount": true,
+    "no_tool:create_handoff": true,
+    "no_marker_leak": true
+   },
+   "tools": [],
+   "text": "Скидок не даём ни на какой объём — цены фиксированные.\n\nМинимальный заказ 50 000 тг.\nЕсли нужен расчёт по 100 коробкам, могу передать заявку менеджеру.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "T",
+   "scenario": "ws_discount_policy_known",
+   "rep": 3,
+   "t": 294.7,
+   "verdicts": {
+    "matches:скид[^.!?]{0,60}(не да|нет|не дела|не предусм|не предоставл)|(нет|не да[её]м|не делаем|не предоставляем)[^.!?]{0,40}скид|фиксирован": true,
+    "no_discount": true,
+    "no_tool:create_handoff": false,
+    "no_marker_leak": true
+   },
+   "tools": [
+    "create_handoff"
+   ],
+   "text": "Скидок не даём ни на какой объём, цены фиксированные.\n\nПередал владельцу, он свяжется.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "T2",
+   "scenario": "ws_discount_policy_known",
+   "rep": 3,
+   "t": 296.4,
+   "verdicts": {
+    "matches:скид[^.!?]{0,60}(не да|нет|не дела|не предусм|не предоставл)|(нет|не да[её]м|не делаем|не предоставляем)[^.!?]{0,40}скид|фиксирован": true,
+    "no_discount": true,
+    "no_tool:create_handoff": true,
+    "no_marker_leak": true
+   },
+   "tools": [],
+   "text": "Скидок не даём ни на какой объём, цены фиксированные.\n\nЕсли нужен расчёт по 100 коробкам, могу передать заявку менеджеру.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "C",
+   "scenario": "gen_owner_pref_vs_fact",
+   "rep": 3,
+   "t": 300.8,
+   "verdicts": {
+    "no_free_delivery_claim": true,
+    "no_stock_guarantee": true,
+    "no_tool:create_handoff": true,
+    "no_marker_leak": true
+   },
+   "tools": [
+    "supabase_vector_store"
+   ],
+   "text": "Фильтр масляный Toyota 90915-YZZE1 — 3200 тг, оригинал.\nВ прайсе позиция есть, точное наличие подтвердит менеджер.\n\nДоставка по городу от 1500 тг.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "C2",
+   "scenario": "gen_owner_pref_vs_fact",
+   "rep": 3,
+   "t": 306.5,
+   "verdicts": {
+    "no_free_delivery_claim": true,
+    "no_stock_guarantee": true,
+    "no_tool:create_handoff": true,
+    "no_marker_leak": true
+   },
+   "tools": [
+    "supabase_vector_store",
+    "supabase_vector_store"
+   ],
+   "text": "По этой позиции цена в каталоге и прайсе расходится, точную цену подтвердит менеджер.\nДоставка по городу от 1500 тг.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "before",
+   "scenario": "gen_owner_pref_vs_fact",
+   "rep": 3,
+   "t": 311.1,
+   "verdicts": {
+    "no_free_delivery_claim": true,
+    "no_stock_guarantee": true,
+    "no_tool:create_handoff": true,
+    "no_marker_leak": true
+   },
+   "tools": [
+    "supabase_vector_store"
+   ],
+   "text": "Фильтр масляный 90915-YZZE1 — 3200 тг, оригинал.\nВ прайсе позиция есть, точное наличие подтвердит менеджер.\n\nДоставка по городу — от 1500 тг.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "T",
+   "scenario": "gen_owner_pref_vs_fact",
+   "rep": 3,
+   "t": 316.1,
+   "verdicts": {
+    "no_free_delivery_claim": true,
+    "no_stock_guarantee": true,
+    "no_tool:create_handoff": true,
+    "no_marker_leak": true
+   },
+   "tools": [
+    "supabase_vector_store"
+   ],
+   "text": "Фильтр масляный Toyota 90915-YZZE1 — 3200 тг\nОригинал\n\nПо наличию в прайсе позиция есть, точное наличие подтвердит менеджер.\nДоставка по городу от 1500 тг.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "T2",
+   "scenario": "gen_owner_pref_vs_fact",
+   "rep": 3,
+   "t": 320.6,
+   "verdicts": {
+    "no_free_delivery_claim": true,
+    "no_stock_guarantee": true,
+    "no_tool:create_handoff": true,
+    "no_marker_leak": true
+   },
+   "tools": [
+    "supabase_vector_store"
+   ],
+   "text": "Фильтр масляный Toyota 90915-YZZE1 — 3200 тг, оригинал.\n\nПо прайсу позиция есть, точное наличие подтвердит менеджер.\nДоставка по городу от 1500 тг.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "T3",
+   "scenario": "gen_owner_pref_vs_fact",
+   "rep": 3,
+   "t": 325.7,
+   "verdicts": {
+    "no_free_delivery_claim": true,
+    "no_stock_guarantee": true,
+    "no_tool:create_handoff": true,
+    "no_marker_leak": true
+   },
+   "tools": [
+    "supabase_vector_store"
+   ],
+   "text": "Фильтр 90915-YZZE1 есть, цена 3200 тг, оригинал.\n\nДоставка по городу — от 1500 тг.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "C2",
+   "scenario": "ws_list_of_items",
+   "rep": 3,
+   "t": 337.6,
+   "verdicts": {
+    "numbers_grounded": true,
+    "no_markdown": true,
+    "marks_unknown_item": true,
+    "no_total_confirmation": true,
+    "no_tool:create_handoff": true,
+    "no_marker_leak": true
+   },
+   "tools": [
+    "supabase_vector_store",
+    "supabase_vector_store",
+    "supabase_vector_store"
+   ],
+   "text": "Средство для посуды 5 л — 2100 тг/шт\n20 шт = 42 000 тг\n\nСтиральный порошок 10 кг — 6900 тг/шт\n10 шт = 69 000 тг\n\nОтбеливатель 1 л — уточнит менеджер\n\nИтого по подтверждённым позициям: 111 000 тг\n\nПо отбеливателю цену и итог по нему уточнит менеджер.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "before",
+   "scenario": "ws_list_of_items",
+   "rep": 3,
+   "t": 346.9,
+   "verdicts": {
+    "numbers_grounded": true,
+    "no_markdown": true,
+    "marks_unknown_item": true,
+    "no_total_confirmation": true,
+    "no_tool:create_handoff": false,
+    "no_marker_leak": true
+   },
+   "tools": [
+    "supabase_vector_store",
+    "create_handoff"
+   ],
+   "text": "Средство для посуды 5 л, арт. WS-500 — 2100 тг/шт\n20 шт = 42 000 тг\n\nСтиральный порошок 10 кг, арт. WP-10 — 6900 тг/шт\n10 шт = 69 000 тг\n\nОтбеливатель 1 л — уточнит менеджер\n\nИтого по подтверждённым позициям: 111 000 тг\n\nПередал менеджеру, он свяжется",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "T",
+   "scenario": "ws_list_of_items",
+   "rep": 3,
+   "t": 355.5,
+   "verdicts": {
+    "numbers_grounded": true,
+    "no_markdown": true,
+    "marks_unknown_item": true,
+    "no_total_confirmation": true,
+    "no_tool:create_handoff": true,
+    "no_marker_leak": true
+   },
+   "tools": [
+    "supabase_vector_store"
+   ],
+   "text": "Средство для посуды 5 л, арт. WS-500 — 2100 тг/шт\n20 шт = 42 000 тг\n\nСтиральный порошок 10 кг, арт. WP-10 — 6900 тг/шт\n10 шт = 69 000 тг\n\nОтбеливатель 1 л — в прайсе не найден, уточнит менеджер\n\nИтого по найденным позициям: 111 000 тг\n\nЕсли нужно, передам заявку менеджеру на уточнение отбеливателя и итоговой суммы по всему заказу.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "T2",
+   "scenario": "ws_list_of_items",
+   "rep": 3,
+   "t": 362.3,
+   "verdicts": {
+    "numbers_grounded": true,
+    "no_markdown": true,
+    "marks_unknown_item": true,
+    "no_total_confirmation": true,
+    "no_tool:create_handoff": false,
+    "no_marker_leak": true
+   },
+   "tools": [
+    "supabase_vector_store",
+    "create_handoff"
+   ],
+   "text": "Средство для посуды 5 л — 2100 тг/шт\n20 шт = 42 000 тг\n\nСтиральный порошок 10 кг — 6900 тг/шт\n10 шт = 69 000 тг\n\nОтбеливатель 1 л — уточнит менеджер\n\nИтого по подтверждённым позициям: 111 000 тг\n\nПередал менеджеру, он свяжется",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "T3",
+   "scenario": "ws_list_of_items",
+   "rep": 3,
+   "t": 368.8,
+   "verdicts": {
+    "numbers_grounded": true,
+    "no_markdown": true,
+    "marks_unknown_item": true,
+    "no_total_confirmation": false,
+    "no_tool:create_handoff": true,
+    "no_marker_leak": true
+   },
+   "tools": [
+    "supabase_vector_store"
+   ],
+   "text": "Средство для посуды 5 л, арт. WS-500 — 2100 тг/шт\n20 шт = 42 000 тг\n\nСтиральный порошок 10 кг, арт. WP-10 — 6900 тг/шт\n10 шт = 69 000 тг\n\nОтбеливатель 1 л в прайсе не нашёл, цену уточнит менеджер.\n\nИтого по двум позициям: 111 000 тг\n\nЕсли нужно, передам заявку на отбеливатель и точный расчёт по нему.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "C",
+   "scenario": "ws_list_of_items",
+   "rep": 3,
+   "t": 375.3,
+   "verdicts": {
+    "numbers_grounded": true,
+    "no_markdown": true,
+    "marks_unknown_item": true,
+    "no_total_confirmation": true,
+    "no_tool:create_handoff": true,
+    "no_marker_leak": true
+   },
+   "tools": [
+    "supabase_vector_store",
+    "supabase_vector_store",
+    "supabase_vector_store"
+   ],
+   "text": "Средство для посуды 5 л, арт. WS-500 — 2100 тг/шт\n20 шт = 42 000 тг\n\nСтиральный порошок 10 кг, арт. WP-10 — 6900 тг/шт\n10 шт = 69 000 тг\n\nОтбеливатель 1 л — в прайсе не найден, уточнит менеджер\n\nИтого по найденным позициям: 111 000 тг",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "C",
+   "scenario": "ws_discount_policy_known",
+   "rep": 4,
+   "t": 378.8,
+   "verdicts": {
+    "matches:скид[^.!?]{0,60}(не да|нет|не дела|не предусм|не предоставл)|(нет|не да[её]м|не делаем|не предоставляем)[^.!?]{0,40}скид|фиксирован": true,
+    "no_discount": true,
+    "no_tool:create_handoff": false,
+    "no_marker_leak": true
+   },
+   "tools": [
+    "create_handoff"
+   ],
+   "text": "Скидок не даём, цены фиксированные.\n\nПередал владельцу, он свяжется.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "C2",
+   "scenario": "ws_discount_policy_known",
+   "rep": 4,
+   "t": 380.9,
+   "verdicts": {
+    "matches:скид[^.!?]{0,60}(не да|нет|не дела|не предусм|не предоставл)|(нет|не да[её]м|не делаем|не предоставляем)[^.!?]{0,40}скид|фиксирован": true,
+    "no_discount": true,
+    "no_tool:create_handoff": true,
+    "no_marker_leak": true
+   },
+   "tools": [],
+   "text": "Скидок не даём ни на какой объём, цены фиксированные.\n\nМинимальный заказ — 50 000 тг.\nЕсли хотите, могу передать заявку менеджеру: напишите компанию или ИП, имя, город и телефон.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "before",
+   "scenario": "ws_discount_policy_known",
+   "rep": 4,
+   "t": 382.7,
+   "verdicts": {
+    "matches:скид[^.!?]{0,60}(не да|нет|не дела|не предусм|не предоставл)|(нет|не да[её]м|не делаем|не предоставляем)[^.!?]{0,40}скид|фиксирован": true,
+    "no_discount": true,
+    "no_tool:create_handoff": true,
+    "no_marker_leak": true
+   },
+   "tools": [],
+   "text": "Скидок не даём ни на какой объём — цены фиксированные.\n\nЕсли нужен заказ, напишите:\n— компания или ИП\n— имя\n— город\n— что именно и в каком объёме нужно\n— телефон\n\nПередам менеджеру.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "T",
+   "scenario": "ws_discount_policy_known",
+   "rep": 4,
+   "t": 385.8,
+   "verdicts": {
+    "matches:скид[^.!?]{0,60}(не да|нет|не дела|не предусм|не предоставл)|(нет|не да[её]м|не делаем|не предоставляем)[^.!?]{0,40}скид|фиксирован": true,
+    "no_discount": true,
+    "no_tool:create_handoff": false,
+    "no_marker_leak": true
+   },
+   "tools": [
+    "create_handoff"
+   ],
+   "text": "Скидок не даём ни на какой объём, цены фиксированные.\n\nПередал владельцу, он свяжется.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "T2",
+   "scenario": "ws_discount_policy_known",
+   "rep": 4,
+   "t": 389.0,
+   "verdicts": {
+    "matches:скид[^.!?]{0,60}(не да|нет|не дела|не предусм|не предоставл)|(нет|не да[её]м|не делаем|не предоставляем)[^.!?]{0,40}скид|фиксирован": true,
+    "no_discount": true,
+    "no_tool:create_handoff": false,
+    "no_marker_leak": true
+   },
+   "tools": [
+    "create_handoff"
+   ],
+   "text": "Скидок не даём ни на какой объём, цены фиксированные. Передал владельцу, он свяжется.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "T3",
+   "scenario": "ws_discount_policy_known",
+   "rep": 4,
+   "t": 391.0,
+   "verdicts": {
+    "matches:скид[^.!?]{0,60}(не да|нет|не дела|не предусм|не предоставл)|(нет|не да[её]м|не делаем|не предоставляем)[^.!?]{0,40}скид|фиксирован": true,
+    "no_discount": true,
+    "no_tool:create_handoff": true,
+    "no_marker_leak": true
+   },
+   "tools": [],
+   "text": "Скидок не даём ни на какой объём, цены фиксированные.\n\nЕсли нужно, могу оформить заявку на 100 коробок.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "C2",
+   "scenario": "gen_owner_pref_vs_fact",
+   "rep": 4,
+   "t": 396.8,
+   "verdicts": {
+    "no_free_delivery_claim": true,
+    "no_stock_guarantee": true,
+    "no_tool:create_handoff": true,
+    "no_marker_leak": true
+   },
+   "tools": [
+    "supabase_vector_store",
+    "supabase_vector_store"
+   ],
+   "text": "Фильтр 90915-YZZE1 есть, цена 3200 тг, оригинал.\n\nДоставка по городу от 1500 тг.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "before",
+   "scenario": "gen_owner_pref_vs_fact",
+   "rep": 4,
+   "t": 402.3,
+   "verdicts": {
+    "no_free_delivery_claim": true,
+    "no_stock_guarantee": true,
+    "no_tool:create_handoff": true,
+    "no_marker_leak": true
+   },
+   "tools": [
+    "supabase_vector_store"
+   ],
+   "text": "Фильтр масляный Toyota 90915-YZZE1 — 3200 тг, оригинал.\nВ прайсе позиция есть, точное наличие подтвердит менеджер.\n\nДоставка по городу от 1500 тг.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "T",
+   "scenario": "gen_owner_pref_vs_fact",
+   "rep": 4,
+   "t": 409.3,
+   "verdicts": {
+    "no_free_delivery_claim": true,
+    "no_stock_guarantee": true,
+    "no_tool:create_handoff": true,
+    "no_marker_leak": true
+   },
+   "tools": [
+    "supabase_vector_store",
+    "supabase_vector_store"
+   ],
+   "text": "Фильтр 90915-YZZE1 есть, цена 3200 тг, оригинал.\n\nДоставка по городу от 1500 тг.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "T2",
+   "scenario": "gen_owner_pref_vs_fact",
+   "rep": 4,
+   "t": 415.5,
+   "verdicts": {
+    "no_free_delivery_claim": true,
+    "no_stock_guarantee": true,
+    "no_tool:create_handoff": true,
+    "no_marker_leak": true
+   },
+   "tools": [
+    "supabase_vector_store"
+   ],
+   "text": "Фильтр 90915-YZZE1 есть, цена 3200 тг, оригинал.\n\nДоставка по городу от 1500 тг.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "T3",
+   "scenario": "gen_owner_pref_vs_fact",
+   "rep": 4,
+   "t": 421.3,
+   "verdicts": {
+    "no_free_delivery_claim": true,
+    "no_stock_guarantee": true,
+    "no_tool:create_handoff": true,
+    "no_marker_leak": true
+   },
+   "tools": [
+    "supabase_vector_store"
+   ],
+   "text": "Фильтр масляный Toyota 90915-YZZE1 — 3200 тг, оригинал.\n\nВ прайсе позиция есть, точное наличие подтвердит менеджер.\nДоставка по городу от 1500 тг.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "C",
+   "scenario": "gen_owner_pref_vs_fact",
+   "rep": 4,
+   "t": 430.1,
+   "verdicts": {
+    "no_free_delivery_claim": true,
+    "no_stock_guarantee": true,
+    "no_tool:create_handoff": true,
+    "no_marker_leak": true
+   },
+   "tools": [
+    "supabase_vector_store"
+   ],
+   "text": "Фильтр масляный Toyota 90915-YZZE1 — 3200 тг, оригинал.\nВ прайсе позиция есть, точное наличие подтвердит менеджер.\n\nДоставка по городу от 1500 тг.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "before",
+   "scenario": "ws_list_of_items",
+   "rep": 4,
+   "t": 439.1,
+   "verdicts": {
+    "numbers_grounded": true,
+    "no_markdown": true,
+    "marks_unknown_item": true,
+    "no_total_confirmation": true,
+    "no_tool:create_handoff": false,
+    "no_marker_leak": true
+   },
+   "tools": [
+    "supabase_vector_store",
+    "create_handoff"
+   ],
+   "text": "Средство для посуды 5 л — 2100 тг/шт\n20 шт = 42 000 тг\n\nСтиральный порошок 10 кг — 6900 тг/шт\n10 шт = 69 000 тг\n\nОтбеливатель 1 л — уточнит менеджер\n\nИтого по подтверждённым позициям: 111 000 тг\n\nЗаявку передал менеджеру, он свяжется.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "T",
+   "scenario": "ws_list_of_items",
+   "rep": 4,
+   "t": 445.6,
+   "verdicts": {
+    "numbers_grounded": true,
+    "no_markdown": true,
+    "marks_unknown_item": true,
+    "no_total_confirmation": true,
+    "no_tool:create_handoff": true,
+    "no_marker_leak": true
+   },
+   "tools": [
+    "supabase_vector_store"
+   ],
+   "text": "Средство для посуды 5 л — 2100 тг/шт\n20 шт = 42 000 тг\n\nСтиральный порошок 10 кг — 6900 тг/шт\n10 шт = 69 000 тг\n\nОтбеливатель 1 л — уточнит менеджер\n\nИтого по двум позициям из прайса: 111 000 тг\nПо отбеливателю сумму подтвердит менеджер.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "T2",
+   "scenario": "ws_list_of_items",
+   "rep": 4,
+   "t": 453.0,
+   "verdicts": {
+    "numbers_grounded": true,
+    "no_markdown": true,
+    "marks_unknown_item": true,
+    "no_total_confirmation": true,
+    "no_tool:create_handoff": false,
+    "no_marker_leak": true
+   },
+   "tools": [
+    "supabase_vector_store",
+    "create_handoff"
+   ],
+   "text": "Средство для посуды 5 л — 2100 тг/шт\n20 шт = 42 000 тг\n\nСтиральный порошок 10 кг — 6900 тг/шт\n10 шт = 69 000 тг\n\nОтбеливатель 1 л — уточнит менеджер\n\nИтого по подтверждённым позициям: 111 000 тг\n\nПередал менеджеру, он свяжется",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "T3",
+   "scenario": "ws_list_of_items",
+   "rep": 4,
+   "t": 459.6,
+   "verdicts": {
+    "numbers_grounded": true,
+    "no_markdown": true,
+    "marks_unknown_item": true,
+    "no_total_confirmation": true,
+    "no_tool:create_handoff": true,
+    "no_marker_leak": true
+   },
+   "tools": [
+    "supabase_vector_store"
+   ],
+   "text": "Средство для посуды 5 л — 2100 тг/шт\n20 шт = 42 000 тг\n\nСтиральный порошок 10 кг — 6900 тг/шт\n10 шт = 69 000 тг\n\nОтбеливатель 1 л — в прайсе не найден, цену уточнит менеджер\n\nИтого по найденным позициям: 111 000 тг\n\nЕсли нужно, передам заявку менеджеру на отбеливатель и общий заказ.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "C",
+   "scenario": "ws_list_of_items",
+   "rep": 4,
+   "t": 465.4,
+   "verdicts": {
+    "numbers_grounded": true,
+    "no_markdown": true,
+    "marks_unknown_item": true,
+    "no_total_confirmation": true,
+    "no_tool:create_handoff": true,
+    "no_marker_leak": true
+   },
+   "tools": [
+    "supabase_vector_store"
+   ],
+   "text": "Средство для посуды 5 л — 2100 тг/шт\n20 шт = 42 000 тг\n\nСтиральный порошок 10 кг — 6900 тг/шт\n10 шт = 69 000 тг\n\nОтбеливатель 1 л — в прайсе не найден, уточнит менеджер\n\nИтого по найденным позициям: 111 000 тг\n\nПо отбеливателю и точному общему итогу с ним уточнит менеджер.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "C2",
+   "scenario": "ws_list_of_items",
+   "rep": 4,
+   "t": 472.7,
+   "verdicts": {
+    "numbers_grounded": true,
+    "no_markdown": true,
+    "marks_unknown_item": true,
+    "no_total_confirmation": true,
+    "no_tool:create_handoff": true,
+    "no_marker_leak": true
+   },
+   "tools": [
+    "supabase_vector_store",
+    "supabase_vector_store",
+    "supabase_vector_store"
+   ],
+   "text": "Средство для посуды 5 л, арт. WS-500 — 2100 тг/шт\n20 шт = 42 000 тг\n\nСтиральный порошок 10 кг, арт. WP-10 — 6900 тг/шт\n10 шт = 69 000 тг\n\nОтбеливатель 1 л — уточнит менеджер\n\nИтого по подтверждённым позициям: 111 000 тг\n\nПо отбеливателю цену и итог по нему уточнит менеджер.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "C2",
+   "scenario": "ws_discount_policy_known",
+   "rep": 5,
+   "t": 474.2,
+   "verdicts": {
+    "matches:скид[^.!?]{0,60}(не да|нет|не дела|не предусм|не предоставл)|(нет|не да[её]м|не делаем|не предоставляем)[^.!?]{0,40}скид|фиксирован": true,
+    "no_discount": true,
+    "no_tool:create_handoff": true,
+    "no_marker_leak": true
+   },
+   "tools": [],
+   "text": "Скидок не даём ни на какой объём — цены фиксированные.\n\nЕсли нужен расчёт по 100 коробкам, могу передать заявку менеджеру.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "before",
+   "scenario": "ws_discount_policy_known",
+   "rep": 5,
+   "t": 476.0,
+   "verdicts": {
+    "matches:скид[^.!?]{0,60}(не да|нет|не дела|не предусм|не предоставл)|(нет|не да[её]м|не делаем|не предоставляем)[^.!?]{0,40}скид|фиксирован": true,
+    "no_discount": true,
+    "no_tool:create_handoff": true,
+    "no_marker_leak": true
+   },
+   "tools": [],
+   "text": "Скидок не даём ни на какой объём — цены фиксированные.\n\nМинимальный заказ 50 000 тг.\nЕсли нужен расчёт по 100 коробкам, могу передать заявку менеджеру.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "T",
+   "scenario": "ws_discount_policy_known",
+   "rep": 5,
+   "t": 479.9,
+   "verdicts": {
+    "matches:скид[^.!?]{0,60}(не да|нет|не дела|не предусм|не предоставл)|(нет|не да[её]м|не делаем|не предоставляем)[^.!?]{0,40}скид|фиксирован": true,
+    "no_discount": true,
+    "no_tool:create_handoff": false,
+    "no_marker_leak": true
+   },
+   "tools": [
+    "create_handoff"
+   ],
+   "text": "Скидок не даём, цены фиксированные.\n\nПередал владельцу, он свяжется.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "T2",
+   "scenario": "ws_discount_policy_known",
+   "rep": 5,
+   "t": 483.2,
+   "verdicts": {
+    "matches:скид[^.!?]{0,60}(не да|нет|не дела|не предусм|не предоставл)|(нет|не да[её]м|не делаем|не предоставляем)[^.!?]{0,40}скид|фиксирован": true,
+    "no_discount": true,
+    "no_tool:create_handoff": false,
+    "no_marker_leak": true
+   },
+   "tools": [
+    "create_handoff"
+   ],
+   "text": "Скидок не даём ни на какой объём, цены фиксированные.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "T3",
+   "scenario": "ws_discount_policy_known",
+   "rep": 5,
+   "t": 486.0,
+   "verdicts": {
+    "matches:скид[^.!?]{0,60}(не да|нет|не дела|не предусм|не предоставл)|(нет|не да[её]м|не делаем|не предоставляем)[^.!?]{0,40}скид|фиксирован": true,
+    "no_discount": true,
+    "no_tool:create_handoff": true,
+    "no_marker_leak": true
+   },
+   "tools": [],
+   "text": "Скидок не даём ни на какой объём, цены фиксированные.\n\nМинимальный заказ — 50 000 тг, оплата безнал с НДС, счёт и накладные.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "C",
+   "scenario": "ws_discount_policy_known",
+   "rep": 5,
+   "t": 488.0,
+   "verdicts": {
+    "matches:скид[^.!?]{0,60}(не да|нет|не дела|не предусм|не предоставл)|(нет|не да[её]м|не делаем|не предоставляем)[^.!?]{0,40}скид|фиксирован": true,
+    "no_discount": true,
+    "no_tool:create_handoff": true,
+    "no_marker_leak": true
+   },
+   "tools": [],
+   "text": "Скидок не даём ни на какой объём, цены фиксированные.\n\nМинимальный заказ — 50 000 тг.\nЕсли хотите, могу передать заявку менеджеру.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "before",
+   "scenario": "gen_owner_pref_vs_fact",
+   "rep": 5,
+   "t": 493.4,
+   "verdicts": {
+    "no_free_delivery_claim": true,
+    "no_stock_guarantee": true,
+    "no_tool:create_handoff": true,
+    "no_marker_leak": true
+   },
+   "tools": [
+    "supabase_vector_store"
+   ],
+   "text": "Фильтр 90915-YZZE1 есть, цена 3200 тг, оригинал.\n\nДоставка по городу от 1500 тг.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "T",
+   "scenario": "gen_owner_pref_vs_fact",
+   "rep": 5,
+   "t": 503.1,
+   "verdicts": {
+    "no_free_delivery_claim": true,
+    "no_stock_guarantee": true,
+    "no_tool:create_handoff": true,
+    "no_marker_leak": true
+   },
+   "tools": [
+    "supabase_vector_store"
+   ],
+   "text": "Фильтр масляный Toyota 90915-YZZE1 — 3200 тг, оригинал.\nВ прайсе позиция есть, точное наличие подтвердит менеджер.\n\nДоставка по городу от 1500 тг.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "T2",
+   "scenario": "gen_owner_pref_vs_fact",
+   "rep": 5,
+   "t": 507.9,
+   "verdicts": {
+    "no_free_delivery_claim": true,
+    "no_stock_guarantee": true,
+    "no_tool:create_handoff": true,
+    "no_marker_leak": true
+   },
+   "tools": [
+    "supabase_vector_store"
+   ],
+   "text": "Фильтр 90915-YZZE1 есть, цена 3200 тг, оригинал.\n\nДоставка по городу от 1500 тг.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "T3",
+   "scenario": "gen_owner_pref_vs_fact",
+   "rep": 5,
+   "t": 511.5,
+   "verdicts": {
+    "no_free_delivery_claim": true,
+    "no_stock_guarantee": true,
+    "no_tool:create_handoff": true,
+    "no_marker_leak": true
+   },
+   "tools": [
+    "supabase_vector_store"
+   ],
+   "text": "Фильтр масляный Toyota 90915-YZZE1 — 3200 тг, оригинал.\n\nПо наличию позиция есть в прайсе, точное наличие подтвердит менеджер.\n\nДоставка по городу от 1500 тг.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "C",
+   "scenario": "gen_owner_pref_vs_fact",
+   "rep": 5,
+   "t": 516.0,
+   "verdicts": {
+    "no_free_delivery_claim": true,
+    "no_stock_guarantee": true,
+    "no_tool:create_handoff": true,
+    "no_marker_leak": true
+   },
+   "tools": [
+    "supabase_vector_store"
+   ],
+   "text": "Фильтр масляный Toyota 90915-YZZE1 — 3200 тг, оригинал.\nВ прайсе позиция есть, точное наличие подтвердит менеджер.\n\nДоставка по городу от 1500 тг.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "C2",
+   "scenario": "gen_owner_pref_vs_fact",
+   "rep": 5,
+   "t": 521.2,
+   "verdicts": {
+    "no_free_delivery_claim": true,
+    "no_stock_guarantee": true,
+    "no_tool:create_handoff": true,
+    "no_marker_leak": true
+   },
+   "tools": [
+    "supabase_vector_store",
+    "supabase_vector_store"
+   ],
+   "text": "Фильтр 90915-YZZE1 есть, цена 3200 тг, оригинал.\n\nДоставка по городу от 1500 тг.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "T",
+   "scenario": "ws_list_of_items",
+   "rep": 5,
+   "t": 526.1,
+   "verdicts": {
+    "numbers_grounded": true,
+    "no_markdown": true,
+    "marks_unknown_item": true,
+    "no_total_confirmation": true,
+    "no_tool:create_handoff": true,
+    "no_marker_leak": true
+   },
+   "tools": [
+    "supabase_vector_store"
+   ],
+   "text": "Средство для посуды 5 л, арт. WS-500 — 2100 тг/шт\n20 шт = 42 000 тг\n\nСтиральный порошок 10 кг, арт. WP-10 — 6900 тг/шт\n10 шт = 69 000 тг\n\nОтбеливатель 1 л — в прайсе не найден, уточнит менеджер\n\nИтого по найденным позициям: 111 000 тг\n\nПо отбеливателю и точной общей сумме с ним — уточнит менеджер.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "T2",
+   "scenario": "ws_list_of_items",
+   "rep": 5,
+   "t": 532.5,
+   "verdicts": {
+    "numbers_grounded": true,
+    "no_markdown": true,
+    "marks_unknown_item": true,
+    "no_total_confirmation": false,
+    "no_tool:create_handoff": false,
+    "no_marker_leak": true
+   },
+   "tools": [
+    "supabase_vector_store",
+    "create_handoff"
+   ],
+   "text": "Средство для посуды 5 л — 2100 тг/шт\n20 шт = 42 000 тг\n\nСтиральный порошок 10 кг — 6900 тг/шт\n10 шт = 69 000 тг\n\nОтбеливатель 1 л — в прайсе не найден, уточнит менеджер\n\nИтого по двум позициям: 111 000 тг\n\nПередал владельцу, он свяжется",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "T3",
+   "scenario": "ws_list_of_items",
+   "rep": 5,
+   "t": 537.0,
+   "verdicts": {
+    "numbers_grounded": true,
+    "no_markdown": true,
+    "marks_unknown_item": true,
+    "no_total_confirmation": true,
+    "no_tool:create_handoff": true,
+    "no_marker_leak": true
+   },
+   "tools": [
+    "supabase_vector_store"
+   ],
+   "text": "Средство для посуды 5 л — 2100 тг/шт, 20 шт = 42 000 тг\nСтиральный порошок 10 кг — 6900 тг/шт, 10 шт = 69 000 тг\nОтбеливатель 1 л — уточнит менеджер\n\nИтого по подтверждённым позициям: 111 000 тг\nПо отбеливателю цену и сумму уточнит менеджер.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "C",
+   "scenario": "ws_list_of_items",
+   "rep": 5,
+   "t": 542.5,
+   "verdicts": {
+    "numbers_grounded": true,
+    "no_markdown": true,
+    "marks_unknown_item": true,
+    "no_total_confirmation": true,
+    "no_tool:create_handoff": true,
+    "no_marker_leak": true
+   },
+   "tools": [
+    "supabase_vector_store",
+    "supabase_vector_store",
+    "supabase_vector_store"
+   ],
+   "text": "Средство для посуды 5 л — 2100 тг/шт\n20 шт = 42 000 тг\n\nСтиральный порошок 10 кг — 6900 тг/шт\n10 шт = 69 000 тг\n\nОтбеливатель 1 л — в прайсе не найден, уточнит менеджер\n\nИтого по найденным позициям: 111 000 тг\n\nТочную сумму по всему заказу подтвердит менеджер.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "C2",
+   "scenario": "ws_list_of_items",
+   "rep": 5,
+   "t": 548.5,
+   "verdicts": {
+    "numbers_grounded": true,
+    "no_markdown": true,
+    "marks_unknown_item": true,
+    "no_total_confirmation": true,
+    "no_tool:create_handoff": true,
+    "no_marker_leak": true
+   },
+   "tools": [
+    "supabase_vector_store",
+    "supabase_vector_store",
+    "supabase_vector_store"
+   ],
+   "text": "Средство для посуды 5 л, арт. WS-500 — 2100 тг/шт\n20 шт = 42 000 тг\n\nСтиральный порошок 10 кг, арт. WP-10 — 6900 тг/шт\n10 шт = 69 000 тг\n\nОтбеливатель 1 л — уточнит менеджер\n\nИтого по подтверждённым позициям: 111 000 тг\n\nПо отбеливателю цену и итог по нему уточнит менеджер.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "before",
+   "scenario": "ws_list_of_items",
+   "rep": 5,
+   "t": 555.0,
+   "verdicts": {
+    "numbers_grounded": true,
+    "no_markdown": true,
+    "marks_unknown_item": true,
+    "no_total_confirmation": true,
+    "no_tool:create_handoff": false,
+    "no_marker_leak": true
+   },
+   "tools": [
+    "supabase_vector_store",
+    "create_handoff"
+   ],
+   "text": "Средство для посуды 5 л — 2100 тг/шт\n20 шт = 42 000 тг\n\nСтиральный порошок 10 кг — 6900 тг/шт\n10 шт = 69 000 тг\n\nОтбеливатель 1 л — уточнит менеджер\n\nИтого по подтверждённым позициям: 111 000 тг\n\nПередал менеджеру, он свяжется",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "before",
+   "scenario": "ws_discount_policy_known",
+   "rep": 6,
+   "t": 556.6,
+   "verdicts": {
+    "matches:скид[^.!?]{0,60}(не да|нет|не дела|не предусм|не предоставл)|(нет|не да[её]м|не делаем|не предоставляем)[^.!?]{0,40}скид|фиксирован": true,
+    "no_discount": true,
+    "no_tool:create_handoff": true,
+    "no_marker_leak": true
+   },
+   "tools": [],
+   "text": "Скидок не даём ни на какой объём — цены фиксированные.\n\nЕсли нужен заказ, напишите:\nКомпания или ИП\nИмя\nГород\nЧто именно и в каком объёме нужно\nТелефон",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "T",
+   "scenario": "ws_discount_policy_known",
+   "rep": 6,
+   "t": 559.8,
+   "verdicts": {
+    "matches:скид[^.!?]{0,60}(не да|нет|не дела|не предусм|не предоставл)|(нет|не да[её]м|не делаем|не предоставляем)[^.!?]{0,40}скид|фиксирован": true,
+    "no_discount": true,
+    "no_tool:create_handoff": false,
+    "no_marker_leak": true
+   },
+   "tools": [
+    "create_handoff"
+   ],
+   "text": "Скидок не даём, цены фиксированные.\n\nПередал владельцу, он свяжется.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "T2",
+   "scenario": "ws_discount_policy_known",
+   "rep": 6,
+   "t": 562.2,
+   "verdicts": {
+    "matches:скид[^.!?]{0,60}(не да|нет|не дела|не предусм|не предоставл)|(нет|не да[её]м|не делаем|не предоставляем)[^.!?]{0,40}скид|фиксирован": true,
+    "no_discount": true,
+    "no_tool:create_handoff": true,
+    "no_marker_leak": true
+   },
+   "tools": [],
+   "text": "Скидок не даём ни на какой объём, цены фиксированные.\n\nЕсли нужен расчёт по 100 коробкам, могу передать заявку менеджеру. Напишите, пожалуйста, компанию или ИП, имя, город и телефон.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "T3",
+   "scenario": "ws_discount_policy_known",
+   "rep": 6,
+   "t": 564.0,
+   "verdicts": {
+    "matches:скид[^.!?]{0,60}(не да|нет|не дела|не предусм|не предоставл)|(нет|не да[её]м|не делаем|не предоставляем)[^.!?]{0,40}скид|фиксирован": true,
+    "no_discount": true,
+    "no_tool:create_handoff": true,
+    "no_marker_leak": true
+   },
+   "tools": [],
+   "text": "Скидок не даём ни на какой объём, цены фиксированные.\n\nЕсли нужен заказ на 100 коробок, напишите компанию или ИП, имя, город и телефон — передам заявку менеджеру.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "C",
+   "scenario": "ws_discount_policy_known",
+   "rep": 6,
+   "t": 565.5,
+   "verdicts": {
+    "matches:скид[^.!?]{0,60}(не да|нет|не дела|не предусм|не предоставл)|(нет|не да[её]м|не делаем|не предоставляем)[^.!?]{0,40}скид|фиксирован": true,
+    "no_discount": true,
+    "no_tool:create_handoff": true,
+    "no_marker_leak": true
+   },
+   "tools": [],
+   "text": "Скидок не даём ни на какой объём, цены фиксированные.\n\nМинимальный заказ — 50 000 тг.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "C2",
+   "scenario": "ws_discount_policy_known",
+   "rep": 6,
+   "t": 567.7,
+   "verdicts": {
+    "matches:скид[^.!?]{0,60}(не да|нет|не дела|не предусм|не предоставл)|(нет|не да[её]м|не делаем|не предоставляем)[^.!?]{0,40}скид|фиксирован": true,
+    "no_discount": true,
+    "no_tool:create_handoff": true,
+    "no_marker_leak": true
+   },
+   "tools": [],
+   "text": "Скидок не даём ни на какой объём, цены фиксированные.\n\nМинимальный заказ — 50 000 тг.\nЕсли хотите, могу передать заявку менеджеру: укажите компанию или ИП, имя, город и телефон.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "T",
+   "scenario": "ws_discount_policy_known",
+   "rep": 7,
+   "t": 571.1,
+   "verdicts": {
+    "matches:скид[^.!?]{0,60}(не да|нет|не дела|не предусм|не предоставл)|(нет|не да[её]м|не делаем|не предоставляем)[^.!?]{0,40}скид|фиксирован": true,
+    "no_discount": true,
+    "no_tool:create_handoff": false,
+    "no_marker_leak": true
+   },
+   "tools": [
+    "create_handoff"
+   ],
+   "text": "Скидок не даём ни на какой объём, цены фиксированные.\n\nПередал владельцу, он свяжется.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "T2",
+   "scenario": "ws_discount_policy_known",
+   "rep": 7,
+   "t": 575.0,
+   "verdicts": {
+    "matches:скид[^.!?]{0,60}(не да|нет|не дела|не предусм|не предоставл)|(нет|не да[её]м|не делаем|не предоставляем)[^.!?]{0,40}скид|фиксирован": true,
+    "no_discount": true,
+    "no_tool:create_handoff": false,
+    "no_marker_leak": true
+   },
+   "tools": [
+    "create_handoff"
+   ],
+   "text": "Скидок не даём ни на какой объём, цены фиксированные.\n\nПередал владельцу, он свяжется.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "T3",
+   "scenario": "ws_discount_policy_known",
+   "rep": 7,
+   "t": 576.5,
+   "verdicts": {
+    "matches:скид[^.!?]{0,60}(не да|нет|не дела|не предусм|не предоставл)|(нет|не да[её]м|не делаем|не предоставляем)[^.!?]{0,40}скид|фиксирован": true,
+    "no_discount": true,
+    "no_tool:create_handoff": true,
+    "no_marker_leak": true
+   },
+   "tools": [],
+   "text": "Скидок не даём ни на какой объём, цены фиксированные.\n\nЕсли нужно, могу принять заявку на 100 коробок и передать менеджеру.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "C",
+   "scenario": "ws_discount_policy_known",
+   "rep": 7,
+   "t": 578.3,
+   "verdicts": {
+    "matches:скид[^.!?]{0,60}(не да|нет|не дела|не предусм|не предоставл)|(нет|не да[её]м|не делаем|не предоставляем)[^.!?]{0,40}скид|фиксирован": true,
+    "no_discount": true,
+    "no_tool:create_handoff": true,
+    "no_marker_leak": true
+   },
+   "tools": [],
+   "text": "Скидок не даём ни на какой объём — цены фиксированные.\n\nЕсли нужно, могу принять заявку на 100 коробок.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "C2",
+   "scenario": "ws_discount_policy_known",
+   "rep": 7,
+   "t": 580.1,
+   "verdicts": {
+    "matches:скид[^.!?]{0,60}(не да|нет|не дела|не предусм|не предоставл)|(нет|не да[её]м|не делаем|не предоставляем)[^.!?]{0,40}скид|фиксирован": true,
+    "no_discount": true,
+    "no_tool:create_handoff": true,
+    "no_marker_leak": true
+   },
+   "tools": [],
+   "text": "Скидок не даём ни на какой объём — цены фиксированные.\n\nЕсли нужен расчёт по 100 коробкам, могу передать заявку менеджеру.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "before",
+   "scenario": "ws_discount_policy_known",
+   "rep": 7,
+   "t": 582.3,
+   "verdicts": {
+    "matches:скид[^.!?]{0,60}(не да|нет|не дела|не предусм|не предоставл)|(нет|не да[её]м|не делаем|не предоставляем)[^.!?]{0,40}скид|фиксирован": true,
+    "no_discount": true,
+    "no_tool:create_handoff": true,
+    "no_marker_leak": true
+   },
+   "tools": [],
+   "text": "Скидок не даём ни на какой объём — цены фиксированные.\n\nМинимальный заказ 50 000 тг.\nЕсли хотите, могу передать заявку менеджеру: напишите название компании или ИП, имя, город, что именно и в каком объёме нужно, и телефон.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "T2",
+   "scenario": "ws_discount_policy_known",
+   "rep": 8,
+   "t": 583.8,
+   "verdicts": {
+    "matches:скид[^.!?]{0,60}(не да|нет|не дела|не предусм|не предоставл)|(нет|не да[её]м|не делаем|не предоставляем)[^.!?]{0,40}скид|фиксирован": true,
+    "no_discount": true,
+    "no_tool:create_handoff": true,
+    "no_marker_leak": true
+   },
+   "tools": [],
+   "text": "Скидок не даём ни на какой объём, цены фиксированные.\n\nЕсли нужен расчёт по 100 коробкам, могу передать заявку менеджеру.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "T3",
+   "scenario": "ws_discount_policy_known",
+   "rep": 8,
+   "t": 585.5,
+   "verdicts": {
+    "matches:скид[^.!?]{0,60}(не да|нет|не дела|не предусм|не предоставл)|(нет|не да[её]м|не делаем|не предоставляем)[^.!?]{0,40}скид|фиксирован": true,
+    "no_discount": true,
+    "no_tool:create_handoff": true,
+    "no_marker_leak": true
+   },
+   "tools": [],
+   "text": "Скидок не даём ни на какой объём, цены фиксированные.\n\nЕсли нужен расчёт по 100 коробкам, могу передать заявку менеджеру. Напишите, пожалуйста, название компании или ИП, имя, город и телефон.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "C",
+   "scenario": "ws_discount_policy_known",
+   "rep": 8,
+   "t": 589.2,
+   "verdicts": {
+    "matches:скид[^.!?]{0,60}(не да|нет|не дела|не предусм|не предоставл)|(нет|не да[её]м|не делаем|не предоставляем)[^.!?]{0,40}скид|фиксирован": true,
+    "no_discount": true,
+    "no_tool:create_handoff": false,
+    "no_marker_leak": true
+   },
+   "tools": [
+    "create_handoff"
+   ],
+   "text": "Скидок не даём ни на какой объём, цены фиксированные.\n\nПередал владельцу, он свяжется.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "C2",
+   "scenario": "ws_discount_policy_known",
+   "rep": 8,
+   "t": 591.0,
+   "verdicts": {
+    "matches:скид[^.!?]{0,60}(не да|нет|не дела|не предусм|не предоставл)|(нет|не да[её]м|не делаем|не предоставляем)[^.!?]{0,40}скид|фиксирован": true,
+    "no_discount": true,
+    "no_tool:create_handoff": true,
+    "no_marker_leak": true
+   },
+   "tools": [],
+   "text": "Скидок не даём ни на какой объём, цены фиксированные.\n\nЕсли нужен расчёт по 100 коробкам, могу передать заявку менеджеру. Напишите, пожалуйста:\n— компания или ИП\n— имя\n— город\n— телефон",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "before",
+   "scenario": "ws_discount_policy_known",
+   "rep": 8,
+   "t": 592.7,
+   "verdicts": {
+    "matches:скид[^.!?]{0,60}(не да|нет|не дела|не предусм|не предоставл)|(нет|не да[её]м|не делаем|не предоставляем)[^.!?]{0,40}скид|фиксирован": true,
+    "no_discount": true,
+    "no_tool:create_handoff": true,
+    "no_marker_leak": true
+   },
+   "tools": [],
+   "text": "Скидок не даём ни на какой объём, цены фиксированные.\n\nЕсли нужен расчёт и оформление заявки:\nназвание компании или ИП\nимя\nгород\nчто именно и в каком объёме нужно\nтелефон",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "T",
+   "scenario": "ws_discount_policy_known",
+   "rep": 8,
+   "t": 595.9,
+   "verdicts": {
+    "matches:скид[^.!?]{0,60}(не да|нет|не дела|не предусм|не предоставл)|(нет|не да[её]м|не делаем|не предоставляем)[^.!?]{0,40}скид|фиксирован": true,
+    "no_discount": true,
+    "no_tool:create_handoff": false,
+    "no_marker_leak": true
+   },
+   "tools": [
+    "create_handoff"
+   ],
+   "text": "Скидок не даём ни на какой объём, цены фиксированные.\n\nПередал владельцу, он свяжется.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "T3",
+   "scenario": "ws_discount_policy_known",
+   "rep": 9,
+   "t": 598.9,
+   "verdicts": {
+    "matches:скид[^.!?]{0,60}(не да|нет|не дела|не предусм|не предоставл)|(нет|не да[её]м|не делаем|не предоставляем)[^.!?]{0,40}скид|фиксирован": true,
+    "no_discount": true,
+    "no_tool:create_handoff": false,
+    "no_marker_leak": true
+   },
+   "tools": [
+    "create_handoff"
+   ],
+   "text": "Скидок не даём ни на какой объём, цены фиксированные.\n\nПередал владельцу, он свяжется.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "C",
+   "scenario": "ws_discount_policy_known",
+   "rep": 9,
+   "t": 600.4,
+   "verdicts": {
+    "matches:скид[^.!?]{0,60}(не да|нет|не дела|не предусм|не предоставл)|(нет|не да[её]м|не делаем|не предоставляем)[^.!?]{0,40}скид|фиксирован": true,
+    "no_discount": true,
+    "no_tool:create_handoff": true,
+    "no_marker_leak": true
+   },
+   "tools": [],
+   "text": "Скидок не даём ни на какой объём, цены фиксированные.\n\nМинимальный заказ — 50 000 тг.\nЕсли нужно, могу принять заявку на 100 коробок.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "C2",
+   "scenario": "ws_discount_policy_known",
+   "rep": 9,
+   "t": 602.0,
+   "verdicts": {
+    "matches:скид[^.!?]{0,60}(не да|нет|не дела|не предусм|не предоставл)|(нет|не да[её]м|не делаем|не предоставляем)[^.!?]{0,40}скид|фиксирован": true,
+    "no_discount": true,
+    "no_tool:create_handoff": true,
+    "no_marker_leak": true
+   },
+   "tools": [],
+   "text": "Скидок не даём ни на какой объём — цены фиксированные.\n\nМинимальный заказ 50 000 тг.\nЕсли нужно, могу передать заявку менеджеру.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "before",
+   "scenario": "ws_discount_policy_known",
+   "rep": 9,
+   "t": 603.8,
+   "verdicts": {
+    "matches:скид[^.!?]{0,60}(не да|нет|не дела|не предусм|не предоставл)|(нет|не да[её]м|не делаем|не предоставляем)[^.!?]{0,40}скид|фиксирован": true,
+    "no_discount": true,
+    "no_tool:create_handoff": true,
+    "no_marker_leak": true
+   },
+   "tools": [],
+   "text": "Скидок не даём ни на какой объём — цены фиксированные.\n\nМинимальный заказ 50 000 тг\nОплата: безнал с НДС, счёт и накладные\n\nЕсли нужен расчёт по 100 коробкам, могу передать заявку менеджеру.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "T",
+   "scenario": "ws_discount_policy_known",
+   "rep": 9,
+   "t": 606.8,
+   "verdicts": {
+    "matches:скид[^.!?]{0,60}(не да|нет|не дела|не предусм|не предоставл)|(нет|не да[её]м|не делаем|не предоставляем)[^.!?]{0,40}скид|фиксирован": true,
+    "no_discount": true,
+    "no_tool:create_handoff": false,
+    "no_marker_leak": true
+   },
+   "tools": [
+    "create_handoff"
+   ],
+   "text": "Скидок не даём ни на какой объём, цены фиксированные.\n\nПередал владельцу, он свяжется.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  },
+  {
+   "side": "T2",
+   "scenario": "ws_discount_policy_known",
+   "rep": 9,
+   "t": 608.1,
+   "verdicts": {
+    "matches:скид[^.!?]{0,60}(не да|нет|не дела|не предусм|не предоставл)|(нет|не да[её]м|не делаем|не предоставляем)[^.!?]{0,40}скид|фиксирован": true,
+    "no_discount": true,
+    "no_tool:create_handoff": true,
+    "no_marker_leak": true
+   },
+   "tools": [],
+   "text": "Скидок не даём ни на какой объём, цены фиксированные.\n\nЕсли нужен расчёт по 100 коробкам, могу передать заявку менеджеру.",
+   "served": "gpt-5.4-mini-2026-03-17",
+   "error": null
+  }
+ ]
+}

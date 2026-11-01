@@ -691,7 +691,7 @@ def price_conflict(ctx, ch):
     marked = any(V9_ROW in d and "[Сверка с каталогом:" in d and "3200" in d and "3900" in d and "Цены расходятся" in d for d in docs)
     sends = b.sends()
     body = (sends[0].get("body") or {}).get("body", "") if sends else ""
-    flat = body.replace(" ", "").replace("\u00a0", "")
+    flat = "".join(body.split())   # every space kind: «3 900» may carry U+202F
     picked = "3900" in flat and "3200" not in flat and "расход" not in body.lower()
     ok = premise and marked and len(sends) == 1 and not picked
     return ok, {"premise_published_catalog": premise, "tool_calls": len(tool_outputs(data, "Supabase Vector Store")), "marked": marked,

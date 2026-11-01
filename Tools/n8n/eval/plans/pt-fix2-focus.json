@@ -1,0 +1,10 @@
+{
+  "label": "pt-fix2-focus",
+  "note": "2026-10-30, follow-up of pt-fix2 (docs/audits/2026-10-29-price-tool/README.md): C2 moved u1_unknown_reask and u2_unknown_new_question by one spurious create_handoff each (0/3 → 1/3) — the re-ask scenarios, the context C2 names («и когда клиент переспрашивает») — and T failed ws_discount_policy_known 10/10, so C2 is checked there too. Same sides as pt-fix2 (f0c81168@n8n vs the working tree with C2), one interleaved schedule, harness h11, set v1.8.",
+  "sides": {"before": "f0c81168@n8n", "after": "worktree@n8n"},
+  "skip_panel": true,
+  "blocks": [
+    {"name": "v6u", "only": "u1_,u2_,u3_,u4_", "repeat": 10},
+    {"name": "discount", "only": "ws_discount_policy_known", "repeat": 10}
+  ]
+}

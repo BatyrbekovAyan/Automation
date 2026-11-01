@@ -311,7 +311,7 @@ def s_published(ctx):
     pv = d.get("promptVersion") if isinstance(d, dict) else None
     ok = st == 200 and isinstance(d, dict) and d.get("success") is True \
         and pv == {"source": "published", "versionId": wf["activeVersionId"], "draftPending": True} \
-        and "3200" in reply.replace(" ", "").replace(" ", "") and "999" not in reply and before == after
+        and "3200" in "".join(reply.split()) and "999" not in reply and before == after
     return ok, {"status": st, "reply": reply[:160], "promptVersion": pv, "published": wf["activeVersionId"], "draft": wf["versionId"],
                 "side_effects_unchanged": before == after}
 
@@ -351,7 +351,7 @@ def s_price_conflict(ctx):
     finally:
         psql(f"delete from documents where metadata->>'fileId' = '{tag}';")
     reply = (d.get("reply") if isinstance(d, dict) else str(d)) or ""
-    flat = reply.replace(" ", "").replace("\u00a0", "")
+    flat = "".join(reply.split())   # every space kind: «3 900» may carry U+202F
     reached = "3900" in flat                                   # 3900 exists only in the price list: the tool ran
     named = "3200" in flat or "расход" in reply.lower()
     ok = st == 200 and isinstance(d, dict) and d.get("success") is True and reached and named

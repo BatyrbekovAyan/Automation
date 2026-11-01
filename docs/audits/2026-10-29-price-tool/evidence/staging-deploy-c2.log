@@ -1,0 +1,17 @@
+~ 3qax5J9u2qsT9Vao 'Edit Whatsapp Workflow' active=True nodes 9 → 9 (+0 -0)
+    rollback pointer: versionId 9bad381a-3306-4551-a625-e15cf9a14789 (activeVersionId 9bad381a-3306-4551-a625-e15cf9a14789)
+    published by the PUT (served version = the update) — no publish call, no deactivate window
+    read-back: ok
+~ TwWPW3gIyjZS3foR 'Edit Telegram Workflow' active=True nodes 9 → 9 (+0 -0)
+    rollback pointer: versionId dd6c8cbc-1ef3-4eb4-8d03-dd7165fcade3 (activeVersionId dd6c8cbc-1ef3-4eb4-8d03-dd7165fcade3)
+    published by the PUT (served version = the update) — no publish call, no deactivate window
+    read-back: ok
+~ Uz6HBBUpAiUqVysB 'CreateTelegramWorkflow' active=True nodes 52 → 52 (+0 -0)
+    rollback pointer: versionId c6f328ad-23dc-4e41-8cdf-0266491cff5a (activeVersionId c6f328ad-23dc-4e41-8cdf-0266491cff5a)
+    published by the PUT (served version = the update) — no publish call, no deactivate window
+    read-back: ok
+~ XuvOp7TxOImOAmlj 'CreateWhatsappWorkflow' active=True nodes 52 → 52 (+0 -0)
+    rollback pointer: versionId 003488a4-05ba-4d26-89dc-46a70c58e0ee (activeVersionId 003488a4-05ba-4d26-89dc-46a70c58e0ee)
+    published by the PUT (served version = the update) — no publish call, no deactivate window
+    read-back: ok
+{"considered": 4, "missing": 0, "up_to_date": 0, "would_update": 0, "updated": 4, "would_publish": 0, "republished": 0, "inactive_must_run": 0, "failed": 0}

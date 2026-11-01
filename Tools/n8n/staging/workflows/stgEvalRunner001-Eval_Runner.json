@@ -29,6 +29,9 @@
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify($json.body.request || {}) }}",
+        "sendHeaders": true,
+        "specifyHeaders": "json",
+        "jsonHeaders": "={{ JSON.stringify(Object.fromEntries(Object.entries($json.body.headers || {}).filter(([k, v]) => [\"openai-platform\", \"user-agent\", \"accept-language\", \"sec-fetch-mode\", \"x-stainless-arch\", \"x-stainless-lang\", \"x-stainless-os\", \"x-stainless-package-version\", \"x-stainless-retry-count\", \"x-stainless-runtime\", \"x-stainless-runtime-version\"].includes(String(k).toLowerCase()) && typeof v === 'string'))) }}",
         "options": {
           "timeout": 90000,
           "response": {

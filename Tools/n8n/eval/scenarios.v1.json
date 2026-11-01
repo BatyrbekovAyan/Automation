@@ -1,6 +1,6 @@
 {
-  "version": "v1.7 (2026-10-13: off-topic classes — three kinds + honest assistant; every v1.6 scenario and check unchanged; harness h10)",
-  "notes": "Synthetic business scenarios — no real chats, no real names or numbers. `mode`: auto (the bot's composed system prompt through the completions proxy, with the create_handoff and price_list_search tools simulated by the runner) | panel (the Suggest Replies webhook on staging). `expect` names deterministic checks the runner applies; `tool` sets the simulated create_handoff result. Q1 (v1.3): in a6_/q1p_ the `business` turn is the OWNER's reply as it reaches the bot's memory (an ai row) — the bot must repeat that agreement; q1c_ must NOT assign a time or serve the client's own time as agreed. Roles (v1.4, h7): `client` = the client; `business` = the bot's OWN earlier reply as memory stores it (delivered, unmarked); `owner` = the owner's reply (owner_app / owner_phone memory row); `bot_unknown` = the bot's earlier reply whose delivery is unknown. `owner` and `bot_unknown` reach the model with the mark the memory writers store at the measured ref (apply-history-handoff.py OWNER_MEMORY_PREFIX / UNDELIVERED_MEMORY_PREFIX at --prompts-ref) — before T6 there is none, so the same scenario measures prod's memory on the old ref and the marked memory on the new one. v1.5 (T11b): `no_tool:create_handoff` = the model must not open a request (on a live bot create_handoff records a request and pauses the chat's auto-reply until the owner's explicit «Авто»); it stands on every auto scenario whose question the business data answers and whose design calls for no handoff — decided by the scenario text and the niche rules it exercises, never by a measured result; the classification and the reason for every scenario left unchecked live in eval/test_checks.py.",
+  "version": "v1.8 (2026-10-29: the price that lives ONLY in the price list — 8 auto scenarios pl_* (products_override / services_override, harness h11; pl_empty_reask_flowers = the e2e-auth retired_bot_reconnects_after_purchase model step); every v1.7 scenario and check unchanged)",
+  "notes": "Synthetic business scenarios — no real chats, no real names or numbers. `mode`: auto (the bot's composed system prompt through the completions proxy, with the create_handoff and price_list_search tools simulated by the runner) | panel (the Suggest Replies webhook on staging). `expect` names deterministic checks the runner applies; `tool` sets the simulated create_handoff result. Q1 (v1.3): in a6_/q1p_ the `business` turn is the OWNER's reply as it reaches the bot's memory (an ai row) — the bot must repeat that agreement; q1c_ must NOT assign a time or serve the client's own time as agreed. Roles (v1.4, h7): `client` = the client; `business` = the bot's OWN earlier reply as memory stores it (delivered, unmarked); `owner` = the owner's reply (owner_app / owner_phone memory row); `bot_unknown` = the bot's earlier reply whose delivery is unknown. `owner` and `bot_unknown` reach the model with the mark the memory writers store at the measured ref (apply-history-handoff.py OWNER_MEMORY_PREFIX / UNDELIVERED_MEMORY_PREFIX at --prompts-ref) — before T6 there is none, so the same scenario measures prod's memory on the old ref and the marked memory on the new one. v1.5 (T11b): `no_tool:create_handoff` = the model must not open a request (on a live bot create_handoff records a request and pauses the chat's auto-reply until the owner's explicit «Авто»); it stands on every auto scenario whose question the business data answers and whose design calls for no handoff — decided by the scenario text and the niche rules it exercises, never by a measured result; the classification and the reason for every scenario left unchecked live in eval/test_checks.py. v1.8 (2026-10-29): `products_override` / `services_override` replace the vertical's catalog for one scenario (\"\" = a bot created without one); the pl_* scenarios ask a price that lives ONLY in the price list, so stating it takes the price-list search — the run's tool_calls show whether the model searched.",
   "knowledge": {
     "auto_parts": {
       "businessType": "Автозапчасти",
@@ -2589,6 +2589,258 @@
       ],
       "expect": [
         "abstain"
+      ]
+    },
+    {
+      "id": "pl_51_roses_flowers",
+      "vertical": "flowers",
+      "mode": "auto",
+      "lang": "ru",
+      "tags": [
+        "price_list",
+        "key"
+      ],
+      "note": "the price lives ONLY in the price list (the catalog has 25 roses and peonies): stating it takes the search",
+      "messages": [
+        [
+          "client",
+          "Сколько стоит букет из 51 розы?"
+        ]
+      ],
+      "expect": [
+        "mentions:48000",
+        "numbers_grounded",
+        "lang_ru",
+        "no_markdown",
+        "no_closing_offer",
+        "no_tool:create_handoff",
+        "no_marker_leak"
+      ]
+    },
+    {
+      "id": "pl_51_roses_kz_flowers",
+      "vertical": "flowers",
+      "mode": "auto",
+      "lang": "kz",
+      "tags": [
+        "price_list",
+        "lang",
+        "key"
+      ],
+      "note": "pl_51_roses_flowers in Kazakh",
+      "messages": [
+        [
+          "client",
+          "51 раушаннан тұратын гүл шоғы қанша тұрады?"
+        ]
+      ],
+      "expect": [
+        "mentions:48000",
+        "numbers_grounded",
+        "lang_kz",
+        "no_markdown",
+        "no_closing_offer",
+        "no_tool:create_handoff",
+        "no_marker_leak"
+      ]
+    },
+    {
+      "id": "pl_iphone13_screen_phone_repair",
+      "vertical": "phone_repair",
+      "mode": "auto",
+      "lang": "ru",
+      "tags": [
+        "price_list",
+        "key"
+      ],
+      "note": "model and repair named; the price lives ONLY in the price list (the catalog has iPhone 11 only)",
+      "messages": [
+        [
+          "client",
+          "iPhone 13, разбит экран. Сколько стоит замена?"
+        ]
+      ],
+      "expect": [
+        "mentions:52000",
+        "mentions_diagnostics_caveat",
+        "numbers_grounded",
+        "lang_ru",
+        "no_markdown",
+        "no_closing_offer",
+        "no_tool:create_handoff",
+        "no_marker_leak"
+      ]
+    },
+    {
+      "id": "pl_ielts_individual_education",
+      "vertical": "education",
+      "mode": "auto",
+      "lang": "ru",
+      "tags": [
+        "price_list",
+        "key"
+      ],
+      "note": "who and the goal named; the price lives ONLY in the price list (the catalog has the kids' group and ЕНТ)",
+      "messages": [
+        [
+          "client",
+          "Я взрослый, готовлюсь к IELTS. Сколько стоят индивидуальные занятия?"
+        ]
+      ],
+      "expect": [
+        "mentions:12000",
+        "numbers_grounded",
+        "lang_ru",
+        "no_markdown",
+        "no_closing_offer",
+        "no_tool:create_handoff",
+        "no_marker_leak"
+      ]
+    },
+    {
+      "id": "pl_spark_plugs_auto_parts",
+      "vertical": "auto_parts",
+      "mode": "auto",
+      "lang": "ru",
+      "tags": [
+        "price_list",
+        "key"
+      ],
+      "note": "the car named; the part lives ONLY in the price list (not in the catalog)",
+      "docs_override": [
+        "Фильтр масляный 90915-YZZE1 Toyota Camry 2019 — 3200 тг, оригинал; аналог Sakura C-1139 — 1400 тг",
+        "Колодки тормозные передние 04465-02220 Camry 2018-2023 — 18500 тг",
+        "Свечи зажигания Denso SK20R11, Toyota Camry 2019 — 4200 тг/шт"
+      ],
+      "messages": [
+        [
+          "client",
+          "Camry 2019, свечи зажигания есть? Сколько стоят?"
+        ]
+      ],
+      "expect": [
+        "mentions:4200",
+        "numbers_grounded",
+        "lang_ru",
+        "no_markdown",
+        "no_closing_offer",
+        "no_tool:create_handoff",
+        "no_marker_leak"
+      ]
+    },
+    {
+      "id": "pl_empty_plain_flowers",
+      "vertical": "flowers",
+      "mode": "auto",
+      "lang": "ru",
+      "tags": [
+        "price_list",
+        "key"
+      ],
+      "note": "a bot created without About Business and catalog (as e2e-auth creates it); the price list is its only data",
+      "messages": [
+        [
+          "client",
+          "Сколько стоит букет «Нежность»?"
+        ]
+      ],
+      "expect": [
+        "mentions:18500",
+        "numbers_grounded",
+        "lang_ru",
+        "no_markdown",
+        "no_closing_offer",
+        "no_tool:create_handoff",
+        "no_marker_leak"
+      ],
+      "business_override": "",
+      "products_override": "",
+      "services_override": "",
+      "docs_override": [
+        "Букет «Нежность» — 18 500 ₸ (15 роз)"
+      ]
+    },
+    {
+      "id": "pl_empty_memory_flowers",
+      "vertical": "flowers",
+      "mode": "auto",
+      "lang": "ru",
+      "tags": [
+        "price_list",
+        "memory",
+        "key"
+      ],
+      "note": "pl_empty_plain_flowers after the earlier dialog of the e2e (the bot already agreed the delivery time)",
+      "messages": [
+        [
+          "client",
+          "Здравствуйте! Можно букет «Нежность» с доставкой в пятницу к 18:00?"
+        ],
+        [
+          "business",
+          "Да, доставим букет «Нежность» в пятницу к 18:00 по адресу Абая 10."
+        ],
+        [
+          "client",
+          "А сколько стоит букет «Нежность»?"
+        ]
+      ],
+      "expect": [
+        "mentions:18500",
+        "numbers_grounded",
+        "lang_ru",
+        "no_markdown",
+        "no_closing_offer",
+        "no_tool:create_handoff",
+        "no_marker_leak"
+      ],
+      "business_override": "",
+      "products_override": "",
+      "services_override": "",
+      "docs_override": [
+        "Букет «Нежность» — 18 500 ₸ (15 роз)"
+      ]
+    },
+    {
+      "id": "pl_empty_reask_flowers",
+      "vertical": "flowers",
+      "mode": "auto",
+      "lang": "ru",
+      "tags": [
+        "price_list",
+        "memory",
+        "key"
+      ],
+      "note": "the model step of e2e-auth retired_bot_reconnects_after_purchase, verbatim: the moved memory, the moved price list, «Напомните…» asks the agreed time AND the price",
+      "messages": [
+        [
+          "client",
+          "Здравствуйте! Можно букет «Нежность» с доставкой в пятницу к 18:00?"
+        ],
+        [
+          "business",
+          "Да, доставим букет «Нежность» в пятницу к 18:00 по адресу Абая 10."
+        ],
+        [
+          "client",
+          "Напомните, во сколько в пятницу вы привезёте букет «Нежность» и сколько он стоит?"
+        ]
+      ],
+      "expect": [
+        "mentions:18500",
+        "mentions:18:00",
+        "numbers_grounded",
+        "lang_ru",
+        "no_markdown",
+        "no_closing_offer",
+        "no_tool:create_handoff",
+        "no_marker_leak"
+      ],
+      "business_override": "",
+      "products_override": "",
+      "services_override": "",
+      "docs_override": [
+        "Букет «Нежность» — 18 500 ₸ (15 роз)"
       ]
     }
   ]

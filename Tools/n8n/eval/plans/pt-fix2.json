@@ -1,0 +1,16 @@
+{
+  "label": "pt-fix2",
+  "note": "2026-10-30, the price-tool fix C2 (docs/audits/2026-10-29-price-tool/README.md): one sentence in _core.md «Цены и ассортимент» — «Цену или наличие позиции, которой нет в «Products»/«Services», ищи в прайс-листах инструментом Supabase Vector Store до ответа — и когда клиент переспрашивает или в сообщении есть другие вопросы.» — injected into the Create/Edit WA/TG prompt maps. Every auto scenario of set v1.8 ×3, before (main's canon f0c81168) vs after (the working tree with C2), one interleaved schedule, the n8n request shape; the tools are identical on both sides, the prompt sentence is the only difference. C2 searched 16/16 on real clones (before 8/16 in the same window) and opened no spurious handoff in the candidate screen (screen-candidates.py). This run checks regressions: every no_tool:create_handoff scenario, pass rates, Kazakh. Harness h11.",
+  "sides": {
+    "before": "f0c81168@n8n",
+    "after": "worktree@n8n"
+  },
+  "skip_panel": true,
+  "blocks": [
+    {
+      "name": "auto",
+      "only": null,
+      "repeat": 3
+    }
+  ]
+}

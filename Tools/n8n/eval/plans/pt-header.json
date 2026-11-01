@@ -1,0 +1,26 @@
+{
+  "label": "pt-header",
+  "note": "2026-10-29, A/B of the transport header (docs/audits/2026-10-29-price-tool/README.md). The same body — the canon prompts (f0c81168) in the n8n request shape (developer message, n8n's tools, strict:false, response_format text; 4795 input tokens on the e2e step, = n8n's own call) — WITHOUT (`n8n`) and WITH (`platform`) the header n8n 2.36.7's lmChatOpenAi adds to every OpenAI call (AiConfig.openAiDefaultHeaders: openai-platform). Before: the real n8n path missed the search on the e2e step 4/12 that evening (23:21-23:35), the proxy without the header 0/34 in the same hours, interleaved 1/6 vs 0/16. reask = the e2e step ×16; pl = the other 7 price-list-only scenarios ×4; b24 = the 24 scenarios that searched on 2026-10-13 ×2. Harness h11, set v1.8, one schedule.",
+  "sides": {
+    "n8n": "f0c81168@n8n",
+    "platform": "f0c81168@n8n+platform"
+  },
+  "skip_panel": true,
+  "blocks": [
+    {
+      "name": "reask",
+      "only": "pl_empty_reask_flowers",
+      "repeat": 16
+    },
+    {
+      "name": "pl",
+      "only": "pl_51_,pl_iphone13_,pl_ielts_,pl_spark_,pl_empty_plain_,pl_empty_memory_",
+      "repeat": 4
+    },
+    {
+      "name": "b24",
+      "only": "ap_price_without_car,ap_price_with_car,ap_sku_exact_kz,ap_unknown_part,ap_handoff_fail,ap_source_conflict,ap_price_agrees_analogues,ws_list_of_items,ws_mixed_lang,fl_absent_item,fl_kz_price,fl_installment_unknown,ks_installment_terms,ks_variant_clarify,ks_kz_availability,ed_schedule_unknown,ed_kz_parent,pr_price_no_model,pr_price_with_model,pr_model_not_in_list,pr_kz_battery,gen_markdown_bait,gen_long_answer_budget,gen_owner_pref_vs_fact",
+      "repeat": 2
+    }
+  ]
+}

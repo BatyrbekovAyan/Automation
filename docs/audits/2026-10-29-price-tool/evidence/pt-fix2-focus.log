@@ -1,0 +1,24 @@
+start 01:18:30
+PASS  u1_unknown_reask                     1.00  v6u/after  
+PASS  u1_unknown_reask                     1.00  v6u/before  
+PASS  u2_unknown_new_question              1.00  v6u/before  
+PASS  u2_unknown_new_question              1.00  v6u/after  
+PASS  u3_sent_control                      1.00  v6u/after  
+PASS  u3_sent_control                      1.00  v6u/before  
+PASS  u4_kz_unknown                        1.00  v6u/before  
+PASS  u4_kz_unknown                        1.00  v6u/after  
+PASS  ws_discount_policy_known             1.00  discount/after  
+PASS  ws_discount_policy_known             1.00  discount/before  
+
+pt-fix2-focus-v6u-before: pass 4 · flaky 0 · fail 0 · runs 40 · errors 0 · retries 0 · $0.0229
+wrote Tools/n8n/eval/results/pt-fix2-focus-v6u-before.md
+
+pt-fix2-focus-v6u-after: pass 4 · flaky 0 · fail 0 · runs 40 · errors 0 · retries 0 · $0.0216
+wrote Tools/n8n/eval/results/pt-fix2-focus-v6u-after.md
+
+pt-fix2-focus-discount-before: pass 1 · flaky 0 · fail 0 · runs 10 · errors 0 · retries 0 · $0.0064
+wrote Tools/n8n/eval/results/pt-fix2-focus-discount-before.md
+
+pt-fix2-focus-discount-after: pass 1 · flaky 0 · fail 0 · runs 10 · errors 0 · retries 0 · $0.0063
+wrote Tools/n8n/eval/results/pt-fix2-focus-discount-after.md
+exit 0 01:19:46

@@ -1,0 +1,21 @@
+{
+  "label": "pt-now",
+  "note": "2026-10-29, price-list search on today's model (docs/audits/2026-10-29-price-tool/README.md). The canon prompts (f0c81168: the bot-facing canon is unchanged since 126f44c2 / 45b08d62, 2026-10-13) in BOTH request shapes, one interleaved schedule: `harness` = the runner's request every earlier number was measured with (system message, its own tools) — comparable with core-a-before/after of 2026-10-13; `n8n` = the request the bot's n8n sends (developer message, the template's tools as n8n builds them, strict:false, response_format text). b24 = the 24 auto scenarios of v1.7 in which the model called the price-list search on 2026-10-13 (core-a-before 42/46 runs, core-a-after 40/46), ×3; pl = the 8 v1.8 scenarios whose price lives ONLY in the price list (pl_empty_reask_flowers = the e2e-auth model step that failed 6/6 that morning), ×8. Harness h11, set v1.8.",
+  "sides": {
+    "harness": "f0c81168@harness",
+    "n8n": "f0c81168@n8n"
+  },
+  "skip_panel": true,
+  "blocks": [
+    {
+      "name": "b24",
+      "only": "ap_price_without_car,ap_price_with_car,ap_sku_exact_kz,ap_unknown_part,ap_handoff_fail,ap_source_conflict,ap_price_agrees_analogues,ws_list_of_items,ws_mixed_lang,fl_absent_item,fl_kz_price,fl_installment_unknown,ks_installment_terms,ks_variant_clarify,ks_kz_availability,ed_schedule_unknown,ed_kz_parent,pr_price_no_model,pr_price_with_model,pr_model_not_in_list,pr_kz_battery,gen_markdown_bait,gen_long_answer_budget,gen_owner_pref_vs_fact",
+      "repeat": 3
+    },
+    {
+      "name": "pl",
+      "only": "pl_",
+      "repeat": 8
+    }
+  ]
+}

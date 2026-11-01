@@ -1579,7 +1579,7 @@ def s_line_reconnect(ctx, ch):
                 tools += [str(it.get("json")) for it in br or []]
         sends = [c for c in mock_calls(since_calls, "message/send")[0] if (c.get("query") or {}).get("profile_id") == p2 and not c.get("dropped")]
         reply = ((sends[0].get("body") or {}).get("body", "") if sends else "")
-        flat = reply.replace(" ", "").replace(" ", "")
+        flat = "".join(reply.split())   # every space kind: «18 500» may carry U+202F
         res["llm"] = {"outcome": exec_outcome(ex), "price_tool_saw_row": any("18 500" in x for x in tools), "reply": reply[:240]}
         ok = det and exec_outcome(ex) == "sent" and "18500" in flat and re.search(r"18[:.]00", reply) is not None
         return ok, json.dumps(res, ensure_ascii=False)
