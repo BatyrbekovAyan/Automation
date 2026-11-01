@@ -664,13 +664,21 @@ public class PaywallController : MonoBehaviour
     {
         List<DashboardOutcome> outcomes = DashboardStore.Load();
         if (DashboardStore.LastFetchMs <= 0) return null;
+        return TrialOrders(outcomes, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
+    }
 
-        long nowMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+    /// <summary>
+    /// The orders of the trial window among <paramref name="outcomes"/> — only the rows «Сводка» may show
+    /// (<see cref="DashboardAudienceFilter.WithoutPersonal"/>): «Личные и рабочие чаты», an order collected in a chat that is
+    /// personal for the assistant is no order on the receipt either, at once.
+    /// </summary>
+    internal static int TrialOrders(IEnumerable<DashboardOutcome> outcomes, long nowMs)
+    {
         var window = new Window
         {
             CurStart = nowMs - PlanCatalog.TrialDays * 86_400_000L,
             CurEnd = nowMs,
         };
-        return DashboardMetrics.CountOrders(outcomes, window);
+        return DashboardMetrics.CountOrders(DashboardAudienceFilter.WithoutPersonal(outcomes), window);
     }
 }

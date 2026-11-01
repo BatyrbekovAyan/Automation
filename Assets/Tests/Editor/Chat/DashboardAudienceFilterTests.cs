@@ -136,6 +136,40 @@ public class DashboardAudienceFilterTests
         Assert.AreEqual(0, Regex.Matches(page, @"FilterByProfiles\(\s*_all").Count, "no metric or list over the unfiltered rows");
     }
 
+    // The paywall's trial receipt («заказов собрано») counts the «Сводка» cache — the same rows, so the same filter.
+    [Test]
+    public void ThePaywallsTrialReceipt_CountsNoOrderFromAPersonalChat()
+    {
+        ChatAudienceStore.ApplyList(new[]
+        {
+            new AudienceProfileState
+            {
+                ProfileId = Wa, ConnectedAtMs = MomentMs,
+                Decisions = new List<AudienceDecision>
+                {
+                    Decision("77000000001@c.us", AudienceKind.Personal, AudienceReason.Contact),
+                    Decision("77000000002@c.us", AudienceKind.Business, AudienceReason.New),
+                },
+            },
+        });
+        long now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        DashboardOutcome[] rows =
+        {
+            Order(Wa, "77000000001@c.us", now),   // personal by the server's decision
+            Order(Wa, "77000000002@c.us", now),   // working
+            Order(Wa, "77000000003@c.us", now),   // nobody has decided it — kept, as in «Сводка»
+        };
+        Assert.AreEqual(2, PaywallController.TrialOrders(rows, now), "an order collected in a personal chat is no order on the receipt");
+
+        ChatAudienceStore.ApplyDesire(Wa, "77000000002@c.us", AudienceKind.Personal);
+        Assert.AreEqual(1, PaywallController.TrialOrders(rows, now), "a chat made personal leaves the receipt at once");
+
+        string collected = MethodBody(Read("Scripts/Billing/PaywallController.cs"), "private static int? TrialOrdersCollected()");
+        StringAssert.Contains("TrialOrders(", collected, "the receipt counts through the filtered count");
+        StringAssert.Contains("DashboardStore.Load()", collected);
+        Assert.IsFalse(collected.Contains("DashboardMetrics.CountOrders("), "never over the unfiltered cache");
+    }
+
     // ---- helpers ----
 
     private (DashboardPage page, TextMeshProUGUI hero) PageWith(params DashboardOutcome[] rows)
