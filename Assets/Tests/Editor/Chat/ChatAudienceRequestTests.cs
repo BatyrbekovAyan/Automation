@@ -250,6 +250,21 @@ public class ChatAudienceRequestTests
         Assert.IsFalse(refused);
     }
 
+    [Test]
+    public void ConnectedAnswer_ARestoredConnection_NamesTheEarlierMoment_AndNoRestart()
+    {
+        // The previous number paired again the same day: the server restores the earlier connection and says so — an EARLIER
+        // moment than the one the app mirrors, restarted false, restored true. The app reads the moment and «not restarted»;
+        // it needs nothing more (the list read after the answer brings the restored connection's decisions back).
+        const long mirrored = 1760000000000L + 2 * 3_600_000L;
+        Assert.AreEqual(ChatAudienceSyncQueue.BatchStatus.Answered, ChatAudienceResponse.ClassifyConnected(200,
+            "{\"success\":true,\"connectedAt\":1760000000000,\"restarted\":false,\"restored\":true}", out long at, out bool restarted));
+        Assert.AreEqual(1760000000000L, at, "the restored connection's earlier moment");
+        Assert.IsFalse(restarted);
+        Assert.IsFalse(ChatAudienceConnectPolicy.NumberRestarted(restarted, mirrored, at),
+            "an earlier moment than the mirrored one is no restart: the server's word decides");
+    }
+
     [TestCase(400, ChatAudienceSyncQueue.BatchStatus.Rejected, TestName = "EveryOp_400_BadRequest_IsARefusal")]
     [TestCase(401, ChatAudienceSyncQueue.BatchStatus.Rejected, TestName = "EveryOp_401_AfterTheRefreshRetry_IsARefusal")]
     [TestCase(403, ChatAudienceSyncQueue.BatchStatus.Rejected, TestName = "EveryOp_403_NotTheTokensProfile_IsARefusal")]

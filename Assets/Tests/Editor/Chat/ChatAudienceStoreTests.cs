@@ -206,6 +206,30 @@ public class ChatAudienceStoreTests
             "the same earliest time is from before the new connection");
     }
 
+    [Test]
+    public void Store_ARestoredConnection_TakesTheEarlierMoment_AndRejudges()
+    {
+        // A mistaken pairing moved the moment forward; pairing the previous number again the same day restores the earlier
+        // connection: the connected answer names the EARLIER moment (restarted false). The mirror takes a moment as it comes —
+        // never only forward — tells it once, and an undecided chat is judged against the restored moment again.
+        long mistakenMs = MomentMs + 2 * 3_600_000L;
+        ChatAudienceStore.ApplyConnected(Wa, mistakenMs);
+        var chat = WhatsappChat("77010000041@c.us", AfterSec + 7200);
+        ChatAudienceStore.NoteLastMessage(Wa, chat.ChatId, AfterSec);       // after the restored moment, before the mistaken one
+        Assert.AreEqual((AudienceKind.Personal, AudienceReason.History), Verdict(ChatAudienceStore.ViewOf(Wa, chat)),
+            "against the mistaken connection the chat reads as a conversation from before it");
+
+        int changes = 0;
+        ChatAudienceStore.OnChanged += () => changes++;
+        ChatAudienceStore.ApplyConnected(Wa, MomentMs);
+        Assert.AreEqual(MomentMs, ChatAudienceStore.ConnectedAtMs(Wa), "the earlier moment is taken as it comes");
+        Assert.AreEqual(1, changes, "and told once");
+        Assert.AreEqual((AudienceKind.Business, AudienceReason.New), Verdict(ChatAudienceStore.ViewOf(Wa, chat)),
+            "against the restored connection the same chat reads as a new person again");
+        ChatAudienceStore.ApplyConnected(Wa, MomentMs);
+        Assert.AreEqual(1, changes, "the same moment again tells nothing");
+    }
+
     private static (AudienceKind, AudienceReason) Verdict(AudienceView view) => (view.Kind, view.Reason);
 
     [Test]
