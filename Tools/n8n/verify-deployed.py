@@ -11,7 +11,13 @@ Canonical workflows (Tools/n8n/workflows/*.json) — each must be:
     (Support Message's recipient chat id), which is also REQUIRED to be bound outside staging;
   * free of unbound `__PLACEHOLDER__` tokens (credential ids, parameters) outside staging;
   * active exactly when expected: everything runs except the two clone TEMPLATES (the prod inventory, and the
-    same contract as staging/bootstrap.py ACTIVE_CANONICAL).
+    same contract as staging/bootstrap.py ACTIVE_CANONICAL);
+  * carrying the canon's value of each CANONICAL_SETTINGS key — what n8n keeps of a successful and of a failed execution,
+    and how long one may run; not set in the canon = not set on the instance — reported as «SETTINGS differ». They are
+    outside the graph, and the journal setting is the one control behind «a chat's text does not settle in the execution
+    journal» («Личные и рабочие чаты», 2026-10-25): an editor toggle or an import that drops `settings` would otherwise
+    read «diff 0» forever. Keys outside the list (binaryMode, which the API reports for reference, redactionPolicy, …) are
+    not compared.
 Bot clones — judged by their REAL graphs (stored + published) against the template's graph_stamp
 (update-clones.py, one shared definition), and by the settings they must take from the template
 (update-clones.TEMPLATE_SETTINGS: what n8n keeps of a successful execution — SETTINGS-BEHIND otherwise; «Личные и
@@ -53,6 +59,10 @@ SUBSTITUTIONS = {"olmqWMfcFpCEcpiE": [("Send To Support Chat", ("chatId",), "__C
 EXPECTED_INACTIVE = {f.split("-", 1)[0] for f in uc.TEMPLATES.values()}
 PLACEHOLDER = re.compile(r"__[A-Z][A-Z0-9_]*__")
 STAGING_ONLY_PREFIX = "stg"
+# The workflow settings a deployed canonical copy must carry exactly as the canon sets them (None = not set on either side).
+# deploy-canonical.py reads the same list: a settings-only difference is «would update», and its read-back compares them.
+# callerPolicy is not here: no canonical workflow sets it.
+CANONICAL_SETTINGS = ("saveDataSuccessExecution", "saveDataErrorExecution", "executionTimeout")
 
 
 def graph_hash(wf, keep_identity=True):
@@ -66,6 +76,18 @@ def graph_hash(wf, keep_identity=True):
         nodes.append(m)
     blob = json.dumps({"nodes": sorted(nodes, key=lambda x: x["name"]), "connections": wf.get("connections")}, sort_keys=True, ensure_ascii=False)
     return hashlib.sha256(blob.encode()).hexdigest()[:12]
+
+
+def settings_drift(canon, live):
+    """{setting: (the deployed value, the canonical value)} for each of CANONICAL_SETTINGS the deployed copy does not carry
+    exactly as the canon does (None = not set). Settings belong to the workflow, not to a version: one comparison covers the
+    stored and the published copy."""
+    want, got = canon.get("settings") or {}, live.get("settings") or {}
+    return {k: (got.get(k), want.get(k)) for k in CANONICAL_SETTINGS if got.get(k) != want.get(k)}
+
+
+def describe_drift(drift):
+    return ", ".join(f"{k} {a!r} (canonical {b!r})" for k, (a, b) in drift.items())
 
 
 def unsubstitute(live, wid):
@@ -115,6 +137,9 @@ def check_canonical(wid, wf, full, staging):
     row["published_match"] = uc.published_matches(full, lambda g: graph_hash(unsubstitute(g, wid)[0]) == want)
     av, vid = full.get("activeVersionId"), full.get("versionId")
     row["published_is_stored"] = (av == vid) if (av and vid) else None
+    drift = settings_drift(wf, full)
+    row["settings_match"] = not drift
+    row["settings_drift"] = {k: list(v) for k, v in drift.items()}
     problems = []
     if row["archived"]:
         problems.append("archived")
@@ -124,6 +149,8 @@ def check_canonical(wid, wf, full, staging):
         problems.append("stored graph differs")
     if row["published_match"] is False:
         problems.append("PUBLISHED graph differs" if pub is not None else "published version is not the stored one")
+    if drift:
+        problems.append("SETTINGS differ: " + describe_drift(drift))
     if row["active"] != row["expected_active"]:
         problems.append("inactive (must run)" if row["expected_active"] else "active (a template must stay inactive)")
     if not staging:   # staging leaves Support Message's chat id/credential dangling on purpose (derive-staging.py)
@@ -234,7 +261,8 @@ def main():
         print(f"  prompt map = Create/Edit Vertical Prompt {book['map_ref']} (sha256 {book['map_hash']})")
     for r in report["canonical"]:
         print(f"  {r['status']:7} {r['id']} {r['file']}  active={r.get('active')} names={r.get('names_match')} "
-              f"graph={r.get('params_match')} published={r.get('published_match')}{('  (' + r['note'] + ')') if r.get('note') else ''}")
+              f"graph={r.get('params_match')} published={r.get('published_match')} settings={r.get('settings_match')}"
+              f"{('  (' + r['note'] + ')') if r.get('note') else ''}")
     for c in report["clones"]:
         print(f"  clone   {c['id']} {c['name']!r} [{c['channel']}] active={c['active']} nodes={c['nodes']} "
               f"graph={c['graph_stamp']} published={c['published_stamp']} sticky={c['stamp']} {clone_verdict(c)}")

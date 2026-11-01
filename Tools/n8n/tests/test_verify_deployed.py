@@ -823,4 +823,72 @@ for ch in CHANNELS:
         c.check(ok is False and SAVE in why, f'read-back of a PUT that did not take: {ok} {why}')
 
 
+# ---------------------------------------------------------------------------------------------- the canon's own settings
+# «Личные и рабочие чаты» (2026-10-25): saveDataSuccessExecution "none" on the bot templates, Suggest Replies, Decide Audience,
+# ChatAudience and the Wappi Proxy is the one control behind the promise that a chat's text does not settle in the execution
+# journal. It lives outside the graph hash, so a toggle in the n8n editor or an import that drops `settings` read «diff 0»
+# forever. The canonical rows compare a whitelist of settings — what n8n keeps of a successful and of a failed execution, and
+# how long one may run — exactly as the canon sets them (not set = not set), under a label of their own.
+WATCHED_SETTINGS = ('saveDataSuccessExecution', 'saveDataErrorExecution', 'executionTimeout')
+SUGGEST, DECIDE = '9PTyYcelRQI7bGDb', 'crAudienceDec001'
+
+
+def with_settings(w, **changes):
+    """A deployed copy with its settings changed: a value, or None to drop the key."""
+    x = copy.deepcopy(w)
+    s = dict(x.get('settings') or {})
+    for k, v in changes.items():
+        if v is None:
+            s.pop(k, None)
+        else:
+            s[k] = v
+    x['settings'] = s
+    return x
+
+
+with Case('SETTINGS premise: the journal setting is the canon\'s on every workflow that can see a chat\'s text — and the whitelist '
+          'covers the keys the canon sets (callerPolicy: no canonical workflow sets it)') as c:
+    for wid in (TEMPLATE_IDS['whatsapp'], TEMPLATE_IDS['telegram'], SUGGEST, DECIDE, 'crChatAudience01', PROXY):
+        c.check((CANON[wid].get('settings') or {}).get('saveDataSuccessExecution') == 'none', f'{wid}: {CANON[wid].get("settings")}')
+    c.check(not any('callerPolicy' in (w.get('settings') or {}) for w in CANON.values()), 'a canonical workflow now sets callerPolicy')
+    vd = module('verify-deployed.py')
+    c.check(tuple(getattr(vd, 'CANONICAL_SETTINGS', ())) == WATCHED_SETTINGS, f'verify-deployed compares {getattr(vd, "CANONICAL_SETTINGS", None)}')
+
+for label, wid, changes, drift in (
+        ('the Wappi Proxy toggled to keep successful executions', PROXY, {'saveDataSuccessExecution': 'all'},
+         {'saveDataSuccessExecution': ['all', 'none']}),
+        ('Decide Audience imported without its settings', DECIDE, {'saveDataSuccessExecution': None, 'saveDataErrorExecution': None},
+         {'saveDataSuccessExecution': [None, 'none'], 'saveDataErrorExecution': [None, 'all']}),
+        ('Suggest Replies lost its execution timeout', SUGGEST, {'executionTimeout': None}, {'executionTimeout': [None, 20]}),
+        ('Set Reply Mode given a setting the canon does not set', SET_REPLY, {'saveDataErrorExecution': 'none'},
+         {'saveDataErrorExecution': ['none', None]})):
+    with Case(f'SETTINGS NEG {label} — graph untouched → DIFF «SETTINGS differ», exit 2') as c:
+        inst = healthy()
+        inst[wid] = with_settings(inst[wid], **changes)
+        code, out, rep = verify(inst)
+        row = canon_row(rep, wid)
+        c.check(code == 2 and row['status'] == 'DIFF' and row.get('params_match') is True and 'SETTINGS differ' in (row.get('note') or ''),
+                f'exit {code}: {row}')
+        c.check(row.get('settings_drift') == drift, f'the drift names each key with (deployed, canonical): {row.get("settings_drift")}')
+
+with Case('SETTINGS a key outside the whitelist (binaryMode the API reports, redactionPolicy, callerPolicy) is not compared — the set '
+          'stays OK, exit 0') as c:
+    inst = healthy()
+    for wid in (PROXY, SUGGEST, DECIDE):
+        inst[wid] = with_settings(inst[wid], binaryMode='separate', redactionPolicy='none', callerPolicy='workflowsFromSameOwner')
+    code, out, rep = verify(inst)
+    c.check(code == 0, f'exit {code}: {brief(rep)}')
+
+with Case('SETTINGS staging base: compared with the DERIVED canon (the templates and Suggest Replies keep every successful execution '
+          'there) — a staging copy carrying the production value is a DIFF') as c:
+    d = derive_module()
+    inst = {wid: deployed(staged(d, w), active=wid not in TEMPLATE_IDS.values()) for wid, w in CANON.items()}
+    code, out, rep = verify(inst, base='http://localhost:5678')
+    c.check(code == 0, f'exit {code}: {brief(rep)}')
+    c.check((inst[SUGGEST].get('settings') or {}).get('saveDataSuccessExecution') == 'all', 'premise: the derived Suggest Replies keeps all')
+    inst[SUGGEST] = with_settings(inst[SUGGEST], saveDataSuccessExecution='none')
+    code, out, rep = verify(inst, base='http://localhost:5678')
+    c.check(code == 2 and 'SETTINGS differ' in (canon_row(rep, SUGGEST).get('note') or ''), f'exit {code}: {canon_row(rep, SUGGEST)}')
+
+
 report()

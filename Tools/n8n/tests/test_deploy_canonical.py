@@ -65,9 +65,12 @@ class FakeN8n:
     `put_publish` = what a PUT's own publish of an active workflow does: ok | refuse (400, the new version SAVED) |
     skip (200, the new version saved, the served one unchanged — an n8n whose PUT does not publish)."""
 
-    def __init__(self, publish='ok', put_publish='ok', report_published_graph=True):
+    def __init__(self, publish='ok', put_publish='ok', report_published_graph=True, put_settings='replace'):
+        """`put_settings` = what a PUT does with `settings`: replace (n8n 2.36's update writes the body's settings) | keep (an
+        instance that ignores them — the read-back must notice)."""
         self.w, self.versions, self.calls, self.n = {}, {}, [], 0
         self.publish, self.put_publish, self.report_published_graph = publish, put_publish, report_published_graph
+        self.put_settings = put_settings
 
     def _save(self, wid, wf):
         self.n += 1
@@ -115,7 +118,9 @@ class FakeN8n:
         if method == 'PUT' and len(parts) == 2:
             vid = self._save(wid, body)
             e.update(name=body['name'], nodes=copy.deepcopy(body['nodes']), connections=copy.deepcopy(body.get('connections') or {}),
-                     settings=copy.deepcopy(body.get('settings') or {}), versionId=vid)
+                     versionId=vid)
+            if self.put_settings == 'replace':
+                e['settings'] = copy.deepcopy(body.get('settings') or {})
             if e['activeVersionId']:
                 if self.put_publish == 'refuse':
                     return 400, {'message': 'There is a conflict with one of the webhooks (the update was saved)'}
@@ -403,6 +408,58 @@ with Case('NEG whole healthy canonical set (placeholders bound, templates inacti
             and s.get('republished', 0) == 0 and s.get('updated') == 0, f'exit {code} {s}')
     c.check(fake.writes() == [], f'no writes on a healthy instance: {fake.writes()[:5]}')
     c.check(not any(p.endswith((SUPPORT, SWS)) for _, p, _ in fake.calls), 'the two placeholder workflows stay out of scope (build-client-webhooks.py --update)')
+
+# ---------------------------------------------------------------------------------------------- the canon's own settings
+# «Личные и рабочие чаты» (2026-10-25): the journal setting (saveDataSuccessExecution "none" wherever a chat's text can appear)
+# lives outside the graph hash. «Up to date» now also needs the deployed copy to carry the canon's value of each of
+# verify-deployed.CANONICAL_SETTINGS; a settings-only difference is «would update», the PUT carries the canon's settings (it
+# always did: body_from) and the read-back compares them.
+PROXY = 'crWappiProxy0001'
+PUT_PROXY = ('PUT', f'/workflows/{PROXY}')
+
+
+def toggled(w, **settings):
+    x = copy.deepcopy(w)
+    x['settings'] = dict(x.get('settings') or {}, **settings)
+    return x
+
+
+with Case('SETTINGS premise: the Wappi Proxy\'s canon keeps no successful execution, and the PUT body is built with the canon\'s settings') as c:
+    c.check((CANON[PROXY].get('settings') or {}).get('saveDataSuccessExecution') == 'none', f'{CANON[PROXY].get("settings")}')
+    c.check(module('deploy-canonical.py').body_from(CANON[PROXY])['settings'] == CANON[PROXY]['settings'], 'body_from carries settings')
+
+with Case('SETTINGS a settings-only difference (graph canonical, the journal setting toggled in the editor): dry-run «would update», '
+          'not «up to date», nothing written') as c:
+    fake = FakeN8n()
+    fake.add(toggled(bound(CANON[PROXY]), saveDataSuccessExecution='all'), active=True)
+    code, out, s = deploy(fake, only=(PROXY,))
+    c.check(code == 0 and counts(s, 'would_update', 'up_to_date') == {'would_update': 1, 'up_to_date': 0} and fake.writes() == [],
+            f'exit {code} {s} writes={fake.writes()}\n{out[-600:]}')
+    c.check('saveDataSuccessExecution' in out, f'the plan must name the setting:\n{out[-600:]}')
+
+with Case('SETTINGS --apply PUTs the canon\'s settings and reads them back: updated=1, exit 0; the PUT published, no deactivate') as c:
+    fake = FakeN8n()
+    fake.add(toggled(bound(CANON[PROXY]), saveDataSuccessExecution='all', executionTimeout=5), active=True)
+    code, out, s = deploy(fake, *APPLY, only=(PROXY,))
+    c.check(code == 0 and counts(s, 'updated', 'failed') == {'updated': 1, 'failed': 0} and fake.writes() == [PUT_PROXY],
+            f'exit {code} {s} writes={fake.writes()}\n{out[-800:]}')
+    put_body = next(b for m, p, b in fake.calls if (m, p) == PUT_PROXY)
+    c.check(put_body['settings'] == CANON[PROXY]['settings'], f'the PUT carries the canon\'s settings: {put_body["settings"]}')
+    c.check(fake.w[PROXY]['settings'] == CANON[PROXY]['settings'] and fake.served(PROXY)[0], f'stored: {fake.w[PROXY]["settings"]}')
+
+with Case('SETTINGS NEG an instance whose PUT keeps the old settings: the read-back fails the run (exit 1, failed=1)') as c:
+    fake = FakeN8n(put_settings='keep')
+    fake.add(toggled(bound(CANON[PROXY]), saveDataSuccessExecution='all'), active=True)
+    code, out, s = deploy(fake, *APPLY, only=(PROXY,))
+    c.check(code == 1 and counts(s, 'updated', 'failed') == {'updated': 0, 'failed': 1}, f'exit {code} {s}\n{out[-800:]}')
+    c.check('FAILED' in out and 'saveDataSuccessExecution' in out.split('FAILED', 1)[1], f'the failure must name the setting:\n{out[-600:]}')
+
+with Case('SETTINGS keys outside the whitelist (binaryMode the API reports, redactionPolicy) do not make a workflow «would update»') as c:
+    fake = FakeN8n()
+    fake.add(toggled(bound(CANON[PROXY]), binaryMode='separate', redactionPolicy='none'), active=True)
+    code, out, s = deploy(fake, only=(PROXY,))
+    c.check(code == 0 and counts(s, 'up_to_date', 'would_update') == {'up_to_date': 1, 'would_update': 0}, f'exit {code} {s}\n{out[-600:]}')
+
 
 # ---------------------------------------------------------------------------------------------- staging (T12, 2026-10-12)
 # The rehearsal of a deploy on staging (F1F2-plan T12) runs THIS tool against the staging n8n. Staging holds the DERIVED

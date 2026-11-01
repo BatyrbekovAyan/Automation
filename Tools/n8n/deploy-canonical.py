@@ -29,6 +29,12 @@ webhook offline exactly then) — and confirmed by a read-back (served = stored 
 workflows are never published or activated: a bot template stays as it is, and a workflow that must run (everything but
 the templates, verify-deployed.py) but is inactive is only reported (`inactive_must_run`) — switching it on is an
 operator's decision.
+«Up to date» also needs the canon's SETTINGS («Личные и рабочие чаты», 2026-10-25): each key of
+verify-deployed.CANONICAL_SETTINGS — what n8n keeps of a successful and of a failed execution, how long one may run — must
+be on the instance exactly as the canon sets it (not set = not set). Settings belong to the workflow, not to a version, and
+only a PUT changes them, so a settings-only difference is «would update» and goes the ordinary PUT path; the PUT body always
+carried the canon's settings (body_from — n8n 2.36.7's public workflowSettings accepts every key the canon sets) and the
+read-back compares them.
 STAGING (T12, 2026-10-12): a local base (localhost / 127.0.0.1) holds the DERIVED copies bootstrap.py imports, so the
 tool compares with — and PUTs — the same derivation (staging_canon: derive-staging.py's steps, credentials re-bound by name
 to the staging instance's own, refused when «Postgres Staging» or any named credential is missing or a production host
@@ -297,7 +303,8 @@ def main():
             print(f"MISSING {wid} {os.path.basename(path)} — import it with n8n import:workflow, not here")
             continue
         want = vd.graph_hash(canon)
-        if vd.graph_hash(cur) == want:
+        drift = vd.settings_drift(canon, cur)   # settings belong to the workflow: only a PUT changes them
+        if vd.graph_hash(cur) == want and not drift:
             if not cur.get("active"):
                 if wid in vd.EXPECTED_INACTIVE:   # a bot template: stored is all there is
                     summary["up_to_date"] += 1
@@ -319,8 +326,12 @@ def main():
         cur_names = {n["name"] for n in cur["nodes"]}
         new_names = {n["name"] for n in canon["nodes"]}
         print(f"~ {wid} '{cur.get('name')}' active={was_active} nodes {len(cur['nodes'])} → {len(canon['nodes'])} "
-              f"(+{len(new_names - cur_names)} -{len(cur_names - new_names)})")
-        print(f"    rollback pointer: versionId {cur.get('versionId')} (activeVersionId {cur.get('activeVersionId')})")
+              f"(+{len(new_names - cur_names)} -{len(cur_names - new_names)})"
+              + ("" if vd.graph_hash(cur) != want else " — the graph is canonical, the settings are not"))
+        if drift:
+            print("    settings: " + ", ".join(f"{k} {a!r} → {b!r}" for k, (a, b) in drift.items()))
+        print(f"    rollback pointer: versionId {cur.get('versionId')} (activeVersionId {cur.get('activeVersionId')})"
+              + (f"; settings before: {json.dumps({k: (cur.get('settings') or {}).get(k) for k in drift})}" if drift else ""))
         if not a.apply:
             summary["would_update"] += 1
             continue
@@ -346,6 +357,8 @@ def main():
         else:
             if vd.graph_hash(got) != vd.graph_hash(canon):
                 problems.append("graph differs from canonical after PUT")
+            if vd.settings_drift(canon, got):
+                problems.append("settings differ from canonical after PUT: " + vd.describe_drift(vd.settings_drift(canon, got)))
             if bool(got.get("active")) != was_active:
                 problems.append(f"active changed: {was_active} → {got.get('active')}")
             if was_active and got.get("activeVersionId") and got.get("activeVersionId") != got.get("versionId"):
