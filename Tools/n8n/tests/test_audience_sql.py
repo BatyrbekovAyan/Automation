@@ -47,6 +47,9 @@ as the generators will compose it. No n8n server, no network, never prod.
                                           unchanged; a sentinel profile → one row of nulls, nothing written
   list_returns_only_valid_decisions_and_the_moment
   backfill_adds_missing_in_time_order_with_owner_mark
+  backfill_skips_the_transports_api_sends a message of ours the transport marks as an API send (from_where api, a task
+                                          id, outgoing_message_api — never isFromAPI) is not stored: the assistant's own
+                                          old replies must never read as the owner's words; a phone send stays owner_phone
   backfill_writes_nothing_for_a_personal_or_undecided_chat
   migration_postchecks                    RLS on, no anon/authenticated grants, the staging tables = the file's DDL,
                                           reply_events takes 'cancelled_personal' and still refuses 'bogus', a re-run is a
@@ -900,6 +903,37 @@ for ch, C in CH.items():
             # the parameter is a JSON text (the generators JSON.stringify it): a JSON scalar or object is no array of messages
             c.check(backfill(pg, P, chat, 'x9', json.dumps('not-an-array')) == [{'added': 0}]
                     and backfill(pg, P, chat, 'x9', {'id': 'x3'}) == [{'added': 0}], 'not an array → nothing')
+
+    with Case(f'backfill_skips_the_transports_api_sends [{ch}]: a message of ours that the transport marks as an API send — '
+              'from_where api, a non-empty task id, the outgoing_message_api type: the attribution the templates\' Reconcile '
+              'Check uses, never isFromAPI (tapi sets it on phone rows too) — gets no history row and no memory row: after a '
+              'wipe Wappi\'s page may still hold the assistant\'s own old replies, and stored as «Владелец: » the memory-marks '
+              'rule would read their times and places as agreements. A phone send (from_where phone, or no mark) stays '
+              'owner_phone; a client\'s message is stored whatever it carries') as c:
+        with PgSession(SETUP) as pg:
+            chat = C['chat']
+            decide(pg, P, chat, 'business', 'new')
+            t = 5000
+            page = [{'id': 'n9', 'fromMe': False, 'body': 'а на завтра?', 'type': 'chat', 'time': t},               # the trigger
+                    {'id': 'n8', 'fromMe': True, 'body': 'ИИ: завтра в 10:00 у входа', 'type': 'chat', 'time': t - 1, 'from_where': 'api'},
+                    {'id': 'n7', 'fromMe': True, 'body': 'ИИ: по задаче', 'type': 'chat', 'time': t - 2, 'task_id': 'a1b2c3'},
+                    {'id': 'n6', 'fromMe': True, 'body': 'ИИ: эхо webhook', 'type': 'chat', 'time': t - 3, 'wh_type': 'outgoing_message_api'},
+                    {'id': 'n5', 'fromMe': True, 'body': 'с телефона', 'type': 'chat', 'time': t - 4, 'from_where': 'phone'},
+                    {'id': 'n4', 'fromMe': True, 'body': 'без отметки', 'type': 'chat', 'time': t - 5},
+                    {'id': 'n3', 'fromMe': True, 'body': 'пустой task id', 'type': 'chat', 'time': t - 6, 'task_id': ' \t '},
+                    {'id': 'n2', 'fromMe': True, 'body': 'только isFromAPI', 'type': 'chat', 'time': t - 7, 'isFromAPI': True,
+                     'task_id': 7},
+                    {'id': 'n1', 'fromMe': False, 'body': 'клиент', 'type': 'chat', 'time': t - 8, 'from_where': 'api'}]
+            got = backfill(pg, P, chat, 'n9', page)
+            h = [(r['message_id'], r['source']) for r in history(pg, P, chat)]
+            c.check(got == [{'added': 5}] and h == [('n1', 'client'), ('n2', 'owner_phone'), ('n3', 'owner_phone'),
+                                                     ('n4', 'owner_phone'), ('n5', 'owner_phone')], f'history: {got} {h}')
+            mem = memory(pg, P, chat)
+            c.check([(m['message']['additional_kwargs']['message_id'], m['message']['type']) for m in mem]
+                    == [('n1', 'human'), ('n2', 'ai'), ('n3', 'ai'), ('n4', 'ai'), ('n5', 'ai')], f'memory: {mem}')
+            c.check(not any(m['message']['content'].startswith(AHH.OWNER_MEMORY_PREFIX + 'ИИ:') for m in mem),
+                    'an API send must never reach the memory as the owner\'s words')
+            c.check(backfill(pg, P, chat, 'n9', page) == [{'added': 0}], 'a second run adds nothing (the skipped rows stay skipped)')
 
     with Case(f'backfill_writes_nothing_for_a_personal_or_undecided_chat [{ch}]') as c:
         with PgSession(SETUP) as pg:

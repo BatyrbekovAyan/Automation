@@ -68,7 +68,8 @@ paste them, never copy them:
   OWNER_SET_SQL              the owner's decisions, version-guarded, refused for a chat that is not a person;
   CONNECTED_SQL              the app reports a connection: another number restarts the moment (and says so: restarted);
   LIST_SQL                   what the app mirrors: the moment and the holding decisions of each profile;
-  BACKFILL_SQL(row, owner)   when a chat turns business, the recent messages it lacks go into the history and the memory.
+  BACKFILL_SQL(row, owner)   when a chat turns business, the recent messages it lacks go into the history and the memory
+                             (never one the transport marks as an API send of ours: the assistant's replies).
   WIPE_SQL                   the Sweep's step: WIPE_DAYS after a business chat turned personal — the owner made it
                              personal (OWNER_SET_SQL's clock), the rule did after another number (DECIDE_WRITE_SQL's
                              clock), or a reconnect landed a personal decision over a business period (the line's move,
@@ -455,6 +456,17 @@ from ids i left join audience_connections c on c.profile_id = i.profile_id
 order by i.ord"""
 
 
+def _api_send(x):
+    """A message of ours that the transport marks as an API send — the attribution the bot templates' Reconcile Check uses
+    (apply-reply-pipeline-v2.py, viaApi): from_where 'api', the outgoing_message_api type, or a task id that is a non-blank
+    string; never isFromAPI, which tapi sets on phone rows too. `x` is the page element (jsonb). Never NULL: an absent mark
+    is no mark."""
+    return ("coalesce((" + x + "->'fromMe') = 'true'::jsonb and (" + x + "->>'from_where' = 'api'"
+            " or " + x + "->>'wh_type' = 'outgoing_message_api'"
+            " or (jsonb_typeof(" + x + "->'task_id') = 'string'"
+            " and regexp_replace(" + x + "->>'task_id', '[[:space:]]', '', 'g') <> '')), false)")
+
+
 def BACKFILL_SQL(memory_row, owner_content_sql):
     """When a chat turns business (Decide Audience's decision, or the owner's set), the start of the conversation the
     assistant never saw — the recent messages Wappi still has — goes into the history and the memory, so it knows the owner
@@ -462,6 +474,10 @@ def BACKFILL_SQL(memory_row, owner_content_sql):
     OWNER_CONTENT_SQL (that module imports this one, so they come in as arguments): the rows have exactly the form the live
     writers store — a client message as Record Suppressed writes it (history 'client', memory 'human'), an owner message as
     Record Outgoing writes the owner's phone message (history 'owner_phone', memory 'ai' opening with «Владелец: »).
+    A message of ours that the transport marks as an API send (_api_send) is not stored at all: after a wipe Wappi's page
+    may still hold the assistant's own old replies, and as «Владелец: » the memory-marks rule would read the times and
+    places in them as the owner's agreements. The owner's sends from the app carry the same mark, so an opener he sent from
+    the app is not restored either (the cost); his sends from the phone are.
 
     The input contract: the JSON parameter is a Wappi messages/get page exactly as returned with order=desc —
     NEWEST FIRST. The statement stores it REVERSED (oldest first), by the page position alone and never by time: Wappi's own
@@ -479,8 +495,11 @@ def BACKFILL_SQL(memory_row, owner_content_sql):
 -- page position alone (never by time: Wappi's order breaks equal timestamps, and a message without a parseable time keeps
 -- its place); history ids and memory row ids both follow it. The owner's message (fromMe) becomes an owner_phone history
 -- row + an ai memory row that opens with the owner mark, the client's a client history row + a human memory row — both
--- carrying source and message_id. A media message stores its type and caption, never its payload. The time only fills
--- sent_at. ALWAYS one row: added = the history rows written.
+-- carrying source and message_id. A message of ours that the transport marks as an API send (from_where api, the
+-- outgoing_message_api type, a non-blank task id — the attribution the templates' Reconcile Check uses; never isFromAPI)
+-- is skipped: the page may still hold the assistant's own old replies (after a wipe), which must never read as the
+-- owner's words; the owner's app sends carry the same mark and are skipped too. A media message stores its type and
+-- caption, never its payload. The time only fills sent_at. ALWAYS one row: added = the history rows written.
 -- Parameters, in order: profile id, chat id, the trigger message id (empty = none), JSON array of {id, fromMe, body,
 -- type, time} = a messages/get page, newest first (caption optional; time in unix seconds).
 with aud_ok as (
@@ -499,6 +518,7 @@ with aud_ok as (
   from src s
   where (select business from aud_ok)
     and s.x->>'id' is distinct from nullif($3, '')
+    and not """ + _api_send("s.x") + """
     and not exists (select 1 from chat_history_events h
                     where h.profile_id = $1 and h.chat_id = $2 and h.message_id = s.x->>'id')
   order by s.x->>'id', s.ord
