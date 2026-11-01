@@ -17,10 +17,13 @@ using UnityEngine.Networking;
 ///     answer is the profile's connection moment — and when another number restarted it (the server's word, or a moment later
 ///     than the one mirrored), «Кто из них клиенты?» is owed again, unless the app asked for it at that very pairing
 ///     (<see cref="PersonalChatsOnboarding.AnswerConnected"/>).
-///   • The list — <see cref="RequestList"/>: read at launch, on a bot switch, on a return to the app (at most once a
-///     minute) and 2 s after every delivered write. A list answered while a write was delivered is stale and is dropped.
-///     And <see cref="RequestListSoon"/>: 3 s after an incoming message in a chat the app holds no verdict for — the
-///     server decides that chat on the message — one read for a whole burst.
+///   • The list — <see cref="RequestList"/>: read at launch (in effect by the first return of focus, or the first bot change
+///     once Start has subscribed — the Awake call runs before the component is enabled, so it only marks the read wanted),
+///     on a bot switch, on a return to the app (at most once a minute), 2 s after every delivered write and after every
+///     Create that succeeded (Manager: its Bind may have moved the line's decisions onto a new profile). A list answered while
+///     a write was delivered is stale and is dropped. And <see cref="RequestListSoon"/>: 3 s after an incoming message in a
+///     person's chat the app holds no verdict for, seen on the chat list or in the open chat — the server decides that chat on
+///     the message — one read for a whole burst.
 ///
 /// Nothing is sent before the reply-mode send gate opens (billing + the session; <see cref="ReplyModeSendGate"/>). V12
 /// mirror: while Manager.DeleteBotOnServer runs, the bot is HELD (<see cref="Hold"/>; a request already on the wire is
@@ -114,7 +117,8 @@ public class ChatAudienceSyncService : MonoBehaviour
     public static void RequestList(bool force = false) => Instance?.ReadList(force);
 
     /// <summary>
-    /// An incoming message reached a chat the app holds no verdict for (ChatManager.ParseChatsJson): the server decides
+    /// An incoming message reached a person's chat the app holds no verdict for (ChatManager.ParseChatsJson, and
+    /// ChatManager.AskVerdictForOpenChat for the open chat): the server decides
     /// that chat on the message, so read the list once, <see cref="ListSoonSeconds"/> later, forced — the minute's throttle
     /// belongs to the other triggers. One timer: requests while it runs share its read, so a burst of messages costs one
     /// read, and a request after it fired starts the next one (a steady stream is read every few seconds, never starved).
