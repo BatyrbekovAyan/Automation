@@ -30,11 +30,13 @@ workflows are never published or activated: a bot template stays as it is, and a
 the templates, verify-deployed.py) but is inactive is only reported (`inactive_must_run`) — switching it on is an
 operator's decision.
 «Up to date» also needs the canon's SETTINGS («Личные и рабочие чаты», 2026-10-25): each key of
-verify-deployed.CANONICAL_SETTINGS — what n8n keeps of a successful and of a failed execution, how long one may run — must
-be on the instance exactly as the canon sets it (not set = not set). Settings belong to the workflow, not to a version, and
-only a PUT changes them, so a settings-only difference is «would update» and goes the ordinary PUT path; the PUT body always
-carried the canon's settings (body_from — n8n 2.36.7's public workflowSettings accepts every key the canon sets) and the
-read-back compares them.
+verify-deployed.CANONICAL_SETTINGS the canon sets — what n8n keeps of a successful and of a failed execution, how long one
+may run — must be on the instance with the canon's value. Settings belong to the workflow, not to a version, and only a PUT
+changes them, so a settings-only difference is «would update» and goes the ordinary PUT path; the PUT body always carried
+the canon's settings (body_from — n8n 2.36.7's public workflowSettings accepts every key the canon sets) and the read-back
+compares them. n8n 2.36.7 MERGES a PUT's settings over the stored ones (WorkflowService.update) and its public API refuses
+'DEFAULT', so a whitelisted key the canon leaves unset cannot be removed by any deploy: it is named on the workflow's line
+and never makes it «would update» (staging, 2026-11-01).
 STAGING (T12, 2026-10-12): a local base (localhost / 127.0.0.1) holds the DERIVED copies bootstrap.py imports, so the
 tool compares with — and PUTs — the same derivation (staging_canon: derive-staging.py's steps, credentials re-bound by name
 to the staging instance's own, refused when «Postgres Staging» or any named credential is missing or a production host
@@ -319,8 +321,10 @@ def main():
                 republish(base, wid, cur, want, a.apply, summary)
                 continue
             summary["up_to_date"] += 1
+            extra = vd.settings_extra(canon, cur)
             print(f"= {wid} '{cur.get('name')}' up to date ("
-                  + ("stored and published" if published else "stored; this n8n reports no published version — not judged") + ")")
+                  + ("stored and published" if published else "stored; this n8n reports no published version — not judged") + ")"
+                  + (f" — settings the canon does not set, kept (a PUT cannot unset them): {json.dumps(extra)}" if extra else ""))
             continue
         was_active = bool(cur.get("active"))
         cur_names = {n["name"] for n in cur["nodes"]}

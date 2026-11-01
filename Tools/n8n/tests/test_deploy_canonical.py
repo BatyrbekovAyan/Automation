@@ -65,9 +65,10 @@ class FakeN8n:
     `put_publish` = what a PUT's own publish of an active workflow does: ok | refuse (400, the new version SAVED) |
     skip (200, the new version saved, the served one unchanged — an n8n whose PUT does not publish)."""
 
-    def __init__(self, publish='ok', put_publish='ok', report_published_graph=True, put_settings='replace'):
-        """`put_settings` = what a PUT does with `settings`: replace (n8n 2.36's update writes the body's settings) | keep (an
-        instance that ignores them — the read-back must notice)."""
+    def __init__(self, publish='ok', put_publish='ok', report_published_graph=True, put_settings='merge'):
+        """`put_settings` = what a PUT does with `settings`: merge — what n8n 2.36.7 does (WorkflowService.update:
+        {...stored settings, ...the body's}; the public API refuses 'DEFAULT', so a key once set cannot be removed) |
+        keep (an instance that ignores them — the read-back must notice)."""
         self.w, self.versions, self.calls, self.n = {}, {}, [], 0
         self.publish, self.put_publish, self.report_published_graph = publish, put_publish, report_published_graph
         self.put_settings = put_settings
@@ -119,8 +120,8 @@ class FakeN8n:
             vid = self._save(wid, body)
             e.update(name=body['name'], nodes=copy.deepcopy(body['nodes']), connections=copy.deepcopy(body.get('connections') or {}),
                      versionId=vid)
-            if self.put_settings == 'replace':
-                e['settings'] = copy.deepcopy(body.get('settings') or {})
+            if self.put_settings == 'merge':
+                e['settings'] = dict(e.get('settings') or {}, **copy.deepcopy(body.get('settings') or {}))
             if e['activeVersionId']:
                 if self.put_publish == 'refuse':
                     return 400, {'message': 'There is a conflict with one of the webhooks (the update was saved)'}
@@ -411,9 +412,11 @@ with Case('NEG whole healthy canonical set (placeholders bound, templates inacti
 
 # ---------------------------------------------------------------------------------------------- the canon's own settings
 # «Личные и рабочие чаты» (2026-10-25): the journal setting (saveDataSuccessExecution "none" wherever a chat's text can appear)
-# lives outside the graph hash. «Up to date» now also needs the deployed copy to carry the canon's value of each of
-# verify-deployed.CANONICAL_SETTINGS; a settings-only difference is «would update», the PUT carries the canon's settings (it
-# always did: body_from) and the read-back compares them.
+# lives outside the graph hash. «Up to date» now also needs the deployed copy to carry the canon's value of each key of
+# verify-deployed.CANONICAL_SETTINGS the canon SETS; a settings-only difference is «would update», the PUT carries the canon's
+# settings (it always did: body_from) and the read-back compares them. A whitelisted key the canon leaves unset is named but
+# never «would update»: n8n 2.36.7 merges a PUT's settings over the stored ones and its public API refuses 'DEFAULT' (staging,
+# 2026-11-01), so no PUT could remove it.
 PROXY = 'crWappiProxy0001'
 PUT_PROXY = ('PUT', f'/workflows/{PROXY}')
 
@@ -439,13 +442,28 @@ with Case('SETTINGS a settings-only difference (graph canonical, the journal set
 
 with Case('SETTINGS --apply PUTs the canon\'s settings and reads them back: updated=1, exit 0; the PUT published, no deactivate') as c:
     fake = FakeN8n()
-    fake.add(toggled(bound(CANON[PROXY]), saveDataSuccessExecution='all', executionTimeout=5), active=True)
+    fake.add(toggled(bound(CANON[PROXY]), saveDataSuccessExecution='all', saveDataErrorExecution='none'), active=True)
     code, out, s = deploy(fake, *APPLY, only=(PROXY,))
     c.check(code == 0 and counts(s, 'updated', 'failed') == {'updated': 1, 'failed': 0} and fake.writes() == [PUT_PROXY],
             f'exit {code} {s} writes={fake.writes()}\n{out[-800:]}')
     put_body = next(b for m, p, b in fake.calls if (m, p) == PUT_PROXY)
     c.check(put_body['settings'] == CANON[PROXY]['settings'], f'the PUT carries the canon\'s settings: {put_body["settings"]}')
     c.check(fake.w[PROXY]['settings'] == CANON[PROXY]['settings'] and fake.served(PROXY)[0], f'stored: {fake.w[PROXY]["settings"]}')
+
+with Case('SETTINGS a whitelisted key the canon does not set (an executionTimeout on the Wappi Proxy) is never «would update» — '
+          'n8n merges a PUT\'s settings and its public API cannot unset a key — but it is named; beside a real drift, the PUT '
+          'repairs the canon\'s keys and the read-back passes with the extra key still there') as c:
+    fake = FakeN8n()
+    fake.add(toggled(bound(CANON[PROXY]), executionTimeout=5), active=True)
+    code, out, s = deploy(fake, *APPLY, only=(PROXY,))
+    c.check(code == 0 and counts(s, 'up_to_date', 'would_update', 'updated') == {'up_to_date': 1, 'would_update': 0, 'updated': 0}
+            and fake.writes() == [] and 'executionTimeout' in out, f'exit {code} {s} writes={fake.writes()}\n{out[-600:]}')
+    fake = FakeN8n()
+    fake.add(toggled(bound(CANON[PROXY]), saveDataSuccessExecution='all', executionTimeout=5), active=True)
+    code, out, s = deploy(fake, *APPLY, only=(PROXY,))
+    c.check(code == 0 and counts(s, 'updated', 'failed') == {'updated': 1, 'failed': 0}
+            and fake.w[PROXY]['settings'] == dict(CANON[PROXY]['settings'], executionTimeout=5),
+            f'exit {code} {s} stored {fake.w[PROXY]["settings"]}\n{out[-800:]}')
 
 with Case('SETTINGS NEG an instance whose PUT keeps the old settings: the read-back fails the run (exit 1, failed=1)') as c:
     fake = FakeN8n(put_settings='keep')

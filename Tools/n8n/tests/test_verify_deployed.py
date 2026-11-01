@@ -828,7 +828,9 @@ for ch in CHANNELS:
 # ChatAudience and the Wappi Proxy is the one control behind the promise that a chat's text does not settle in the execution
 # journal. It lives outside the graph hash, so a toggle in the n8n editor or an import that drops `settings` read «diff 0»
 # forever. The canonical rows compare a whitelist of settings — what n8n keeps of a successful and of a failed execution, and
-# how long one may run — exactly as the canon sets them (not set = not set), under a label of their own.
+# how long one may run — wherever the canon SETS one, under a label of their own. A whitelisted key the canon leaves unset is
+# named for information and never counted: n8n 2.36.7 merges a PUT's settings over the stored ones and its public API refuses
+# 'DEFAULT', so no deploy could remove it (staging, 2026-11-01).
 WATCHED_SETTINGS = ('saveDataSuccessExecution', 'saveDataErrorExecution', 'executionTimeout')
 SUGGEST, DECIDE = '9PTyYcelRQI7bGDb', 'crAudienceDec001'
 
@@ -859,9 +861,7 @@ for label, wid, changes, drift in (
          {'saveDataSuccessExecution': ['all', 'none']}),
         ('Decide Audience imported without its settings', DECIDE, {'saveDataSuccessExecution': None, 'saveDataErrorExecution': None},
          {'saveDataSuccessExecution': [None, 'none'], 'saveDataErrorExecution': [None, 'all']}),
-        ('Suggest Replies lost its execution timeout', SUGGEST, {'executionTimeout': None}, {'executionTimeout': [None, 20]}),
-        ('Set Reply Mode given a setting the canon does not set', SET_REPLY, {'saveDataErrorExecution': 'none'},
-         {'saveDataErrorExecution': ['none', None]})):
+        ('Suggest Replies lost its execution timeout', SUGGEST, {'executionTimeout': None}, {'executionTimeout': [None, 20]})):
     with Case(f'SETTINGS NEG {label} — graph untouched → DIFF «SETTINGS differ», exit 2') as c:
         inst = healthy()
         inst[wid] = with_settings(inst[wid], **changes)
@@ -870,6 +870,16 @@ for label, wid, changes, drift in (
         c.check(code == 2 and row['status'] == 'DIFF' and row.get('params_match') is True and 'SETTINGS differ' in (row.get('note') or ''),
                 f'exit {code}: {row}')
         c.check(row.get('settings_drift') == drift, f'the drift names each key with (deployed, canonical): {row.get("settings_drift")}')
+
+with Case('SETTINGS a whitelisted key the canon does not set (saveDataErrorExecution on Set Reply Mode) is named but not counted — '
+          'no deploy could remove it — OK, exit 0') as c:
+    inst = healthy()
+    inst[SET_REPLY] = with_settings(inst[SET_REPLY], saveDataErrorExecution='none')
+    code, out, rep = verify(inst)
+    row = canon_row(rep, SET_REPLY)
+    c.check(code == 0 and row['status'] == 'OK' and row.get('settings_drift') == {}, f'exit {code}: {row}')
+    c.check(row.get('settings_extra') == {'saveDataErrorExecution': 'none'} and 'saveDataErrorExecution' in out,
+            f'the key must be named: {row.get("settings_extra")}\n{out[-600:]}')
 
 with Case('SETTINGS a key outside the whitelist (binaryMode the API reports, redactionPolicy, callerPolicy) is not compared — the set '
           'stays OK, exit 0') as c:
