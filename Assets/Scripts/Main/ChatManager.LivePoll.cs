@@ -55,6 +55,13 @@ public partial class ChatManager
     private Coroutine _livePollRoutine;
 
     /// <summary>
+    /// «Личные и рабочие чаты»: an incoming message of the open chat waiting for the server's verdict — the poll's every-second
+    /// tick asks for a list read again on its schedule (<see cref="TickOpenChatVerdictWatch"/>). Stopped on a bot or channel
+    /// switch and on a privacy clear, beside the poll's re-kick.
+    /// </summary>
+    private readonly OpenChatVerdictWatch _verdictWatch = new OpenChatVerdictWatch();
+
+    /// <summary>
     /// The open-chat live poll. Ticks once a second and, when OpenChatLivePollGate allows,
     /// re-issues SyncLatestMessages for the open chat. Self-gating: whenever no chat is open,
     /// the app is backgrounded, the open isn't settled, or the interval hasn't elapsed, the
@@ -82,6 +89,10 @@ public partial class ChatManager
             // sliding), minus Populate — the initial open already syncs during Populate, so the
             // repeating poll only needs to engage once the chat has fully settled.
             bool chatOpenSettled = _phase == ChatOpenPhase.Idle && !SwipeToBack.IsSliding;
+
+            // «Личные и рабочие чаты»: an incoming message waiting for the server's verdict asks again on its schedule —
+            // every tick, whatever the poll gate says (the read is the list's, not a messages/get).
+            TickOpenChatVerdictWatch(chatIsOpen, Time.realtimeSinceStartup);
 
             // A settled, visible chat always has its cache populated (OpenChatRoutine sets it);
             // guard anyway — SyncLatestMessages iterates cachedList and would NRE on null.

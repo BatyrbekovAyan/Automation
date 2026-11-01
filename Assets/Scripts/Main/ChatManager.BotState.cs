@@ -142,7 +142,8 @@ public partial class ChatManager
         ReloadTgOwnUserIdFor(botId);
 
         // D5: StopAllCoroutines() above killed the open-chat live poll — re-kick it so a bot
-        // switch never strands it (guarded against duplicates).
+        // switch never strands it (guarded against duplicates). The open chat's verdict asks belong to the bot left.
+        _verdictWatch.Stop();
         if (_livePollRoutine != null) StopCoroutine(_livePollRoutine);
         _livePollRoutine = StartCoroutine(OpenChatLivePollRoutine());
 

@@ -18,8 +18,11 @@ using static OpenChatFixture;
 ///   • The read. An incoming message in a person's chat the app holds no verdict for (no server decision mirrored, no owner's
 ///     move on its way) asks ChatAudienceSyncService for a list read soon — once per pass, never for the cache load, our own
 ///     message, a decided chat or a non-person (a group or a channel is never decided). The open chat asks too, for a message
-///     from the other side among those its sync finds (ChatManager.AskVerdictForOpenChat): a chat the owner began gets its
-///     verdict, the «Авто» chip and the panel while it stays open. (The service's one-timer coalescing is pinned in
+///     from the other side among those its sync finds (ChatManager.AskVerdictForOpenChat), and — the server writes its
+///     decision some seconds after the message — asks again 7 and 15 seconds later while the chat stays open and undecided
+///     (OpenChatVerdictWatch, looked at on every tick of the live poll): at most three reads per message, none once the
+///     verdict is mirrored, the chat closes or another chat or bot is open. A chat the owner began gets its verdict, the
+///     «Авто» chip and the panel while it stays open. (The service's one-timer coalescing is pinned in
 ///     IncomingNotifyPolicyTests.)
 /// The cue and the request are observed through NotificationFx.IncomingDetected and ChatAudienceSyncService.ListSoonRequested.
 /// </summary>
@@ -225,6 +228,89 @@ public class PersonalChatCueTests
     }
 
     [Test]
+    public void TheOpenChat_AsksAgainWhileUndecided_AtMostThreeTimes_AndStopsOnTheVerdict()
+    {
+        const string lead = "77000000030@c.us";      // the owner began, the person replies while the chat is open
+        ChatManager manager = NewChatManager();
+        Parse(manager, List(Row(lead, "L1", After, 0, mine: true)), isInitialLoad: true);
+        OpenChat(manager, lead);
+
+        ArrivedAt(manager, lead, 100f, Message("L2", incoming: true));
+        Assert.AreEqual(1, readRequests, "the message's own ask");
+        Tick(manager, true, 103f);
+        Tick(manager, true, 106f);
+        Assert.AreEqual(1, readRequests, "nothing more before seven seconds");
+        Tick(manager, true, 107f);
+        Assert.AreEqual(2, readRequests, "still undecided seven seconds after the message: asked again");
+        Tick(manager, true, 115f);
+        Assert.AreEqual(3, readRequests, "and fifteen seconds after it");
+        Tick(manager, true, 123f);
+        Tick(manager, true, 140f);
+        Assert.AreEqual(3, readRequests, "never more than three reads for one message");
+
+        ArrivedAt(manager, lead, 200f, Message("L3", incoming: true));
+        Assert.AreEqual(4, readRequests, "a new message from the other side starts the schedule over");
+        ChatAudienceStore.ApplyList(new[]
+        {
+            new AudienceProfileState
+            {
+                ProfileId = Profile, ConnectedAtMs = MomentMs,
+                Decisions = new List<AudienceDecision>
+                {
+                    new AudienceDecision { ChatId = lead, Kind = AudienceKind.Business, Reason = AudienceReason.New, Version = 0 },
+                },
+            },
+        });
+        Tick(manager, true, 207f);
+        Tick(manager, true, 215f);
+        Assert.AreEqual(4, readRequests, "the verdict is mirrored: nothing more is asked");
+    }
+
+    [TestCase("closed", TestName = "TheOpenChatsAsks_Stop_WhenTheChatCloses")]
+    [TestCase("another chat", TestName = "TheOpenChatsAsks_Stop_WhenAnotherChatOpens")]
+    [TestCase("another bot", TestName = "TheOpenChatsAsks_Stop_WhenTheBotSwitches")]
+    public void TheOpenChatsAsks_StopAtOnce(string what)
+    {
+        const string lead = "77000000031@c.us";
+        ChatManager manager = NewChatManager();
+        Parse(manager, List(Row(lead, "L1", After, 0, mine: true), Row("77000000032@c.us", "O1", After, 0)), isInitialLoad: true);
+        OpenChat(manager, lead);
+        ArrivedAt(manager, lead, 100f, Message("L2", incoming: true));
+        Assert.AreEqual(1, readRequests, "premise: the message's own ask");
+
+        bool open = true;
+        if (what == "closed") open = false;
+        else if (what == "another chat") OpenChat(manager, "77000000032@c.us");
+        else typeof(ChatManager).GetProperty(nameof(ChatManager.CurrentBotId)).SetValue(manager, "AnotherBotWithoutTheProfile");
+        Tick(manager, open, 107f);
+        if (what == "another chat") OpenChat(manager, lead);                 // back to the chat: the watch stays stopped
+        if (what == "another bot") typeof(ChatManager).GetProperty(nameof(ChatManager.CurrentBotId)).SetValue(manager, TestBot);
+        Tick(manager, true, 115f);
+        Assert.AreEqual(1, readRequests, $"{what}: nothing more is asked");
+    }
+
+    [Test]
+    public void TheLivePoll_LooksEverySecond_AndEverySwitchStopsTheAsks()
+    {
+        string routine = SourceGuard.MethodBody(SourceGuard.Read("Scripts/Main/ChatManager.LivePoll.cs"), "private IEnumerator OpenChatLivePollRoutine()");
+        int tick = routine.IndexOf("TickOpenChatVerdictWatch(chatIsOpen, Time.realtimeSinceStartup);", StringComparison.Ordinal);
+        int cacheGuard = routine.IndexOf("if (_activeChatCache == null) continue;", StringComparison.Ordinal);
+        int gate = routine.IndexOf("OpenChatLivePollGate.ShouldIssue(", StringComparison.Ordinal);
+        Assert.IsTrue(tick >= 0 && tick < cacheGuard && tick < gate,
+            "the open chat's verdict asks are looked at on every tick, whatever the poll's own gate says");
+        foreach ((string file, string method) in new[]
+                 {
+                     ("Scripts/Main/ChatManager.BotState.cs", "public void SetActiveBot("),
+                     ("Scripts/Main/ChatManager.Channel.cs", "public void SetActiveChannel("),
+                     ("Scripts/Main/ChatManager.PrivacyClear.cs", "public void ClearAllLocalHistory("),
+                 })
+        {
+            StringAssert.Contains("_verdictWatch.Stop();", SourceGuard.MethodBody(SourceGuard.Read(file), method),
+                $"{method}: the asks of the chat left behind stop");
+        }
+    }
+
+    [Test]
     public void TheOpenChatsSync_AsksForTheVerdict_WithEveryBatchItFinds()
     {
         string sync = SourceGuard.MethodBody(SourceGuard.Read("Scripts/Main/ChatManager.cs"), "IEnumerator SyncLatestMessages(");
@@ -267,6 +353,22 @@ public class PersonalChatCueTests
         MethodInfo ask = typeof(ChatManager).GetMethod("AskVerdictForOpenChat", BindingFlags.Instance | BindingFlags.NonPublic);
         Assert.IsNotNull(ask, "ChatManager.AskVerdictForOpenChat moved — the open chat's new messages no longer ask for a verdict");
         Call(() => ask.Invoke(manager, new object[] { chatId, new List<MessageViewModel>(messages) }));
+    }
+
+    // The same at the clock reading `now` (ChatManager.AskVerdictForOpenChatAt — the live path hands in the real clock).
+    private static void ArrivedAt(ChatManager manager, string chatId, float now, params MessageViewModel[] messages)
+    {
+        MethodInfo ask = typeof(ChatManager).GetMethod("AskVerdictForOpenChatAt", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.IsNotNull(ask, "ChatManager.AskVerdictForOpenChatAt moved — the open chat's new messages no longer start the asks");
+        Call(() => ask.Invoke(manager, new object[] { chatId, new List<MessageViewModel>(messages), now }));
+    }
+
+    // One tick of the open chat's live poll for the verdict asks (ChatManager.TickOpenChatVerdictWatch).
+    private static void Tick(ChatManager manager, bool chatIsOpen, float now)
+    {
+        MethodInfo tick = typeof(ChatManager).GetMethod("TickOpenChatVerdictWatch", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.IsNotNull(tick, "ChatManager.TickOpenChatVerdictWatch moved — the open chat no longer asks again");
+        Call(() => tick.Invoke(manager, new object[] { chatIsOpen, now }));
     }
 
     private static MessageViewModel Message(string id, bool incoming) =>

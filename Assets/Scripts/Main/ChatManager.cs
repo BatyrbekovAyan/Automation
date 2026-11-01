@@ -528,18 +528,45 @@ public partial class ChatManager : MonoBehaviour
     /// «Личные и рабочие чаты»: messages new to the OPEN chat (its sync found them). When one of them is the other side's
     /// and the chat is a person the app holds no verdict for, the server decides the chat on that message — a chat the owner
     /// began becomes working on the client's reply — and the app learns it only from a list read: without one, the open chat
-    /// would show no «Авто» chip and no panel for as long as it stays open. Asked through the same one-timer read as the chat
-    /// list; a non-person, a decided chat or a move on its way asks nothing (the live poll runs every few seconds).
+    /// would show no «Авто» chip and no panel for as long as it stays open. The read is asked at once, through the same
+    /// one-timer read as the chat list, and asked again on the <see cref="OpenChatVerdictWatch"/> schedule while the chat
+    /// stays open and undecided (<see cref="TickOpenChatVerdictWatch"/>); a non-person, a decided chat or a move on its way
+    /// asks nothing.
     /// </summary>
-    private void AskVerdictForOpenChat(string chatId, List<MessageViewModel> arrived)
+    private void AskVerdictForOpenChat(string chatId, List<MessageViewModel> arrived) =>
+        AskVerdictForOpenChatAt(chatId, arrived, Time.realtimeSinceStartup);
+
+    // The same, at the clock reading `now` (the tests hand in their own).
+    private void AskVerdictForOpenChatAt(string chatId, List<MessageViewModel> arrived, float now)
     {
         if (arrived == null || !arrived.Exists(m => m != null && m.isIncoming)) return;
         ChatViewModel chat = GetChat(chatId);
         string profileId = GetActiveProfileId();
-        if (chat == null || string.IsNullOrEmpty(profileId)) return;
-        if (ChatAudienceRule.NonHuman(chat.Facts) != NonHumanKind.None || ChatAudienceStore.KindOf(profileId, chat.ChatId) != null) return;
-        ChatAudienceSyncService.RequestListSoon();
+        if (chat == null || string.IsNullOrEmpty(profileId) || !AwaitsOpenChatVerdict(profileId, chat)) return;
+        _verdictWatch.Arm(profileId, chat.ChatId, now);
+        if (_verdictWatch.ShouldAsk(profileId, chat.ChatId, chatIsOpen: true, awaitsVerdict: true, now))
+            ChatAudienceSyncService.RequestListSoon();
     }
+
+    /// <summary>
+    /// The open chat's live poll looks once a second (<see cref="OpenChatLivePollRoutine"/>): while an incoming message
+    /// waits for the server's verdict, a read is asked again on the <see cref="OpenChatVerdictWatch"/> schedule — at most
+    /// <see cref="OpenChatVerdictWatch.MaxAsks"/> asks per message — and the watch stops at once when the chat is decided
+    /// (or the owner's move is mirrored), closed or replaced by another, or another profile is active.
+    /// </summary>
+    private void TickOpenChatVerdictWatch(bool chatIsOpen, float now)
+    {
+        if (!_verdictWatch.IsArmed) return;
+        string profileId = GetActiveProfileId();
+        ChatViewModel chat = string.IsNullOrEmpty(currentChatId) ? null : GetChat(currentChatId);
+        bool awaits = chat != null && !string.IsNullOrEmpty(profileId) && AwaitsOpenChatVerdict(profileId, chat);
+        if (_verdictWatch.ShouldAsk(profileId, currentChatId, chatIsOpen, awaits, now))
+            ChatAudienceSyncService.RequestListSoon();
+    }
+
+    // A person's chat the app holds no verdict for: no server decision mirrored and no owner's move on its way.
+    private static bool AwaitsOpenChatVerdict(string profileId, ChatViewModel chat) =>
+        ChatAudienceRule.NonHuman(chat.Facts) == NonHumanKind.None && ChatAudienceStore.KindOf(profileId, chat.ChatId) == null;
 
     /// <summary>
     /// True while a chats/filter sync is in flight. Guards RefreshActiveBotChats

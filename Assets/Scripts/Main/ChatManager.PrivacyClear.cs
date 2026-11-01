@@ -88,6 +88,7 @@ public partial class ChatManager
         // D5: StopAllCoroutines() above killed the open-chat live poll — re-kick it, matching
         // SetActiveBot / SetActiveChannel, so a privacy clear never strands the poll for the
         // rest of the session (guarded against duplicates).
+        _verdictWatch.Stop();
         if (_livePollRoutine != null) StopCoroutine(_livePollRoutine);
         _livePollRoutine = StartCoroutine(OpenChatLivePollRoutine());
 

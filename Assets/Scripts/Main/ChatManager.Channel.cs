@@ -98,7 +98,8 @@ public partial class ChatManager
 
         // D5: StopAllCoroutines() above killed the open-chat live poll — re-kick it so a channel
         // switch never strands it (D5 is cross-channel; the poll must keep running on Telegram
-        // too). Guarded against duplicates.
+        // too). Guarded against duplicates. The open chat's verdict asks belong to the channel left.
+        _verdictWatch.Stop();
         if (_livePollRoutine != null) StopCoroutine(_livePollRoutine);
         _livePollRoutine = StartCoroutine(OpenChatLivePollRoutine());
 
