@@ -229,7 +229,8 @@ def describe_message(message, reference, unit="min"):
             f"  chatId={fmt_id(chat)}  to={fmt_id(message.get('to'))}  phone={digit_count(message, 'phone')}"
             f"  contact_name={filled(message, 'contact_name')}"
             f"  senderName={filled(message, 'senderName')}  chat_type={cat(message.get('chat_type'))}"
-            f"  is_bot={cat(message.get('is_bot'))}  wh_type={cat(message.get('wh_type'))}")
+            f"  is_bot={cat(message.get('is_bot'))}  wh_type={cat(message.get('wh_type'))}"
+            f"  from_where={cat(message.get('from_where'))}  task_id={filled(message, 'task_id')}")
 
 
 def key_labels(rows, prefix):
@@ -552,7 +553,7 @@ def list_match(args, chat_id, cache):
 
 # ---- selftest ----
 
-SENTINELS = ("Сауле", "Темирова", "Secret", "СЕКРЕТ", "секрет", "7701234567", "FL00D", "caption-text", "Петров")
+SENTINELS = ("Сауле", "Темирова", "Secret", "СЕКРЕТ", "секрет", "7701234567", "FL00D", "caption-text", "Петров", "T-9f8e7d")
 
 
 def cmd_selftest(_args):
@@ -573,6 +574,7 @@ def cmd_selftest(_args):
                "contact_name": "Сауле Темирова", "senderName": "Secret", "time": 1761400100,
                "chat_type": "dialog", "is_bot": False, "phone": "77012345678", "to": "77019876543@c.us"}
     tg_message = {"id": 55, "type": "text", "body": "секрет", "from": "FL00D", "chatId": "7701234567", "time": 1761400100}
+    api_send = dict(message, fromMe=True, from_where="api", task_id="T-9f8e7d")    # a send through the API, as tapi marks it
     webhook = {"messages": [dict(message, wh_type="incoming_message")]}
 
     at = 1761400200.0
@@ -581,7 +583,7 @@ def cmd_selftest(_args):
         emit(describe_wa_dialog(dialog, at))
     for dialog in (tg_dialog, tg_service):
         emit(describe_tg_dialog(dialog, at))
-    for row in (message, tg_message):
+    for row in (message, tg_message, api_send):
         emit(describe_message(row, at, "s"))
         emit(keys_of(row))
     for row in webhook_messages(webhook):
@@ -601,6 +603,8 @@ def cmd_selftest(_args):
         "a stranger's profile name is told apart from the book name": "contact.PushName=yes" in output,
         "the dialog's other ids are told by format": "chat.ids=id=NNNNNNNNNNN@c.us,lid=NNNNNNNNNNNNNNN@lid" in output,
         "a message's phone is told by its digit count": "phone=11d" in output,
+        "an API send's marks are told (the value of from_where, task_id only as present)":
+            "from_where=api" in output and "task_id=yes" in output and "from_where=<none>" in output and "task_id=-" in output,
         "the WhatsApp card is filtered by the chat id's digits":
             card_request("wa", wa_dialog["id"]) == ("sync/chats/filter", {"client_name": "77012345678"}),
         "the Telegram card is the first chats/get page":
