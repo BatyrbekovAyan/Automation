@@ -1091,25 +1091,43 @@ def number_change_wipe(ctx, ch):
               f"number again (within {audience.RESTORE_HOURS} hours): the answer says restored (restarted false) with the earlier "
               "moment; the previous number's client — decided business, his conversation stored — is still business and "
               "listed, the decision computed on the mistaken account is not; his next message is answered at once (no first "
-              "minutes, no new decision), no wipe clock starts and nothing he had is wiped")
+              "minutes, no new decision), no wipe clock starts and nothing he had is wiped. Another client of the previous number "
+              "wrote to the mistaken number meanwhile and its account knows him (a saved contact there): Decide Audience decided "
+              f"him personal on it and the wipe clock started — after the return, with the clock {audience.WIPE_DAYS} days old, "
+              "the Sweep's «Wipe Personal Chats» leaves him alone (the clock is the mistaken account's)")
 def wrong_number_return(ctx, ch):
     s = Stand(ctx, ch, "rr", connected="3 days")
     o = own_profile(ctx, s.pid)
-    client, stray = s.chat("c"), s.chat("x")
+    client, stray, wrote = s.chat("c"), s.chat("x"), s.chat("w")
     moment = int(psql(f"select (extract(epoch from connected_at) * 1000)::bigint from audience_connections where profile_id = '{s.pid}';"))
-    # 1. a client of the previous number: decided business on the connection (a day ago, under its number), his conversation
-    #    stored; no per-chat reply mode of his own (store_chat's stand-in row says «Выбрать»): the bot's own «Авто» applies
-    psql(f"insert into chat_audience (profile_id, chat_id, kind, source, reason, decided_at, decided_phone) values "
-         f"('{s.pid}', '{client}', 'business', 'default', 'new', now() - interval '1 day', '{OWN[ch]}');")
-    store_chat(ctx, s.pid, client, f"rr{ctx.run_id[:6]}")
+    # 1. two clients of the previous number: decided business on the connection (a day ago, under its number), their
+    #    conversations stored; the first has no per-chat reply mode of his own (store_chat's stand-in row says «Выбрать»): the
+    #    bot's own «Авто» applies
+    for label, chat in (("c", client), ("w", wrote)):
+        psql(f"insert into chat_audience (profile_id, chat_id, kind, source, reason, decided_at, decided_phone) values "
+             f"('{s.pid}', '{chat}', 'business', 'default', 'new', now() - interval '1 day', '{OWN[ch]}');")
+        store_chat(ctx, s.pid, chat, f"rr{label}{ctx.run_id[:6]}")
     psql(f"delete from reply_mode_flags where profile_id = '{s.pid}' and chat_id = '{client}';")
-    before = stored(s.pid, client)
-    # 2. the mistaken pairing: another account paired, the app reports it — and a decision Decide Audience computes on it
+    before, wrote_before = stored(s.pid, client), stored(s.pid, wrote)
+    # 2. the mistaken pairing: another account paired, the app reports it — past its first minutes (a message is decided, not
+    #    waited out) — and a decision computed on it (written here the way Decide Audience writes one: under its number)
     other_number = "77020000055"
     paired(s.pid, ch, other_number)
     st1, d1 = audience_connected(o, s.pid)
+    psql(f"update audience_connections set connected_at = connected_at - interval '{audience.SETTLE_MINUTES + 30} minutes' "
+         f"where profile_id = '{s.pid}';")
     psql(f"insert into chat_audience (profile_id, chat_id, kind, source, reason, decided_at, decided_phone) values "
          f"('{s.pid}', '{stray}', 'business', 'default', 'new', now(), '{other_number}');")
+    #    the second client writes to the mistaken number, whose account knows him: Decide Audience decides him personal there
+    s.cards(stranger(ch, s.chat("other")), saved_contact(ch, wrote))
+    s.mark()
+    wmid, wt = f"rrw-{ctx.run_id}", int(time.time())
+    s.history(wrote, [row(ch, wrote, wmid, False, "Добрый день, это я", wt)])
+    s.post(wrote, wmid, "Добрый день, это я", wt, **({"contact_name": "Айгерим Сохранённая"} if ch == "wa" else {}))
+    ew = s.one(60)
+    wrote_clock = psql(f"select kind || '|' || source || '|' || reason || '|' || (personal_since is not null) || '|' "
+                       f"|| coalesce(decided_phone, '-') from chat_audience where profile_id = '{s.pid}' and chat_id = '{wrote}';")
+    wrote_sends = len(s.sends(wrote))
     # 3. the owner pairs the previous number again (the same day), the app reports it
     paired(s.pid, ch, OWN[ch])
     st2, d2 = audience_connected(o, s.pid)
@@ -1127,18 +1145,36 @@ def wrong_number_return(ctx, ch):
     clock = psql(f"select kind || '|' || source || '|' || reason || '|' || (personal_since is null) || '|' || (wiped_at is null) "
                  f"from chat_audience where profile_id = '{s.pid}' and chat_id = '{client}';")
     after = stored(s.pid, client)
-    mine = [x for x in lst[2] if x[0] in (client, stray)]
+    mine = [x for x in lst[2] if x[0] in (client, stray, wrote)]
+    # 5. the second client's clock, two days on: his decision and the connection moved back together (the order between them
+    #    kept), then one run of the Sweep's wipe — the derived node on the real n8n
+    days = f"{audience.WIPE_DAYS} days 1 hour"
+    psql(f"update chat_audience set decided_at = decided_at - interval '{days}', personal_since = personal_since - interval '{days}' "
+         f"where profile_id = '{s.pid}' and chat_id = '{wrote}';"
+         f"update audience_connections set connected_at = connected_at - interval '{days}', "
+         f"prev_connected_at = prev_connected_at - interval '{days}' where profile_id = '{s.pid}';")
+    out = run_wipe(ctx, ch, "rr")
+    wrote_after = stored(s.pid, wrote)
+    wrote_mark = psql(f"select kind || '|' || (personal_since is not null) || '|' || (wiped_at is null) from chat_audience "
+                      f"where profile_id = '{s.pid}' and chat_id = '{wrote}';")
     ok = (before == dict(STORED, flags=0) and st1 == 200 and (d1 or {}).get("restarted") is True
           and st2 == 200 and (d2 or {}).get("restored") is True and (d2 or {}).get("restarted") is False
           and (d2 or {}).get("connectedAt") == moment and conn == f"{OWN[ch]}|{moment}|{other_number}"
           and lst[0] == 200 and lst[1] == moment and mine == [(client, "business", "default", "new")]
           and e.get("outcome") == "sent" and e.get("decide") is None and len(s.sends(client)) == 1
           and ledger(s.pid, client, mid) == "sent" and clock == "business|default|new|true|true"
-          and all(after[k] >= before[k] for k in CHAT_TABLES))
+          and all(after[k] >= before[k] for k in CHAT_TABLES)
+          and ew.get("outcome") == "personal_contact" and ew.get("decide") == {"audience": "personal", "outcome": "personal_contact"}
+          and wrote_sends == 0 and wrote_clock == f"personal|default|contact|true|{other_number}"
+          and "wiped_chats" in out and wrote_before == STORED and wrote_after == STORED and wrote_mark == "personal|true|true")
     return ok, {"before": before, "mistaken": (st1, d1), "return": (st2, d2), "connection(phone|ms|remembered)": conn,
                 "moment": moment, "list(this scenario's chats)": mine, "list_moment": lst[1], **summary(e),
                 "sends": len(s.sends(client)), "ledger": ledger(s.pid, client, mid),
-                "decision(kind|source|reason|no clock|not wiped)": clock, "after": after}
+                "decision(kind|source|reason|no clock|not wiped)": clock, "after": after,
+                "second_client_on_the_mistaken_number": summary(ew), "second_client_sends": wrote_sends,
+                "second_client(kind|source|reason|clock|number)": wrote_clock, "wipe_node": out,
+                "second_client_stored(before|after the wipe)": (wrote_before, wrote_after),
+                "second_client(kind|clock|not wiped)": wrote_mark}
 
 
 # ================================================================================================ run
