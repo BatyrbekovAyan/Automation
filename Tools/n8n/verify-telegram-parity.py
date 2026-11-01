@@ -226,13 +226,29 @@ def check_reply_mode_gate():
 
 
 # «Личные и рабочие чаты» (2026-10-25): the audience gate is the SAME in both templates — a gate that drifted on one channel
-# would answer (or store) a personal chat on that messenger only. Its Ifs and Suppressed? carry identical parameters; Decide
-# Audience differs in exactly two inputs — the channel constant and the WhatsApp chat code (whatsapp_chat_id on WhatsApp, ''
-# on Telegram, where tapi sends none); the gate's edges are the same.
+# would answer (or store) a personal chat on that messenger only. Its Ifs and Suppressed? carry identical parameters but for
+# ONE designed difference: on Telegram, Business? and Decided Business? end with the not-a-person term of rule step 1
+# (apply-history-handoff.TG_PERSON_TERM: the webhook's is_bot, a chat type audience.TG_NONHUMAN_TYPES names), which
+# WhatsApp's rule — it reads no chat type — does not have. Decide Audience differs in exactly two inputs — the channel
+# constant and the WhatsApp chat code (whatsapp_chat_id on WhatsApp, '' on Telegram, where tapi sends none); the gate's edges
+# are the same.
 AUDIENCE_FORK = ("Audience Known?", "Business?", "Decided Business?", "Suppressed?")
+TG_TERM_NODES = ("Business?", "Decided Business?")
 AUDIENCE_EDGES = ("Read Reply Mode", "Audience Known?", "Business?", "Decide Audience", "Decided Business?")
 DECIDE_CHANNEL_INPUTS = {WA_BOT: {"channel": "whatsapp", "chatLid": "={{ String($('Webhook').first().json.body.messages[0].whatsapp_chat_id || '') }}"},
                          TG_BOT: {"channel": "telegram", "chatLid": ""}}
+_HH = None
+
+
+def tg_person_term():
+    """apply-history-handoff.TG_PERSON_TERM — the text of the Telegram gate's not-a-person term (built from audience.py)."""
+    global _HH
+    if _HH is None:
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("apply_history_handoff", os.path.join(HERE, "apply-history-handoff.py"))
+        _HH = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(_HH)
+    return _HH.TG_PERSON_TERM
 
 
 def _without_ids(x):
@@ -246,8 +262,15 @@ def check_audience_fork():
     wa, tg = load(WA_BOT), load(TG_BOT)
     for name in AUDIENCE_FORK:
         a, b = node(wa["nodes"], name), node(tg["nodes"], name)
-        assert _without_ids(a["parameters"]) == _without_ids(b["parameters"]), \
-            f"{name} differs between the WhatsApp and the Telegram template (one audience gate)"
+        pa, pb = _without_ids(a["parameters"]), _without_ids(b["parameters"])
+        if name in TG_TERM_NODES:
+            ca, cb = pa["conditions"]["conditions"][0], pb["conditions"]["conditions"][0]
+            la, lb = ca.get("leftValue") or "", cb.get("leftValue") or ""
+            assert la.endswith(" }}") and lb == la[:-len(" }}")] + " && " + tg_person_term() + " }}", \
+                f"{name}: the Telegram gate must be the WhatsApp one plus the not-a-person term of rule step 1 and nothing else " \
+                f"(WhatsApp {la!r}, Telegram {lb!r})"
+            cb["leftValue"] = la
+        assert pa == pb, f"{name} differs between the WhatsApp and the Telegram template (one audience gate)"
         assert {k: a.get(k) for k in GATE_BEHAVIOUR_KEYS} == {k: b.get(k) for k in GATE_BEHAVIOUR_KEYS}, \
             f"{name}: behaviour keys differ between the templates"
     da, db = copy.deepcopy(node(wa["nodes"], "Decide Audience")), copy.deepcopy(node(tg["nodes"], "Decide Audience"))
@@ -261,7 +284,7 @@ def check_audience_fork():
         "Decide Audience: behaviour keys differ between the templates"
     for src in AUDIENCE_EDGES:
         assert wa["connections"].get(src) == tg["connections"].get(src), f"{src}: the gate's edges differ between the templates"
-    print("OK  audience gate (personal chats: WA == TG but the channel and the chat code)")
+    print("OK  audience gate (personal chats: WA == TG but the channel, the chat code and Telegram's not-a-person term)")
 
 
 def check_bind_orchestrator(f, channel, jsonb_key, opposite_key, opposite_field):

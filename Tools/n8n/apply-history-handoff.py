@@ -29,7 +29,9 @@ chat's decision that holds (audience.AUDIENCE_SQL) and the profile's connection 
 *Audience Known? →[personal | business] *Business? →[business] Suppressed? … |[personal] Outcome «personal»;
 →[no decision] *Decide Audience (Execute Workflow crAudienceDec001, build-decide-audience.py: the nine inputs it declares) →
 *Decided Business? (the sub-workflow's OWN answer — audience and outcome business) →[business] Suppressed? … |[else] Outcome
-(the sub-workflow's own personal outcome). Suppressed? reads Read Reply Mode's row (after Decide Audience the item is the
+(the sub-workflow's own personal outcome). On Telegram both Business? and Decided Business? also refuse a webhook that is not
+a person by rule step 1 (is_bot, a chat type audience.TG_NONHUMAN_TYPES names — TG_PERSON_TERM), whatever decision is
+stored; WhatsApp's rule reads no chat type. Suppressed? reads Read Reply Mode's row (after Decide Audience the item is the
 sub-workflow's answer). Nothing but the Outcome stamp is reachable from the two «not business» branches. Record Outgoing
 records business chats only (ignored_personal); Cancel Label names a lease refused for a personal chat cancelled_personal
 (the lease itself is apply-reply-pipeline-v2.py's). The templates keep no successful execution (saveDataSuccessExecution
@@ -397,10 +399,28 @@ __OFF_HOURS__ as off_hours;""".replace("__OFF_HOURS__", bs.OFF_HOURS_SQL()).repl
 # Edit patch nodes[0] and nodes[5] by index); nothing but the Outcome stamp is reachable from the two «not business» branches
 # (verify-history-handoff.check_audience_gate proves it by reachability, for every send, Wappi call and write).
 AUDIENCE_KNOWN_EXPR = "={{ $json.audience === 'personal' || $json.audience === 'business' }}"
-BUSINESS_EXPR = "={{ $json.audience === 'business' }}"
+_BUSINESS = "$json.audience === 'business'"
 # Only Decide Audience's own answer carries `outcome`: the Execute Workflow node continues on error, and when it throws
 # outside its runner n8n hands its INPUT item on — Read Reply Mode's row, which has an audience column of its own.
-DECIDED_BUSINESS_EXPR = "={{ $json.audience === 'business' && $json.outcome === 'business' }}"
+_DECIDED_BUSINESS = "$json.audience === 'business' && $json.outcome === 'business'"
+# Rule step 1 at the gate (spec §3.1, audience.RULE_JS): on Telegram a webhook that says the chat is not a person — the
+# webhook's is_bot, or a chat type audience.TG_NONHUMAN_TYPES names (a bot's reply arrives as chat_type bot) — is never a
+# business chat, whatever decision is stored. The owner may have marked the chat business before its bot ever wrote (the app
+# offers no «В рабочие» for a bot; this is the second line), and two bots answering each other would burn the quota. WhatsApp's
+# rule reads no chat type, so its gate keeps the decision alone — the one designed difference between the two templates'
+# gates (verify-telegram-parity.py check_audience_fork; verify-history-handoff.py check_audience_gate pins both sides).
+TG_PERSON_TERM = ("(" + M + ".is_bot !== true && !" + json.dumps(list(au.TG_NONHUMAN_TYPES))
+                  + ".includes(String(" + M + ".chat_type ?? '')))")
+
+
+def business_expr(channel):
+    """Business?: a decision that holds and says business — and, on Telegram, a webhook that is a person."""
+    return "={{ " + _BUSINESS + (" && " + TG_PERSON_TERM if channel == "telegram" else "") + " }}"
+
+
+def decided_business_expr(channel):
+    """Decided Business?: Decide Audience's own business answer — and, on Telegram, a webhook that is a person."""
+    return "={{ " + _DECIDED_BUSINESS + (" && " + TG_PERSON_TERM if channel == "telegram" else "") + " }}"
 # After Decide Audience the item is the sub-workflow's answer: the mode is read off Read Reply Mode's own row.
 SUPPRESSED_EXPR = "={{ $('Read Reply Mode').first().json.suppressed }}"
 _MODE_ROW = "$('Read Reply Mode').first().json"
@@ -601,9 +621,9 @@ def patch_bot(fname):
     ch |= set_query(node(wf, "Read Reply Mode"), READ_MODE_SQL)
     # (3b) personal chats: the audience gate between the mode read and Suppressed? (appended nodes: nodes[0]/[5] stay put)
     ch |= ensure(wf, if_true("Audience Known?", AUDIENCE_KNOWN_EXPR, GATE_POSITIONS["Audience Known?"], fname))
-    ch |= ensure(wf, if_true("Business?", BUSINESS_EXPR, GATE_POSITIONS["Business?"], fname))
+    ch |= ensure(wf, if_true("Business?", business_expr(CHANNEL[fname]), GATE_POSITIONS["Business?"], fname))
     ch |= ensure(wf, decide_node(fname))
-    ch |= ensure(wf, if_true("Decided Business?", DECIDED_BUSINESS_EXPR, GATE_POSITIONS["Decided Business?"], fname))
+    ch |= ensure(wf, if_true("Decided Business?", decided_business_expr(CHANNEL[fname]), GATE_POSITIONS["Decided Business?"], fname))
     ch |= set_edges(wf, "Read Reply Mode", [["Audience Known?"]])
     ch |= set_edges(wf, "Audience Known?", [["Business?"], ["Decide Audience"]])
     ch |= set_edges(wf, "Business?", [["Suppressed?"], ["Outcome"]])
@@ -934,8 +954,8 @@ def gate_current(wf, fname):
         return False
     d = decide_node(fname)
     dn = node(wf, "Decide Audience")
-    return cond("Audience Known?") == AUDIENCE_KNOWN_EXPR and cond("Business?") == BUSINESS_EXPR \
-        and cond("Decided Business?") == DECIDED_BUSINESS_EXPR and cond("Suppressed?") == SUPPRESSED_EXPR \
+    return cond("Audience Known?") == AUDIENCE_KNOWN_EXPR and cond("Business?") == business_expr(CHANNEL[fname]) \
+        and cond("Decided Business?") == decided_business_expr(CHANNEL[fname]) and cond("Suppressed?") == SUPPRESSED_EXPR \
         and all(dn.get(k) == d[k] for k in ("parameters", "type", "typeVersion", "alwaysOutputData", "onError")) \
         and edges("Read Reply Mode") == [["Audience Known?"]] and edges("Audience Known?") == [["Business?"], ["Decide Audience"]] \
         and edges("Business?") == [["Suppressed?"], ["Outcome"]] and edges("Decide Audience") == [["Decided Business?"]] \

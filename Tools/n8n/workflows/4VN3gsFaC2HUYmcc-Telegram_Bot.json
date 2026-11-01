@@ -1929,7 +1929,7 @@
           "conditions": [
             {
               "id": "bd7bf62c-ff85-5536-a51f-c24ac3660ab8",
-              "leftValue": "={{ $json.audience === 'business' }}",
+              "leftValue": "={{ $json.audience === 'business' && ($('Webhook').first().json.body.messages[0].is_bot !== true && ![\"channel\", \"chat\", \"bot\"].includes(String($('Webhook').first().json.body.messages[0].chat_type ?? ''))) }}",
               "rightValue": "",
               "operator": {
                 "type": "boolean",
@@ -2092,7 +2092,7 @@
           "conditions": [
             {
               "id": "be1b4aeb-54b7-59d0-bc9d-570f858d2bcd",
-              "leftValue": "={{ $json.audience === 'business' && $json.outcome === 'business' }}",
+              "leftValue": "={{ $json.audience === 'business' && $json.outcome === 'business' && ($('Webhook').first().json.body.messages[0].is_bot !== true && ![\"channel\", \"chat\", \"bot\"].includes(String($('Webhook').first().json.body.messages[0].chat_type ?? ''))) }}",
               "rightValue": "",
               "operator": {
                 "type": "boolean",

@@ -27,6 +27,9 @@ What runs — no n8n server, no network, never production:
 
   RM  read_mode_returns_audience_in_one_row
   P   personal_writes_nothing (a personal decision of the owner's and a computed one), personal_in_vybrat_writes_nothing
+  N   rule step 1 at the gate: telegram_nonperson_with_an_owner_business_row_is_never_claimed (is_bot, a non-person chat
+      type — the Telegram gate refuses it whatever decision is stored), decided_business_refuses_a_telegram_nonperson,
+      whatsapp_gate_reads_no_chat_type; V NEG: the term dropped on Telegram / added on WhatsApp fails both verifiers
   D   undecided_goes_to_decide_then_business_continues (the graph to the claim; the chain to «sent»),
       undecided_personal_ends_with_its_outcome, decide_gets_the_nine_inputs_typed, missing_connection_passes_null,
       raw_bigint_fails_the_call, decide_passthrough_is_never_business, decide_answer_matrix, decide_outcomes_are_the_stamps
@@ -292,6 +295,50 @@ for ch, T in TEMPLATES.items():
                     f'trail {r.trail} stamp {stamp(r)}')
             c.check(counts(pg) == dict(NOTHING, reply_mode_flags=1), f'rows written: {counts(pg)}')
 
+# ---------------------------------------------------------------------------------------------------- N: not a person (rule step 1)
+AUD = module('audience.py')
+NONPERSON_TG = [(t, t == 'bot') for t in AUD.TG_NONHUMAN_TYPES] + [('user', True)]   # (chat_type, is_bot) a person never has
+
+with Case('telegram_nonperson_with_an_owner_business_row_is_never_claimed [TG]: the owner marked a Telegram chat business before '
+          'its bot ever wrote (the app offers no «В рабочие» for a bot — this is the second line); a webhook that says the chat '
+          'is not a person — is_bot, or a chat type audience.TG_NONHUMAN_TYPES names (a bot\'s reply arrives as chat_type bot) — '
+          'ends through Business?[false] at the stamp «personal»: no claim, no write, no Wappi call. The same chat as a person '
+          '(chat_type user, is_bot false) is claimed (the control)') as c:
+    for chat_type, is_bot in NONPERSON_TG:
+        with Session(SETUP) as pg:
+            connect(pg, 'TG')
+            decide_row(pg, 'TG', 'business')
+            r = walk(pg, 'TG', incoming('TG', chat_type=chat_type, is_bot=is_bot))
+            s = stamp(r)
+            c.check(r.trail == ENTRY + ['Business?', 'Outcome'] and s is not None and s.get('outcome') == 'personal',
+                    f'chat_type {chat_type!r} is_bot {is_bot}: trail {r.trail} stamp {s}')
+            c.check(counts(pg) == NOTHING and r.calls == [] and sub_run(r) is None,
+                    f'chat_type {chat_type!r} is_bot {is_bot}: rows {counts(pg)} calls {r.calls}')
+    with Session(SETUP) as pg:
+        connect(pg, 'TG')
+        decide_row(pg, 'TG', 'business')
+        r = walk(pg, 'TG', incoming('TG'))
+        c.check(r.trail == ENTRY + ['Business?'] + TO_CLAIM and ledger(pg, 'TG') == {'m-trig': 'claimed'},
+                f'the person (control): trail {r.trail} ledger {ledger(pg, "TG")}')
+
+with Case('decided_business_refuses_a_telegram_nonperson [TG]: Decide Audience may answer business for a chat the owner made '
+          'business while it ran (Write Decision keeps the owner\'s row) — Decided Business?, through n8n\'s engine, still refuses '
+          'a webhook that is not a person; a person passes (the control)') as c:
+    leftValue = node(TEMPLATES['TG'], 'Decided Business?')['parameters']['conditions']['conditions'][0]['leftValue']
+    answer = {'audience': 'business', 'outcome': 'business'}
+    for chat_type, is_bot in NONPERSON_TG:
+        wh = {'body': {'messages': [incoming('TG', chat_type=chat_type, is_bot=is_bot)]}}
+        c.check(expr(leftValue, answer, {'Webhook': wh}) is False, f'chat_type {chat_type!r} is_bot {is_bot}: passed {leftValue}')
+    c.check(expr(leftValue, answer, {'Webhook': {'body': {'messages': [incoming('TG')]}}}) is True, f'the person: {leftValue}')
+
+with Case('whatsapp_gate_reads_no_chat_type [WA]: WhatsApp\'s rule reads no chat type (spec §3.3; audience.RULE_JS) — the WhatsApp '
+          'gate is unchanged: a business chat whose webhook carries an unexpected chat_type is claimed as before') as c:
+    with Session(SETUP) as pg:
+        connect(pg, 'WA')
+        decide_row(pg, 'WA', 'business')
+        r = walk(pg, 'WA', incoming('WA', chat_type='chat'))
+        c.check(r.trail == ENTRY + ['Business?'] + TO_CLAIM, f'trail {r.trail} halt {r.halt}')
+
 # ---------------------------------------------------------------------------------------------------- D: Decide Audience
 for ch, T in TEMPLATES.items():
     pid, chat = CHATS[ch]
@@ -438,7 +485,9 @@ for ch, T in TEMPLATES.items():
                                   ('Read Reply Mode\'s row handed on (saying business)', {'suppressed': False, 'off_hours': False,
                                    'audience': 'business', 'connected_at_ms': '1', 'connection_phone': OWN}, False),
                                   ('an error item', {'error': 'boom'}, False), ('an empty item', {}, False)):
-            c.check(bool(expr(cond, item)) is want, f'Decided Business? on {label}: want {want}')
+            # the run's own webhook, a person (on Telegram the gate also reads it: rule step 1)
+            c.check(bool(expr(cond, item, {'Webhook': {'body': {'messages': [incoming(ch)]}}})) is want,
+                    f'Decided Business? on {label}: want {want}')
 
     with Case(f'decide_answer_matrix [{ch}]: the Outcome stamp after Decided Business? false carries the sub-workflow\'s own outcome '
               'when it is one of its five personal ones; an error item, the mode read\'s row handed on, a missing or unknown value '
@@ -685,6 +734,45 @@ for label, mutate, needle in GATE_MUTATIONS:
                 c.check(False, f'the mutation does not apply to the canon: {type(e).__name__}: {e}')
             finally:
                 shutil.rmtree(d, ignore_errors=True)
+
+
+def cond_to(name, value):
+    def m(w):
+        nd(w, name)['parameters']['conditions']['conditions'][0]['leftValue'] = value
+    return m
+
+
+# The ONE designed difference between the two gates: on Telegram, Business? and Decided Business? also refuse a webhook that
+# rule step 1 calls not a person. Dropping it on Telegram, or adding it on WhatsApp (whose rule reads no chat type), fails
+# both verifiers.
+CHANNEL_TERM_MUTATIONS = (
+    ('TG', 'the Telegram Business? without the not-a-person term', cond_to('Business?', "={{ $json.audience === 'business' }}")),
+    ('TG', 'the Telegram Decided Business? without the not-a-person term',
+     cond_to('Decided Business?', "={{ $json.audience === 'business' && $json.outcome === 'business' }}")),
+    ('WA', 'the WhatsApp Business? reading the chat type',
+     lambda w: cond_to('Business?', nd(TEMPLATES['TG'], 'Business?')['parameters']['conditions']['conditions'][0]['leftValue'])(w)),
+)
+
+for ch, label, mutate in CHANNEL_TERM_MUTATIONS:
+    with Case(f'V NEG [{ch}] {label}: verify-history-handoff.py fails naming the file, verify-telegram-parity.py fails on the '
+              'audience gate') as c:
+        d = scratch()
+        try:
+            fname = FILES[ch]
+            w = json.loads((d / fname).read_text(encoding='utf-8'))
+            before = json.dumps(w, sort_keys=True)
+            mutate(w)
+            c.check(json.dumps(w, sort_keys=True) != before, f'{label}: the mutation changed nothing')
+            (d / fname).write_text(json.dumps(w, indent=2, ensure_ascii=False) + '\n', encoding='utf-8')
+            rc_, text = run_tool('verify-history-handoff.py', d)
+            fails = [ln for ln in text.splitlines() if ln.startswith('HISTORY/HANDOFF FAIL')]
+            c.check(rc_ != 0 and any('Business?' in ln and fname in ln for ln in fails), f'history/handoff: exit {rc_}: {text[-700:]}')
+            rc_, text = run_tool('verify-telegram-parity.py', d)
+            c.check(rc_ != 0 and 'PARITY FAIL' in text and 'audience gate' in text, f'parity: exit {rc_}: {text[-700:]}')
+        except (StopIteration, KeyError, ValueError, IndexError) as e:
+            c.check(False, f'the mutation does not apply to the canon: {type(e).__name__}: {e}')
+        finally:
+            shutil.rmtree(d, ignore_errors=True)
 
 
 def p_wa_gate_differs(d):

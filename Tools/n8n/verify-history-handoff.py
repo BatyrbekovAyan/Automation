@@ -249,14 +249,28 @@ def check_audience_gate(wf, f, declared):
         "a personal or undecided chat would get a send, a Wappi call or a write"
     assert set(AUDIENCE_GATE) | {"Outcome"} <= reach, f"{tag} the gate is not on the path from the Webhook: {sorted(reach)}"
     hh_ = hh()
-    for name, want in (("Audience Known?", hh_.AUDIENCE_KNOWN_EXPR), ("Business?", hh_.BUSINESS_EXPR),
-                       ("Decided Business?", hh_.DECIDED_BUSINESS_EXPR), ("Suppressed?", hh_.SUPPRESSED_EXPR)):
+    channel = hh_.CHANNEL.get(os.path.basename(f), "")
+    for name, want in (("Audience Known?", hh_.AUDIENCE_KNOWN_EXPR), ("Business?", hh_.business_expr(channel)),
+                       ("Decided Business?", hh_.decided_business_expr(channel)), ("Suppressed?", hh_.SUPPRESSED_EXPR)):
         n = names[name]
         conds = n["parameters"].get("conditions") or {}
         cl = conds.get("conditions") or []
         assert n["type"] == "n8n-nodes-base.if" and len(cl) == 1 and cl[0].get("leftValue") == want \
             and cl[0].get("operator") == BOOLEAN_TRUE and conds.get("combinator") == "and", \
             f"{tag} {name} must be the one boolean condition {want!r}: {cl}"
+    # Rule step 1 at the gate, read independently of the generator's text: on Telegram Business? and Decided Business? refuse
+    # a webhook that is not a person — the webhook's is_bot, and EVERY chat type audience.TG_NONHUMAN_TYPES names (taken from
+    # audience.py, never a copy) — whatever decision is stored; on WhatsApp, whose rule reads no chat type, neither is read.
+    m_ = "$('Webhook').first().json.body.messages[0]"
+    for name in ("Business?", "Decided Business?"):
+        lv = (((names[name]["parameters"].get("conditions") or {}).get("conditions") or [{}])[0]).get("leftValue") or ""
+        if channel == "telegram":
+            assert m_ + ".is_bot !== true" in lv and json.dumps(list(au().TG_NONHUMAN_TYPES)) + ".includes(String(" + m_ + ".chat_type" in lv, \
+                f"{tag} {name} must refuse a Telegram webhook that is not a person (is_bot, a chat type of audience.TG_NONHUMAN_TYPES " \
+                f"{list(au().TG_NONHUMAN_TYPES)}) whatever decision is stored: {lv}"
+        else:
+            assert "chat_type" not in lv and "is_bot" not in lv, \
+                f"{tag} {name} must not read the webhook's chat type or is_bot on {channel or 'this channel'} (its rule reads no chat type): {lv}"
     for src, want in (("Audience Known?", [["Business?"], ["Decide Audience"]]), ("Business?", [["Suppressed?"], ["Outcome"]]),
                       ("Decide Audience", [["Decided Business?"]]), ("Decided Business?", [["Suppressed?"], ["Outcome"]])):
         assert edges(src) == want, f"{tag} {src} must lead to {want}: {edges(src)}"
@@ -333,6 +347,21 @@ def _audience_tripwires(wf, f, declared):
              ("Decide Audience failing the run", key("Decide Audience", "onError", None)),
              ("the bigint handed on as text", raw_bigint),
              ("Read Reply Mode failing open", key("Read Reply Mode", "onError", "continueRegularOutput")))
+    # rule step 1 at the gate: the Telegram term dropped or narrowed, or the WhatsApp gate reading a chat type
+    term, types = hh().TG_PERSON_TERM, json.dumps(list(au().TG_NONHUMAN_TYPES))
+    narrowed = term.replace(types, json.dumps([t for t in au().TG_NONHUMAN_TYPES if t != "bot"]))
+    if hh().CHANNEL.get(os.path.basename(f)) == "telegram":
+        wrong += (("the Telegram Business? without the not-a-person term", cond("Business?", "={{ $json.audience === 'business' }}")),
+                  ("the Telegram Decided Business? without the not-a-person term",
+                   cond("Decided Business?", "={{ $json.audience === 'business' && $json.outcome === 'business' }}")),
+                  ("the Telegram Business? forgetting the bot type",
+                   cond("Business?", "={{ $json.audience === 'business' && " + narrowed + " }}")),
+                  ("the Telegram Decided Business? ignoring is_bot",
+                   cond("Decided Business?", "={{ $json.audience === 'business' && $json.outcome === 'business' && "
+                        + term.replace(".is_bot !== true", ".is_bot !== 'never'") + " }}")))
+    else:
+        wrong += (("the WhatsApp Business? reading the chat type",
+                   cond("Business?", "={{ $json.audience === 'business' && " + term + " }}")),)
     for label, mutate in wrong:
         bad = copy.deepcopy(wf)
         mutate(bad)
@@ -341,6 +370,22 @@ def _audience_tripwires(wf, f, declared):
         except AssertionError:
             continue
         fail(f"personal chats tripwire accepted a broken audience gate ({label}) in {f}")
+    if hh().CHANNEL.get(os.path.basename(f)) == "telegram":
+        # the generator narrowed too (its term without the bot type, the canon regenerated from it): the equality with the
+        # generator's text passes, so only the check read off audience.py may catch it
+        saved = hh().TG_PERSON_TERM
+        bad = copy.deepcopy(wf)
+        try:
+            hh().TG_PERSON_TERM = narrowed
+            cond("Business?", hh().business_expr("telegram"))(bad)
+            cond("Decided Business?", hh().decided_business_expr("telegram"))(bad)
+            try:
+                check_audience_gate(bad, f, declared)
+            except AssertionError:
+                return
+            fail(f"personal chats tripwire accepted a gate generated from a term without the bot type in {f}")
+        finally:
+            hh().TG_PERSON_TERM = saved
 
 _BS = None
 
