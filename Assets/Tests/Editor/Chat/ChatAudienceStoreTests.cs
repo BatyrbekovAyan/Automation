@@ -6,8 +6,9 @@ using NUnit.Framework;
 /// «Личные и рабочие чаты»: the app's mirror of the server's decisions. What a chat IS for the assistant
 /// (<see cref="ChatAudienceStore.KindOf"/>, <see cref="ChatAudienceStore.AllowsAssistant"/>) is the server's decision or the
 /// owner's move still on its way — never the rule. How a chat is SHOWN (<see cref="ChatAudienceStore.ViewOf"/>) falls back
-/// to the shared rule for a chat the server has not decided yet, judged by the chat's facts and its last message against
-/// the connection moment. The server's view is cached on disk; the moves are not (the queue redraws them on launch).
+/// to the shared rule for a chat the server has not decided yet, judged by the chat's facts and the EARLIEST last message the
+/// app has seen for it against the connection moment. The server's view and those times are cached on disk; the moves are
+/// not (the queue redraws them on launch).
 /// </summary>
 public class ChatAudienceStoreTests
 {
@@ -127,6 +128,87 @@ public class ChatAudienceStoreTests
     }
 
     [Test]
+    public void Store_AnUndecidedChat_IsJudgedByTheEarliestLastMessageTheAppSaw()
+    {
+        ChatAudienceStore.ApplyConnected(Wa, MomentMs);
+        var old = WhatsappChat("77010000011@c.us", AfterSec);
+        ChatAudienceStore.NoteLastMessage(Wa, old.ChatId, BeforeSec);   // the list showed it before the connection…
+        ChatAudienceStore.NoteLastMessage(Wa, old.ChatId, AfterSec);    // …then with its first message after it
+        AudienceView oldView = ChatAudienceStore.ViewOf(Wa, old);
+        Assert.AreEqual((AudienceKind.Personal, AudienceReason.History), (oldView.Kind, oldView.Reason),
+            "a conversation the app saw before the connection stays one when the person writes again");
+        Assert.IsFalse(oldView.Decided, "still only how the chat is shown — the server decides it");
+
+        var fresh = WhatsappChat("77010000012@c.us", AfterSec + 60);
+        ChatAudienceStore.NoteLastMessage(Wa, fresh.ChatId, AfterSec);
+        AudienceView freshView = ChatAudienceStore.ViewOf(Wa, fresh);
+        Assert.AreEqual((AudienceKind.Business, AudienceReason.New), (freshView.Kind, freshView.Reason),
+            "a chat the app first saw after the connection: a new person");
+        Assert.AreEqual(AudienceReason.History, ChatAudienceStore.ViewOf(Wa, WhatsappChat(fresh.ChatId, BeforeSec)).Reason,
+            "the chat's own last message counts when it is the earlier one");
+
+        Assert.AreEqual(AudienceReason.History, ChatAudienceStore.ViewOf(Wa, WhatsappChat("77010000013@c.us", BeforeSec)).Reason,
+            "a chat nothing was noted for is judged by its own last message");
+        Assert.AreEqual(AudienceReason.New, ChatAudienceStore.ViewOf(Wa, WhatsappChat("77010000014@c.us", AfterSec)).Reason);
+
+        const string other = "store-wa-profile-2";
+        ChatAudienceStore.ApplyConnected(other, MomentMs);
+        Assert.AreEqual(AudienceKind.Business, ChatAudienceStore.ViewOf(other, old).Kind, "what the app saw belongs to its profile");
+
+        const string noTime = "77010000015@c.us";
+        ChatAudienceStore.NoteLastMessage(Wa, noTime, 0);
+        ChatAudienceStore.NoteLastMessage(Wa, noTime, -5);
+        ChatAudienceStore.NoteLastMessage(Bot.UnauthedProfileSentinel, noTime, BeforeSec);
+        ChatAudienceStore.NoteLastMessage(Wa, "", BeforeSec);
+        ChatAudienceStore.NoteLastMessage(Wa, null, BeforeSec);
+        Assert.AreEqual(AudienceKind.Business, ChatAudienceStore.ViewOf(Wa, WhatsappChat(noTime, AfterSec)).Kind,
+            "a time the list did not give, or a profile that is no profile, is no evidence");
+    }
+
+    [Test]
+    public void Store_TheEarliestTimeSurvivesARestart_AndACacheWrittenBeforeItLoads()
+    {
+        ChatAudienceStore.ApplyConnected(Wa, MomentMs);
+        var chat = WhatsappChat("77010000021@c.us", AfterSec);
+        ChatAudienceStore.NoteLastMessage(Wa, chat.ChatId, BeforeSec);
+        ChatAudienceStore.DropMemoryForTests();   // a restart
+        Assert.AreEqual(AudienceReason.History, ChatAudienceStore.ViewOf(Wa, chat).Reason, "the earliest time is written down with the mirror");
+
+        // A cache from before the app kept these times: its mirror loads, and the chat is judged by its own last message.
+        File.WriteAllText(_cache, "{\"profiles\":[{\"profileId\":\"" + Wa + "\",\"connectedAtMs\":" + MomentMs
+            + ",\"decisions\":[{\"chatId\":\"a@c.us\",\"kind\":\"business\",\"reason\":\"new\",\"byOwner\":false,\"version\":0}]}]}");
+        ChatAudienceStore.DropMemoryForTests();
+        Assert.AreEqual(MomentMs, ChatAudienceStore.ConnectedAtMs(Wa));
+        Assert.AreEqual(AudienceKind.Business, ChatAudienceStore.KindOf(Wa, "a@c.us"));
+        Assert.AreEqual(AudienceKind.Business, ChatAudienceStore.ViewOf(Wa, chat).Kind, "nothing was noted in that cache");
+
+        ChatAudienceStore.NoteLastMessage(Wa, chat.ChatId, BeforeSec);
+        ChatAudienceStore.DropMemoryForTests();
+        Assert.AreEqual(AudienceKind.Business, ChatAudienceStore.KindOf(Wa, "a@c.us"), "the mirror is written back with the times");
+        Assert.AreEqual(AudienceReason.History, ChatAudienceStore.ViewOf(Wa, chat).Reason);
+
+        File.WriteAllText(_cache, "{\"profiles\":null,\"seen\":null}");
+        ChatAudienceStore.DropMemoryForTests();
+        Assert.IsNull(ChatAudienceStore.ConnectedAtMs(Wa), "empty parts read as nothing, never a crash");
+    }
+
+    [Test]
+    public void Store_ANewConnectionMoment_RejudgesByTheSameEarliestTime()
+    {
+        ChatAudienceStore.ApplyConnected(Wa, MomentMs);
+        var chat = WhatsappChat("77010000031@c.us", AfterSec + 7200);
+        ChatAudienceStore.NoteLastMessage(Wa, chat.ChatId, AfterSec);
+        Assert.AreEqual((AudienceKind.Business, AudienceReason.New), Verdict(ChatAudienceStore.ViewOf(Wa, chat)),
+            "first seen an hour after the connection: a new person");
+
+        ChatAudienceStore.ApplyConnected(Wa, MomentMs + 2 * 3_600_000L);   // another number: a new connection after it
+        Assert.AreEqual((AudienceKind.Personal, AudienceReason.History), Verdict(ChatAudienceStore.ViewOf(Wa, chat)),
+            "the same earliest time is from before the new connection");
+    }
+
+    private static (AudienceKind, AudienceReason) Verdict(AudienceView view) => (view.Kind, view.Reason);
+
+    [Test]
     public void Store_AllowsAssistantOnlyForBusiness()
     {
         ChatAudienceStore.ApplyList(new[] { Profile(Wa, MomentMs,
@@ -157,6 +239,8 @@ public class ChatAudienceStoreTests
             Profile(Tg, MomentMs + 1, Decision("555", AudienceKind.Personal, AudienceReason.Contact)),
         });
         ChatAudienceStore.ApplyDesire(Wa, "x@c.us", AudienceKind.Business);
+        ChatAudienceStore.NoteLastMessage(Wa, "h@c.us", BeforeSec);
+        ChatAudienceStore.NoteLastMessage(Tg, "556", BeforeSec);
 
         ChatAudienceStore.ForgetProfile(Wa);
         Assert.IsNull(ChatAudienceStore.KindOf(Wa, "a@c.us"), "the profile's decisions go");
@@ -167,6 +251,11 @@ public class ChatAudienceStoreTests
         ChatAudienceStore.DropMemoryForTests();   // a restart: what the cache file still holds
         Assert.IsNull(ChatAudienceStore.KindOf(Wa, "a@c.us"), "the cache forgot it too");
         Assert.AreEqual(MomentMs + 1, ChatAudienceStore.ConnectedAtMs(Tg));
+        ChatAudienceStore.ApplyConnected(Wa, MomentMs);
+        Assert.AreEqual(AudienceReason.New, ChatAudienceStore.ViewOf(Wa, WhatsappChat("h@c.us", AfterSec)).Reason,
+            "…and the times the app saw for its chats");
+        Assert.AreEqual(AudienceReason.History, ChatAudienceStore.ViewOf(Tg, TelegramChat("556", AfterSec)).Reason,
+            "another profile keeps those too");
     }
 
     [Test]
@@ -200,11 +289,14 @@ public class ChatAudienceStoreTests
             Profile(Wa, MomentMs, Decision("a@c.us", AudienceKind.Business, AudienceReason.New)),
             Profile(Tg, MomentMs, Decision("555", AudienceKind.Personal, AudienceReason.Contact)),
         });
+        ChatAudienceStore.NoteLastMessage(Wa, "s@c.us", BeforeSec);
         ChatAudienceStore.ApplyList(new[] { Profile(Wa, MomentMs + 60_000, Decision("b@c.us", AudienceKind.Personal, AudienceReason.History)) });
         Assert.IsNull(ChatAudienceStore.KindOf(Wa, "a@c.us"), "the listed profile is replaced: a decision that no longer holds goes");
         Assert.AreEqual(AudienceKind.Personal, ChatAudienceStore.KindOf(Wa, "b@c.us"));
         Assert.AreEqual(MomentMs + 60_000, ChatAudienceStore.ConnectedAtMs(Wa), "another number: a new moment");
         Assert.AreEqual(AudienceKind.Personal, ChatAudienceStore.KindOf(Tg, "555"), "a profile the list did not name is kept");
+        Assert.AreEqual(AudienceReason.History, ChatAudienceStore.ViewOf(Wa, WhatsappChat("s@c.us", AfterSec)).Reason,
+            "what the app saw is its own, not the server's view: a list answer keeps it");
 
         ChatAudienceStore.ApplyList(new[] { Profile(Wa, null) });
         Assert.IsNull(ChatAudienceStore.ConnectedAtMs(Wa), "the server knows no moment for it now");
@@ -251,11 +343,16 @@ public class ChatAudienceStoreTests
         Assert.AreEqual(3, changes, "many chats moved at once are told once");
         ChatAudienceStore.Batch(() => ChatAudienceStore.RetractDesire(Wa, "zzz@c.us"));
         Assert.AreEqual(3, changes, "a batch that changed nothing tells nothing");
+        ChatAudienceStore.NoteLastMessage(Wa, "n@c.us", BeforeSec);
+        Assert.AreEqual(3, changes, "noting what the list showed tells nothing — the view already reads the chat's own last message");
 
         ChatAudienceStore.ClearAll();
         Assert.AreEqual(4, changes);
         Assert.IsFalse(File.Exists(_cache), "the full wipe deletes the cache file");
         Assert.IsNull(ChatAudienceStore.KindOf(Wa, "b@c.us"));
         Assert.IsNull(ChatAudienceStore.ConnectedAtMs(Wa));
+        ChatAudienceStore.ApplyConnected(Wa, MomentMs);
+        Assert.AreEqual(AudienceReason.New, ChatAudienceStore.ViewOf(Wa, WhatsappChat("n@c.us", AfterSec)).Reason,
+            "…and what the app saw");
     }
 }

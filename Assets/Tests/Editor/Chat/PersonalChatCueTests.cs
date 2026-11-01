@@ -10,9 +10,10 @@ using static OpenChatFixture;
 /// «Личные и рабочие чаты»: what an incoming message does on the REAL ChatManager.ParseChatsJson (driven by reflection on a
 /// bare manager — OpenChatFixture — with a bot whose WhatsApp profile the audience store knows and has a connection moment
 /// for).
-///   • The cue. On a merged row the chat's verdict BEFORE the message counts too: the app judges an undecided chat's
-///     history by its LAST message, and the message itself moves that past the connection moment — while the server decides
-///     the chat on that very message by its history. So a conversation from before the connection does not ring.
+///   • The cue. The app judges an undecided chat's history by the EARLIEST last message it has seen for the chat (kept by
+///     ChatAudienceStore, across restarts), so a conversation from before the connection stays personal and does not ring
+///     when its person writes again — the server decides the chat on that message by its history. On a merged row the
+///     chat's verdict BEFORE the message counts too (the row's facts may change with it).
 ///   • The read. An incoming message in a chat the app holds no verdict for (no server decision mirrored, no owner's move on
 ///     its way) asks ChatAudienceSyncService for a list read soon — once per pass, never for the cache load, our own
 ///     message or a decided chat. (The service's one-timer coalescing is pinned in IncomingNotifyPolicyTests.)
@@ -69,7 +70,7 @@ public class PersonalChatCueTests
     // ---- the cue ----
 
     [Test]
-    public void AConversationFromBeforeTheConnection_DoesNotRing_OnItsFirstMessageAfterIt()
+    public void AConversationFromBeforeTheConnection_StaysPersonal_AndQuiet_AsItsPersonWritesAgain()
     {
         const string chat = "77000000001@c.us";
         ChatManager manager = NewChatManager();
@@ -79,11 +80,32 @@ public class PersonalChatCueTests
             "a non-contact the owner wrote with before the connection");
 
         Parse(manager, List(Row(chat, "M2", After, unread: 1)), isInitialLoad: false);
+        AudienceView first = View(manager, chat);
+        Assert.AreEqual((AudienceKind.Personal, AudienceReason.History), (first.Kind, first.Reason),
+            "its first message after the connection: the app judges the chat by the earliest last message it saw");
 
-        Assert.AreEqual(AudienceKind.Business, View(manager, chat).Kind,
-            "the app's estimate now reads the new last message as after the connection — why the verdict before it counts");
-        Assert.AreEqual(0, cues, "the server decides personal/history on this very message — the app stays quiet");
-        Assert.AreEqual(1, readRequests, "…and asks for the server's verdict soon");
+        Parse(manager, List(Row(chat, "M3", Later, unread: 2)), isInitialLoad: false);
+        Assert.AreEqual(AudienceKind.Personal, View(manager, chat).Kind, "…and so on every later one");
+
+        Assert.AreEqual(0, cues, "the server decides personal/history on these messages — the app stays quiet throughout");
+        Assert.AreEqual(2, readRequests, "…and asks for the server's verdict soon, on each pass while it holds none");
+    }
+
+    [Test]
+    public void TheEarliestLastMessage_OutlivesARestart()
+    {
+        const string chat = "77000000010@c.us";
+        Parse(NewChatManager(), List(Row(chat, "R1", Before, unread: 0)), isInitialLoad: true);
+
+        ChatAudienceStore.DropMemoryForTests();   // the app restarts: the mirror and what it saw come back from the cache file
+        ChatManager restarted = NewChatManager();
+        Parse(restarted, List(Row(chat, "R2", After, unread: 1)), isInitialLoad: true);   // the list cached after the person wrote
+        AudienceView view = View(restarted, chat);
+        Assert.AreEqual((AudienceKind.Personal, AudienceReason.History), (view.Kind, view.Reason),
+            "the time the app saw before the restart still counts");
+
+        Parse(restarted, List(Row(chat, "R3", Later, unread: 2)), isInitialLoad: false);
+        Assert.AreEqual(0, cues, "a conversation from before the connection does not ring after a restart either");
     }
 
     [Test]

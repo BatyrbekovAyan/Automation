@@ -185,17 +185,18 @@ public static class ChatAudienceRule
     }
 
     /// <summary>
-    /// Whether a conversation existed before the channel was connected, judged by the chat's LAST message: older than the
-    /// connection moment → true, otherwise false. Only a display estimate for a chat the server has not decided — the
-    /// server looks at the oldest message. Null (neither yes nor no) when the moment is not known, and also when there is
-    /// no usable time on either side: a missing time is no evidence that the conversation was old.
+    /// Whether a conversation existed before the channel was connected, judged by one message time: older than the
+    /// connection moment → true, otherwise false. The app passes the EARLIEST last-message time it has seen for the chat
+    /// (ChatAudienceStore.ViewOf) — only a display estimate for a chat the server has not decided; the server reads the
+    /// chat's history itself. Null (neither yes nor no) when the moment is not known, and also when there is no usable time
+    /// on either side: a missing time is no evidence that the conversation was old.
     /// </summary>
-    /// <param name="lastMessageUnixSec">Unix seconds of the chat's last message (0 when the list gave none).</param>
+    /// <param name="messageUnixSec">Unix seconds of that message (0 when none is known).</param>
     /// <param name="connectedAtMs">Unix milliseconds of the connection moment, null when not known.</param>
-    public static bool? HistoryBeforeConnection(long lastMessageUnixSec, long? connectedAtMs)
+    public static bool? HistoryBeforeConnection(long messageUnixSec, long? connectedAtMs)
     {
-        if (!connectedAtMs.HasValue || connectedAtMs.Value <= 0 || lastMessageUnixSec <= 0) return null;
-        return lastMessageUnixSec * 1000L < connectedAtMs.Value;
+        if (!connectedAtMs.HasValue || connectedAtMs.Value <= 0 || messageUnixSec <= 0) return null;
+        return messageUnixSec * 1000L < connectedAtMs.Value;
     }
 
     private static (AudienceKind Kind, AudienceReason Reason) PersonalBecause(AudienceReason reason) =>

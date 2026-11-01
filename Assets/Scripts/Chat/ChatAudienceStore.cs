@@ -26,14 +26,19 @@ public sealed class AudienceView
 /// assistant must keep to a decision while the phone is off). Per profile: the moment its channel counts as connected and
 /// the decisions that hold, as the ChatAudience list returned them, cached at
 /// <c>persistentDataPath/audience_cache.json</c>. Over them: the owner's moves the server has not confirmed yet, drawn at
-/// once — kept in memory only, the queue (<see cref="ChatAudienceSyncService"/>, PlayerPrefs) redraws them on launch.
+/// once — kept in memory only, the queue (<see cref="ChatAudienceSyncService"/>, PlayerPrefs) redraws them on launch. Beside
+/// them, in the same cache file: the app's own observation — per profile and chat, the EARLIEST last-message time the chat
+/// list has ever shown (<see cref="NoteLastMessage"/>; never sent anywhere).
 ///
 /// Two readings, deliberately different:
 ///   • what a chat IS for the assistant — <see cref="KindOf"/> / <see cref="AllowsAssistant"/>: the owner's move, else the
 ///     server's decision, else nothing. Never the rule: a chat the server has not decided gets no assistant here.
 ///   • how a chat is SHOWN — <see cref="ViewOf"/>: the same, and for an undecided chat the shared rule
-///     (<see cref="ChatAudienceRule.Decide"/>) over its facts and an estimate of its history: its LAST message against the
-///     connection moment. Only an estimate — the server looks at the oldest message and decides on the next incoming one.
+///     (<see cref="ChatAudienceRule.Decide"/>) over its facts and an estimate of its history: the earliest last message the
+///     app has seen for the chat against the connection moment. A chat the app listed before its first message after the
+///     connection therefore stays a conversation from before it when that message comes — it does not flip to working, ring
+///     or leave «Кто из них клиенты?» while the server decides it. Only an estimate — the server looks at the chat's history
+///     itself and decides on the next incoming message; a chat the app first lists after such a message reads as new.
 /// Every change is told once through <see cref="OnChanged"/> (a <see cref="Batch"/> of changes once in all).
 /// </summary>
 public static class ChatAudienceStore
@@ -54,6 +59,8 @@ public static class ChatAudienceStore
         new Dictionary<string, Dictionary<string, AudienceKind>>(StringComparer.Ordinal);
 
     private static Dictionary<string, Mirror> _mirrors;   // the server's view; null until first read from the cache
+    // The app's own: profile → chat → the earliest last-message time (unix seconds) the chat list showed; read with the mirror.
+    private static Dictionary<string, Dictionary<string, long>> _seen;
     private static string _cachePathOverride;
     private static int _batchDepth;
     private static bool _changedInBatch;
@@ -61,7 +68,23 @@ public static class ChatAudienceStore
 
     private static string CachePath => _cachePathOverride ?? Path.Combine(Application.persistentDataPath, CacheFileName);
 
-    private static Dictionary<string, Mirror> Mirrors => _mirrors ??= LoadCache();
+    private static Dictionary<string, Mirror> Mirrors
+    {
+        get
+        {
+            EnsureLoaded();
+            return _mirrors;
+        }
+    }
+
+    private static Dictionary<string, Dictionary<string, long>> Seen
+    {
+        get
+        {
+            EnsureLoaded();
+            return _seen;
+        }
+    }
 
     // ---- the server's view ----
 
@@ -142,6 +165,29 @@ public static class ChatAudienceStore
         if (RemoveDesire(profileId, chatId)) Changed();
     }
 
+    // ---- what the app has seen ----
+
+    /// <summary>
+    /// The chat list showed the chat with its last message at <paramref name="lastMessageUnixSec"/> (ChatManager.ParseChatsJson,
+    /// every row, the cache load included). Kept when it is the EARLIEST such time for the chat — a later one changes nothing —
+    /// and written down with the mirror. Tells nothing: the chat's own last-message time is always part of what
+    /// <see cref="ViewOf"/> reads, so the time just seen cannot change a view; it matters once a newer message moves the
+    /// chat's own time past the connection moment. No time (≤ 0), no chat or no real profile — nothing to keep.
+    /// </summary>
+    public static void NoteLastMessage(string profileId, string chatId, long lastMessageUnixSec)
+    {
+        if (!ChatAudienceRequest.IsRealProfileId(profileId) || string.IsNullOrEmpty(chatId) || lastMessageUnixSec <= 0) return;
+        if (!Seen.TryGetValue(profileId, out var chats))
+        {
+            chats = new Dictionary<string, long>(StringComparer.Ordinal);
+            Seen[profileId] = chats;
+        }
+        if (chats.TryGetValue(chatId, out long earliest) && earliest <= lastMessageUnixSec) return;
+        chats[chatId] = lastMessageUnixSec;
+        if (_batchDepth > 0) _dirtyInBatch = true;
+        else WriteCache();
+    }
+
     // ---- reading ----
 
     /// <summary>The server's moment for the profile's connection (unix ms), null when not known.</summary>
@@ -157,7 +203,9 @@ public static class ChatAudienceStore
 
     /// <summary>
     /// How the chat is shown: the owner's move, else the server's decision, else the shared rule over the chat's facts and
-    /// its history estimate — the LAST message against the connection moment (unknown moment → unknown history → personal).
+    /// its history estimate — the earliest last message the app has seen for the chat (<see cref="NoteLastMessage"/>, or the
+    /// chat's own when that is earlier or nothing was noted) against the connection moment (unknown moment → unknown history
+    /// → personal).
     /// </summary>
     public static AudienceView ViewOf(string profileId, ChatViewModel chat)
     {
@@ -180,7 +228,7 @@ public static class ChatAudienceStore
         }
         else
         {
-            bool? history = ChatAudienceRule.HistoryBeforeConnection(chat.LastMessageTime, ConnectedAtMs(profileId));
+            bool? history = ChatAudienceRule.HistoryBeforeConnection(EarliestLastMessageSec(profileId, chat), ConnectedAtMs(profileId));
             (view.Kind, view.Reason) = ChatAudienceRule.Decide(facts, history, null);
         }
         return view;
@@ -191,13 +239,14 @@ public static class ChatAudienceStore
 
     // ---- forgetting ----
 
-    /// <summary>A profile that is gone (its bot was deleted): its decisions, its moment and its moves.</summary>
+    /// <summary>A profile that is gone (its bot was deleted): its decisions, its moment, its moves and what the app saw for it.</summary>
     public static void ForgetProfile(string profileId)
     {
         if (string.IsNullOrEmpty(profileId)) return;
         bool mirror = Mirrors.Remove(profileId);
+        bool seen = Seen.Remove(profileId);
         bool moves = Desires.Remove(profileId);
-        if (mirror) MirrorChanged();
+        if (mirror || seen) MirrorChanged();
         else if (moves) Changed();
     }
 
@@ -205,6 +254,7 @@ public static class ChatAudienceStore
     public static void ClearAll()
     {
         _mirrors = new Dictionary<string, Mirror>(StringComparer.Ordinal);
+        _seen = new Dictionary<string, Dictionary<string, long>>(StringComparer.Ordinal);
         Desires.Clear();
         _dirtyInBatch = false;
         try
@@ -268,6 +318,7 @@ public static class ChatAudienceStore
     private static void ResetMemory()
     {
         _mirrors = null;
+        _seen = null;
         Desires.Clear();
         _batchDepth = 0;
         _changedInBatch = false;
@@ -284,6 +335,17 @@ public static class ChatAudienceStore
             Mirrors[profileId] = mirror;
         }
         return mirror;
+    }
+
+    // The earliest last-message time known for the chat: the one noted for it, or its own when that is earlier or nothing was
+    // noted; 0 when there is neither.
+    private static long EarliestLastMessageSec(string profileId, ChatViewModel chat)
+    {
+        long own = chat.LastMessageTime;
+        if (string.IsNullOrEmpty(profileId) || string.IsNullOrEmpty(chat.ChatId)
+            || !Seen.TryGetValue(profileId, out var chats) || !chats.TryGetValue(chat.ChatId, out long noted))
+            return own;
+        return own > 0 && own < noted ? own : noted;
     }
 
     private static AudienceDecision DecisionOf(string profileId, string chatId)
@@ -349,10 +411,19 @@ public static class ChatAudienceStore
 
     // ---- the cache file ----
 
+    // A cache written before the app kept its last-message times has no `seen`: it reads as nothing seen yet.
     [Serializable]
     private class CacheFile
     {
         public List<CacheProfile> profiles = new List<CacheProfile>();
+        public List<CacheSeen> seen = new List<CacheSeen>();
+    }
+
+    [Serializable]
+    private class CacheSeen
+    {
+        public string profileId;
+        public Dictionary<string, long> chats = new Dictionary<string, long>();
     }
 
     [Serializable]
@@ -373,37 +444,59 @@ public static class ChatAudienceStore
         public long version;
     }
 
-    private static Dictionary<string, Mirror> LoadCache()
+    // The mirror and what the app saw, from the cache file — both empty when there is none or it does not read.
+    private static void EnsureLoaded()
     {
-        var mirrors = new Dictionary<string, Mirror>(StringComparer.Ordinal);
+        if (_mirrors != null && _seen != null) return;
+        _mirrors = new Dictionary<string, Mirror>(StringComparer.Ordinal);
+        _seen = new Dictionary<string, Dictionary<string, long>>(StringComparer.Ordinal);
         try
         {
             string path = CachePath;
-            if (!File.Exists(path)) return mirrors;
+            if (!File.Exists(path)) return;
             var file = JsonConvert.DeserializeObject<CacheFile>(File.ReadAllText(path));
-            if (file?.profiles == null) return mirrors;
-            foreach (var profile in file.profiles)
-            {
-                if (profile == null || !ChatAudienceRequest.IsRealProfileId(profile.profileId)) continue;
-                var mirror = new Mirror { ConnectedAtMs = Positive(profile.connectedAtMs) };
-                foreach (var row in profile.decisions ?? new List<CacheDecision>())
-                {
-                    if (row == null || string.IsNullOrEmpty(row.chatId) || !ChatAudienceRequest.TryParseKind(row.kind, out AudienceKind kind)) continue;
-                    mirror.Decisions[row.chatId] = new AudienceDecision
-                    {
-                        ChatId = row.chatId, Kind = kind, Reason = ChatAudienceRequest.ParseReason(row.reason),
-                        ByOwner = row.byOwner, Version = row.version,
-                    };
-                }
-                mirrors[profile.profileId] = mirror;
-            }
+            LoadMirrors(file?.profiles, _mirrors);
+            LoadSeen(file?.seen, _seen);
         }
         catch (Exception e)
         {
             Debug.LogWarning($"[ChatAudienceStore] the cache is unreadable, starting empty: {e.Message}");
-            mirrors.Clear();
+            _mirrors.Clear();
+            _seen.Clear();
         }
-        return mirrors;
+    }
+
+    private static void LoadMirrors(List<CacheProfile> profiles, Dictionary<string, Mirror> mirrors)
+    {
+        if (profiles == null) return;
+        foreach (var profile in profiles)
+        {
+            if (profile == null || !ChatAudienceRequest.IsRealProfileId(profile.profileId)) continue;
+            var mirror = new Mirror { ConnectedAtMs = Positive(profile.connectedAtMs) };
+            foreach (var row in profile.decisions ?? new List<CacheDecision>())
+            {
+                if (row == null || string.IsNullOrEmpty(row.chatId) || !ChatAudienceRequest.TryParseKind(row.kind, out AudienceKind kind)) continue;
+                mirror.Decisions[row.chatId] = new AudienceDecision
+                {
+                    ChatId = row.chatId, Kind = kind, Reason = ChatAudienceRequest.ParseReason(row.reason),
+                    ByOwner = row.byOwner, Version = row.version,
+                };
+            }
+            mirrors[profile.profileId] = mirror;
+        }
+    }
+
+    private static void LoadSeen(List<CacheSeen> rows, Dictionary<string, Dictionary<string, long>> seen)
+    {
+        if (rows == null) return;
+        foreach (var row in rows)
+        {
+            if (row?.chats == null || !ChatAudienceRequest.IsRealProfileId(row.profileId)) continue;
+            var chats = new Dictionary<string, long>(StringComparer.Ordinal);
+            foreach (var pair in row.chats)
+                if (!string.IsNullOrEmpty(pair.Key) && pair.Value > 0) chats[pair.Key] = pair.Value;
+            if (chats.Count > 0) seen[row.profileId] = chats;
+        }
     }
 
     private static void WriteCache()
@@ -420,6 +513,8 @@ public static class ChatAudienceStore
                 });
             file.profiles.Add(profile);
         }
+        foreach (var pair in Seen)
+            file.seen.Add(new CacheSeen { profileId = pair.Key, chats = new Dictionary<string, long>(pair.Value) });
         try
         {
             File.WriteAllText(CachePath, JsonConvert.SerializeObject(file));

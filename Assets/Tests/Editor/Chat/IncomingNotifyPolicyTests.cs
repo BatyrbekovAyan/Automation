@@ -67,8 +67,8 @@ public class IncomingNotifyPolicyTests
 
     // The policy is only as good as what ChatManager hands it: BOTH sites in ParseChatsJson (a merged row and a new one) must
     // pass the chat's audience as the list draws it — the store's view, never a literal. A merged row passes the verdict
-    // before the message OR after it (the message itself moves an undecided chat's history estimate); a new row has no
-    // «before». PersonalChatCueTests drives the merged path for real.
+    // before the message OR after it (the row's facts may change with the message, and the server decides an undecided chat
+    // on it); a new row has no «before». PersonalChatCueTests drives the merged path for real.
     [Test]
     public void ParseChatsJson_HandsEveryNotifySiteTheChatsAudience()
     {
@@ -85,7 +85,7 @@ public class IncomingNotifyPolicyTests
         int before = parse.IndexOf("bool personalBefore = IsPersonalChat(", System.StringComparison.Ordinal);
         int update = parse.IndexOf("existingVm.UpdateLastMessage(", System.StringComparison.Ordinal);
         Assert.GreaterOrEqual(before, 0, "the merged row takes its verdict before the message");
-        Assert.Less(before, update, "…BEFORE UpdateLastMessage moves the last message past the connection moment");
+        Assert.Less(before, update, "…BEFORE the row takes the message");
 
         string helper = SourceGuard.MethodBody(source, "bool IsPersonalChat(");
         StringAssert.Contains("ChatAudienceStore.ViewOf(", helper, "the verdict the list draws the chat by");

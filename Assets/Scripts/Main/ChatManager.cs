@@ -326,6 +326,9 @@ public partial class ChatManager : MonoBehaviour
         // ...and one list read soon per pass when an incoming message reached a chat the server has not decided for the
         // app yet: the server decides it on that very message, and the app learns the verdict only from a list read.
         bool audienceReadSoon = false;
+        // ...and what the list showed: every chat's last-message time, kept by the store as the EARLIEST it has seen for the
+        // chat — how an undecided chat is shown (ChatAudienceStore.ViewOf). Written once, after the pass.
+        var shownTimes = new List<(string chatId, long time)>();
 
         foreach (var chat in response.dialogs)
         {
@@ -383,6 +386,7 @@ public partial class ChatManager : MonoBehaviour
             // hidden by then, so IncomingNotifyPolicy can no longer suppress it. Self-clearing:
             // a genuinely newer message doesn't match the acked id and reports normally.
             int effectiveUnread = _readAcks.EffectiveUnread(chatKey, chat.last_message_id, chat.unread_count);
+            shownTimes.Add((chatKey, unixTime));
 
             if (chatLookup.TryGetValue(chatKey, out var existingVm))
             {
@@ -393,10 +397,10 @@ public partial class ChatManager : MonoBehaviour
                 // Capture before the id is overwritten: did the last message change?
                 bool lastIdChanged = existingVm.LastMessageId != chat.last_message_id;
 
-                // «Личные и рабочие чаты»: the chat's audience as it stood BEFORE this message. The app judges an
-                // undecided chat's history by its LAST message, and this message moves that past the connection moment —
-                // while the server decides the chat on this very message by its history. A conversation from before the
-                // connection must not ring as a new person's first message.
+                // «Личные и рабочие чаты»: the chat's audience as it stood BEFORE this message. The history estimate
+                // does not move with the message (the store judges an undecided chat by the earliest last message it
+                // saw), but the row's facts may (a contact saved or deleted meanwhile) — and the server decides the chat
+                // on this very message: a chat that was personal does not ring on it.
                 bool personalBefore = IsPersonalChat(audienceProfileId, existingVm);
 
                 existingVm.UpdateLastMessage(lastMsg, unixTime);
@@ -459,6 +463,7 @@ public partial class ChatManager : MonoBehaviour
 
         if (notifyIncoming) NotificationFx.OnIncomingDetected();
         if (audienceReadSoon) ChatAudienceSyncService.RequestListSoon();   // the service coalesces a burst into one read
+        NoteShownTimes(audienceProfileId, shownTimes);
 
         // Drop chats deleted on the server: present in memory but absent from this full list.
         // chats/filter returns the complete set, so a missing chat was removed in WhatsApp itself.
@@ -484,6 +489,20 @@ public partial class ChatManager : MonoBehaviour
                 }
             }
         }
+    }
+
+    /// <summary>
+    /// «Личные и рабочие чаты»: the list's last-message times go to the audience store, which keeps the earliest per chat —
+    /// so a chat listed before its first message after the connection keeps showing as a conversation from before it.
+    /// One write for the whole pass.
+    /// </summary>
+    private static void NoteShownTimes(string profileId, List<(string chatId, long time)> shown)
+    {
+        if (!ChatAudienceRequest.IsRealProfileId(profileId) || shown.Count == 0) return;
+        ChatAudienceStore.Batch(() =>
+        {
+            foreach ((string chatId, long time) in shown) ChatAudienceStore.NoteLastMessage(profileId, chatId, time);
+        });
     }
 
     /// <summary>
