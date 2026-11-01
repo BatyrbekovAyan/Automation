@@ -17,7 +17,8 @@ still wired as designed».
           other branch on the canvas: n8n v1 runs a node's branches one after another, the topmost first, and one unhandled
           error ends the run (nodes of the Sweep Config subtree have no onError), so a wipe placed below would silently
           stop whenever an earlier branch fails;
-      (4) the statement keeps its safety shape: it deletes from the eight per-chat tables and from nothing else (never
+      (4) the statement keeps its safety shape: it deletes from the per-chat tables — clone_lineage.MOVED_TABLES minus the
+          per-bot rows and the decision, derived so a new per-chat table on the line cannot escape it — and from nothing else (never
           dialog_counts — the tariff usage —, never the per-bot rows, never the decision itself), the chat's own reply_mode_flags
           row only (never the bot-wide '*' row), takes the work list locked and skipping what is locked, at most WIPE_BATCH
           oldest first, personal decisions only (never a business row) with a clock — the owner's and a computed one that
@@ -114,6 +115,7 @@ def _module(name, filename):
 
 
 AUD = _module("audience", "audience.py")
+CL = _module("clone_lineage", "clone_lineage.py")
 
 SWEEP_FILE = "fXYpCXPKw92EzRz8-Profile_Lifecycle_Sweep.json"
 TRIGGER = "Every 6 Hours"
@@ -121,10 +123,13 @@ WIPE_NODE = "Wipe Personal Chats"
 # The sweep's canonical Postgres credential — written here on its own (not read from the generator that wrote the node), and
 # required to be the very one the sweep's older nodes use.
 CANONICAL_PG = {"postgres": {"id": "vvRrFiEXzLVqKjOx", "name": "Postgres"}}
-# What the step deletes from: the set Delete Chat Memory clears per CHAT — the per-bot rows (bot_schedule,
-# audience_connections), the tariff usage (dialog_counts) and the decision itself (chat_audience) are not chat data.
-CHAT_TABLES = ("chat_history_events", "chat_reply_state", "conversation_outcomes", "handoff_requests", "n8n_chat_histories",
-               "reply_events", "reply_mode_flags", "suggestion_sets")
+# What the step deletes from: the tables the bot's line moves and Delete Chat Memory clears (clone_lineage.MOVED_TABLES),
+# minus what is not a chat's data — the per-bot rows (bot_schedule, audience_connections) and the decision itself
+# (chat_audience). Derived, never listed: a per-chat table added to the line is a table the wipe must empty too, and the
+# check below then fails until WIPE_SQL deletes from it. The tariff usage (dialog_counts) is not on the line at all.
+NOT_CHAT_DATA = ("bot_schedule", "chat_audience", "audience_connections")
+CHAT_TABLES = tuple(t for t in CL.MOVED_TABLES if t not in NOT_CHAT_DATA)
+assert "dialog_counts" not in CHAT_TABLES, "dialog_counts is the tariff usage — the wipe must never delete from it"
 NEVER_NAMED = ("dialog_counts", "bot_schedule", "audience_connections", "bot_profiles")
 
 

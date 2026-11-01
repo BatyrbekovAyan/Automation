@@ -40,6 +40,9 @@ apply-personal-wipe.py's patch on copies; the verifier runs for real. No n8n ser
   the_work_list_can_use_the_partial_index   the planner can take the batch from the migration's chat_audience_wipe_idx
   statement_shape                           no parameters, one delete per table, never dialog_counts / the line's other
                                             tables / the decision itself, passes verify-sql-comments (V1)
+  chat_tables_follow_the_line               the per-chat tables are DERIVED from clone_lineage.MOVED_TABLES (minus the
+                                            per-bot rows and the decision): exactly what WIPE_SQL deletes, what the cases
+                                            seed and what the verifier derives; never dialog_counts
   sweep_node_is_wired_and_independent       one node, Every 6 Hours → it directly (not behind Sweep Config / any dry-run
                                             gate), terminal, fail-open, the sweep's Postgres credential, the FIRST branch
                                             the trigger runs (n8n v1 runs the branches top-down and an unhandled error ends
@@ -69,15 +72,18 @@ from harness import N8N, Case, PgSession, bind, module, node, report, sql_litera
 
 AUD = module('audience.py')
 VSC = module('verify-sql-comments.py')
+CL = module('clone_lineage.py')
 
 SWEEP_FILE = 'fXYpCXPKw92EzRz8-Profile_Lifecycle_Sweep.json'
 NODE = 'Wipe Personal Chats'
 STAR = '*'
 
-# The per-chat tables the wipe empties — the set Delete Chat Memory clears, minus the per-bot ones (bot_schedule,
-# audience_connections) and the decision itself (chat_audience).
-CHAT_TABLES = ('n8n_chat_histories', 'chat_history_events', 'conversation_outcomes', 'handoff_requests', 'reply_events',
-               'chat_reply_state', 'suggestion_sets', 'reply_mode_flags')
+# The per-chat tables the wipe empties — the tables the bot's line moves and Delete Chat Memory clears
+# (clone_lineage.MOVED_TABLES), minus the per-bot ones (bot_schedule, audience_connections) and the decision itself
+# (chat_audience). Derived, never listed: a per-chat table added to the line must be wiped too, and the cases below then
+# fail until WIPE_SQL deletes from it and SEEDED seeds it.
+NOT_CHAT_DATA = ('bot_schedule', 'chat_audience', 'audience_connections')
+CHAT_TABLES = tuple(t for t in CL.MOVED_TABLES if t not in NOT_CHAT_DATA)
 # bot_profiles: CONNECTED_SQL dates a profile's first connection by its line (audience.LINE_CONNECTED_AT_SQL)
 TABLES = ('chat_audience', 'audience_connections', 'dialog_counts', 'bot_profiles') + CHAT_TABLES
 SERIAL = ('n8n_chat_histories', 'chat_history_events', 'handoff_requests')
@@ -529,6 +535,18 @@ with Case('statement_shape: no parameters, one delete per per-chat table, never 
             f'the delay is WIPE_DAYS written as hours ({HOURS}): a clock change never moves it')
     found = VSC.check_query(q)
     c.check(not found, f'verify-sql-comments: {found}')
+
+with Case('chat_tables_follow_the_line: the per-chat tables are clone_lineage.MOVED_TABLES minus the per-bot rows and the '
+          'decision — exactly the tables WIPE_SQL deletes from and the tables the behaviour cases seed; never dialog_counts') as c:
+    code = '\n'.join(re.sub(r'--.*$', '', line) for line in AUD.WIPE_SQL.split('\n'))
+    deleted = sorted(re.findall(r'delete from (\w+)', ' '.join(code.lower().split())))
+    c.check(deleted == sorted(CHAT_TABLES), f'derived from the line {sorted(CHAT_TABLES)} vs deleted by the wipe {deleted}')
+    c.check('dialog_counts' not in CHAT_TABLES and 'dialog_counts' not in CL.MOVED_TABLES, 'the tariff usage is never chat data')
+    c.check(set(NOT_CHAT_DATA) <= set(CL.MOVED_TABLES), f'the exclusions must name tables of the line: {NOT_CHAT_DATA}')
+    c.check(set(SEEDED) == set(CHAT_TABLES), f'every per-chat table must be seeded by the behaviour cases: '
+                                             f'{sorted(set(CHAT_TABLES) ^ set(SEEDED))}')
+    vpc = module('verify-personal-chats.py')
+    c.check(tuple(vpc.CHAT_TABLES) == CHAT_TABLES, f'the verifier derives the same list: {vpc.CHAT_TABLES}')
 
 # ================================================================================================ the Sweep node
 def targets(w, src):
