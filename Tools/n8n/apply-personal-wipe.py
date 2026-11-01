@@ -4,8 +4,9 @@
 plan docs/superpowers/plans/2026-10-25-personal-chats.md Task 8) — the Profile Lifecycle Sweep's step that, WIPE_DAYS
 (two) days after a business chat turned personal (the owner made it personal, the rule did after another number, or a
 reconnect landed a personal decision over a business period — the clock personal_since, audience.OWNER_SET_SQL /
-DECIDE_WRITE_SQL / clone_lineage.BIND_WORKFLOW_SQL), deletes what the assistant stored about it. Idempotent
-patch of the canonical workflow; this file OWNS the node «Wipe Personal Chats»:
+DECIDE_WRITE_SQL / clone_lineage.BIND_WORKFLOW_SQL), deletes what the assistant stored about it — never for a computed
+decision a return to the previous number voided whose clock the mistaken account started (audience.RESTORE_VOIDED_SQL).
+Idempotent patch of the canonical workflow; this file OWNS the node «Wipe Personal Chats»:
 
   Profile Lifecycle Sweep (fXYpCXPKw92EzRz8):
     Every 6 Hours ──> Wipe Personal Chats      one Postgres node = audience.WIPE_SQL (no parameters)
