@@ -45,8 +45,10 @@ names the chat by its id or, on WhatsApp only, by the chat's @lid code (CHAT_COD
 it while the webhook and the chat list name them by their number). Every Code node that reads a chat's page against the chat it
 asked for embeds it verbatim: the bot templates' Latest+Combine / Final Check / Reconcile Check (apply-reply-pipeline-v2.py;
 the code is the webhook's whatsapp_chat_id), Decide Audience's Decide (the same code, its input chatLid) and the ChatAudience
-webhook's Chat Code / Replay Plan (the code from the chat card's chat.LID). tests/test_audience_rule.py guards its truth table;
-verify-message-batching.py, verify-reply-pipeline.py and verify-personal-chats.py pin it where it is embedded.
+webhook's Chat Code / Replay Plan (the code from the chat card's chat.LID). The app's ChatIdentity repeats it in C# (the code from
+the chat-list row's chat.LID). Both run every row of fixtures/chat-identity-cases.json — tests/test_audience_rule.py and the app's
+ChatIdentityTests — so a new row goes into that one file; verify-message-batching.py, verify-reply-pipeline.py and
+verify-personal-chats.py pin it where it is embedded.
 
 The decisions in SQL (plan Task 2; schema sql/2026-10-25-chat-audience.sql: chat_audience, audience_connections). The
 statements the n8n nodes run over the two tables are written here once — except the two that belong to the bot's line:
