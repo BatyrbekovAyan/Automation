@@ -30,6 +30,8 @@ network, never production. Every scenario runs for a WhatsApp and a Telegram pro
   G5  set_business_backfills_before_the_replay — the backfill is COMMITTED when the replay request leaves
   G6  stale_waiting_message_not_replayed (25 h) — but it reaches the history through the backfill
   G7  owner_answered_last_not_replayed
+  G7b set_business_backfills_the_owners_app_send_unless_the_assistant_worked — an API-marked message of ours is the
+      owner's app send (owner_app) unless the tariff usage names the chat under the profile's account (then skipped)
   G8  set_personal_never_replays
   G9  respond_comes_before_the_replay — in the run and in the graph
   G10 connected_first_time_takes_the_line_moment
@@ -85,7 +87,8 @@ OPEN = {'CR_AUTH_SECRET': SECRET, 'CR_AUTH_COMPAT_UNTIL': '2099-01-01T00:00:00Z'
 INSTALL = 'inst-chat-aud'
 REPLAY_BASE = 'http://localhost:5678/webhook/'
 
-TABLES = ('bot_profiles', 'chat_audience', 'audience_connections', 'chat_history_events', 'n8n_chat_histories')
+# dialog_counts: the backfill reads the tariff usage («has the assistant worked in this chat»), so the session gets its own
+TABLES = ('bot_profiles', 'chat_audience', 'audience_connections', 'chat_history_events', 'n8n_chat_histories', 'dialog_counts')
 # LIKE copies the PUBLIC sequence as the id default: the temp copies get their own, so nothing shared moves
 SETUP = ("set timezone = 'UTC';\n"
          + ''.join(f'create temp table {t} (like public.{t} including all);\n' for t in TABLES)
@@ -520,6 +523,31 @@ for ch, C in CH.items():
             c.check([(h['message_id'], h['source']) for h in history(pg, P, C['chat'])] == [('m-q', 'client'), ('m-own', 'owner_phone')]
                     and memory(pg, P, C['chat'])[-1]['content'] == owner_mark() + 'Будут завтра к 10.',
                     f'{history(pg, P, C["chat"])} {memory(pg, P, C["chat"])}')
+
+    with Case(f'G7b [{ch}] set_business_backfills_the_owners_app_send_unless_the_assistant_worked: two chats made business at '
+              'once, each page newest-first with a message of ours the transport marks as an API send (from_where api, a task '
+              'id) — no replay, the owner wrote last. The chat the tariff usage does not name under the profile\'s account gets '
+              'it as the owner\'s send from the app (owner_app, the owner mark); in the chat it names (the assistant worked '
+              'there — before the chat was made personal and wiped, say) it may be the assistant\'s own old reply: skipped') as c:
+        with Session(SETUP) as pg:
+            profile(pg, P, C['channel'])
+            pg.x(f"insert into dialog_counts (app_user_id, chat_id, d) values ('u-cra', {L(C['chat2'])}, current_date - 10);")
+            fake = Fake(pages={
+                (P, C['chat']): [row(C['chat'], 'a-app', True, 'Записал вас на завтра, 10:00', 300, from_where='api', task_id='t-a'),
+                                 row(C['chat'], 'a-q', False, 'можно на завтра?', 900)],
+                (P, C['chat2']): [row(C['chat2'], 'b-ai', True, 'Записал вас на завтра, 10:00', 300, from_where='api', task_id='t-b'),
+                                  row(C['chat2'], 'b-q', False, 'можно на завтра?', 900)]})
+            r = call(pg, set_body(P, (C['chat'], 'business', 5), (C['chat2'], 'business', 5)), [P], fake=fake)
+            c.check(answer(r)[0] == 200 and not fake.replays and r.ran('Backfill'), f'{r}')
+            mem = memory(pg, P, C['chat'])
+            c.check([(h['message_id'], h['source']) for h in history(pg, P, C['chat'])] == [('a-q', 'client'), ('a-app', 'owner_app')]
+                    and [(m['type'], m['content'], m['additional_kwargs']) for m in mem] == [
+                        ('human', 'можно на завтра?', {'source': 'client', 'message_id': 'a-q'}),
+                        ('ai', owner_mark() + 'Записал вас на завтра, 10:00', {'source': 'owner_app', 'message_id': 'a-app'})],
+                    f'never worked here: {history(pg, P, C["chat"])} {mem}')
+            c.check([(h['message_id'], h['source']) for h in history(pg, P, C['chat2'])] == [('b-q', 'client')]
+                    and [m['additional_kwargs']['message_id'] for m in memory(pg, P, C['chat2'])] == ['b-q'],
+                    f'the assistant worked here: {history(pg, P, C["chat2"])} {memory(pg, P, C["chat2"])}')
 
     with Case(f'G8 [{ch}] set_personal_never_replays: making a chat personal reads nothing from Wappi, writes nothing to the '
               'history or the memory and replays nothing — even with a fresh message waiting') as c:

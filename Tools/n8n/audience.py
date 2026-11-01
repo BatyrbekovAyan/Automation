@@ -69,7 +69,9 @@ paste them, never copy them:
   CONNECTED_SQL              the app reports a connection: another number restarts the moment (and says so: restarted);
   LIST_SQL                   what the app mirrors: the moment and the holding decisions of each profile;
   BACKFILL_SQL(row, owner)   when a chat turns business, the recent messages it lacks go into the history and the memory
-                             (never one the transport marks as an API send of ours: the assistant's replies).
+                             (a message of ours the transport marks as an API send is the owner's from the app — unless
+                             the tariff usage shows the assistant worked in the chat: then it may be its own reply and is
+                             skipped).
   WIPE_SQL                   the Sweep's step: WIPE_DAYS after a business chat turned personal — the owner made it
                              personal (OWNER_SET_SQL's clock), the rule did after another number (DECIDE_WRITE_SQL's
                              clock), or a reconnect landed a personal decision over a business period (the line's move,
@@ -467,17 +469,38 @@ def _api_send(x):
             " and regexp_replace(" + x + "->>'task_id', '[[:space:]]', '', 'g') <> '')), false)")
 
 
+def _assistant_worked(profile, chat):
+    """«The assistant has worked in this chat», by a fact that outlives the wipe: the tariff usage (dialog_counts) holds a
+    day of the chat under the profile's account (bot_profiles.app_user_id). The bot templates' Count Dialog writes that row
+    — or finds it — before every automatic reply; «Выбрать» stops at Suppressed? and a personal or undecided chat at the
+    audience gate, both before it, the panel never counts, and the billing merge only copies rows that exist to the
+    account's new id. Nothing deletes it: the wipe, Delete Chat Memory and the bot's line leave the tariff usage alone. The
+    key is the account, not the bot (the row carries no profile): another bot of the account that worked in a chat of the
+    same id counts too. `profile` / `chat` are SQL expressions. Never NULL."""
+    return ("exists (select 1 from bot_profiles bp join dialog_counts dc on dc.app_user_id = bp.app_user_id"
+            " where bp.profile_id = " + profile + " and dc.chat_id = " + chat + ")")
+
+
 def BACKFILL_SQL(memory_row, owner_content_sql):
     """When a chat turns business (Decide Audience's decision, or the owner's set), the start of the conversation the
-    assistant never saw — the recent messages Wappi still has — goes into the history and the memory, so it knows the owner
-    already wrote to the client first. `memory_row` / `owner_content_sql` are apply-history-handoff.py's MEMORY_ROW and
+    assistant never saw — the recent messages Wappi still has — goes into the history and the memory, so it knows what the
+    owner already wrote to the client. `memory_row` / `owner_content_sql` are apply-history-handoff.py's MEMORY_ROW and
     OWNER_CONTENT_SQL (that module imports this one, so they come in as arguments): the rows have exactly the form the live
-    writers store — a client message as Record Suppressed writes it (history 'client', memory 'human'), an owner message as
-    Record Outgoing writes the owner's phone message (history 'owner_phone', memory 'ai' opening with «Владелец: »).
-    A message of ours that the transport marks as an API send (_api_send) is not stored at all: after a wipe Wappi's page
-    may still hold the assistant's own old replies, and as «Владелец: » the memory-marks rule would read the times and
-    places in them as the owner's agreements. The owner's sends from the app carry the same mark, so an opener he sent from
-    the app is not restored either (the cost); his sends from the phone are.
+    writers store — a client message as Record Suppressed writes it (history 'client', memory 'human'), the owner's message
+    from the phone as Record Outgoing writes it (history 'owner_phone', memory 'ai' opening with «Владелец: »), the owner's
+    message from the app as the Wappi Proxy's Record Owner Send writes it (history 'owner_app', the same marked memory row).
+
+    Which message of ours came from the app: the transport marks an API send (_api_send) — but the assistant's own replies
+    go out through the same API with the same mark. Where the assistant has worked in the chat (_assistant_worked) such a
+    message may be one of its old replies, still on Wappi's page after a wipe emptied the chat's history, and as «Владелец: »
+    the memory-marks rule would read the times and places in it as the owner's agreements — so there it is not stored at
+    all, and the owner's app sends of that chat are lost with it (the cost). Everywhere else the assistant never replied,
+    so it is the owner's send from the app: owner_app. A message of ours without the mark is the owner's from the phone:
+    owner_phone, wherever. The usage can name no day of a chat the assistant did answer: every reply there passed a Count
+    Dialog that wrote nothing (it fails open on a database fault, or when the profile's or the account's row is missing), or
+    the profile moved to another billing id (a reinstall: the claim by code moves it and carries no usage, the merge of the
+    two ids carries only the current month's) and the chat's rows stayed under the old one — then such a reply still on
+    the page is stored as owner_app.
 
     The input contract: the JSON parameter is a Wappi messages/get page exactly as returned with order=desc —
     NEWEST FIRST. The statement stores it REVERSED (oldest first), by the page position alone and never by time: Wappi's own
@@ -486,30 +509,36 @@ def BACKFILL_SQL(memory_row, owner_content_sql):
     that order (the memory node reads memory by id)."""
     assert memory_row.count("%s") == 4 and owner_content_sql.count("%s") == 1, "MEMORY_ROW takes four values, OWNER_CONTENT_SQL one"
     client_row = memory_row % ("'human'", "m.body", "'client'", "m.id")
-    owner_row = memory_row % ("'ai'", owner_content_sql % "m.body", "'owner_phone'", "m.id")
+    phone_row = memory_row % ("'ai'", owner_content_sql % "m.body", "'owner_phone'", "m.id")
+    app_row = memory_row % ("'ai'", owner_content_sql % "m.body", "'owner_app'", "m.id")
     return """-- «Личные и рабочие чаты»: the start of a conversation that just turned business. Writes ONLY while the chat's holding
 -- decision is business. Skips the trigger message (it goes on through the normal path, which records it) and every
 -- message whose id the chat's history already has (the assistant's replies, the app's and the phone's sends recorded
 -- while the chat was business); elements without a string id or a boolean fromMe are skipped too. The page comes as
 -- Wappi's messages/get returns it with order=desc — NEWEST FIRST — and the rest is stored REVERSED, oldest first, by the
 -- page position alone (never by time: Wappi's order breaks equal timestamps, and a message without a parseable time keeps
--- its place); history ids and memory row ids both follow it. The owner's message (fromMe) becomes an owner_phone history
--- row + an ai memory row that opens with the owner mark, the client's a client history row + a human memory row — both
--- carrying source and message_id. A message of ours that the transport marks as an API send (from_where api, the
--- outgoing_message_api type, a non-blank task id — the attribution the templates' Reconcile Check uses; never isFromAPI)
--- is skipped: the page may still hold the assistant's own old replies (after a wipe), which must never read as the
--- owner's words; the owner's app sends carry the same mark and are skipped too. A media message stores its type and
--- caption, never its payload. The time only fills sent_at. ALWAYS one row: added = the history rows written.
+-- its place); history ids and memory row ids both follow it. The client's message becomes a client history row + a human
+-- memory row; the owner's (fromMe) an ai memory row that opens with the owner mark + a history row: owner_phone for a
+-- send from the phone, owner_app for a send the transport marks as an API send (from_where api, the outgoing_message_api
+-- type, a non-blank task id — the attribution the templates' Reconcile Check uses; never isFromAPI): the owner's send from
+-- the app. Every row carries source and message_id. Except where the assistant has worked in this chat — the tariff usage
+-- (dialog_counts, which nothing wipes) holds a day of this chat under the profile's account: the assistant's own replies
+-- carry the same API mark, and after a wipe the page may still hold them, which must never read as the owner's words, so
+-- there an API send is not stored at all (the owner's app sends with it). A media message stores its type and caption,
+-- never its payload. The time only fills sent_at. ALWAYS one row: added = the history rows written.
 -- Parameters, in order: profile id, chat id, the trigger message id (empty = none), JSON array of {id, fromMe, body,
 -- type, time} = a messages/get page, newest first (caption optional; time in unix seconds).
 with aud_ok as (
   select """ + BUSINESS_SQL("$1", "$2") + """ as business
+), worked as (
+  select """ + _assistant_worked("$1", "$2") + """ as worked
 ), src as (
   select e.x, e.ord from jsonb_array_elements(""" + _json_array("$4") + """) with ordinality as e(x, ord)
   where jsonb_typeof(e.x) = 'object' and jsonb_typeof(e.x->'id') = 'string' and e.x->>'id' <> ''
     and jsonb_typeof(e.x->'fromMe') = 'boolean'
 ), msgs as (
   select distinct on (s.x->>'id') s.x->>'id' as id, s.ord, (s.x->'fromMe') = 'true'::jsonb as from_me,
+         """ + _api_send("s.x") + """ as via_api,
          case when s.x->>'type' in ('chat', 'text') then left(coalesce(s.x->>'body', ''), 4000)
               else '[' || coalesce(nullif(s.x->>'type', ''), 'media') || ']'
                    || coalesce(' ' || left(nullif(s.x->>'caption', ''), 1000), '') end as body,
@@ -518,21 +547,23 @@ with aud_ok as (
   from src s
   where (select business from aud_ok)
     and s.x->>'id' is distinct from nullif($3, '')
-    and not """ + _api_send("s.x") + """
+    and not (""" + _api_send("s.x") + """ and (select worked from worked))
     and not exists (select 1 from chat_history_events h
                     where h.profile_id = $1 and h.chat_id = $2 and h.message_id = s.x->>'id')
   order by s.x->>'id', s.ord
 ), ev as (
   insert into chat_history_events (profile_id, chat_id, message_id, source, body, msg_type, sent_at)
-  select $1, $2, m.id, case when m.from_me then 'owner_phone' else 'client' end, m.body, m.msg_type, to_timestamp(m.t)
+  select $1, $2, m.id, case when m.via_api then 'owner_app' when m.from_me then 'owner_phone' else 'client' end,
+         m.body, m.msg_type, to_timestamp(m.t)
   from msgs m
   order by m.ord desc
   on conflict (profile_id, chat_id, message_id) do nothing
   returning message_id
 ), mem as (
   insert into n8n_chat_histories (session_id, message)
-  select $1 || ':' || $2, case when m.from_me then """ + owner_row + """
-                          else """ + client_row + """ end
+  select $1 || ':' || $2, case when m.via_api then """ + app_row + """
+                               when m.from_me then """ + phone_row + """
+                               else """ + client_row + """ end
   from msgs m
   where m.id in (select message_id from ev)
     and not exists (select 1 from n8n_chat_histories x

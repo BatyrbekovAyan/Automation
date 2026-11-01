@@ -619,6 +619,55 @@ def make_business_stale(ctx, ch):
                 "bot_runs_after": len(after), "sends": len(s.sends(chat))}
 
 
+@for_channels("backfill_owner_app_send_unless_the_assistant_worked", "the owner answers from the app (the Wappi Proxy's "
+              "message.send — the transport marks the send as an API send) in two chats that have no decision, so nothing "
+              "records it; then he makes both business (ChatAudience set) → in the chat where the assistant never worked the "
+              "backfill restores his answer as owner_app with the owner mark; in the chat whose tariff usage the account holds "
+              "(the assistant worked there, an earlier month) the same kind of message may be the assistant's own old reply and "
+              "is skipped; the client's question and the owner's phone message are stored in both, nothing is replayed")
+def backfill_owner_app(ctx, ch):
+    s = dedicated(ctx, ch, "ba")
+    o = own_profile(ctx, s.pid)
+    t = int(time.time())
+    chats = {"fresh": s.chat("f"), "worked": s.chat("w")}
+    ids = {k: (f"ba{k[0]}q-{ctx.run_id}", f"ba{k[0]}p-{ctx.run_id}") for k in chats}       # the client's question, the phone answer
+    for k, chat in chats.items():
+        s.history(chat, [row(ch, chat, ids[k][1], True, "Добрый день! Розы есть.", t - 600),
+                         row(ch, chat, ids[k][0], False, "Есть розы?", t - 900)])
+    account = psql(f"select app_user_id from bot_profiles where profile_id = '{s.pid}';")      # the profile's account
+    psql(f"insert into dialog_counts (app_user_id, chat_id, d) values ('{account}', '{chats['worked']}', "
+         f"(now() at time zone 'Asia/Almaty')::date - 40) on conflict do nothing;")
+    sent = {}
+    for k, chat in chats.items():
+        st, d = e2e_auth.proxy(o.token, {"op": "message.send", "channel": s.channel, "profile_id": s.pid,
+                                         "recipient": chat.split("@")[0] if ch == "wa" else chat, "body": "Записал вас на завтра, 10:00"})
+        sent[k] = (st, str((d or {}).get("message_id") or ""))
+    time.sleep(2)                                       # Record Owner Send runs after the proxy's answer: it must write nothing
+    before = {k: stored(s.pid, chat) for k, chat in chats.items()}
+    s.mark()
+    st, d = audience_set(o, s.pid, (chats["fresh"], "business"), (chats["worked"], "business"))
+    got = {k: wait_rows(f"select count(*) from chat_history_events where profile_id = '{s.pid}' and chat_id = '{chat}';", want)
+           for (k, chat), want in zip(chats.items(), ("3", "2"))}
+    time.sleep(2)                                       # nothing more lands
+    res = (d or {}).get("results") or []
+    app_f = sent["fresh"][1]
+    owner_rows = psql(f"select coalesce(string_agg(message->>'content', '|' order by id), '') from n8n_chat_histories "
+                      f"where session_id = '{s.pid}:{chats['fresh']}' and message->'additional_kwargs'->>'source' = 'owner_app';")
+    ok = (account == ctx.app_user_id and all(v[0] == 200 and v[1] for v in sent.values())
+          and before == {"fresh": NOTHING, "worked": NOTHING}
+          and st == 200 and len(res) == 2 and all(r.get("applied") is True and r.get("kind") == "business" for r in res)
+          and got == {"fresh": "3", "worked": "2"}
+          and history(s.pid, chats["fresh"]) == f"{ids['fresh'][0]}:client,{ids['fresh'][1]}:owner_phone,{app_f}:owner_app"
+          and memory(s.pid, chats["fresh"]) == "human:client,ai:owner_phone,ai:owner_app"
+          and owner_rows == "Владелец: Записал вас на завтра, 10:00"
+          and history(s.pid, chats["worked"]) == f"{ids['worked'][0]}:client,{ids['worked'][1]}:owner_phone"
+          and memory(s.pid, chats["worked"]) == "human:client,ai:owner_phone"
+          and not calls_since(s.since_calls, s.pid, "message/send", "message/reply"))
+    return ok, {"sends(http, id)": sent, "before": before, "set": (st, res), "rows": got,
+                "fresh": (history(s.pid, chats["fresh"]), memory(s.pid, chats["fresh"]), owner_rows),
+                "worked": (history(s.pid, chats["worked"]), memory(s.pid, chats["worked"]))}
+
+
 @for_channels("make_personal_cancels_inflight", "a business chat; while the AI composes the answer the owner makes the chat "
               "personal → the send lease refuses (cancelled_personal), nothing is sent, the reply's draft leaves the memory")
 def make_personal_inflight(ctx, ch):

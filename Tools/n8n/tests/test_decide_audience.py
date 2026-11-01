@@ -44,7 +44,8 @@ No n8n server, no network, never production. A scenario runs on both channels wh
     foreign_row_page_is_unknown_not_written, wa_rows_under_the_code_count_as_this_chat (history and backfill),
     row_without_time_is_unknown_not_written, history_500_is_personal_unknown_not_written
   the write and the backfill
-    business_backfills_the_owners_first_message, backfill_uses_the_history_page_no_second_call,
+    business_backfills_the_owners_first_message, business_backfills_the_owners_app_reply_unless_the_assistant_worked,
+    backfill_uses_the_history_page_no_second_call,
     backfill_failure_keeps_business, write_failure_is_personal_unknown, second_run_reads_the_first_decision,
     owner_decision_set_meanwhile_is_kept
   the requests, the canon, the verifier
@@ -81,7 +82,8 @@ INPUTS = (('channel', 'string'), ('profileId', 'string'), ('chatId', 'string'), 
           ('messageId', 'string'), ('chatType', 'string'), ('isBot', 'boolean'), ('connectedAtMs', 'number'),
           ('connectionPhone', 'string'))
 
-TABLES = ('bot_profiles', 'chat_audience', 'audience_connections', 'chat_history_events', 'n8n_chat_histories')
+# dialog_counts: the backfill reads the tariff usage («has the assistant worked in this chat»), so the session gets its own
+TABLES = ('bot_profiles', 'chat_audience', 'audience_connections', 'chat_history_events', 'n8n_chat_histories', 'dialog_counts')
 # LIKE copies the PUBLIC sequence as the id default: the temp copies get their own, so nothing shared moves
 SETUP = ("set timezone = 'UTC';\n"
          + ''.join(f'create temp table {t} (like public.{t} including all);\n' for t in TABLES)
@@ -738,6 +740,35 @@ for ch, C in CH.items():
             c.check(conversation_memory_ok(mem), f'memory: {mem}')
             own = next((m for m in mem if (m.get('additional_kwargs') or {}).get('message_id') == 'm-own'), {})
             c.check(own.get('additional_kwargs') == {'source': 'owner_phone', 'message_id': 'm-own'}, f'the owner row: {own}')
+
+    with Case(f'business_backfills_the_owners_app_reply_unless_the_assistant_worked [{ch}]: the owner answered the new client '
+              'from the app while the chat had no decision — the transport marks that send as an API send (from_where api, a '
+              'task id) and nothing recorded it; when the chat turns business it reaches the history as owner_app and the '
+              'memory with the owner mark. Where the tariff usage names the chat under the profile\'s account (the assistant '
+              'has worked in it) the same message may be the assistant\'s own old reply: skipped') as c:
+        row = row_of(ch)
+        page = [row(C['chat'], 'm-trig', False, 'а доставка есть?', now_s() - 60),
+                row(C['chat'], 'm-app', True, 'Здравствуйте! Розы есть, 25 шт — 25000 тг.', now_s() - 300,
+                    from_where='api', task_id='t-app-1'),
+                row(C['chat'], 'm-c1', False, 'есть розы?', now_s() - 600)]
+        with Session(SETUP) as pg:
+            moment, fake = new_person(pg, ch, page=page)
+            r = decide(pg, inputs(C, moment), fake)
+            c.check(answer(r) == BUSINESS and r.ran('Backfill'), f'{answer(r)} {r}')
+            c.check(history(pg, P, C['chat']) == [('m-c1', 'client'), ('m-app', 'owner_app')], f'history: {history(pg, P, C["chat"])}')
+            mem = memory(pg, P, C['chat'])
+            c.check([(m.get('type'), m.get('content'), m.get('additional_kwargs')) for m in mem] == [
+                ('human', 'есть розы?', {'source': 'client', 'message_id': 'm-c1'}),
+                ('ai', OWNER_MARK + 'Здравствуйте! Розы есть, 25 шт — 25000 тг.', {'source': 'owner_app', 'message_id': 'm-app'})],
+                    f'memory: {mem}')
+        with Session(SETUP) as pg:
+            moment, fake = new_person(pg, ch, page=page)
+            pg.x(f"insert into dialog_counts (app_user_id, chat_id, d) values ('u-dec', {L(C['chat'])}, current_date - 3);")
+            r = decide(pg, inputs(C, moment), fake)
+            c.check(answer(r) == BUSINESS and r.ran('Backfill'), f'{answer(r)} {r}')
+            c.check(history(pg, P, C['chat']) == [('m-c1', 'client')]
+                    and [(m.get('additional_kwargs') or {}).get('message_id') for m in memory(pg, P, C['chat'])] == ['m-c1'],
+                    f'the assistant worked here: {history(pg, P, C["chat"])} {memory(pg, P, C["chat"])}')
 
     with Case(f'backfill_uses_the_history_page_no_second_call [{ch}]: the backfill is handed the very page the history fact '
               'read — ONE messages/get in the whole run, Backfill after Write Decision, the page exactly as Wappi returned it '

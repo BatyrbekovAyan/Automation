@@ -47,9 +47,15 @@ as the generators will compose it. No n8n server, no network, never prod.
                                           unchanged; a sentinel profile → one row of nulls, nothing written
   list_returns_only_valid_decisions_and_the_moment
   backfill_adds_missing_in_time_order_with_owner_mark
-  backfill_skips_the_transports_api_sends a message of ours the transport marks as an API send (from_where api, a task
-                                          id, outgoing_message_api — never isFromAPI) is not stored: the assistant's own
-                                          old replies must never read as the owner's words; a phone send stays owner_phone
+  backfill_stores_the_owners_app_sends_where_the_assistant_never_worked   a message of ours the transport marks as an
+                                          API send (from_where api, a task id, outgoing_message_api — never isFromAPI) in a
+                                          chat the tariff usage (dialog_counts) does not name under the profile's account is
+                                          the owner's send from the app: owner_app + the owner-marked memory row, the rows
+                                          Record Owner Send writes; another chat's or another account's usage does not count;
+                                          a phone send stays owner_phone
+  backfill_skips_the_assistants_api_sends_where_it_has_worked   the same messages in a chat the usage names under the
+                                          account (any day, an earlier month too) may be the assistant's own old replies:
+                                          skipped, never the owner's words; a phone send stays owner_phone
   backfill_writes_nothing_for_a_personal_or_undecided_chat
   migration_postchecks                    RLS on, no anon/authenticated grants, the staging tables = the file's DDL,
                                           reply_events takes 'cancelled_personal' and still refuses 'bogus', a re-run is a
@@ -82,9 +88,11 @@ AUDIENCE_PY = N8N / 'audience.py'
 
 AUD = module('audience.py')
 AHH = module('apply-history-handoff.py')
+BAW = module('build-auth-workflows.py')        # the Wappi Proxy's Record Owner Send: the owner_app rows the backfill mirrors
 VSC = module('verify-sql-comments.py')
 
-TABLES = ('bot_profiles', 'chat_audience', 'audience_connections', 'chat_history_events', 'n8n_chat_histories')
+# dialog_counts: the backfill reads the tariff usage («has the assistant worked in this chat»), so the session gets its own
+TABLES = ('bot_profiles', 'chat_audience', 'audience_connections', 'chat_history_events', 'n8n_chat_histories', 'dialog_counts')
 # LIKE copies the PUBLIC sequence as the id default: the temp copies get their own, so nothing shared moves
 SETUP = (''.join(f'create temp table {t} (like public.{t} including all);\n' for t in TABLES)
          + ''.join(f"create temp sequence {t}_aud_seq; alter table {t} alter column id set default nextval('{t}_aud_seq');\n"
@@ -96,6 +104,7 @@ CH = {'WA': {'channel': 'whatsapp', 'chat': '77011234567@c.us', 'chat2': '770176
              'chat4': '5550202020', 'chat5': '5550303030'}}
 OLD_STATES = ('claimed', 'generated', 'send_pending', 'sent', 'send_failed', 'send_unknown', 'superseded', 'cancelled_owner',
               'cancelled_mode', 'cancelled_busy', 'cancelled_fetch', 'generation_failed', 'quota_denied', 'suppressed')
+ACCOUNT = 'u-audience-test'      # the account profile() registers a profile under (bot_profiles.app_user_id)
 
 
 # ------------------------------------------------------------------------------------------------ the statements, bound
@@ -142,7 +151,7 @@ def line_ms(pg, pid):
 # ------------------------------------------------------------------------------------------------ seeding and reading
 def profile(pg, pid, channel, age, superseded_by=None):
     pg.x(f"insert into bot_profiles (profile_id, app_user_id, channel, created_at, superseded_by) values "
-         f"({L(pid)}, 'u-audience-test', {L(channel)}, now() - interval {L(age)}, {L(superseded_by)});")
+         f"({L(pid)}, {L(ACCOUNT)}, {L(channel)}, now() - interval {L(age)}, {L(superseded_by)});")
 
 
 def created_ms(pg, pid):
@@ -829,6 +838,42 @@ def memory(pg, pid, chat):
     return pg.q(f"select id, message from n8n_chat_histories where session_id = {L(pid + ':' + chat)} order by id")
 
 
+def usage(pg, app_user_id, chat, days_ago=0):
+    """A day of the tariff usage, as Count Dialog writes it before an automatic reply: (account, chat, the Almaty date)."""
+    pg.x(f"insert into dialog_counts (app_user_id, chat_id, d) values ({L(app_user_id)}, {L(chat)}, "
+         f"(now() at time zone 'Asia/Almaty')::date - {int(days_ago)});")
+
+
+def api_page(t=5000):
+    """A newest-first page whose messages of ours carry every way the transport marks an API send (from_where api, a task id,
+    the outgoing_message_api type), every way that is NOT one (from_where phone, no mark, a blank task id, isFromAPI with a
+    numeric task id) and a client's message carrying from_where api; n9 is the trigger."""
+    return [{'id': 'n9', 'fromMe': False, 'body': 'а на завтра?', 'type': 'chat', 'time': t},
+            {'id': 'n8', 'fromMe': True, 'body': 'Записал вас на завтра, 10:00', 'type': 'chat', 'time': t - 1, 'from_where': 'api'},
+            {'id': 'n7', 'fromMe': True, 'body': 'Прайс во вложении', 'type': 'chat', 'time': t - 2, 'task_id': 'a1b2c3'},
+            {'id': 'n6', 'fromMe': True, 'body': '/9j/4AAQSkZJRgABAQ-base64-payload', 'type': 'image', 'caption': 'прайс',
+             'time': t - 3, 'wh_type': 'outgoing_message_api'},
+            {'id': 'n5', 'fromMe': True, 'body': 'с телефона', 'type': 'chat', 'time': t - 4, 'from_where': 'phone'},
+            {'id': 'n4', 'fromMe': True, 'body': 'без отметки', 'type': 'chat', 'time': t - 5},
+            {'id': 'n3', 'fromMe': True, 'body': 'пустой task id', 'type': 'chat', 'time': t - 6, 'task_id': ' \t '},
+            {'id': 'n2', 'fromMe': True, 'body': 'только isFromAPI', 'type': 'chat', 'time': t - 7, 'isFromAPI': True, 'task_id': 7},
+            {'id': 'n1', 'fromMe': False, 'body': 'клиент', 'type': 'chat', 'time': t - 8, 'from_where': 'api'}]
+
+
+API_PAGE_PHONE_AND_CLIENT = [('n1', 'client', 'клиент', 'chat'), ('n2', 'owner_phone', 'только isFromAPI', 'chat'),
+                             ('n3', 'owner_phone', 'пустой task id', 'chat'), ('n4', 'owner_phone', 'без отметки', 'chat'),
+                             ('n5', 'owner_phone', 'с телефона', 'chat')]
+
+
+def memory_rows(pg, pid, chat):
+    return [(m['message']['additional_kwargs']['message_id'], m['message']['type'], m['message']['content'],
+             m['message']['additional_kwargs']['source']) for m in memory(pg, pid, chat)]
+
+
+API_PAGE_PHONE_AND_CLIENT_MEMORY = [('n1', 'human', 'клиент', 'client')] + [
+    (mid, 'ai', AHH.OWNER_MEMORY_PREFIX + body, 'owner_phone') for mid, _, body, _ in API_PAGE_PHONE_AND_CLIENT[1:]]
+
+
 for ch, C in CH.items():
     P = f'{ch.lower()}-aud-p1'
     with Case(f'backfill_adds_missing_in_time_order_with_owner_mark [{ch}]: the trigger and every id already in the chat\'s '
@@ -904,36 +949,60 @@ for ch, C in CH.items():
             c.check(backfill(pg, P, chat, 'x9', json.dumps('not-an-array')) == [{'added': 0}]
                     and backfill(pg, P, chat, 'x9', {'id': 'x3'}) == [{'added': 0}], 'not an array → nothing')
 
-    with Case(f'backfill_skips_the_transports_api_sends [{ch}]: a message of ours that the transport marks as an API send — '
-              'from_where api, a non-empty task id, the outgoing_message_api type: the attribution the templates\' Reconcile '
-              'Check uses, never isFromAPI (tapi sets it on phone rows too) — gets no history row and no memory row: after a '
-              'wipe Wappi\'s page may still hold the assistant\'s own old replies, and stored as «Владелец: » the memory-marks '
-              'rule would read their times and places as agreements. A phone send (from_where phone, or no mark) stays '
-              'owner_phone; a client\'s message is stored whatever it carries') as c:
+    with Case(f'backfill_stores_the_owners_app_sends_where_the_assistant_never_worked [{ch}]: a message of ours that the '
+              'transport marks as an API send — from_where api, a non-empty task id, the outgoing_message_api type: the '
+              'attribution the templates\' Reconcile Check uses, never isFromAPI (tapi sets it on phone rows too) — in a chat '
+              'where the assistant never worked (the tariff usage does not name this chat under the profile\'s account; another '
+              'chat\'s usage and another account\'s usage of this chat do not count) is the owner\'s send from the app: an '
+              'owner_app history row and an ai memory row opening with the owner mark — the rows the Wappi Proxy\'s Record Owner '
+              'Send writes for an app send. A phone send (from_where phone, or no mark) stays owner_phone; a client\'s message '
+              'is stored whatever it carries; a media send keeps its type and caption, never its payload') as c:
         with PgSession(SETUP) as pg:
             chat = C['chat']
+            profile(pg, P, C['channel'], '3 days')
             decide(pg, P, chat, 'business', 'new')
-            t = 5000
-            page = [{'id': 'n9', 'fromMe': False, 'body': 'а на завтра?', 'type': 'chat', 'time': t},               # the trigger
-                    {'id': 'n8', 'fromMe': True, 'body': 'ИИ: завтра в 10:00 у входа', 'type': 'chat', 'time': t - 1, 'from_where': 'api'},
-                    {'id': 'n7', 'fromMe': True, 'body': 'ИИ: по задаче', 'type': 'chat', 'time': t - 2, 'task_id': 'a1b2c3'},
-                    {'id': 'n6', 'fromMe': True, 'body': 'ИИ: эхо webhook', 'type': 'chat', 'time': t - 3, 'wh_type': 'outgoing_message_api'},
-                    {'id': 'n5', 'fromMe': True, 'body': 'с телефона', 'type': 'chat', 'time': t - 4, 'from_where': 'phone'},
-                    {'id': 'n4', 'fromMe': True, 'body': 'без отметки', 'type': 'chat', 'time': t - 5},
-                    {'id': 'n3', 'fromMe': True, 'body': 'пустой task id', 'type': 'chat', 'time': t - 6, 'task_id': ' \t '},
-                    {'id': 'n2', 'fromMe': True, 'body': 'только isFromAPI', 'type': 'chat', 'time': t - 7, 'isFromAPI': True,
-                     'task_id': 7},
-                    {'id': 'n1', 'fromMe': False, 'body': 'клиент', 'type': 'chat', 'time': t - 8, 'from_where': 'api'}]
-            got = backfill(pg, P, chat, 'n9', page)
-            h = [(r['message_id'], r['source']) for r in history(pg, P, chat)]
-            c.check(got == [{'added': 5}] and h == [('n1', 'client'), ('n2', 'owner_phone'), ('n3', 'owner_phone'),
-                                                     ('n4', 'owner_phone'), ('n5', 'owner_phone')], f'history: {got} {h}')
-            mem = memory(pg, P, chat)
-            c.check([(m['message']['additional_kwargs']['message_id'], m['message']['type']) for m in mem]
-                    == [('n1', 'human'), ('n2', 'ai'), ('n3', 'ai'), ('n4', 'ai'), ('n5', 'ai')], f'memory: {mem}')
-            c.check(not any(m['message']['content'].startswith(AHH.OWNER_MEMORY_PREFIX + 'ИИ:') for m in mem),
-                    'an API send must never reach the memory as the owner\'s words')
-            c.check(backfill(pg, P, chat, 'n9', page) == [{'added': 0}], 'a second run adds nothing (the skipped rows stay skipped)')
+            usage(pg, ACCOUNT, C['chat2'])
+            usage(pg, 'u-someone-else', chat)
+            got = backfill(pg, P, chat, 'n9', api_page())
+            h = [(r['message_id'], r['source'], r['body'], r['msg_type']) for r in history(pg, P, chat)]
+            c.check(got == [{'added': 8}] and h == API_PAGE_PHONE_AND_CLIENT + [
+                ('n6', 'owner_app', '[image] прайс', 'image'), ('n7', 'owner_app', 'Прайс во вложении', 'chat'),
+                ('n8', 'owner_app', 'Записал вас на завтра, 10:00', 'chat')], f'history: {got} {h}')
+            c.check(memory_rows(pg, P, chat) == API_PAGE_PHONE_AND_CLIENT_MEMORY + [
+                ('n6', 'ai', AHH.OWNER_MEMORY_PREFIX + '[image] прайс', 'owner_app'),
+                ('n7', 'ai', AHH.OWNER_MEMORY_PREFIX + 'Прайс во вложении', 'owner_app'),
+                ('n8', 'ai', AHH.OWNER_MEMORY_PREFIX + 'Записал вас на завтра, 10:00', 'owner_app')],
+                    f'memory: {memory_rows(pg, P, chat)}')
+            c.check(not any('base64' in json.dumps(x, ensure_ascii=False) for x in (h, memory(pg, P, chat))),
+                    'a media payload must never be stored')
+            c.check(backfill(pg, P, chat, 'n9', api_page()) == [{'added': 0}], 'a second run adds nothing')
+            # the SAME rows the live writer of an app send stores (the Wappi Proxy's Record Owner Send, after its answer)
+            pg.q(bind(BAW.RECORD_OWNER_SEND_SQL, [P, chat, 'm-app', 'из приложения', 'chat', 'exec-1',
+                                                  None, None, None, None, None, None]))
+            by_id = {m['message']['additional_kwargs']['message_id']: m['message'] for m in memory(pg, P, chat)}
+            shape = lambda m: (m['type'], sorted(m), sorted(m['additional_kwargs']), m['additional_kwargs']['source'], m['response_metadata'])
+            c.check('n8' in by_id and 'm-app' in by_id and shape(by_id['n8']) == shape(by_id['m-app'])
+                    and by_id['m-app']['content'] == AHH.OWNER_MEMORY_PREFIX + 'из приложения',
+                    f'owner_app rows differ from Record Owner Send: {by_id.get("n8")} / {by_id.get("m-app")}')
+            c.check([r['source'] for r in history(pg, P, chat) if r['message_id'] in ('n8', 'm-app')] == ['owner_app', 'owner_app'],
+                    f'history sources: {history(pg, P, chat)}')
+
+    with Case(f'backfill_skips_the_assistants_api_sends_where_it_has_worked [{ch}]: the same messages in a chat where the '
+              'assistant has worked — the tariff usage names the chat under the profile\'s account (Count Dialog writes it before '
+              'every automatic reply and nothing deletes it; any day counts, an earlier month too) — may be the assistant\'s own '
+              'old replies still on Wappi\'s page after a wipe: no history row, no memory row, so the memory-marks rule never '
+              'reads their times and places as the owner\'s agreements. A phone send stays owner_phone, a client\'s message '
+              'client') as c:
+        with PgSession(SETUP) as pg:
+            chat = C['chat']
+            profile(pg, P, C['channel'], '3 days')
+            decide(pg, P, chat, 'business', 'new')
+            usage(pg, ACCOUNT, chat, days_ago=40)
+            got = backfill(pg, P, chat, 'n9', api_page())
+            h = [(r['message_id'], r['source'], r['body'], r['msg_type']) for r in history(pg, P, chat)]
+            c.check(got == [{'added': 5}] and h == API_PAGE_PHONE_AND_CLIENT, f'history: {got} {h}')
+            c.check(memory_rows(pg, P, chat) == API_PAGE_PHONE_AND_CLIENT_MEMORY, f'memory: {memory_rows(pg, P, chat)}')
+            c.check(backfill(pg, P, chat, 'n9', api_page()) == [{'added': 0}], 'a second run adds nothing (the skipped rows stay skipped)')
 
     with Case(f'backfill_writes_nothing_for_a_personal_or_undecided_chat [{ch}]') as c:
         with PgSession(SETUP) as pg:
