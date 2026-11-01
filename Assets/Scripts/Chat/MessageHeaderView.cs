@@ -239,10 +239,16 @@ public class MessageHeaderView : MonoBehaviour
             return;
         }
         if (!CanBeMoved(profileId, chat)) return;
-        // «Авто» once working = the panel would not suggest there: the chat's own mode, the schedule and the quota.
+        // «Авто» once working = the panel would not suggest there: the chat's own mode, the schedule and the quota. And
+        // whether anyone answers at all: the bot's settings may have switched the chat's channel off.
         bool autoOn = suggestions != null && !suggestions.WouldSuggestIgnoringAudience();
-        PersonalChatSheets.AskMakeBusiness(botName, profileId, chat, autoOn, RegularFont, SemiboldFont);
+        bool channelOn = ChannelSwitchedOn(botName, ChatManager.Instance.ActiveChannel);
+        PersonalChatSheets.AskMakeBusiness(botName, profileId, chat, autoOn, channelOn, RegularFont, SemiboldFont);
     }
+
+    // The bot's channel is switched on in its settings — read as the bot card reads it: on unless it was switched off.
+    private static bool ChannelSwitchedOn(string botName, ChatChannel channel) =>
+        PlayerPrefs.GetInt(botName + (channel == ChatChannel.Telegram ? "isOnTelegram" : "isOnWhatsapp"), 1) == 1;
 
     // «Сделать личным» — only for a working chat (a personal one moves through its pill).
     private void HandleNameTapped()

@@ -94,14 +94,18 @@ public class PersonalChatSheetsWiringTests
 
     // ---- «Сделать чат рабочим?» ----
 
-    [TestCase(true, false, 2.0, PersonalChatsCopy.MakeBusinessAutoFresh, true)]
-    [TestCase(true, false, 30.0, PersonalChatsCopy.MakeBusinessAutoNoFresh, true)]
-    [TestCase(true, true, 2.0, PersonalChatsCopy.MakeBusinessAutoNoFresh, false)]
-    [TestCase(false, false, 2.0, PersonalChatsCopy.MakeBusinessManual, false)]
-    public void MakeBusiness_SaysWhatTheAssistantWillDo(bool autoOn, bool ownerLast, double ageHours, string body, bool note)
+    [TestCase(true, true, false, "chat", 2.0, PersonalChatsCopy.MakeBusinessAutoFresh, true)]
+    [TestCase(true, true, false, "chat", 30.0, PersonalChatsCopy.MakeBusinessAutoNoFresh, true)]
+    [TestCase(true, true, true, "chat", 2.0, PersonalChatsCopy.MakeBusinessAutoNoFresh, false)]
+    [TestCase(true, true, false, "ptt", 2.0, PersonalChatsCopy.MakeBusinessAutoNoFresh, false)]        // a fresh voice message
+    [TestCase(true, true, false, "reaction", 2.0, PersonalChatsCopy.MakeBusinessAutoNoFresh, false)]   // a fresh reaction
+    [TestCase(true, false, false, "chat", 2.0, PersonalChatsCopy.MakeBusinessChannelOff, false)]       // the channel switched off
+    [TestCase(false, true, false, "chat", 2.0, PersonalChatsCopy.MakeBusinessManual, false)]
+    public void MakeBusiness_SaysWhatTheAssistantWillDo(bool autoOn, bool channelOn, bool ownerLast, string lastType, double ageHours,
+        string body, bool note)
     {
-        ChatViewModel chat = Chat("77000000301@c.us", "Сауле", ageHours, ownerLast);
-        PersonalChatSheets.AskMakeBusiness(TestBot, Profile, chat, autoOn, null, null);
+        ChatViewModel chat = Chat("77000000301@c.us", "Сауле", ageHours, ownerLast, lastType: lastType);
+        PersonalChatSheets.AskMakeBusiness(TestBot, Profile, chat, autoOn, channelOn, null, null);
 
         Assert.IsTrue(PersonalChatSheets.IsShowing);
         Transform panel = PersonalChatSheets.MakeBusinessPanelForTests.transform;
@@ -118,7 +122,7 @@ public class PersonalChatSheetsWiringTests
     public void MakeBusiness_Yes_MovesTheChat_AndCloses()
     {
         ChatViewModel chat = Chat("77000000302@c.us", "Сауле", 1, ownerLast: false);
-        PersonalChatSheets.AskMakeBusiness(TestBot, Profile, chat, true, null, null);
+        PersonalChatSheets.AskMakeBusiness(TestBot, Profile, chat, true, true, null, null);
         Tap(Find(PersonalChatSheets.MakeBusinessPanelForTests.transform, "Primary"));
 
         CollectionAssert.AreEqual(new[] { (AudienceKind.Business, TestBot, Profile, chat.ChatId) }, moves,
@@ -132,11 +136,11 @@ public class PersonalChatSheetsWiringTests
     public void MakeBusiness_KeepPersonal_AndTheScrim_MoveNothing()
     {
         ChatViewModel chat = Chat("77000000303@c.us", "Сауле", 1, ownerLast: false);
-        PersonalChatSheets.AskMakeBusiness(TestBot, Profile, chat, true, null, null);
+        PersonalChatSheets.AskMakeBusiness(TestBot, Profile, chat, true, true, null, null);
         Tap(Find(PersonalChatSheets.MakeBusinessPanelForTests.transform, "Secondary"));
         Assert.IsFalse(PersonalChatSheets.IsShowing, "«Оставить личным» closes the sheet");
 
-        PersonalChatSheets.AskMakeBusiness(TestBot, Profile, chat, true, null, null);
+        PersonalChatSheets.AskMakeBusiness(TestBot, Profile, chat, true, true, null, null);
         Tap(Find(PersonalChatSheets.MakeBusinessPanelForTests.transform, "Scrim"));
         Assert.IsFalse(PersonalChatSheets.IsShowing, "a tap outside the sheet closes it too");
         Assert.IsEmpty(moves, "the chat stays personal");
@@ -193,7 +197,7 @@ public class PersonalChatSheetsWiringTests
     {
         ChatViewModel chat = Chat("77000000307@c.us", "Сауле", 1, ownerLast: false);
         PersonalChatSheets.AskMakePersonal(TestBot, Profile, chat, "", null, null);
-        PersonalChatSheets.AskMakeBusiness(TestBot, Profile, chat, false, null, null);
+        PersonalChatSheets.AskMakeBusiness(TestBot, Profile, chat, false, true, null, null);
         Assert.IsTrue(PersonalChatSheets.TryCloseTop(), "Back closes the sheet that is up");
         Assert.IsFalse(PersonalChatSheets.IsShowing, "…and nothing is left under it: asking one sheet sent the other away");
         Assert.IsFalse(PersonalChatSheets.TryCloseTop(), "nothing left to close");
@@ -238,13 +242,15 @@ public class PersonalChatSheetsWiringTests
 
     // ---- the sheets fit their copy (the real fonts the header hands in) ----
 
-    [TestCase(true, false, 1.0)]
-    [TestCase(true, false, 30.0)]
-    [TestCase(false, false, 1.0)]
-    public void MakeBusiness_TheTextNeverRunsIntoTheButtons(bool autoOn, bool ownerLast, double ageHours)
+    [TestCase(true, true, false, 1.0)]
+    [TestCase(true, true, false, 30.0)]
+    [TestCase(true, false, false, 1.0)]
+    [TestCase(false, true, false, 1.0)]
+    public void MakeBusiness_TheTextNeverRunsIntoTheButtons(bool autoOn, bool channelOn, bool ownerLast, double ageHours)
     {
         (TMP_FontAsset regular, TMP_FontAsset semibold) = Fonts();
-        PersonalChatSheets.AskMakeBusiness(TestBot, Profile, Chat("77000000308@c.us", "Сауле", ageHours, ownerLast), autoOn, regular, semibold);
+        PersonalChatSheets.AskMakeBusiness(TestBot, Profile, Chat("77000000308@c.us", "Сауле", ageHours, ownerLast), autoOn, channelOn,
+            regular, semibold);
 
         Transform panel = PersonalChatSheets.MakeBusinessPanelForTests.transform;
         var sheet = (RectTransform)Find(panel, "SheetRoot");
@@ -270,7 +276,7 @@ public class PersonalChatSheetsWiringTests
         Assert.LessOrEqual(primary.top + primary.height, secondary.top + 0.01f, "«Оставить личным» under the button");
         Assert.AreEqual(PersonalChatSheets.SheetWidth, sheet.rect.width, 0.01f);
         Assert.GreaterOrEqual(sheet.rect.height, PersonalChatSheets.BusinessLayout.SheetHeight - 0.01f, "the sheet only ever grows");
-        TestContext.Out.WriteLine($"[FIT] make-business auto={autoOn} age={ageHours}: sheet {sheet.rect.height:F1}u");
+        TestContext.Out.WriteLine($"[FIT] make-business auto={autoOn} channel={channelOn} age={ageHours}: sheet {sheet.rect.height:F1}u");
     }
 
     [Test]
@@ -439,15 +445,66 @@ public class PersonalChatSheetsWiringTests
         Assert.IsEmpty(moves);
     }
 
+    // «Авто» in the chat (the bot's default here), and the bot's WhatsApp switch as its settings left it: -1 never written.
+    [TestCase(-1, PersonalChatsCopy.MakeBusinessAutoNoFresh)]
+    [TestCase(1, PersonalChatsCopy.MakeBusinessAutoNoFresh)]
+    [TestCase(0, PersonalChatsCopy.MakeBusinessChannelOff)]
+    public void ThePill_SaysWhetherTheChannelAnswersAtAll(int channelSwitch, string body)
+    {
+        const string friend = "77000000413@c.us";
+        string channelKey = TestBot + "isOnWhatsapp";
+        Header header = NewOpenChatHeader(Row(friend, "Сауле", contact: "Сауле"));
+        OpenChat(ChatManager.Instance, friend);   // what the controller reads the chat's mode for
+        var controller = NewHost("Suggestions").AddComponent<SuggestionsController>();
+        var refs = new SerializedObject(header.View);
+        refs.FindProperty("suggestions").objectReferenceValue = controller;
+        refs.ApplyModifiedPropertiesWithoutUndo();
+
+        Func<string, int> savedGet = SemiAutoStore.GetInt;
+        Action<string, int> savedSet = SemiAutoStore.SetIntAndSave;
+        Func<string, bool> savedDefault = SemiAutoStore.BotDefaultSemi;
+        var memory = new Dictionary<string, int>();
+        SemiAutoStore.GetInt = key => memory.TryGetValue(key, out int value) ? value : 0;
+        SemiAutoStore.SetIntAndSave = (key, value) => memory[key] = value;
+        SemiAutoStore.BotDefaultSemi = _ => false;
+        PlayerPrefs.DeleteKey(channelKey);
+        try
+        {
+            if (channelSwitch >= 0) PlayerPrefs.SetInt(channelKey, channelSwitch);
+            header.Select(friend);
+            header.Pill.onClick.Invoke();
+
+            Assert.IsTrue(PersonalChatSheets.IsShowing);
+            Assert.AreEqual(body, TextOf(PersonalChatSheets.MakeBusinessPanelForTests.transform, "Body"),
+                channelSwitch == 0
+                    ? "the bot's settings switched WhatsApp off: no promise that anyone answers by itself"
+                    : "«Авто» answers the new messages (the chat's last one is days old)");
+        }
+        finally
+        {
+            PlayerPrefs.DeleteKey(channelKey);
+            SemiAutoStore.GetInt = savedGet;
+            SemiAutoStore.SetIntAndSave = savedSet;
+            SemiAutoStore.BotDefaultSemi = savedDefault;
+        }
+    }
+
     [Test]
     public void TheHeader_AsksTheModeWithoutTheAudience_AndTheChatsLastMessage()
     {
-        string pill = MethodBody(Read(HeaderPath), "private void HandlePersonalPillTapped()");
+        string header = Read(HeaderPath);
+        string pill = MethodBody(header, "private void HandlePersonalPillTapped()");
         StringAssert.Contains("!suggestions.WouldSuggestIgnoringAudience()", pill,
             "«Авто» in this chat = the panel would not suggest there (its stored mode, the schedule, the quota)");
         StringAssert.Contains("PersonalChatSheets.AskMakeBusiness(", pill);
+        StringAssert.Contains("ChannelSwitchedOn(", pill, "…and whether the bot's settings left the chat's channel on");
+        string channel = MethodBody(header, "private static bool ChannelSwitchedOn(");
+        StringAssert.Contains("\"isOnWhatsapp\"", channel);
+        StringAssert.Contains("\"isOnTelegram\"", channel, "the open chat's own channel");
+        StringAssert.Contains(", 1) == 1", channel, "read as the bot card reads it: on unless it was switched off");
         string ask = MethodBody(Read(SheetsPath), "public static void AskMakeBusiness(");
         StringAssert.Contains("!chat.IsLastMessageMine", ask, "the client's message last…");
+        StringAssert.Contains("MakeBusinessCopy.IsReplayable(chat.LastMessageType)", ask, "…of a type the server hands on…");
         StringAssert.Contains("MakeBusinessCopy.AgeHours(chat.LastMessageTime", ask, "…and how old it is");
         StringAssert.Contains("MakeBusinessCopy.For(", ask);
         string name = MethodBody(Read(HeaderPath), "private void HandleNameTapped()");
@@ -457,11 +514,13 @@ public class PersonalChatSheetsWiringTests
 
     // ---- harness: the sheets ----
 
-    private static ChatViewModel Chat(string id, string title, double ageHours, bool ownerLast, bool contact = false)
+    // A WhatsApp chat whose last message is a text (the chat list's «chat») unless another type is given.
+    private static ChatViewModel Chat(string id, string title, double ageHours, bool ownerLast, bool contact = false, string lastType = "chat")
     {
         long time = DateTimeOffset.UtcNow.ToUnixTimeSeconds() - (long)(ageHours * 3600);
         var facts = new AudienceFacts(false, id, "", false, false, false, contact);
-        return new ChatViewModel(id, title, null, "Здравствуйте, есть красные розы на завтра?", time, isLastMessageMine: ownerLast, facts: facts);
+        return new ChatViewModel(id, title, null, "Здравствуйте, есть красные розы на завтра?", time, lastMessageType: lastType,
+            isLastMessageMine: ownerLast, facts: facts);
     }
 
     private static AudienceView View(AudienceKind kind, AudienceReason reason) =>
@@ -607,6 +666,7 @@ public class PersonalChatSheetsWiringTests
         unread_count = 0,
         last_message_id = "M-" + id,
         last_message_data = "Здравствуйте",
+        last_message_type = "chat",
         last_timestamp = After,
         last_message_sender = new { isMe = false, pushname = "" },
     };

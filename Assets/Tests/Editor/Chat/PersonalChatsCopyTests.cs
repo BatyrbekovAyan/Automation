@@ -125,6 +125,7 @@ public class PersonalChatsCopyTests
         Assert.AreEqual("У вас включено «Авто»: ИИ-сотрудник будет отвечать сам на новые сообщения. Выключить «Авто» в этом чате можно отдельно.",
             PersonalChatsCopy.MakeBusinessAutoNoFresh);
         Assert.AreEqual("ИИ-сотрудник будет подсказывать ответы, а отправлять их будете вы.", PersonalChatsCopy.MakeBusinessManual);
+        Assert.AreEqual("ИИ-сотрудник не будет отвечать сам: канал выключен в его настройках.", PersonalChatsCopy.MakeBusinessChannelOff);
         Assert.AreEqual("Сделать личным", PersonalChatsCopy.MakePersonalAction);
         Assert.AreEqual("в контактах", PersonalChatsCopy.ContactMark);
         Assert.AreEqual("новый", PersonalChatsCopy.NewMark);

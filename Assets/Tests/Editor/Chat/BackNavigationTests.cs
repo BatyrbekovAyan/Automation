@@ -143,7 +143,7 @@ public class BackNavigationTests
             var chat = new ChatViewModel("77000000501@c.us", "Сауле", null, "Есть розы на завтра?",
                 System.DateTimeOffset.UtcNow.ToUnixTimeSeconds());
 
-            PersonalChatSheets.AskMakeBusiness("Bot0", "back-profile", chat, autoOn: true, null, null);
+            PersonalChatSheets.AskMakeBusiness("Bot0", "back-profile", chat, autoOn: true, channelOn: true, null, null);
             Assert.AreEqual("personal-chat-sheets", BackNavigation.Dispatch(RouterTargets()), "Back over «Сделать чат рабочим?»");
             Assert.IsFalse(PersonalChatSheets.IsShowing, "Back = «Оставить личным»: the sheet closes");
 

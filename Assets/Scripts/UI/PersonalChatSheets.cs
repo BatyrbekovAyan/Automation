@@ -9,8 +9,9 @@ using UnityEngine.UI;
 /// «Личные и рабочие чаты» (spec §5.5, §5.6, sketch 009 screens 5–6): the open chat's two bottom sheets.
 ///   • «Сделать чат рабочим?» — <see cref="AskMakeBusiness"/>, raised by the «Личный» pill of a personal chat. The text says
 ///     what the assistant will do once the chat is working (<see cref="MakeBusinessCopy"/>: answer the waiting message
-///     itself, answer new ones, or only suggest), with a small note when a waiting message is answered or skipped by its
-///     age. «Сделать рабочим» moves the chat (<see cref="ChatAudienceSyncService.MakeBusiness"/>); «Оставить личным», a tap
+///     itself, answer new ones, nothing by itself on a channel switched off, or only suggest), with a small note when a
+///     waiting message is answered or skipped by its age. «Сделать рабочим» moves the chat
+///     (<see cref="ChatAudienceSyncService.MakeBusiness"/>); «Оставить личным», a tap
 ///     outside, a drag down and the system Back leave it where it is.
 ///   • «Сделать личным» — <see cref="AskMakePersonal"/>, raised by a tap on a working chat's name or avatar: the chat's
 ///     name, its number with «в контактах» / «новый» (<see cref="NumberLine"/>), the action card «Сделать личным» with what
@@ -104,10 +105,12 @@ public static class PersonalChatSheets
 
     /// <summary>
     /// «Сделать чат рабочим?» for <paramref name="chat"/> of the bot's <paramref name="profileId"/>. <paramref name="autoOn"/>
-    /// — «Авто» would hold in the chat once it is working (its own mode, the schedule, the quota); whether the client waits
-    /// and for how long is read off the chat's last message.
+    /// — «Авто» would hold in the chat once it is working (its own mode, the schedule, the quota); <paramref name="channelOn"/>
+    /// — the bot's settings left the chat's channel on (off, nobody answers there by itself). Whether the client waits, for
+    /// how long and whether the server would hand that message on at all is read off the chat's last message.
     /// </summary>
-    public static void AskMakeBusiness(string botName, string profileId, ChatViewModel chat, bool autoOn, TMP_FontAsset regular, TMP_FontAsset semibold)
+    public static void AskMakeBusiness(string botName, string profileId, ChatViewModel chat, bool autoOn, bool channelOn,
+        TMP_FontAsset regular, TMP_FontAsset semibold)
     {
         if (chat == null) return;
         CancelMakePersonal();
@@ -115,7 +118,8 @@ public static class PersonalChatSheets
         businessTarget = new Target(botName, profileId, chat.ChatId);
 
         long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-        (string body, string note) = MakeBusinessCopy.For(autoOn, !chat.IsLastMessageMine, MakeBusinessCopy.AgeHours(chat.LastMessageTime, now));
+        (string body, string note) = MakeBusinessCopy.For(autoOn, channelOn, !chat.IsLastMessageMine,
+            MakeBusinessCopy.IsReplayable(chat.LastMessageType), MakeBusinessCopy.AgeHours(chat.LastMessageTime, now));
         Stamp(semibold, businessTitle, businessYes);
         Stamp(regular, businessBody, businessNote, businessNo);
         businessTitle.text = PersonalChatsCopy.MakeBusinessTitle;

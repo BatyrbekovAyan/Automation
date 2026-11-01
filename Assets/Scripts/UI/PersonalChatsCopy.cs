@@ -70,6 +70,8 @@ public static class PersonalChatsCopy
     /// <summary>«Старше суток» is <see cref="ChatAudienceRule.FreshHours"/> = 24.</summary>
     public const string MakeBusinessStaleNote = "На сообщения старше суток он не отвечает — начнёт с нового.";
     public const string MakeBusinessManual = "ИИ-сотрудник будет подсказывать ответы, а отправлять их будете вы.";
+    /// <summary>«Авто» in the chat, but the bot's settings switched this channel off: nobody answers there by itself.</summary>
+    public const string MakeBusinessChannelOff = "ИИ-сотрудник не будет отвечать сам: канал выключен в его настройках.";
     public const string MakePersonalAction = "Сделать личным";
     public const string ContactMark = "в контактах";
     public const string NewMark = "новый";
