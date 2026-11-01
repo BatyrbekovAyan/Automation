@@ -16,6 +16,8 @@ using UnityEngine;
 ///   • again when the server says another number restarted the connection (<see cref="AnswerConnected"/>) — unless the app
 ///     itself asked for the screen at that pairing: the first answer for that profile is consumed, whatever it says
 ///     (<c>{bot}AudienceOnboardingFor{Whatsapp|Telegram}</c> = the profile), so the screen comes once.
+/// Withdrawn when the server says the pairing RESTORED the earlier connection (<see cref="AnswerRestored"/>: the previous number
+/// back soon after a mistaken one, its decisions holding again) — the app's own request for that very pairing only.
 /// Channels paired before this version are marked seen ONCE, right after the bots load, and their stored numbers become the
 /// last paired ones (<see cref="PresetChannelsSeen"/>): those bots get the screen only for a later number change. The flag is
 /// cleared when the owner is done with the screen («Готово» / «Отмечу позже»); everything here goes when the bot is deleted
@@ -154,16 +156,36 @@ public static class PersonalChatsOnboarding
     {
         if (!ChatAudienceRequest.IsRealProfileId(profileId) || botNames == null) return false;
         var bots = new List<string>(botNames);
-        if (ConsumeOwnRequest(profileId, bots)) return false;
+        if (ConsumeOwnRequest(profileId, bots, out _, out _)) return false;
         return numberRestarted && RequestForProfile(profileId, bots);
+    }
+
+    /// <summary>
+    /// The server answered a connection report of <paramref name="profileId"/> by RESTORING the earlier connection: the previous
+    /// number was paired again soon after a mistaken one, and its decisions hold again — nothing is owed for it. The app asked for
+    /// the screen itself at this pairing (<see cref="ReportPairing"/>: the number differs from the last paired one, the mistaken
+    /// number); when that request names this profile it is consumed, as every answer consumes it, and withdrawn — the owed flag of
+    /// that bot's channel is cleared. Nothing more: a request naming another profile stays, a restore never owes the screen, and a
+    /// screen already on display stays until the owner closes it (clearing the flag closes nothing). True when a request was
+    /// withdrawn.
+    /// </summary>
+    public static bool AnswerRestored(string profileId, IEnumerable<string> botNames)
+    {
+        if (!ChatAudienceRequest.IsRealProfileId(profileId) || botNames == null) return false;
+        if (!ConsumeOwnRequest(profileId, botNames, out string botName, out bool telegram)) return false;
+        Clear(botName, telegram);
+        return true;
     }
 
     public static string RequestedForKey(string botName, bool telegram) =>
         $"{botName}{(telegram ? TelegramRequestedForSuffix : WhatsappRequestedForSuffix)}";
 
-    // The app asked the screen for this profile at its pairing: that request answers the server's word, once.
-    private static bool ConsumeOwnRequest(string profileId, IEnumerable<string> botNames)
+    // The app asked the screen for this profile at its pairing: that request answers the server's word, once. Names the bot and
+    // the channel whose request it was.
+    private static bool ConsumeOwnRequest(string profileId, IEnumerable<string> botNames, out string requestedBot, out bool requestedTelegram)
     {
+        requestedBot = null;
+        requestedTelegram = false;
         foreach (string botName in botNames)
         {
             if (string.IsNullOrEmpty(botName)) continue;
@@ -173,6 +195,8 @@ public static class PersonalChatsOnboarding
                 if (PlayerPrefs.GetString(key, "") != profileId) continue;
                 PlayerPrefs.DeleteKey(key);
                 PlayerPrefs.Save();
+                requestedBot = botName;
+                requestedTelegram = telegram;
                 return true;
             }
         }

@@ -386,6 +386,74 @@ public class PersonalChatsOnboardingTests
             "…and the request it does not name stays");
     }
 
+    // ---- a return to the previous number ----
+
+    [Test]
+    public void AReturnToThePreviousNumber_TheServersRestore_WithdrawsTheAppsOwnRequest_TheScreenDoesNotComeBack()
+    {
+        PlayerPrefs.SetString(TestBot + "WhatsappProfileId", "wa-p");
+        string[] bots = { OtherTestBot, TestBot };
+        PersonalChatsOnboarding.ReportPairing(TestBot, telegram: false, "wa-p", "77011112233", newBot: true);
+        PersonalChatsOnboarding.AnswerConnected("wa-p", numberRestarted: false, bots);
+        PersonalChatsOnboarding.Clear(TestBot, telegram: false);   // the owner was done with the first screen
+        // The mistake: another account paired on the same profile — the app owes the screen, the server restarts the moment.
+        Assert.IsTrue(PersonalChatsOnboarding.ReportPairing(TestBot, telegram: false, "wa-p", "77019998877", newBot: false), "premise");
+        Assert.IsFalse(PersonalChatsOnboarding.AnswerConnected("wa-p", numberRestarted: true, bots), "premise: the app asked already");
+        // The return the same day: the number differs from the last paired one — the mistaken one —, so the app owes it again…
+        Assert.IsTrue(PersonalChatsOnboarding.ReportPairing(TestBot, telegram: false, "wa-p", "+7 701 111 22 33", newBot: false));
+        Assert.IsTrue(PersonalChatsOnboarding.IsRequested(TestBot, telegram: false), "premise: owed by the app's own comparison");
+        requested.Clear();
+
+        // …until the server says it restored the earlier connection: its decisions hold again, nothing is owed for it.
+        Assert.IsTrue(PersonalChatsOnboarding.AnswerRestored("wa-p", bots), "the app's own request for this pairing is withdrawn");
+        Assert.IsFalse(PersonalChatsOnboarding.IsRequested(TestBot, telegram: false), "the screen does not come back after a return");
+        Assert.IsFalse(PlayerPrefs.HasKey(PersonalChatsOnboarding.RequestedForKey(TestBot, telegram: false)), "the request is consumed");
+        Assert.IsEmpty(requested, "a restore never owes the screen");
+        Assert.IsTrue(PersonalChatsOnboarding.IsChannelSeen(TestBot, telegram: false), "the channel stays seen");
+        Assert.AreEqual("+7 701 111 22 33", PersonalChatsOnboarding.PairedNumber(TestBot, telegram: false),
+            "the previous number is the last paired one again — a later number change still owes the screen");
+        Assert.IsFalse(PersonalChatsOnboarding.AnswerRestored("wa-p", bots), "once: nothing of the app's is left to withdraw");
+    }
+
+    [Test]
+    public void TheServersRestore_WithdrawsOnlyTheAppsOwnRequest_ForThatVeryProfile()
+    {
+        PersonalChatsOnboarding.ReportPairing(TestBot, telegram: false, "wa-old", "77011112233", newBot: true);   // its answer never came
+        PersonalChatsOnboarding.Request(TestBot, telegram: true);                                                 // owed on the other channel
+        requested.Clear();
+
+        Assert.IsFalse(PersonalChatsOnboarding.AnswerRestored("wa-new", new[] { TestBot }), "another profile's restore");
+        Assert.IsTrue(PersonalChatsOnboarding.IsRequested(TestBot, telegram: false), "…withdraws nothing the app asked for another profile");
+        Assert.AreEqual("wa-old", PlayerPrefs.GetString(PersonalChatsOnboarding.RequestedForKey(TestBot, telegram: false), ""));
+        Assert.IsFalse(PersonalChatsOnboarding.AnswerRestored(global::Bot.UnauthedProfileSentinel, new[] { TestBot }));
+        Assert.IsFalse(PersonalChatsOnboarding.AnswerRestored("wa-old", null));
+
+        Assert.IsTrue(PersonalChatsOnboarding.AnswerRestored("wa-old", new[] { TestBot }));
+        Assert.IsFalse(PersonalChatsOnboarding.IsRequested(TestBot, telegram: false), "its own channel's screen is withdrawn");
+        Assert.IsTrue(PersonalChatsOnboarding.IsRequested(TestBot, telegram: true), "the other channel's stays owed");
+        Assert.IsEmpty(requested, "a restore never owes the screen");
+    }
+
+    [Test]
+    public void TheServersRestore_NeverClosesTheScreenOnDisplay()
+    {
+        FolderHarness h = PersonalChatsFolderFixture.Build(TestBot, Profile, hosts);
+        PlayerPrefs.SetString(TestBot + "WhatsappProfileId", Profile);
+        Assert.IsTrue(PersonalChatsOnboarding.ReportPairing(TestBot, telegram: false, Profile, "77011112233", newBot: false), "premise");
+        PersonalChatsOnboarding.TryShow();
+        Assert.IsTrue(h.Folder.IsOpen && h.Folder.Mode == FolderMode.Onboarding, "premise: the owner looks at the screen already");
+
+        Assert.IsTrue(PersonalChatsOnboarding.AnswerRestored(Profile, new[] { TestBot }));
+        Assert.IsTrue(h.Folder.IsOpen, "the screen on display stays until the owner closes it");
+        Assert.AreEqual(FolderMode.Onboarding, h.Folder.Mode);
+        Assert.IsFalse(PersonalChatsOnboarding.IsRequested(TestBot, telegram: false), "…but nothing is owed any more");
+
+        h.Secondary.onClick.Invoke();   // «Отмечу позже»
+        Assert.IsFalse(h.Folder.IsOpen);
+        PersonalChatsOnboarding.TryShow();
+        Assert.IsFalse(h.Folder.IsOpen, "and it does not come back");
+    }
+
     // ---- where it is owed (sources: a pairing, a server answer) ----
 
     [Test]
@@ -408,14 +476,17 @@ public class PersonalChatsOnboardingTests
     public void TheConnectedAnswer_TellsANumberChange_UnlessTheAppAskedAtThatPairing()
     {
         string send = MethodBody(Read("Scripts/Chat/ChatAudienceSyncService.cs"), "private IEnumerator SendConnected(");
-        StringAssert.Contains("ChatAudienceResponse.ClassifyConnected(www.responseCode, www.downloadHandler?.text, out long connectedAtMs, out bool restarted)",
-            send, "the answer's restarted is read");
+        StringAssert.Contains("ChatAudienceResponse.ClassifyConnected(www.responseCode, www.downloadHandler?.text, out long connectedAtMs,\n"
+                              + "            out bool restarted, out bool restored)",
+            send, "the answer's restarted and restored are read");
         int mirrored = send.IndexOf("ChatAudienceStore.ConnectedAtMs(profileId)", StringComparison.Ordinal);
         int applied = send.IndexOf("ChatAudienceStore.ApplyConnected(profileId, connectedAtMs);", StringComparison.Ordinal);
         Assert.IsTrue(mirrored >= 0 && applied > mirrored, "the mirrored moment is read before the answer replaces it");
-        int answer = send.IndexOf("PersonalChatsOnboarding.AnswerConnected(profileId, ChatAudienceConnectPolicy.NumberRestarted(restarted, mirrored, connectedAtMs),",
+        int restore = send.IndexOf("if (restored) PersonalChatsOnboarding.AnswerRestored(profileId, BotNames());", StringComparison.Ordinal);
+        int answer = send.IndexOf("else PersonalChatsOnboarding.AnswerConnected(profileId, ChatAudienceConnectPolicy.NumberRestarted(restarted, mirrored, connectedAtMs),",
             StringComparison.Ordinal);
-        Assert.Greater(answer, applied, "every answered report is settled against the app's own request");
+        Assert.IsTrue(restore > applied && answer > restore,
+            "every answered report is settled against the app's own request: a restore withdraws it, any other answer consumes it");
         StringAssert.DoesNotContain("PersonalChatsOnboarding.RequestForProfile(", send, "never past the app's own request");
     }
 

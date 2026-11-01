@@ -254,15 +254,41 @@ public class ChatAudienceRequestTests
     public void ConnectedAnswer_ARestoredConnection_NamesTheEarlierMoment_AndNoRestart()
     {
         // The previous number paired again the same day: the server restores the earlier connection and says so — an EARLIER
-        // moment than the one the app mirrors, restarted false, restored true. The app reads the moment and «not restarted»;
-        // it needs nothing more (the list read after the answer brings the restored connection's decisions back).
+        // moment than the one the app mirrors, restarted false, restored true. The app reads the moment, «not restarted» and
+        // «restored» (which withdraws the app's own «Кто из них клиенты?» for that pairing); the list read after the answer
+        // brings the restored connection's decisions back.
         const long mirrored = 1760000000000L + 2 * 3_600_000L;
         Assert.AreEqual(ChatAudienceSyncQueue.BatchStatus.Answered, ChatAudienceResponse.ClassifyConnected(200,
-            "{\"success\":true,\"connectedAt\":1760000000000,\"restarted\":false,\"restored\":true}", out long at, out bool restarted));
+            "{\"success\":true,\"connectedAt\":1760000000000,\"restarted\":false,\"restored\":true}", out long at, out bool restarted,
+            out bool restored));
         Assert.AreEqual(1760000000000L, at, "the restored connection's earlier moment");
         Assert.IsFalse(restarted);
+        Assert.IsTrue(restored, "the server's word: the earlier connection is back");
         Assert.IsFalse(ChatAudienceConnectPolicy.NumberRestarted(restarted, mirrored, at),
             "an earlier moment than the mirrored one is no restart: the server's word decides");
+    }
+
+    [Test]
+    public void ConnectedAnswer_SaysRestoredOnlyByTheBooleanTrue()
+    {
+        foreach (string body in new[]
+                 {
+                     "{\"success\":true,\"connectedAt\":1760000000000,\"restarted\":false,\"restored\":false}",
+                     "{\"success\":true,\"connectedAt\":1760000000000,\"restarted\":true}",
+                     "{\"success\":true,\"connectedAt\":1760000000000,\"restored\":\"true\"}",
+                     "{\"success\":true,\"connectedAt\":1760000000000,\"restored\":1}",
+                     "{\"success\":true,\"connectedAt\":1760000000000,\"restored\":null}",
+                 })
+        {
+            Assert.AreEqual(ChatAudienceSyncQueue.BatchStatus.Answered, ChatAudienceResponse.ClassifyConnected(200, body, out _, out _, out bool not));
+            Assert.IsFalse(not, $"'{body}': only the boolean true says the connection was restored");
+        }
+
+        Assert.AreEqual(ChatAudienceSyncQueue.BatchStatus.Transient,
+            ChatAudienceResponse.ClassifyConnected(200, "{\"success\":true,\"restored\":true}", out _, out _, out bool noMoment));
+        Assert.IsFalse(noMoment, "an answer that names no moment says nothing at all");
+        Assert.AreEqual(ChatAudienceSyncQueue.BatchStatus.Rejected, ChatAudienceResponse.ClassifyConnected(403, Refusal, out _, out _, out bool refused));
+        Assert.IsFalse(refused);
     }
 
     [TestCase(400, ChatAudienceSyncQueue.BatchStatus.Rejected, TestName = "EveryOp_400_BadRequest_IsARefusal")]

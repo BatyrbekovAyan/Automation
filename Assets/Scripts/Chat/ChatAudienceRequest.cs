@@ -8,7 +8,7 @@ using Newtonsoft.Json.Linq;
 /// bodies. One POST path, the op in the body:
 ///   list       {op, profileIds[≤ 20]}                       → {success, profiles[{profileId, connectedAt|null, decisions[…]}]}
 ///   set        {op, profileId, chats[{chatId, kind, version} ≤ 50]} → {success, results[{chatId, applied, kind, version, refused}]}
-///   connected  {op, profileId}                              → {success, connectedAt, restarted}
+///   connected  {op, profileId}                              → {success, connectedAt, restarted, restored}
 /// The server reads the connected number from get/status itself — the app never sends one. A chat id is the chat-list key
 /// (<c>ChatViewModel.ChatId</c> = <c>ChatManager.CurrentChatId</c>), the key the per-chat reply mode uses; the reply mode's
 /// wildcard <c>'*'</c> names every chat and is never one (<see cref="IsSendableChatId"/>). Answers are read by
@@ -193,25 +193,35 @@ public static class ChatAudienceResponse
     }
 
     public static ChatAudienceSyncQueue.BatchStatus ClassifyConnected(long responseCode, string body, out long connectedAtMs) =>
-        ClassifyConnected(responseCode, body, out connectedAtMs, out _);
+        ClassifyConnected(responseCode, body, out connectedAtMs, out _, out _);
+
+    public static ChatAudienceSyncQueue.BatchStatus ClassifyConnected(long responseCode, string body, out long connectedAtMs, out bool restarted) =>
+        ClassifyConnected(responseCode, body, out connectedAtMs, out restarted, out _);
 
     /// <summary>
-    /// The connected answer, with <paramref name="restarted"/> — the server moved the moment because another number was paired
-    /// (only the boolean true says so; a missing or non-boolean field is false, and an answer that names no moment says nothing).
+    /// The connected answer, with <paramref name="restarted"/> — the server moved the moment because another number was paired —
+    /// and <paramref name="restored"/> — the server brought the earlier connection back, the previous number paired again soon
+    /// after a mistaken one (its moment, earlier than the one mirrored, comes with it). Only the boolean true says either; a
+    /// missing or non-boolean field is false, and an answer that names no moment says nothing.
     /// </summary>
-    public static ChatAudienceSyncQueue.BatchStatus ClassifyConnected(long responseCode, string body, out long connectedAtMs, out bool restarted)
+    public static ChatAudienceSyncQueue.BatchStatus ClassifyConnected(long responseCode, string body, out long connectedAtMs, out bool restarted,
+        out bool restored)
     {
         connectedAtMs = 0;
         restarted = false;
+        restored = false;
         var status = Envelope(responseCode, body, null, out JObject envelope);
         if (status != ChatAudienceSyncQueue.BatchStatus.Answered) return status;
         long? moment = ReadLong(envelope["connectedAt"]);
         if (moment == null || moment.Value <= 0) return ChatAudienceSyncQueue.BatchStatus.Transient;   // names no moment
         connectedAtMs = moment.Value;
-        JToken word = envelope["restarted"];
-        restarted = word != null && word.Type == JTokenType.Boolean && (bool)word;
+        restarted = IsTrue(envelope["restarted"]);
+        restored = IsTrue(envelope["restored"]);
         return status;
     }
+
+    // Only the boolean true.
+    private static bool IsTrue(JToken word) => word != null && word.Type == JTokenType.Boolean && (bool)word;
 
     // The status line, then the envelope: a JSON object, success the boolean true, and (when named) the op's array.
     private static ChatAudienceSyncQueue.BatchStatus Envelope(long responseCode, string body, string arrayField, out JObject envelope)

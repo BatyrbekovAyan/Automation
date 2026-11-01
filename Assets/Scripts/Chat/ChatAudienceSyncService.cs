@@ -16,7 +16,9 @@ using UnityEngine.Networking;
 ///   • Connection reports — <see cref="ReportConnected"/>, after every confirmed pairing: the same queue, sent first; the
 ///     answer is the profile's connection moment — and when another number restarted it (the server's word, or a moment later
 ///     than the one mirrored), «Кто из них клиенты?» is owed again, unless the app asked for it at that very pairing
-///     (<see cref="PersonalChatsOnboarding.AnswerConnected"/>).
+///     (<see cref="PersonalChatsOnboarding.AnswerConnected"/>); when the server restored the earlier connection instead (the
+///     previous number back soon after a mistaken one), the app's own request for that pairing is withdrawn
+///     (<see cref="PersonalChatsOnboarding.AnswerRestored"/>).
 ///   • The list — <see cref="RequestList"/>: read at launch (in effect by the first return of focus, or the first bot change
 ///     once Start has subscribed — the Awake call runs before the component is enabled, so it only marks the read wanted),
 ///     on a bot switch, on a return to the app (at most once a minute), 2 s after every delivered write and after every
@@ -388,7 +390,8 @@ public class ChatAudienceSyncService : MonoBehaviour
         }
         using var scope = www;
 
-        var status = ChatAudienceResponse.ClassifyConnected(www.responseCode, www.downloadHandler?.text, out long connectedAtMs, out bool restarted);
+        var status = ChatAudienceResponse.ClassifyConnected(www.responseCode, www.downloadHandler?.text, out long connectedAtMs,
+            out bool restarted, out bool restored);
         LogUnanswered(ChatAudienceRequest.OpConnected, status, www);
         ChatAudienceSyncQueue.ApplyConnectedResult(_model, entry, sentReport, status, NowMs());
         Persist();
@@ -396,9 +399,12 @@ public class ChatAudienceSyncService : MonoBehaviour
         _deliveries++;
         long? mirrored = ChatAudienceStore.ConnectedAtMs(profileId);   // read before the answer replaces it
         ChatAudienceStore.ApplyConnected(profileId, connectedAtMs);
-        // Another number on the channel is a new connection: «Кто из них клиенты?» is owed again to the bot holding the profile —
-        // unless the app itself asked for it at this pairing (the first answer for that profile is consumed, whatever it says).
-        PersonalChatsOnboarding.AnswerConnected(profileId, ChatAudienceConnectPolicy.NumberRestarted(restarted, mirrored, connectedAtMs),
+        // The previous number back soon after a mistaken one: the server restored the earlier connection and its decisions hold
+        // again — the app's own «Кто из них клиенты?» for this pairing is withdrawn. Otherwise another number on the channel is a
+        // new connection: the screen is owed again to the bot holding the profile — unless the app itself asked for it at this
+        // pairing (the first answer for that profile is consumed, whatever it says).
+        if (restored) PersonalChatsOnboarding.AnswerRestored(profileId, BotNames());
+        else PersonalChatsOnboarding.AnswerConnected(profileId, ChatAudienceConnectPolicy.NumberRestarted(restarted, mirrored, connectedAtMs),
             BotNames());
         ListAfterDelivery();
     }
