@@ -1,0 +1,1134 @@
+Task 18 — репетиция пакета выкладки «Личные и рабочие чаты» на стенде из прод-состояния (2026-11-02)
+
+Только стенд: n8n 2.36.7 (task runners) http://localhost:5678, Postgres pg.sh (5433; PG 16.2 — на проде 17), Wappi-мок
+127.0.0.1:8765 из этой ветки. Прод — ни одного запроса: его состояние подтверждено офлайн (§A). Инструменты — те же, что пойдут
+на прод (deploy-canonical.py, update-clones.py, verify-deployed.py и скрипты пакета newwf.py / readback.py / smoke.py / watch.py,
+все с явным --base http://localhost:5678); миграция и SQL-файлы пакета — как есть, через Postgres-узел n8n (staging-двойник
+.secrets/sql-oneoff.py: тот же харнес, удаление временного workflow через 35 с; отличаются база, ключ и учётка «Postgres Staging»).
+Сырые журналы шагов: Tools/test-output/task18/ (gitignored). Время — UTC (Алматы = UTC+5).
+
+=== §A. Прод сейчас: офлайн-сверка (без единого запроса к проду) и состав пакета ===
+
+### A.1 prod = canon 40bbf80b (scratchpad prod_state_confirm.py: the 2026-10-23 JSON snapshot vs canon 007ca164; git between the refs; the 2026-11-01 text snapshot)
+(a) 2026-10-23 JSON snapshot vs canon 007ca164: 30 equal, 0 differ (of 30 rows; clones 0, archived 1, unknown 0)
+(b) git diff --name-only 007ca164 40bbf80b -- workflows sql: ['Tools/n8n/workflows/3qax5J9u2qsT9Vao-Edit_Whatsapp_Workflow.json', 'Tools/n8n/workflows/TwWPW3gIyjZS3foR-Edit_Telegram_Workflow.json', 'Tools/n8n/workflows/Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json', 'Tools/n8n/workflows/XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json']
+(b) git diff --name-only 7a7a40a0 40bbf80b -- workflows prompts sql: empty
+(b) graphs equal at 007ca164 and 40bbf80b: 26 of 30; differ: ['3qax5J9u2qsT9Vao-Edit_Whatsapp_Workflow.json', 'TwWPW3gIyjZS3foR-Edit_Telegram_Workflow.json', 'Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json', 'XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json']
+(c) 2026-11-01 snapshot: 30 canonical rows, statuses ['OK'], not-OK none; files = canon 40bbf80b: True
+(c) header: canonical 30 diff 0 clones 2
+(c) snapshot prompt map: introduced in fce9987b, sha256 e027b4b39537; the map of Create WA at 40bbf80b: sha256 e027b4b39537 -> EQUAL
+(c) template whatsapp at 40bbf80b: stamp c0a7c5186fb2; snapshot clone aND1y2ktZoNlszAW graph c0a7c5186fb2 published c0a7c5186fb2 -> EQUAL
+(c) template telegram at 40bbf80b: stamp 62e09511fc94; snapshot clone TbQaKxJaBJkKN2nA graph 62e09511fc94 published 62e09511fc94 -> EQUAL
+CONFIRMED: prod = canon 40bbf80b
+
+### A.2 the package offline: graphs (verify-deployed.graph_hash) and canonical settings, canon at 40bbf80b vs the package canon
+canon at 40bbf80b: 30 files; working tree: 32 files
+  CHANGED  0DP79STI3pafXO9B-Set_Workflow_State.json  graph dcce761854bd -> 2a2b9eb5eba7  nodes 20 -> 20 
+  CHANGED  2htWSV5IHO8E2CgB-Dashboard_Outcomes.json  graph 5f4cd7fb634d -> 13b0fa2cca2e  nodes 16 -> 16 
+  same     2islisFH7jjLoPQM-Delete_Orphan_Profiles.json  graph d617975779c3  settings {}
+  same     3qax5J9u2qsT9Vao-Edit_Whatsapp_Workflow.json  graph caea05bb1dcc  settings {}
+  CHANGED  4VN3gsFaC2HUYmcc-Telegram_Bot.json  graph 2433180b00c9 -> a1e3c21f0e79  nodes 60 -> 64 +['Audience Known?', 'Business?', 'Decide Audience', 'Decided Business?']
+           settings {} -> {"saveDataSuccessExecution": "none"}
+  CHANGED  4wYitz5ek30SVNlT-WhatsApp_Bot.json  graph 60aa43640382 -> 3c53710fa0b6  nodes 60 -> 64 +['Audience Known?', 'Business?', 'Decide Audience', 'Decided Business?']
+           settings {} -> {"saveDataSuccessExecution": "none"}
+  CHANGED  9PTyYcelRQI7bGDb-Suggest_Replies.json  graph fc2f19c5c996 -> 84d59c9c26bb  nodes 26 -> 26 
+           settings {"executionTimeout": 20} -> {"executionTimeout": 20, "saveDataSuccessExecution": "none"}
+  same     KoTuIlk4LMrlvnWI-Upload_File.json  graph f02c66d37543  settings {}
+  same     SCLcpn6DMDG3Z4VN-Set_Reply_Mode.json  graph 3873901fbeb7  settings {}
+  same     TwWPW3gIyjZS3foR-Edit_Telegram_Workflow.json  graph cf3e82152efb  settings {}
+  CHANGED  Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json  graph fed4629fee42 -> 80e93626bd01  nodes 52 -> 52 
+  CHANGED  XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json  graph 789086fca8ff -> 58f80a16aafb  nodes 52 -> 52 
+  same     ZGYr6srzS3rSSXHp-RevenueCat_Events.json  graph a3c52f30dcf7  settings {}
+  same     ZTqpumOpL1rNDOp6-Delete_File.json  graph c95684c375e4  settings {}
+  NEW      crAudienceDec001-Decide_Audience.json  graph 4e3736a6bc7e  settings {"saveDataErrorExecution": "all", "saveDataSuccessExecution": "none"}
+  same     crAuthSession001-Auth_Session.json  graph faeae51618cd  settings {}
+  same     crChannelWatch001-Channel_Watch.json  graph dd08325d3263  settings {"saveDataErrorExecution": "all", "saveDataSuccessExecution": "none"}
+  NEW      crChatAudience01-Chat_Audience.json  graph 30f1fc89207c  settings {"saveDataErrorExecution": "all", "saveDataSuccessExecution": "none"}
+  same     crHandoffDry0001-Handoff_Request_Dry.json  graph eb4a57065e2b  settings {"saveDataErrorExecution": "all", "saveDataSuccessExecution": "none"}
+  same     crHandoffNtfy001-Handoff_Notifier.json  graph 53faf5b0fbe6  settings {"saveDataErrorExecution": "all", "saveDataSuccessExecution": "none"}
+  same     crHandoffReq0001-Handoff_Request.json  graph 101b0e9cb2d9  settings {"saveDataErrorExecution": "all", "saveDataSuccessExecution": "none"}
+  same     crHandoffsApi001-Handoffs.json  graph 0f7922b25d2c  settings {"saveDataErrorExecution": "all", "saveDataSuccessExecution": "none"}
+  same     crPriceSearch001-Price_List_Search.json  graph b4dc16d0f034  settings {"saveDataErrorExecution": "all", "saveDataSuccessExecution": "none"}
+  same     crSetSchedule001-Set_Schedule.json  graph cfd76ff12bb7  settings {"saveDataErrorExecution": "all", "saveDataSuccessExecution": "none"}
+  same     crTestDialog0001-Test_Dialog.json  graph 1ac55e708033  settings {"executionTimeout": 60, "saveDataErrorExecution": "all", "saveDataSuccessExecution": "none"}
+  same     crVerifyIdent001-Verify_Identity.json  graph b329f4831d9e  settings {"saveDataErrorExecution": "all", "saveDataSuccessExecution": "none"}
+  CHANGED  crWappiProxy0001-Wappi_Proxy.json  graph c8bba5e407f4 -> 21204c214a4a  nodes 24 -> 24 
+  CHANGED  fXYpCXPKw92EzRz8-Profile_Lifecycle_Sweep.json  graph 35be6f37abeb -> 6abfa98ea38c  nodes 40 -> 41 +['Wipe Personal Chats']
+  same     hHwvfOvTCS42pXnq-Landing_Lead.json  graph 09247f533308  settings {}
+  same     jtbssfzXbOxwTK4k-Get_Usage.json  graph 46bb12615cdb  settings {}
+  CHANGED  lmjYsdNcQA2IE5rl-Delete_Bot_Files.json  graph ab64a6555282 -> 95b6407aa939  nodes 19 -> 19 
+  same     olmqWMfcFpCEcpiE-Support_Message.json  graph ac543e712be8  settings {}
+package (graph or canonical settings differ): 12
+
+### A.3 prod clones after update-clones: template stamps at 40bbf80b -> the package (update-clones.graph_stamp), node changes
+whatsapp: stamp 40bbf80b c0a7c5186fb2 -> now 5c4c33e27468; settings {'saveDataSuccessExecution': None} -> {'saveDataSuccessExecution': 'none'}
+   add ['Audience Known?', 'Business?', 'Decide Audience', 'Decided Business?']  remove []
+   change ['Acquire Send Lease', 'Cancel Label', 'Final Check', 'Latest+Combine', 'Outcome', 'Read Reply Mode', 'Reconcile Check', 'Record Outgoing', 'Suppressed?']  connections changed True
+telegram: stamp 40bbf80b 62e09511fc94 -> now cc77e05b537a; settings {'saveDataSuccessExecution': None} -> {'saveDataSuccessExecution': 'none'}
+   add ['Audience Known?', 'Business?', 'Decide Audience', 'Decided Business?']  remove []
+   change ['Acquire Send Lease', 'Cancel Label', 'Final Check', 'Latest+Combine', 'Outcome', 'Read Reply Mode', 'Reconcile Check', 'Record Outgoing', 'Suppressed?']  connections changed True
+
+### A.4 step 4a with the PROD values, offline (newwf.py copy --target prod — exactly what the owner will see)
+crAudienceDec001-Decide_Audience.json [('httpHeaderAuth', 'ZowntFGvApDJ7UzQ', 'WappiAuthToken'), ('postgres', 'vvRrFiEXzLVqKjOx', 'Postgres')] graph 4e3736a6bc7e (canon 4e3736a6bc7e) id crAudienceDec001 active False saveDataSuccessExecution 'none' -> OK
+crChatAudience01-Chat_Audience.json [('httpHeaderAuth', 'ZowntFGvApDJ7UzQ', 'WappiAuthToken'), ('postgres', 'vvRrFiEXzLVqKjOx', 'Postgres')] graph 30f1fc89207c (canon 30f1fc89207c) id crChatAudience01 active False saveDataSuccessExecution 'none' -> OK
+copies in /private/tmp/claude-501/-Users-ayan-Projects-Automation/bfafad35-f3fe-444e-8f96-9f057ad0019e/scratchpad/t18/import-prod-offline
+
+=== §B. Миграция на СВЕЖЕМ кластере (порт 5434, scratch PGDATA): весь порядок pg.sh и порядок прода, сравнение схем, обратный оператор ===
+
+### B.1 scratchpad fresh_cluster.sh
+### (i) pg.sh init on a FRESH throwaway cluster (port 5434, /private/tmp/claude-501/-Users-ayan-Projects-Automation/bfafad35-f3fe-444e-8f96-9f057ad0019e/scratchpad/t18/fresh/pgdata-t18) — every migration in pg.sh's order, the new one last
+initdb done -> /private/tmp/claude-501/-Users-ayan-Projects-Automation/bfafad35-f3fe-444e-8f96-9f057ad0019e/scratchpad/t18/fresh/pgdata-t18
+waiting for server to start.... done
+server started
+database choosereply_staging created (owner n8n_staging — the n8n credential user, table owner like prod)
+apply 2026-08-21-billing-schema.sql
+apply 2026-08-21-billing-rls.sql
+apply 2026-08-21-bot-key.sql
+apply 2026-08-21-deleted-reason.sql
+apply 2026-08-22-product-id.sql
+apply 2026-08-26-suggestion-counts.sql
+apply 2026-08-27-landing-leads.sql
+apply 2026-07-19-reply-mode-flags.sql
+apply 2026-07-07-conversation-outcomes.sql
+apply 2026-09-17-auth-installs.sql
+apply 2026-09-17-reply-mode-version.sql
+apply 2026-09-17-reply-events.sql
+psql:/Users/ayan/Projects/Automation/.claude/worktrees/personal-chats/Tools/n8n/sql/2026-09-17-reply-events.sql:12: NOTICE:  relation "n8n_chat_histories" already exists, skipping
+apply 2026-09-17-history-handoff.sql
+apply 2026-09-17-suggestion-request-keys.sql
+apply 2026-09-22-test-dialog.sql
+apply 2026-09-27-claim-pairing.sql
+apply 2026-09-27-billing-bindings.sql
+apply 2026-09-27-reply-order.sql
+apply 2026-10-07-claim-code-attempts.sql
+apply 2026-10-07-retired-clone-deactivate.sql
+apply 2026-10-11-billing-conflicts.sql
+apply 2026-10-11-bot-lineage.sql
+apply 2026-10-12-memory-marks-backfill.sql
+apply 2026-09-25-learning-foundation.sql
+apply 2026-10-14-rc-event-ledger.sql
+apply 2026-10-15-identity-heal-log.sql
+psql:/Users/ayan/Projects/Automation/.claude/worktrees/personal-chats/Tools/n8n/sql/2026-10-15-identity-heal-log.sql:33: NOTICE:  column "hint" of relation "identity_heal_log" already exists, skipping
+apply 2026-10-14-channel-snapshot.sql
+psql:/Users/ayan/Projects/Automation/.claude/worktrees/personal-chats/Tools/n8n/sql/2026-10-14-channel-snapshot.sql:33: NOTICE:  column "notify_attempts" of relation "channel_snapshot" already exists, skipping
+apply 2026-10-14-bot-schedule.sql
+psql:/Users/ayan/Projects/Automation/.claude/worktrees/personal-chats/Tools/n8n/sql/2026-10-14-bot-schedule.sql:44: NOTICE:  trigger "bot_schedule_tz_check" for relation "public.bot_schedule" does not exist, skipping
+apply 2026-10-25-chat-audience.sql
+psql:/Users/ayan/Projects/Automation/.claude/worktrees/personal-chats/Tools/n8n/sql/2026-10-25-chat-audience.sql:73: NOTICE:  column "decided_phone" of relation "chat_audience" already exists, skipping
+psql:/Users/ayan/Projects/Automation/.claude/worktrees/personal-chats/Tools/n8n/sql/2026-10-25-chat-audience.sql:74: NOTICE:  column "prev_phone" of relation "audience_connections" already exists, skipping
+psql:/Users/ayan/Projects/Automation/.claude/worktrees/personal-chats/Tools/n8n/sql/2026-10-25-chat-audience.sql:75: NOTICE:  column "prev_connected_at" of relation "audience_connections" already exists, skipping
+apply staging 2026-09-17-documents-stub.sql
+migrations applied to choosereply_staging@127.0.0.1:5434
+init rc=0
+### postcheck after init (psql; expect 11|6|3|t|0|3|t|1|t|0)
+11|6|3|t|0|3|t|1|t|0
+### pg.sh migrate — second pass (idempotency)
+apply 2026-08-21-billing-schema.sql
+apply 2026-08-21-billing-rls.sql
+apply 2026-08-21-bot-key.sql
+apply 2026-08-21-deleted-reason.sql
+apply 2026-08-22-product-id.sql
+apply 2026-08-26-suggestion-counts.sql
+apply 2026-08-27-landing-leads.sql
+apply 2026-07-19-reply-mode-flags.sql
+apply 2026-07-07-conversation-outcomes.sql
+apply 2026-09-17-auth-installs.sql
+apply 2026-09-17-reply-mode-version.sql
+apply 2026-09-17-reply-events.sql
+apply 2026-09-17-history-handoff.sql
+apply 2026-09-17-suggestion-request-keys.sql
+apply 2026-09-22-test-dialog.sql
+apply 2026-09-27-claim-pairing.sql
+apply 2026-09-27-billing-bindings.sql
+apply 2026-09-27-reply-order.sql
+apply 2026-10-07-claim-code-attempts.sql
+apply 2026-10-07-retired-clone-deactivate.sql
+apply 2026-10-11-billing-conflicts.sql
+apply 2026-10-11-bot-lineage.sql
+apply 2026-10-12-memory-marks-backfill.sql
+apply 2026-09-25-learning-foundation.sql
+apply 2026-10-14-rc-event-ledger.sql
+apply 2026-10-15-identity-heal-log.sql
+apply 2026-10-14-channel-snapshot.sql
+apply 2026-10-14-bot-schedule.sql
+apply 2026-10-25-chat-audience.sql
+apply staging 2026-09-17-documents-stub.sql
+migrations applied to choosereply_staging@127.0.0.1:5434
+migrate#2 rc=0
+### pg.sh migrate — third pass
+apply 2026-08-21-billing-schema.sql
+apply 2026-08-21-billing-rls.sql
+apply 2026-08-21-bot-key.sql
+apply 2026-08-21-deleted-reason.sql
+apply 2026-08-22-product-id.sql
+apply 2026-08-26-suggestion-counts.sql
+apply 2026-08-27-landing-leads.sql
+apply 2026-07-19-reply-mode-flags.sql
+apply 2026-07-07-conversation-outcomes.sql
+apply 2026-09-17-auth-installs.sql
+apply 2026-09-17-reply-mode-version.sql
+apply 2026-09-17-reply-events.sql
+apply 2026-09-17-history-handoff.sql
+apply 2026-09-17-suggestion-request-keys.sql
+apply 2026-09-22-test-dialog.sql
+apply 2026-09-27-claim-pairing.sql
+apply 2026-09-27-billing-bindings.sql
+apply 2026-09-27-reply-order.sql
+apply 2026-10-07-claim-code-attempts.sql
+apply 2026-10-07-retired-clone-deactivate.sql
+apply 2026-10-11-billing-conflicts.sql
+apply 2026-10-11-bot-lineage.sql
+apply 2026-10-12-memory-marks-backfill.sql
+apply 2026-09-25-learning-foundation.sql
+apply 2026-10-14-rc-event-ledger.sql
+apply 2026-10-15-identity-heal-log.sql
+apply 2026-10-14-channel-snapshot.sql
+apply 2026-10-14-bot-schedule.sql
+apply 2026-10-25-chat-audience.sql
+apply staging 2026-09-17-documents-stub.sql
+migrations applied to choosereply_staging@127.0.0.1:5434
+migrate#3 rc=0
+### postcheck after the repeats (expect the same)
+11|6|3|t|0|3|t|1|t|0
+schema dump (i):     1277 lines
+
+### (ii) the PROD order on the same cluster: a NEW database with every pg.sh migration EXCEPT 2026-10-25-chat-audience.sql (= prod's schema)
+skip 2026-10-25-chat-audience.sql (the package's migration)
+### precheck (expect t|t|1|t|f)
+t|t|1|t|f
+### the migration (psql -f, the file as is)
+psql:/Users/ayan/Projects/Automation/.claude/worktrees/personal-chats/Tools/n8n/sql/2026-10-25-chat-audience.sql:73: NOTICE:  column "decided_phone" of relation "chat_audience" already exists, skipping
+psql:/Users/ayan/Projects/Automation/.claude/worktrees/personal-chats/Tools/n8n/sql/2026-10-25-chat-audience.sql:74: NOTICE:  column "prev_phone" of relation "audience_connections" already exists, skipping
+psql:/Users/ayan/Projects/Automation/.claude/worktrees/personal-chats/Tools/n8n/sql/2026-10-25-chat-audience.sql:75: NOTICE:  column "prev_connected_at" of relation "audience_connections" already exists, skipping
+rc=0
+### postcheck (expect 11|6|3|t|0|3|t|1|t|0)
+11|6|3|t|0|3|t|1|t|0
+### the migration again (idempotency)
+psql:/Users/ayan/Projects/Automation/.claude/worktrees/personal-chats/Tools/n8n/sql/2026-10-25-chat-audience.sql:56: NOTICE:  relation "chat_audience" already exists, skipping
+psql:/Users/ayan/Projects/Automation/.claude/worktrees/personal-chats/Tools/n8n/sql/2026-10-25-chat-audience.sql:58: NOTICE:  relation "chat_audience_wipe_idx" already exists, skipping
+psql:/Users/ayan/Projects/Automation/.claude/worktrees/personal-chats/Tools/n8n/sql/2026-10-25-chat-audience.sql:66: NOTICE:  relation "audience_connections" already exists, skipping
+psql:/Users/ayan/Projects/Automation/.claude/worktrees/personal-chats/Tools/n8n/sql/2026-10-25-chat-audience.sql:73: NOTICE:  column "decided_phone" of relation "chat_audience" already exists, skipping
+psql:/Users/ayan/Projects/Automation/.claude/worktrees/personal-chats/Tools/n8n/sql/2026-10-25-chat-audience.sql:74: NOTICE:  column "prev_phone" of relation "audience_connections" already exists, skipping
+psql:/Users/ayan/Projects/Automation/.claude/worktrees/personal-chats/Tools/n8n/sql/2026-10-25-chat-audience.sql:75: NOTICE:  column "prev_connected_at" of relation "audience_connections" already exists, skipping
+rc=0
+### postcheck (expect the same)
+11|6|3|t|0|3|t|1|t|0
+### reply_events CHECK constraints after (contype = 'c'; expect exactly one, with 'cancelled_personal')
+reply_events_state_check | CHECK ((state = ANY (ARRAY['claimed'::text, 'generated'::text, 'send_pending'::text, 'sent'::text, 'send_failed'::text, 'send_unknown'::text, 'superseded'::text, 'cancelled_owner'::text, 'cancelled_mode'::text, 'cancelled_busy'::text, 'cancelled_fetch'::text, 'generation_failed'::text, 'quota_denied'::text, 'suppressed'::text, 'cancelled_personal'::text])))
+### the Task 9e columns (expect decided_phone, prev_phone, prev_connected_at — nullable, last)
+audience_connections.prev_phone text nullable=YES position=5
+audience_connections.prev_connected_at timestamp with time zone nullable=YES position=6
+chat_audience.decided_phone text nullable=YES position=11
+### the wipe index
+CREATE INDEX chat_audience_wipe_idx ON public.chat_audience USING btree (personal_since) WHERE ((kind = 'personal'::text) AND (wiped_at IS NULL) AND (personal_since IS NOT NULL))
+
+### (iii) schemas: (i) init order vs (ii) prod order + the migration (expect identical)
+diff lines:        0
+### the file's reverse operator on (ii) (only once nothing reads the tables) -> prod schema byte for byte?
+reverse rc=0
+diff lines (prod schema vs reversed):        0
+### precheck after the reverse (expect t|t|1|t|f again)
+t|t|1|t|f
+### stop the throwaway cluster
+waiting for server to shut down.... done
+server stopped
+
+=== §C. Репетиция на основном стенде — порядок чек-листа README ===
+
+### R1 bootstrap.py --canon-ref 40bbf80b --bot wa:stgwa001 --bot tg:stgtg001 (22:01:16Z -> 22:03:24Z)
+2. server up at http://localhost:5678 (pid 41531, log /Users/ayan/.n8n-staging/n8n.log)
+3. API key already present
+   canon: 40bbf80b (git archive -> /var/folders/65/d93rj7qn5csdsm10l1l8t4jm0000gn/T/canon-ref-sa5i20oy/Tools/n8n/workflows)
+   staging isolation: KoTuIlk4LMrlvnWI-Upload_File.json: ['Supabase Vector Store (+3 sub-nodes)', 'Store Original File']
+   staging isolation: ZTqpumOpL1rNDOp6-Delete_File.json: ['Delete Stored Original']
+   staging price search: crPriceSearch001-Price_List_Search.json: ['Search Price Lists (+1 sub-nodes)']
+   staging isolation: lmjYsdNcQA2IE5rl-Delete_Bot_Files.json: ['Delete Stored Original']
+   31 workflows + 2 staging bots -> /Users/ayan/Projects/Automation/.claude/worktrees/personal-chats/Tools/n8n/workflows-staging
+   n8n base http://localhost:5678; Wappi -> http://127.0.0.1:8765; postgres -> 'Postgres Staging' (stgPostgres000001)
+   note: left dangling on purpose (isolation): ['Support Bot']
+   Skipping invalid workflow file: /Users/ayan/Projects/Automation/.claude/worktrees/personal-chats/Tools/n8n/workflows-staging/_manifest.json
+   Importing 33 workflows...
+   Deactivating workflow "Set Workflow State".
+   Deactivating workflow "Dashboard Outcomes".
+   Deactivating workflow "Delete Orphan Profiles".
+   Deactivating workflow "Edit Whatsapp Workflow".
+   Deactivating workflow "Suggest Replies".
+   Deactivating workflow "Upload File".
+   Deactivating workflow "Set Reply Mode".
+   Deactivating workflow "Edit Telegram Workflow".
+   Deactivating workflow "CreateTelegramWorkflow".
+   Deactivating workflow "CreateWhatsappWorkflow".
+   Deactivating workflow "RevenueCat Events".
+   Deactivating workflow "Delete File".
+   Deactivating workflow "Auth Session".
+   Deactivating workflow "Channel Watch".
+   Deactivating workflow "Handoff Request (dry)".
+   Deactivating workflow "Handoff Notifier".
+   Deactivating workflow "Handoff Request".
+   Deactivating workflow "Handoffs".
+   Deactivating workflow "Price List Search".
+   Deactivating workflow "Set Schedule".
+   Deactivating workflow "Test Dialog".
+   Deactivating workflow "Verify Identity".
+   Deactivating workflow "Wappi Proxy".
+   Deactivating workflow "Profile Lifecycle Sweep".
+   Deactivating workflow "Landing Lead".
+   Deactivating workflow "Get Usage".
+   Deactivating workflow "Delete Bot Files".
+   Deactivating workflow "Support Message".
+   Deactivating workflow "STAGING Eval Runner".
+   Deactivating workflow "STAGING TG stgtg001".
+   Deactivating workflow "STAGING WA stgwa001".
+   Successfully imported 33 workflows.
+5. imported 31 workflows + 2 staging bots; published 33
+2. server up at http://localhost:5678 (pid 41858, log /Users/ayan/.n8n-staging/n8n.log)
+staging ready: http://localhost:5678
+
+### R2 the stand = prod: the two new workflows switched off and deleted (>= 36 s, insights rule); both tables dropped and the ledger CHECK restored by the migration file's own reverse operator; precheck by psql
+crAudienceDec001 on the stand: GET 200 active True
+crChatAudience01 on the stand: GET 200 active True
+crAudienceDec001 deactivate 200
+crChatAudience01 deactivate 200
+waiting 36 s before deleting (insights rule)
+crAudienceDec001 delete 200 -> GET 404
+crChatAudience01 delete 200 -> GET 404
+reply_events rows in 'cancelled_personal' (staging test data left by e2e-audience): 0
+decision / connection rows before the drop: 0|0
+dropped both tables, the reply ledger's CHECK restored without 'cancelled_personal' (the migration file's reverse operator)
+precheck (psql; expect t|t|1|t|f): t|t|1|t|f 
+
+### R3 verify-deployed (stand vs the package canon): expect canonical 32, diff 12 = DIFF x10 + MISSING x2; the staging clones BEHIND
+base http://localhost:5678: canonical 32 (diff 12), clones 2 (behind template 2, of them prompt head behind 0; custom prompts 2, not counted), archived clones 0 (not counted), other 2
+  prompt map = Create/Edit Vertical Prompt as introduced in fce9987b (sha256 e027b4b39537)
+  DIFF    0DP79STI3pafXO9B 0DP79STI3pafXO9B-Set_Workflow_State.json  active=True names=True graph=False published=False settings=True  (stored graph differs; PUBLISHED graph differs)
+  DIFF    2htWSV5IHO8E2CgB 2htWSV5IHO8E2CgB-Dashboard_Outcomes.json  active=True names=True graph=False published=False settings=True  (stored graph differs; PUBLISHED graph differs)
+  OK      2islisFH7jjLoPQM 2islisFH7jjLoPQM-Delete_Orphan_Profiles.json  active=True names=True graph=True published=True settings=True
+  OK      3qax5J9u2qsT9Vao 3qax5J9u2qsT9Vao-Edit_Whatsapp_Workflow.json  active=True names=True graph=True published=True settings=True
+  DIFF    4VN3gsFaC2HUYmcc 4VN3gsFaC2HUYmcc-Telegram_Bot.json  active=False names=False graph=False published=None settings=True  (node set differs; stored graph differs)
+  DIFF    4wYitz5ek30SVNlT 4wYitz5ek30SVNlT-WhatsApp_Bot.json  active=False names=False graph=False published=None settings=True  (node set differs; stored graph differs)
+  DIFF    9PTyYcelRQI7bGDb 9PTyYcelRQI7bGDb-Suggest_Replies.json  active=True names=True graph=False published=False settings=True  (stored graph differs; PUBLISHED graph differs)
+  OK      KoTuIlk4LMrlvnWI KoTuIlk4LMrlvnWI-Upload_File.json  active=True names=True graph=True published=True settings=True
+  OK      SCLcpn6DMDG3Z4VN SCLcpn6DMDG3Z4VN-Set_Reply_Mode.json  active=True names=True graph=True published=True settings=True
+  OK      TwWPW3gIyjZS3foR TwWPW3gIyjZS3foR-Edit_Telegram_Workflow.json  active=True names=True graph=True published=True settings=True
+  DIFF    Uz6HBBUpAiUqVysB Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json  active=True names=True graph=False published=False settings=True  (stored graph differs; PUBLISHED graph differs)
+  DIFF    XuvOp7TxOImOAmlj XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json  active=True names=True graph=False published=False settings=True  (stored graph differs; PUBLISHED graph differs)
+  OK      ZGYr6srzS3rSSXHp ZGYr6srzS3rSSXHp-RevenueCat_Events.json  active=True names=True graph=True published=True settings=True
+  OK      ZTqpumOpL1rNDOp6 ZTqpumOpL1rNDOp6-Delete_File.json  active=True names=True graph=True published=True settings=True
+  MISSING crAudienceDec001 crAudienceDec001-Decide_Audience.json  active=None names=None graph=None published=None settings=None
+  OK      crAuthSession001 crAuthSession001-Auth_Session.json  active=True names=True graph=True published=True settings=True
+  OK      crChannelWatch001 crChannelWatch001-Channel_Watch.json  active=True names=True graph=True published=True settings=True
+  MISSING crChatAudience01 crChatAudience01-Chat_Audience.json  active=None names=None graph=None published=None settings=None
+  OK      crHandoffDry0001 crHandoffDry0001-Handoff_Request_Dry.json  active=True names=True graph=True published=True settings=True
+  OK      crHandoffNtfy001 crHandoffNtfy001-Handoff_Notifier.json  active=True names=True graph=True published=True settings=True
+  OK      crHandoffReq0001 crHandoffReq0001-Handoff_Request.json  active=True names=True graph=True published=True settings=True
+  OK      crHandoffsApi001 crHandoffsApi001-Handoffs.json  active=True names=True graph=True published=True settings=True
+  OK      crPriceSearch001 crPriceSearch001-Price_List_Search.json  active=True names=True graph=True published=True settings=True
+  OK      crSetSchedule001 crSetSchedule001-Set_Schedule.json  active=True names=True graph=True published=True settings=True
+  OK      crTestDialog0001 crTestDialog0001-Test_Dialog.json  active=True names=True graph=True published=True settings=True
+  OK      crVerifyIdent001 crVerifyIdent001-Verify_Identity.json  active=True names=True graph=True published=True settings=True
+  DIFF    crWappiProxy0001 crWappiProxy0001-Wappi_Proxy.json  active=True names=True graph=False published=False settings=True  (stored graph differs; PUBLISHED graph differs)
+  DIFF    fXYpCXPKw92EzRz8 fXYpCXPKw92EzRz8-Profile_Lifecycle_Sweep.json  active=True names=False graph=False published=False settings=True  (node set differs; stored graph differs; PUBLISHED graph differs)
+  OK      hHwvfOvTCS42pXnq hHwvfOvTCS42pXnq-Landing_Lead.json  active=True names=True graph=True published=True settings=True
+  OK      jtbssfzXbOxwTK4k jtbssfzXbOxwTK4k-Get_Usage.json  active=True names=True graph=True published=True settings=True
+  DIFF    lmjYsdNcQA2IE5rl lmjYsdNcQA2IE5rl-Delete_Bot_Files.json  active=True names=True graph=False published=False settings=True  (stored graph differs; PUBLISHED graph differs)
+  OK      olmqWMfcFpCEcpiE olmqWMfcFpCEcpiE-Support_Message.json  active=True names=True graph=True published=True settings=True
+  clone   stgtg40da979c774 'STAGING TG stgtg001' [telegram] active=True nodes=60 graph=e9532e7b4139 published=e9532e7b4139 sticky=None BEHIND  prompt=custom (custom prompt — kept verbatim by update-clones, not counted: no Create/Edit grammar (Business Type line + Additional Instructions marker))
+  clone   stgwab77f282533c 'STAGING WA stgwa001' [whatsapp] active=True nodes=60 graph=4943da220c3f published=4943da220c3f sticky=None BEHIND  prompt=custom (custom prompt — kept verbatim by update-clones, not counted: no Create/Edit grammar (Business Type line + Additional Instructions marker))
+wrote /Users/ayan/Projects/Automation/.claude/worktrees/personal-chats/Tools/test-output/task18/stg-before.json
+
+### R4 deploy-canonical dry-run (+ Set Workflow State with --include-placeholders): would_update 9 + 1, missing 2, up_to_date 19, failed 0
+~ 2htWSV5IHO8E2CgB 'Dashboard Outcomes' active=True nodes 16 → 16 (+0 -0)
+    rollback pointer: versionId 6ed39b17-7df0-41f5-ae4b-158023a5bd61 (activeVersionId 6ed39b17-7df0-41f5-ae4b-158023a5bd61)
+= 2islisFH7jjLoPQM 'Delete Orphan Profiles' up to date (stored and published)
+= 3qax5J9u2qsT9Vao 'Edit Whatsapp Workflow' up to date (stored and published)
+~ 4VN3gsFaC2HUYmcc 'Telegram Bot' active=False nodes 60 → 64 (+4 -0)
+    rollback pointer: versionId 036d5c6b-feef-4a66-87be-3f3e0306cd34 (activeVersionId None)
+~ 4wYitz5ek30SVNlT 'WhatsApp Bot' active=False nodes 60 → 64 (+4 -0)
+    rollback pointer: versionId b3ddb7ca-58ab-4a96-a31f-7e8ea6611831 (activeVersionId None)
+~ 9PTyYcelRQI7bGDb 'Suggest Replies' active=True nodes 26 → 26 (+0 -0)
+    rollback pointer: versionId 2af317b9-bd48-4611-8b87-026a73077146 (activeVersionId 2af317b9-bd48-4611-8b87-026a73077146)
+= KoTuIlk4LMrlvnWI 'Upload File' up to date (stored and published)
+= SCLcpn6DMDG3Z4VN 'Set Reply Mode' up to date (stored and published)
+= TwWPW3gIyjZS3foR 'Edit Telegram Workflow' up to date (stored and published)
+~ Uz6HBBUpAiUqVysB 'CreateTelegramWorkflow' active=True nodes 52 → 52 (+0 -0)
+    rollback pointer: versionId 102c0fbc-c50d-4f77-9018-a8ac88cc377b (activeVersionId 102c0fbc-c50d-4f77-9018-a8ac88cc377b)
+~ XuvOp7TxOImOAmlj 'CreateWhatsappWorkflow' active=True nodes 52 → 52 (+0 -0)
+    rollback pointer: versionId 7a91d04e-8ae7-4f9c-9507-75c8e23a233e (activeVersionId 7a91d04e-8ae7-4f9c-9507-75c8e23a233e)
+= ZGYr6srzS3rSSXHp 'RevenueCat Events' up to date (stored and published)
+= ZTqpumOpL1rNDOp6 'Delete File' up to date (stored and published)
+MISSING crAudienceDec001 crAudienceDec001-Decide_Audience.json — import it with n8n import:workflow, not here
+= crAuthSession001 'Auth Session' up to date (stored and published)
+= crChannelWatch001 'Channel Watch' up to date (stored and published)
+MISSING crChatAudience01 crChatAudience01-Chat_Audience.json — import it with n8n import:workflow, not here
+= crHandoffDry0001 'Handoff Request (dry)' up to date (stored and published)
+= crHandoffNtfy001 'Handoff Notifier' up to date (stored and published)
+= crHandoffReq0001 'Handoff Request' up to date (stored and published)
+= crHandoffsApi001 'Handoffs' up to date (stored and published)
+= crPriceSearch001 'Price List Search' up to date (stored and published)
+= crSetSchedule001 'Set Schedule' up to date (stored and published)
+= crTestDialog0001 'Test Dialog' up to date (stored and published)
+= crVerifyIdent001 'Verify Identity' up to date (stored and published)
+~ crWappiProxy0001 'Wappi Proxy' active=True nodes 24 → 24 (+0 -0)
+    rollback pointer: versionId 480a2240-930b-4386-a163-89c51e6519bb (activeVersionId 480a2240-930b-4386-a163-89c51e6519bb)
+~ fXYpCXPKw92EzRz8 'Profile Lifecycle Sweep' active=True nodes 41 → 42 (+1 -0)
+    rollback pointer: versionId ec7a194c-26b8-4b59-80b0-d8364ef4828e (activeVersionId ec7a194c-26b8-4b59-80b0-d8364ef4828e)
+= hHwvfOvTCS42pXnq 'Landing Lead' up to date (stored and published)
+= jtbssfzXbOxwTK4k 'Get Usage' up to date (stored and published)
+~ lmjYsdNcQA2IE5rl 'Delete Bot Files' active=True nodes 19 → 19 (+0 -0)
+    rollback pointer: versionId 424bebba-da43-4d35-84a3-b248d229e7c6 (activeVersionId 424bebba-da43-4d35-84a3-b248d229e7c6)
+{"considered": 30, "missing": 2, "up_to_date": 19, "would_update": 9, "updated": 0, "would_publish": 0, "republished": 0, "inactive_must_run": 0, "failed": 0}
+
+### R4b
+~ 0DP79STI3pafXO9B 'Set Workflow State' active=True nodes 20 → 20 (+0 -0)
+    rollback pointer: versionId 22aea4b4-9820-43a1-804b-533bf9001f8b (activeVersionId 22aea4b4-9820-43a1-804b-533bf9001f8b)
+{"considered": 1, "missing": 0, "up_to_date": 0, "would_update": 1, "updated": 0, "would_publish": 0, "republished": 0, "inactive_must_run": 0, "failed": 0}
+
+### R0 step 0.2 on the stand: newwf.py creds
+GET /credentials 200 | rows 10 | wanted [('httpHeaderAuth', 'ZowntFGvApDJ7UzQ', 'WappiAuthToken'), ('postgres', 'stgPostgres000001', 'Postgres Staging')] | OK
+
+### R5 step 2 through n8n's own Postgres node (stand deploy start 2026-11-01T22:04:58Z): precheck -> migration -> postcheck -> migration again -> postcheck; then psql
+--- docs/audits/2026-10-25-personal-chats/precheck.sql  (22:05:13Z)
+200 {"no_audience":true,"no_connections":true,"state_checks":"1","state_check_named":true,"personal_state":false}
+--- Tools/n8n/sql/2026-10-25-chat-audience.sql  (22:05:50Z)
+200 {"success":true}
+--- docs/audits/2026-10-25-personal-chats/postcheck.sql  (22:06:26Z)
+200 {"audience_cols":"11","connection_cols":"6","restore_cols":"3","rls":true,"client_grants":"0","indexes":"3","wipe_idx":true,"state_checks":"1","personal_state":true,"rows":"0"}
+--- Tools/n8n/sql/2026-10-25-chat-audience.sql  (22:07:03Z)
+200 {"success":true}
+--- docs/audits/2026-10-25-personal-chats/postcheck.sql  (22:07:40Z)
+200 {"audience_cols":"11","connection_cols":"6","restore_cols":"3","rls":true,"client_grants":"0","indexes":"3","wipe_idx":true,"state_checks":"1","personal_state":true,"rows":"0"}
+--- psql: the reply ledger's CHECK constraints (contype = 'c')
+1 | reply_events_state_check
+--- psql: the Task 9e columns
+audience_connections.prev_connected_at nullable=YES position=6
+audience_connections.prev_phone nullable=YES position=5
+chat_audience.decided_phone nullable=YES position=11
+
+### R6 step 3: Set Workflow State --include-placeholders --apply --yes
+~ 0DP79STI3pafXO9B 'Set Workflow State' active=True nodes 20 → 20 (+0 -0)
+    rollback pointer: versionId 22aea4b4-9820-43a1-804b-533bf9001f8b (activeVersionId 22aea4b4-9820-43a1-804b-533bf9001f8b)
+    published by the PUT (served version = the update) — no publish call, no deactivate window
+    read-back: ok
+{"considered": 1, "missing": 0, "up_to_date": 0, "would_update": 0, "updated": 1, "would_publish": 0, "republished": 0, "inactive_must_run": 0, "failed": 0}
+
+### R7a step 4a with the STAND values (the derived copies — hosts and credentials rewritten, so the graph differs from the canon by design)
+crAudienceDec001-Decide_Audience.json [('httpHeaderAuth', 'ZowntFGvApDJ7UzQ', 'WappiAuthToken'), ('postgres', 'stgPostgres000001', 'Postgres Staging')] graph d63052ace385 (canon 4e3736a6bc7e) id crAudienceDec001 active False saveDataSuccessExecution 'none' -> OK
+crChatAudience01-Chat_Audience.json [('httpHeaderAuth', 'ZowntFGvApDJ7UzQ', 'WappiAuthToken'), ('postgres', 'stgPostgres000001', 'Postgres Staging')] graph 53cd0623d38e (canon 30f1fc89207c) id crChatAudience01 active False saveDataSuccessExecution 'none' -> OK
+copies in /private/tmp/claude-501/-Users-ayan-Projects-Automation/bfafad35-f3fe-444e-8f96-9f057ad0019e/scratchpad/t18/import-stand
+
+### R7b step 4b: n8n import:workflow of the audited copies WHILE the server runs (prod: docker compose exec -T n8n n8n import:workflow)
+server before import: 200
+Importing 1 workflows...
+Successfully imported 1 workflow.
+import crAudienceDec001-Decide_Audience rc=0
+Importing 1 workflows...
+Successfully imported 1 workflow.
+import crChatAudience01-Chat_Audience rc=0
+server after import: 200
+
+### R7c step 4c: GET before activation
+crAudienceDec001 GET 200 | active False | creds ['ZowntFGvApDJ7UzQ', 'stgPostgres000001'] | OK
+crChatAudience01 GET 200 | active False | creds ['ZowntFGvApDJ7UzQ', 'stgPostgres000001'] | OK
+
+### R7-order probe A — a throwaway workflow whose Execute Workflow node calls crAudienceDec001, published while crAudienceDec001 is imported but NOT published (it never runs; deleted at once)
+crAudienceDec001: GET 200 active False activeVersionId None
+throwaway workflow create 200 id xV42r4ePAPR65fCY
+activate (publish) -> 400 {"error": "{\"message\":\"Cannot publish workflow: Node \\\"Decide Audience\\\" references workflow crAudienceDec001 (\\\"Decide Audience\\\") which is not published. Please publish all referenced sub-workflows first.\"}"}
+throwaway deleted 200 (it never ran)
+
+### R7d step 4d: publish crAudienceDec001 through the API
+crAudienceDec001 activate 200 | active True | published=stored True | published graph d63052ace385 (canon d63052ace385) | creds ['ZowntFGvApDJ7UzQ', 'stgPostgres000001'] | OK
+
+### R7-order probe B — the same throwaway workflow after the publish (positive control)
+crAudienceDec001: GET 200 active True activeVersionId 2886e207-cfc9-45e6-933d-5e3f940bee42
+throwaway workflow create 200 id KG4ji14bUNwNaSJV
+activate (publish) -> 200 {"updatedAt": "2026-11-01T22:10:04.515Z", "createdAt": "2026-11-01T22:10:04.515Z", "id": "KG4ji14bUNwNaSJV", "name": "ZZZ TEMP order probe published", "description": null, "active": true, "isArchived": false, "nodes": [{"id": "h1", "name": "Hook", "type": "n8n-nodes-base.webhook", "typeVersion": 2, "position": [0, 0], "parameters": {"httpMethod": "POST", "path": "zzz-order-probe-published", "respo
+throwaway deleted 200 (it never ran)
+
+### R7e step 4e: activate crChatAudience01
+crChatAudience01 activate 200 | active True | published=stored True | published graph 53cd0623d38e (canon 53cd0623d38e) | creds ['ZowntFGvApDJ7UzQ', 'stgPostgres000001'] | OK
+
+### R8 step 4f: smoke.py (no data written)
+7.1 GET /webhook/ChatAudience -> [404] Did you mean to make a POST request?  OK
+7.1 GET /webhook/CreateWhatsappWorkflow -> [404] Did you mean to make a POST request?  OK
+7.1 GET /webhook/CreateTelegramWorkflow -> [404] Did you mean to make a POST request?  OK
+7.1 GET /webhook/DeleteBotFiles -> [404] Did you mean to make a POST request?  OK
+7.1 GET /webhook/SuggestReplies -> [404] Did you mean to make a POST request?  OK
+7.1 GET /webhook/DashboardOutcomes -> [404] Did you mean to make a POST request?  OK
+7.1 GET /webhook/WappiProxy -> [404] Did you mean to make a POST request?  OK
+7.1 GET /webhook/SetWorkflowState -> [404] Did you mean to make a POST request?  OK
+7.2 POST ChatAudience {} (no token) -> [401] {"success": false, "error": "unauthorized", "reason": "unauthorized:missing"}  OK
+7.3 POST ChatAudience {} (forged token) -> [401] {"success": false, "error": "unauthorized", "reason": "unauthorized:bad_signature"}  OK
+7.4 POST SetWorkflowState activate crChatAudience01 (no token) -> [400] {"success": false, "error": "protected_workflow"}  OK
+7.4 POST SetWorkflowState activate crAudienceDec001 (no token) -> [400] {"success": false, "error": "protected_workflow"}  OK
+SMOKE OK
+
+### R9 step 5: deploy-canonical --apply --yes one at a time, in the README's order
+### 22:10:37Z deploy-canonical --base http://localhost:5678 --only XuvOp7TxOImOAmlj --apply --yes
+~ XuvOp7TxOImOAmlj 'CreateWhatsappWorkflow' active=True nodes 52 → 52 (+0 -0)
+    rollback pointer: versionId 7a91d04e-8ae7-4f9c-9507-75c8e23a233e (activeVersionId 7a91d04e-8ae7-4f9c-9507-75c8e23a233e)
+    published by the PUT (served version = the update) — no publish call, no deactivate window
+    read-back: ok
+{"considered": 1, "missing": 0, "up_to_date": 0, "would_update": 0, "updated": 1, "would_publish": 0, "republished": 0, "inactive_must_run": 0, "failed": 0}
+exit=0
+### 22:10:37Z deploy-canonical --base http://localhost:5678 --only Uz6HBBUpAiUqVysB --apply --yes
+~ Uz6HBBUpAiUqVysB 'CreateTelegramWorkflow' active=True nodes 52 → 52 (+0 -0)
+    rollback pointer: versionId 102c0fbc-c50d-4f77-9018-a8ac88cc377b (activeVersionId 102c0fbc-c50d-4f77-9018-a8ac88cc377b)
+    published by the PUT (served version = the update) — no publish call, no deactivate window
+    read-back: ok
+{"considered": 1, "missing": 0, "up_to_date": 0, "would_update": 0, "updated": 1, "would_publish": 0, "republished": 0, "inactive_must_run": 0, "failed": 0}
+exit=0
+### 22:10:38Z deploy-canonical --base http://localhost:5678 --only lmjYsdNcQA2IE5rl --apply --yes
+~ lmjYsdNcQA2IE5rl 'Delete Bot Files' active=True nodes 19 → 19 (+0 -0)
+    rollback pointer: versionId 424bebba-da43-4d35-84a3-b248d229e7c6 (activeVersionId 424bebba-da43-4d35-84a3-b248d229e7c6)
+    published by the PUT (served version = the update) — no publish call, no deactivate window
+    read-back: ok
+{"considered": 1, "missing": 0, "up_to_date": 0, "would_update": 0, "updated": 1, "would_publish": 0, "republished": 0, "inactive_must_run": 0, "failed": 0}
+exit=0
+### 22:10:38Z deploy-canonical --base http://localhost:5678 --only fXYpCXPKw92EzRz8 --apply --yes
+~ fXYpCXPKw92EzRz8 'Profile Lifecycle Sweep' active=True nodes 41 → 42 (+1 -0)
+    rollback pointer: versionId ec7a194c-26b8-4b59-80b0-d8364ef4828e (activeVersionId ec7a194c-26b8-4b59-80b0-d8364ef4828e)
+    published by the PUT (served version = the update) — no publish call, no deactivate window
+    read-back: ok
+{"considered": 1, "missing": 0, "up_to_date": 0, "would_update": 0, "updated": 1, "would_publish": 0, "republished": 0, "inactive_must_run": 0, "failed": 0}
+exit=0
+### 22:10:39Z deploy-canonical --base http://localhost:5678 --only crWappiProxy0001 --apply --yes
+~ crWappiProxy0001 'Wappi Proxy' active=True nodes 24 → 24 (+0 -0)
+    rollback pointer: versionId 480a2240-930b-4386-a163-89c51e6519bb (activeVersionId 480a2240-930b-4386-a163-89c51e6519bb)
+    published by the PUT (served version = the update) — no publish call, no deactivate window
+    read-back: ok
+{"considered": 1, "missing": 0, "up_to_date": 0, "would_update": 0, "updated": 1, "would_publish": 0, "republished": 0, "inactive_must_run": 0, "failed": 0}
+exit=0
+### 22:10:39Z deploy-canonical --base http://localhost:5678 --only 9PTyYcelRQI7bGDb --apply --yes
+~ 9PTyYcelRQI7bGDb 'Suggest Replies' active=True nodes 26 → 26 (+0 -0)
+    rollback pointer: versionId 2af317b9-bd48-4611-8b87-026a73077146 (activeVersionId 2af317b9-bd48-4611-8b87-026a73077146)
+    published by the PUT (served version = the update) — no publish call, no deactivate window
+    read-back: ok
+{"considered": 1, "missing": 0, "up_to_date": 0, "would_update": 0, "updated": 1, "would_publish": 0, "republished": 0, "inactive_must_run": 0, "failed": 0}
+exit=0
+### 22:10:40Z deploy-canonical --base http://localhost:5678 --only 2htWSV5IHO8E2CgB --apply --yes
+~ 2htWSV5IHO8E2CgB 'Dashboard Outcomes' active=True nodes 16 → 16 (+0 -0)
+    rollback pointer: versionId 6ed39b17-7df0-41f5-ae4b-158023a5bd61 (activeVersionId 6ed39b17-7df0-41f5-ae4b-158023a5bd61)
+    published by the PUT (served version = the update) — no publish call, no deactivate window
+    read-back: ok
+{"considered": 1, "missing": 0, "up_to_date": 0, "would_update": 0, "updated": 1, "would_publish": 0, "republished": 0, "inactive_must_run": 0, "failed": 0}
+exit=0
+### 22:10:40Z deploy-canonical --base http://localhost:5678 --only 4wYitz5ek30SVNlT --apply --yes
+~ 4wYitz5ek30SVNlT 'WhatsApp Bot' active=False nodes 60 → 64 (+4 -0)
+    rollback pointer: versionId b3ddb7ca-58ab-4a96-a31f-7e8ea6611831 (activeVersionId None)
+    read-back: ok
+{"considered": 1, "missing": 0, "up_to_date": 0, "would_update": 0, "updated": 1, "would_publish": 0, "republished": 0, "inactive_must_run": 0, "failed": 0}
+exit=0
+### 22:10:41Z deploy-canonical --base http://localhost:5678 --only 4VN3gsFaC2HUYmcc --apply --yes
+~ 4VN3gsFaC2HUYmcc 'Telegram Bot' active=False nodes 60 → 64 (+4 -0)
+    rollback pointer: versionId 036d5c6b-feef-4a66-87be-3f3e0306cd34 (activeVersionId None)
+    read-back: ok
+{"considered": 1, "missing": 0, "up_to_date": 0, "would_update": 0, "updated": 1, "would_publish": 0, "republished": 0, "inactive_must_run": 0, "failed": 0}
+exit=0
+
+### R10a step 6.1: update-clones dry-run (the stand's two staging clones; on prod: the two clones of «2»)
+base http://localhost:5678 · mode dry-run · template stamps {'whatsapp': 'fda0c72318a8', 'telegram': '838d71744efa'}
+prompt map applied: Create/Edit Vertical Prompt as introduced in fce9987b (sha256 e027b4b39537) — deploy the matching Create/Edit BEFORE this run, or the next owner save would put an older head back
+~ stgtg40da979c774 'STAGING TG stgtg001' [telegram] active=True → +4 -0 ~9 conn=changed
+    add: ['Audience Known?', 'Business?', 'Decide Audience', 'Decided Business?']
+    remove: []
+    change: ['Acquire Send Lease', 'Cancel Label', 'Final Check', 'Latest+Combine', 'Outcome', 'Read Reply Mode', 'Reconcile Check', 'Record Outgoing', 'Suppressed?']
+    prompt: custom — kept verbatim (no Create/Edit grammar (Business Type line + Additional Instructions marker); replace only with --set-vertical stgtg40da979c774=<vertical id>)
+    keep: path='stgtg001' label line + owner tail, creds=['httpHeaderAuth', 'openAiApi', 'postgres']
+~ stgwab77f282533c 'STAGING WA stgwa001' [whatsapp] active=True → +4 -0 ~9 conn=changed
+    add: ['Audience Known?', 'Business?', 'Decide Audience', 'Decided Business?']
+    remove: []
+    change: ['Acquire Send Lease', 'Cancel Label', 'Final Check', 'Latest+Combine', 'Outcome', 'Read Reply Mode', 'Reconcile Check', 'Record Outgoing', 'Suppressed?']
+    prompt: custom — kept verbatim (no Create/Edit grammar (Business Type line + Additional Instructions marker); replace only with --set-vertical stgwab77f282533c=<vertical id>)
+    keep: path='stgwa001' label line + owner tail, creds=['httpHeaderAuth', 'openAiApi', 'postgres']
+{"clones": 2, "up_to_date": 0, "would_update": 2, "updated": 0, "failed": 0}
+
+### R10b step 6.2: update-clones --apply --yes
+base http://localhost:5678 · mode APPLY · template stamps {'whatsapp': 'fda0c72318a8', 'telegram': '838d71744efa'}
+prompt map applied: Create/Edit Vertical Prompt as introduced in fce9987b (sha256 e027b4b39537) — deploy the matching Create/Edit BEFORE this run, or the next owner save would put an older head back
+~ stgtg40da979c774 'STAGING TG stgtg001' [telegram] active=True → +4 -0 ~9 conn=changed
+    add: ['Audience Known?', 'Business?', 'Decide Audience', 'Decided Business?']
+    remove: []
+    change: ['Acquire Send Lease', 'Cancel Label', 'Final Check', 'Latest+Combine', 'Outcome', 'Read Reply Mode', 'Reconcile Check', 'Record Outgoing', 'Suppressed?']
+    prompt: custom — kept verbatim (no Create/Edit grammar (Business Type line + Additional Instructions marker); replace only with --set-vertical stgtg40da979c774=<vertical id>)
+    keep: path='stgtg001' label line + owner tail, creds=['httpHeaderAuth', 'openAiApi', 'postgres']
+    rollback pointer: versionId df1e2ab5-3f8f-4816-917c-3bfde4643380 (activeVersionId df1e2ab5-3f8f-4816-917c-3bfde4643380) before the update
+    published by the PUT (served version = the update) — no deactivate/activate window
+    read-back: ok
+~ stgwab77f282533c 'STAGING WA stgwa001' [whatsapp] active=True → +4 -0 ~9 conn=changed
+    add: ['Audience Known?', 'Business?', 'Decide Audience', 'Decided Business?']
+    remove: []
+    change: ['Acquire Send Lease', 'Cancel Label', 'Final Check', 'Latest+Combine', 'Outcome', 'Read Reply Mode', 'Reconcile Check', 'Record Outgoing', 'Suppressed?']
+    prompt: custom — kept verbatim (no Create/Edit grammar (Business Type line + Additional Instructions marker); replace only with --set-vertical stgwab77f282533c=<vertical id>)
+    keep: path='stgwa001' label line + owner tail, creds=['httpHeaderAuth', 'openAiApi', 'postgres']
+    rollback pointer: versionId 85777c99-08e4-442f-9423-5291bb97e53f (activeVersionId 85777c99-08e4-442f-9423-5291bb97e53f) before the update
+    published by the PUT (served version = the update) — no deactivate/activate window
+    read-back: ok
+{"clones": 2, "up_to_date": 0, "would_update": 0, "updated": 2, "failed": 0}
+
+### R10c step 6.2: update-clones dry-run again
+base http://localhost:5678 · mode dry-run · template stamps {'whatsapp': 'fda0c72318a8', 'telegram': '838d71744efa'}
+prompt map applied: Create/Edit Vertical Prompt as introduced in fce9987b (sha256 e027b4b39537) — deploy the matching Create/Edit BEFORE this run, or the next owner save would put an older head back
+= stgtg40da979c774 'STAGING TG stgtg001' [telegram] up to date (838d71744efa, graph-verified, prompt custom); prompt: custom — kept verbatim (no Create/Edit grammar (Business Type line + Additional Instructions marker); replace only with --set-vertical stgtg40da979c774=<vertical id>)
+= stgwab77f282533c 'STAGING WA stgwa001' [whatsapp] up to date (fda0c72318a8, graph-verified, prompt custom); prompt: custom — kept verbatim (no Create/Edit grammar (Business Type line + Additional Instructions marker); replace only with --set-vertical stgwab77f282533c=<vertical id>)
+{"clones": 2, "up_to_date": 2, "would_update": 0, "updated": 0, "failed": 0}
+
+### R11 step 6.3: verify-deployed after the package
+base http://localhost:5678: canonical 32 (diff 0), clones 2 (behind template 0, of them prompt head behind 0; custom prompts 2, not counted), archived clones 0 (not counted), other 2
+  prompt map = Create/Edit Vertical Prompt as introduced in fce9987b (sha256 e027b4b39537)
+  OK      0DP79STI3pafXO9B 0DP79STI3pafXO9B-Set_Workflow_State.json  active=True names=True graph=True published=True settings=True
+  OK      2htWSV5IHO8E2CgB 2htWSV5IHO8E2CgB-Dashboard_Outcomes.json  active=True names=True graph=True published=True settings=True
+  OK      2islisFH7jjLoPQM 2islisFH7jjLoPQM-Delete_Orphan_Profiles.json  active=True names=True graph=True published=True settings=True
+  OK      3qax5J9u2qsT9Vao 3qax5J9u2qsT9Vao-Edit_Whatsapp_Workflow.json  active=True names=True graph=True published=True settings=True
+  OK      4VN3gsFaC2HUYmcc 4VN3gsFaC2HUYmcc-Telegram_Bot.json  active=False names=True graph=True published=None settings=True
+  OK      4wYitz5ek30SVNlT 4wYitz5ek30SVNlT-WhatsApp_Bot.json  active=False names=True graph=True published=None settings=True
+  OK      9PTyYcelRQI7bGDb 9PTyYcelRQI7bGDb-Suggest_Replies.json  active=True names=True graph=True published=True settings=True
+  OK      KoTuIlk4LMrlvnWI KoTuIlk4LMrlvnWI-Upload_File.json  active=True names=True graph=True published=True settings=True
+  OK      SCLcpn6DMDG3Z4VN SCLcpn6DMDG3Z4VN-Set_Reply_Mode.json  active=True names=True graph=True published=True settings=True
+  OK      TwWPW3gIyjZS3foR TwWPW3gIyjZS3foR-Edit_Telegram_Workflow.json  active=True names=True graph=True published=True settings=True
+  OK      Uz6HBBUpAiUqVysB Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json  active=True names=True graph=True published=True settings=True
+  OK      XuvOp7TxOImOAmlj XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json  active=True names=True graph=True published=True settings=True
+  OK      ZGYr6srzS3rSSXHp ZGYr6srzS3rSSXHp-RevenueCat_Events.json  active=True names=True graph=True published=True settings=True
+  OK      ZTqpumOpL1rNDOp6 ZTqpumOpL1rNDOp6-Delete_File.json  active=True names=True graph=True published=True settings=True
+  OK      crAudienceDec001 crAudienceDec001-Decide_Audience.json  active=True names=True graph=True published=True settings=True
+  OK      crAuthSession001 crAuthSession001-Auth_Session.json  active=True names=True graph=True published=True settings=True
+  OK      crChannelWatch001 crChannelWatch001-Channel_Watch.json  active=True names=True graph=True published=True settings=True
+  OK      crChatAudience01 crChatAudience01-Chat_Audience.json  active=True names=True graph=True published=True settings=True
+  OK      crHandoffDry0001 crHandoffDry0001-Handoff_Request_Dry.json  active=True names=True graph=True published=True settings=True
+  OK      crHandoffNtfy001 crHandoffNtfy001-Handoff_Notifier.json  active=True names=True graph=True published=True settings=True
+  OK      crHandoffReq0001 crHandoffReq0001-Handoff_Request.json  active=True names=True graph=True published=True settings=True
+  OK      crHandoffsApi001 crHandoffsApi001-Handoffs.json  active=True names=True graph=True published=True settings=True
+  OK      crPriceSearch001 crPriceSearch001-Price_List_Search.json  active=True names=True graph=True published=True settings=True
+  OK      crSetSchedule001 crSetSchedule001-Set_Schedule.json  active=True names=True graph=True published=True settings=True
+  OK      crTestDialog0001 crTestDialog0001-Test_Dialog.json  active=True names=True graph=True published=True settings=True
+  OK      crVerifyIdent001 crVerifyIdent001-Verify_Identity.json  active=True names=True graph=True published=True settings=True
+  OK      crWappiProxy0001 crWappiProxy0001-Wappi_Proxy.json  active=True names=True graph=True published=True settings=True
+  OK      fXYpCXPKw92EzRz8 fXYpCXPKw92EzRz8-Profile_Lifecycle_Sweep.json  active=True names=True graph=True published=True settings=True
+  OK      hHwvfOvTCS42pXnq hHwvfOvTCS42pXnq-Landing_Lead.json  active=True names=True graph=True published=True settings=True
+  OK      jtbssfzXbOxwTK4k jtbssfzXbOxwTK4k-Get_Usage.json  active=True names=True graph=True published=True settings=True
+  OK      lmjYsdNcQA2IE5rl lmjYsdNcQA2IE5rl-Delete_Bot_Files.json  active=True names=True graph=True published=True settings=True
+  OK      olmqWMfcFpCEcpiE olmqWMfcFpCEcpiE-Support_Message.json  active=True names=True graph=True published=True settings=True
+  clone   stgtg40da979c774 'STAGING TG stgtg001' [telegram] active=True nodes=64 graph=838d71744efa published=838d71744efa sticky=838d71744efa AT-CANONICAL  prompt=custom (custom prompt — kept verbatim by update-clones, not counted: no Create/Edit grammar (Business Type line + Additional Instructions marker))
+  clone   stgwab77f282533c 'STAGING WA stgwa001' [whatsapp] active=True nodes=64 graph=fda0c72318a8 published=fda0c72318a8 sticky=fda0c72318a8 AT-CANONICAL  prompt=custom (custom prompt — kept verbatim by update-clones, not counted: no Create/Edit grammar (Business Type line + Additional Instructions marker))
+wrote /Users/ayan/Projects/Automation/.claude/worktrees/personal-chats/Tools/test-output/task18/stg-after.json
+
+### R11b package ids: stand «before» (live/published) -> «after» == canon (derived); deploy-canonical dry-run again
+  0DP79STI3pafXO9B  dcce761854bd/dcce761854bd -> 2a2b9eb5eba7/2a2b9eb5eba7  canon 2a2b9eb5eba7  DIFF -> OK  OK
+  2htWSV5IHO8E2CgB  5f4cd7fb634d/5f4cd7fb634d -> 13b0fa2cca2e/13b0fa2cca2e  canon 13b0fa2cca2e  DIFF -> OK  OK
+  4VN3gsFaC2HUYmcc  fcd3e263d926/None -> 57f41ae4c1aa/None  canon 57f41ae4c1aa  DIFF -> OK  OK
+  4wYitz5ek30SVNlT  79e8bc207459/None -> 8c19cb36d2f1/None  canon 8c19cb36d2f1  DIFF -> OK  OK
+  9PTyYcelRQI7bGDb  fc2f19c5c996/fc2f19c5c996 -> 84d59c9c26bb/84d59c9c26bb  canon 84d59c9c26bb  DIFF -> OK  OK
+  Uz6HBBUpAiUqVysB  dd800a689b8c/dd800a689b8c -> 4cd1edfccb31/4cd1edfccb31  canon 4cd1edfccb31  DIFF -> OK  OK
+  XuvOp7TxOImOAmlj  6dff0cee1215/6dff0cee1215 -> c8850413b1db/c8850413b1db  canon c8850413b1db  DIFF -> OK  OK
+  crAudienceDec001  None/None -> d63052ace385/d63052ace385  canon d63052ace385  MISSING -> OK  OK
+  crChatAudience01  None/None -> 53cd0623d38e/53cd0623d38e  canon 53cd0623d38e  MISSING -> OK  OK
+  crWappiProxy0001  8ec4c68137d0/8ec4c68137d0 -> b02c781af6af/b02c781af6af  canon b02c781af6af  DIFF -> OK  OK
+  fXYpCXPKw92EzRz8  192950031ab3/192950031ab3 -> b5e74444b0dc/b5e74444b0dc  canon b5e74444b0dc  DIFF -> OK  OK
+  lmjYsdNcQA2IE5rl  cf598d2a5e80/cf598d2a5e80 -> eb893f8056b0/eb893f8056b0  canon eb893f8056b0  DIFF -> OK  OK
+{"considered": 30, "missing": 0, "up_to_date": 30, "would_update": 0, "updated": 0, "would_publish": 0, "republished": 0, "inactive_must_run": 0, "failed": 0}
+{"considered": 1, "missing": 0, "up_to_date": 1, "would_update": 0, "updated": 0, "would_publish": 0, "republished": 0, "inactive_must_run": 0, "failed": 0}
+
+### R12 step 6.4: readback.py (on the stand the derived templates, Suggest Replies and clones keep successful executions — 'all'; on prod 'none')
+4wYitz5ek30SVNlT 4wYitz5ek30SVNlT-WhatsApp_Bot.json: saveDataSuccessExecution = 'all' (want 'all') OK
+4VN3gsFaC2HUYmcc 4VN3gsFaC2HUYmcc-Telegram_Bot.json: saveDataSuccessExecution = 'all' (want 'all') OK
+9PTyYcelRQI7bGDb 9PTyYcelRQI7bGDb-Suggest_Replies.json: saveDataSuccessExecution = 'all' (want 'all') OK
+9PTyYcelRQI7bGDb 9PTyYcelRQI7bGDb-Suggest_Replies.json: executionTimeout = 20 (want 20) OK
+crAudienceDec001 crAudienceDec001-Decide_Audience.json: saveDataSuccessExecution = 'none' (want 'none') OK
+crChatAudience01 crChatAudience01-Chat_Audience.json: saveDataSuccessExecution = 'none' (want 'none') OK
+crWappiProxy0001 crWappiProxy0001-Wappi_Proxy.json: saveDataSuccessExecution = 'none' (want 'none') OK
+clone stgtg40da979c774 'STAGING TG stgtg001' [telegram] active=True: saveDataSuccessExecution = 'all' (want 'all') OK
+clone stgwab77f282533c 'STAGING WA stgwa001' [whatsapp] active=True: saveDataSuccessExecution = 'all' (want 'all') OK
+clones read: 2
+READ-BACK OK
+
+### R13 step 7: smoke.py --session
+7.1 GET /webhook/ChatAudience -> [404] Did you mean to make a POST request?  OK
+7.1 GET /webhook/CreateWhatsappWorkflow -> [404] Did you mean to make a POST request?  OK
+7.1 GET /webhook/CreateTelegramWorkflow -> [404] Did you mean to make a POST request?  OK
+7.1 GET /webhook/DeleteBotFiles -> [404] Did you mean to make a POST request?  OK
+7.1 GET /webhook/SuggestReplies -> [404] Did you mean to make a POST request?  OK
+7.1 GET /webhook/DashboardOutcomes -> [404] Did you mean to make a POST request?  OK
+7.1 GET /webhook/WappiProxy -> [404] Did you mean to make a POST request?  OK
+7.1 GET /webhook/SetWorkflowState -> [404] Did you mean to make a POST request?  OK
+7.2 POST ChatAudience {} (no token) -> [401] {"success": false, "error": "unauthorized", "reason": "unauthorized:missing"}  OK
+7.3 POST ChatAudience {} (forged token) -> [401] {"success": false, "error": "unauthorized", "reason": "unauthorized:bad_signature"}  OK
+7.4 POST SetWorkflowState activate crChatAudience01 (no token) -> [400] {"success": false, "error": "protected_workflow"}  OK
+7.4 POST SetWorkflowState activate crAudienceDec001 (no token) -> [400] {"success": false, "error": "protected_workflow"}  OK
+7.5 AuthSession bootstrap (one anonymous install) -> [200] {"success": true, "installId": "4a2dcc41-9852-4ad5-b3d6-13edce690b70", "token": "<hidden>"}  OK
+7.6 POST ChatAudience list [] (that session's token) -> [400] {"success": false, "error": "bad_request", "reason": "profileIds"}  OK
+SMOKE OK
+
+### R14 step 8.1 + 8.3: watch.py (errors since the stand deploy start) and watch.py --sweep (no stand tick yet)
+crAudienceDec001 GET 200 | error executions since 2026-11-01T22:04:58Z: []
+crChatAudience01 GET 200 | error executions since 2026-11-01T22:04:58Z: []
+0DP79STI3pafXO9B GET 200 | error executions since 2026-11-01T22:04:58Z: []
+XuvOp7TxOImOAmlj GET 200 | error executions since 2026-11-01T22:04:58Z: []
+Uz6HBBUpAiUqVysB GET 200 | error executions since 2026-11-01T22:04:58Z: []
+lmjYsdNcQA2IE5rl GET 200 | error executions since 2026-11-01T22:04:58Z: []
+fXYpCXPKw92EzRz8 GET 200 | error executions since 2026-11-01T22:04:58Z: []
+crWappiProxy0001 GET 200 | error executions since 2026-11-01T22:04:58Z: []
+9PTyYcelRQI7bGDb GET 200 | error executions since 2026-11-01T22:04:58Z: []
+2htWSV5IHO8E2CgB GET 200 | error executions since 2026-11-01T22:04:58Z: []
+whole instance GET 200 | error executions since 2026-11-01T22:04:58Z: []
+fXYpCXPKw92EzRz8 GET 200 | executions since 2026-11-01T22:04:58Z: 0
+  no execution yet: the Sweep ticks every 6 hours (00:00 / 06:00 / 12:00 / 18:00 Asia/Almaty) — run this again after the next tick
+
+### R14b step 8.3 on a real execution: a probe workflow with the derived «Wipe Personal Chats» node, read by watch.py --sweep --workflow <probe>
+probe LegfrkT4QuEnjymC execution 52806 status success
+LegfrkT4QuEnjymC GET 200 | executions since 2026-11-01T22:12:10Z: 1
+  execution 52806 2026-11-01T22:12:11.052Z status success | Wipe Personal Chats: [{"wiped_chats": 0, "deleted_rows": 0}] | OK 
+watch.py exit 0
+   waiting 35s before deleting 1 workflow(s) that ran (n8n insights flush, ≥ 35 s rule)
+probe switched off and deleted (>= 35 s after its run)
+
+### R15 derive-staging.py (no import): workflows-staging = the package canon (e2e reads derived nodes from disk)
+staging isolation: KoTuIlk4LMrlvnWI-Upload_File.json: ['Supabase Vector Store (+3 sub-nodes)', 'Store Original File']
+staging isolation: ZTqpumOpL1rNDOp6-Delete_File.json: ['Delete Stored Original']
+staging price search: crPriceSearch001-Price_List_Search.json: ['Search Price Lists (+1 sub-nodes)']
+staging isolation: lmjYsdNcQA2IE5rl-Delete_Bot_Files.json: ['Delete Stored Original']
+33 workflows + 2 staging bots -> /Users/ayan/Projects/Automation/.claude/worktrees/personal-chats/Tools/n8n/workflows-staging
+n8n base http://localhost:5678; Wappi -> http://127.0.0.1:8765; postgres -> 'Postgres Staging' (stgPostgres000001)
+note: left dangling on purpose (isolation): ['Support Bot']
+
+### R16 step 9 played on the stand: docs/audits/2026-10-25-personal-chats/stand-canary.py — a bot made through the PUBLIC API (Create WA/TG) calls the CLI-imported, API-published crAudienceDec001
+PASS  canary_api_clone[wa] (40s)
+      {"create": [200, true, "CFOpVkaMH4z9iTVd"], "profile": "profile-000001", "new": {"webhook": 200, "execution": "52813", "outcome": "sent", "decide_ran": true, "decide": {"audience": "business", "outcome": "business"}, "decision": "business|default|new", "sends": 1}, "contact": {"webhook": 200, "execution": "52816", "outcome": "personal_contact", "decide_ran": true, "decide": {"audience": "personal", "outcome": "personal_contact"}, "decision": "personal|default|contact", "sends": 0, "stored": {"history": 0, "memory": 0, "outcomes": 0, "handoffs": 0, "ledger": 0, "state": 0, "sets": 0, "flags": 0}}, "panel": {"http": 200, "error": "personal_chat", "cards": 0, "llm_ran": false, "gate": "personal_chat"}, "list": [200, [["contact", "personal", "default", "contact"], ["new", "business", "default", "new"]], 1793563976616], "connection(moment-created s, phone)": ["0", "-"]}
+PASS  canary_api_clone[tg] (37s)
+      {"create": [200, true, "gwOj6GwDeOJjC9Un"], "profile": "profile-000003", "new": {"webhook": 200, "execution": "52825", "outcome": "sent", "decide_ran": true, "decide": {"audience": "business", "outcome": "business"}, "decision": "business|default|new", "sends": 1}, "contact": {"webhook": 200, "execution": "52828", "outcome": "personal_contact", "decide_ran": true, "decide": {"audience": "personal", "outcome": "personal_contact"}, "decision": "personal|default|contact", "sends": 0, "stored": {"history": 0, "memory": 0, "outcomes": 0, "handoffs": 0, "ledger": 0, "state": 0, "sets": 0, "flags": 0}}, "panel": {"http": 200, "error": "personal_chat", "cards": 0, "llm_ran": false, "gate": "personal_chat"}, "list": [200, [["contact", "personal", "default", "contact"], ["new", "business", "default", "new"]], 1793564015935], "connection(moment-created s, phone)": ["0", "-"]}
+   cleanup: deleted rows: 1
+   cleanup: 2 owner fixture(s)
+   waiting 30s before deleting 2 workflow(s) that ran (n8n insights flush, ≥ 35 s rule)
+
+2 pass, 0 fail
+
+### R17 health.sql and canary.sql through n8n's Postgres node (after the canary's cleanup)
+--- health.sql (22:15:02Z)
+200 {"suspicious":"0","profiles":[]}
+--- canary.sql (22:15:39Z)
+200 {"decisions":[],"connections":[],"personal_history_rows":"0","personal_memory_rows":"0","personal_ledger_rows":"0","ledger_last_day":[]}
+
+### R17b health.sql positive control: an Ensure-made connection 2 h old without a decision (listed), the same with a decision and a fresh one (not listed); rows removed
+200 {"suspicious":"1","profiles":[{"profile_id":"stg-health-silent","connected_at":"2026-11-01T19:16Z","row_created":"2026-11-01T20:16Z"}]}
+control rows removed: 0
+
+=== §D. e2e на развёрнутом стенде ===
+
+### D.1 e2e-audience.py (full, WA + TG)
+R18 start 2026-11-01T22:17:16Z
+   pre-run: swept 0 stale mock profile(s) (live mock knows 0)
+PASS  contact_no_reply_nothing_written[wa] (4s) — a saved contact writes first (WhatsApp: contact.FullName on the chat card; Telegram: user.Contact) → personal / contact is written once; no reply, no read receipt, no typing; nothing about the chat is stored (history, memory, «Сводка», ledger); the only Wappi call is the card read — no history read
+      {"outcome": "personal_contact", "decide": {"audience": "personal", "outcome": "personal_contact"}, "status": "success", "decision": "personal|default|contact", "stored": {"history": 0, "memory": 0, "outcomes": 0, "handoffs": 0, "ledger": 0, "state": 0, "sets": 0, "flags": 0}, "reads": [["chats/filter", {"client_name": "77020034885"}]], "touched": 0}
+PASS  contact_no_reply_nothing_written[tg] (4s) — a saved contact writes first (WhatsApp: contact.FullName on the chat card; Telegram: user.Contact) → personal / contact is written once; no reply, no read receipt, no typing; nothing about the chat is stored (history, memory, «Сводка», ledger); the only Wappi call is the card read — no history read
+      {"outcome": "personal_contact", "decide": {"audience": "personal", "outcome": "personal_contact"}, "status": "success", "decision": "personal|default|contact", "stored": {"history": 0, "memory": 0, "outcomes": 0, "handoffs": 0, "ledger": 0, "state": 0, "sets": 0, "flags": 0}, "reads": [["chats/get", {"limit": "20", "offset": "0", "order": "desc"}]], "touched": 0}
+PASS  new_person_replies[wa] (30s) — a new person (not in the contacts — WhatsApp: the card's contact with an empty FullName, the webhook's contact_name his own profile name; Telegram: user.Contact false) writes first after the first minutes, no conversation before the connection → business / new is written and the AI replies once. The profile starts with NO connection row: Decide Audience's Ensure Connection creates it with the line's moment (bot_profiles.created_at), on the stand's task runners
+      {"outcome": "sent", "decide": {"audience": "business", "outcome": "business"}, "status": "success", "decision": "business|default|new", "connection(moment−created s, phone)": ["0", "-"], "sends": 1, "ledger": "sent", "history": "np-af8450f04dca:client,sent-000001:ai", "reads": [["chats/filter", {"client_name": "77024199178"}], ["messages/get", {"chat_id": "77024199178@c.us", "limit": "50", "order": "desc"}]]}
+PASS  new_person_replies[tg] (32s) — a new person (not in the contacts — WhatsApp: the card's contact with an empty FullName, the webhook's contact_name his own profile name; Telegram: user.Contact false) writes first after the first minutes, no conversation before the connection → business / new is written and the AI replies once. The profile starts with NO connection row: Decide Audience's Ensure Connection creates it with the line's moment (bot_profiles.created_at), on the stand's task runners
+      {"outcome": "sent", "decide": {"audience": "business", "outcome": "business"}, "status": "success", "decision": "business|default|new", "connection(moment−created s, phone)": ["0", "-"], "sends": 1, "ledger": "sent", "history": "np-af8450f04dca:client,sent-000002:ai", "reads": [["chats/get", {"limit": "20", "offset": "0", "order": "desc"}], ["messages/get", {"chat_id": "565970532", "limit": "50", "order": "desc"}]]}
+PASS  wa_never_saved_number_writes_first_replies_once[wa] (32s) — a WhatsApp number that was never in the address book writes first (the card's contact present, FullName / PushName empty, Found false), no conversation before the connection, after the first minutes → business; the AI replies exactly once — the re-delivered webhook is a duplicate
+      {"outcome": "sent", "decide": {"audience": "business", "outcome": "business"}, "status": "success", "decision": "business|default|new", "outcomes": ["duplicate", "sent"], "sends": 1}
+PASS  old_chat_no_reply[wa] (3s) — a person who is not a contact but wrote before the connection (the newest page holds rows older than the moment) → personal / history; no reply, nothing stored. On Telegram the mock answers order=asc the way tapi does (the newest page, re-sorted): a regression to «the oldest message» would see only the trigger and answer an old acquaintance — the scenario would fail
+      {"outcome": "personal_history", "decide": {"audience": "personal", "outcome": "personal_history"}, "status": "success", "decision": "personal|default|history", "stored": {"history": 0, "memory": 0, "outcomes": 0, "handoffs": 0, "ledger": 0, "state": 0, "sets": 0, "flags": 0}, "reads": [["chats/filter", {"client_name": "77020513447"}], ["messages/get", {"chat_id": "77020513447@c.us", "limit": "50", "order": "desc"}]]}
+PASS  old_chat_no_reply[tg] (3s) — a person who is not a contact but wrote before the connection (the newest page holds rows older than the moment) → personal / history; no reply, nothing stored. On Telegram the mock answers order=asc the way tapi does (the newest page, re-sorted): a regression to «the oldest message» would see only the trigger and answer an old acquaintance — the scenario would fail
+      {"outcome": "personal_history", "decide": {"audience": "personal", "outcome": "personal_history"}, "status": "success", "decision": "personal|default|history", "stored": {"history": 0, "memory": 0, "outcomes": 0, "handoffs": 0, "ledger": 0, "state": 0, "sets": 0, "flags": 0}, "reads": [["chats/get", {"limit": "20", "offset": "0", "order": "desc"}], ["messages/get", {"chat_id": "560422464", "limit": "50", "order": "desc"}]]}
+PASS  settle_window_no_reply_no_write[wa] (34s) — inside the first minutes after the connection (the line's moment a minute ago, no connection row: Ensure Connection creates it) a new person's message gets no reply, asks Wappi nothing, writes no decision and stores nothing; once the window is over (the moment moved back past it) the next message decides business and is answered
+      {"first": {"outcome": "personal_settling", "decide": {"audience": "personal", "outcome": "personal_settling"}, "status": "success"}, "reads_first": [], "connection_first": ["0", "-"], "decision_first": "", "stored_first": {"history": 0, "memory": 0, "outcomes": 0, "handoffs": 0, "ledger": 0, "state": 0, "sets": 0, "flags": 0}, "second": {"outcome": "sent", "decide": {"audience": "business", "outcome": "business"}, "status": "success"}, "decision": "business|default|new", "sends": 1}
+PASS  settle_window_no_reply_no_write[tg] (34s) — inside the first minutes after the connection (the line's moment a minute ago, no connection row: Ensure Connection creates it) a new person's message gets no reply, asks Wappi nothing, writes no decision and stores nothing; once the window is over (the moment moved back past it) the next message decides business and is answered
+      {"first": {"outcome": "personal_settling", "decide": {"audience": "personal", "outcome": "personal_settling"}, "status": "success"}, "reads_first": [], "connection_first": ["0", "-"], "decision_first": "", "stored_first": {"history": 0, "memory": 0, "outcomes": 0, "handoffs": 0, "ledger": 0, "state": 0, "sets": 0, "flags": 0}, "second": {"outcome": "sent", "decide": {"audience": "business", "outcome": "business"}, "status": "success"}, "decision": "business|default|new", "sends": 1}
+PASS  wappi_failure_then_next_message_decides[wa] (30s) — Wappi answers HTTP 500 — first to the chat card, then to the history read — so the fact is not known: those messages are personal (no reply, nothing stored) and NO decision is written; the next message asks again, decides business and is answered
+      {"card_500": {"outcome": "personal_unknown", "decide": {"audience": "personal", "outcome": "personal_unknown"}, "status": "success"}, "history_500": {"outcome": "personal_unknown", "decide": {"audience": "personal", "outcome": "personal_unknown"}, "status": "success"}, "after_each": ["", ""], "next": {"outcome": "sent", "decide": {"audience": "business", "outcome": "business"}, "status": "success"}, "decision": "business|default|new", "sends": 1}
+PASS  wappi_failure_then_next_message_decides[tg] (30s) — Wappi answers HTTP 500 — first to the chat card, then to the history read — so the fact is not known: those messages are personal (no reply, nothing stored) and NO decision is written; the next message asks again, decides business and is answered
+      {"card_500": {"outcome": "personal_unknown", "decide": {"audience": "personal", "outcome": "personal_unknown"}, "status": "success"}, "history_500": {"outcome": "personal_unknown", "decide": {"audience": "personal", "outcome": "personal_unknown"}, "status": "success"}, "after_each": ["", ""], "next": {"outcome": "sent", "decide": {"audience": "business", "outcome": "business"}, "status": "success"}, "decision": "business|default|new", "sends": 1}
+PASS  make_business_fresh_replies_once[wa] (43s) — a chat decided personal (a saved contact) whose client is waiting: the owner makes it business (ChatAudience set) → the start of the conversation reaches the history and the memory (the owner's answer with the owner mark), the waiting message (2 minutes old) is handed to the bot again and answered exactly once; the same set again replays nothing. WhatsApp: the rows are listed under the number, the card names the chat's code — the replayed message carries it as whatsapp_chat_id
+      {"first": {"outcome": "personal_contact", "decide": {"audience": "personal", "outcome": "personal_contact"}, "status": "success"}, "set": [200, [{"chatId": "77028308462@c.us", "applied": true, "kind": "business", "version": 1793571678974, "refused": null}]], "replayed": {"id": "mbt-af8450f04dca", "chatId": "77028308462@c.us", "from": "77028308462@c.us", "whatsapp_chat_id": "100038863432491@lid"}, "run": {"outcome": "sent", "decide": null, "status": "success"}, "sends": 1, "ledger": "sent", "history": "mbf-af8450f04dca:client,mbo-af8450f04dca:owner_phone,mbt-af8450f04dca:client,sent-000014:ai", "memory": "human:client,ai:owner_phone,human:agent,ai:agent", "same_set_again": [200, 0]}
+PASS  make_business_fresh_replies_once[tg] (43s) — a chat decided personal (a saved contact) whose client is waiting: the owner makes it business (ChatAudience set) → the start of the conversation reaches the history and the memory (the owner's answer with the owner mark), the waiting message (2 minutes old) is handed to the bot again and answered exactly once; the same set again replays nothing. WhatsApp: the rows are listed under the number, the card names the chat's code — the replayed message carries it as whatsapp_chat_id
+      {"first": {"outcome": "personal_contact", "decide": {"audience": "personal", "outcome": "personal_contact"}, "status": "success"}, "set": [200, [{"chatId": "563905427", "applied": true, "kind": "business", "version": 1793571721949, "refused": null}]], "replayed": {"id": "mbt-af8450f04dca", "chatId": "563905427", "from": "563905427", "whatsapp_chat_id": null}, "run": {"outcome": "sent", "decide": null, "status": "success"}, "sends": 1, "ledger": "sent", "history": "mbf-af8450f04dca:client,mbo-af8450f04dca:owner_phone,mbt-af8450f04dca:client,sent-000015:ai", "memory": "human:client,ai:owner_phone,human:agent,ai:agent", "same_set_again": [200, 0]}
+PASS  wa_lid_rows_make_business_backfills_and_replays[wa] (36s) — a WhatsApp chat Wappi lists under its @lid code (the list entry under the number with chat.LID = the code, every messages/get row under the code, the webhook with chatId = the number and whatsapp_chat_id = the code), decided personal (a saved contact), made business by the owner → ChatAudience reads the card, backfills the conversation under the NUMBER (history + memory, nothing under the code), sends exactly one replay with chatId = from = the number and whatsapp_chat_id = the code, and the replayed run — whose reads list the chat under the code, which the bot takes as the chat's — answers exactly once: outcome sent, one send, the ledger under the number says sent
+      {"first": {"outcome": "personal_contact", "decide": {"audience": "personal", "outcome": "personal_contact"}, "status": "success"}, "set": 200, "card_reads": [["chats/filter", {"client_name": "77027655324"}]], "history": "ldf-af8450f04dca:client,ldo-af8450f04dca:owner_phone,ldt-af8450f04dca:client,sent-000016:ai", "history_under_code": "", "memory": "human:client,ai:owner_phone,human:agent,ai:agent", "memory_under_code": "", "replays": 1, "executions": 1, "replayed": {"id": "ldt-af8450f04dca", "chatId": "77027655324@c.us", "from": "77027655324@c.us", "whatsapp_chat_id": "100038537992250@lid"}, "replayed_run": {"outcome": "sent", "ledger": "sent", "last_node": "Outcome"}, "sends": 1}
+PASS  make_business_stale_no_reply[wa] (10s) — a personal chat whose client wrote 25 hours ago: the owner makes it business → the conversation is backfilled (the old message included), nothing is handed to the bot, no reply
+      {"first": {"outcome": "personal_contact", "decide": {"audience": "personal", "outcome": "personal_contact"}, "status": "success"}, "set": 200, "history": "msf-af8450f04dca:client,mso-af8450f04dca:owner_phone,mst-af8450f04dca:client", "memory": "human:client,ai:owner_phone,human:client", "bot_runs_after": 0, "sends": 0}
+PASS  make_business_stale_no_reply[tg] (10s) — a personal chat whose client wrote 25 hours ago: the owner makes it business → the conversation is backfilled (the old message included), nothing is handed to the bot, no reply
+      {"first": {"outcome": "personal_contact", "decide": {"audience": "personal", "outcome": "personal_contact"}, "status": "success"}, "set": 200, "history": "msf-af8450f04dca:client,mso-af8450f04dca:owner_phone,mst-af8450f04dca:client", "memory": "human:client,ai:owner_phone,human:client", "bot_runs_after": 0, "sends": 0}
+PASS  backfill_owner_app_send_unless_the_assistant_worked[wa] (8s) — the owner answers from the app (the Wappi Proxy's message.send — the transport marks the send as an API send) in two chats that have no decision, so nothing records it; then he makes both business (ChatAudience set) → in the chat where the assistant never worked the backfill restores his answer as owner_app with the owner mark; in the chat whose tariff usage the account holds (the assistant worked there, an earlier month) the same kind of message may be the assistant's own old reply and is skipped; the client's question and the owner's phone message are stored in both, nothing is replayed
+      {"sends(http, id)": {"fresh": [200, "sent-000017"], "worked": [200, "sent-000018"]}, "before": {"fresh": {"history": 0, "memory": 0, "outcomes": 0, "handoffs": 0, "ledger": 0, "state": 0, "sets": 0, "flags": 0}, "worked": {"history": 0, "memory": 0, "outcomes": 0, "handoffs": 0, "ledger": 0, "state": 0, "sets": 0, "flags": 0}}, "set": [200, [{"chatId": "77026885419@c.us", "applied": true, "kind": "business", "version": 1793571821255, "refused": null}, {"chatId": "77024802052@c.us", "applied": true, "kind": "business", "version": 1793571821256, "refused": null}]], "rows": {"fresh": "3", "worked": "2"}, "fresh": ["bafq-af8450f04dca:client,bafp-af8450f04dca:owner_phone,sent-000017:owner_app", "human:client,ai:owner_phone,ai:owner_app", "Владелец: Записал вас на завтра, 10:00"], "worked": ["bawq-af8450f04dca:client,bawp-af8450f04dca:owner_phone", "human:client,ai:owner_phone"]}
+PASS  backfill_owner_app_send_unless_the_assistant_worked[tg] (8s) — the owner answers from the app (the Wappi Proxy's message.send — the transport marks the send as an API send) in two chats that have no decision, so nothing records it; then he makes both business (ChatAudience set) → in the chat where the assistant never worked the backfill restores his answer as owner_app with the owner mark; in the chat whose tariff usage the account holds (the assistant worked there, an earlier month) the same kind of message may be the assistant's own old reply and is skipped; the client's question and the owner's phone message are stored in both, nothing is replayed
+      {"sends(http, id)": {"fresh": [200, "sent-000019"], "worked": [200, "sent-000020"]}, "before": {"fresh": {"history": 0, "memory": 0, "outcomes": 0, "handoffs": 0, "ledger": 0, "state": 0, "sets": 0, "flags": 0}, "worked": {"history": 0, "memory": 0, "outcomes": 0, "handoffs": 0, "ledger": 0, "state": 0, "sets": 0, "flags": 0}}, "set": [200, [{"chatId": "568399361", "applied": true, "kind": "business", "version": 1793571828802, "refused": null}, {"chatId": "560383334", "applied": true, "kind": "business", "version": 1793571828803, "refused": null}]], "rows": {"fresh": "3", "worked": "2"}, "fresh": ["bafq-af8450f04dca:client,bafp-af8450f04dca:owner_phone,sent-000019:owner_app", "human:client,ai:owner_phone,ai:owner_app", "Владелец: Записал вас на завтра, 10:00"], "worked": ["bawq-af8450f04dca:client,bawp-af8450f04dca:owner_phone", "human:client,ai:owner_phone"]}
+PASS  make_personal_cancels_inflight[wa] (33s) — a business chat; while the AI composes the answer the owner makes the chat personal → the send lease refuses (cancelled_personal), nothing is sent, the reply's draft leaves the memory
+      {"run": {"outcome": "cancelled_personal", "decide": null, "status": "success"}, "ledger": "cancelled_personal", "sends": 0, "ai_drafts": "0", "decision": "personal|owner|owner"}
+PASS  make_personal_cancels_inflight[tg] (33s) — a business chat; while the AI composes the answer the owner makes the chat personal → the send lease refuses (cancelled_personal), nothing is sent, the reply's draft leaves the memory
+      {"run": {"outcome": "cancelled_personal", "decide": null, "status": "success"}, "ledger": "cancelled_personal", "sends": 0, "ai_drafts": "0", "decision": "personal|owner|owner"}
+PASS  tg_bot_777000_channel_no_reply[tg] (11s) — Telegram: a bot's message (the webhook's chat_type bot, is_bot true), the service account 777000, a channel post, and a bot known only from its card (user.Bot) → personal / nonhuman each, written; no reply, nothing stored; the first three ask Wappi nothing; the owner cannot make 777000 business (refused nonhuman)
+      {"per_chat(outcome, decision, nothing_stored, transport_actions)": {"566138075": ["personal_nonhuman", "personal|default|nonhuman", true, 0], "777000": ["personal_nonhuman", "personal|default|nonhuman", true, 0], "-100567604085": ["personal_nonhuman", "personal|default|nonhuman", true, 0], "565258469": ["personal_nonhuman", "personal|default|nonhuman", true, 0]}, "reads": {"566138075": [], "777000": [], "-100567604085": [], "565258469": [["chats/get", {"limit": "20", "offset": "0", "order": "desc"}]]}, "owner_set_777000": {"chatId": "777000", "applied": false, "kind": "personal", "version": 0, "refused": "nonhuman"}}
+PASS  wa_newsletter_no_reply[wa] (9s) — WhatsApp: a channel (@newsletter), the status list (status@broadcast) and a group id (@g.us) — should Wappi ever deliver them with from == chatId — are personal / nonhuman by the id alone: no Wappi call, no reply, nothing stored; the owner cannot make the channel business (refused nonhuman)
+      {"per_chat(outcome, decision, nothing_stored, reads, transport_actions)": {"12036377026683342@newsletter": ["personal_nonhuman", "personal|default|nonhuman", true, [], 0], "status@broadcast": ["personal_nonhuman", "personal|default|nonhuman", true, [], 0], "12036477026683342@g.us": ["personal_nonhuman", "personal|default|nonhuman", true, [], 0]}, "owner_set_channel": {"chatId": "12036377026683342@newsletter", "applied": false, "kind": "personal", "version": 0, "refused": "nonhuman"}}
+PASS  self_message_not_recorded[wa] (3s) — the owner writes to himself («Избранное»): it arrives as outgoing_message_phone with is_me 1 and the chat = his own number (Telegram: his own user id) → recorded nowhere (the chat has no business decision), no decision written, no reply
+      {"outcome": "ignored_personal", "decide": null, "status": "success", "decision": "", "stored": {"history": 0, "memory": 0, "outcomes": 0, "handoffs": 0, "ledger": 0, "state": 0, "sets": 0, "flags": 0}}
+PASS  self_message_not_recorded[tg] (4s) — the owner writes to himself («Избранное»): it arrives as outgoing_message_phone with is_me 1 and the chat = his own number (Telegram: his own user id) → recorded nowhere (the chat has no business decision), no decision written, no reply
+      {"outcome": "ignored_personal", "decide": null, "status": "success", "decision": "", "stored": {"history": 0, "memory": 0, "outcomes": 0, "handoffs": 0, "ledger": 0, "state": 0, "sets": 0, "flags": 0}}
+PASS  owner_app_send_in_personal_not_recorded[wa] (6s) — the owner's messages from the app (Wappi Proxy message.send) go out in every chat, but only a BUSINESS chat records them (owner_app history + the marked memory row); a personal chat and a chat without a decision record nothing
+      {"sends(http, id)": {"77020721762@c.us": [200, true], "77025948700@c.us": [200, true], "77025419633@c.us": [200, true]}, "business": ["sent-000023:owner_app", "ai:owner_app"], "personal": {"history": 0, "memory": 0, "outcomes": 0, "handoffs": 0, "ledger": 0, "state": 0, "sets": 0, "flags": 0}, "undecided": {"history": 0, "memory": 0, "outcomes": 0, "handoffs": 0, "ledger": 0, "state": 0, "sets": 0, "flags": 0}}
+PASS  owner_app_send_in_personal_not_recorded[tg] (6s) — the owner's messages from the app (Wappi Proxy message.send) go out in every chat, but only a BUSINESS chat records them (owner_app history + the marked memory row); a personal chat and a chat without a decision record nothing
+      {"sends(http, id)": {"560338336": [200, true], "561080091": [200, true], "562425107": [200, true]}, "business": ["sent-000026:owner_app", "ai:owner_app"], "personal": {"history": 0, "memory": 0, "outcomes": 0, "handoffs": 0, "ledger": 0, "state": 0, "sets": 0, "flags": 0}, "undecided": {"history": 0, "memory": 0, "outcomes": 0, "handoffs": 0, "ledger": 0, "state": 0, "sets": 0, "flags": 0}}
+PASS  suggest_refused_for_personal[wa] (6s) — Suggest Replies refuses a personal chat and a chat without a decision on the server (personal_chat for the session caller): the model never runs and nothing is counted; a business chat gets cards
+      {"refused(http, error, cards, llm_ran, gate, counted)": {"77028965526@c.us": [200, "personal_chat", 0, false, "personal_chat", "0"], "77026911957@c.us": [200, "personal_chat", 0, false, "personal_chat", "0"]}, "business": [200, 4, null, "1"]}
+PASS  suggest_refused_for_personal[tg] (6s) — Suggest Replies refuses a personal chat and a chat without a decision on the server (personal_chat for the session caller): the model never runs and nothing is counted; a business chat gets cards
+      {"refused(http, error, cards, llm_ran, gate, counted)": {"560988459": [200, "personal_chat", 0, false, "personal_chat", "0"], "568950627": [200, "personal_chat", 0, false, "personal_chat", "0"]}, "business": [200, 4, null, "1"]}
+PASS  dashboard_hides_personal[wa] (2s) — «Сводка» shows a business chat's outcome and leaves out a personal one — its verdict and its open handoff alike — at once (not when its data is wiped); made business again, it comes back
+      {"personal": [200, [["77029069365@c.us", "classifier"]]], "made_business": [200, [["77021845141@c.us", "event"], ["77029069365@c.us", "classifier"]]]}
+PASS  dashboard_hides_personal[tg] (2s) — «Сводка» shows a business chat's outcome and leaves out a personal one — its verdict and its open handoff alike — at once (not when its data is wiped); made business again, it comes back
+      {"personal": [200, [["564962976", "classifier"]]], "made_business": [200, [["564962976", "classifier"], ["568427910", "event"]]]}
+PASS  wipe_after_two_days[wa] (3s) — the Sweep's «Wipe Personal Chats» (the derived node, run on the real n8n): a chat the owner made personal more than 2 days ago loses what the assistant stored about it (memory, history, «Сводка», handoffs, ledger, chat state, shown sets, its own reply-mode row) and is marked wiped; one still inside that limit keeps everything; the bot-wide reply-mode row and the tariff usage stay
+      {"node": {"wiped_chats": 1, "deleted_rows": 9}, "old": {"history": 0, "memory": 0, "outcomes": 0, "handoffs": 0, "ledger": 0, "state": 0, "sets": 0, "flags": 0}, "recent": {"history": 1, "memory": 2, "outcomes": 1, "handoffs": 1, "ledger": 1, "state": 1, "sets": 1, "flags": 1}, "wiped": "77028011244@c.us:true\n77029675811@c.us:false", "bot_wide_flag": "1", "usage_rows": "2"}
+PASS  wipe_after_two_days[tg] (3s) — the Sweep's «Wipe Personal Chats» (the derived node, run on the real n8n): a chat the owner made personal more than 2 days ago loses what the assistant stored about it (memory, history, «Сводка», handoffs, ledger, chat state, shown sets, its own reply-mode row) and is marked wiped; one still inside that limit keeps everything; the bot-wide reply-mode row and the tariff usage stay
+      {"node": {"wiped_chats": 1, "deleted_rows": 9}, "old": {"history": 0, "memory": 0, "outcomes": 0, "handoffs": 0, "ledger": 0, "state": 0, "sets": 0, "flags": 0}, "recent": {"history": 1, "memory": 2, "outcomes": 1, "handoffs": 1, "ledger": 1, "state": 1, "sets": 1, "flags": 1}, "wiped": "560349413:true\n568457143:false", "bot_wide_flag": "1", "usage_rows": "2"}
+PASS  reconnect_keeps_decisions[wa] (3s) — a reconnect (a NEW profile of the same bot: Create from settings, the same number) keeps the owner's marks, the computed decisions and the connection moment: the bind moves them onto the new profile, the app's connected report for it says restarted false and the moment is the first connection's
+      {"connected#1": [200, {"success": true, "connectedAt": 1793571960358, "restarted": false, "restored": false}], "before": [200, 1793571960358, [["77025759430@c.us", "personal", "default", "contact"], ["77026410041@c.us", "business", "owner", "owner"], ["77029647910@c.us", "personal", "owner", "owner"]]], "create#2": [200, ["profile-000027"]], "connected#2": [200, {"success": true, "connectedAt": 1793571960358, "restarted": false, "restored": false}], "after": [200, 1793571960358, [["77025759430@c.us", "personal", "default", "contact"], ["77026410041@c.us", "business", "owner", "owner"], ["77029647910@c.us", "personal", "owner", "owner"]]], "left_on_old(decisions|connection)": "0|0"}
+PASS  reconnect_keeps_decisions[tg] (3s) — a reconnect (a NEW profile of the same bot: Create from settings, the same number) keeps the owner's marks, the computed decisions and the connection moment: the bind moves them onto the new profile, the app's connected report for it says restarted false and the moment is the first connection's
+      {"connected#1": [200, {"success": true, "connectedAt": 1793571963408, "restarted": false, "restored": false}], "before": [200, 1793571963408, [["566793585", "personal", "default", "contact"], ["568206416", "personal", "owner", "owner"], ["568211612", "business", "owner", "owner"]]], "create#2": [200, ["profile-000029"]], "connected#2": [200, {"success": true, "connectedAt": 1793571963408, "restarted": false, "restored": false}], "after": [200, 1793571963408, [["566793585", "personal", "default", "contact"], ["568206416", "personal", "owner", "owner"], ["568211612", "business", "owner", "owner"]]], "left_on_old(decisions|connection)": "0|0"}
+PASS  delete_bot_wipes_decisions[wa] (3s) — deleting the bot (Delete Bot Files from the app) deletes its chat decisions and its connection moment with the rest of its line; another profile's decisions stay
+      {"before(decisions|connection)": "3|1", "delete": [200, {"success": true, "deletedAudience": 3, "deletedConnections": 1}], "after": "0|0", "another_profile": "personal|owner|owner"}
+PASS  delete_bot_wipes_decisions[tg] (3s) — deleting the bot (Delete Bot Files from the app) deletes its chat decisions and its connection moment with the rest of its line; another profile's decisions stay
+      {"before(decisions|connection)": "3|1", "delete": [200, {"success": true, "deletedAudience": 3, "deletedConnections": 1}], "after": "0|0", "another_profile": "personal|owner|owner"}
+PASS  number_change_voids_defaults[wa] (33s) — another number connected to the same profile (the app's connected report; the server reads the number from get/status) restarts the connection: restarted true, the computed decisions stop holding (gone from the list; the next message of such a chat is undecided again — inside the new first minutes, no reply), the owner's decision holds (its chat is still answered)
+      {"connected": [200, {"success": true, "connectedAt": 1793571973967, "restarted": true, "restored": false}], "connection(phone|fresh)": "77020000077|true", "list(this scenario's chats)": [["77025766975@c.us", "business", "owner", "owner"]], "list_sources": ["owner"], "voided_chat_next_message": {"outcome": "personal_settling", "decide": {"audience": "personal", "outcome": "personal_settling"}, "status": "success"}, "owners_chat": {"outcome": "sent", "decide": null, "status": "success"}, "sends": [0, 1]}
+PASS  number_change_voids_defaults[tg] (33s) — another number connected to the same profile (the app's connected report; the server reads the number from get/status) restarts the connection: restarted true, the computed decisions stop holding (gone from the list; the next message of such a chat is undecided again — inside the new first minutes, no reply), the owner's decision holds (its chat is still answered)
+      {"connected": [200, {"success": true, "connectedAt": 1793572006738, "restarted": true, "restored": false}], "connection(phone|fresh)": "77020000077|true", "list(this scenario's chats)": [["560621452", "business", "owner", "owner"]], "list_sources": ["owner"], "voided_chat_next_message": {"outcome": "personal_settling", "decide": {"audience": "personal", "outcome": "personal_settling"}, "status": "success"}, "owners_chat": {"outcome": "sent", "decide": null, "status": "success"}, "sends": [0, 1]}
+PASS  number_change_rule_personal_wipes_business_history[wa] (6s) — a client of the OLD number (decided business, its history, memory and the rest stored), then another number connected (the app's connected report; the server reads it from get/status): the chat's next message, after the new first minutes, is decided personal by the rule — the person is a saved contact of the new number — so no reply and the wipe clock starts at that decision; with the clock moved back past 2 days, the Sweep's «Wipe Personal Chats» deletes the business period and marks the chat wiped; the tariff usage stays
+      {"before": {"history": 1, "memory": 2, "outcomes": 1, "handoffs": 1, "ledger": 1, "state": 1, "sets": 1, "flags": 1}, "connected": [200, {"success": true, "connectedAt": 1793572039553, "restarted": true, "restored": false}], "outcome": "personal_contact", "decide": {"audience": "personal", "outcome": "personal_contact"}, "status": "success", "sends": 0, "decision(kind|source|reason|clock|clock=decided_at|not wiped)": "personal|default|contact|true|true|true", "kept_until_the_wipe": {"history": 1, "memory": 2, "outcomes": 1, "handoffs": 1, "ledger": 1, "state": 1, "sets": 1, "flags": 1}, "node": {"wiped_chats": 1, "deleted_rows": 9}, "after": {"history": 0, "memory": 0, "outcomes": 0, "handoffs": 0, "ledger": 0, "state": 0, "sets": 0, "flags": 0}, "wiped|kind": "true|personal", "usage_rows": "1"}
+PASS  number_change_rule_personal_wipes_business_history[tg] (5s) — a client of the OLD number (decided business, its history, memory and the rest stored), then another number connected (the app's connected report; the server reads it from get/status): the chat's next message, after the new first minutes, is decided personal by the rule — the person is a saved contact of the new number — so no reply and the wipe clock starts at that decision; with the clock moved back past 2 days, the Sweep's «Wipe Personal Chats» deletes the business period and marks the chat wiped; the tariff usage stays
+      {"before": {"history": 1, "memory": 2, "outcomes": 1, "handoffs": 1, "ledger": 1, "state": 1, "sets": 1, "flags": 1}, "connected": [200, {"success": true, "connectedAt": 1793572045065, "restarted": true, "restored": false}], "outcome": "personal_contact", "decide": {"audience": "personal", "outcome": "personal_contact"}, "status": "success", "sends": 0, "decision(kind|source|reason|clock|clock=decided_at|not wiped)": "personal|default|contact|true|true|true", "kept_until_the_wipe": {"history": 1, "memory": 2, "outcomes": 1, "handoffs": 1, "ledger": 1, "state": 1, "sets": 1, "flags": 1}, "node": {"wiped_chats": 1, "deleted_rows": 9}, "after": {"history": 0, "memory": 0, "outcomes": 0, "handoffs": 0, "ledger": 0, "state": 0, "sets": 0, "flags": 0}, "wiped|kind": "true|personal", "usage_rows": "1"}
+PASS  wrong_number_return_restores[wa] (37s) — a mistaken pairing — another account paired to the bot's profile (the app's connected report; the server reads the number from get/status) — undone the same day by pairing the previous number again (within 24 hours): the answer says restored (restarted false) with the earlier moment; the previous number's client — decided business, his conversation stored — is still business and listed, the decision computed on the mistaken account is not; his next message is answered at once (no first minutes, no new decision), no wipe clock starts and nothing he had is wiped. Another client of the previous number wrote to the mistaken number meanwhile and its account knows him (a saved contact there): Decide Audience decided him personal on it and the wipe clock started — after the return, with the clock 2 days old, the Sweep's «Wipe Personal Chats» leaves him alone (the clock is the mistaken account's)
+      {"before": {"history": 1, "memory": 2, "outcomes": 1, "handoffs": 1, "ledger": 1, "state": 1, "sets": 1, "flags": 0}, "mistaken": [200, {"success": true, "connectedAt": 1793572050997, "restarted": true, "restored": false}], "return": [200, {"success": true, "connectedAt": 1793312849581, "restarted": false, "restored": true}], "connection(phone|ms|remembered)": "77010000099|1793312849581|77020000055", "moment": 1793312849581, "list(this scenario's chats)": [["77023330633@c.us", "business", "default", "new"]], "list_moment": 1793312849581, "outcome": "sent", "decide": null, "status": "success", "sends": 1, "ledger": "sent", "decision(kind|source|reason|no clock|not wiped)": "business|default|new|true|true", "after": {"history": 3, "memory": 4, "outcomes": 1, "handoffs": 1, "ledger": 2, "state": 1, "sets": 1, "flags": 0}, "second_client_on_the_mistaken_number": {"outcome": "personal_contact", "decide": {"audience": "personal", "outcome": "personal_contact"}, "status": "success"}, "second_client_sends": 0, "second_client(kind|source|reason|clock|number)": "personal|default|contact|true|77020000055", "wipe_node": {"wiped_chats": 0, "deleted_rows": 0}, "second_client_stored(before|after the wipe)": [{"history": 1, "memory": 2, "outcomes": 1, "handoffs": 1, "ledger": 1, "state": 1, "sets": 1, "flags": 1}, {"history": 1, "memory": 2, "outcomes": 1, "handoffs": 1, "ledger": 1, "state": 1, "sets": 1, "flags": 1}], "second_client(kind|clock|not wiped)": "personal|true|true"}
+PASS  wrong_number_return_restores[tg] (37s) — a mistaken pairing — another account paired to the bot's profile (the app's connected report; the server reads the number from get/status) — undone the same day by pairing the previous number again (within 24 hours): the answer says restored (restarted false) with the earlier moment; the previous number's client — decided business, his conversation stored — is still business and listed, the decision computed on the mistaken account is not; his next message is answered at once (no first minutes, no new decision), no wipe clock starts and nothing he had is wiped. Another client of the previous number wrote to the mistaken number meanwhile and its account knows him (a saved contact there): Decide Audience decided him personal on it and the wipe clock started — after the return, with the clock 2 days old, the Sweep's «Wipe Personal Chats» leaves him alone (the clock is the mistaken account's)
+      {"before": {"history": 1, "memory": 2, "outcomes": 1, "handoffs": 1, "ledger": 1, "state": 1, "sets": 1, "flags": 0}, "mistaken": [200, {"success": true, "connectedAt": 1793572088162, "restarted": true, "restored": false}], "return": [200, {"success": true, "connectedAt": 1793312886741, "restarted": false, "restored": true}], "connection(phone|ms|remembered)": "77010000098|1793312886741|77020000055", "moment": 1793312886741, "list(this scenario's chats)": [["567966011", "business", "default", "new"]], "list_moment": 1793312886741, "outcome": "sent", "decide": null, "status": "success", "sends": 1, "ledger": "sent", "decision(kind|source|reason|no clock|not wiped)": "business|default|new|true|true", "after": {"history": 3, "memory": 4, "outcomes": 1, "handoffs": 1, "ledger": 2, "state": 1, "sets": 1, "flags": 0}, "second_client_on_the_mistaken_number": {"outcome": "personal_contact", "decide": {"audience": "personal", "outcome": "personal_contact"}, "status": "success"}, "second_client_sends": 0, "second_client(kind|source|reason|clock|number)": "personal|default|contact|true|77020000055", "wipe_node": {"wiped_chats": 0, "deleted_rows": 0}, "second_client_stored(before|after the wipe)": [{"history": 1, "memory": 2, "outcomes": 1, "handoffs": 1, "ledger": 1, "state": 1, "sets": 1, "flags": 1}, {"history": 1, "memory": 2, "outcomes": 1, "handoffs": 1, "ledger": 1, "state": 1, "sets": 1, "flags": 1}], "second_client(kind|clock|not wiped)": "personal|true|true"}
+   cleanup: deleted rows: 124
+   cleanup: 27 owner fixture(s)
+
+42 pass, 0 fail
+exit=0
+R18 end 2026-11-01T22:29:37Z
+
+### D.2 after e2e: verify-deployed + the n8n log
+### verify-deployed --base http://localhost:5678 (22:29:54Z)
+base http://localhost:5678: canonical 32 (diff 0), clones 2 (behind template 0, of them prompt head behind 0; custom prompts 2, not counted), archived clones 0 (not counted), other 2
+  prompt map = Create/Edit Vertical Prompt as introduced in fce9987b (sha256 e027b4b39537)
+OK rows: 32
+  clone   stgtg40da979c774 'STAGING TG stgtg001' [telegram] active=True nodes=64 graph=838d71744efa published=838d71744efa sticky=838d71744efa AT-CANO
+  clone   stgwab77f282533c 'STAGING WA stgwa001' [whatsapp] active=True nodes=64 graph=fda0c72318a8 published=fda0c72318a8 sticky=fda0c72318a8 AT-CANO
+exit=0
+### n8n log since the current server start (line 62140 of    62245)
+'Error while saving insights' lines: 0
+error / exception lines:
+9PTyYcelRQI7bGDb GET 200 | error executions since 2026-11-01T22:04:58Z: []
+2htWSV5IHO8E2CgB GET 200 | error executions since 2026-11-01T22:04:58Z: []
+whole instance GET 200 | error executions since 2026-11-01T22:04:58Z: []
+
+=== §E. Гейты (канон не тронут) ===
+
+### E.1 every generator --check (inject-prompts.py skipped: tiktoken is not installed here — its transform is unchanged, the prompt maps equal main's)
+### apply-auth-gate.py --check
+auth gate: OK
+rc=0
+### apply-billing-consolidation.py --check
+billing consolidation: OK
+rc=0
+### apply-clone-lifecycle.py --check
+clone lifecycle: OK
+rc=0
+### apply-history-handoff.py --check
+history/handoff: OK
+rc=0
+### apply-learning-a.py --check
+learning A: OK
+rc=0
+### apply-learning-b.py --check
+learning B: OK
+rc=0
+### apply-outcome-stamps.py --check
+outcome stamps: OK
+rc=0
+### apply-personal-wipe.py --check
+personal wipe: OK
+rc=0
+### apply-reply-mode-v2.py --check
+reply-mode v2: OK
+rc=0
+### apply-reply-pipeline-v2.py --check
+reply pipeline v2: OK
+rc=0
+### apply-slot-count-fix.py --check
+OK  XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json
+OK  Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json
+rc=0
+### apply-suggest-v2.py --check
+suggest v2: OK
+rc=0
+### apply-sweep-clone-deactivate.py --check
+sweep clone deactivate: OK
+rc=0
+### build-auth-workflows.py --check
+auth workflows: up to date
+rc=0
+### build-channel-watch.py --check
+channel watch: OK
+rc=0
+### build-chat-audience.py --check
+chat audience: OK
+rc=0
+### build-decide-audience.py --check
+decide audience: OK
+rc=0
+### build-handoff-workflows.py --check
+handoff workflows: OK
+rc=0
+### build-price-search.py --check
+price search: OK
+rc=0
+### build-set-schedule.py --check
+set schedule: OK
+rc=0
+### build-test-dialog.py --check
+test dialog: OK
+rc=0
+### build-verify-identity.py --check
+verify identity: OK
+rc=0
+### inject-panel-prompts.py --check
+9PTyYcelRQI7bGDb-Suggest_Replies.json: up-to-date
+rc=0
+### clone_lineage.py --check
+clone_lineage: 11 statements, 0 findings
+rc=0
+
+### E.2 every offline verifier
+### verify-auth-gate.py
+OK  0DP79STI3pafXO9B-Set_Workflow_State.json (gate + rule {'legacy': True})
+OK  SCLcpn6DMDG3Z4VN-Set_Reply_Mode.json (gate + rule {'profiles': ['profileIds'], 'legacy': True})
+OK  9PTyYcelRQI7bGDb-Suggest_Replies.json (gate + rule {'profiles': ['profileId'], 'workflows': ['botWaId', 'botTgId'], 'appUser': ['appUserId'], 'legacy': True})
+OK  2htWSV5IHO8E2CgB-Dashboard_Outcomes.json (gate + rule {'profiles': ['profileIds'], 'legacy': True})
+OK  jtbssfzXbOxwTK4k-Get_Usage.json (gate + rule {'appUser': ['appUserId'], 'legacy': True})
+OK  KoTuIlk4LMrlvnWI-Upload_File.json (gate + rule {'workflows': ['whatsappWorkflowId', 'telegramWorkflowId'], 'legacy': True})
+OK  ZTqpumOpL1rNDOp6-Delete_File.json (gate + rule {'legacy': True})
+OK  lmjYsdNcQA2IE5rl-Delete_Bot_Files.json (gate + rule {'legacy': True})
+OK  XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json (gate + rule {'profiles': ['WhatsappProfileId'], 'workflows': ['TelegramWorkflowId'], 'appUser': ['AppUserID'], 'appUserRequired': ['AppUserID'], 'legacy': True})
+OK  Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json (gate + rule {'profiles': ['TelegramProfileId'], 'workflows': ['WhatsappWorkflowId'], 'appUser': ['AppUserID'], 'appUserRequired': ['AppUserID'], 'legacy': True})
+OK  3qax5J9u2qsT9Vao-Edit_Whatsapp_Workflow.json (gate + rule {'workflows': ['WhatsappWorkflowId', 'TelegramWorkflowId'], 'legacy': True})
+OK  TwWPW3gIyjZS3foR-Edit_Telegram_Workflow.json (gate + rule {'workflows': ['WhatsappWorkflowId', 'TelegramWorkflowId'], 'legacy': True})
+OK  olmqWMfcFpCEcpiE-Support_Message.json (gate + rule {'legacy': True})
+OK  crWappiProxy0001-Wappi_Proxy.json (allow-list, ownership, no legacy, no stored executions)
+OK  crAuthSession001-Auth_Session.json (cap, hash compare, single round-trip refresh, TTL, claim scoping, M4 retired refusal, V3 conflict journal)
+OK  4wYitz5ek30SVNlT-WhatsApp_Bot.json (callback bound to the registered profile)
+OK  4VN3gsFaC2HUYmcc-Telegram_Bot.json (callback bound to the registered profile)
+OK  Upload File / Delete File (ownership registry + owner-scoped delete)
+OK  XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json (workflow id + owner bound to the profile, on Bind's positive marker)
+OK  Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json (workflow id + owner bound to the profile, on Bind's positive marker)
+OK  Delete Bot Files / Set Workflow State (V12: database ownership, honest answer, idempotent delete)
+OK  Delete Bot Files (T5: every deleting node by the bot's line, app_delete, the line's clones booked)
+OK  Set Workflow State (protected list carries Auth Session + Wappi Proxy)
+ALL AUTH GATE ASSERTS PASSED
+rc=0
+### verify-billing-consolidation.py
+OK  ZGYr6srzS3rSSXHp-RevenueCat_Events.json (Consolidate Aliases / Transfer Subscriber = billing_consolidation.py; plan carried only from an active alias into a never-paid seed without a period — trialing or sweep-demoted trial/expired; settled = no row version; no re-key from RevenueCat)
+ALL BILLING CONSOLIDATION ASSERTS PASSED
+rc=0
+### verify-channel-watch.py
+OK  crChannelWatch001-Channel_Watch.json (every 10 min; the sweeps' floor / cap / boolean-only rules; a notice only for a recorded DOWN, at most 6 counted attempts, through ANOTHER channel of the same install that THIS run's list shows authorised, the A5 owner-number rule, the full A4 text, delivered-only stamp; protected; tripwire self-check: 24 mutations rejected)
+ALL CHANNEL WATCH ASSERTS PASSED
+rc=0
+### verify-clone-lifecycle.py
+OK  fXYpCXPKw92EzRz8-Profile_Lifecycle_Sweep.json (T5: branch A deletes the booked clones past the dry-run gate; V12 skips superseded rows)
+OK  XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json (the bot's line: plan → reuse | create → bind on its marker → discard on every no)
+OK  Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json (the bot's line: plan → reuse | create → bind on its marker → discard on every no)
+OK  Create WA / TG are one graph
+ALL CLONE LIFECYCLE ASSERTS PASSED
+rc=0
+### verify-history-handoff.py
+OK  4wYitz5ek30SVNlT-WhatsApp_Bot.json
+OK  4VN3gsFaC2HUYmcc-Telegram_Bot.json
+OK  handoff workflows (request / notifier / app webhook)
+OK  test dialog (no memory, no send, no quota, dry handoff, owner check)
+OK  integrations (Create types / Dashboard / Delete / Set State / proxy)
+OK  journal (prod keeps no successful execution of the bots and the panel; staging keeps them; clones follow)
+ALL HISTORY/HANDOFF ASSERTS PASSED
+rc=0
+### verify-learning-a.py
+learning A verify: OK
+rc=0
+### verify-learning-b.py
+learning B verify: OK
+rc=0
+### verify-message-batching.py
+OK  4wYitz5ek30SVNlT-WhatsApp_Bot.json (Latest+Combine's own rows: chat identity tripwire, 8 mutations rejected)
+OK  4VN3gsFaC2HUYmcc-Telegram_Bot.json (Latest+Combine's own rows: chat identity tripwire, 8 mutations rejected)
+OK  cross-template identity
+ALL BATCHING ASSERTS PASSED
+rc=0
+### verify-orphan-sweep.py
+OK  2islisFH7jjLoPQM-Delete_Orphan_Profiles.json (Live Profiles → Plan Sweep: a once-authorised profile with a live bot_profiles row is never deleted, a never-authorised one is swept as before; a failed live read protects every profile, an empty one none; nothing disabled, the old guards intact; tripwire self-check: 13 mutations rejected)
+ALL ORPHAN SWEEP ASSERTS PASSED
+rc=0
+### verify-personal-chats.py
+OK  wipe: Wipe Personal Chats = audience.WIPE_SQL, a target of Every 6 Hours and of nothing else (no dry-run gate), the first branch it runs, terminal, fail-open; the statement keeps its safety shape; tripwire self-check: 39 mutations rejected
+OK  readers: the proxy's Record Owner Send, the panel's gate (+ Gate Decision, Build Response) and «Сводка» (Find Changed Sessions, Fetch Outcomes) pass only business chats (audience.BUSINESS_SQL); tripwire self-check: 16 mutations rejected
+OK  webhook: crChatAudience01 = build-chat-audience.py's output — token-only gate, Validate (wildcard, limits), the op fork, audience.py's statements, the answer before the tail, Wappi reads without mark_all, the WhatsApp chat card's @lid code, the replay to localhost only after the backfill, the A5 phone rule, protected everywhere; tripwire self-check: 74 mutations rejected
+OK  decide: crAudienceDec001 = build-decide-audience.py's output — nine inputs (no contactName), every edge ending in Shape, positive-field gates, three statements of audience.py each behind its gate, two Wappi reads (neverError, 10 s, never mark_all, never asc), RULE_JS verbatim, business only on the written row, protected everywhere; tripwire self-check: 67 mutations rejected
+personal chats verify: OK
+rc=0
+### verify-reply-mode.py
+OK  SCLcpn6DMDG3Z4VN-Set_Reply_Mode.json (versioned atomic upsert, per-profile report, 400/500 codes)
+OK  XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json (initial reply mode seeded before the clone exists; a clone only on the saved marker)
+OK  Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json (initial reply mode seeded before the clone exists; a clone only on the saved marker)
+OK  bot templates (gate read unchanged: absence → reply)
+ALL REPLY MODE ASSERTS PASSED
+rc=0
+### verify-reply-pipeline.py
+OK  4wYitz5ek30SVNlT-WhatsApp_Bot.json
+OK  4VN3gsFaC2HUYmcc-Telegram_Bot.json
+OK  cross-template identity of the stage-3 nodes; chat identity tripwire: 32 mutations rejected
+ALL REPLY PIPELINE ASSERTS PASSED
+rc=0
+### verify-set-schedule.py
+ALL SET SCHEDULE ASSERTS PASSED
+rc=0
+### verify-sql-comments.py
+OK  109 Postgres node(s) in 33 workflow file(s): no placeholder outside code, no {{ }}, no modifier, no leading =
+rc=0
+### verify-telegram-parity.py
+OK  4VN3gsFaC2HUYmcc-Telegram_Bot.json
+OK  reply mode gate (B1: the schedule term, WA == TG, no node added)
+OK  audience gate (personal chats: WA == TG but the channel, the chat code and Telegram's not-a-person term)
+OK  Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json
+OK  XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json
+OK  XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json (canonical-export invariant)
+OK  Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json (canonical-export invariant)
+OK  XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json (refused create deletes the profile, retires its row, answers channel_limit)
+OK  Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json (refused create deletes the profile, retires its row, answers channel_limit)
+OK  4VN3gsFaC2HUYmcc-Telegram_Bot.json (dialog-metering wiring)
+OK  4wYitz5ek30SVNlT-WhatsApp_Bot.json (dialog-metering wiring)
+OK  both bot templates share byte-identical metering SQL + Code
+OK  4VN3gsFaC2HUYmcc-Telegram_Bot.json (model id pinned)
+OK  4wYitz5ek30SVNlT-WhatsApp_Bot.json (model id pinned)
+OK  9PTyYcelRQI7bGDb-Suggest_Replies.json
+OK  ZGYr6srzS3rSSXHp-RevenueCat_Events.json (usage carry gated on snapshot acceptance)
+OK  ZGYr6srzS3rSSXHp-RevenueCat_Events.json (idempotency ledger: read-only fail-open gate, written only inside the upsert statement, update gated on it)
+ALL PARITY ASSERTS PASSED
+rc=0
+### verify-verify-identity.py
+OK  crVerifyIdent001-Verify_Identity.json (token-only gate, identity from crAuth, RevenueCat v2 aliases read-only, nothing written without RevenueCat's list + Plan Heal's decision, Heal = billing_consolidation.CONSOLIDATE_SQL + its journal CTE, success only on 'healed', refusals 409 + journaled after the answer, the journal carries Validate's hint, protected)
+ALL VERIFY IDENTITY ASSERTS PASSED
+rc=0
+### node verify-panel-prompts.js
+sentinel table
+  OK    auto_parts: sentinel unique
+  OK    wholesale: sentinel unique
+  OK    flowers: sentinel unique
+  OK    kaspi_seller: sentinel unique
+  OK    education: sentinel unique
+  OK    phone_repair: sentinel unique
+  OK    auto_parts: sentinel present in panel/auto_parts.md
+  OK    wholesale: sentinel present in panel/wholesale.md
+  OK    flowers: sentinel present in panel/flowers.md
+  OK    kaspi_seller: sentinel present in panel/kaspi_seller.md
+  OK    education: sentinel present in panel/education.md
+  OK    phone_repair: sentinel present in panel/phone_repair.md
+
+composed systemPrompt (per vertical)
+  OK    auto_parts: contains sentinel
+  OK    auto_parts: contains subordinating НИША header
+  OK    auto_parts: НИША precedes ДОП. ИНСТРУКЦИИ
+  OK    wholesale: contains sentinel
+  OK    wholesale: contains subordinating НИША header
+  OK    wholesale: НИША precedes ДОП. ИНСТРУКЦИИ
+  OK    flowers: contains sentinel
+  OK    flowers: contains subordinating НИША header
+  OK    flowers: НИША precedes ДОП. ИНСТРУКЦИИ
+  OK    kaspi_seller: contains sentinel
+  OK    kaspi_seller: contains subordinating НИША header
+  OK    kaspi_seller: НИША precedes ДОП. ИНСТРУКЦИИ
+  OK    education: contains sentinel
+  OK    education: contains subordinating НИША header
+  OK    education: НИША precedes ДОП. ИНСТРУКЦИИ
+  OK    phone_repair: contains sentinel
+  OK    phone_repair: contains subordinating НИША header
+  OK    phone_repair: НИША precedes ДОП. ИНСТРУКЦИИ
+
+composed systemPrompt (empty + legacy id)
+  OK    (empty): no НИША block
+  OK    (empty): no vertical sentinel leaks
+  OK    (empty): base rules still present
+  OK    car_service: no НИША block
+  OK    car_service: no vertical sentinel leaks
+  OK    car_service: base rules still present
+
+PASS
+rc=0
+### python3 verify_rag.py all
+VERIFY OK: all
+rc=0
+### python3 verify-telegram-parity.py --self-test
+ok   control: the unmodified set passes every check
+ok   old_wiring [WA]: caught by [refusal chain WA] XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json: node 'Retire Refused Profile' not found -- the refusal chain Delete Refused Profile -> Retire Refused Pr
+ok   old_wiring [TG]: caught by [refusal chain TG] Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json: node 'Retire Refused Profile' not found -- the refusal chain Delete Refused Profile -> Retire Refused Pr
+ok   delete_to_respond [WA]: caught by [refusal chain WA] XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json: Delete Refused Profile -> [['Respond Channel Limit']], expected [['Retire Refused Profile']] (one output
+ok   delete_to_respond [TG]: caught by [refusal chain TG] Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json: Delete Refused Profile -> [['Respond Channel Limit']], expected [['Retire Refused Profile']] (one output
+ok   retire_into_creation [WA]: caught by [refusal chain WA] XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json: Retire Refused Profile -> [['Retire Same Bot Slot']], expected [['Respond Channel Limit']] (one output, 
+ok   retire_into_creation [TG]: caught by [refusal chain TG] Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json: Retire Refused Profile -> [['Retire Same Bot Slot']], expected [['Respond Channel Limit']] (one output, 
+ok   fanout_into_creation [WA]: caught by [refusal chain WA] XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json: Delete Refused Profile -> [['Retire Refused Profile', 'Retire Same Bot Slot']], expected [['Retire Refus
+ok   fanout_into_creation [TG]: caught by [refusal chain TG] Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json: Delete Refused Profile -> [['Retire Refused Profile', 'Retire Same Bot Slot']], expected [['Retire Refus
+ok   over_limit_to_creation [WA]: caught by [refusal chain WA] XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json: If Slot Limit's over-limit branch goes to ['Retire Same Bot Slot'], expected ['Delete Refused Profile']
+ok   over_limit_to_creation [TG]: caught by [refusal chain TG] Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json: If Slot Limit's over-limit branch goes to ['Retire Same Bot Slot'], expected ['Delete Refused Profile']
+ok   retire_disabled [WA]: caught by [refusal chain WA] XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json: Retire Refused Profile is disabled -- the refused profile's row keeps counting as a channel
+ok   retire_disabled [TG]: caught by [refusal chain TG] Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json: Retire Refused Profile is disabled -- the refused profile's row keeps counting as a channel
+ok   retire_fail_closed [WA]: caught by [refusal chain WA] XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json: Retire Refused Profile onError is None, not continueRegularOutput -- a Postgres error would abort the ex
+ok   retire_fail_closed [TG]: caught by [refusal chain TG] Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json: Retire Refused Profile onError is None, not continueRegularOutput -- a Postgres error would abort the ex
+ok   retire_error_output_to_creation [WA]: caught by [refusal chain WA] XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json: Retire Refused Profile onError is 'continueErrorOutput', not continueRegularOutput -- a Postgres error w
+ok   retire_error_output_to_creation [TG]: caught by [refusal chain TG] Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json: Retire Refused Profile onError is 'continueErrorOutput', not continueRegularOutput -- a Postgres error w
+ok   where_without_workflow_guard [WA]: caught by [refusal chain WA] XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json: Retire Refused Profile WHERE lost `workflow_id is null` -- it could retire a row other than the refused,
+ok   where_without_workflow_guard [TG]: caught by [refusal chain TG] Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json: Retire Refused Profile WHERE lost `workflow_id is null` -- it could retire a row other than the refused,
+ok   where_by_owner [WA]: caught by [refusal chain WA] XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json: Retire Refused Profile WHERE is widened past the refused profile ('app_user_id'): "app_user_id = (select
+ok   where_by_owner [TG]: caught by [refusal chain TG] Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json: Retire Refused Profile WHERE is widened past the refused profile ('app_user_id'): "app_user_id = (select
+ok   retire_on_allowed_branch [WA]: caught by [refusal chain WA] XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json: ['Respond Channel Limit', 'Retire Refused Profile'] reachable from the ALLOWED branch -- the delete/reti
+ok   retire_on_allowed_branch [TG]: caught by [refusal chain TG] Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json: ['Respond Channel Limit', 'Retire Refused Profile'] reachable from the ALLOWED branch -- the delete/reti
+ok   retire_cte_select [WA]: caught by [refusal chain WA] XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json: Retire Refused Profile can emit NO item on a zero-row result (typeVersion 2.6, alwaysOutputData None, to
+ok   retire_cte_select [TG]: caught by [refusal chain TG] Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json: Retire Refused Profile can emit NO item on a zero-row result (typeVersion 2.6, alwaysOutputData None, to
+ok   retire_other_channel_field [WA]: caught by [refusal chain WA] XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json: Retire Refused Profile queryReplacement wrong (channel field / binding):
+ok   retire_other_channel_field [TG]: caught by [refusal chain TG] Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json: Retire Refused Profile queryReplacement wrong (channel field / binding):
+ok   retire_dev_credential [WA]: caught by [canonical export WA] XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json: Retire Refused Profile's postgres credential id is not canonical: {'id': 'devPgCred000001', 'name': 'Pos
+ok   retire_dev_credential [TG]: caught by [canonical export TG] Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json: Retire Refused Profile's postgres credential id is not canonical: {'id': 'devPgCred000001', 'name': 'Pos
+ok   respond_not_terminal [WA]: caught by [refusal chain WA] XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json: Respond Channel Limit gained an outgoing connection (it must stay the terminal `lastNode` response)
+ok   respond_not_terminal [TG]: caught by [refusal chain TG] Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json: Respond Channel Limit gained an outgoing connection (it must stay the terminal `lastNode` response)
+ok   respond_merges_input [WA]: caught by [refusal chain WA] XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json: Respond Channel Limit now merges its input -- the delete/retire payload would leak into the refusal body
+ok   respond_merges_input [TG]: caught by [refusal chain TG] Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json: Respond Channel Limit now merges its input -- the delete/retire payload would leak into the refusal body
+SELF-TEST PASSED: 33/33 cases
+rc=0
+
+### E.3 Tools/wappi/probe-audience-facts.py selftest (step 0.3's probe now prints from_where / task_id)
+selftest: no name / text / number in the output | every sign present
+
+=== §F. Стенд возвращён на рабочий канон и остановлен ===
+
+### F.1 bootstrap.py --bot wa:stgwa001 --bot tg:stgtg001 (no --canon-ref) + verify-deployed
+F1 start 2026-11-01T22:30:38Z
+bootstrap exit=0
+2. server up at http://localhost:5678 (pid 54925, log /Users/ayan/.n8n-staging/n8n.log)
+   Successfully imported 35 workflows.
+5. imported 33 workflows + 2 staging bots; published 33
+2. server up at http://localhost:5678 (pid 55253, log /Users/ayan/.n8n-staging/n8n.log)
+staging ready: http://localhost:5678
+F1 bootstrap end 2026-11-01T22:32:56Z
+verify-deployed exit=0
+base http://localhost:5678: canonical 32 (diff 0), clones 2 (behind template 0, of them prompt head behind 0; custom prompts 2, not counted), archived clones 0 (not counted), other 2
+OK rows: 32
+  clone   stgtg40da979c774 'STAGING TG stgtg001' [telegram] active=True nodes=64 graph=838d71744efa published=838d71744efa sticky=None AT-CA
+  clone   stgwab77f282533c 'STAGING WA stgwa001' [whatsapp] active=True nodes=64 graph=fda0c72318a8 published=fda0c72318a8 sticky=None AT-CA
+
+### F.2 stop
+F2 2026-11-01T22:33:13Z — last stand run (verify-deployed after the restore) ended just before this
+stopped
+n8n stop exit=0 at 22:33:15Z
+mock (pid 41497) kill rc=0 at 22:33:23Z
+waiting for server to shut down.... done
+server stopped
+pg.sh stop rc=0 at 22:33:24Z
+listeners on 5678:        0
+listeners on 8765:        0
+pg_ctl: no server running
