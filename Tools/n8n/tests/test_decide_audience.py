@@ -1010,24 +1010,32 @@ def _extra_postgres(w):
     w['connections']['Read Decision Again'] = {'main': [[{'node': 'Persist?', 'type': 'main', 'index': 0}]]}
 
 
-# The plan's negatives and the live checks' three, each on a scratch copy of the exports; each must fail the CLI.
+# The plan's negatives and the live checks' three, each on a scratch copy of the exports; each must fail the CLI WITH the
+# finding that targets it. Any hand edit already fails check (1) — the workflow must be the generator's output — so «the CLI
+# failed» alone proves nothing about the check a negative is there for: each one names the message it must produce.
 SCRATCH = (
-    ('neverError removed from the card read', lambda w: nd(w, 'Chat Card')['parameters']['options']['response']['response'].pop('neverError')),
-    ('neverError removed from the history read', lambda w: nd(w, 'Recent Messages')['parameters']['options']['response']['response'].pop('neverError')),
+    ('neverError removed from the card read', lambda w: nd(w, 'Chat Card')['parameters']['options']['response']['response'].pop('neverError'),
+     'Chat Card must be a Wappi read'),
+    ('neverError removed from the history read', lambda w: nd(w, 'Recent Messages')['parameters']['options']['response']['response'].pop('neverError'),
+     'Recent Messages must be a Wappi read'),
     ('mark_all in a URL', lambda w: nd(w, 'Recent Messages')['parameters'].__setitem__(
-        'url', nd(w, 'Recent Messages')['parameters']['url'].replace("'sync/messages/get'", "'sync/messages/get?mark_all=true'"))),
-    ('Persist? by «the node passed»', _cond('Persist?', '={{ $json !== undefined }}')),
-    ('an extra Postgres node', _extra_postgres),
-    ('order asc in an HTTP node', _query('Recent Messages', "order: 'desc'", "order: 'asc'")),
-    ('a contactName input', lambda w: nd(w, TRIGGER)['parameters']['workflowInputs']['values'].append({'name': 'contactName', 'type': 'string'})),
-    ('the WhatsApp card without client_name', _query('Chat Card', ", client_name: $json.clientName", "")),
+        'url', nd(w, 'Recent Messages')['parameters']['url'].replace("'sync/messages/get'", "'sync/messages/get?mark_all=true'")),
+     'mark_all must appear nowhere'),
+    ('Persist? by «the node passed»', _cond('Persist?', '={{ $json !== undefined }}'), 'Persist? must judge a positive field'),
+    ('an extra Postgres node', _extra_postgres, 'exactly three Postgres nodes'),
+    ('order asc in an HTTP node', _query('Recent Messages', "order: 'desc'", "order: 'asc'"), 'Recent Messages asks order asc'),
+    ('a contactName input', lambda w: nd(w, TRIGGER)['parameters']['workflowInputs']['values'].append({'name': 'contactName', 'type': 'string'}),
+     'no contactName input'),
+    ('the WhatsApp card without client_name', _query('Chat Card', ", client_name: $json.clientName", ""), 'filter chats/filter by client_name'),
     ('Decide emits the row\'s kind (a gate could take its item for the row)', lambda w: nd(w, 'Decide')['parameters'].__setitem__(
-        'jsCode', nd(w, 'Decide')['parameters']['jsCode'].replace('verdictKind: verdict.kind,', 'kind: verdict.kind, verdictKind: verdict.kind,'))),
-    ('Became Business? without the row\'s source', _cond('Became Business?', "={{ $json.kind === 'business' }}")),
+        'jsCode', nd(w, 'Decide')['parameters']['jsCode'].replace('verdictKind: verdict.kind,', 'kind: verdict.kind, verdictKind: verdict.kind,')),
+     "Decide emits ['kind']"),
+    ('Became Business? without the row\'s source', _cond('Became Business?', "={{ $json.kind === 'business' }}"),
+     'Became Business? must judge a positive field'),
 )
 
-for label, mutate in SCRATCH:
-    with Case(f'V NEG {label}: the verifier fails on a scratch copy') as c:
+for label, mutate, expect in SCRATCH:
+    with Case(f'V NEG {label}: the verifier fails on a scratch copy with the finding that targets it') as c:
         d = Path(tempfile.mkdtemp(prefix='dec-verify-'))
         try:
             for f in WF.glob('*.json'):
@@ -1038,7 +1046,8 @@ for label, mutate in SCRATCH:
             c.check(json.dumps(w, sort_keys=True) != before, 'the mutation changed nothing')
             (d / FILE).write_text(json.dumps(w, indent=2, ensure_ascii=False) + '\n', encoding='utf-8')
             rc_, out = run_verifier(d)
-            c.check(rc_ != 0 and 'FAIL [decide]' in out, f'exit {rc_}: {out[-700:]}')
+            findings = [ln for ln in out.splitlines() if ln.startswith('FAIL [decide]')]
+            c.check(rc_ != 0 and any(expect in ln for ln in findings), f'exit {rc_}, no finding {expect!r}: {out[-900:]}')
         finally:
             shutil.rmtree(d, ignore_errors=True)
 
