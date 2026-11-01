@@ -152,6 +152,33 @@ public class ChatAudienceWiringTests
         Assert.IsFalse(auth.Contains("BeforePairing") || auth.Contains("StoredNumber("), "the settings never decide against the stored number");
     }
 
+    // A re-pairing that makes a NEW profile (the reconnect after a purchase, the settings' fresh path, the WhatsApp resend-code
+    // recreate) is reported before its Create, so the list read that follows the report runs before the server's Bind has
+    // moved the line's decisions and connection moment onto the new profile. Every Create that succeeded reads the list again
+    // once the refreshed token lists the new profile — on its success path, in the same block as the refresh.
+    [Test]
+    public void EveryCreateThatSucceeded_ReadsTheListAgain_AfterTheTokenRefresh()
+    {
+        string manager = Src("Scripts/Main/Manager.cs");
+        const string read = "ChatAudienceSyncService.RequestList(force: true);";
+        foreach (string method in new[]
+                 {
+                     "private IEnumerator CreateWhatsappWorkflowFromStart(GameObject bot)",
+                     "private IEnumerator CreateWhatsappWorkflowFromEdit()",
+                     "private IEnumerator CreateTelegramWorkflowFromStart(GameObject bot)",
+                     "private IEnumerator CreateTelegramWorkflowFromEdit()",
+                 })
+        {
+            string body = MethodBody(manager, method);
+            int refreshed = At(body, "yield return AuthClient.Instance.ForceRefresh();");
+            int listed = At(body, read);
+            Assert.Less(refreshed, listed, $"{method}: the list is read once the token lists the new profile");
+            Assert.IsFalse(body.Substring(refreshed, listed - refreshed).Contains("}"),
+                $"{method}: in the success block of the refresh — a failed Create moved nothing");
+            Assert.AreEqual(1, Regex.Matches(body, Regex.Escape(read)).Count, $"{method}: once");
+        }
+    }
+
     // ── deletion ─────────────────────────────────────────────────────────────────────────────────────────────
 
     [Test]

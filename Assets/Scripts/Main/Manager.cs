@@ -3902,6 +3902,9 @@ public partial class Manager : MonoBehaviour
                 PendingProfileLedger.MarkWhatsappClaimed();
                 SeedReplyModeDefaultForProfile(bot.name, startedBot.whatsappProfileId);   // WR-02: '*' row for a channel authed after a Вместе default
                 ScheduleSyncService.DesireSavedForNewChannel(bot.name);   // B2: a schedule saved before this channel's Create finished
+                // «Личные и рабочие чаты»: the list read after the pairing's report may have run before Create's Bind moved the
+                // line's chat decisions and connection moment onto a new profile — read them again, now that the token lists it.
+                ChatAudienceSyncService.RequestList(force: true);
             }
         }
 
@@ -4002,6 +4005,7 @@ public partial class Manager : MonoBehaviour
                 ProfileRetirement.AfterCreate(bot, ChatChannel.WhatsApp, result.AdoptedProfiles);
                 SeedReplyModeDefaultForProfile(bot.name, bot.whatsappProfileId);   // WR-02: '*' row for a channel authed after a Вместе default
                 ScheduleSyncService.DesireSavedForNewChannel(bot.name);          // B2: the new channel gets the bot's schedule
+                ChatAudienceSyncService.RequestList(force: true);                // the line's chat decisions — see the start-path twin
 
                 // The CreateWhatsappWorkflow webhook ACTIVATES the clone before it responds. Honor the
                 // channel toggle — the only activation gate since the capsule↔ReplyMode unification (a
@@ -4118,6 +4122,7 @@ public partial class Manager : MonoBehaviour
                 PendingProfileLedger.MarkTelegramClaimed();
                 SeedReplyModeDefaultForProfile(bot.name, startedBot.telegramProfileId);   // WR-02: '*' row for a channel authed after a Вместе default
                 ScheduleSyncService.DesireSavedForNewChannel(bot.name);   // B2: a schedule saved before this channel's Create finished
+                ChatAudienceSyncService.RequestList(force: true);         // the line's chat decisions — see the WhatsApp twin
             }
         }
 
@@ -4218,6 +4223,7 @@ public partial class Manager : MonoBehaviour
                 ProfileRetirement.AfterCreate(bot, ChatChannel.Telegram, result.AdoptedProfiles);
                 SeedReplyModeDefaultForProfile(bot.name, bot.telegramProfileId);   // WR-02: '*' row for a channel authed after a Вместе default
                 ScheduleSyncService.DesireSavedForNewChannel(bot.name);          // B2: the new channel gets the bot's schedule
+                ChatAudienceSyncService.RequestList(force: true);                // the line's chat decisions — see the start-path twin
 
                 // The CreateTelegramWorkflow webhook ACTIVATES the clone before it responds. Honor the
                 // channel toggle — the only activation gate since the capsule↔ReplyMode unification (a
