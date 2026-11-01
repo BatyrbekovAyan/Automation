@@ -70,8 +70,10 @@ paste them, never copy them:
   LIST_SQL                   what the app mirrors: the moment and the holding decisions of each profile;
   BACKFILL_SQL(row, owner)   when a chat turns business, the recent messages it lacks go into the history and the memory.
   WIPE_SQL                   the Sweep's step: WIPE_DAYS after a business chat turned personal — the owner made it
-                             personal, or the rule did after another number (DECIDE_WRITE_SQL's clock) —, what the
-                             assistant stored about it is deleted (never dialog_counts) and the decision is marked wiped.
+                             personal (OWNER_SET_SQL's clock), the rule did after another number (DECIDE_WRITE_SQL's
+                             clock), or a reconnect landed a personal decision over a business period (the line's move,
+                             clone_lineage.BIND_WORKFLOW_SQL) —, what the assistant stored about it is deleted (never
+                             dialog_counts) and the decision is marked wiped.
 tests/test_audience_sql.py runs every one of them but the last on real SQL (staging Postgres), the race of two first messages
 included; tests/test_personal_wipe.py runs WIPE_SQL (and the Sweep node that carries it) the same way.
 
@@ -85,8 +87,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 SETTLE_MINUTES = 30     # after a channel is connected, a chat without a decision gets no reply, no suggestion and no decision
                         # for this long (what Wappi can read of the account's history may be incomplete at first)
 FRESH_HOURS = 24        # a message that waited for the owner's decision is handed to the assistant again only while younger
-WIPE_DAYS = 2           # the data of a business chat that turned personal (the owner's decision, or the rule after another
-                        # number) is wiped after this many days
+WIPE_DAYS = 2           # the data of a business chat that turned personal (the owner's decision, the rule after another
+                        # number, or the line's move on a reconnect) is wiped after this many days
 WIPE_BATCH = 200        # chats the Sweep wipes per run (every 6 hours); the oldest first, the rest wait for the next run
 RECENT_LIMIT = 10       # the page of a chat's NEWEST messages the server reads from Wappi (messages/get, order desc): Decide
                         # Audience's history fact (a page of fewer rows is the whole chat) and the start of the conversation
@@ -522,10 +524,12 @@ select (select count(*) from ev)::int as added"""
 WIPE_SQL = """-- «Личные и рабочие чаты»: the Profile Lifecycle Sweep's step «Wipe Personal Chats» (every 6 hours; it does not depend on a
 -- dry-run flag). """ + str(WIPE_DAYS) + """ days after a business chat turned personal, what the assistant stored about that chat is deleted
 -- — the protection against a mis-tap: a chat that is business again sooner keeps everything.
--- A chat turns personal by the owner's decision (OWNER_SET_SQL), or by the rule: after another number, a computed personal
--- decision replaces the stale business row of a client of the old number (DECIDE_WRITE_SQL). Both start the clock
--- personal_since; a chat that becomes business again clears it. A computed personal decision for a chat that was never
--- business starts none: nothing of it was ever stored.
+-- A chat turns personal three ways, and each starts the clock personal_since: by the owner's decision (OWNER_SET_SQL); by
+-- the rule — after another number, a computed personal decision replaces the stale business row of a client of the old
+-- number (DECIDE_WRITE_SQL); by the line's move on a reconnect — the decision that lands on the new profile is personal
+-- while a business period lies under it (the bind, clone_lineage.BIND_WORKFLOW_SQL: the earliest running clock of the
+-- chat's rows, else the moment of the move). A chat that becomes business again clears the clock. A computed personal
+-- decision for a chat that was never business starts none: nothing of it was ever stored.
 -- The work list is chat_audience: kind 'personal' (never a business row, whatever personal_since says), the clock
 -- personal_since set and old enough, not wiped yet — the owner's decisions and the computed ones alike —, the oldest first,
 -- """ + str(WIPE_BATCH) + """ at most per run (the partial index chat_audience_wipe_idx is built for exactly this). The rows are locked, and a

@@ -4,7 +4,8 @@ plan docs/superpowers/plans/2026-10-25-personal-chats.md Task 8): the Profile Li
 after a chat that was business turned personal, deletes what the assistant remembered about that chat — and nothing else.
 A chat turns personal by the owner's decision, or by the rule: after another number (or a re-pair that brings one) the
 computed business row stops holding, and the next message's computed personal decision (a contact or history of the new
-number) replaces it — both start the clock personal_since.
+number) replaces it — both start the clock personal_since; the third way, the line's move on a reconnect that lands a
+personal decision over a business period, starts it inside the bind (tests/test_clone_lineage_sql.py L28 / L29).
 
 What runs — audience.WIPE_SQL, executed on REAL SQL against session temp tables of the staging Postgres (`like public.X
 including all`: the migration must be applied — pg.sh migrate), the way n8n runs it (no parameters, nothing to bind); the

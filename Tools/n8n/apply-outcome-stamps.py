@@ -26,7 +26,8 @@ B1 «расписание бота» (2026-10-14): a message the bot's SCHEDULE 
 `off_hours` on; the stamp then says `off_hours` instead of `suppressed`. A «Вместе» chat inside the window keeps
 `suppressed`. Only on a RECORDED suppression (Record Suppressed's own row, outcome 'suppressed'): the node continues
 on error, and a failure outside the query runner hands its INPUT on (the R8 behaviour) — the mode read's row, off_hours
-true but no outcome — which keeps the pre-B1 label `other:Record Suppressed` (the message was never recorded).
+true but no outcome, which keeps the pre-B1 label `other:Record Suppressed` (the message was never recorded); or, when the
+chat was decided in that very run, Decide Audience's answer, whose outcome `business` the stamp then shows.
 
 Branches stamped: If[false] (from != chatId), Suppressed?[true], Is Latest?[false] (older fragment
 of a burst), If Quota Allows[false], HTTP Request[main] (the Wappi send returned). Nothing on the
