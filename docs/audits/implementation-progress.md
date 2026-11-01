@@ -620,3 +620,27 @@ e2e-learning 12/12, красный контроль на прод-ref падае
 Переподключите канал в приложении.»; резюме «Сводки» называют ассистента ИИ-сотрудником (старые резюме обновятся, когда чат
 классифицируется заново). Клиентская часть переименования — в новой сборке. **Откат:** `POST /workflows/<id>/activate
 {"versionId": …}` по указателям выше; сайт — командой отката `deploy.sh` из `docs/audits/2026-10-23-deploy-rollback-pointers.txt`.
+
+## Развёртывание 2026-11-01 — C2 «поиск в прайсе перед ценой» (прод, команды запускал владелец)
+
+Владелец сам влил ветку и запустил все команды выкладки из основной папки (`/Users/ayan/Projects/Automation`): прод-ключ
+лежит только в её `Tools/n8n/.secrets/`. Пакет — исправление C2 из `docs/audits/2026-10-29-price-tool/README.md`: одно
+предложение в `_core.md` «Цены и ассортимент» → карты промптов ниш в Create/Edit WA/TG. Канон — `main` `7a7a40a0`
+(слияние ветки `claude/friendly-elion-21cc7d`: `16653521`, `fce9987b`, `da4787e8`). До выкладки прод = канон `f0c81168`:
+выкладка 23.10 закончилась verify-deployed 0, эти 4 workflow не менялись с `60bec485`. Шаблоны ботов, Test Dialog и
+миграции не затронуты.
+
+| Шаг | Результат | Доказательство |
+|---|---|---|
+| слияние (владелец) | `git merge --no-edit claude/friendly-elion-21cc7d` → `7a7a40a0` (родители `a0666be9`, `da4787e8`), без конфликтов; `_core.md` и 4 workflow в main = ветка = файлы на диске | вывод git |
+| dry-run (владелец) | `deploy-canonical.py --base https://n8n.choosereply.com --only XuvOp7TxOImOAmlj --only Uz6HBBUpAiUqVysB --only 3qax5J9u2qsT9Vao --only TwWPW3gIyjZS3foR` → would_update 4, nodes 52 → 52 и 9 → 9 (+0 −0), все active, stored = published, would_publish 0; точки отката — activeVersionId до выкладки | `docs/audits/2026-11-01-deploy-rollback-pointers.txt` |
+| apply (владелец) | `--apply --yes` → у всех 4 «published by the PUT … no deactivate window», «read-back: ok»; updated 4, failed 0 | там же |
+| клоны (владелец) | `update-clones.py --base https://n8n.choosereply.com` → 2 живых клона ИИ-сотрудника «2» (автозапчасти; WhatsApp `aND1y2ktZoNlszAW`, Telegram `TbQaKxJaBJkKN2nA`): голова промпта `126f44c2` → карта `fce9987b`, +196 символов = ровно предложение C2 с пробелом (между ними карта менялась только им), хвост владельца 70 и 118 символов сохранён, меняется только AI Agent; `--apply --yes` → updated 2, failed 0, оба опубликованы своим PUT, read-back ok; архивный «13» пропущен | там же |
+| снимок «после» | `verify-deployed.py` → канон 30 (diff 0), клонов 2 — оба AT-CANONICAL, `prompt=at_canonical/auto_parts`; архивных 1 (не считается); ни одного DIFF и BEHIND | `docs/audits/2026-11-01-prod-after-c2.txt` |
+
+Что изменилось: цену или наличие позиции, которой нет в «Products»/«Services», ИИ-сотрудник ищет в прайс-листах до
+ответа — и когда клиент переспрашивает или в сообщении есть другие вопросы. Действует для новых ИИ-сотрудников (Create),
+после сохранения настроек (Edit) и уже сейчас — у обоих клонов «2». Ответ при расхождении цен каталога и прайса C2 не
+меняет (клоны ниш, 0/16 с C2 и без). **Откат:** `POST /workflows/<id>/activate {"versionId": …}` по указателям из
+`docs/audits/2026-11-01-deploy-rollback-pointers.txt` — 4 workflow и 2 клона. Ветка «личные чаты» тоже меняет Create
+WA/TG: она вливается второй и пересобирает Create генераторами поверх этого main (решение владельца 29–30.10).

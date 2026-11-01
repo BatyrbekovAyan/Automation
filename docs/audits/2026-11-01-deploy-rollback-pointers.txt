@@ -1,0 +1,20 @@
+# C2 «поиск в прайсе перед ценой» — Create/Edit WA/TG (2026-11-01; owner merged claude/friendly-elion-21cc7d into main 7a7a40a0 and runs the deploy)
+# Dry-run before the apply (deploy-canonical.py --base https://n8n.choosereply.com --only XuvOp7TxOImOAmlj --only Uz6HBBUpAiUqVysB --only 3qax5J9u2qsT9Vao --only TwWPW3gIyjZS3foR), 2026-11-01 ~10:44Z:
+~ 3qax5J9u2qsT9Vao 'Edit Whatsapp Workflow' active=True nodes 9 → 9 (+0 -0)
+    rollback pointer: versionId 4b60d47b-a945-4a02-96c7-9ba68c87b831 (activeVersionId 4b60d47b-a945-4a02-96c7-9ba68c87b831)
+~ TwWPW3gIyjZS3foR 'Edit Telegram Workflow' active=True nodes 9 → 9 (+0 -0)
+    rollback pointer: versionId 6c1dbb33-1815-4665-8b8c-71501d2c5cc2 (activeVersionId 6c1dbb33-1815-4665-8b8c-71501d2c5cc2)
+~ Uz6HBBUpAiUqVysB 'CreateTelegramWorkflow' active=True nodes 52 → 52 (+0 -0)
+    rollback pointer: versionId 6c257ff1-431c-4c6f-aa0c-4441d9bd76d9 (activeVersionId 6c257ff1-431c-4c6f-aa0c-4441d9bd76d9)
+~ XuvOp7TxOImOAmlj 'CreateWhatsappWorkflow' active=True nodes 52 → 52 (+0 -0)
+    rollback pointer: versionId 7c0c1b81-34ab-42df-b561-790e39034d8e (activeVersionId 7c0c1b81-34ab-42df-b561-790e39034d8e)
+{"considered": 4, "missing": 0, "up_to_date": 0, "would_update": 4, "updated": 0, "would_publish": 0, "republished": 0, "inactive_must_run": 0, "failed": 0}
+# Previous versions = the canon before C2 (f0c81168; these four workflows unchanged since 60bec485). Rollback, one per workflow:
+XuvOp7TxOImOAmlj CreateWhatsappWorkflow: POST /workflows/XuvOp7TxOImOAmlj/activate {"versionId": "7c0c1b81-34ab-42df-b561-790e39034d8e"}
+Uz6HBBUpAiUqVysB CreateTelegramWorkflow: POST /workflows/Uz6HBBUpAiUqVysB/activate {"versionId": "6c257ff1-431c-4c6f-aa0c-4441d9bd76d9"}
+3qax5J9u2qsT9Vao Edit Whatsapp Workflow: POST /workflows/3qax5J9u2qsT9Vao/activate {"versionId": "4b60d47b-a945-4a02-96c7-9ba68c87b831"}
+TwWPW3gIyjZS3foR Edit Telegram Workflow: POST /workflows/TwWPW3gIyjZS3foR/activate {"versionId": "6c1dbb33-1815-4665-8b8c-71501d2c5cc2"}
+# Apply of the four (deploy-canonical.py … --apply --yes): updated 4, failed 0 — each published by its own PUT (no deactivate window), read-back ok.
+# Clones (update-clones.py --base https://n8n.choosereply.com --apply --yes, prompt map of fce9987b), 2026-11-01 ~10:49Z: 2 clones of bot «2» (auto_parts), only the AI Agent prompt changed, +196 chars = the C2 sentence, owner tails kept; '13' archived — skipped. updated 2, failed 0, read-back ok.
+TbQaKxJaBJkKN2nA '2' [telegram]: previous activeVersionId 78ee36d8-f11e-41bf-8613-4ba45ed68a53 (rollback: POST /workflows/TbQaKxJaBJkKN2nA/activate {"versionId": "78ee36d8-f11e-41bf-8613-4ba45ed68a53"})
+aND1y2ktZoNlszAW '2' [whatsapp]: previous activeVersionId 5ba0bf72-b99d-4de4-aa19-8d0c74d9f4dd (rollback: POST /workflows/aND1y2ktZoNlszAW/activate {"versionId": "5ba0bf72-b99d-4de4-aa19-8d0c74d9f4dd"})
