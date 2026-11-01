@@ -75,11 +75,13 @@ still wired as designed».
       (5) the two Wappi reads only (Chat Card, Recent Messages): GET, the canonical WappiAuthToken credential, fullResponse
           + neverError, at most 10 s, continue on error, the Wappi bases; Telegram's card = chats/get limit 20 / offset 0 /
           order desc, WhatsApp's = chats/filter by client_name; the history = this chat's newest page of
-          audience.RECENT_LIMIT rows; mark_all nowhere, order asc nowhere (Telegram's tapi ignores asc);
+          audience.HISTORY_LIMIT rows (larger than the backfill's audience.RECENT_LIMIT); mark_all nowhere, order asc
+          nowhere (Telegram's tapi ignores asc);
       (6) Plan Facts, Read Card and Decide embed audience.RULE_JS verbatim; no Code node reads contact_name; Plan Facts
           stops for audience.SETTLE_MINUTES and asks no card for an @lid chat; Read Card takes the dialog whose id IS the
           chat id and the WhatsApp contact from contact.FullName; Decide reads the history off the one page (its trigger,
-          its code, the full-page rule) and hands it on unsorted; Shape answers business only on the written row (one
+          its code, the full-page rule at HISTORY_LIMIT) and hands its newest RECENT_LIMIT rows on unsorted (the
+          backfill's slice); Shape answers business only on the written row (one
           with a source). No node before Write Decision emits kind, reason or source — the fields of its row — and
           Decide hands its verdict on as verdictKind / verdictReason: when Write Decision throws before its statement,
           n8n hands that input item on unchanged, and the business gates must never take it for the row;
@@ -1176,8 +1178,9 @@ def check_decide(bundle, sql=None):
     need("{ profile_id: $json.profileId, client_name: $json.clientName }" in card,
          "Chat Card on WhatsApp must filter chats/filter by client_name — the digits of the chat id (Plan Facts' clientName)")
     rq = P["Recent Messages"].get("jsonQuery", "")
-    need(f"chat_id: $json.chatId, limit: {AUD.RECENT_LIMIT}, order: 'desc'" in rq,
-         f"Recent Messages must read THIS chat's newest page: limit audience.RECENT_LIMIT ({AUD.RECENT_LIMIT}), order desc")
+    need(f"chat_id: $json.chatId, limit: {AUD.HISTORY_LIMIT}, order: 'desc'" in rq and AUD.HISTORY_LIMIT > AUD.RECENT_LIMIT,
+         f"Recent Messages must read THIS chat's newest page: limit audience.HISTORY_LIMIT ({AUD.HISTORY_LIMIT}, larger than the "
+         f"backfill's {AUD.RECENT_LIMIT}), order desc")
 
     # (6) the Code nodes: the rule verbatim, the window, the card, the page, the answer
     for name in RULE_CARRIERS:
@@ -1204,14 +1207,15 @@ def check_decide(bundle, sql=None):
     need("typeof contact.FullName === 'string' && contact.FullName.trim() !== ''" in rc,
          "Read Card's WhatsApp contact must be contact.FullName — a name from the phone's address book")
     dj = P["Decide"].get("jsCode", "")
-    need(f"const RECENT_LIMIT = {AUD.RECENT_LIMIT};" in dj and "String(m.id) === plan.messageId" in dj
-         and "time(m) * 1000 < plan.connectedAtMs" in dj and "facts.history = rows.length < RECENT_LIMIT ? false : null;" in dj
+    need(f"const HISTORY_LIMIT = {AUD.HISTORY_LIMIT};" in dj and f"const RECENT_LIMIT = {AUD.RECENT_LIMIT};" in dj
+         and "String(m.id) === plan.messageId" in dj
+         and "time(m) * 1000 < plan.connectedAtMs" in dj and "facts.history = rows.length < HISTORY_LIMIT ? false : null;" in dj
          and "const chat = chatIdentity(plan.channel, plan.chatId, plan.chatLid);" in dj
          and "typeof m.chatId === 'string' && m.chatId !== '' && !chat.names(m.chatId));" in dj and "body.uuid !== plan.profileId" in dj
-         and "rows.every(ours)" in dj and "persist: verdict.reason !== 'unknown'" in dj and "page = rows;" in dj,
+         and "rows.every(ours)" in dj and "persist: verdict.reason !== 'unknown'" in dj and "page = rows.slice(0, RECENT_LIMIT);" in dj,
          "Decide must read the history off the one page: this profile's and this chat's (its code counts), holding the trigger, "
-         "a row older than the connection → true, a short page → false, a full one of new rows → unknown; persist only a known "
-         "reason; hand the page on as Wappi returned it")
+         "a row older than the connection → true, a page shorter than HISTORY_LIMIT → false, a full one of new rows → unknown; "
+         "persist only a known reason; hand the newest RECENT_LIMIT rows of the page on as Wappi returned them")
     need(dj.count(AUD.CHAT_IDENTITY_JS) == 1 and dj.count(AUD.CHAT_IDENTITY_BEGIN) == 1,
          "Decide must embed audience.CHAT_IDENTITY_JS verbatim, once — a row is the chat's by its id or WhatsApp's @lid code")
     sh = P["Shape"].get("jsCode", "")
@@ -1356,7 +1360,7 @@ DECIDE_MUTATIONS = (
     ("Can Decide? by «the node continued»", _dec_cond("Can Decide?", "={{ $json.go !== false }}"), "Can Decide? must judge a positive field"),
     ("an extra Postgres node", _dec_extra_postgres, "exactly three Postgres nodes"),
     ("order asc in the history read", _dec("Recent Messages", "jsonQuery", "order: 'desc'", "order: 'asc'"), "Recent Messages asks order asc"),
-    ("the plan's oldest message (limit 1, asc)", _dec("Recent Messages", "jsonQuery", f"limit: {AUD.RECENT_LIMIT}, order: 'desc'",
+    ("the plan's oldest message (limit 1, asc)", _dec("Recent Messages", "jsonQuery", f"limit: {AUD.HISTORY_LIMIT}, order: 'desc'",
                                                       "limit: 1, order: 'asc'"), "Recent Messages asks order asc"),
     ("order asc in the card read", _dec("Chat Card", "jsonQuery", "offset: 0, order: 'desc'", "offset: 0, order: 'asc'"),
      "Chat Card asks order asc"),
@@ -1367,10 +1371,12 @@ DECIDE_MUTATIONS = (
     ("the WhatsApp card without client_name", _dec("Chat Card", "jsonQuery", ", client_name: $json.clientName", ""), "filter chats/filter by client_name"),
     ("the Telegram card on another page", _dec("Chat Card", "jsonQuery", "limit: 20, offset: 0", "limit: 50, offset: 0"),
      "first page of chats/get"),
-    ("the history page shrunk", _dec("Recent Messages", "jsonQuery", f"limit: {AUD.RECENT_LIMIT},", "limit: 5,"),
-     "limit audience.RECENT_LIMIT"),
+    ("the history page shrunk", _dec("Recent Messages", "jsonQuery", f"limit: {AUD.HISTORY_LIMIT},", "limit: 5,"),
+     "limit audience.HISTORY_LIMIT"),
+    ("the history page cut back to the backfill's slice (a longer new conversation stays undecided for good)",
+     _dec("Recent Messages", "jsonQuery", f"limit: {AUD.HISTORY_LIMIT},", f"limit: {AUD.RECENT_LIMIT},"), "limit audience.HISTORY_LIMIT"),
     ("the history read of another chat", _dec("Recent Messages", "jsonQuery", "chat_id: $json.chatId", "chat_id: $json.chatLid"),
-     "limit audience.RECENT_LIMIT"),
+     "limit audience.HISTORY_LIMIT"),
     ("the card read waits 30 s", lambda b: node(b[DECIDE_FILE], "Chat Card")["parameters"]["options"].__setitem__("timeout", 30000),
      "Chat Card must be a Wappi read"),
     ("the history read on another credential", _dec_node("Recent Messages", "credentials", {"httpHeaderAuth": {"id": "dev0000000000000",
@@ -1395,8 +1401,11 @@ DECIDE_MUTATIONS = (
     ("Decide counts a page without the trigger", _dec("Decide", "jsCode", "String(m.id) === plan.messageId", "true"),
      "Decide must read the history off the one page"),
     ("Decide calls a full page of new rows the whole chat",
-     _dec("Decide", "jsCode", "facts.history = rows.length < RECENT_LIMIT ? false : null;", "facts.history = false;"),
+     _dec("Decide", "jsCode", "facts.history = rows.length < HISTORY_LIMIT ? false : null;", "facts.history = false;"),
      "Decide must read the history off the one page"),
+    ("Decide judges a short page by the backfill's slice",
+     _dec("Decide", "jsCode", "facts.history = rows.length < HISTORY_LIMIT ? false : null;",
+          "facts.history = rows.length < RECENT_LIMIT ? false : null;"), "Decide must read the history off the one page"),
     ("Decide counts rows of any chat", _dec("Decide", "jsCode", " && rows.every(ours)", ""), "Decide must read the history off the one page"),
     ("Decide ignores the code", _dec("Decide", "jsCode", "chatIdentity(plan.channel, plan.chatId, plan.chatLid)",
                                      "chatIdentity(plan.channel, plan.chatId, '')"), "Decide must read the history off the one page"),
@@ -1405,7 +1414,10 @@ DECIDE_MUTATIONS = (
     ("Decide takes a code on Telegram", _dec("Decide", "jsCode", "channel === 'whatsapp' && ", ""), "Decide must embed audience.CHAT_IDENTITY_JS"),
     ("Decide takes a code without @lid", _dec("Decide", "jsCode", "\n    && code.endsWith(CODE_SUFFIX)", ""),
      "Decide must embed audience.CHAT_IDENTITY_JS"),
-    ("Decide sorts the page before the backfill", _dec("Decide", "jsCode", "page = rows;", "page = rows.slice().reverse();"),
+    ("Decide sorts the page before the backfill", _dec("Decide", "jsCode", "page = rows.slice(0, RECENT_LIMIT);",
+                                                       "page = rows.slice(0, RECENT_LIMIT).reverse();"),
+     "Decide must read the history off the one page"),
+    ("Decide hands the whole history page to the backfill", _dec("Decide", "jsCode", "page = rows.slice(0, RECENT_LIMIT);", "page = rows;"),
      "Decide must read the history off the one page"),
     ("Decide writes an unknown", _dec("Decide", "jsCode", "persist: verdict.reason !== 'unknown'", "persist: true"),
      "Decide must read the history off the one page"),

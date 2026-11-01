@@ -90,9 +90,15 @@ FRESH_HOURS = 24        # a message that waited for the owner's decision is hand
 WIPE_DAYS = 2           # the data of a business chat that turned personal (the owner's decision, the rule after another
                         # number, or the line's move on a reconnect) is wiped after this many days
 WIPE_BATCH = 200        # chats the Sweep wipes per run (every 6 hours); the oldest first, the rest wait for the next run
-RECENT_LIMIT = 10       # the page of a chat's NEWEST messages the server reads from Wappi (messages/get, order desc): Decide
-                        # Audience's history fact (a page of fewer rows is the whole chat) and the start of the conversation
-                        # the backfill stores when a chat turns business (Decide Audience, the ChatAudience webhook)
+RECENT_LIMIT = 10       # the start of the conversation the backfill stores when a chat turns business: the newest this many
+                        # messages of the chat (messages/get, order desc) — the ChatAudience webhook reads exactly this many,
+                        # Decide Audience keeps this many of its history page
+HISTORY_LIMIT = 50      # the page of a chat's NEWEST messages Decide Audience reads for the history fact (messages/get, order
+                        # desc): a row older than the connection → history; a page that holds the trigger and has fewer rows
+                        # is the whole chat; a full page of newer rows is unknown. Larger than the backfill's slice so a new
+                        # client's conversation of more than RECENT_LIMIT messages (the settling window, the owner answering
+                        # by phone) still gets decided; no larger than the page the app itself asks on every chat open
+                        # (ChatManager.MessagesPerPage = 50, the Wappi Proxy's messages.get)
 WA_NONHUMAN_SUFFIXES = ("@g.us", "@newsletter", "@broadcast")   # a group; a channel; the status and broadcast lists
 TG_SERVICE_IDS = ("777000",)                                    # the Telegram service account (login codes and the like)
 TG_NONHUMAN_TYPES = ("channel", "chat", "bot")                  # Telegram chat types that are not a person: a channel; a group; a bot

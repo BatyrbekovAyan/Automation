@@ -58,6 +58,7 @@ OWN = {"wa": "77010000099", "tg": "77010000098"}         # the connected number 
 OWN_TG_USER = "996500000099"                              # the Telegram account's own user id (its «Избранное»)
 OWN_LID = "100000000000001@lid"                           # the owner's own WhatsApp code
 FACT_PATHS = ("chats/filter", "chats/get", "messages/get", "get/status")
+HISTORY_PAGE = str(audience.HISTORY_LIMIT)   # Decide Audience's history read, as the mock records its query (text)
 CHAT_TABLES = ("history", "memory", "outcomes", "handoffs", "ledger", "state", "sets", "flags")
 
 
@@ -403,11 +404,11 @@ def new_person(ctx, ch):
     s.post(chat, mid, "Здравствуйте! Сколько стоит букет из 25 роз?", t, **({"contact_name": "Клиент"} if ch == "wa" else {}))
     e = s.one()
     reads = fact_reads(s.since_calls, s.pid)
-    decide_reads = [r for r in reads if r[0] != "messages/get" or r[1].get("limit") == "10"]
+    decide_reads = [r for r in reads if r[0] != "messages/get" or r[1].get("limit") == HISTORY_PAGE]
     ok = (e.get("outcome") == "sent" and e.get("decide") == {"audience": "business", "outcome": "business"}
           and decision(s.pid, chat) == "business|default|new" and connection(s.pid) == ("0", "-")
           and len(s.sends(chat)) == 1 and ledger(s.pid, chat, mid) == "sent" and history(s.pid, chat).startswith(f"{mid}:client")
-          and reads_clean(reads) and ("messages/get", {"chat_id": chat, "limit": "10", "order": "desc"}) in decide_reads)
+          and reads_clean(reads) and ("messages/get", {"chat_id": chat, "limit": HISTORY_PAGE, "order": "desc"}) in decide_reads)
     return ok, {**summary(e), "decision": decision(s.pid, chat), "connection(moment−created s, phone)": connection(s.pid),
                 "sends": len(s.sends(chat)), "ledger": ledger(s.pid, chat, mid), "history": history(s.pid, chat), "reads": decide_reads}
 
@@ -447,7 +448,7 @@ def old_chat(ctx, ch):
     ok = (e.get("outcome") == "personal_history" and e.get("decide") == {"audience": "personal", "outcome": "personal_history"}
           and decision(s.pid, chat) == "personal|default|history" and stored(s.pid, chat) == NOTHING
           and not touched(s.since_calls, s.pid, chat, mid) and reads_clean(reads)
-          and ("messages/get", {"chat_id": chat, "limit": "10", "order": "desc"}) in reads)
+          and ("messages/get", {"chat_id": chat, "limit": HISTORY_PAGE, "order": "desc"}) in reads)
     return ok, {**summary(e), "decision": decision(s.pid, chat), "stored": stored(s.pid, chat), "reads": reads}
 
 

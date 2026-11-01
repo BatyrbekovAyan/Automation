@@ -36,10 +36,11 @@ No n8n server, no network, never production. A scenario runs on both channels wh
     passthrough_ensure_connection_is_unknown_not_written, passthrough_chat_card_is_unknown_not_written,
     passthrough_recent_messages_is_unknown_not_written, passthrough_write_decision_is_unknown_no_backfill,
     passthrough_backfill_keeps_business
-  the history page (ONE messages/get, order desc, RECENT_LIMIT rows)
+  the history page (ONE messages/get, order desc, HISTORY_LIMIT rows; the backfill keeps the newest RECENT_LIMIT of them)
     wa_new_person_business_after_one_history_call, tg_new_person_business_after_one_history_call,
     wa_old_chat_personal_history, tg_old_chat_personal_history, short_page_without_old_row_is_business,
-    full_page_all_new_is_unknown_not_written, page_without_trigger_is_unknown_not_written, empty_history_is_unknown,
+    full_page_all_new_is_unknown_not_written, ten_newer_rows_then_an_older_one_is_history,
+    twelve_message_new_conversation_is_business, page_without_trigger_is_unknown_not_written, empty_history_is_unknown,
     foreign_row_page_is_unknown_not_written, wa_rows_under_the_code_count_as_this_chat (history and backfill),
     row_without_time_is_unknown_not_written, history_500_is_personal_unknown_not_written
   the write and the backfill
@@ -47,7 +48,8 @@ No n8n server, no network, never production. A scenario runs on both channels wh
     backfill_failure_keeps_business, write_failure_is_personal_unknown, second_run_reads_the_first_decision,
     owner_decision_set_meanwhile_is_kept
   the requests, the canon, the verifier
-    the_requests, A1 a_return_to_asc_fails_these_scenarios, no_url_carries_mark_all, protected_and_generated,
+    the_requests, history_page_is_one_the_app_asks, A1 a_return_to_asc_fails_these_scenarios, no_url_carries_mark_all,
+    protected_and_generated,
     V0 / V NEG verify-personal-chats.py --only decide on the canon and on scratch copies
 
     python3 Tools/n8n/tests/test_decide_audience.py
@@ -72,7 +74,7 @@ GEN = N8N / 'build-decide-audience.py'
 VERIFY = N8N / 'verify-personal-chats.py'
 AUD = module('audience.py')
 OWNER_MARK = module('apply-history-handoff.py').OWNER_MEMORY_PREFIX
-LIMIT = AUD.RECENT_LIMIT
+PAGE = AUD.HISTORY_LIMIT        # the history page Decide Audience reads (the backfill keeps its newest AUD.RECENT_LIMIT rows)
 WA_BASE, TG_BASE = 'https://wappi.pro/api/', 'https://wappi.pro/tapi/'
 WAPPI_CRED = {'httpHeaderAuth': {'id': 'EuhhqAaV56DpoqAN', 'name': 'WappiAuthToken'}}
 INPUTS = (('channel', 'string'), ('profileId', 'string'), ('chatId', 'string'), ('chatLid', 'string'),
@@ -319,8 +321,8 @@ def new_person(pg, ch, page=None, card=None):
 
 def old_chat(pg, ch, workflow=None):
     """A stranger the owner wrote with before the connection: 12 messages, the 4 oldest from before it, the trigger newest.
-    The newest page of 10 holds two old rows; WhatsApp's honest asc would answer the oldest 10 — no trigger; tapi's asc
-    re-sorts the newest page, and a «limit 1, asc» read there is the trigger itself — the chat would look new."""
+    The newest page holds the old rows; WhatsApp's honest «limit 1, asc» would answer the oldest row only — no trigger; tapi's
+    asc re-sorts the newest page, and a «limit 1, asc» read there is the trigger itself — the chat would look new."""
     C, row = CH[ch], row_of(ch)
     profile(pg, C['pid'], C['channel'])
     moment = connect(pg, C['pid'])
@@ -603,24 +605,51 @@ for ch, C in CH.items():
             c.check(decision(pg, P, C['chat']) == {'kind': 'personal', 'source': 'default', 'reason': 'history'}, 'written')
             c.check(history(pg, P, C['chat']) == [] and memory(pg, P, C['chat']) == [], 'nothing stored')
 
-    with Case(f'short_page_without_old_row_is_business [{ch}]: {LIMIT - 1} rows (fewer than the page holds: the whole chat), '
+    with Case(f'short_page_without_old_row_is_business [{ch}]: {PAGE - 1} rows (fewer than the page holds: the whole chat), '
               'the trigger among them, none older than the connection → business') as c:
         with Session(SETUP) as pg:
             page = [row(C['chat'], 'm-trig', False, 'и ещё вопрос', now_s() - 10)]
-            page += [row(C['chat'], f'm{k}', k % 2 == 0, f'сообщение {k}', now_s() - 60 * (k + 1)) for k in range(LIMIT - 2)]
+            page += [row(C['chat'], f'm{k}', k % 2 == 0, f'сообщение {k}', now_s() - 60 * (k + 1)) for k in range(PAGE - 2)]
             moment, fake = new_person(pg, ch, page=page)
             r = decide(pg, inputs(C, moment), fake)
             c.check(answer(r) == BUSINESS, f'{answer(r)} {r}')
 
-    with Case(f'full_page_all_new_is_unknown_not_written [{ch}]: a full page ({LIMIT} rows, and a chat of 12), every row newer '
+    with Case(f'full_page_all_new_is_unknown_not_written [{ch}]: a full page ({PAGE} rows, and a chat of {PAGE + 2}), every row newer '
               'than the connection → the page may not be the whole chat: personal_unknown, nothing written') as c:
-        for total in (LIMIT, 12):
+        for total in (PAGE, PAGE + 2):
             with Session(SETUP) as pg:
                 page = [row(C['chat'], 'm-trig', False, 'алло', now_s() - 5)]
                 page += [row(C['chat'], f'm{k}', k % 2 == 0, f'сообщение {k}', now_s() - 60 * (k + 1)) for k in range(total - 1)]
                 moment, fake = new_person(pg, ch, page=page)
                 r = decide(pg, inputs(C, moment), fake)
                 c.check(answer(r) == personal('unknown') and not statements(r) and nothing_written(pg), f'{total} rows: {answer(r)} {r}')
+
+    with Case(f'ten_newer_rows_then_an_older_one_is_history [{ch}]: ten messages after the connection (the trigger the newest) '
+              'and an eleventh from before it — the history page reaches the old row: personal / history, written, nothing '
+              'stored (a page of ten would end on new rows and leave the chat undecided for good)') as c:
+        with Session(SETUP) as pg:
+            page = [row(C['chat'], 'm-trig', False, 'алло', now_s() - 5)]
+            page += [row(C['chat'], f'm{k}', k % 2 == 0, f'сообщение {k}', now_s() - 60 * (k + 1)) for k in range(9)]
+            moment, fake = new_person(pg, ch, page=page)
+            page.append(row(C['chat'], 'm-old', True, 'давнее', old_s(moment)))      # the eleventh: before the connection
+            r = decide(pg, inputs(C, moment), fake)
+            c.check(answer(r) == personal('history') and wappi(r) == ['Chat Card', 'Recent Messages'], f'{answer(r)} {r}')
+            c.check(decision(pg, P, C['chat']) == {'kind': 'personal', 'source': 'default', 'reason': 'history'}, 'written')
+            c.check(history(pg, P, C['chat']) == [] and memory(pg, P, C['chat']) == [], 'a personal chat stores nothing')
+
+    with Case(f'twelve_message_new_conversation_is_business [{ch}]: a new client wrote twelve messages after the connection '
+              '(the owner answered in between), none before it — the page holds the whole chat: business / new, written; the '
+              f'backfill stores the newest {AUD.RECENT_LIMIT} rows of that page but the trigger, oldest first') as c:
+        with Session(SETUP) as pg:
+            page = [row(C['chat'], 'm-trig', False, 'и ещё вопрос', now_s() - 5)]
+            page += [row(C['chat'], f'm{k:02d}', k % 3 == 1, f'сообщение {k}', now_s() - 60 * (k + 1)) for k in range(11)]
+            moment, fake = new_person(pg, ch, page=page)
+            r = decide(pg, inputs(C, moment), fake)
+            c.check(answer(r) == BUSINESS and r.ran('Backfill'), f'{answer(r)} {r}')
+            c.check(decision(pg, P, C['chat']) == {'kind': 'business', 'source': 'default', 'reason': 'new'}, 'written')
+            kept = [m['id'] for m in page[1:AUD.RECENT_LIMIT]][::-1]      # the newest RECENT_LIMIT rows, the trigger left out
+            c.check([mid for mid, _ in history(pg, P, C['chat'])] == kept,
+                    f'the backfill keeps the newest {AUD.RECENT_LIMIT} rows of the page: {history(pg, P, C["chat"])} vs {kept}')
 
     with Case(f'page_without_trigger_is_unknown_not_written [{ch}]: the page does not hold the incoming message (Wappi indexes '
               'a new chat with a delay) → stale: personal_unknown, nothing written') as c:
@@ -849,7 +878,7 @@ with Case('wa_is_bot_nonhuman_no_calls: the incoming WhatsApp webhook says is_bo
 for ch, C in CH.items():
     P = C['pid']
     with Case(f'the_requests [{ch}]: the card — WhatsApp chats/filter by the digits of the chat id, Telegram chats/get limit 20 / '
-              f'offset 0 / order desc; the history — messages/get of THIS chat, limit {LIMIT}, order desc; both GET with the Wappi '
+              f'offset 0 / order desc; the history — messages/get of THIS chat, limit {PAGE}, order desc; both GET with the Wappi '
               'credential, fullResponse + neverError, 10 s, never mark_all') as c:
         with Session(SETUP) as pg:
             moment, fake = new_person(pg, ch)
@@ -860,7 +889,7 @@ for ch, C in CH.items():
                          else (TG_BASE + 'sync/chats/get', {'profile_id': P, 'limit': 20, 'offset': 0, 'order': 'desc'}))
             c.check(cc and (cc['url'], cc['query']) == want_card, f'the card: {cc and (cc["url"], cc["query"])}')
             c.check(rm and (rm['url'], rm['query']) == (C['base'] + 'sync/messages/get',
-                                                        {'profile_id': P, 'chat_id': C['chat'], 'limit': LIMIT, 'order': 'desc'}),
+                                                        {'profile_id': P, 'chat_id': C['chat'], 'limit': PAGE, 'order': 'desc'}),
                     f'the history: {rm and (rm["url"], rm["query"])}')
             for x in (cc, rm):
                 if x:
@@ -868,6 +897,18 @@ for ch, C in CH.items():
                     c.check(x['method'] == 'GET' and x['credentials'] == WAPPI_CRED and resp.get('fullResponse') is True
                             and resp.get('neverError') is True and x['options'].get('timeout') == 10000 and x['body'] is None,
                             f'{x["node"]}: {x}')
+
+with Case('history_page_is_one_the_app_asks: audience.HISTORY_LIMIT is larger than the backfill\'s RECENT_LIMIT, no larger than '
+          'the page the app itself asks on every chat open (ChatManager.MessagesPerPage, through the Wappi Proxy\'s messages.get) '
+          'and inside the proxy\'s own bound for messages.get') as c:
+    import re as _re
+    cm = (N8N.parents[1] / 'Assets' / 'Scripts' / 'Main' / 'ChatManager.cs').read_text(encoding='utf-8')
+    app = _re.search(r'public static int MessagesPerPage = (\d+);', cm)
+    bound = _re.search(r"'messages\.get':.*?limit: \['limit', 'int', (\d+),", (N8N / 'build-auth-workflows.py').read_text(encoding='utf-8'))
+    c.check(app and bound, f'premise — the app\'s page and the proxy\'s bound are readable: {bool(app)} {bool(bound)}')
+    if app and bound:
+        c.check(AUD.RECENT_LIMIT < PAGE <= int(app.group(1)) <= int(bound.group(1)),
+                f'RECENT_LIMIT {AUD.RECENT_LIMIT} < HISTORY_LIMIT {PAGE} <= the app\'s page {app.group(1)} <= the proxy\'s bound {bound.group(1)}')
 
 # ================================================================================================ A1: asc would fail
 def with_query(w, old, new):
@@ -885,7 +926,7 @@ with Case('A1 a_return_to_asc_fails_these_scenarios: on copies of the canon whos
           'trigger itself (an old chat looks new) and turns the backfill\'s order around') as c:
     w = canon()
     copies = (('order asc', with_query(w, "order: 'desc'", "order: 'asc'")),
-              ('limit 1, order asc', with_query(w, f"limit: {LIMIT}, order: 'desc'", "limit: 1, order: 'asc'")))
+              ('limit 1, order asc', with_query(w, f"limit: {PAGE}, order: 'desc'", "limit: 1, order: 'asc'")))
     for label, copy_ in copies:
         for ch, C in CH.items():
             broken = []

@@ -271,7 +271,8 @@ return { json: { profile_id: req.profile_id, chat_id: req.chat_id, channel: req.
     "__CHAT_IDENTITY_JS__", au.CHAT_IDENTITY_JS)
 
 RECENT_URL = "={{ ($json.channel === 'telegram' ? '" + TG_BASE + "' : '" + WA_BASE + "') + 'sync/messages/get' }}"
-# the start of a conversation: the last messages Wappi still has (audience.RECENT_LIMIT — the page Decide Audience reads too)
+# the start of a conversation: the last messages Wappi still has (audience.RECENT_LIMIT — the slice of its larger history page
+# Decide Audience backfills too)
 RECENT_QUERY = ("={{ JSON.stringify({ profile_id: $json.profile_id, chat_id: $json.chat_id, limit: " + str(au.RECENT_LIMIT)
                 + ", order: 'desc' }) }}")
 
