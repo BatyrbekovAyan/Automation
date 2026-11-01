@@ -51,8 +51,11 @@ public static class MakeBusinessCopy
 
     /// <summary>
     /// Whether the server would hand the open chat's newest message to the assistant again, by the type its live list holds
-    /// (<see cref="MessageTypeParser"/> reads the same messages/get words): text and the media the server replays. A voice
-    /// message, a reaction and a type the app does not know (a location, a contact card among them) promise nothing.
+    /// (<see cref="MessageTypeParser"/> reads the same messages/get words): text and the media the server replays; a voice
+    /// message and a reaction never. A type the app does not know never reaches here — a location and a contact card among
+    /// them, which the server does replay: ChatManager drops an Unknown row, like a reaction, while it builds the open chat's
+    /// live list, so the open chat's newest message is never one, and for such a message the chat row's own word decides
+    /// (<see cref="IsReplayable(string)"/>: «location», «vcard»). Unknown answers false only as the side that promises nothing.
     /// </summary>
     public static bool IsReplayable(MessageType type) =>
         type == MessageType.Chat || type == MessageType.Image || type == MessageType.Video || type == MessageType.Audio

@@ -157,8 +157,19 @@ public class MakeBusinessCopyTests
         foreach (MessageType type in new[] { MessageType.Chat, MessageType.Image, MessageType.Video, MessageType.Audio, MessageType.Sticker,
                                              MessageType.Document })
             Assert.IsTrue(MakeBusinessCopy.IsReplayable(type), $"{type} is handed to the assistant again");
-        foreach (MessageType type in new[] { MessageType.Voice, MessageType.Reaction, MessageType.Unknown })
-            Assert.IsFalse(MakeBusinessCopy.IsReplayable(type), $"{type} is not");
+        foreach (MessageType type in new[] { MessageType.Voice, MessageType.Reaction })
+            Assert.IsFalse(MakeBusinessCopy.IsReplayable(type), $"{type} is never handed on");
+
+        // A type the app does not know — a location and a contact card among them, which the server DOES hand on — never reaches
+        // the sheet as the open chat's newest message: the open chat's live list keeps no Unknown row (both builders drop it, as
+        // they drop a reaction), so for such a message the chat row's own word decides. Unknown answers false only as the side
+        // that promises nothing.
+        string manager = SourceGuard.Read("Scripts/Main/ChatManager.cs");
+        int drops = Regex.Matches(manager, Regex.Escape("if (norm.messageType == MessageType.Unknown) continue;")).Count;
+        Assert.GreaterOrEqual(drops, 2, "the open chat's live list builders must keep dropping Unknown rows (the sync and the page load)");
+        Assert.IsFalse(MakeBusinessCopy.IsReplayable(MessageType.Unknown), "the side that promises nothing");
+        Assert.IsTrue(MakeBusinessCopy.IsReplayable("location") && MakeBusinessCopy.IsReplayable("vcard"),
+            "the row's own word for a location and a contact card — the server hands both on");
     }
 
     [Test]
