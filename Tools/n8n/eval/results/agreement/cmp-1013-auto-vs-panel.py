@@ -33,6 +33,17 @@ mp = E.model_params("worktree")
 marks = E.memory_marks("worktree")
 app_user_id = subprocess.run([sys.executable, os.path.join(REPO, "Tools/n8n/staging/fixtures.py"), "create-subscriber", "--run-id", f"avp{int(time.time())}"],
                              capture_output=True, text=True, check=True).stdout.strip()
+CLEANUP = [sys.executable, os.path.join(REPO, "Tools/n8n/staging/fixtures.py"), "delete", "--app-user-id", app_user_id,
+           "--profile-id", E.PANEL_PROFILE]
+# The panel answers only in a business chat («Личные и рабочие чаты», 2026-10-25) — elsewhere it refuses, and the refusal would
+# be scored as «панель молчит». Its fixture chat is made business the owner's way, as run-eval.py's main does; a failed seed
+# removes the subscriber just created and stops.
+try:
+    subprocess.run([sys.executable, os.path.join(REPO, "Tools/n8n/staging/fixtures.py"), "set-audience", "--profile-id", E.PANEL_PROFILE,
+                    "--chat-id", E.PANEL_CHAT, "--kind", "business"], capture_output=True, text=True, check=True)
+except subprocess.CalledProcessError:
+    subprocess.run(CLEANUP, capture_output=True)
+    raise
 
 
 def panel_know(know, sc):
@@ -100,14 +111,14 @@ if os.environ.get("REJUDGE"):          # re-score saved pairs with the CURRENT r
         rows = list(ex.map(rj, saved))
     json.dump(rows, open(OUT, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
     from collections import Counter
-    subprocess.run([sys.executable, os.path.join(REPO, "Tools/n8n/staging/fixtures.py"), "delete", "--app-user-id", app_user_id], capture_output=True)
+    subprocess.run(CLEANUP, capture_output=True)
     print("verdicts:", Counter(r["verdict"] for r in rows)); sys.exit(0)
 tasks = [(sid, r) for r in range(REPEATS) for sid in IDS]
 try:
     with ThreadPoolExecutor(max_workers=4) as ex:
         rows = list(ex.map(one, tasks))
 finally:
-    subprocess.run([sys.executable, os.path.join(REPO, "Tools/n8n/staging/fixtures.py"), "delete", "--app-user-id", app_user_id], capture_output=True)
+    subprocess.run(CLEANUP, capture_output=True)
 json.dump(rows, open(OUT, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
 from collections import Counter
 print("verdicts:", Counter(r["verdict"] for r in rows))
