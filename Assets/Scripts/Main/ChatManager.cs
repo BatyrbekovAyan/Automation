@@ -372,6 +372,10 @@ public partial class ChatManager : MonoBehaviour
             // list cache is this answer verbatim (chats.json), so the facts need no storage of their own.
             AudienceFacts facts = ChatAudienceFacts.From(chat, ActiveChannel, chatKey, ownWhatsappNumber);
 
+            // WhatsApp: the @lid code Wappi may list this chat's messages under (the row's chat.LID), kept only when it
+            // counts (ChatIdentity) — the open chat's pages are judged by it (AcceptChatPage). Never a key.
+            string chatCode = ChatIdentity.For(ActiveChannel, chatKey, chat.chat?.LID).Code;
+
             // Read the unread count through our own ack ledger: while this row's last message
             // is one the owner already read on screen, it counts as 0 no matter what the server
             // still says. Without it, a message that arrived DURING an open chat repaints the
@@ -401,6 +405,7 @@ public partial class ChatManager : MonoBehaviour
                 bool mergedIsMine = chat.last_message_sender != null && chat.last_message_sender.isMe;
                 existingVm.UpdateLastMessageMeta(chat.last_message_type, chat.last_message_delivery_status, mergedIsMine);
                 existingVm.UpdateFacts(facts);   // a contact saved or deleted since the last read can move the chat between the lists
+                existingVm.UpdateChatCode(chatCode);
 
                 // A genuinely new last message resets per-message resolved state. Only then:
                 // adopt the new sender pushname (the resolver backfills it if empty for a LID
@@ -437,7 +442,8 @@ public partial class ChatManager : MonoBehaviour
                                                isLastMessageMine: isMine,
                                                lastMessageSenderName: chat.last_message_sender?.pushname,
                                                isGroup: isGroup,
-                                               facts: facts);
+                                               facts: facts,
+                                               chatCode: chatCode);
                 Chats.Add(chatVM);
                 chatLookup[chatKey] = chatVM;
                 OnChatAdded?.Invoke(chatVM);
@@ -687,7 +693,7 @@ public partial class ChatManager : MonoBehaviour
         {
             MessagesResponseRaw response = JsonConvert.DeserializeObject<MessagesResponseRaw>(www.downloadHandler.text);
 
-            if (CrossChatResponseGuard.IsForDifferentChat(response?.messages, chatId))
+            if (!AcceptChatPage(response, chatId))
             {
                 // Wappi handed us another chat's window (concurrent-request crossing). Drop it —
                 // the cache + page fetch already rendered this chat's real messages, and the next
@@ -1284,7 +1290,7 @@ public partial class ChatManager : MonoBehaviour
         try
         {
             MessagesResponseRaw response = JsonConvert.DeserializeObject<MessagesResponseRaw>(www.downloadHandler.text);
-            if (CrossChatResponseGuard.IsForDifferentChat(response?.messages, chatId))
+            if (!AcceptChatPage(response, chatId))
             {
                 // Crossed response for another chat — patching _activeChatCache from it would
                 // overwrite this chat's media/quote fields with a foreign chat's. Skip the pass.
@@ -1369,7 +1375,7 @@ public partial class ChatManager : MonoBehaviour
         {
             MessagesResponseRaw response = JsonConvert.DeserializeObject<MessagesResponseRaw>(www.downloadHandler.text);
 
-            if (CrossChatResponseGuard.IsForDifferentChat(response?.messages, chatId))
+            if (!AcceptChatPage(response, chatId))
             {
                 // Wappi handed this request another chat's window (concurrent-request crossing).
                 // Handled after the try so we can yield a retry — see below.

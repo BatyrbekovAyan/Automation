@@ -25,6 +25,19 @@ public class ChatDialogUser
     public bool Self;
 }
 
+/// <summary>
+/// WhatsApp chats/filter: the chat's own record, reduced to its <see cref="LID"/> — the @lid code Wappi may list the chat's
+/// messages/get rows under while the list names the chat by its number (live check «@lid и номер — один id»). Which LID
+/// counts as the chat's code is <see cref="ChatIdentity"/>'s to say. The real record carries more (VerifiedName, Status,
+/// PictureID, Devices …) and a Telegram group's row has a <c>chat</c> card of its own (Title, ParticipantsCount …);
+/// JsonUtility skips what is not declared, so a Telegram row's LID stays empty — and Telegram has no codes anyway.
+/// </summary>
+[Serializable]
+public class ChatDialogChat
+{
+    public string LID;
+}
+
 [Serializable]
 public class ChatDialog
 {
@@ -50,4 +63,7 @@ public class ChatDialog
     // either null: an object the row lacks reads as an empty name / all flags false (see ChatAudienceFacts).
     public ChatDialogContact contact;
     public ChatDialogUser user;
+    // WhatsApp rows also carry `chat`: its LID is the code the chat's messages/get rows may come under (ChatIdentity).
+    // Never null after JsonUtility either: a row without it reads as no LID.
+    public ChatDialogChat chat;
 }

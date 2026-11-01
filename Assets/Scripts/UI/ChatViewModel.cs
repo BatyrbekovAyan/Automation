@@ -31,6 +31,11 @@ public class ChatViewModel
     // and the channel's connection moment. default = nothing known, which the rule reads as personal / unknown.
     public AudienceFacts Facts { get; private set; }
 
+    // WhatsApp: the @lid code this chat's messages/get rows may carry instead of ChatId — the chat-list row's chat.LID, kept
+    // only when it counts (ChatIdentity); "" otherwise and always on Telegram. Never a key: the chat is kept under ChatId
+    // everywhere, the code only tells which rows of a page are this chat's (ChatManager.AcceptChatPage).
+    public string ChatCode { get; private set; }
+
     // Reacted-to message context for a reaction last-message. Null = unknown
     // (formatter omits the "to …" clause). Phase 2 backfills these from a fetch.
     public string ReactionTargetText { get; private set; }
@@ -50,7 +55,8 @@ public class ChatViewModel
                          bool isLastMessageMine = false,
                          string lastMessageSenderName = null,
                          bool isGroup = false,
-                         AudienceFacts facts = default)
+                         AudienceFacts facts = default,
+                         string chatCode = null)
     {
         ChatId = chatId;
         Title = title;
@@ -67,6 +73,7 @@ public class ChatViewModel
         // and let ParseChatsJson pass true for Telegram groups (numeric id, no suffix).
         IsGroup = isGroup || ChatIdFormat.IsGroup(chatId);
         Facts = facts;
+        ChatCode = chatCode ?? "";
         LastMessageTimeString = FormatTimestamp(lastTime);
 
         // OnlineStatus = "tap here for contact info";
@@ -104,6 +111,9 @@ public class ChatViewModel
         Facts = facts;
         NotifyUpdated();
     }
+
+    /// <summary>Re-reads the chat's code from a fresh chat-list row. No NotifyUpdated — it is not visual state.</summary>
+    public void UpdateChatCode(string code) => ChatCode = code ?? "";
 
     public void UpdateLastMessageId(string id)
     {
