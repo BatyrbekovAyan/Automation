@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Reflection;
 using Newtonsoft.Json;
 using NUnit.Framework;
 using UnityEngine;
@@ -14,9 +15,12 @@ using static OpenChatFixture;
 ///     ChatAudienceStore, across restarts), so a conversation from before the connection stays personal and does not ring
 ///     when its person writes again — the server decides the chat on that message by its history. On a merged row the
 ///     chat's verdict BEFORE the message counts too (the row's facts may change with it).
-///   • The read. An incoming message in a chat the app holds no verdict for (no server decision mirrored, no owner's move on
-///     its way) asks ChatAudienceSyncService for a list read soon — once per pass, never for the cache load, our own
-///     message or a decided chat. (The service's one-timer coalescing is pinned in IncomingNotifyPolicyTests.)
+///   • The read. An incoming message in a person's chat the app holds no verdict for (no server decision mirrored, no owner's
+///     move on its way) asks ChatAudienceSyncService for a list read soon — once per pass, never for the cache load, our own
+///     message, a decided chat or a non-person (a group or a channel is never decided). The open chat asks too, for a message
+///     from the other side among those its sync finds (ChatManager.AskVerdictForOpenChat): a chat the owner began gets its
+///     verdict, the «Авто» chip and the panel while it stays open. (The service's one-timer coalescing is pinned in
+///     IncomingNotifyPolicyTests.)
 /// The cue and the request are observed through NotificationFx.IncomingDetected and ChatAudienceSyncService.ListSoonRequested.
 /// </summary>
 public class PersonalChatCueTests
@@ -168,6 +172,70 @@ public class PersonalChatCueTests
     }
 
     [Test]
+    public void AGroupOrAChannel_AsksNoRead_TheServerNeverDecidesThem()
+    {
+        const string group = "120363000000000002@g.us";
+        const string channel = "120363000000000003@newsletter";
+        ChatManager manager = NewChatManager();
+        Parse(manager, List(Row(group, "G1", After, 0, isGroup: true), Row(channel, "K1", After, 0)), isInitialLoad: true);
+
+        Parse(manager, List(Row(group, "G2", Later, 1, isGroup: true), Row(channel, "K2", Later, 1)), isInitialLoad: false);
+
+        Assert.AreEqual(0, readRequests, "no verdict will ever come for a non-person — asking would read the list on every pass");
+        Assert.AreEqual(0, cues, "…and a non-person is personal: no cue either");
+    }
+
+    // ---- the open chat ----
+
+    [Test]
+    public void AMessageFromTheOtherSide_InTheOpenUndecidedChat_AsksForTheServersVerdict()
+    {
+        const string lead = "77000000020@c.us";      // the owner wrote first; the person has just replied, the chat open
+        const string decided = "77000000021@c.us";   // the server's decision is mirrored
+        const string moving = "77000000022@c.us";    // the owner's move on its way
+        const string group = "120363000000000004@g.us";
+        ChatAudienceStore.ApplyList(new[]
+        {
+            new AudienceProfileState
+            {
+                ProfileId = Profile, ConnectedAtMs = MomentMs,
+                Decisions = new List<AudienceDecision>
+                {
+                    new AudienceDecision { ChatId = decided, Kind = AudienceKind.Business, Reason = AudienceReason.New, Version = 0 },
+                },
+            },
+        });
+        ChatAudienceStore.ApplyDesire(Profile, moving, AudienceKind.Business);
+        ChatManager manager = NewChatManager();
+        Parse(manager, List(Row(lead, "L1", After, 0, mine: true), Row(decided, "D1", After, 0), Row(moving, "V1", After, 0),
+            Row(group, "G1", After, 0, isGroup: true)), isInitialLoad: true);
+
+        Arrived(manager, lead, Message("L2", incoming: false));
+        Assert.AreEqual(0, readRequests, "the owner's own message decides nothing on the server");
+        Arrived(manager, lead, Message("L3", incoming: false), Message("L4", incoming: true));
+        Assert.AreEqual(1, readRequests, "the person replied in the open chat: the server decides it on that message — read soon");
+
+        Arrived(manager, decided, Message("D2", incoming: true));
+        Arrived(manager, moving, Message("V2", incoming: true));
+        Arrived(manager, group, Message("G2", incoming: true));
+        Arrived(manager, "77000000029@c.us", Message("X1", incoming: true));
+        Arrived(manager, lead);
+        Assert.AreEqual(1, readRequests,
+            "a decided chat, a move on its way, a non-person, a chat the list does not hold and nothing new ask nothing");
+    }
+
+    [Test]
+    public void TheOpenChatsSync_AsksForTheVerdict_WithEveryBatchItFinds()
+    {
+        string sync = SourceGuard.MethodBody(SourceGuard.Read("Scripts/Main/ChatManager.cs"), "IEnumerator SyncLatestMessages(");
+        int found = sync.IndexOf("if (newMessages.Count > 0)", StringComparison.Ordinal);
+        int asked = sync.IndexOf("AskVerdictForOpenChat(chatId, brandNew);", StringComparison.Ordinal);
+        int settled = sync.IndexOf("bool isSettled", StringComparison.Ordinal);
+        Assert.IsTrue(found >= 0 && asked > found && settled > asked,
+            "the messages new to the open chat ask for the verdict as soon as they are found — shown now or queued for the slide");
+    }
+
+    [Test]
     public void ABurstOfUndecidedChats_AsksOnceAPass()
     {
         ChatManager manager = NewChatManager();
@@ -193,13 +261,24 @@ public class PersonalChatCueTests
         return ChatAudienceStore.ViewOf(Profile, vm);
     }
 
-    // A WhatsApp chats/filter row of a person who is not a saved contact.
-    private static object Row(string id, string lastId, string time, int unread, bool mine = false) => new
+    // Messages new to the open chat, as its sync hands them on (ChatManager.AskVerdictForOpenChat).
+    private static void Arrived(ChatManager manager, string chatId, params MessageViewModel[] messages)
+    {
+        MethodInfo ask = typeof(ChatManager).GetMethod("AskVerdictForOpenChat", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.IsNotNull(ask, "ChatManager.AskVerdictForOpenChat moved — the open chat's new messages no longer ask for a verdict");
+        Call(() => ask.Invoke(manager, new object[] { chatId, new List<MessageViewModel>(messages) }));
+    }
+
+    private static MessageViewModel Message(string id, bool incoming) =>
+        new MessageViewModel { messageId = id, type = MessageType.Chat, text = "text " + id, isIncoming = incoming };
+
+    // A WhatsApp chats/filter row of a person who is not a saved contact (or of a group).
+    private static object Row(string id, string lastId, string time, int unread, bool mine = false, bool isGroup = false) => new
     {
         id,
         name = "Chat " + id,
         contact = new { Found = true, FullName = "" },
-        isGroup = false,
+        isGroup,
         unread_count = unread,
         last_message_id = lastId,
         last_message_data = "text " + lastId,

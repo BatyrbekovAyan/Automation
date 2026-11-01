@@ -427,7 +427,7 @@ public partial class ChatManager : MonoBehaviour
                     isInitialLoad, lastIdChanged, mergedIsMine, effectiveUnread,
                     chatKey, currentChatId, chatPanelVisible,
                     chatIsPersonal: personalBefore || IsPersonalChat(audienceProfileId, existingVm));
-                audienceReadSoon |= AwaitsServerVerdict(isInitialLoad, lastIdChanged, mergedIsMine, audienceProfileId, chatKey);
+                audienceReadSoon |= AwaitsServerVerdict(isInitialLoad, lastIdChanged, mergedIsMine, audienceProfileId, chatKey, facts);
             }
             else
             {
@@ -457,7 +457,7 @@ public partial class ChatManager : MonoBehaviour
                     unreadCount: effectiveUnread, chatId: chatKey,
                     openChatId: currentChatId, chatPanelVisible: chatPanelVisible,
                     chatIsPersonal: IsPersonalChat(audienceProfileId, chatVM));
-                audienceReadSoon |= AwaitsServerVerdict(isInitialLoad, lastIdChanged: true, isMine, audienceProfileId, chatKey);
+                audienceReadSoon |= AwaitsServerVerdict(isInitialLoad, lastIdChanged: true, isMine, audienceProfileId, chatKey, facts);
             }
         }
 
@@ -513,13 +513,33 @@ public partial class ChatManager : MonoBehaviour
         ChatAudienceStore.ViewOf(profileId, chat).Kind == AudienceKind.Personal;
 
     /// <summary>
-    /// «Личные и рабочие чаты»: an incoming message (not the cache load, a new last message, not ours) reached a chat the
-    /// app holds no verdict for — no server decision mirrored and no move of the owner's on its way. The server decides
-    /// the chat on this very message; the app learns that only from a list read.
+    /// «Личные и рабочие чаты»: an incoming message (not the cache load, a new last message, not ours) reached a person's
+    /// chat the app holds no verdict for — no server decision mirrored and no move of the owner's on its way. The server
+    /// decides the chat on this very message; the app learns that only from a list read. A non-person (a group, a channel, a
+    /// bot) is never decided: asking for it would read the list on every pass.
     /// </summary>
-    private static bool AwaitsServerVerdict(bool isInitialLoad, bool lastIdChanged, bool isMine, string profileId, string chatKey) =>
+    private static bool AwaitsServerVerdict(bool isInitialLoad, bool lastIdChanged, bool isMine, string profileId, string chatKey,
+        in AudienceFacts facts) =>
         !isInitialLoad && lastIdChanged && !isMine && !string.IsNullOrEmpty(profileId)
+        && ChatAudienceRule.NonHuman(facts) == NonHumanKind.None
         && ChatAudienceStore.KindOf(profileId, chatKey) == null;
+
+    /// <summary>
+    /// «Личные и рабочие чаты»: messages new to the OPEN chat (its sync found them). When one of them is the other side's
+    /// and the chat is a person the app holds no verdict for, the server decides the chat on that message — a chat the owner
+    /// began becomes working on the client's reply — and the app learns it only from a list read: without one, the open chat
+    /// would show no «Авто» chip and no panel for as long as it stays open. Asked through the same one-timer read as the chat
+    /// list; a non-person, a decided chat or a move on its way asks nothing (the live poll runs every few seconds).
+    /// </summary>
+    private void AskVerdictForOpenChat(string chatId, List<MessageViewModel> arrived)
+    {
+        if (arrived == null || !arrived.Exists(m => m != null && m.isIncoming)) return;
+        ChatViewModel chat = GetChat(chatId);
+        string profileId = GetActiveProfileId();
+        if (chat == null || string.IsNullOrEmpty(profileId)) return;
+        if (ChatAudienceRule.NonHuman(chat.Facts) != NonHumanKind.None || ChatAudienceStore.KindOf(profileId, chat.ChatId) != null) return;
+        ChatAudienceSyncService.RequestListSoon();
+    }
 
     /// <summary>
     /// True while a chats/filter sync is in flight. Guards RefreshActiveBotChats
@@ -900,6 +920,9 @@ public partial class ChatManager : MonoBehaviour
             // bubbles on top of themselves (HandleBatchMessages does not Clear
             // outside OnChatSelected), producing visible duplicates.
             var brandNew = new List<MessageViewModel>(newMessages);
+
+            // «Личные и рабочие чаты»: a message from the other side in an open chat with no verdict — read it soon.
+            AskVerdictForOpenChat(chatId, brandNew);
 
             // Add the old cached messages to the bottom of the brand new ones
             newMessages.AddRange(cachedList);
