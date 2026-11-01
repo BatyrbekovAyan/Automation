@@ -56,17 +56,22 @@ the move on a reconnect is part of clone_lineage.py's BIND_WORKFLOW_SQL (Create 
 with the bot part of apply-history-handoff.py's DELETE_NEW_TAIL (Delete Bot Files' Delete Chat Memory). The generators
 paste them, never copy them:
   VALID_SQL(a, c)            «this decision holds»: the owner's always, a computed one only while taken on the current
-                             connection (decided_at >= connected_at; another number moves connected_at);
+                             connection — at or after its moment (decided_at >= connected_at; another number moves
+                             connected_at) and under its number (decided_phone; a restored connection brings back exactly
+                             the decisions taken on it);
   AUDIENCE_SQL(p, c)         the kind of the decision that holds, else NULL (no decision) — a scalar subquery;
   BUSINESS_SQL(p, c)         true only for a holding BUSINESS decision — what every writer and reader asks;
   CONNECTION_SQL(p)          the profile's connection as two select-list columns (connected_at_ms, connection_phone) — what
                              the templates' Read Reply Mode hands Decide Audience;
   LINE_CONNECTED_AT_SQL(p)   the line's moment: the earliest created_at along the superseded_by chain, now() without a row;
   ENSURE_CONNECTION_SQL      the profile's connection row, created with the line's moment when the app has not reported one;
-  DECIDE_WRITE_SQL           a computed decision, written once (it replaces only a computed row that no longer holds; a
-                             personal one replacing a BUSINESS row starts the wipe clock, as the owner's «личный» does);
+  DECIDE_WRITE_SQL           a computed decision, written once with the connected number (it replaces only a computed
+                             row that no longer holds; a personal one replacing a BUSINESS row starts the wipe clock, as
+                             the owner's «личный» does);
   OWNER_SET_SQL              the owner's decisions, version-guarded, refused for a chat that is not a person;
-  CONNECTED_SQL              the app reports a connection: another number restarts the moment (and says so: restarted);
+  CONNECTED_SQL              the app reports a connection: another number restarts the moment (and says so: restarted)
+                             and remembers the connection it replaced; the remembered number back within RESTORE_HOURS
+                             restores that connection instead (restored);
   LIST_SQL                   what the app mirrors: the moment and the holding decisions of each profile;
   BACKFILL_SQL(row, owner)   when a chat turns business, the recent messages it lacks go into the history and the memory
                              (a message of ours the transport marks as an API send is the owner's from the app — unless
@@ -93,6 +98,10 @@ FRESH_HOURS = 24        # a message that waited for the owner's decision is hand
 WIPE_DAYS = 2           # the data of a business chat that turned personal (the owner's decision, the rule after another
                         # number, or the line's move on a reconnect) is wiped after this many days
 WIPE_BATCH = 200        # chats the Sweep wipes per run (every 6 hours); the oldest first, the rest wait for the next run
+RESTORE_HOURS = 24      # a mistaken pairing (another account scanned the code) is undone by pairing the previous number again
+                        # within this long of the mistaken connection's moment: the earlier connection comes back — its number,
+                        # its moment and the computed decisions taken on it — instead of a new connection starting (CONNECTED_SQL;
+                        # on a reconnect through a new profile, clone_lineage.BIND_WORKFLOW_SQL). Later it is another number.
 RECENT_LIMIT = 10       # the start of the conversation the backfill stores when a chat turns business: the newest this many
                         # messages of the chat (messages/get, order desc) — the ChatAudience webhook reads exactly this many,
                         # Decide Audience keeps this many of its history page
@@ -236,9 +245,13 @@ def _nonhuman_id_sql(chat):
 def VALID_SQL(a="a", c="c"):
     """«This decision holds» — `a` a chat_audience row, `c` the profile's audience_connections row (null-extended when
     there is none: then every decision holds). The owner's decision always holds; a computed one only while it was taken
-    on the current connection — another number (CONNECTED_SQL) moves connected_at forward and so voids the older
-    computed rows without touching them."""
-    return "(" + a + ".source = 'owner' or " + a + ".decided_at >= coalesce(" + c + ".connected_at, '-infinity'))"
+    on the current connection: at or after its moment — another number (CONNECTED_SQL) moves connected_at forward and so
+    voids the older computed rows without touching them — and under its number, so that a connection CONNECTED_SQL
+    restores brings back exactly the decisions taken on it, never those of the mistaken account in between (they were
+    taken after the restored moment, under another number). A number not known on either side does not void anything:
+    a decision taken before the first number was reported, or a connection whose number is not known yet."""
+    return ("(" + a + ".source = 'owner' or (" + a + ".decided_at >= coalesce(" + c + ".connected_at, '-infinity')"
+            " and coalesce(" + a + ".decided_phone = " + c + ".phone, true)))")
 
 
 def AUDIENCE_SQL(profile="$1", chat="$2"):
@@ -303,24 +316,29 @@ DECIDE_WRITE_SQL = """-- «Личные и рабочие чаты»: write the 
 -- The pair must be one the rule gives: business only as new, personal as nonhuman / contact / history; a business
 -- decision for a chat id that is not a person (a group, a channel, the service account) is never written. Anything else
 -- writes nothing and answers nulls (the caller reads that as «not business»).
--- An existing row is replaced only when it is a computed one that no longer holds (taken before the current connection:
--- another number). The owner's row and a computed row that still holds are kept: the conflict locks them and writes every
--- column back unchanged, then hands them back. That is how the second of two first messages racing here reads the FIRST
--- one's decision: the conflict waits for the first insert to commit and returns the committed row — a re-read in the same
--- statement could not see it (one snapshot per statement), and a conflict that updates nothing returns nothing.
+-- The number the profile's channel is connected with now is written with it (decided_phone): a computed decision holds
+-- only on the connection it was taken on — its moment and its number (VALID_SQL).
+-- An existing row is replaced only when it is a computed one that no longer holds (taken before the current connection
+-- or under another number: another number connected, or a mistaken connection undone). The owner's row and a computed
+-- row that still holds are kept: the conflict locks them and writes every column back unchanged, then hands them back.
+-- That is how the second of two first messages racing here reads the FIRST one's decision: the conflict waits for the
+-- first insert to commit and returns the committed row — a re-read in the same statement could not see it (one snapshot
+-- per statement), and a conflict that updates nothing returns nothing.
 -- The wipe clock, when a row is replaced (the owner's own rules, OWNER_SET_SQL): a personal decision over a BUSINESS row
 -- starts it — personal_since = the moment of this decision, wiped_at cleared —, because what the assistant stored while the
 -- chat was business is still there (after another number, a client of the old number who is a contact of the new one, or
--- has history there); WIPE_SQL deletes it WIPE_DAYS later. Personal over personal keeps the clock and the wiped mark as they
+-- has history there; after a mistaken connection undone, a business decision taken on the other account); WIPE_SQL
+-- deletes it WIPE_DAYS later. Personal over personal keeps the clock and the wiped mark as they
 -- were, an empty clock included; a business decision clears both. A new row starts no clock: nothing of a chat without a
 -- decision is ever stored.
 -- ALWAYS one row: kind, reason, source of the decision that holds after the write.
 -- Parameters, in order: profile id, chat id, kind, reason.
 with aud_conn as (
-  select (select c0.connected_at from audience_connections c0 where c0.profile_id = $1) as connected_at
+  select (select c0.connected_at from audience_connections c0 where c0.profile_id = $1) as connected_at,
+         (select c0.phone from audience_connections c0 where c0.profile_id = $1) as phone
 ), decided as (
-  insert into chat_audience as a (profile_id, chat_id, kind, source, reason, decided_at, updated_at)
-  select $1, $2, $3, 'default', $4, now(), now()
+  insert into chat_audience as a (profile_id, chat_id, kind, source, reason, decided_at, updated_at, decided_phone)
+  select $1, $2, $3, 'default', $4, now(), now(), (select phone from aud_conn)
   where """ + _real_profile("$1") + """ and nullif($2, '') is not null
     and (($3 = 'business' and $4 = 'new') or ($3 = 'personal' and $4 in ('nonhuman', 'contact', 'history')))
     and not ($3 = 'business' and """ + _nonhuman_id_sql("$2") + """)
@@ -328,6 +346,7 @@ with aud_conn as (
     kind           = case when """ + _DECIDE_STALE + """ then excluded.kind else a.kind end,
     reason         = case when """ + _DECIDE_STALE + """ then excluded.reason else a.reason end,
     decided_at     = case when """ + _DECIDE_STALE + """ then excluded.decided_at else a.decided_at end,
+    decided_phone  = case when """ + _DECIDE_STALE + """ then excluded.decided_phone else a.decided_phone end,
     personal_since = case when """ + _DECIDE_STALE + """
                           then case when excluded.kind = 'business' then null
                                     when a.kind = 'business' then excluded.decided_at
@@ -407,34 +426,50 @@ def _digits(expr):
 
 _NUMBER_CHANGES = "excluded.phone is not null and excluded.phone is distinct from " + _digits("c.phone")   # filled in or another
 _ANOTHER_NUMBER = "excluded.phone is not null and " + _digits("c.phone") + " <> excluded.phone"         # a KNOWN number replaced
+# … by the remembered one, while the current connection is younger than RESTORE_HOURS: a mistaken connection undone
+_RESTORES = (_ANOTHER_NUMBER + " and excluded.phone = " + _digits("c.prev_phone") + " and c.prev_connected_at is not null"
+             " and c.connected_at >= now() - interval '" + str(RESTORE_HOURS) + " hours'")
 
 CONNECTED_SQL = """-- «Личные и рабочие чаты»: the app reports a confirmed connection of the profile's channel; the number is the one the
 -- server read from get/status (only its digits count; empty = not known). No row: created with the line's moment and the
 -- number. A row without a number takes the number and keeps its moment. The same number, or none given, changes nothing.
 -- ANOTHER number is a new connection (owner decision 19): the moment becomes now — every computed decision taken before
--- it stops holding (VALID_SQL), the owner's stay — and the new number is kept.
--- ALWAYS one row: connected_at_ms of the row after it (null for a sentinel profile, which writes nothing) and restarted —
--- true only when THIS statement moved the moment (an existing row, another known number: the app then asks «Кто из них
--- клиенты?» again); a first row, a number filled in, the same or no number, a sentinel: false. «Moved» is read off the
--- row itself — the moment is now exactly when this statement set it — so a concurrent report that moved it first does
--- not make this one say so.
+-- it, or under the old number, stops holding (VALID_SQL), the owner's stay —, the new number is kept and the connection it
+-- replaced is remembered (prev_phone / prev_connected_at: the last one only).
+-- The REMEMBERED number back within """ + str(RESTORE_HOURS) + """ hours (RESTORE_HOURS) of the current connection's moment restores that connection
+-- instead: a mistaken pairing (another account scanned the code) undone the same day. Its number and its moment come back
+-- and the connection just left is remembered in turn; the computed decisions taken on the restored connection hold again,
+-- those taken on the mistaken one do not (VALID_SQL: a computed decision holds only under its own number). Later than
+-- that it is another number as above — and so is a number two changes back (A, B, C, then A: only C is remembered).
+-- ALWAYS one row: connected_at_ms of the row after it (null for a sentinel profile, which writes nothing); restarted —
+-- true only when THIS statement moved the moment to now (an existing row, another known number that is no return: the
+-- app then asks «Кто из них клиенты?» again); restored — true only when THIS statement brought the remembered connection
+-- back. A first row, a number filled in, the same or no number, a sentinel: both false. Both are read off the row itself,
+-- so a concurrent report that changed the row first does not make this one say so: restarted — the moment is now;
+-- restored — the number changed now (updated_at is now) while the moment is not now and a connection is remembered (a
+-- number filled in remembers none: only a known number replaced is ever remembered).
 -- Parameters, in order: profile id, the connected number.
 with num as (
   select """ + _digits("$2") + """ as phone
-), prev as (
+), existing as (
   select c0.connected_at from audience_connections c0 where c0.profile_id = $1
 ), up as (
   insert into audience_connections as c (profile_id, phone, connected_at)
   select $1, num.phone, """ + LINE_CONNECTED_AT_SQL("$1") + """ from num
   where """ + _real_profile("$1") + """
   on conflict (profile_id) do update set
-    connected_at = case when """ + _ANOTHER_NUMBER + """ then now() else c.connected_at end,
-    phone        = case when """ + _NUMBER_CHANGES + """ then excluded.phone else c.phone end,
-    updated_at   = case when """ + _NUMBER_CHANGES + """ then now() else c.updated_at end
-  returning c.connected_at
+    connected_at      = case when """ + _RESTORES + """ then c.prev_connected_at
+                             when """ + _ANOTHER_NUMBER + """ then now() else c.connected_at end,
+    phone             = case when """ + _NUMBER_CHANGES + """ then excluded.phone else c.phone end,
+    prev_phone        = case when """ + _ANOTHER_NUMBER + """ then """ + _digits("c.phone") + """ else c.prev_phone end,
+    prev_connected_at = case when """ + _ANOTHER_NUMBER + """ then c.connected_at else c.prev_connected_at end,
+    updated_at        = case when """ + _NUMBER_CHANGES + """ then now() else c.updated_at end
+  returning c.connected_at, c.updated_at, c.prev_phone
 )
 select """ + _ms("(select connected_at from up)") + """ as connected_at_ms,
-       coalesce(exists (select 1 from prev) and (select connected_at from up) = now(), false) as restarted"""
+       coalesce(exists (select 1 from existing) and (select connected_at from up) = now(), false) as restarted,
+       coalesce((select u.updated_at = now() and u.connected_at <> now() and u.prev_phone is not null from up u), false)
+         as restored"""
 
 
 LIST_SQL = """-- «Личные и рабочие чаты»: what the app mirrors (the ChatAudience webhook's list). For every profile asked — each once, in

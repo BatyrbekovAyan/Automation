@@ -719,11 +719,12 @@ def check_webhook(bundle, sql=None):
     need("rows.length === asked" in ss and "typeof r.applied === 'boolean'" in ss and "typeof r.became_business === 'boolean'" in ss
          and "Number(r.version)" in ss,
          "Shape Set must answer success only on one well-formed row per distinct chat, the version as a number")
-    need("typeof row.restarted !== 'boolean'" in sc and "Number.isSafeInteger(ms) && ms > 0" in sc
+    need("typeof row.restarted !== 'boolean'" in sc and "typeof row.restored !== 'boolean'" in sc
+         and "restarted: row.restarted, restored: row.restored" in sc and "Number.isSafeInteger(ms) && ms > 0" in sc
          and "done({ success: false, error: 'not_authorized' }, 409)" in sc and "done({ success: false, error: 'wappi_unavailable' }, 502)" in sc
          and "reason: 'profileId' }, 400)" in sc,
          "Shape Connected must answer 409 / 502 / 400 / 500 by what happened and success only on one row with a positive "
-         "moment and a boolean restarted")
+         "moment and the booleans restarted and restored, both handed to the app")
     need(sources(wf, "Respond") == [("Shape Connected", 0), ("Shape List", 0)] and sources(wf, "Shape Connected")
          == [("Channel Known?", 1), ("Connected", 0), ("Phone OK?", 1)],
          f"Respond must answer Shape List and Shape Connected alone, Shape Connected judge every way out of connected: "
@@ -999,6 +1000,12 @@ WEBHOOK_MUTATIONS = (
      "Replay Plan must"),
     ("Shape Set calls any row a success", _wh("Shape Set", "jsCode", "typeof r.became_business === 'boolean'", "true"), "Shape Set must"),
     ("Shape Connected without restarted", _wh("Shape Connected", "jsCode", " || typeof row.restarted !== 'boolean'", ""), "Shape Connected must"),
+    ("Shape Connected without restored", _wh("Shape Connected", "jsCode", "\n    || typeof row.restored !== 'boolean'", ""),
+     "Shape Connected must"),
+    ("Shape Connected keeps restored from the app", _wh("Shape Connected", "jsCode", ", restored: row.restored }", " }"),
+     "Shape Connected must"),
+    ("Connected restores nothing", _wh("Connected", "query", " then c.prev_connected_at\n", " then c.connected_at\n"),
+     "differs from audience.CONNECTED_SQL"),
     ("Auth Gate disabled", _wh_node("Auth Gate", "disabled", True), "Auth Gate is disabled"),
     ("Replay Plan disabled", _wh_node("Replay Plan", "disabled", True), "Replay Plan is disabled"),
     ("successful executions saved", lambda b: b[WEBHOOK_FILE]["settings"].__setitem__("saveDataSuccessExecution", "all"),

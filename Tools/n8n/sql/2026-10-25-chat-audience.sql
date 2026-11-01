@@ -15,15 +15,23 @@
 --                   one (the reply_mode_flags / bot_schedule guard); computed rows keep 0;
 --   decided_at      when the row's decision was taken: a computed decision HOLDS only while decided_at >= the
 --                   profile's connected_at (another number restarts the connection and voids the older computed rows
---                   without touching them); the owner's decision always holds (audience.VALID_SQL);
+--                   without touching them) and it was taken under the connected number (decided_phone); the owner's
+--                   decision always holds (audience.VALID_SQL);
 --   personal_since  when the chat turned personal after it was business — the owner made it personal, a computed
 --                   personal decision replaced a business row (after another number: the old number's client is a contact
 --                   of the new one), or a reconnect's merge landed a personal row over a business period — the 2-day wipe
 --                   of the Profile Lifecycle Sweep counts from it; null = no clock (a computed personal decision of a chat
 --                   that was never business: nothing of it was stored — the owner's «личный» stamps a clock either way);
---   wiped_at        when that wipe ran (the partial index below is the wipe's work list).
+--   wiped_at        when that wipe ran (the partial index below is the wipe's work list);
+--   decided_phone   the digits of the number the profile's channel was connected with when a COMPUTED decision was taken
+--                   (null = not known then); a computed decision holds only under that number — so after a mistaken
+--                   pairing is undone, the decisions computed on the other account stay void and those of the restored
+--                   number hold again. Read for computed rows only (the owner's decision holds whatever the number).
 -- audience_connections — one row per profile: the moment its channel counts as connected (the earliest created_at of the
---   bot's line, or now() when another number was connected) and the connected number's digits (null = not known yet).
+--   bot's line, or now() when another number was connected), the connected number's digits (null = not known yet), and
+--   the connection it replaced — prev_phone / prev_connected_at, the last one only: the remembered number back within
+--   audience.RESTORE_HOURS of the current connection's moment restores that connection (its number and its moment)
+--   instead of starting a new one (audience.CONNECTED_SQL; on a reconnect the bind does the same).
 -- reply_events.state gains 'cancelled_personal' (a reply in preparation is cancelled when its chat turned personal).
 --
 -- Both tables move with the bot's line on a reconnect (clone_lineage.MOVED_TABLES, the bind in clone_lineage.py) and are
@@ -43,6 +51,7 @@ create table if not exists public.chat_audience (
   personal_since timestamptz,
   wiped_at       timestamptz,
   updated_at     timestamptz not null default now(),
+  decided_phone  text,                             -- a computed decision's number (digits; null = not known)
   primary key (profile_id, chat_id)
 );
 create index if not exists chat_audience_wipe_idx on public.chat_audience (personal_since)
@@ -51,9 +60,20 @@ create table if not exists public.audience_connections (
   profile_id   text primary key,                   -- the Wappi profile
   phone        text,                               -- the connected number's digits (null = not known yet)
   connected_at timestamptz not null,
-  updated_at   timestamptz not null default now()
+  updated_at   timestamptz not null default now(),
+  prev_phone        text,                          -- the number this connection replaced (digits; null = none)
+  prev_connected_at timestamptz                    -- and that connection's moment
 );
 -- TABLE-END
+
+-- The remembered connection and a computed decision's number came after the first copy of this file: on tables that copy
+-- created they are added here — at the end, nullable, the existing rows kept (a computed row without a number holds as
+-- before; a connection without a remembered one restores nothing). A re-run changes nothing.
+-- COLUMNS-BEGIN
+alter table public.chat_audience add column if not exists decided_phone text;
+alter table public.audience_connections add column if not exists prev_phone text;
+alter table public.audience_connections add column if not exists prev_connected_at timestamptz;
+-- COLUMNS-END
 
 -- The wipe's work list (audience.WIPE_SQL) is every personal decision with a running clock, the owner's and a computed one
 -- alike. An index an earlier copy of this file built named the owner's source in its predicate, which that list cannot use
@@ -99,8 +119,10 @@ revoke all on table public.chat_audience from anon, authenticated;
 revoke all on table public.audience_connections from anon, authenticated;
 
 -- Post-checks:
---   \d public.chat_audience                                                          -- the ten columns above
---   \d public.audience_connections                                                   -- the four columns above
+--   \d public.chat_audience                                                          -- the eleven columns above
+--   \d public.audience_connections                                                   -- the six columns above
+--   select table_name, column_name from information_schema.columns where table_schema = 'public'
+--   and column_name in ('decided_phone', 'prev_phone', 'prev_connected_at');       -- the three, nullable, last
 --   select indexdef from pg_indexes where indexname = 'chat_audience_wipe_idx';     -- (personal_since) WHERE kind = 'personal' …
 --   select relname, relrowsecurity from pg_class
 --   where oid in ('public.chat_audience'::regclass, 'public.audience_connections'::regclass);       -- expect t, t

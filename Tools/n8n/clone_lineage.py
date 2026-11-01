@@ -75,6 +75,18 @@ def protected_ids():
 
 PROTECTED = protected_ids()
 PROT = ", ".join("'%s'" % i for i in PROTECTED)
+
+
+def _audience_restore_hours():
+    """audience.RESTORE_HOURS — the personal chats' constants live in audience.py (loaded by path: the test harness and the
+    generators import this module from different working directories)."""
+    spec = importlib.util.spec_from_file_location("audience_for_lineage", os.path.join(HERE, "audience.py"))
+    m = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    return m.RESTORE_HOURS
+
+
+RESTORE_HOURS = _audience_restore_hours()
 ID_FORM = "'^[A-Za-z0-9]{8,36}$'"          # a clone id as n8n issues it (Set Workflow State's Validate uses the same)
 
 
@@ -178,16 +190,23 @@ _BIND_TEMPLATE = """-- F1 + F2 (plan 2026-10-11 §1.5): bind the clone to the pr
 --   the owner's set refuses it too), then the owner's over a computed one; of two owner rows the new profile's own; of
 --   two computed rows the predecessors' when the connection stays the line's (the connection merge below keeps the line's
 --   moment — the line decided once, while the new profile's own row was decided against its own created_at) and the new
---   profile's own on a new connection (both numbers known and different, that merge's very condition); among
---   predecessors the freshest. Its values stay as they were (the moment moves with it, so a moved computed decision keeps
---   holding) — except the wipe clock: a PERSONAL row that lands over a business period (one of the chat's taken rows —
+--   profile's own on a new connection (both numbers known and different, that merge's very condition) — unless that
+--   new connection is a return the merge restores (below): then the predecessors' row lands when it was taken on the
+--   restored connection (at or after its moment, under its number), the new profile's own when it was not (a decision of
+--   the mistaken account); among predecessors the freshest. Its values stay as they were — the number it was taken under
+--   included (the moment moves with it, so a moved computed decision keeps holding on its own connection) — except the
+--   wipe clock: a PERSONAL row that lands over a business period (one of the chat's taken rows —
 --   the predecessors' or the new profile's own — is business, or personal with a running clock) carries a running one,
 --   the earliest running clock among those rows else now(), with wiped_at cleared, so the business period moved under it
 --   is wiped WIPE_DAYS later (audience.WIPE_SQL); a personal row with no business period under it keeps its clock as it
 --   is. The connection: the new profile's own row stays when its number and the number of the predecessors'
 --   EARLIEST row are both known and differ (another number is a new connection; its moment is raised to the newest
---   predecessor moment when older, never lowered); otherwise the new profile ends with the earliest moment and that
---   row's number — or, when that row has none, the new profile's own known number (never dropped). A kept row keeps
+--   predecessor moment when older, never lowered) and remembers that earliest row's number and moment as the connection
+--   it replaced — unless its number is the one that earliest row itself replaced and that row's connection began within
+--   audience.RESTORE_HOURS (a mistaken pairing undone through a new profile): then the line's earlier connection is
+--   restored, its number and moment, and the mistaken one is remembered — as audience.CONNECTED_SQL does on one profile;
+--   otherwise the new profile ends with the earliest moment and that row's number and remembered connection — or, when
+--   that row has no number, the new profile's own known number (never dropped). A kept row keeps
 --   its updated_at unless its values change. Every predecessor row of the two tables is deleted and the winner is
 --   inserted again under the new profile, so a row the first messages of a chat wrote for the new profile while this
 --   statement ran is met by ON CONFLICT on its committed version — never a key clash.
@@ -384,28 +403,29 @@ with me as (
   returning 1
 ), conn_take as (      -- personal chats: the predecessors' connection rows (PK profile_id) all leave their profiles, likewise
   delete from audience_connections c where c.profile_id in (select pid from p)
-  returning c.profile_id as pid, c.phone, c.connected_at, c.updated_at
-), conn_e as (         -- the earliest of them (its moment, its number, its updated_at) and the newest moment among them
-  select e.phone, e.connected_at, e.updated_at, max(e.connected_at) over () as newest
+  returning c.profile_id as pid, c.phone, c.connected_at, c.updated_at, c.prev_phone, c.prev_connected_at
+), conn_e as (         -- the earliest of them (its moment, its number, its updated_at, the connection it replaced) and the
+  select e.phone, e.connected_at, e.updated_at, e.prev_phone, e.prev_connected_at,     -- newest moment among them
+    max(e.connected_at) over () as newest
   from conn_take e order by e.connected_at, e.updated_at, e.pid limit 1
 ), aud_take as (       -- personal chats: the predecessors' chat decisions (PK profile_id + chat_id) all leave their profiles,
   delete from chat_audience a                    -- each on its committed version: a row a concurrent statement moved
   where a.profile_id in (select pid from p)      -- meanwhile is skipped, never taken back
   returning a.profile_id as pid, a.chat_id, a.kind, a.source, a.reason, a.version, a.decided_at, a.personal_since,
-    a.wiped_at, a.updated_at
+    a.wiped_at, a.updated_at, a.decided_phone
 ), aud_best as (       -- per chat the predecessors' best row: a non-human decision over everything, then the owner's over a
   select distinct on (w.chat_id) w.chat_id, w.kind, w.source, w.reason, w.version, w.decided_at, w.personal_since,
-    w.wiped_at, w.updated_at                                                       -- computed one, then the freshest
+    w.wiped_at, w.updated_at, w.decided_phone                                      -- computed one, then the freshest
   from aud_take w
   order by w.chat_id, (w.reason = 'nonhuman') desc, (w.source = 'owner') desc, w.updated_at desc, w.version desc,
     w.decided_at desc, w.pid desc
 ), aud_mv as (         -- it lands on the new profile, whose own row (its committed version) meets the conflict and stays
   insert into chat_audience as t (profile_id, chat_id, kind, source, reason, version, decided_at, personal_since, wiped_at,
-                                  updated_at)                     -- unless it loses (the rules in the head of this statement)
+                                  updated_at, decided_phone)      -- unless it loses (the rules in the head of this statement)
   select $1, b.chat_id, b.kind, b.source, b.reason, b.version, b.decided_at,
     case when b.kind = 'personal' and <B_PERIOD> then coalesce(<B_CLOCK>, now()) else b.personal_since end,
     case when b.kind = 'personal' and <B_PERIOD> then null else b.wiped_at end,
-    b.updated_at
+    b.updated_at, b.decided_phone
   from aud_best b
   on conflict (profile_id, chat_id) do update set
     kind       = case when <MOVED_WINS> then excluded.kind else t.kind end,
@@ -413,6 +433,7 @@ with me as (
     reason     = case when <MOVED_WINS> then excluded.reason else t.reason end,
     version    = case when <MOVED_WINS> then excluded.version else t.version end,
     decided_at = case when <MOVED_WINS> then excluded.decided_at else t.decided_at end,
+    decided_phone = case when <MOVED_WINS> then excluded.decided_phone else t.decided_phone end,
     personal_since = case when <LANDS_PERSONAL> and <T_PERIOD> then coalesce(<T_CLOCK>, now())
                           when <MOVED_WINS> then excluded.personal_since else t.personal_since end,
     wiped_at   = case when <LANDS_PERSONAL> and <T_PERIOD> then null
@@ -424,20 +445,30 @@ with me as (
   returning exists (select 1 from aud_best b where b.chat_id = t.chat_id and b.kind = t.kind and b.source = t.source
                       and b.reason = t.reason and b.version = t.version and b.decided_at = t.decided_at) as took
 ), conn_mv as (        -- onto the new profile: its own row (its committed version) stays when both numbers are known and
-  insert into audience_connections as t (profile_id, phone, connected_at, updated_at)   -- differ, the moment raised to the
-  select $1, e.phone, e.connected_at, e.updated_at from conn_e e                        -- newest predecessor's when older;
-  on conflict (profile_id) do update set                                                -- otherwise the earlier row wins,
-    phone        = case when <ANOTHER_NUMBER> or <EARLIEST_UNKNOWN> then t.phone        -- with its number, else with the new
-                        else excluded.phone end,                                        -- profile's own known one
-    connected_at = case when <ANOTHER_NUMBER> then greatest(t.connected_at, (select newest from conn_e))
-                        else excluded.connected_at end,
+  insert into audience_connections as t (profile_id, phone, connected_at, updated_at, prev_phone, prev_connected_at)
+  select $1, e.phone, e.connected_at, e.updated_at, e.prev_phone, e.prev_connected_at from conn_e e
+  on conflict (profile_id) do update set   -- differ, the moment raised to the newest predecessor's when older, remembering
+    phone        = case when <ANOTHER_NUMBER> or <EARLIEST_UNKNOWN> then t.phone        -- the earliest row's connection —
+                        else excluded.phone end,                                        -- unless it is a return: then
+    connected_at = case when <RESTORES> then excluded.prev_connected_at                 -- that row's own remembered one
+                        when <ANOTHER_NUMBER> then greatest(t.connected_at, (select newest from conn_e))   -- comes back; else
+                        else excluded.connected_at end,                                 -- the earlier row wins, with its
+    prev_phone   = case when <ANOTHER_NUMBER> then excluded.phone                       -- number (or the new profile's own
+                        else excluded.prev_phone end,                                   -- known one) and the connection
+    prev_connected_at = case when <ANOTHER_NUMBER> then excluded.connected_at           -- it remembered
+                        else excluded.prev_connected_at end,
     updated_at   = case when <ANOTHER_NUMBER> then now()
                         when <EARLIEST_UNKNOWN> and <OWN_KNOWN> then now()      -- the early moment with the own number: a
                         else excluded.updated_at end                            -- row neither of them was
-  where case when <ANOTHER_NUMBER> then (select newest from conn_e) > t.connected_at    -- a kept row changes only when its
-             else excluded.connected_at < t.connected_at end                            -- values do
-  returning t.connected_at = (select connected_at from conn_e)          -- took: the earliest predecessor moment landed, its
-    and (<EARLIEST_UNKNOWN_SUB> or t.phone is not distinct from (select phone from conn_e)) as took   -- number not overruled
+  where case when <RESTORES> then true                                                  -- a kept row changes only when its
+             when <ANOTHER_NUMBER> then (select newest from conn_e) > t.connected_at    -- values do
+                  or t.prev_phone is distinct from excluded.phone or t.prev_connected_at is distinct from excluded.connected_at
+             else excluded.connected_at < t.connected_at end
+  returning (t.connected_at = (select connected_at from conn_e)         -- took: the earliest predecessor moment landed, its
+     and (<EARLIEST_UNKNOWN_SUB> or t.phone is not distinct from (select phone from conn_e)))   -- number not overruled —
+    or (t.connected_at = (select prev_connected_at from conn_e)          -- or, a return, the connection it remembered did
+        and t.prev_connected_at = (select connected_at from conn_e)
+        and t.prev_phone is not distinct from (select phone from conn_e)) as took
 )
 select exists (select 1 from bind where workflow_id = $2) as bound, $2::text as workflow_id,
   coalesce((select jsonb_agg(a.pid order by a.pid) from (
@@ -478,17 +509,35 @@ def _another_number(own, earliest):
     return "coalesce(" + _digits(own) + " <> " + _digits(earliest) + ", false)"
 
 
+def _restores(own, earliest, earliest_prev, earliest_prev_at, earliest_at):
+    """Another number (above) that is a return: the new profile's own number is the one the predecessors' EARLIEST
+    connection row itself replaced (`earliest_prev`, its moment `earliest_prev_at`), and that row's connection began within
+    audience.RESTORE_HOURS (`earliest_at`) — a mistaken pairing undone through a new profile. The line then restores its
+    earlier connection instead of starting a new one, exactly as audience.CONNECTED_SQL does on one profile."""
+    return ("(" + _another_number(own, earliest) + " and coalesce(" + _digits(own) + " = " + _digits(earliest_prev) + ", false)"
+            " and " + earliest_prev_at + " is not null and " + earliest_at + " >= now() - interval '" + str(RESTORE_HOURS)
+            + " hours')")
+
+
 # Inside conn_mv's conflict: the new profile's own number (t) and the earliest predecessor's (excluded) are BOTH known and
 # their digits differ — another number, a new connection (owner decision 19). An unknown number on either side is not one.
 _ANOTHER_NUMBER = _another_number("t.phone", "excluded.phone")
-# The same condition for aud_mv's conflict: the new profile's own connection row as this statement found it, the earliest
-# predecessor row of conn_e. Not met, the connection stays the line's (its earliest moment), and of two COMPUTED chat
-# decisions the predecessors' lands — the line decided once; met, the new profile's own computed row keeps winning.
-_AUD_ANOTHER_NUMBER = _another_number("(select c.phone from audience_connections c where c.profile_id = $1)",
-                                      "(select e.phone from conn_e e)")
+_RESTORES = _restores("t.phone", "excluded.phone", "excluded.prev_phone", "excluded.prev_connected_at", "excluded.connected_at")
+# The same conditions for aud_mv's conflict: the new profile's own connection row as this statement found it, the earliest
+# predecessor row of conn_e. Not another number, the connection stays the line's (its earliest moment), and of two COMPUTED
+# chat decisions the predecessors' lands — the line decided once; another number, the new profile's own computed row keeps
+# winning — unless it is a return: then the line's earlier connection comes back, and the predecessors' row lands when it
+# was taken on that connection (at or after its moment, under its number), the new profile's own when it was not.
+_AUD_OWN_PHONE = "(select c.phone from audience_connections c where c.profile_id = $1)"
+_AUD_ANOTHER_NUMBER = _another_number(_AUD_OWN_PHONE, "(select e.phone from conn_e e)")
+_AUD_RESTORES = _restores(_AUD_OWN_PHONE, "(select e.phone from conn_e e)", "(select e.prev_phone from conn_e e)",
+                          "(select e.prev_connected_at from conn_e e)", "(select e.connected_at from conn_e e)")
+_ON_RESTORED = ("(excluded.decided_at >= (select e.prev_connected_at from conn_e e) and coalesce("
+                + _digits("excluded.decided_phone") + " = " + _digits(_AUD_OWN_PHONE) + ", true))")
 _MOVED_WINS = ("(t.reason <> 'nonhuman' and (excluded.reason = 'nonhuman'"
                " or (excluded.source = 'owner' and t.source <> 'owner')"
-               " or (excluded.source = 'default' and t.source = 'default' and not " + _AUD_ANOTHER_NUMBER + ")))")
+               " or (excluded.source = 'default' and t.source = 'default' and (not " + _AUD_ANOTHER_NUMBER
+               + " or (" + _AUD_RESTORES + " and " + _ON_RESTORED + ")))))")
 _LANDS_PERSONAL = "(case when " + _MOVED_WINS + " then excluded.kind else t.kind end) = 'personal'"
 _RUNS = "{a}.kind = 'personal' and {a}.personal_since is not null and {a}.wiped_at is null"     # a wipe clock that runs
 
@@ -519,7 +568,7 @@ _OWN_KNOWN = _digits("t.phone") + " is not null"
 def bind_workflow_sql(channel):
     c = CHANNELS[channel]
     return _sql(_BIND_TEMPLATE, KEY=c["meta_key"], OTHER=c["other_meta_key"], FCOL=c["file_column"],
-                PREDS=_json_strings("$8"), REPLACE=_json_strings("$7"), ANOTHER_NUMBER=_ANOTHER_NUMBER,
+                PREDS=_json_strings("$8"), REPLACE=_json_strings("$7"), ANOTHER_NUMBER=_ANOTHER_NUMBER, RESTORES=_RESTORES,
                 EARLIEST_UNKNOWN_SUB=_EARLIEST_UNKNOWN_SUB, EARLIEST_UNKNOWN=_EARLIEST_UNKNOWN, OWN_KNOWN=_OWN_KNOWN,
                 MOVED_WINS=_MOVED_WINS, LANDS_PERSONAL=_LANDS_PERSONAL,
                 B_PERIOD=_taken_period("b.chat_id"), B_CLOCK=_taken_clock("b.chat_id"),

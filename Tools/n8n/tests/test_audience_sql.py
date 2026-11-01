@@ -40,6 +40,20 @@ as the generators will compose it. No n8n server, no network, never prod.
   computed_business_clears_the_clock      computed business over a stale personal row with a clock clears it (and wiped_at)
   computed_personal_over_personal_keeps_the_clock   empty stays empty, a running clock is not restarted, a wiped mark stays
   computed_clock_rearms_after_a_wipe      personal → wiped → business → personal: a new, later clock and no wiped mark
+  restore_within_a_day                    a mistaken pairing to another number, corrected within RESTORE_HOURS: the earlier
+                                          connection comes back (its number, its moment, the number left remembered; restored
+                                          true, restarted false); the previous number's computed decisions hold again, those
+                                          computed on the mistaken connection do not; LIST mirrors it; a repeat changes nothing
+  return_after_a_day_is_another_number    the same return after RESTORE_HOURS of the mistaken connection is a new connection;
+                                          a minute inside the limit still restores
+  a_b_c_a_is_a_new_connection             only the last replaced number is remembered
+  mistaken_decisions_follow_the_clock_rule   after the return the mistaken connection's decisions are replaced like any voided
+                                          decision (personal over business starts the wipe clock, business clears it); the
+                                          previous number's decisions hold again and are only answered
+  owner_rows_untouched_by_the_return      the owner's decisions of both connections hold before and after, byte for byte
+  back_and_forth_within_a_day             A → B → A → B on a connection younger than RESTORE_HOURS: each return restores exactly
+                                          the decisions computed on that number
+  race_two_reports_of_the_return_one_restore   two connections report the previous number at once: one says restored
   owner_set_became_business               true only for an APPLIED business whose previous holding kind was not business
   line_moment_follows_superseded_by       the earliest created_at along the superseded_by chain (same channel), now() without
                                           a row, a cycle terminates
@@ -63,6 +77,9 @@ as the generators will compose it. No n8n server, no network, never prod.
                                           schedule
   migration_replaces_an_old_wipe_index    an older copy's wipe index (it named the owner's source) is rebuilt with the work
                                           list's predicate, once (a fixture schema)
+  migration_adds_the_remembered_connection   on the tables an earlier copy of the file created, the file adds the number a
+                                          computed decision was taken under and the connection's remembered previous number
+                                          and moment — at the end, nullable, the rows kept; a second run changes nothing
   statements_pass_the_sql_guard           verify-sql-comments finds nothing in any statement (V1)
   audience_module_never_imports_apply_history_handoff   (that module imports audience.py — an import back is a cycle)
   fixtures_clean_both_tables              staging/fixtures.py delete clears both tables of a fixture profile; the mock sweep
@@ -79,7 +96,7 @@ import sys
 import time
 import uuid
 
-from harness import N8N, Case, PgSession, bind, module, report, sql_literal as L, sql_run
+from harness import N8N, ROOT, Case, PgSession, bind, module, report, sql_literal as L, sql_run
 
 MIGRATION = N8N / 'sql' / '2026-10-25-chat-audience.sql'
 PG_SH = N8N / 'staging' / 'pg.sh'
@@ -174,6 +191,21 @@ def conn_row(pg, pid):
     return r[0] if r else None
 
 
+def conn_full(pg, pid):
+    """The connection with the one it replaced: {phone, ms, prev_phone, prev_ms}. The remembered columns are read through
+    to_jsonb, so a table that does not have them yet reads None there — a check fails on the value, never on the SQL."""
+    r = pg.q(f"select c.phone, (extract(epoch from c.connected_at) * 1000)::bigint as ms, to_jsonb(c)->>'prev_phone' as prev_phone, "
+             f"(extract(epoch from (to_jsonb(c)->>'prev_connected_at')::timestamptz) * 1000)::bigint as prev_ms "
+             f"from audience_connections c where c.profile_id = {L(pid)}")
+    return r[0] if r else None
+
+
+def decided_phone(pg, pid, chat):
+    """The number a computed decision was taken under (to_jsonb: None while the column does not exist)."""
+    r = pg.q(f"select to_jsonb(a)->>'decided_phone' as p from chat_audience a where a.profile_id = {L(pid)} and a.chat_id = {L(chat)}")
+    return r[0]['p'] if r else None
+
+
 def n_rows(pg, table, pid):
     return pg.q(f"select count(*)::int as n from {table} where profile_id = {L(pid)}")[0]['n']
 
@@ -191,11 +223,11 @@ NULL_DEC = {'kind': None, 'reason': None, 'source': None}
 _NUMBERS = iter(range(77030000001, 77039999999))
 
 
-def new_number(pg, pid):
+def new_number(pg, pid, number=None):
     """Another number reported for the profile (CONNECTED_SQL, the app's `connected` after «Сменить номер»): the moment becomes
-    now, so every computed decision taken before stops holding."""
+    now, so every computed decision taken before stops holding. `number` = a given one, else a fresh one never used before."""
     tick(pg)
-    got = connected(pg, pid, str(next(_NUMBERS)))[0]
+    got = connected(pg, pid, number or str(next(_NUMBERS)))[0]
     tick(pg)
     assert got['restarted'] is True, f'premise: another number must restart the connection: {got}'
     return got
@@ -339,7 +371,7 @@ with Case('race_two_reports_of_a_new_number_one_restart: two connections report 
         a, b, waited = race(fx, bind(AUD.CONNECTED_SQL, [P, '77020000002']), bind(AUD.CONNECTED_SQL, [P, '+7 702 000 00 02']))
         c.check(waited, "the second never waited on the first's uncommitted update — the race was not exercised")
         c.check(len(a) == 1 and a[0]['restarted'] is True and a[0]['connected_at_ms'] > old, f'the first moved it: {a} (old {old})')
-        c.check(b == [{'connected_at_ms': a[0]['connected_at_ms'] if a else None, 'restarted': False}],
+        c.check(b == [{'connected_at_ms': a[0]['connected_at_ms'] if a else None, 'restarted': False, 'restored': False}],
                 f'the second must find the moved moment and not say restarted: {b} vs {a}')
 
 for ch, C in CH.items():
@@ -451,24 +483,24 @@ for ch, C in CH.items():
             tick(pg)
             got = connected(pg, P, '+7 (701) 111-22-33')
             filled = conn_row(pg, P)
-            c.check(got == [{'connected_at_ms': moment, 'restarted': False}] and filled['phone'] == '77011112233'
+            c.check(got == [{'connected_at_ms': moment, 'restarted': False, 'restored': False}] and filled['phone'] == '77011112233'
                     and filled['ms'] == moment, f'a missing number is filled in, the moment kept: {got} {filled}')
             for same in ('77011112233', '7 701 111 22 33', '', None):
                 tick(pg)
                 got = connected(pg, P, same)
-                c.check(got == [{'connected_at_ms': moment, 'restarted': False}] and conn_row(pg, P) == filled,
+                c.check(got == [{'connected_at_ms': moment, 'restarted': False, 'restored': False}] and conn_row(pg, P) == filled,
                         f'{same!r} must change nothing: {got} {conn_row(pg, P)}')
             Q = f'{ch.lower()}-aud-q1'
             profile(pg, Q, C['channel'], '2 days')
             got = connected(pg, Q, '77012223344')
-            c.check(got == [{'connected_at_ms': created_ms(pg, Q), 'restarted': False}] and conn_row(pg, Q)['phone'] == '77012223344',
+            c.check(got == [{'connected_at_ms': created_ms(pg, Q), 'restarted': False, 'restored': False}] and conn_row(pg, Q)['phone'] == '77012223344',
                     f'no row → the line\'s moment and the number: {got} {conn_row(pg, Q)}')
             tick(pg)
             got = connected(pg, P, '77019998877')
             c.check(got[0]['connected_at_ms'] > moment and got[0]['restarted'] is True and conn_row(pg, P)['phone'] == '77019998877',
                     f'another number: {got} {conn_row(pg, P)}')
-            c.check(connected(pg, '', '77019998877') == [{'connected_at_ms': None, 'restarted': False}]
-                    and connected(pg, '-1', '7701') == [{'connected_at_ms': None, 'restarted': False}]
+            c.check(connected(pg, '', '77019998877') == [{'connected_at_ms': None, 'restarted': False, 'restored': False}]
+                    and connected(pg, '-1', '7701') == [{'connected_at_ms': None, 'restarted': False, 'restored': False}]
                     and n_rows(pg, 'audience_connections', '-1') == 0,
                     'a sentinel profile: one row of nulls (restarted false), nothing written')
 
@@ -490,6 +522,7 @@ for ch, C in CH.items():
             tick(pg)
             seen.append(connected(pg, R, '+7 702 000 00 02')[0])     # the new number again
             c.check([s['restarted'] for s in seen] == [False, False, False, False, True, False], f'restarted: {seen}')
+            c.check([s.get('restored') for s in seen] == [False] * 6, f'nothing was a return to a remembered number: {seen}')
             c.check(len({s['connected_at_ms'] for s in seen[:4]}) == 1 and seen[4]['connected_at_ms'] > seen[0]['connected_at_ms']
                     and seen[5]['connected_at_ms'] == seen[4]['connected_at_ms'], f'the moments: {seen}')
             S = f'{ch.lower()}-aud-s1'
@@ -615,7 +648,7 @@ for ch, C in CH.items():
             profile(pg, cb, C['channel'], '6 days', superseded_by=ca)
             c.check(line_ms(pg, cb) == created_ms(pg, ca), 'a cycle terminates and still answers the earliest')
             c.check(ensure(pg, p3) == [{'connected_at_ms': m1, 'phone': None}], f'ENSURE takes the line\'s moment: {ensure(pg, p3)}')
-            c.check(connected(pg, p2, '77010000009') == [{'connected_at_ms': m1, 'restarted': False}],
+            c.check(connected(pg, p2, '77010000009') == [{'connected_at_ms': m1, 'restarted': False, 'restored': False}],
                     'CONNECTED on a fresh row takes it too')
 
     with Case(f'ensure_connection_always_one_row [{ch}]: created once with the line\'s moment and no number, an existing row '
@@ -773,6 +806,191 @@ for ch, C in CH.items():
             r = row(pg, P, chat)
             c.check(r['personal_since'] is not None and r['personal_since'] > first and r['wiped_at'] is None,
                     f'personal again starts a new clock: {first} → {r}')
+
+# ================================================================================================ the return to the previous number
+# A mistaken pairing (another account scanned the code — the plain WhatsApp instead of WhatsApp Business on the same phone)
+# corrected by pairing the previous number again within RESTORE_HOURS of the mistaken connection's moment: the connection
+# that was left comes back — its number and its moment — and with it the computed decisions taken on it. The decisions
+# computed on the mistaken connection do not hold: they were taken against another account. Later than RESTORE_HOURS it is
+# another number (a new connection), and only the last replaced number is remembered.
+A_NUM, B_NUM, C_NUM = '77010000011', '77020000022', '77030000033'
+A_SHOWN = '+7 (701) 000-00-11'          # the previous number as get/status may write it: only its digits count
+RESTORE_MIN = AUD.RESTORE_HOURS * 60 if hasattr(AUD, 'RESTORE_HOURS') else 24 * 60
+
+
+def holding(pg, pid, *chats):
+    return tuple(audience(pg, pid, x) for x in chats)
+
+
+for ch, C in CH.items():
+    P = f'{ch.lower()}-aud-rs'
+    with Case(f'restore_within_a_day [{ch}]: a mistaken pairing to another number, corrected within RESTORE_HOURS — the earlier '
+              'connection comes back (its number and its moment: restored true, restarted false; the number just left is '
+              'remembered); the computed decisions taken on it hold again, those computed on the mistaken connection do not; '
+              'LIST mirrors exactly that; a repeated report changes nothing') as c:
+        with PgSession(SETUP) as pg:
+            profile(pg, P, C['channel'], '3 days')
+            t0 = connected(pg, P, A_NUM)[0]['connected_at_ms']
+            c.check(t0 == created_ms(pg, P), f'premise: the first connection takes the line\'s moment: {t0}')
+            decide(pg, P, C['chat'], 'business', 'new')                # the previous number's client
+            decide(pg, P, C['chat2'], 'personal', 'contact')           # the previous number's contact
+            c.check(decided_phone(pg, P, C['chat']) == A_NUM, f'a computed decision carries its number: '
+                                                               f'{decided_phone(pg, P, C["chat"])}')
+            t1 = new_number(pg, P, B_NUM)['connected_at_ms']           # the mistaken pairing
+            decide(pg, P, C['chat3'], 'business', 'new')               # computed on the mistaken connection
+            decide(pg, P, C['chat4'], 'personal', 'history')
+            c.check(holding(pg, P, C['chat'], C['chat2'], C['chat3'], C['chat4']) == (None, None, 'business', 'personal'),
+                    'premise: on the mistaken connection only its own decisions hold')
+            back = connected(pg, P, A_SHOWN)
+            c.check(back == [{'connected_at_ms': t0, 'restarted': False, 'restored': True}], f'the return: {back} (t0 {t0})')
+            c.check(conn_full(pg, P) == {'phone': A_NUM, 'ms': t0, 'prev_phone': B_NUM, 'prev_ms': t1},
+                    f'the connection: the previous number and moment back, the mistaken one remembered: {conn_full(pg, P)}')
+            c.check(holding(pg, P, C['chat'], C['chat2'], C['chat3'], C['chat4']) == ('business', 'personal', None, None),
+                    f'what holds after the return: {holding(pg, P, C["chat"], C["chat2"], C["chat3"], C["chat4"])}')
+            c.check(business(pg, P, C['chat']) is True and business(pg, P, C['chat3']) is False, 'BUSINESS_SQL follows')
+            l = listed(pg, [P])
+            c.check(l and l[0]['connected_at_ms'] == t0
+                    and sorted(d['chatId'] for d in l[0]['decisions']) == sorted([C['chat'], C['chat2']]),
+                    f'LIST: the restored moment and only the previous number\'s decisions: {l}')
+            kept = conn_full(pg, P)
+            tick(pg)
+            again = connected(pg, P, A_NUM)
+            c.check(again == [{'connected_at_ms': t0, 'restarted': False, 'restored': False}] and conn_full(pg, P) == kept,
+                    f'a repeated report of the same number changes nothing and says nothing: {again} {conn_full(pg, P)}')
+
+    with Case(f'return_after_a_day_is_another_number [{ch}]: the previous number back after RESTORE_HOURS of the mistaken '
+              'connection is another number, as before — restarted true, restored false, the moment now, the number left '
+              'remembered; neither the previous number\'s computed decisions nor the mistaken ones hold. A minute inside the '
+              'limit still restores') as c:
+        for label, minutes, restores in (('inside', RESTORE_MIN - 1, True), ('outside', RESTORE_MIN + 1, False)):
+            with PgSession(SETUP) as pg:
+                profile(pg, P, C['channel'], '5 days')
+                t0 = connected(pg, P, A_NUM)[0]['connected_at_ms']
+                decide(pg, P, C['chat'], 'business', 'new')
+                new_number(pg, P, B_NUM)
+                decide(pg, P, C['chat3'], 'business', 'new')
+                pg.x(f"update audience_connections set connected_at = connected_at - interval '{minutes} minutes' "
+                     f"where profile_id = {L(P)};")                  # the mistaken connection began that long ago
+                t1 = conn_full(pg, P)['ms']
+                tick(pg)
+                t = now_ms(pg)
+                back = connected(pg, P, A_NUM)[0]
+                if restores:
+                    c.check(back == {'connected_at_ms': t0, 'restarted': False, 'restored': True}, f'{label}: {back}')
+                    c.check(holding(pg, P, C['chat'], C['chat3']) == ('business', None), f'{label}: what holds')
+                else:
+                    c.check(back.get('restarted') is True and back.get('restored') is False and back['connected_at_ms'] >= t - 1000,
+                            f'{label}: another number: {back} (t {t})')
+                    c.check(conn_full(pg, P) == {'phone': A_NUM, 'ms': back['connected_at_ms'], 'prev_phone': B_NUM, 'prev_ms': t1},
+                            f'{label}: the new connection remembers the one it replaced: {conn_full(pg, P)}')
+                    c.check(holding(pg, P, C['chat'], C['chat3']) == (None, None), f'{label}: nothing computed holds')
+        c.check(getattr(AUD, 'RESTORE_HOURS', None) == 24, 'RESTORE_HOURS is 24 (the owner\'s «в течение суток»)')
+
+    with Case(f'a_b_c_a_is_a_new_connection [{ch}]: only the last replaced number is remembered — A → B → C → A, minutes '
+              'apart, is a new connection: restarted true, restored false, the moment now, C remembered; the decisions of A '
+              'do not hold') as c:
+        with PgSession(SETUP) as pg:
+            profile(pg, P, C['channel'], '3 days')
+            t0 = connected(pg, P, A_NUM)[0]['connected_at_ms']
+            decide(pg, P, C['chat'], 'business', 'new')
+            new_number(pg, P, B_NUM)
+            tc = new_number(pg, P, C_NUM)['connected_at_ms']
+            c.check(conn_full(pg, P)['prev_phone'] == B_NUM, f'premise: C remembers B: {conn_full(pg, P)}')
+            back = connected(pg, P, A_NUM)[0]
+            c.check(back.get('restarted') is True and back.get('restored') is False and back['connected_at_ms'] > tc > t0,
+                    f'A after C: a new connection: {back}')
+            c.check(conn_full(pg, P) == {'phone': A_NUM, 'ms': back['connected_at_ms'], 'prev_phone': C_NUM, 'prev_ms': tc},
+                    f'C is the one remembered: {conn_full(pg, P)}')
+            c.check(audience(pg, P, C['chat']) is None, 'the decisions of the first A connection do not hold')
+
+    with Case(f'mistaken_decisions_follow_the_clock_rule [{ch}]: after the return the decisions computed on the mistaken '
+              'connection behave as decisions another number voided — the next computed decision replaces them: personal over '
+              'a business one starts the wipe clock (personal_since = that decision\'s moment, nothing wiped), business clears '
+              'a clock the mistaken connection started; the previous number\'s decisions hold again, so a computed decision '
+              'only answers them and no clock starts there') as c:
+        with PgSession(SETUP) as pg:
+            profile(pg, P, C['channel'], '3 days')
+            connected(pg, P, A_NUM)
+            decide(pg, P, C['chat'], 'business', 'new')                # the previous number's client
+            decide(pg, P, C['chat4'], 'business', 'new')               # another client of it…
+            new_number(pg, P, B_NUM)
+            decide(pg, P, C['chat3'], 'business', 'new')               # computed on the mistaken connection
+            decide(pg, P, C['chat4'], 'personal', 'contact')           # …whom the mistaken account knows: replaced, a clock
+            c.check(row(pg, P, C['chat4'])['personal_since'] is not None, f'premise: {row(pg, P, C["chat4"])}')
+            back = connected(pg, P, A_NUM)
+            c.check(back and back[0].get('restored') is True, f'premise: the return restores: {back}')
+            got = decide(pg, P, C['chat3'], 'personal', 'contact')
+            r3 = row(pg, P, C['chat3'])
+            c.check(got == [dec('personal', 'contact', 'default')] and r3['personal_since'] is not None
+                    and r3['personal_since'] == r3['decided_at'] and r3['wiped_at'] is None,
+                    f'the mistaken business decision is replaced and the clock starts at the new decision: {got} {r3}')
+            got = decide(pg, P, C['chat4'], 'business', 'new')
+            r4 = row(pg, P, C['chat4'])
+            c.check(got == [dec('business', 'new', 'default')] and r4['personal_since'] is None and r4['wiped_at'] is None,
+                    f'business clears the clock the mistaken connection started: {got} {r4}')
+            before = row(pg, P, C['chat'])
+            tick(pg)
+            got = decide(pg, P, C['chat'], 'personal', 'contact')
+            c.check(got == [dec('business', 'new', 'default')] and row(pg, P, C['chat']) == before
+                    and before['personal_since'] is None,
+                    f'the previous number\'s decision holds again: answered, never replaced, no clock: {got} {row(pg, P, C["chat"])}')
+            c.check(holding(pg, P, C['chat'], C['chat3'], C['chat4']) == ('business', 'personal', 'business'), 'what holds')
+
+    with Case(f'owner_rows_untouched_by_the_return [{ch}]: the owner\'s decisions — made on the previous connection and on the '
+              'mistaken one — hold before the return and after it, byte for byte') as c:
+        with PgSession(SETUP) as pg:
+            profile(pg, P, C['channel'], '3 days')
+            connected(pg, P, A_NUM)
+            owner_set(pg, P, [{'chatId': C['chat'], 'kind': 'business', 'version': 10},
+                              {'chatId': C['chat2'], 'kind': 'personal', 'version': 11}])
+            new_number(pg, P, B_NUM)
+            owner_set(pg, P, [{'chatId': C['chat3'], 'kind': 'personal', 'version': 12},
+                              {'chatId': C['chat4'], 'kind': 'business', 'version': 13}])
+            mine = {x: row(pg, P, x) for x in (C['chat'], C['chat2'], C['chat3'], C['chat4'])}
+            want = ('business', 'personal', 'personal', 'business')
+            c.check(holding(pg, P, *mine) == want, 'premise: all four hold on the mistaken connection')
+            back = connected(pg, P, A_NUM)
+            c.check(back and back[0].get('restored') is True, f'premise: the return restores: {back}')
+            c.check({x: row(pg, P, x) for x in mine} == mine, f'the owner\'s rows changed: {mine} → '
+                                                               f'{ {x: row(pg, P, x) for x in mine} }')
+            c.check(holding(pg, P, *mine) == want, f'and all four hold after the return: {holding(pg, P, *mine)}')
+
+    with Case(f'back_and_forth_within_a_day [{ch}]: a connection younger than RESTORE_HOURS — A → B → A → B: each return to the '
+              'remembered number restores it, and with it exactly the decisions computed on that number (they never lose '
+              'their number): after the second return the mistaken account\'s decisions hold again, the first account\'s do '
+              'not') as c:
+        with PgSession(SETUP) as pg:
+            profile(pg, P, C['channel'], '2 hours')
+            t0 = connected(pg, P, A_NUM)[0]['connected_at_ms']
+            decide(pg, P, C['chat'], 'business', 'new')                # A
+            t1 = new_number(pg, P, B_NUM)['connected_at_ms']
+            decide(pg, P, C['chat3'], 'business', 'new')               # B
+            back = connected(pg, P, A_NUM)
+            c.check(back == [{'connected_at_ms': t0, 'restarted': False, 'restored': True}], f'A again: {back}')
+            c.check(holding(pg, P, C['chat'], C['chat3']) == ('business', None), 'after A again')
+            tick(pg)
+            again = connected(pg, P, B_NUM)
+            c.check(again == [{'connected_at_ms': t1, 'restarted': False, 'restored': True}], f'B again: {again} (t1 {t1})')
+            c.check(conn_full(pg, P) == {'phone': B_NUM, 'ms': t1, 'prev_phone': A_NUM, 'prev_ms': t0}, f'{conn_full(pg, P)}')
+            c.check(holding(pg, P, C['chat'], C['chat3']) == (None, 'business'),
+                    f'after B again: {holding(pg, P, C["chat"], C["chat3"])}')
+
+with Case('race_two_reports_of_the_return_one_restore: after a mistaken number two connections report the previous one at '
+          'once — the first restores the connection (restored true), the second waits on its lock and finds it restored: '
+          'the same moment, restored false, restarted false') as c:
+    P = 'wa-race-return'
+    with Race() as fx:
+        fx.main.x(f"insert into bot_profiles (profile_id, app_user_id, channel, created_at) values "
+                  f"({L(P)}, 'u-audience-test', 'whatsapp', now() - interval '3 days');")
+        t0 = fx.main.q(bind(AUD.CONNECTED_SQL, [P, A_NUM]))[0]['connected_at_ms']
+        fx.main.x('select pg_sleep(0.003);')
+        fx.main.q(bind(AUD.CONNECTED_SQL, [P, B_NUM]))
+        fx.main.x('select pg_sleep(0.003);')
+        a, b, waited = race(fx, bind(AUD.CONNECTED_SQL, [P, A_NUM]), bind(AUD.CONNECTED_SQL, [P, A_SHOWN]))
+        c.check(waited, "the second never waited on the first's uncommitted update — the race was not exercised")
+        c.check(a == [{'connected_at_ms': t0, 'restarted': False, 'restored': True}], f'the first restored it: {a} (t0 {t0})')
+        c.check(b == [{'connected_at_ms': t0, 'restarted': False, 'restored': False}],
+                f'the second must find it restored and not say so: {b}')
 
 with Case('list_returns_only_valid_decisions_and_the_moment: every profile asked, once, in the order asked; the moment (null '
           'without a row); only the decisions that hold, as {chatId, kind, source, reason, version}') as c:
@@ -1049,6 +1267,12 @@ with Case('migration_postchecks: RLS on, no grants to anon/authenticated, the st
             temp = pg.q(SHAPE_SQL.format(rel=f'pg_temp.{t}'))[0]['shape']
             pub = pg.q(SHAPE_SQL.format(rel=f'public.{t}'))[0]['shape']
             c.check(temp == pub, f'public.{t} differs from the migration\'s DDL (stale staging table?): file {temp} / staging {pub}')
+        remembered = pg.q("select table_name || '.' || column_name as c from information_schema.columns where table_schema = 'public' "
+                          "and (table_name, column_name) in (('chat_audience', 'decided_phone'), ('audience_connections', 'prev_phone'), "
+                          "('audience_connections', 'prev_connected_at')) order by 1")
+        c.check([r['c'] for r in remembered] == ['audience_connections.prev_connected_at', 'audience_connections.prev_phone',
+                                                 'chat_audience.decided_phone'],
+                f'the remembered connection\'s columns: {remembered}')
         rls = pg.q("select relname, relrowsecurity from pg_class where oid in ('public.chat_audience'::regclass, "
                    "'public.audience_connections'::regclass) order by relname")
         c.check(rls == [{'relname': 'audience_connections', 'relrowsecurity': True}, {'relname': 'chat_audience', 'relrowsecurity': True}],
@@ -1092,7 +1316,10 @@ with Case('migration_postchecks: RLS on, no grants to anon/authenticated, the st
     snap = ("select json_build_object('oid', (select oid from pg_constraint where conrelid = 'public.reply_events'::regclass and "
             "conname = 'reply_events_state_check'), 'tables', (select json_agg(c.oid order by c.relname) from pg_class c where "
             "c.oid in ('public.chat_audience'::regclass, 'public.audience_connections'::regclass)), "
-            "'index', to_regclass('public.chat_audience_wipe_idx')::oid)::text;\n")
+            "'index', to_regclass('public.chat_audience_wipe_idx')::oid, "
+            "'columns', (select json_agg(a.attrelid::regclass::text || '.' || a.attname order by a.attrelid::regclass::text, a.attnum) "
+            "from pg_attribute a where a.attrelid in ('public.chat_audience'::regclass, 'public.audience_connections'::regclass) "
+            "and a.attnum > 0 and not a.attisdropped))::text;\n")
     out = sql_run(snap + MIGRATION.read_text(encoding='utf-8') + '\n' + snap)          # inside BEGIN … ROLLBACK
     marks = [json.loads(l) for l in out.splitlines() if l.strip().startswith('{')]
     c.check(len(marks) == 2 and marks[0] == marks[1], f'a re-run must change nothing (the CHECK not re-created): {marks}')
@@ -1135,6 +1362,59 @@ with Case('migration_replaces_an_old_wipe_index: an index an earlier copy of the
             pg.x(f'drop schema if exists {schema} cascade;')
 
 
+PRE_RESTORE_REV = 'c72c3680'     # the migration as it was before the remembered connection: neither column existed
+
+
+def columns_block():
+    """The migration's block that adds the remembered connection's columns (between its COLUMNS-BEGIN / END lines)."""
+    text = MIGRATION.read_text(encoding='utf-8')
+    return text.split('-- COLUMNS-BEGIN')[1].split('\n', 1)[1].split('-- COLUMNS-END')[0]
+
+
+with Case('migration_adds_the_remembered_connection: on the tables an earlier copy of the file created — without the number a '
+          'computed decision was taken under, without the remembered previous connection — the file adds '
+          'chat_audience.decided_phone and audience_connections.prev_phone / prev_connected_at: at the end, nullable, every '
+          'existing row kept as it was; a second run changes nothing — run on a fixture schema') as c:
+    schema = 't_aud_col_' + uuid.uuid4().hex[:16]
+    old = subprocess.run(['git', '-C', str(ROOT), 'show', f'{PRE_RESTORE_REV}:Tools/n8n/sql/{MIGRATION.name}'],
+                         capture_output=True, text=True, check=True).stdout
+    old_tables = old.split('-- TABLE-BEGIN')[1].split('\n', 1)[1].split('-- TABLE-END')[0].replace('public.', schema + '.')
+    cols = (f"select table_name || '.' || column_name || ':' || data_type || ':' || is_nullable as c "
+            f"from information_schema.columns where table_schema = {L(schema)} order by table_name, ordinal_position")
+    rows_sql = (f"select (select jsonb_agg(to_jsonb(a) - 'updated_at' - 'decided_at' order by a.chat_id) from {schema}.chat_audience a) as aud, "
+                f"(select jsonb_agg(to_jsonb(k) - 'updated_at' order by k.profile_id) from {schema}.audience_connections k) as conn")
+    try:
+        with PgSession() as pg:
+            pg.x(f"create schema {schema};\n{old_tables}\n"
+                 f"insert into {schema}.chat_audience (profile_id, chat_id, kind, source, reason) "
+                 f"values ('p', 'x@c.us', 'business', 'default', 'new');\n"
+                 f"insert into {schema}.audience_connections (profile_id, phone, connected_at) "
+                 f"values ('p', '77010000011', timestamptz '2026-10-30 10:00:00+00');")
+            before, rows_before = [r['c'] for r in pg.q(cols)], pg.q(rows_sql)[0]
+            block = columns_block().replace('public.', schema + '.')
+            pg.x(block)
+            after, rows_after = [r['c'] for r in pg.q(cols)], pg.q(rows_sql)[0]
+            pg.x(block)
+            again = [r['c'] for r in pg.q(cols)]
+        conn_old = [x for x in before if x.startswith('audience_connections.')]
+        aud_old = [x for x in before if x.startswith('chat_audience.')]
+        want = (conn_old + ['audience_connections.prev_phone:text:YES',
+                            'audience_connections.prev_connected_at:timestamp with time zone:YES']
+                + aud_old + ['chat_audience.decided_phone:text:YES'])
+        c.check('public.' in columns_block() and not any('prev_' in x or 'decided_phone' in x for x in before),
+                f'premise: the earlier copy has neither column: {before}')
+        c.check(after == want, f'the columns must be added at the end, nullable: {after}')
+        c.check(again == after, f'a second run must change nothing: {after} → {again}')
+        c.check([{k: v for k, v in r.items() if k != 'decided_phone'} for r in rows_after['aud']] == rows_before['aud']
+                and all(r.get('decided_phone') is None for r in rows_after['aud'])
+                and [{k: v for k, v in r.items() if not k.startswith('prev_')} for r in rows_after['conn']] == rows_before['conn']
+                and all(r.get('prev_phone') is None and r.get('prev_connected_at') is None for r in rows_after['conn']),
+                f'the rows must be kept, the new columns empty: {rows_before} → {rows_after}')
+    finally:
+        with PgSession() as pg:
+            pg.x(f'drop schema if exists {schema} cascade;')
+
+
 # ================================================================================================ guards
 with Case('statements_pass_the_sql_guard: verify-sql-comments finds nothing in any statement or fragment (V1: no $ + digit '
           'in a comment or literal, no {{, no pg-promise modifier, no leading =)') as c:
@@ -1148,7 +1428,8 @@ with Case('statements_pass_the_sql_guard: verify-sql-comments finds nothing in a
         found = VSC.check_query(q)
         c.check(not found, f'{name}: {found}')
         c.check(isinstance(q, str) and not q.lstrip().startswith('='), f'{name} must be a plain query string')
-    c.check(AUD.VALID_SQL() == "(a.source = 'owner' or a.decided_at >= coalesce(c.connected_at, '-infinity'))", AUD.VALID_SQL())
+    c.check(AUD.VALID_SQL() == "(a.source = 'owner' or (a.decided_at >= coalesce(c.connected_at, '-infinity')"
+                               " and coalesce(a.decided_phone = c.phone, true)))", AUD.VALID_SQL())
     c.check(AUD.AUDIENCE_SQL("$7", "$8").count('$7') == 1 and AUD.BUSINESS_SQL("x.p", "x.c").count('x.p') == 1,
             'the fragments place the caller\'s expressions exactly once')
 

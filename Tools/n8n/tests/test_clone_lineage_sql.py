@@ -24,7 +24,7 @@ current ids»: every existing deletion path must reach everything after a move, 
           L19 — a clone booked for deletion is never offered for reuse (no live row ever drives a booked clone);
   L20     B1 (2026-10-14): the bot's schedule follows its line — the predecessor's row moves (values and version kept),
           the new profile's own row wins, among two predecessors the freshest; nothing is left under an old id;
-  L21–L29 «Личные и рабочие чаты» (2026-10-25): the chat decisions (chat_audience) and the connection moment
+  L21–L30 «Личные и рабочие чаты» (2026-10-25): the chat decisions (chat_audience) and the connection moment
           (audience_connections), written by the real audience.py statements, follow the line — L21 a reconnect carries
           them and the moved computed decisions keep holding; L22 per chat the owner's row beats a computed one (the new
           profile's own row is replaced IN PLACE, one row per key), of two owner rows the new profile's own, of two
@@ -41,7 +41,11 @@ current ids»: every existing deletion path must reach everything after a move, 
           another number keeps the own computed row, and a personal row that lands over a business period (a business
           row, or a running clock, among the chat's taken rows) carries a running clock — the earliest running one, else
           the bind's moment — and its period is wiped two days later; a business row never gets one, an owner row keeps
-          winning;
+          winning; L30 a mistaken pairing corrected through the line (the previous number on a new profile, reported before
+          or after the bind, or the mistake on the new profile itself) restores the earlier connection as the same profile
+          does — its number and moment, the mistaken one remembered —: the previous number's computed decisions hold again,
+          the mistaken connection's do not, the merge picks the row taken on the restored connection; after RESTORE_HOURS it
+          is another number;
   C1–C3   races on TWO real connections over a shared fixture schema (the V6-concurrent pattern): the second bind's
           snapshot predates the first's commit. C1 — two Creates of the same profile: the loser answers bound = false
           (no clone lost, the price lists follow the bound one, the retry reuses the winner). C2 — two new profiles adopt
@@ -1167,11 +1171,21 @@ def earliest_connection_wins_over_a_lazy_row_of_the_new_profile(ch):
                             f'moved_connections / dropped_rows {b}')
 
 
+def remembered(pg, pid):
+    """The connection the profile's connection replaced, (number, moment in unix ms) — through to_jsonb, so a table without
+    the columns reads (None, None) and a check fails on the value, never on the SQL."""
+    r = pg.q(f"select to_jsonb(c)->>'prev_phone' as phone, "
+             f"(extract(epoch from (to_jsonb(c)->>'prev_connected_at')::timestamptz) * 1000)::bigint as ms "
+             f"from audience_connections c where c.profile_id = {L(pid)}")
+    return (r[0]['phone'], r[0]['ms']) if r else None
+
+
 def own_row_wins_when_the_number_changed(ch):
     P1, P2, WF1, WF2 = P(ch, 'P1'), P(ch, 'P2'), W(ch, 'old'), W(ch, 'new')
     A, C = '77041@c.us', '77043@c.us'
     with Case(tagged(f'L24 [{ch}] own_row_wins_when_the_number_changed: the new profile reported ANOTHER number — a new '
-                     'connection (owner decision 19): its own row stays exactly as it was, the predecessor\'s goes; the moved '
+                     'connection (owner decision 19): its own number and moment stay as they were and it remembers the '
+                     'connection it replaced (the predecessor\'s number and moment), the predecessor\'s row goes; the moved '
                      'computed decisions of the old number stop holding, the owner\'s keep holding')) as c:
         with PgSession(SETUP) as pg:
             row(pg, ch, P1, wfid=WF1, reason='trial_expiry')
@@ -1182,11 +1196,15 @@ def own_row_wins_when_the_number_changed(ch):
             register(pg, ch, P2)
             seed_star(pg, P2)
             connect(pg, P2, '+7 702 000 00 02')                           # the new profile's own report: another number
-            own = connection(pg, P2)
+            own, pred = connection(pg, P2), connection(pg, P1)
             plan, b, _ = create(pg, ch, P2, WF2, prev=P1)
             c.check(b.get('bound') is True or HEAD_MODE, f'bind {b}')
-            c.check(own is not None and own['phone'] == '77020000002' and connection(pg, P2) == own,
-                    f'the new profile\'s own row changed: {connection(pg, P2)}, expected {own}')
+            got = connection(pg, P2)
+            c.check(own is not None and own['phone'] == '77020000002' and got is not None
+                    and (got['phone'], got['connected_at']) == (own['phone'], own['connected_at']),
+                    f'the new profile\'s own number and moment changed: {got}, expected {own}')
+            c.check(remembered(pg, P2) == ('77010000001', ms(pg, pred['connected_at'])),
+                    f'it must remember the connection it replaced: {remembered(pg, P2)}, the predecessor\'s {pred}')
             c.check(connection(pg, P1) is None, f'the predecessor\'s connection row is left: {connection(pg, P1)}')
             c.check([r['chat_id'] for r in decisions(pg, P2)] == [A, C] and decisions(pg, P1) == [],
                     f'the decisions did not move: {decisions(pg, P2)} / {decisions(pg, P1)}')
@@ -1478,6 +1496,118 @@ def bind_merge_keeps_the_wipe_clock(ch):
                     c.check((b.get('moved_audience'), b.get('dropped_rows')) == want, f'moved_audience / dropped_rows {b}')
 
 
+RESTORE_HOURS = getattr(AUD, 'RESTORE_HOURS', 24)
+
+
+def return_through_the_line(ch):
+    """A mistaken pairing corrected through a NEW profile of the bot: the line restores the earlier connection exactly as the
+    same profile does (audience.CONNECTED_SQL) — the same holding decisions, the same connection, the same wipe clocks."""
+    P1, P2, WF1, WF2 = P(ch, 'P1'), P(ch, 'P2'), W(ch, 'old'), W(ch, 'new')
+    A1, A2, O, M1, M2 = '77101@c.us', '77102@c.us', '77103@c.us', '77104@c.us', '77105@c.us'
+    NUM_A, NUM_B = '77010000001', '77020000002'
+    for v, title in (
+            ('before', 'the bot\'s profile was paired to another account by mistake, the owner pairs the previous number on a '
+                       'NEW profile and it reports the number BEFORE the bind: the bind restores the earlier connection — its '
+                       'number and moment, the mistaken one remembered —; the previous number\'s computed decisions and the '
+                       'owner\'s hold, those computed on the mistaken connection do not; a later report changes nothing'),
+            ('after', 'the same, the new profile reports the number only AFTER the bind: the bind carries the mistaken '
+                      'connection with the one it replaced, and the report restores it — the same outcome'),
+            ('own', 'reported before the bind, and the new profile already decided some chats itself: of two computed rows the '
+                    'moved one taken on the restored connection lands (the line decides once); against a moved row of the '
+                    'mistaken connection the new profile\'s own lands — a personal one over that business period with a running '
+                    'clock, a business one without'),
+            ('late', f'the mistaken connection began more than {RESTORE_HOURS} hours ago: another number, as before — the new '
+                     'profile\'s own connection stays and remembers the mistaken one; no computed decision holds'),
+            ('newmistake', 'the mistake is the NEW profile (it reported another number before the bind): the merged connection '
+                           'remembers the line\'s — and when the owner pairs the previous number on that profile within '
+                           f'{RESTORE_HOURS} hours, its report restores it')):
+        with Case(tagged(f'L30 [{ch}] return_through_the_line: {title}')) as c:
+            with PgSession(SETUP) as pg:
+                row(pg, ch, P1, wfid=WF1)                                 # the bot's profile, live
+                t0 = connect(pg, P1, NUM_A, created_ago='10 days')['connected_at_ms']
+                decide(pg, P1, A1, 'business', 'new', ago='5 days')       # the previous number's client
+                decide(pg, P1, A2, 'personal', 'contact', ago='5 days')   # its contact
+                owner_decides(pg, P1, O, 'business', 1760000000031, ago='4 days')
+                pg.x('select pg_sleep(0.003);')
+                t1 = None
+                if v != 'newmistake':
+                    wrong = connect(pg, P1, NUM_B)                        # the mistaken pairing of the bot's profile
+                    t1 = wrong['connected_at_ms']
+                    c.check(wrong['restarted'] is True, f'premise: the mistaken number restarts the connection: {wrong}')
+                    pg.x('select pg_sleep(0.003);')
+                    decide(pg, P1, M1, 'business', 'new')                 # computed on the mistaken connection
+                    decide(pg, P1, M2, 'personal', 'history')
+                    if v == 'late':
+                        pg.x(f"update audience_connections set connected_at = connected_at - interval '{RESTORE_HOURS} hours 1 minute' "
+                             f"where profile_id = {L(P1)};")
+                        t1 = ms(pg, connection(pg, P1)['connected_at'])
+                proxy_row(pg, ch, P2)
+                register(pg, ch, P2)
+                seed_star(pg, P2)
+                if v in ('before', 'own', 'late'):
+                    connect(pg, P2, '+7 (701) 000-00-01')                 # the new profile's report: the previous number
+                elif v == 'newmistake':
+                    connect(pg, P2, NUM_B)                                # the new profile's report: another account
+                if v == 'own':
+                    decide(pg, P2, A1, 'personal', 'history')             # decided against the new profile's own moment
+                    decide(pg, P2, M1, 'personal', 'contact')
+                    decide(pg, P2, M2, 'business', 'new')
+                moved_a1, moved_m1 = decision(pg, P1, A1), decision(pg, P1, M1)
+                own_m1, own_m2 = decision(pg, P2, M1), decision(pg, P2, M2)
+                t_bind = now_ms(pg)
+                plan, b, _ = create(pg, ch, P2, WF2, prev=P1)
+                c.check(plan.get('pred_profiles') == [P1] or HEAD_MODE, f'premise: plan {plan}')
+                c.check(b.get('bound') is True or HEAD_MODE, f'bind {b}')
+                if v == 'after':
+                    report_ = connect(pg, P2, NUM_A)
+                    c.check(report_ == {'connected_at_ms': t0, 'restarted': False, 'restored': True},
+                            f'the report after the bind restores: {report_} (t0 {t0})')
+                if v == 'newmistake':
+                    got = connection(pg, P2)
+                    c.check(got is not None and got['phone'] == NUM_B and remembered(pg, P2) == (NUM_A, t0),
+                            f'the merged connection: the mistaken number, the line\'s remembered: {got} {remembered(pg, P2)}')
+                    c.check(holds(pg, P2, A1) is None, 'premise: on the mistaken account the previous decisions do not hold')
+                    pg.x('select pg_sleep(0.003);')
+                    t1 = ms(pg, got['connected_at'])
+                    report_ = connect(pg, P2, NUM_A)
+                    c.check(report_ == {'connected_at_ms': t0, 'restarted': False, 'restored': True},
+                            f'the owner pairs the previous number on the new profile: restored: {report_} (t0 {t0})')
+                got = connection(pg, P2)
+                kept = {A1: holds(pg, P2, A1), A2: holds(pg, P2, A2), O: holds(pg, P2, O), M1: holds(pg, P2, M1), M2: holds(pg, P2, M2)}
+                if v == 'late':
+                    c.check(got is not None and got['phone'] == NUM_A and ms(pg, got['connected_at']) >= t_bind - 60000
+                            and remembered(pg, P2) == (NUM_B, t1),
+                            f'another number: the own connection stays and remembers the mistaken one: {got} {remembered(pg, P2)}')
+                    c.check(kept == {A1: None, A2: None, O: 'business', M1: None, M2: None}, f'what holds: {kept}')
+                    continue
+                c.check(got is not None and got['phone'] == NUM_A and ms(pg, got['connected_at']) == t0
+                        and remembered(pg, P2) == (NUM_B, t1),
+                        f'the earlier connection restored, the mistaken one remembered: {got} {remembered(pg, P2)} (t0 {t0}, t1 {t1})')
+                if v == 'own':
+                    c.check(without_clock(decision(pg, P2, A1)) == without_clock(moved_a1),
+                            f'the moved row taken on the restored connection lands: {decision(pg, P2, A1)} / {moved_a1}')
+                    m1 = decision(pg, P2, M1)
+                    c.check(without_clock(m1) == without_clock(own_m1) and clocked_at_the_bind(pg, m1, t_bind),
+                            f'the own personal row lands over the mistaken business period, clocked at the bind: {m1} / {own_m1} '
+                            f'(the moved one {moved_m1})')
+                    c.check(decision(pg, P2, M2) == own_m2 and own_m2['personal_since'] is None,
+                            f'the own business row lands unclocked: {decision(pg, P2, M2)} / {own_m2}')
+                    c.check(kept == {A1: 'business', A2: 'personal', O: 'business', M1: 'personal', M2: 'business'}, f'what holds: {kept}')
+                else:
+                    c.check(kept == {A1: 'business', A2: 'personal', O: 'business', M1: None, M2: None},
+                            f'what holds after the return: {kept}')
+                    lst = pg.q(bind(AUD.LIST_SQL, [json.dumps([P2])]))
+                    c.check(len(lst) == 1 and lst[0]['connected_at_ms'] == t0 and [d['chatId'] for d in lst[0]['decisions']] == [A1, A2, O],
+                            f'what the app mirrors: {lst}')
+                    later = connect(pg, P2, NUM_A)
+                    c.check(later == {'connected_at_ms': t0, 'restarted': False, 'restored': False},
+                            f'a later report of the same number changes nothing: {later}')
+                c.check(decisions(pg, P1) == [] and connection(pg, P1) is None, 'left under the old id')
+                if not HEAD_MODE and v in ('before', 'after'):
+                    c.check((b.get('moved_audience'), b.get('moved_connections')) == ({'before': 5, 'after': 5}[v], 1),
+                            f'moved_audience / moved_connections {b}')
+
+
 def race_lazy_rows_during_the_bind(ch):
     P1, P2, WF1, WF2 = P(ch, 'P1'), P(ch, 'P2'), W(ch, 'old'), W(ch, 'new')
     A = '77051@c.us'
@@ -1521,7 +1651,8 @@ CREATE_MATRIX = (reconnect_after_purchase, same_profile_clone_gone, same_profile
                  owner_on_predecessor_beats_default_on_new, earliest_connection_wins_over_a_lazy_row_of_the_new_profile,
                  own_row_wins_when_the_number_changed, number_change_never_yields_an_older_moment,
                  own_number_survives_an_unknown_earliest_number, nonhuman_beats_everything,
-                 line_move_then_rule_personal_starts_the_clock, bind_merge_keeps_the_wipe_clock, race_lazy_rows_during_the_bind)
+                 line_move_then_rule_personal_starts_the_clock, bind_merge_keeps_the_wipe_clock, return_through_the_line,
+                 race_lazy_rows_during_the_bind)
 
 
 # ---------------------------------------------------------------- module-only statements (no pre-F1 counterpart)
