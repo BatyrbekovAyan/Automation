@@ -203,6 +203,8 @@ def au():
 # connection; it alone stands between the group filter If and Audience Known?. Audience Known? / Business? / Decided
 # Business? are single boolean conditions on positive fields; Decided Business? needs the sub-workflow's OWN answer (its
 # outcome too: Decide Audience continues on error, and n8n then hands Read Reply Mode's row — with an audience column — on).
+# On Telegram both business gates also refuse a webhook that rule step 1 calls not a person (is_bot, a chat type of
+# audience.TG_NONHUMAN_TYPES — apply-history-handoff.TG_PERSON_TERM), whatever decision is stored; WhatsApp's read no chat type.
 # Decide Audience calls crAudienceDec001 with exactly the inputs that sub-workflow declares (types checked, nothing
 # converted), and Suppressed? reads Read Reply Mode's row. Reachability, the property itself: from the Webhook, with
 # Business?[true] and Decided Business?[true] cut, only the routing Ifs, the gate, Record Outgoing (business-only in its own
