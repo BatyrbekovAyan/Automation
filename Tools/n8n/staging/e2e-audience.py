@@ -245,9 +245,10 @@ class Stand:
             psql(f"update bot_profiles set created_at = now() - interval '{line_age}' where profile_id = '{self.pid}';")
         if connected is None:
             psql(f"delete from audience_connections where profile_id = '{self.pid}';")
-        else:
+        else:      # no remembered connection: a number another scenario left there must not make a return of this one
             psql(f"insert into audience_connections (profile_id, phone, connected_at) values ('{self.pid}', '{OWN[ch]}', now() - interval '{connected}') "
-                 f"on conflict (profile_id) do update set phone = excluded.phone, connected_at = excluded.connected_at, updated_at = now();")
+                 f"on conflict (profile_id) do update set phone = excluded.phone, connected_at = excluded.connected_at, updated_at = now(), "
+                 f"prev_phone = null, prev_connected_at = null;")
         mock("POST", "/__mock/audience", {"profile_id": self.pid, "clear_faults": True, "dialogs": [], "lid_rows": {}})
         self.mark()
 
@@ -1083,6 +1084,61 @@ def number_change_wipe(ctx, ch):
     return ok, {"before": before, "connected": (st, d), **summary(e), "sends": len(s.sends(chat)),
                 "decision(kind|source|reason|clock|clock=decided_at|not wiped)": clock, "kept_until_the_wipe": kept,
                 "node": out, "after": stored(s.pid, chat), "wiped|kind": wiped, "usage_rows": usage}
+
+
+@for_channels("wrong_number_return_restores", "a mistaken pairing — another account paired to the bot's profile (the app's "
+              "connected report; the server reads the number from get/status) — undone the same day by pairing the previous "
+              f"number again (within {audience.RESTORE_HOURS} hours): the answer says restored (restarted false) with the earlier "
+              "moment; the previous number's client — decided business, his conversation stored — is still business and "
+              "listed, the decision computed on the mistaken account is not; his next message is answered at once (no first "
+              "minutes, no new decision), no wipe clock starts and nothing he had is wiped")
+def wrong_number_return(ctx, ch):
+    s = Stand(ctx, ch, "rr", connected="3 days")
+    o = own_profile(ctx, s.pid)
+    client, stray = s.chat("c"), s.chat("x")
+    moment = int(psql(f"select (extract(epoch from connected_at) * 1000)::bigint from audience_connections where profile_id = '{s.pid}';"))
+    # 1. a client of the previous number: decided business on the connection (a day ago, under its number), his conversation
+    #    stored; no per-chat reply mode of his own (store_chat's stand-in row says «Выбрать»): the bot's own «Авто» applies
+    psql(f"insert into chat_audience (profile_id, chat_id, kind, source, reason, decided_at, decided_phone) values "
+         f"('{s.pid}', '{client}', 'business', 'default', 'new', now() - interval '1 day', '{OWN[ch]}');")
+    store_chat(ctx, s.pid, client, f"rr{ctx.run_id[:6]}")
+    psql(f"delete from reply_mode_flags where profile_id = '{s.pid}' and chat_id = '{client}';")
+    before = stored(s.pid, client)
+    # 2. the mistaken pairing: another account paired, the app reports it — and a decision Decide Audience computes on it
+    other_number = "77020000055"
+    paired(s.pid, ch, other_number)
+    st1, d1 = audience_connected(o, s.pid)
+    psql(f"insert into chat_audience (profile_id, chat_id, kind, source, reason, decided_at, decided_phone) values "
+         f"('{s.pid}', '{stray}', 'business', 'default', 'new', now(), '{other_number}');")
+    # 3. the owner pairs the previous number again (the same day), the app reports it
+    paired(s.pid, ch, OWN[ch])
+    st2, d2 = audience_connected(o, s.pid)
+    lst = decisions_of(o, s.pid)
+    conn = psql(f"select phone || '|' || (extract(epoch from connected_at) * 1000)::bigint || '|' || coalesce(prev_phone, '-') "
+                f"from audience_connections where profile_id = '{s.pid}';")
+    # 4. the client writes again
+    s.cards(stranger(ch, client))
+    s.mark()
+    mid, t = f"rr-{ctx.run_id}", int(time.time())
+    text = "Здравствуйте, это снова я — букет на завтра в силе?"
+    s.history(client, [row(ch, client, mid, False, text, t)])
+    s.post(client, mid, text, t)
+    e = s.one()
+    clock = psql(f"select kind || '|' || source || '|' || reason || '|' || (personal_since is null) || '|' || (wiped_at is null) "
+                 f"from chat_audience where profile_id = '{s.pid}' and chat_id = '{client}';")
+    after = stored(s.pid, client)
+    mine = [x for x in lst[2] if x[0] in (client, stray)]
+    ok = (before == dict(STORED, flags=0) and st1 == 200 and (d1 or {}).get("restarted") is True
+          and st2 == 200 and (d2 or {}).get("restored") is True and (d2 or {}).get("restarted") is False
+          and (d2 or {}).get("connectedAt") == moment and conn == f"{OWN[ch]}|{moment}|{other_number}"
+          and lst[0] == 200 and lst[1] == moment and mine == [(client, "business", "default", "new")]
+          and e.get("outcome") == "sent" and e.get("decide") is None and len(s.sends(client)) == 1
+          and ledger(s.pid, client, mid) == "sent" and clock == "business|default|new|true|true"
+          and all(after[k] >= before[k] for k in CHAT_TABLES))
+    return ok, {"before": before, "mistaken": (st1, d1), "return": (st2, d2), "connection(phone|ms|remembered)": conn,
+                "moment": moment, "list(this scenario's chats)": mine, "list_moment": lst[1], **summary(e),
+                "sends": len(s.sends(client)), "ledger": ledger(s.pid, client, mid),
+                "decision(kind|source|reason|no clock|not wiped)": clock, "after": after}
 
 
 # ================================================================================================ run
