@@ -12,7 +12,9 @@ including all`: the migration must be applied — pg.sh migrate), the way n8n ru
 chats are made personal by the module's OWN statements — OWNER_SET_SQL for the owner, CONNECTED_SQL + DECIDE_WRITE_SQL for the
 rule —, so the dates the wipe counts from are the ones the webhook and Decide Audience write.
 Time is moved by writing personal_since into the past (a test cannot wait two days); the rule's cases only move a clock that
-runs, never start one. The race case runs on TWO real connections over a uniquely named fixture schema (a temp table is
+runs, never start one. The cases of a corrected mistaken pairing move every moment of the profile back together (`travel`):
+whether a clock is the mistaken account's is read against the connection it started on. The race cases run on TWO real
+connections over a uniquely named fixture schema (a temp table is
 invisible to the other connection), dropped afterwards. The workflow cases read the canonical Sweep JSON and
 apply-personal-wipe.py's patch on copies; the verifier runs for real. No n8n server, no network, never prod.
 
@@ -35,12 +37,25 @@ apply-personal-wipe.py's patch on copies; the verifier runs for real. No n8n ser
   rearmed_by_the_rule_after_a_wipe          wiped → business by the rule (clock and mark cleared) → personal by the rule: a
                                             new clock, wiped again two days after the LAST «personal»
   a_holding_business_row_is_never_wiped     a business decision of the current connection stays business and keeps its data
+  restore_spares_the_previous_numbers_client   a client of the previous number who wrote to the mistaken number was decided
+                                            personal there (the clock started); the previous number paired again within
+                                            RESTORE_HOURS restores the connection, and the wipe leaves him alone — two days on,
+                                            a month on; his next message decides him business again (WhatsApp and Telegram)
+  late_return_is_a_number_change_and_wipes  the same return after RESTORE_HOURS is another number: the clock runs, two days on
+                                            his business period is wiped (WhatsApp and Telegram)
+  restore_spares_only_the_mistaken_accounts_clock   after the return every other clock runs: the owner's «личный» over a
+                                            chat of the mistaken period, a clock from before the mistake, a chat of the mistaken
+                                            period decided personal on the restored number — and the client himself once the
+                                            restored number decides him personal too
   limit_200_oldest_first                    one run wipes the 200 oldest; the rest wait for the next run
   locked_row_is_skipped_never_waited_for    the owner takes a chat back (uncommitted) while the wipe runs: the wipe skips it
                                             (no wait, no delete), still wipes the others, and finds nothing there afterwards
+  connection_report_in_flight_never_holds_the_wipe   the wipe reads the connection but never locks it: a connection report
+                                            in flight neither makes it wait nor makes it skip the profile's chats
   the_work_list_can_use_the_partial_index   the planner can take the batch from the migration's chat_audience_wipe_idx
   statement_shape                           no parameters, one delete per table, never dialog_counts / the line's other
-                                            tables / the decision itself, passes verify-sql-comments (V1)
+                                            tables / the decision itself, the connection only read (by the restore skip),
+                                            passes verify-sql-comments (V1)
   chat_tables_follow_the_line               the per-chat tables are DERIVED from clone_lineage.MOVED_TABLES (minus the
                                             per-bot rows and the decision): exactly what WIPE_SQL deletes, what the cases
                                             seed and what the verifier derives; never dialog_counts
@@ -191,7 +206,26 @@ def shift(pg, pid, chat, interval):
          f"where profile_id = {L(pid)} and chat_id = {L(chat)} and personal_since is not null;")
 
 
+def travel(pg, pid, interval):
+    """`interval` passes for the profile: every moment of its decisions and of its connection moves back by it, so the order
+    between them stays what it was — a wipe clock against the connection it started on, a decision against the moment it was
+    taken after. (A clock moved back alone would read as one that ran before the connection it started on.)"""
+    pg.x(f"update chat_audience set decided_at = decided_at - interval {L(interval)}, "
+         f"personal_since = personal_since - interval {L(interval)}, updated_at = updated_at - interval {L(interval)} "
+         f"where profile_id = {L(pid)};"
+         f"update audience_connections set connected_at = connected_at - interval {L(interval)}, "
+         f"prev_connected_at = prev_connected_at - interval {L(interval)}, updated_at = updated_at - interval {L(interval)} "
+         f"where profile_id = {L(pid)};")
+
+
 ZERO = {'wiped_chats': 0, 'deleted_rows': 0}
+# A corrected mistaken pairing: the previous number, the mistaken one, and a number the bot had before the previous one.
+OLD_NUM, WRONG_NUM, EARLIER_NUM = '77010000001', '77020000002', '77030000003'
+RESTORE_CHATS = {'WA': {'client': '77010000050@c.us', 'earlier': '77010000051@c.us', 'stray': '77010000052@c.us',
+                        'owners': '77010000053@c.us'},
+                 'TG': {'client': '5510000050', 'earlier': '5510000051', 'stray': '5510000052', 'owners': '5510000053'}}
+PERSONAL_CONTACT = {'kind': 'personal', 'reason': 'contact', 'source': 'default'}
+BUSINESS_NEW = {'kind': 'business', 'reason': 'new', 'source': 'default'}
 
 
 # ------------------------------------------------------------------------------------------------ the race fixture
@@ -451,6 +485,115 @@ with PgSession(SETUP) as pg:
                 and decision(pg, pid, chat) == {'kind': 'business', 'source': 'default', 'has_since': False, 'wiped': False},
                 f'a business chat keeps everything: {decision(pg, pid, chat)}')
 
+    # A corrected mistaken pairing: another account paired, then the previous number again within RESTORE_HOURS —
+    # CONNECTED_SQL restores the earlier connection (here on one profile; through a new profile of the line:
+    # tests/test_clone_lineage_sql.py L31). A client of the previous number who also wrote to the mistaken number was decided
+    # there; when that account knows him, the personal decision replaced his business row and started the wipe clock. The
+    # decision stops holding with the return, and the wipe must leave him alone: that clock is the mistaken account's.
+    for ch, channel in (('WA', 'whatsapp'), ('TG', 'telegram')):
+        client = RESTORE_CHATS[ch]['client']
+        for late in (False, True):
+            label = 'late_return_is_a_number_change_and_wipes' if late else 'restore_spares_the_previous_numbers_client'
+            title = ('the previous number paired again only after RESTORE_HOURS — another number, a new connection: the clock the '
+                     'mistaken account started runs, and two days on the client\'s stored business period is wiped (the rule of a '
+                     'number change); dialog_counts never') if late else (
+                     'the previous number paired again within RESTORE_HOURS restores the connection; two days on — and a month '
+                     'on — the wipe leaves the client alone, everything he had is kept; his next message on the previous number '
+                     'decides him business again and the clock is gone')
+            with Case(f'{label} [{ch}]: a client of the previous number (business, his conversation stored) wrote to the mistaken '
+                      f'number and its account knows him — decided personal there, the wipe clock started; {title}') as c:
+                reset(pg)
+                pid = f'p-rst-{ch.lower()}-{int(late)}'
+                profile(pg, pid, channel, '5 days')
+                connected(pg, pid, OLD_NUM)                                    # the previous number, the line's moment
+                c.check(decide(pg, pid, client, 'business', 'new') == BUSINESS_NEW, 'premise: a client of the previous number')
+                seed(pg, pid, client)                                          # his conversation, stored while he was business
+                usage(pg, client)
+                wrong = connected(pg, pid, WRONG_NUM)                          # the mistaken pairing
+                c.check(wrong['restarted'] is True and wrong.get('restored') is False, f'premise: the mistake restarts: {wrong}')
+                got = decide(pg, pid, client, 'personal', 'contact')          # he wrote to the mistaken number, which knows him
+                c.check(got == PERSONAL_CONTACT
+                        and decision(pg, pid, client) == {'kind': 'personal', 'source': 'default', 'has_since': True, 'wiped': False},
+                        f'premise: the mistaken account\'s decision replaced his business row and started the clock: {got} '
+                        f'{decision(pg, pid, client)}')
+                if late:
+                    pg.x(f"update audience_connections set connected_at = connected_at - interval '{AUD.RESTORE_HOURS} hours 1 minute' "
+                         f"where profile_id = {L(pid)};")                      # the mistaken connection began over a day ago
+                back = connected(pg, pid, OLD_NUM)                             # the previous number paired again
+                c.check(back.get('restored') is (not late) and back['restarted'] is late,
+                        f'premise: {"too late — a new connection" if late else "the return restores the connection"}: {back}')
+                c.check(wipe(pg) == ZERO and held(pg, pid, client) == SEEDED, 'nothing is wiped before two days, whatever the clock')
+                travel(pg, pid, f'{HOURS} hours 1 minute')
+                r = wipe(pg)
+                if late:
+                    c.check(r == {'wiped_chats': 1, 'deleted_rows': SEEDED_TOTAL} and held(pg, pid, client) == NOTHING,
+                            f'two days on, a number change: his stored business period is wiped: {r} {held(pg, pid, client)}')
+                    c.check(dialog_rows(pg, client) == 2, 'dialog_counts (the tariff usage) must never be touched')
+                    continue
+                c.check(r == ZERO and held(pg, pid, client) == SEEDED and decision(pg, pid, client)['wiped'] is False,
+                        f'two days on: the previous number\'s client keeps everything: {r} {held(pg, pid, client)} '
+                        f'{decision(pg, pid, client)}')
+                travel(pg, pid, '30 days')
+                c.check(wipe(pg) == ZERO and held(pg, pid, client) == SEEDED,
+                        f'a month on too — the connection stays restored: {held(pg, pid, client)}')
+                got = decide(pg, pid, client, 'business', 'new')               # his next message, on the previous number
+                c.check(got == BUSINESS_NEW
+                        and decision(pg, pid, client) == {'kind': 'business', 'source': 'default', 'has_since': False, 'wiped': False},
+                        f'decided business again — the clock is gone: {got} {decision(pg, pid, client)}')
+                c.check(wipe(pg) == ZERO and held(pg, pid, client) == SEEDED and dialog_rows(pg, client) == 2,
+                        'nothing wiped, the tariff usage untouched')
+
+    for ch, channel in (('WA', 'whatsapp'), ('TG', 'telegram')):
+        x = RESTORE_CHATS[ch]
+        with Case(f'restore_spares_only_the_mistaken_accounts_clock [{ch}]: after the return the wipe still takes every personal '
+                  'decision whose clock is not the mistaken account\'s — the owner\'s «личный» over a chat of the mistaken period '
+                  '(it carries the mistaken number), a clock that ran before the mistake (a chat that had turned personal on the '
+                  'previous number), a chat of the mistaken period decided personal on the restored number; and the client himself '
+                  'once the restored number decides him personal too (his clock kept: personal over personal)') as c:
+            reset(pg)
+            pid = f'p-rso-{ch.lower()}'
+            profile(pg, pid, channel, '9 days')
+            connected(pg, pid, EARLIER_NUM)                                    # the number the bot had before the previous one…
+            decide(pg, pid, x['earlier'], 'business', 'new')                   # …and its client
+            seed(pg, pid, x['earlier'])
+            connected(pg, pid, OLD_NUM)                                        # the previous number: another number, as usual
+            decide(pg, pid, x['earlier'], 'personal', 'contact')               # a contact of it: the earlier client's clock runs
+            decide(pg, pid, x['client'], 'business', 'new')                    # the previous number's client
+            seed(pg, pid, x['client'])
+            connected(pg, pid, WRONG_NUM)                                      # the mistake
+            decide(pg, pid, x['client'], 'personal', 'contact')                # the mistaken account knows him: its clock starts
+            decide(pg, pid, x['earlier'], 'personal', 'contact')               # personal over personal: the earlier clock is kept
+            decide(pg, pid, x['stray'], 'business', 'new')                     # a client of the mistaken account
+            seed(pg, pid, x['stray'])
+            decide(pg, pid, x['owners'], 'business', 'new')                    # another one, whom the owner makes personal there
+            seed(pg, pid, x['owners'])
+            c.check(owner_set(pg, pid, x['owners'], 'personal', 1)['applied'] is True, 'premise: the owner\'s «личный»')
+            c.check(all(decision(pg, pid, x[k])['has_since'] for k in ('client', 'earlier', 'owners')),
+                    f'premise: three clocks run: { {k: decision(pg, pid, x[k]) for k in x} }')
+            back = connected(pg, pid, OLD_NUM)                                 # the return
+            c.check(back.get('restored') is True, f'premise: the return restores the connection: {back}')
+            travel(pg, pid, f'{HOURS} hours 1 minute')
+            r = wipe(pg)
+            got = {k: held(pg, pid, x[k]) == SEEDED for k in x}
+            c.check(r == {'wiped_chats': 2, 'deleted_rows': 2 * SEEDED_TOTAL}
+                    and got == {'client': True, 'earlier': False, 'stray': True, 'owners': False},
+                    f'two days on: the owner\'s «личный» and the clock from before the mistake are wiped; the client of the previous '
+                    f'number and the mistaken period\'s business chat are kept — {r} kept {got}')
+            got = decide(pg, pid, x['stray'], 'personal', 'history')          # the mistaken period's client, on the restored number
+            c.check(got == {'kind': 'personal', 'reason': 'history', 'source': 'default'}
+                    and decision(pg, pid, x['stray'])['has_since'] is True, f'premise: a clock of the restored number: {got}')
+            travel(pg, pid, f'{HOURS} hours 1 minute')
+            r = wipe(pg)
+            c.check(r == {'wiped_chats': 1, 'deleted_rows': SEEDED_TOTAL} and held(pg, pid, x['stray']) == NOTHING
+                    and held(pg, pid, x['client']) == SEEDED,
+                    f'a clock of the restored number runs as usual — the client is still kept: {r}')
+            got = decide(pg, pid, x['client'], 'personal', 'contact')          # the restored number decides him personal too
+            c.check(got == PERSONAL_CONTACT and decision(pg, pid, x['client'])['has_since'] is True,
+                    f'premise: personal over personal keeps the clock: {got} {decision(pg, pid, x["client"])}')
+            r = wipe(pg)
+            c.check(r == {'wiped_chats': 1, 'deleted_rows': SEEDED_TOTAL} and held(pg, pid, x['client']) == NOTHING,
+                    f'the decision holds now and is no longer the mistaken account\'s: its clock runs, two days are long past: {r}')
+
     with Case('limit_200_oldest_first: one run wipes the 200 oldest; the rest wait for the next run') as c:
         reset(pg)
         pid = 'p-many'
@@ -494,6 +637,23 @@ with Case('locked_row_is_skipped_never_waited_for: the owner takes a chat back (
                        f"where profile_id = {L(P)} and chat_id = {L(A)}")[0]
         c.check(row == {'kind': 'business', 'clear': True, 'open': True}, f'the owner\'s decision stands: {row}')
 
+with Case('connection_report_in_flight_never_holds_the_wipe: the wipe reads the profile\'s connection (a restored one spares the '
+          'mistaken account\'s clocks) but never locks it — a connection report in flight (uncommitted) neither makes it wait '
+          'nor makes it skip the profile\'s chats') as c:
+    with Schema() as s:
+        P, A = 'p-race-conn', 'race-conn@c.us'
+        s.main.x(f"insert into bot_profiles (profile_id, app_user_id, channel, created_at) values "
+                 f"({L(P)}, 'u-wipe', 'whatsapp', now() - interval '5 days');")
+        s.main.x(f"insert into audience_connections (profile_id, phone, connected_at) values ({L(P)}, {L(OLD_NUM)}, now() - interval '5 days');")
+        s.main.x(f"insert into chat_audience (profile_id, chat_id, kind, source, reason, version, personal_since) "
+                 f"values ({L(P)}, {L(A)}, 'personal', 'owner', 'owner', 1, now() - interval '3 days');")
+        s.main.x(f"insert into suggestion_sets (request_key, profile_id, chat_id, items) values ('rk-conn', {L(P)}, {L(A)}, '[]');")
+        s.owner.x('begin;')
+        s.owner.q(bind(AUD.CONNECTED_SQL, [P, WRONG_NUM]))                    # another number reported, not committed yet
+        r = s.main.q(AUD.WIPE_SQL)[0]                                          # waits → statement timeout
+        c.check(r == {'wiped_chats': 1, 'deleted_rows': 1}, f'the wipe runs past the locked connection row: {r}')
+        s.owner.x('rollback;')
+
 # ------------------------------------------------------------------------------------------------ the work list's index
 MIGRATION = N8N / 'sql' / '2026-10-25-chat-audience.sql'
 
@@ -527,8 +687,13 @@ with Case('statement_shape: no parameters, one delete per per-chat table, never 
     c.check(deleted == sorted(CHAT_TABLES), f'the tables deleted from: {deleted}')
     c.check(re.search(r'\$\d', q) is None and '{{' not in q and not q.lstrip().startswith('='),
             'the statement takes no parameter and is no n8n expression')
-    for forbidden in ('dialog_counts', 'bot_schedule', 'audience_connections', 'delete from chat_audience', 'bot_profiles'):
+    for forbidden in ('dialog_counts', 'bot_schedule', 'delete from chat_audience', 'bot_profiles'):
         c.check(forbidden not in flat, f'{forbidden} must never appear in the wipe')
+    restore = ' '.join(AUD.RESTORE_VOIDED_SQL('a').lower().split())
+    c.check(f'and not {restore}' in flat and flat.count('audience_connections') == 1
+            and not any(w in flat for w in ('delete from audience_connections', 'update audience_connections',
+                                            'insert into audience_connections')),
+            'the connection is read once — by the restore skip, audience.RESTORE_VOIDED_SQL — and never written')
     c.check(flat.count('update chat_audience') == 1 and 'wiped_at = now()' in flat, 'one update marks the chats wiped')
     c.check('for update skip locked' in flat and AUD.WIPE_BATCH == 200 and f'limit {AUD.WIPE_BATCH}' in flat,
             'locks what it takes, skips what is locked, at most 200 chats a run')

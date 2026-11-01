@@ -23,7 +23,10 @@ still wired as designed».
           row only (never the bot-wide '*' row), takes the work list locked and skipping what is locked, at most WIPE_BATCH
           oldest first, personal decisions only (never a business row) with a clock — the owner's and a computed one that
           replaced a business row alike, never narrowed by source —, not yet wiped, older than WIPE_DAYS written as hours, and
-          marks wiped_at.
+          marks wiped_at; the one decision it leaves out is audience.RESTORE_VOIDED_SQL's (a computed personal decision the
+          return to the previous number voided, its clock started on the mistaken connection: a restored connection,
+          connected_at < prev_connected_at, the row the rule's, under the remembered number, at or after its moment, the clock
+          too) — the only place it names the connection (audience_connections), read and never written.
   readers — Task 5: the three server places outside the bot templates that write or read a chat pass only a BUSINESS chat
       (audience.BUSINESS_SQL — never «not personal»):
       (1) the Wappi Proxy's Record Owner Send opens with the business word keyed on its profile and chat parameters, both
@@ -132,7 +135,13 @@ CANONICAL_PG = {"postgres": {"id": "vvRrFiEXzLVqKjOx", "name": "Postgres"}}
 NOT_CHAT_DATA = ("bot_schedule", "chat_audience", "audience_connections")
 CHAT_TABLES = tuple(t for t in CL.MOVED_TABLES if t not in NOT_CHAT_DATA)
 assert "dialog_counts" not in CHAT_TABLES, "dialog_counts is the tariff usage — the wipe must never delete from it"
-NEVER_NAMED = ("dialog_counts", "bot_schedule", "audience_connections", "bot_profiles")
+NEVER_NAMED = ("dialog_counts", "bot_schedule", "bot_profiles")
+# The connection is read by one fragment only — the restore skip — and never written.
+CONNECTION_TABLE = "audience_connections"
+# What the restore skip must ask, read in the module's own fragment: a restored connection (its moment earlier than the one
+# it remembers), the rule's row, under the remembered number, at or after its moment, the clock started there too.
+RESTORE_CONDITIONS = ("aud_rv.connected_at < aud_rv.prev_connected_at", "a.source = 'default'", "a.decided_phone = aud_rv.prev_phone",
+                      "a.decided_at >= aud_rv.prev_connected_at", "a.personal_since >= aud_rv.prev_connected_at")
 
 
 def node(wf, name):
@@ -236,6 +245,8 @@ def check_wipe(sweep, sql=None):
          f"the statement must delete from exactly the per-chat tables {sorted(CHAT_TABLES)}, once each: {deleted}")
     for name in NEVER_NAMED:
         need(name not in flat, f"the statement must never touch {name} (the tariff usage / per-bot rows / the decision are not a chat's data)")
+    for write in (f"delete from {CONNECTION_TABLE}", f"update {CONNECTION_TABLE}", f"insert into {CONNECTION_TABLE}"):
+        need(write not in flat, f"the statement must never write {CONNECTION_TABLE} — the connection is a per-bot row, only read")
     need("delete from chat_audience" not in flat, "the statement must never delete the decision itself — the chat has to stay personal")
     flags = re.search(r"delete from reply_mode_flags .*?returning 1", flat)
     need(bool(flags) and "<> '*'" in flags.group(0),
@@ -248,7 +259,16 @@ def check_wipe(sweep, sql=None):
          "the work list must be the PERSONAL decisions with a clock, not wiped yet, old enough (kind / wiped_at / personal_since) — "
          "never a business row")
     batch = re.search(r"with batch as \(.*?\), hist as \(", flat)
-    need(bool(batch) and "source" not in batch.group(0),
+    work = batch.group(0) if batch else ""
+    restore = " ".join(AUD.RESTORE_VOIDED_SQL("a").lower().split())
+    need(all(cond in restore for cond in RESTORE_CONDITIONS),
+         f"audience.RESTORE_VOIDED_SQL must ask for a restored connection, the rule's row, under the remembered number, at or after "
+         f"its moment, its clock started there too — every one of {RESTORE_CONDITIONS}")
+    need(f"and not {restore}" in work and flat.count(CONNECTION_TABLE) == 1,
+         "the work list must leave out exactly the decisions a return to the previous number voided — `and not "
+         "audience.RESTORE_VOIDED_SQL('a')`, as the module writes it — and name the connection nowhere else: a corrected "
+         "mistaken pairing must not wipe the previous number's client")
+    need(bool(batch) and "source" not in work.replace(restore, ""),
          "the work list must not be narrowed by source: a computed personal decision that replaced a business row (after another "
          "number) carries the clock too, and its stored business period must be wiped like the owner's")
     need(f"now() - interval '{AUD.WIPE_DAYS * 24} hours'" in flat,
@@ -366,6 +386,22 @@ WIPE_MUTATIONS = (
     ("the delay shortened", _sql(f"interval '{AUD.WIPE_DAYS * 24} hours'", "interval '24 hours'"), "the delay must be WIPE_DAYS"),
     ("the update no longer marks the chats wiped", _sql("set wiped_at = now(), updated_at = now()", "set updated_at = now()"),
      "must mark the decisions wiped"),
+    ("the restore skip removed (a corrected mistaken pairing would wipe the previous number's client)",
+     _sql("\n    and not " + AUD.RESTORE_VOIDED_SQL("a"), ""), "voided"),
+    ("the restore skip on any connection (a real number change would keep the old number's business period)",
+     _sql(" and aud_rv.connected_at < aud_rv.prev_connected_at", ""), "voided"),
+    ("the restore skip spares the owner's decisions too", _sql("a.source = 'default' and ", ""), "voided"),
+    ("the restore skip by the current number", _sql("a.decided_phone = aud_rv.prev_phone", "a.decided_phone = aud_rv.phone"), "voided"),
+    ("the restore skip spares a clock that ran before the mistake", _sql(" and a.personal_since >= aud_rv.prev_connected_at", ""),
+     "voided"),
+    ("the connection read a second time",
+     _sql("    and a.personal_since <= now()",
+          "    and exists (select 1 from audience_connections z where z.profile_id = a.profile_id)\n    and a.personal_since <= now()"),
+     "voided"),
+    ("the statement writes the connection",
+     _sql("), marked as (", "), conn as (\n  update audience_connections x set updated_at = now() from batch b\n"
+                            "  where x.profile_id = b.profile_id\n  returning 1\n), marked as ("),
+     "must never write audience_connections"),
 )
 
 

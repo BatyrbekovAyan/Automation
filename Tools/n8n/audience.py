@@ -77,11 +77,14 @@ paste them, never copy them:
                              (a message of ours the transport marks as an API send is the owner's from the app — unless
                              the tariff usage shows the assistant worked in the chat: then it may be its own reply and is
                              skipped).
+  RESTORE_VOIDED_SQL(a)      «a computed personal decision the return to the previous number voided, its clock the mistaken
+                             account's»: taken under the number a restored connection remembers, at or after that number's
+                             moment, its wipe clock started there too — what WIPE_SQL leaves alone;
   WIPE_SQL                   the Sweep's step: WIPE_DAYS after a business chat turned personal — the owner made it
                              personal (OWNER_SET_SQL's clock), the rule did after another number (DECIDE_WRITE_SQL's
                              clock), or a reconnect landed a personal decision over a business period (the line's move,
                              clone_lineage.BIND_WORKFLOW_SQL) —, what the assistant stored about it is deleted (never
-                             dialog_counts) and the decision is marked wiped.
+                             dialog_counts) and the decision is marked wiped; never a decision RESTORE_VOIDED_SQL names.
 tests/test_audience_sql.py runs every one of them but the last on real SQL (staging Postgres), the race of two first messages
 included; tests/test_personal_wipe.py runs WIPE_SQL (and the Sweep node that carries it) the same way.
 
@@ -609,6 +612,25 @@ with aud_ok as (
 select (select count(*) from ev)::int as added"""
 
 
+def RESTORE_VOIDED_SQL(a="a"):
+    """«A computed personal decision the return to the previous number voided, its clock the mistaken account's» — `a` a
+    chat_audience row. True only while the row's profile has a RESTORED connection: one that brought an earlier connection back
+    (CONNECTED_SQL, or the bind on a reconnect through a new profile) carries that earlier moment and remembers the mistaken
+    connection it left, whose moment is LATER (connected_at < prev_connected_at); another number moves connected_at to now,
+    after the moment it remembers, so a real number change never matches. On such a connection the row is the rule's (never
+    the owner's: the owner's decision holds whatever the number), taken under the remembered — mistaken — number at or after
+    its moment (decided_phone = prev_phone, decided_at >= prev_connected_at; it no longer holds, VALID_SQL), and its wipe clock
+    started there too (personal_since >= prev_connected_at): the mistaken account's personal decision replaced a business row
+    of the previous number. A clock that ran before the mistake does not match: it keeps running, as it would have. WIPE_SQL
+    leaves such a row alone — a corrected mistaken pairing must not wipe the previous number's client. The skip ends when the
+    next computed decision replaces the row (DECIDE_WRITE_SQL writes the current number) and with a later number change."""
+    pad = "\n" + " " * 20                     # continuation lines, aligned under the select in WIPE_SQL's work list
+    return ("exists (select 1 from audience_connections aud_rv" + pad
+            + "where aud_rv.profile_id = " + a + ".profile_id and aud_rv.connected_at < aud_rv.prev_connected_at" + pad
+            + "  and " + a + ".source = 'default' and " + a + ".decided_phone = aud_rv.prev_phone" + pad
+            + "  and " + a + ".decided_at >= aud_rv.prev_connected_at and " + a + ".personal_since >= aud_rv.prev_connected_at)")
+
+
 # The step is a node of the Profile Lifecycle Sweep (apply-personal-wipe.py): no parameters, nothing to bind. The delay is
 # WIPE_DAYS written as hours, so a clock change never moves it by an hour; the batch is WIPE_BATCH. Both numbers are written into
 # the statement's own comment as well, so the node reads on its own in the n8n editor. Unqualified table names, as in every
@@ -624,10 +646,13 @@ WIPE_SQL = """-- «Личные и рабочие чаты»: the Profile Lifecy
 -- decision for a chat that was never business starts none: nothing of it was ever stored.
 -- The work list is chat_audience: kind 'personal' (never a business row, whatever personal_since says), the clock
 -- personal_since set and old enough, not wiped yet — the owner's decisions and the computed ones alike —, the oldest first,
--- """ + str(WIPE_BATCH) + """ at most per run (the partial index chat_audience_wipe_idx is built for exactly this). The rows are locked, and a
--- row another statement holds is skipped, never waited for: a write that takes the chat back to business may be in flight
--- (the owner's, or a computed business decision after another number), and that chat is left alone (it is business by the
--- next run, so it is not selected again).
+-- """ + str(WIPE_BATCH) + """ at most per run (the partial index chat_audience_wipe_idx is built for exactly this). One personal decision is left
+-- out: a computed one the return to the previous number voided whose clock the mistaken account started (RESTORE_VOIDED_SQL —
+-- a client of the previous number who wrote to the mistaken number during the mistake, decided personal there): a corrected
+-- mistaken pairing must not wipe the previous number's client. The connection is only read for that, never locked.
+-- The rows are locked, and a row another statement holds is skipped, never waited for: a write that takes the chat back to
+-- business may be in flight (the owner's, or a computed business decision after another number), and that chat is left
+-- alone (it is business by the next run, so it is not selected again).
 -- For each chat: its rows in n8n_chat_histories (session_id = profile id, a colon, chat id), chat_history_events,
 -- conversation_outcomes, handoff_requests, reply_events, chat_reply_state, suggestion_sets and its OWN row of reply_mode_flags
 -- (never the bot-wide row, chat id '*'). Never dialog_counts (the tariff usage), never the decision itself, never the per-bot
@@ -639,6 +664,7 @@ with batch as (
   from chat_audience a
   where a.kind = 'personal' and a.wiped_at is null and a.personal_since is not null
     and a.personal_since <= now() - interval '""" + str(WIPE_DAYS * 24) + """ hours'
+    and not """ + RESTORE_VOIDED_SQL("a") + """
   order by a.personal_since, a.profile_id, a.chat_id
   limit """ + str(WIPE_BATCH) + """
   for update skip locked

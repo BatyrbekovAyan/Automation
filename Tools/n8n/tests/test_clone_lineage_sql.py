@@ -24,7 +24,7 @@ current ids»: every existing deletion path must reach everything after a move, 
           L19 — a clone booked for deletion is never offered for reuse (no live row ever drives a booked clone);
   L20     B1 (2026-10-14): the bot's schedule follows its line — the predecessor's row moves (values and version kept),
           the new profile's own row wins, among two predecessors the freshest; nothing is left under an old id;
-  L21–L30 «Личные и рабочие чаты» (2026-10-25): the chat decisions (chat_audience) and the connection moment
+  L21–L31 «Личные и рабочие чаты» (2026-10-25): the chat decisions (chat_audience) and the connection moment
           (audience_connections), written by the real audience.py statements, follow the line — L21 a reconnect carries
           them and the moved computed decisions keep holding; L22 per chat the owner's row beats a computed one (the new
           profile's own row is replaced IN PLACE, one row per key), of two owner rows the new profile's own, of two
@@ -45,7 +45,9 @@ current ids»: every existing deletion path must reach everything after a move, 
           or after the bind, or the mistake on the new profile itself) restores the earlier connection as the same profile
           does — its number and moment, the mistaken one remembered —: the previous number's computed decisions hold again,
           the mistaken connection's do not, the merge picks the row taken on the restored connection; after RESTORE_HOURS it
-          is another number;
+          is another number; L31 a client of the previous number decided personal by the mistaken account (its clock
+          started) lands on the new profile with that clock, and the wipe leaves him alone on the restored connection —
+          reported before or after the bind — while after RESTORE_HOURS (another number) his business period is wiped;
   C1–C3   races on TWO real connections over a shared fixture schema (the V6-concurrent pattern): the second bind's
           snapshot predates the first's commit. C1 — two Creates of the same profile: the loser answers bound = false
           (no clone lost, the price lists follow the bound one, the retry reuses the winner). C2 — two new profiles adopt
@@ -1608,6 +1610,86 @@ def return_through_the_line(ch):
                             f'moved_audience / moved_connections {b}')
 
 
+def travel(pg, pid, interval):
+    """`interval` passes for the profile: every moment of its chat decisions and of its connection moves back by it, so the order
+    between them stays what it was — a wipe clock against the connection it started on, a decision against the moment it was
+    taken after. (A clock moved back alone would read as one that ran before the connection it started on.)"""
+    pg.x(f"""update chat_audience set decided_at = decided_at - interval {L(interval)},
+               personal_since = personal_since - interval {L(interval)}, updated_at = updated_at - interval {L(interval)}
+             where profile_id = {L(pid)};
+             update audience_connections set connected_at = connected_at - interval {L(interval)},
+               prev_connected_at = prev_connected_at - interval {L(interval)}, updated_at = updated_at - interval {L(interval)}
+             where profile_id = {L(pid)};""")
+
+
+def return_through_the_line_spares_the_previous_numbers_client(ch):
+    """A client of the previous number who also wrote to the mistaken number was decided personal there (its account knows him):
+    the decision replaced his business row and started the wipe clock. When the mistake is undone through a NEW profile of the
+    line, the bind carries that row — and its running clock — onto the new profile and restores the earlier connection: the
+    wipe must leave him alone there, exactly as after a return on one profile (tests/test_personal_wipe.py). After
+    RESTORE_HOURS it is another number, and the clock runs as after any number change."""
+    P1, P2, WF1, WF2 = P(ch, 'P1'), P(ch, 'P2'), W(ch, 'old'), W(ch, 'new')
+    X = '77111@c.us'
+    NUM_A, NUM_B = '77010000001', '77020000002'
+    two_days = f"{AUD.WIPE_DAYS * 24} hours 1 minute"
+    for v, title in (
+            ('before', 'the new profile reports the previous number BEFORE the bind: the bind restores the earlier connection, '
+                       'the client\'s row lands with the mistaken account\'s clock — and two days on (and a month on) the wipe '
+                       'leaves him alone; his next message decides him business again, the clock gone'),
+            ('after', 'the new profile reports the previous number only AFTER the bind (the report restores): the same'),
+            ('late', f'control — the mistaken connection began more than {RESTORE_HOURS} hours ago: another number, no restore; '
+                     'the clock the mistaken account started runs and two days on the client\'s business period is wiped')):
+        with Case(tagged(f'L31 [{ch}] return_through_the_line_spares_the_previous_numbers_client: a client of the previous number '
+                         '(business, his conversation stored) wrote to the mistaken number and its account knows him — decided '
+                         f'personal there, the wipe clock started; {title}')) as c:
+            with PgSession(SETUP) as pg:
+                row(pg, ch, P1, wfid=WF1)                                 # the bot's profile, live
+                connect(pg, P1, NUM_A, created_ago='10 days')
+                decide(pg, P1, X, 'business', 'new', ago='5 days')        # the previous number's client…
+                chat_data(pg, P1, X, 'business-period', age=60 * 24 * 4)  # …whose conversation the writers stored
+                pg.x('select pg_sleep(0.003);')
+                wrong = connect(pg, P1, NUM_B)                            # the mistaken pairing of the bot's profile
+                c.check(wrong['restarted'] is True, f'premise: the mistaken number restarts the connection: {wrong}')
+                pg.x('select pg_sleep(0.003);')
+                got = decide(pg, P1, X, 'personal', 'contact')            # he wrote to the mistaken number, which knows him
+                mistaken = decision(pg, P1, X)
+                c.check(got == {'kind': 'personal', 'reason': 'contact', 'source': 'default'} and mistaken['personal_since'] is not None,
+                        f'premise: the mistaken account\'s decision replaced his business row and started the clock: {got} {mistaken}')
+                if v == 'late':
+                    pg.x(f"update audience_connections set connected_at = connected_at - interval '{RESTORE_HOURS} hours 1 minute' "
+                         f"where profile_id = {L(P1)};")
+                proxy_row(pg, ch, P2)
+                register(pg, ch, P2)
+                seed_star(pg, P2)
+                if v in ('before', 'late'):
+                    connect(pg, P2, '+7 (701) 000-00-01')                 # the new profile's report: the previous number
+                plan, b, _ = create(pg, ch, P2, WF2, prev=P1)
+                c.check(plan.get('pred_profiles') == [P1] or HEAD_MODE, f'premise: plan {plan}')
+                c.check(b.get('bound') is True or HEAD_MODE, f'bind {b}')
+                if v == 'after':
+                    report_ = connect(pg, P2, NUM_A)
+                    c.check(report_.get('restored') is True, f'premise: the report after the bind restores: {report_}')
+                landed = decision(pg, P2, X)
+                c.check(landed is not None and landed['kind'] == 'personal' and landed['personal_since'] == mistaken['personal_since']
+                        and landed['wiped_at'] is None, f'premise: the row lands with the mistaken account\'s clock: {landed} / {mistaken}')
+                c.check(holds(pg, P2, X) is None, f'premise: the mistaken account\'s decision does not hold: {holds(pg, P2, X)}')
+                c.check(chat_counts(pg, P2, X) == STORED_CHAT, f'premise: the business period moved: {chat_counts(pg, P2, X)}')
+                travel(pg, P2, two_days)
+                w, left = sweep_wipe(pg), chat_counts(pg, P2, X)
+                if v == 'late':
+                    c.check(w['wiped_chats'] == 1 and left == GONE_CHAT, f'another number: the business period is wiped: {w} {left}')
+                    continue
+                c.check(w['wiped_chats'] == 0 and left == STORED_CHAT and decision(pg, P2, X)['wiped_at'] is None,
+                        f'two days on: the previous number\'s client keeps everything: {w} {left}')
+                travel(pg, P2, '30 days')
+                c.check(sweep_wipe(pg)['wiped_chats'] == 0 and chat_counts(pg, P2, X) == STORED_CHAT, 'a month on too')
+                got = decide(pg, P2, X, 'business', 'new')                # his next message, on the previous number
+                after = decision(pg, P2, X)
+                c.check(got == {'kind': 'business', 'reason': 'new', 'source': 'default'} and after['personal_since'] is None
+                        and holds(pg, P2, X) == 'business', f'decided business again, the clock gone: {got} {after}')
+                c.check(sweep_wipe(pg)['wiped_chats'] == 0 and chat_counts(pg, P2, X) == STORED_CHAT, 'nothing wiped')
+
+
 def race_lazy_rows_during_the_bind(ch):
     P1, P2, WF1, WF2 = P(ch, 'P1'), P(ch, 'P2'), W(ch, 'old'), W(ch, 'new')
     A = '77051@c.us'
@@ -1652,7 +1734,7 @@ CREATE_MATRIX = (reconnect_after_purchase, same_profile_clone_gone, same_profile
                  own_row_wins_when_the_number_changed, number_change_never_yields_an_older_moment,
                  own_number_survives_an_unknown_earliest_number, nonhuman_beats_everything,
                  line_move_then_rule_personal_starts_the_clock, bind_merge_keeps_the_wipe_clock, return_through_the_line,
-                 race_lazy_rows_during_the_bind)
+                 return_through_the_line_spares_the_previous_numbers_client, race_lazy_rows_during_the_bind)
 
 
 # ---------------------------------------------------------------- module-only statements (no pre-F1 counterpart)
