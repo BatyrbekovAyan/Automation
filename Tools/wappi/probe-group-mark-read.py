@@ -101,7 +101,7 @@ USAGE
   #    Docs say no; cheap to falsify since we already call this endpoint.
   Tools/wappi/probe-group-mark-read.py --profile <id> --chat <chat_id> --probe-messages-get
 
-The token is read from Assets/StreamingAssets/secrets.json (wappiAuthToken) and never printed.
+The token is read from Tools/n8n/.secrets/wappi-token.txt (gitignored) and never printed.
 """
 
 from __future__ import annotations  # `dict | None` annotations on the system python (< 3.10)
@@ -116,17 +116,18 @@ import urllib.request
 
 API = "https://wappi.pro/api/sync"
 PROJECT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-SECRETS = os.path.join(PROJECT, "Assets", "StreamingAssets", "secrets.json")
+# Never secrets.json: StreamingAssets ships verbatim inside the app (audit A1).
+TOKEN_FILE = os.path.join(PROJECT, "Tools", "n8n", ".secrets", "wappi-token.txt")
 
 
 def token() -> str:
     try:
-        with open(SECRETS, encoding="utf-8") as fh:
-            tok = json.load(fh).get("wappiAuthToken", "")
+        with open(TOKEN_FILE, encoding="utf-8") as fh:
+            tok = fh.read().strip()
     except FileNotFoundError:
-        sys.exit(f"ERROR: {SECRETS} not found (copy secrets.json.example and fill it in).")
-    if not tok or tok.startswith("YOUR_"):
-        sys.exit("ERROR: wappiAuthToken missing or still the placeholder in secrets.json.")
+        sys.exit(f"ERROR: {TOKEN_FILE} not found (put the Wappi token there, one line).")
+    if not tok:
+        sys.exit(f"ERROR: {TOKEN_FILE} is empty.")
     return tok
 
 

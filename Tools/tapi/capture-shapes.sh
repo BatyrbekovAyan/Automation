@@ -23,7 +23,7 @@
 #
 # TOKEN SAFETY
 #   The Wappi token is read LOCALLY at runtime from
-#   Assets/StreamingAssets/secrets.json (never hardcoded, never printed, never
+#   Tools/n8n/.secrets/wappi-token.txt (never hardcoded, never printed, never
 #   written to a sample file, never passed as an argument). It is used only in
 #   the Authorization request header. Response BODIES are written to disk;
 #   request headers are not.
@@ -56,7 +56,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 
 BASE="https://wappi.pro"
-SECRETS="${PROJECT}/Assets/StreamingAssets/secrets.json"
+TOKEN_FILE="${PROJECT}/Tools/n8n/.secrets/wappi-token.txt"  # gitignored; never secrets.json (it ships in the app)
 # Samples land under Tools/tapi/samples/ (gitignored — may contain PII).
 SAMPLES_DIR="${SCRIPT_DIR}/samples"
 
@@ -77,7 +77,7 @@ print_banner() {
     * run any auth step (QR / phone / code / 2FA)
     * change any webhook configuration
     * pass the mark_all parameter (would mark your chats read)
-  Your Wappi token is read locally from secrets.json and used
+  Your Wappi token is read locally from wappi-token.txt and used
   only in the Authorization header — never printed, never saved.
   Samples are written to Tools/tapi/samples/ (gitignored).
 ================================================================
@@ -170,16 +170,16 @@ if ! command -v curl >/dev/null 2>&1; then
   echo "ERROR: 'curl' is required but was not found." >&2
   exit 2
 fi
-if [ ! -f "${SECRETS}" ]; then
-  echo "ERROR: secrets file not found: ${SECRETS}" >&2
-  echo "  Create it from Assets/StreamingAssets/secrets.json.example (see CLAUDE.md secrets policy)." >&2
+if [ ! -f "${TOKEN_FILE}" ]; then
+  echo "ERROR: token file not found: ${TOKEN_FILE}" >&2
+  echo "  Put the Wappi token there (one line, gitignored)." >&2
   exit 2
 fi
 
 # --- Read the token LOCALLY (never printed / logged / written to samples) ---
-TOKEN="$(jq -r '.wappiAuthToken // empty' "${SECRETS}")"
+TOKEN="$(tr -d '[:space:]' < "${TOKEN_FILE}")"
 if [ -z "${TOKEN}" ]; then
-  echo "ERROR: no auth token found in secrets.json (key is missing or empty)." >&2
+  echo "ERROR: no auth token found in ${TOKEN_FILE} (file is empty)." >&2
   exit 2
 fi
 # The token is sent via a curl --config read from a process substitution (see
@@ -187,7 +187,7 @@ fi
 # any local process via 'ps' while curl runs. Reject charsets that could break
 # the config-file quoting ('"' or '\') before that config is ever built.
 if [[ ! "${TOKEN}" =~ ^[A-Za-z0-9._-]+$ ]]; then
-  echo "ERROR: token in secrets.json has unexpected characters." >&2
+  echo "ERROR: token in ${TOKEN_FILE} has unexpected characters." >&2
   exit 2
 fi
 
@@ -256,7 +256,7 @@ if [ -z "${PROFILE_ID}" ]; then
   fi
   if [ "${HTTP}" -lt 200 ] || [ "${HTTP}" -ge 300 ]; then
     echo "ERROR: profile listing returned HTTP ${HTTP} — wappi.pro rejected the request." >&2
-    echo "  A 401/403 usually means the token in secrets.json is wrong or expired." >&2
+    echo "  A 401/403 usually means the token in wappi-token.txt is wrong or expired." >&2
     exit 5
   fi
   PROFILE_ID="$(printf '%s' "${PROFILES_JSON}" | jq -r '
