@@ -9,17 +9,21 @@ patch of the canonical workflow; this file OWNS the node «Wipe Personal Chats»
   Profile Lifecycle Sweep (fXYpCXPKw92EzRz8):
     Every 6 Hours ──> Wipe Personal Chats      one Postgres node = audience.WIPE_SQL (no parameters)
 
-  * It hangs straight on the trigger, like «Expire Learning Rows» (apply-learning-a.py), and sits right under it on the
-    canvas, above branch A (apply-sweep-clone-deactivate.py keeps that one the lowest). It is NOT behind «Sweep Config» and
+  * It hangs straight on the trigger, like «Expire Learning Rows» (apply-learning-a.py). It is NOT behind «Sweep Config» and
     no dry-run flag gates it: the step deletes by the age of a chat's personal clock, not by the state of a profile, and a
     dry run would only postpone a deletion that has already waited two days.
+  * It is the FIRST branch the trigger runs: n8n v1 runs a node's branches one after another, the topmost on the canvas
+    first (on a tie the leftmost), and an unhandled error in any branch ends the run — several nodes of the Sweep Config
+    subtree have no onError, so a wipe placed below that subtree would silently stop whenever it fails. The node therefore
+    sits one row ABOVE the highest other branch of the trigger, in Sweep Config's column (branch A stays the lowest,
+    apply-sweep-clone-deactivate.py).
   * It is terminal and fail-open (onError continueRegularOutput): a failed run changes nothing (the statement is one
     transaction) and the next run, six hours later, takes the same work list again.
   * The statement, the delay and the batch are audience.py's (WIPE_SQL, WIPE_DAYS, WIPE_BATCH); tests/test_personal_wipe.py
-    runs it on real SQL, verify-personal-chats.py pins the node.
+    runs it on real SQL, verify-personal-chats.py pins the node (the first branch included).
 
-The patch fixes the node's own fields (query, type, credential, onError, not disabled) and the one edge from the trigger; where
-the node sits on the canvas is left to whoever moved it.
+The patch fixes the node's own fields (query, type, credential, onError, not disabled), its POSITION (where it sits decides
+when n8n runs it) and the one edge from the trigger.
 
     python3 Tools/n8n/apply-personal-wipe.py            # patch workflows/ in place (re-runnable)
     python3 Tools/n8n/apply-personal-wipe.py --check    # exit 2 when the node is missing or stale
@@ -37,11 +41,11 @@ import audience  # noqa: E402  (the statement lives with the rest of the chat de
 PATH = os.path.join(HERE, "workflows", "fXYpCXPKw92EzRz8-Profile_Lifecycle_Sweep.json")
 NODE = "Wipe Personal Chats"
 TRIGGER = "Every 6 Hours"
-ANCHOR = "Expire Learning Rows"         # the node it sits under
+COLUMN = "Sweep Config"                 # the node whose column it sits in (the trigger's first column of branches)
 ROW = 160                               # canvas rows between two stacked nodes of this branch
 PG_CRED = {"id": "vvRrFiEXzLVqKjOx", "name": "Postgres"}     # the canonical Postgres credential every node of the sweep uses
 # what the patch enforces on the node itself, and what must not be on it (a disabled node hands its input on untouched)
-OWNED = ("parameters", "type", "typeVersion", "credentials", "onError")
+OWNED = ("parameters", "type", "typeVersion", "position", "credentials", "onError")
 FORBIDDEN = ("disabled",)
 
 
@@ -54,13 +58,15 @@ def node(wf, name):
 
 
 def position_for(wf):
-    """Right under «Expire Learning Rows»; without it, one row below where apply-learning-a.py puts that one (under the trigger,
-    one column to the right)."""
-    anchor = node(wf, ANCHOR)
-    if anchor is not None:
-        return [anchor["position"][0], anchor["position"][1] + ROW]
+    """One row ABOVE the highest other branch of the trigger (so n8n v1 runs the wipe first), in Sweep Config's column —
+    without Sweep Config, one column right of the trigger. Without another branch, one row above the trigger."""
     trig = node(wf, TRIGGER)
-    return [trig["position"][0] + 220, trig["position"][1] + 400 + ROW]
+    others = [node(wf, e["node"]) for out in (wf["connections"].get(TRIGGER) or {}).get("main") or [] for e in (out or [])
+              if e.get("node") != NODE]
+    tops = [n["position"][1] for n in others if n is not None]
+    column = node(wf, COLUMN)
+    x = column["position"][0] if column is not None else trig["position"][0] + 220
+    return [x, (min(tops) if tops else trig["position"][1]) - ROW]
 
 
 def desired(position):
@@ -78,7 +84,7 @@ def patch_sweep(wf):
         wf["nodes"].append(desired(position_for(wf)))
         changed = True
     else:
-        want = desired(cur["position"])
+        want = desired(position_for(wf))
         for key in OWNED:
             if cur.get(key) != want[key]:
                 cur[key] = copy.deepcopy(want[key])

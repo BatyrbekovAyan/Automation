@@ -1299,7 +1299,7 @@
       "typeVersion": 2.6,
       "position": [
         -680,
-        760
+        40
       ],
       "credentials": {
         "postgres": {

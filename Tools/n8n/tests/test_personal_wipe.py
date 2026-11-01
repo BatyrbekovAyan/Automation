@@ -41,14 +41,18 @@ apply-personal-wipe.py's patch on copies; the verifier runs for real. No n8n ser
   statement_shape                           no parameters, one delete per table, never dialog_counts / the line's other
                                             tables / the decision itself, passes verify-sql-comments (V1)
   sweep_node_is_wired_and_independent       one node, Every 6 Hours → it directly (not behind Sweep Config / any dry-run
-                                            gate), terminal, fail-open, the sweep's Postgres credential, under Expire
-                                            Learning Rows and above branch A
+                                            gate), terminal, fail-open, the sweep's Postgres credential, the FIRST branch
+                                            the trigger runs (n8n v1 runs the branches top-down and an unhandled error ends
+                                            the run): strictly above every other branch, in Sweep Config's column
   generator_is_idempotent_and_repairs_drift patch_sweep brings a bare canon forward to the committed JSON, repairs a stale
-                                            query / disabled flag / credential / onError, and a second pass changes nothing
+                                            query / disabled flag / credential / onError / position (a node moved below
+                                            Sweep Config, or another branch moved above it), and a second pass changes
+                                            nothing
   sibling_generators_agree                  apply-learning-a.py and apply-sweep-clone-deactivate.py --check stay green
   verifier_accepts_the_canon                verify-personal-chats.py: OK (its own tripwire self-check included)
-  verifier_rejects_a_broken_sweep_on_a_scratch_copy   --dir on copies of the Sweep (a dry-run gate, a disabled node, no node, no
-                                            file) exits 1 with the finding; the untouched copy passes
+  verifier_rejects_a_broken_sweep_on_a_scratch_copy   --dir on copies of the Sweep (a dry-run gate, a disabled node, the wipe
+                                            below Sweep Config, no node, no file) exits 1 with the finding; the untouched
+                                            copy passes
 
     python3 Tools/n8n/tests/test_personal_wipe.py
 """
@@ -552,8 +556,15 @@ def generator():
     return module('apply-personal-wipe.py')
 
 
-with Case('sweep_node_is_wired_and_independent: Every 6 Hours → Wipe Personal Chats directly, terminal, fail-open, under Expire '
-          'Learning Rows and above branch A') as c:
+def v1_order(w, src):
+    """The targets of `src` in the order n8n's v1 engine runs them: sorted by canvas position, the topmost first (on a tie
+    the leftmost), each branch run to its end before the next (n8n-core workflow-execute.js)."""
+    names = [e['node'] for out in (w['connections'].get(src) or {}).get('main') or [] for e in (out or [])]
+    return sorted(dict.fromkeys(names), key=lambda n: (node(w, n)['position'][1], node(w, n)['position'][0]))
+
+
+with Case('sweep_node_is_wired_and_independent: Every 6 Hours → Wipe Personal Chats directly, terminal, fail-open, the FIRST '
+          'branch the trigger runs (strictly above every other branch, in Sweep Config\'s column)') as c:
     sw = wf(SWEEP_FILE)
     names = [n['name'] for n in sw['nodes']]
     c.check(names.count(NODE) == 1, f'exactly one {NODE}: {names.count(NODE)}')
@@ -568,9 +579,13 @@ with Case('sweep_node_is_wired_and_independent: Every 6 Hours → Wipe Personal 
     c.check(sources(sw, NODE) == [('Every 6 Hours', 0)], f'fed by the trigger ONLY — no dry-run gate in between: {sources(sw, NODE)}')
     c.check(NODE not in reachable(sw, 'Sweep Config'), 'unreachable from Sweep Config (the dryRun flags live there)')
     c.check(not sw['connections'].get(NODE), 'terminal: nothing runs after it')
-    expire, retirements = node(sw, 'Expire Learning Rows'), node(sw, 'Clone Retirements')
-    c.check(n['position'][0] == expire['position'][0] and expire['position'][1] < n['position'][1] < retirements['position'][1],
-            f'under Expire Learning Rows, above branch A (which must stay the lowest): {n["position"]}')
+    order = v1_order(sw, 'Every 6 Hours')
+    others = [x for x in order if x != NODE]
+    c.check(order[0] == NODE and all(node(sw, x)['position'][1] > n['position'][1] for x in others),
+            f'the first branch n8n runs from the trigger, strictly above the others (an unhandled error in an earlier branch '
+            f'would end the run before it): {[(x, node(sw, x)["position"]) for x in order]}')
+    c.check(n['position'][0] == node(sw, 'Sweep Config')['position'][0], f'in Sweep Config\'s column: {n["position"]}')
+    c.check(set(others) == {'Sweep Config', 'Expire Learning Rows'}, f'the trigger\'s other branches: {others}')
     c.check(len({x['id'] for x in sw['nodes']}) == len(sw['nodes']), 'node ids stay unique')
 
 with Case('generator_is_idempotent_and_repairs_drift: patch_sweep brings a bare canon to the committed JSON and fixes drift; '
@@ -597,9 +612,14 @@ with Case('generator_is_idempotent_and_repairs_drift: patch_sweep brings a bare 
     drifted(lambda n: n.pop('onError'), 'a removed onError')
     drifted(lambda n: n.update(credentials={'postgres': {'id': 'dev0000000000000', 'name': 'Postgres Dev'}}), 'another credential')
     drifted(lambda n: n['parameters'].update(options={'queryReplacement': 'x'}), 'a parameter list')
-    moved = copy.deepcopy(canon)
-    node(moved, NODE)['position'] = [0, 0]
-    c.check(G.check_sweep(moved) is True, 'a hand-moved node is left where the owner put it (the canvas is theirs)')
+    # the position is the generator's: where the node sits decides WHEN n8n runs it (v1 runs the trigger's branches top-down)
+    drifted(lambda n: n.update(position=[-680, 760]), 'a node moved below Sweep Config')
+    drifted(lambda n: n.update(position=[0, 0]), 'a node moved anywhere else')
+    raised = copy.deepcopy(canon)
+    node(raised, 'Sweep Config')['position'] = [-680, -500]          # someone moved another branch above the wipe
+    c.check(G.check_sweep(raised) is False and G.patch_sweep(raised) is True
+            and v1_order(raised, 'Every 6 Hours')[0] == NODE and node(raised, NODE)['position'] == [-680, -500 - G.ROW],
+            f'the wipe follows above the highest other branch: {node(raised, NODE)["position"]}')
     r = subprocess.run([sys.executable, str(N8N / 'apply-personal-wipe.py'), '--check'], capture_output=True, text=True)
     c.check(r.returncode == 0 and 'personal wipe: OK' in r.stdout, f'--check: {r.returncode} {r.stdout.strip()} {r.stderr.strip()[-300:]}')
 
@@ -636,6 +656,9 @@ with Case('verifier_rejects_a_broken_sweep_on_a_scratch_copy: --dir on copies of
             and 'personal chats verify:' in r.stdout and 'verify: OK' not in r.stdout, f'a dry-run gate: {r.returncode} {r.stdout.strip()[-400:]}')
     r = verify_copy(lambda w: node(w, NODE).update(disabled=True))
     c.check(r.returncode == 1 and 'is disabled' in r.stdout, f'a disabled node: {r.returncode} {r.stdout.strip()[-400:]}')
+    r = verify_copy(lambda w: node(w, NODE).update(position=[-680, 760]))
+    c.check(r.returncode == 1 and 'must be the FIRST branch' in r.stdout,
+            f'the wipe below Sweep Config: {r.returncode} {r.stdout.strip()[-400:]}')
     r = verify_copy(lambda w: w['nodes'].remove(node(w, NODE)))
     c.check(r.returncode == 1 and 'expected exactly one node' in r.stdout, f'a missing node: {r.returncode} {r.stdout.strip()[-400:]}')
     with tempfile.TemporaryDirectory() as d:

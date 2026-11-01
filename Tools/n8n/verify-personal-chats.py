@@ -13,7 +13,10 @@ still wired as designed».
           disabled node hands its input on untouched, i.e. silently does nothing;
       (3) exactly one such node, a target of Every 6 Hours exactly once and entered from NOTHING else (not behind Sweep Config,
           not behind a dry-run If: the step deletes by the age of a chat's personal clock, not by the state of a profile),
-          terminal, unreachable from Sweep Config;
+          terminal, unreachable from Sweep Config, and the FIRST branch n8n runs from Every 6 Hours — strictly above every
+          other branch on the canvas: n8n v1 runs a node's branches one after another, the topmost first, and one unhandled
+          error ends the run (nodes of the Sweep Config subtree have no onError), so a wipe placed below would silently
+          stop whenever an earlier branch fails;
       (4) the statement keeps its safety shape: it deletes from the eight per-chat tables and from nothing else (never
           dialog_counts — the tariff usage —, never the per-bot rows, never the decision itself), the chat's own reply_mode_flags
           row only (never the bot-wide '*' row), takes the work list locked and skipping what is locked, at most WIPE_BATCH
@@ -153,6 +156,15 @@ def reachable(wf, start, cut=None):
     return seen
 
 
+def v1_order(wf, src):
+    """The targets of `src` (every main output) in the order n8n's v1 engine runs them: it sorts a node's targets by canvas
+    position — the topmost first, on a tie the leftmost — and runs each branch to its end before it starts the next
+    (n8n-core execution-engine/workflow-execute.js: nodesToAdd.sort by position, then unshift onto the execution stack)."""
+    names = [e["node"] for out in (wf["connections"].get(src) or {}).get("main") or [] for e in (out or [])]
+    pos = lambda n: tuple(((node(wf, n) or {}).get("position") or [0, 0])[:2])
+    return sorted(dict.fromkeys(names), key=lambda n: (pos(n)[1], pos(n)[0]))
+
+
 def code_of(sql):
     """The statement without its `--` comments (they explain, the statement decides; the comment names dialog_counts on purpose)."""
     return "\n".join(re.sub(r"--.*$", "", line) for line in sql.split("\n"))
@@ -201,6 +213,14 @@ def check_wipe(sweep, sql=None):
          f"{WIPE_NODE} is reachable from Sweep Config — the dry-run flags live there and must never gate this step")
     successors = (sweep["connections"].get(WIPE_NODE) or {}).get("main") or []
     need(all(not out for out in successors), f"{WIPE_NODE} must be terminal — nothing runs after it: {sweep['connections'].get(WIPE_NODE)}")
+    # the FIRST branch of the trigger: n8n v1 runs the trigger's branches one after another, topmost first, and an unhandled
+    # error in any of them ends the run — strictly above every other branch, so no tie-break on the canvas decides it
+    order = v1_order(sweep, TRIGGER)
+    wipe_y = ((node(sweep, WIPE_NODE) or {}).get("position") or [0, 0])[1]
+    need(order[:1] == [WIPE_NODE] and all(((node(sweep, o) or {}).get("position") or [0, 0])[1] > wipe_y
+                                          for o in order if o != WIPE_NODE),
+         f"{WIPE_NODE} must be the FIRST branch n8n runs from {TRIGGER} — strictly above every other branch on the canvas "
+         f"(n8n v1 runs them top-down, and an unhandled error in an earlier branch ends the run before the wipe): {order}")
 
     # (4) the safety shape of the statement (read without its comments)
     flat = " ".join(code_of(expected).lower().split())
@@ -306,6 +326,10 @@ WIPE_MUTATIONS = (
     ("behind Sweep Config", _gate("Sweep Config", 0), "ONLY from Every 6 Hours"),
     ("behind a dry-run If", _gate("Trial/Churn Dry Run?", 1), "ONLY from Every 6 Hours"),
     ("a successor wired", _successor, "must be terminal"),
+    ("the wipe moved below Sweep Config (it would run after that subtree)", _set("position", [-680, 760]), "must be the FIRST branch"),
+    ("the wipe level with Sweep Config (only the tie-break would decide)",
+     lambda s: node(s, WIPE_NODE).__setitem__("position", [node(s, WIPE_NODE)["position"][0] - 220, node(s, "Sweep Config")["position"][1]]),
+     "must be the FIRST branch"),
     ("the node duplicated", _duplicate, "expected exactly one node"),
     ("the statement also deletes dialog_counts",
      _sql("), marked as (", "), usage as (\n  delete from dialog_counts d using batch b\n  where d.chat_id = b.chat_id\n  returning 1\n), marked as ("),
@@ -363,8 +387,9 @@ def group_wipe(directory):
     fails = check_wipe(sweep)
     if not fails:
         fails = self_check(sweep, check_wipe, WIPE_MUTATIONS)
-    return fails, (f"wipe: {WIPE_NODE} = audience.WIPE_SQL, a target of {TRIGGER} and of nothing else (no dry-run gate), terminal, "
-                   f"fail-open; the statement keeps its safety shape; tripwire self-check: {len(WIPE_MUTATIONS)} mutations rejected")
+    return fails, (f"wipe: {WIPE_NODE} = audience.WIPE_SQL, a target of {TRIGGER} and of nothing else (no dry-run gate), the first "
+                   f"branch it runs, terminal, fail-open; the statement keeps its safety shape; tripwire self-check: "
+                   f"{len(WIPE_MUTATIONS)} mutations rejected")
 
 
 # ================================================================================================ group: readers
