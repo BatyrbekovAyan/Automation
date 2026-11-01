@@ -1,0 +1,40 @@
+start 00:47:22
+FLAKY ap_sku_exact_kz                      0.83  kz/after  failed: lang_kz
+PASS  ws_kz_min_order                      1.00  kz/before  
+FLAKY ap_sku_exact_kz                      0.50  kz/before  failed: lang_kz
+PASS  ws_kz_min_order                      1.00  kz/after  
+FLAKY fl_kz_price                          0.67  kz/after  failed: lang_kz
+FLAKY fl_kz_price                          0.67  kz/before  failed: lang_kz
+FLAKY ks_kz_availability                   0.67  kz/before  failed: lang_kz
+PASS  ks_kz_availability                   1.00  kz/after  
+FLAKY ed_kz_parent                         0.83  kz/after  failed: lang_kz
+FLAKY ed_kz_parent                         0.83  kz/before  failed: lang_kz, no_tool:create_handoff
+FAIL  pr_kz_battery                        0.00  kz/before  failed: lang_kz, mentions:15000
+FLAKY pr_kz_battery                        0.33  kz/after  failed: lang_kz
+PASS  gen_kz_pure_greeting                 1.00  kz/before  
+FLAKY gen_kz_pure_greeting                 0.83  kz/after  failed: no_tool:create_handoff
+FLAKY pl_51_roses_kz_flowers               0.83  kz/before  failed: lang_kz
+PASS  pl_51_roses_kz_flowers               1.00  kz/after  
+PASS  ws_list_of_items                     1.00  wslist/before  
+FLAKY ws_list_of_items                     0.83  wslist/after  failed: no_total_confirmation
+PASS  ws_discount_policy_known             1.00  discount/before  
+FAIL  ws_discount_policy_known             0.00  discount/after  failed: no_tool:create_handoff
+
+pt-fix-focus-kz-before: pass 2 · flaky 5 · fail 1 · runs 48 · errors 0 · retries 0 · $0.0593
+wrote Tools/n8n/eval/results/pt-fix-focus-kz-before.md
+
+pt-fix-focus-kz-after: pass 3 · flaky 5 · fail 0 · runs 48 · errors 0 · retries 0 · $0.0645
+wrote Tools/n8n/eval/results/pt-fix-focus-kz-after.md
+
+pt-fix-focus-discount-before: pass 1 · flaky 0 · fail 0 · runs 10 · errors 0 · retries 0 · $0.0095
+wrote Tools/n8n/eval/results/pt-fix-focus-discount-before.md
+
+pt-fix-focus-discount-after: pass 0 · flaky 0 · fail 1 · runs 10 · errors 0 · retries 0 · $0.0141
+wrote Tools/n8n/eval/results/pt-fix-focus-discount-after.md
+
+pt-fix-focus-wslist-before: pass 1 · flaky 0 · fail 0 · runs 6 · errors 0 · retries 0 · $0.0098
+wrote Tools/n8n/eval/results/pt-fix-focus-wslist-before.md
+
+pt-fix-focus-wslist-after: pass 0 · flaky 1 · fail 0 · runs 6 · errors 0 · retries 0 · $0.0104
+wrote Tools/n8n/eval/results/pt-fix-focus-wslist-after.md
+exit 0 00:51:47

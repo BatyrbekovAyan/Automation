@@ -1,0 +1,2761 @@
+{
+ "summary": {
+  "label": "pt-now-b24-n8n",
+  "prompts_ref": "f0c81168",
+  "search_ref": "f0c81168",
+  "side": "n8n",
+  "block": "b24",
+  "plan": "Tools/n8n/eval/plans/pt-now.json",
+  "scenario_version": "v1.8 (2026-10-29: the price that lives ONLY in the price list — 8 auto scenarios pl_* (products_override / services_override, harness h11; pl_empty_reask_flowers = the e2e-auth retired_bot_reconnects_after_purchase model step); every v1.7 scenario and check unchanged)",
+  "harness": "h11 (2026-10-29: scenario fields products_override / services_override (scenario_knowledge) for the price that lives ONLY in the price list — set v1.8 adds the pl_* scenarios; no check function changed, every v1.7 scenario composes and scores byte for byte; on top of h10 (2026-10-13: three off-topic classes — names_scope (рамка + имя бизнеса), no_refusal_on_greeting, honest_assistant, spam_minimal; panel cards_eq_1_refusal, cards_name_business; set v1.7 adds the scenarios for them, knowledge.<vertical>.businessName rides into About Business as «Название:» like the app writes it; every earlier check unchanged; on top of h9 (2026-10-13: panel checks cards_first_no_decision:<topic> — card 1 neither grants nor refuses a condition the data does not state — cards_absent:<regex> — no card states a rule absent from the data — and cards_first_matches:<regex>; auto check matches:<regex>; set v1.6 adds the scenarios for them; every earlier check unchanged; on top of h8 (2026-10-12, T11b: interleaved schedule — every scenario's repeats spread over the whole run, round-robin over the scenarios, the sides of one repeat back to back with the first side rotating (--side / --plan run the sides of a comparison as ONE schedule); set v1.5 adds no_tool:create_handoff wherever the scenario does not call for a handoff; no check function changed; on top of h7 (2026-10-12, T11 Q1 B + V6-unknown: scenario roles `owner` / `bot_unknown` rendered with the memory marks the writers store at --prompts-ref (apply-history-handoff.py; none before T6); no_marker_leak, no_tool:<name>, not_says_already, no_delivery_doubt; on top of h6 2026-10-09, Q1: not_mentions:X — X stated in no un-refused clause and not merely quoted as the client's words, for the client-time echo; mentions:H:MM reads a time of day; on top of h5 2026-10-08, V9-r2: no_conflict_claim / no_price_caveat for a price list that AGREES with the catalog; on top of h4 2026-10-07 V9: «расхождение» + negated conflict, zero-price / elliptical free delivery, «итого по N позициям» partial, «нужен» / the car or device by name, a word inside the installment claim, Kazakh = no Russian sentence, «18,000»; h3 2026-09-27 R14; checks pinned by test_checks.py)))",
+  "model": "gpt-5.4-mini",
+  "reasoning_effort": null,
+  "dropped_params": [],
+  "panel_model": null,
+  "max_tokens": 200,
+  "request": "n8n",
+  "models_served": [
+   "gpt-5.4-mini-2026-03-17"
+  ],
+  "search_simulation": "Price List Search sub-workflow (Reconcile Prices at f0c81168)",
+  "memory_marks": {
+   "owner": "Владелец: ",
+   "bot_unknown": "[доставка не подтверждена] "
+  },
+  "workers": 2,
+  "scenarios": 24,
+  "runs": 72,
+  "pass_all": 19,
+  "flaky": 3,
+  "fail": 2,
+  "error_runs": 0,
+  "transport_retries": 0,
+  "finish_reason_length_runs": 0,
+  "prompt_tokens": 692985,
+  "cached_tokens": 630016,
+  "completion_tokens": 6957,
+  "reasoning_tokens": 0,
+  "cost_usd_auto_path": 0.1258,
+  "prices_usd_per_1m": [
+   0.75,
+   0.075,
+   4.5
+  ],
+  "latency_ms": {
+   "auto": {
+    "n": 72,
+    "median": 3536,
+    "p90": 5400,
+    "max": 7990
+   },
+   "panel": null
+  },
+  "seconds": 484,
+  "by_check": {
+   "asks_car": "3/3",
+   "asks_model": "3/3",
+   "asks_variant_or_prices_both": "3/3",
+   "claims_handoff_only_if_ok": "3/3",
+   "lang_kz": "13/15",
+   "lang_ru": "3/3",
+   "marks_unknown_item": "3/3",
+   "mentions:15000": "0/3",
+   "mentions:25000": "3/3",
+   "mentions:3200": "6/6",
+   "mentions:35000": "3/3",
+   "mentions:55000": "3/3",
+   "mentions_diagnostics_caveat": "3/3",
+   "mentions_kaspi": "3/3",
+   "no_closing_offer": "3/3",
+   "no_conflict_claim": "3/3",
+   "no_free_delivery_claim": "3/3",
+   "no_fresh_price_pick": "3/3",
+   "no_installment_claim": "3/3",
+   "no_invented_installment_terms": "3/3",
+   "no_invented_sku": "3/3",
+   "no_markdown": "23/24",
+   "no_marker_leak": "72/72",
+   "no_price": "12/12",
+   "no_price_caveat": "3/3",
+   "no_price_for:тюльпан": "3/3",
+   "no_schedule_invention": "3/3",
+   "no_stock_denial": "6/6",
+   "no_stock_guarantee": "6/6",
+   "no_tool:create_handoff": "43/48",
+   "no_total_confirmation": "3/3",
+   "numbers_grounded": "33/33",
+   "offers_handoff_or_clarifies": "15/15",
+   "tool_called": "3/3"
+  }
+ },
+ "results": [
+  {
+   "id": "ap_price_without_car",
+   "vertical": "auto_parts",
+   "mode": "auto",
+   "lang": "ru",
+   "tags": [
+    "niche",
+    "key"
+   ],
+   "repeats": 3,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "no_price": true,
+      "asks_car": true,
+      "lang_ru": true,
+      "no_markdown": true,
+      "no_closing_offer": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Какая у вас марка, модель и год авто?",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "Колодки тормозные передние Toyota 04465-02220 цена"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 10247,
+      "completion_tokens": 51,
+      "cached_tokens": 9984,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3867,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 17,
+     "t": 26.5,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "no_price": true,
+      "asks_car": true,
+      "lang_ru": true,
+      "no_markdown": true,
+      "no_closing_offer": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Какая у вас марка, модель и год авто?",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "Колодки тормозные передние Toyota 04465-02220 цена"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 10247,
+      "completion_tokens": 51,
+      "cached_tokens": 9984,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2794,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 112,
+     "t": 198.9,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "no_price": true,
+      "asks_car": true,
+      "lang_ru": true,
+      "no_markdown": true,
+      "no_closing_offer": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Для подбора нужны марка, модель и год автомобиля.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "колодки тормозные передние Toyota 04465-02220 цена"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 10247,
+      "completion_tokens": 52,
+      "cached_tokens": 9984,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2934,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 209,
+     "t": 369.2,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    }
+   ]
+  },
+  {
+   "id": "ap_price_with_car",
+   "vertical": "auto_parts",
+   "mode": "auto",
+   "lang": "ru",
+   "tags": [
+    "catalog"
+   ],
+   "repeats": 3,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "numbers_grounded": true,
+      "mentions:3200": true,
+      "no_markdown": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Фильтр масляный Toyota 90915-YZZE1 — 3200 тг\nОригинал, цена без установки\n\nЕсть ещё аналог Sakura C-1139 — 1400 тг",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "масляный фильтр Toyota 90915-YZZE1 цена"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 10261,
+      "completion_tokens": 80,
+      "cached_tokens": 9984,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3351,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 18,
+     "t": 27.6,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "numbers_grounded": true,
+      "mentions:3200": true,
+      "no_markdown": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Фильтр масляный Toyota 90915-YZZE1 — 3200 тг\nОригинал, цена без установки\n\nЕсть ещё аналог Sakura C-1139 — 1400 тг",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "масляный фильтр Toyota 90915-YZZE1 цена"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 10261,
+      "completion_tokens": 80,
+      "cached_tokens": 7552,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 4075,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 115,
+     "t": 202.0,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "numbers_grounded": true,
+      "mentions:3200": true,
+      "no_markdown": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Фильтр масляный Toyota 90915-YZZE1 — 3200 тг, оригинал.\n\nЕсть ещё аналог Sakura C-1139 — 1400 тг.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "масляный фильтр Toyota 90915-YZZE1 цена"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 10261,
+      "completion_tokens": 76,
+      "cached_tokens": 9984,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3496,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 210,
+     "t": 369.4,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    }
+   ]
+  },
+  {
+   "id": "ap_sku_exact_kz",
+   "vertical": "auto_parts",
+   "mode": "auto",
+   "lang": "kz",
+   "tags": [
+    "docs",
+    "lang"
+   ],
+   "repeats": 3,
+   "pass_rate": 0.3333333333333333,
+   "runs": [
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "numbers_grounded": true,
+      "no_invented_sku": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Бар, 3200 тг.\nАртикул: 90915-YZZE1\n\nОригинал, цена без установки.\nНақты қалдығын менеджер растайды.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "90915-YZZE1 фильтр масляный Toyota цена наличие"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 10289,
+      "completion_tokens": 75,
+      "cached_tokens": 9984,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3470,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 21,
+     "t": 34.3,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "lang_kz": false,
+      "numbers_grounded": true,
+      "no_invented_sku": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Иә, бар.\n\nФильтр масляный Toyota 90915-YZZE1 — 3200 тг\nОригинал, бағасы орнатусыз\n\nТочное наличие подтвердит менеджер.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "90915-YZZE1 фильтр масляный Toyota цена наличие"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 10289,
+      "completion_tokens": 82,
+      "cached_tokens": 9984,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3311,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 116,
+     "t": 205.0,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "lang_kz": false,
+      "numbers_grounded": true,
+      "no_invented_sku": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Бар, 3200 тг.\nАртикул: 90915-YZZE1\n\nОригинал. Точное наличие подтвердит менеджер.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "90915-YZZE1 фильтр масляный Toyota цена наличие"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 10289,
+      "completion_tokens": 69,
+      "cached_tokens": 9984,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3014,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 213,
+     "t": 375.7,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    }
+   ]
+  },
+  {
+   "id": "ap_unknown_part",
+   "vertical": "auto_parts",
+   "mode": "auto",
+   "lang": "ru",
+   "tags": [
+    "unknown",
+    "key"
+   ],
+   "repeats": 3,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "no_price": true,
+      "no_stock_denial": true,
+      "offers_handoff_or_clarifies": true,
+      "no_marker_leak": true
+     },
+     "text": "Для подбора уточните, пожалуйста, марку, модель и год авто.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "катализатор Prius 2015 цена наличие"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 10252,
+      "completion_tokens": 49,
+      "cached_tokens": 9984,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3252,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 22,
+     "t": 36.2,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "no_price": true,
+      "no_stock_denial": true,
+      "offers_handoff_or_clarifies": true,
+      "no_marker_leak": true
+     },
+     "text": "Для Prius 2015 катализатор в данных не найден.\n\nЕсли нужен подбор точно, напишите VIN и номер телефона — менеджер проверит по авто и подскажет цену.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "катализатор Prius 2015"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 10250,
+      "completion_tokens": 67,
+      "cached_tokens": 9984,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3632,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 119,
+     "t": 209.6,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "no_price": true,
+      "no_stock_denial": true,
+      "offers_handoff_or_clarifies": true,
+      "no_marker_leak": true
+     },
+     "text": "По катализатору для Prius 2015 в данных нет позиции.\n\nЕсли нужен подбор, пришлите VIN и номер телефона — менеджер подберёт точно.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "катализатор Prius 2015"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 10250,
+      "completion_tokens": 64,
+      "cached_tokens": 9984,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3137,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 214,
+     "t": 376.0,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    }
+   ]
+  },
+  {
+   "id": "ap_handoff_fail",
+   "vertical": "auto_parts",
+   "mode": "auto",
+   "lang": "ru",
+   "tags": [
+    "handoff",
+    "key"
+   ],
+   "repeats": 3,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "tool_called": true,
+      "claims_handoff_only_if_ok": true,
+      "no_marker_leak": true
+     },
+     "text": "Не удалось автоматически передать заявку.\n\nПозвоните, пожалуйста, по номеру: +7 777 000 11 22\nИли напишите сюда ещё раз — попробую передать повторно.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "name": "Арман",
+        "phone": "87011234567",
+        "summary": "Клиент готов купить колодки тормозные передние Toyota 04465-02220 для Camry 2019."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 10278,
+      "completion_tokens": 106,
+      "cached_tokens": 9984,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 5257,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 25,
+     "t": 41.8,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "tool_called": true,
+      "claims_handoff_only_if_ok": true,
+      "no_marker_leak": true
+     },
+     "text": "Не удалось автоматически передать заявку.\n\nПозвоните, пожалуйста, по номеру +7 777 000 11 22 или напишите сюда ещё раз — менеджер поможет оформить заказ.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "name": "Арман",
+        "phone": "87011234567",
+        "summary": "Клиент хочет колодки Toyota 04465-02220 для Camry 2019, готов к покупке."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 10276,
+      "completion_tokens": 100,
+      "cached_tokens": 9984,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3581,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 120,
+     "t": 211.3,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "tool_called": true,
+      "claims_handoff_only_if_ok": true,
+      "no_marker_leak": true
+     },
+     "text": "Не удалось автоматически передать заявку.\n\nПозвоните, пожалуйста, по номеру +7 777 000 11 22 — менеджер оформит заказ.",
+     "tool_calls": [
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "name": "Арман",
+        "phone": "87011234567",
+        "summary": "Клиент готов купить колодки Toyota 04465-02220 для Camry 2019. Нужна передача заявки на подтверждение и оформление."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 10285,
+      "completion_tokens": 103,
+      "cached_tokens": 9984,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3405,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 217,
+     "t": 381.6,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    }
+   ]
+  },
+  {
+   "id": "ap_source_conflict",
+   "vertical": "auto_parts",
+   "mode": "auto",
+   "lang": "ru",
+   "tags": [
+    "conflict",
+    "key"
+   ],
+   "repeats": 3,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "no_fresh_price_pick": true,
+      "no_markdown": true,
+      "no_marker_leak": true
+     },
+     "text": "По этой позиции цены в каталоге и прайсе расходятся:\nв каталоге — 3200 тг\nв прайсе — 3900 тг\n\nТочную цену подтвердит менеджер.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "90915-YZZE1 фильтр масляный Toyota цена"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 10273,
+      "completion_tokens": 79,
+      "cached_tokens": 9984,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3761,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 26,
+     "t": 44.1,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "no_fresh_price_pick": true,
+      "no_markdown": true,
+      "no_marker_leak": true
+     },
+     "text": "По этой позиции цены в каталоге и прайсе расходятся: в каталоге 3200 тг, в прайсе 3900 тг.\nТочную цену подтвердит менеджер.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "90915-YZZE1 фильтр масляный Toyota цена"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 10273,
+      "completion_tokens": 77,
+      "cached_tokens": 9984,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 5400,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 123,
+     "t": 217.2,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "no_fresh_price_pick": true,
+      "no_markdown": true,
+      "no_marker_leak": true
+     },
+     "text": "По этой позиции цены в каталоге и прайсе расходятся: в каталоге 3200 тг, в прайсе 3900 тг.\nТочную цену подтвердит владелец.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "Toyota 90915-YZZE1 фильтр масляный цена"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 10274,
+      "completion_tokens": 79,
+      "cached_tokens": 9984,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3536,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 218,
+     "t": 383.6,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    }
+   ]
+  },
+  {
+   "id": "ap_price_agrees_analogues",
+   "vertical": "auto_parts",
+   "mode": "auto",
+   "lang": "ru",
+   "tags": [
+    "conflict_control",
+    "key"
+   ],
+   "repeats": 3,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "mentions:3200": true,
+      "no_conflict_claim": true,
+      "no_price_caveat": true,
+      "no_markdown": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Фильтр масляный Toyota 90915-YZZE1 — 3200 тг\nОригинал.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "90915-YZZE1 фильтр масляный Toyota цена"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 10310,
+      "completion_tokens": 61,
+      "cached_tokens": 9984,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3082,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 29,
+     "t": 50.7,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "mentions:3200": true,
+      "no_conflict_claim": true,
+      "no_price_caveat": true,
+      "no_markdown": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Фильтр масляный Toyota 90915-YZZE1 — 3200 тг, оригинал.\n\nЕсть ещё аналоги:\nKnecht OC 91 — 1400 тг\nFiltron OP 563 — 1350 тг\nMahle OC 217 — 1600 тг",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "90915-YZZE1 фильтр масляный Toyota цена"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 10310,
+      "completion_tokens": 101,
+      "cached_tokens": 7552,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3513,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 124,
+     "t": 222.6,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "mentions:3200": true,
+      "no_conflict_claim": true,
+      "no_price_caveat": true,
+      "no_markdown": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Фильтр масляный 90915-YZZE1 есть.\n\n3200 тг — оригинал Toyota\n1400 тг — Knecht OC 91\n1350 тг — Filtron OP 563\n1600 тг — Mahle OC 217\n\nПо наличию точнее подтвердит менеджер.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "Toyota Camry 2019 фильтр масляный 90915-YZZE1 цена наличие"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 10317,
+      "completion_tokens": 110,
+      "cached_tokens": 9984,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 4116,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 221,
+     "t": 388.3,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    }
+   ]
+  },
+  {
+   "id": "ws_list_of_items",
+   "vertical": "wholesale",
+   "mode": "auto",
+   "lang": "ru",
+   "tags": [
+    "catalog",
+    "long"
+   ],
+   "repeats": 3,
+   "pass_rate": 0.0,
+   "runs": [
+    {
+     "verdicts": {
+      "numbers_grounded": true,
+      "no_markdown": true,
+      "marks_unknown_item": true,
+      "no_total_confirmation": true,
+      "no_tool:create_handoff": false,
+      "no_marker_leak": true
+     },
+     "text": "Средство для посуды 5 л — 2100 тг/шт\n20 шт = 42 000 тг\n\nСтиральный порошок 10 кг — 6900 тг/шт\n10 шт = 69 000 тг\n\nОтбеливатель 1 л — в прайсе не найден, цену уточнит менеджер\n\nИтого по подтверждённым позициям: 111 000 тг\n\nПередал владельцу, он свяжется",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "Средство для посуды 5 л цена, Стиральный порошок 10 кг цена, отбеливатель 1 л цена"
+       }
+      },
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "summary": "Нужен прайс и итог по заявке: средство для посуды 5 л — 20 шт, порошок 10 кг — 10 шт, отбеливатель 1 л — 30 шт. Клиент просит посчитать итог.",
+        "name": "",
+        "phone": ""
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 10129,
+      "completion_tokens": 247,
+      "cached_tokens": 4864,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 7133,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 30,
+     "t": 51.7,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "numbers_grounded": true,
+      "no_markdown": true,
+      "marks_unknown_item": true,
+      "no_total_confirmation": true,
+      "no_tool:create_handoff": false,
+      "no_marker_leak": true
+     },
+     "text": "Средство для посуды 5 л, арт. WS-500 — 2100 тг/шт\n20 шт = 42 000 тг\n\nСтиральный порошок 10 кг, арт. WP-10 — 6900 тг/шт\n10 шт = 69 000 тг\n\nОтбеливатель 1 л — уточнит менеджер\n\nИтого по подтверждённым позициям: 111 000 тг\n\nПередал менеджеру, он свяжется",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "Средство для посуды 5 л цена, Стиральный порошок 10 кг цена, отбеливатель 1 л цена"
+       }
+      },
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "summary": "Нужен прайс и итог по заявке: средство для посуды 5 л — 20 шт, стиральный порошок 10 кг — 10 шт, отбеливатель 1 л — 30 шт. Клиент просит посчитать итог.",
+        "name": "",
+        "phone": ""
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 10132,
+      "completion_tokens": 254,
+      "cached_tokens": 7424,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 5998,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 127,
+     "t": 227.4,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "numbers_grounded": true,
+      "no_markdown": true,
+      "marks_unknown_item": true,
+      "no_total_confirmation": true,
+      "no_tool:create_handoff": false,
+      "no_marker_leak": true
+     },
+     "text": "Средство для посуды 5 л, арт. WS-500 — 2100 тг/шт\n20 шт = 42 000 тг\n\nСтиральный порошок 10 кг, арт. WP-10 — 6900 тг/шт\n10 шт = 69 000 тг\n\nОтбеливатель 1 л в прайсе не найден, цену и итог по нему уточнит менеджер.\n\nИтого по подтверждённым позициям: 111 000 тг\n\nПередал владельцу, он свяжется",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "Средство для посуды 5 л цена, порошок 10 кг цена, отбеливатель 1 л цена"
+       }
+      },
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "order",
+        "name": "",
+        "phone": "",
+        "summary": "Запрос на прайс и расчет: средство для посуды 5 л — 20 шт, стиральный порошок 10 кг — 10 шт, отбеливатель 1 л — 30 шт. Нужно подтвердить цену и итоговую сумму по позиции отбеливатель 1 л."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 10134,
+      "completion_tokens": 267,
+      "cached_tokens": 9472,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 6279,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 222,
+     "t": 391.0,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    }
+   ]
+  },
+  {
+   "id": "ws_mixed_lang",
+   "vertical": "wholesale",
+   "mode": "auto",
+   "lang": "mixed",
+   "tags": [
+    "lang"
+   ],
+   "repeats": 3,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "numbers_grounded": true,
+      "no_markdown": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Позиция в прайсе есть, точный остаток подтвердит менеджер.\n\nСтиральный порошок 10 кг — 6900 тг/шт.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "Стиральный порошок 10 кг цена наличие"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9914,
+      "completion_tokens": 70,
+      "cached_tokens": 9472,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3100,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 33,
+     "t": 59.4,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "numbers_grounded": true,
+      "no_markdown": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Иә, прайста бар.\n\nСтиральный порошок 10 кг, арт. WP-10 — 6900 тг/шт.\nНақты қалдығын менеджер растайды.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "Стиральный порошок 10 кг цена наличие"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9914,
+      "completion_tokens": 76,
+      "cached_tokens": 9216,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3570,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 128,
+     "t": 233.1,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "numbers_grounded": true,
+      "no_markdown": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Позиция в прайсе есть, точный остаток подтвердит менеджер.\n\nСтиральный порошок 10 кг — 6900 тг.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "Стиральный порошок 10 кг цена наличие"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9914,
+      "completion_tokens": 68,
+      "cached_tokens": 9472,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3266,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 225,
+     "t": 398.9,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    }
+   ]
+  },
+  {
+   "id": "fl_absent_item",
+   "vertical": "flowers",
+   "mode": "auto",
+   "lang": "ru",
+   "tags": [
+    "unknown",
+    "key"
+   ],
+   "repeats": 3,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "no_stock_denial": true,
+      "no_price_for:тюльпан": true,
+      "offers_handoff_or_clarifies": true,
+      "no_marker_leak": true
+     },
+     "text": "Тюльпанов в прайсе не нашла.\n\nЕсть:\nБукет 25 роз — 25000 тг\nБукет пионов — 18000 тг\n\nЕсли хотите, могу передать владельцу вопрос по тюльпанам.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "тюльпаны цена наличие букет тюльпанов"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9863,
+      "completion_tokens": 94,
+      "cached_tokens": 9344,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3670,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 34,
+     "t": 62.0,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "no_stock_denial": true,
+      "no_price_for:тюльпан": true,
+      "offers_handoff_or_clarifies": true,
+      "no_marker_leak": true
+     },
+     "text": "Тюльпанов в прайсе не вижу.\n\nМогу предложить:\nБукет 25 роз — 25000 тг\nБукет пионов — 18000 тг\n\nЕсли хотите, передам флористу запрос на тюльпаны — наличие подтвердит он при оформлении.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "тюльпаны цена наличие букет тюльпанов"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9863,
+      "completion_tokens": 105,
+      "cached_tokens": 9344,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3940,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 131,
+     "t": 236.8,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "no_stock_denial": true,
+      "no_price_for:тюльпан": true,
+      "offers_handoff_or_clarifies": true,
+      "no_marker_leak": true
+     },
+     "text": "Тюльпанов в прайсе не нашла.\n\nМогу предложить:\nБукет 25 роз — 25000 тг\nБукет пионов — 18000 тг\n\nЕсли хотите, передам вопрос флористу — он уточнит по тюльпанам.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "тюльпаны цена наличие букет тюльпанов"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9863,
+      "completion_tokens": 101,
+      "cached_tokens": 9344,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3683,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 226,
+     "t": 400.8,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    }
+   ]
+  },
+  {
+   "id": "fl_kz_price",
+   "vertical": "flowers",
+   "mode": "auto",
+   "lang": "kz",
+   "tags": [
+    "lang"
+   ],
+   "repeats": 3,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "mentions:25000": true,
+      "numbers_grounded": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "25 раушан гүлі — 25000 тг.\n\nНақты қалдығын флорист тапсырыс рәсімдегенде растайды.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "25 роз букет цена прайс-лист"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9830,
+      "completion_tokens": 64,
+      "cached_tokens": 9344,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3217,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 37,
+     "t": 65.9,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "mentions:25000": true,
+      "numbers_grounded": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "25 раушан гүлі — 25000 тг.\n\n50 см, Эквадор.\nНақты қалдығын флорист тапсырысты рәсімдегенде растайды.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "25 раушан гүлі, цена, букет 25 роз"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9836,
+      "completion_tokens": 78,
+      "cached_tokens": 9472,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3307,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 132,
+     "t": 240.3,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "mentions:25000": true,
+      "numbers_grounded": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "25 раушан гүлі — 25000 тг.\n\nНақты қалдығын флорист тапсырыс рәсімдегенде растайды.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "25 раушан гүлі, цена, букет 25 роз"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9836,
+      "completion_tokens": 70,
+      "cached_tokens": 9344,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3396,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 229,
+     "t": 405.9,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    }
+   ]
+  },
+  {
+   "id": "fl_installment_unknown",
+   "vertical": "flowers",
+   "mode": "auto",
+   "lang": "ru",
+   "tags": [
+    "installment",
+    "key"
+   ],
+   "repeats": 3,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "no_installment_claim": true,
+      "offers_handoff_or_clarifies": true,
+      "no_marker_leak": true
+     },
+     "text": "По Kaspi рассрочке в данных магазина информации нет.\n\nМогу передать вопрос владельцу — напишите, пожалуйста, имя и номер телефона.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4866,
+      "completion_tokens": 33,
+      "cached_tokens": 4608,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1480,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 38,
+     "t": 69.1,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "no_installment_claim": true,
+      "offers_handoff_or_clarifies": true,
+      "no_marker_leak": true
+     },
+     "text": "{\"input\":\"Kaspi рассрочка на букеты: можно ли оформить, условия оплаты, есть ли ограничения\"}\nПо данным магазина про Kaspi рассрочку информации нет.\n\nМогу передать вопрос владельцу — напишите, пожалуйста, имя и номер телефона.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4866,
+      "completion_tokens": 63,
+      "cached_tokens": 4608,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1770,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 135,
+     "t": 244.0,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "no_installment_claim": true,
+      "offers_handoff_or_clarifies": true,
+      "no_marker_leak": true
+     },
+     "text": "По Kaspi рассрочке в данных магазина информации нет.\n\nМогу передать владельцу, он уточнит. Напишите, пожалуйста, имя и номер телефона.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 4866,
+      "completion_tokens": 36,
+      "cached_tokens": 4608,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1801,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 230,
+     "t": 407.8,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    }
+   ]
+  },
+  {
+   "id": "ks_installment_terms",
+   "vertical": "kaspi_seller",
+   "mode": "auto",
+   "lang": "ru",
+   "tags": [
+    "installment",
+    "key"
+   ],
+   "repeats": 3,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "no_invented_installment_terms": true,
+      "mentions_kaspi": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Наушники JBL Tune 510BT есть в магазине, цена 18 990 тг.\n\nОформление и рассрочка Kaspi — на странице товара:\nhttps://kaspi.kz/shop/techstore\n\nТочный срок и процент видны при оформлении в Kaspi.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "Kaspi рассрочка JBL Tune 510BT 12 месяцев процент условия TechMart"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9872,
+      "completion_tokens": 98,
+      "cached_tokens": 7296,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 4404,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 41,
+     "t": 72.3,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "no_invented_installment_terms": true,
+      "mentions_kaspi": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Оформление и рассрочка Kaspi — на странице товара:\nhttps://kaspi.kz/shop/techstore\n\nТочный срок и процент видны при оформлении в Kaspi.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "рассрочка 12 месяцев JBL процент TechMart Kaspi"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9868,
+      "completion_tokens": 74,
+      "cached_tokens": 4736,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3632,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 136,
+     "t": 245.7,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "no_invented_installment_terms": true,
+      "mentions_kaspi": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Оформление и рассрочка Kaspi — на странице товара:\nhttps://kaspi.kz/shop/techstore\n\nТочный срок и процент видны при оформлении в Kaspi.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "Kaspi рассрочка JBL Tune 510BT 12 месяцев процент"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9869,
+      "completion_tokens": 75,
+      "cached_tokens": 9472,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3409,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 233,
+     "t": 412.6,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    }
+   ]
+  },
+  {
+   "id": "ks_variant_clarify",
+   "vertical": "kaspi_seller",
+   "mode": "auto",
+   "lang": "ru",
+   "tags": [
+    "niche"
+   ],
+   "repeats": 3,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "asks_variant_or_prices_both": true,
+      "numbers_grounded": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Наушники JBL Tune 510BT — 18 990 тг\nЕсть чёрные и белые.\nОформить можно на странице магазина в Kaspi: https://kaspi.kz/shop/techstore",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "JBL 510 цена наушники JBL Tune 510BT"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9852,
+      "completion_tokens": 80,
+      "cached_tokens": 9344,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3413,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 42,
+     "t": 73.7,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "asks_variant_or_prices_both": true,
+      "numbers_grounded": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Наушники JBL Tune 510BT — 18 990 тг\n\nЕсть чёрные и белые.\nОформление и рассрочка — на странице товара в Kaspi:\nhttps://kaspi.kz/shop/techstore",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "JBL 510 цена наушники JBL Tune 510BT"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9852,
+      "completion_tokens": 84,
+      "cached_tokens": 9472,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3727,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 139,
+     "t": 251.6,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "asks_variant_or_prices_both": true,
+      "numbers_grounded": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Наушники JBL Tune 510BT стоят 18 990 тг.\n\nЕсть в чёрном и белом цвете.\nОформление и рассрочка — на странице товара в Kaspi:\nhttps://kaspi.kz/shop/techstore",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "JBL 510 цена наушники JBL Tune 510BT"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9852,
+      "completion_tokens": 87,
+      "cached_tokens": 9344,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3522,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 234,
+     "t": 412.9,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    }
+   ]
+  },
+  {
+   "id": "ks_kz_availability",
+   "vertical": "kaspi_seller",
+   "mode": "auto",
+   "lang": "kz",
+   "tags": [
+    "lang"
+   ],
+   "repeats": 3,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "no_stock_guarantee": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Иә, ақ түсі бар.\n\nНаушники JBL Tune 510BT — 18990 тг\nТүстері: қара және ақ\n\nKaspi арқылы рәсімдеу:\nhttps://kaspi.kz/shop/techstore",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "JBL Tune 510BT white black availability color white"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9856,
+      "completion_tokens": 82,
+      "cached_tokens": 9344,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3464,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 45,
+     "t": 79.7,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "no_stock_guarantee": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Иә, ақ түсі бар.\n\nНаушники JBL Tune 510BT белые — 18990 тг\nТапсырысты Kaspi арқылы рәсімдеуге болады: https://kaspi.kz/shop/techstore",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "JBL Tune 510BT white availability color white"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9855,
+      "completion_tokens": 81,
+      "cached_tokens": 9344,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3786,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 140,
+     "t": 252.7,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "no_stock_guarantee": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Иә, ақ түсі бар.\n\nНаушники JBL Tune 510BT белые — 18990 тг\nОформление Kaspi арқылы: https://kaspi.kz/shop/techstore",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "JBL Tune 510BT white availability color white"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9855,
+      "completion_tokens": 74,
+      "cached_tokens": 9344,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3348,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 237,
+     "t": 419.6,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    }
+   ]
+  },
+  {
+   "id": "ed_schedule_unknown",
+   "vertical": "education",
+   "mode": "auto",
+   "lang": "ru",
+   "tags": [
+    "unknown"
+   ],
+   "repeats": 3,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "no_schedule_invention": true,
+      "offers_handoff_or_clarifies": true,
+      "no_marker_leak": true
+     },
+     "text": "По прайсу есть только:\nАнглийский для детей, группа — 40000 тг/мес, 3 раза в неделю\nIELTS индивидуально — 12000 тг/занятие\n\nПро группу для взрослых по субботам утром точное расписание не указано. Администратор уточнит актуальное время и набор.\n\nЕсли хотите, могу передать заявку на пробный урок — он бесплатный.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "Учебный центр Bilim группа по субботам утром для взрослых расписание взрослые суббота утро"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9746,
+      "completion_tokens": 136,
+      "cached_tokens": 9344,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 6280,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 46,
+     "t": 80.6,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "no_schedule_invention": true,
+      "offers_handoff_or_clarifies": true,
+      "no_marker_leak": true
+     },
+     "text": "По прайсу есть только:\nАнглийский для детей, группа — 40000 тг/мес, 3 раза в неделю\n\nПро группу для взрослых по субботам утром точное расписание не указано. Администратор уточнит актуальное время и набор.\n\nЕсли хотите, могу передать заявку на пробный урок — он бесплатный.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "Учебный центр Bilim расписание группы по субботам утром для взрослых английский или ЕНТ"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9745,
+      "completion_tokens": 120,
+      "cached_tokens": 9472,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3961,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 143,
+     "t": 258.6,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "no_schedule_invention": true,
+      "offers_handoff_or_clarifies": true,
+      "no_marker_leak": true
+     },
+     "text": "По прайсу есть только группа по английскому для детей и индивидуальный IELTS.\n\nДля взрослых группы по субботам утром в данных нет — уточнит администратор. Могу передать вопрос, если напишете имя и номер телефона.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "Учебный центр Bilim группа по субботам утром для взрослых расписание взрослые суббота утро"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9746,
+      "completion_tokens": 96,
+      "cached_tokens": 9472,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 5288,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 238,
+     "t": 421.2,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    }
+   ]
+  },
+  {
+   "id": "ed_kz_parent",
+   "vertical": "education",
+   "mode": "auto",
+   "lang": "kz",
+   "tags": [
+    "lang"
+   ],
+   "repeats": 3,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "mentions:55000": true,
+      "numbers_grounded": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "ЕНТ-ге дайындық — 55 000 тг/ай.\n\nМатематика және физика кіреді.\n\nҚаласаңыз, баланың аты-жөнін, жасын және телефон нөмірін жіберіңіз — тегін пробный сабаққа жазып беремін.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "Учебный центр Bilim цена подготовка к ЕНТ месяц, для школьников и взрослых"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9755,
+      "completion_tokens": 103,
+      "cached_tokens": 9344,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3549,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 49,
+     "t": 87.7,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "mentions:55000": true,
+      "numbers_grounded": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "ЕНТ-ге дайындық — 55 000 тг/ай.\n\nМатематика және физика кіреді.\n\nПробный сабақ тегін. Егер қаласаңыз, өтінім қалдырайын: баланың аты-жөні, жасы және телефон нөмірін жазыңыз.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "ЕНТ подготовка цена месяц для школьников и взрослых, курс, длительность, расписание"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9754,
+      "completion_tokens": 106,
+      "cached_tokens": 9344,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 4014,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 144,
+     "t": 260.9,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "mentions:55000": true,
+      "numbers_grounded": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "ЕНТ-ге дайындық — 55 000 тг/ай.\n\nМатематика және физика кіреді.\n\nҚаласаңыз, балаңыздың аты-жөнін, жасын және телефон нөмірін жіберіңіз — тегін пробный сабаққа өтінішті администраторға жіберемін.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "ЕНТ подготовка цена месяц для школьников и взрослых, курс, стоимость, расписание"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9753,
+      "completion_tokens": 110,
+      "cached_tokens": 9344,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3492,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 241,
+     "t": 428.2,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    }
+   ]
+  },
+  {
+   "id": "pr_price_no_model",
+   "vertical": "phone_repair",
+   "mode": "auto",
+   "lang": "ru",
+   "tags": [
+    "niche",
+    "key"
+   ],
+   "repeats": 3,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "asks_model": true,
+      "no_price": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Уточните, пожалуйста, модель телефона.\n\nПо модели скажу точную цену. Точная цена — после диагностики, мастер подтвердит её до начала работ.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "замена экрана цена iPhone 11 35000 тг"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 10092,
+      "completion_tokens": 70,
+      "cached_tokens": 9728,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3185,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 50,
+     "t": 90.4,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "asks_model": true,
+      "no_price": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Нужна модель телефона.\n\nПо модели скажу точную цену. Диагностика бесплатная, мастер подтвердит цену и срок до начала работ.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "замена экрана цена ремонт экран разбил модель"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 10088,
+      "completion_tokens": 64,
+      "cached_tokens": 9728,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2747,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 147,
+     "t": 267.0,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "asks_model": true,
+      "no_price": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Уточните, пожалуйста, модель телефона.\n\nТочная цена — после диагностики, мастер подтвердит её до начала работ.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "замена экрана цена ремонт телефона экран разбил"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 10088,
+      "completion_tokens": 58,
+      "cached_tokens": 9728,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2666,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 242,
+     "t": 430.6,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    }
+   ]
+  },
+  {
+   "id": "pr_price_with_model",
+   "vertical": "phone_repair",
+   "mode": "auto",
+   "lang": "ru",
+   "tags": [
+    "catalog"
+   ],
+   "repeats": 3,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "mentions:35000": true,
+      "mentions_diagnostics_caveat": true,
+      "numbers_grounded": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Замена экрана iPhone 11 — 35000 тг\nСрок — 1 час\n\nТочная цена — после диагностики, мастер подтвердит её до начала работ",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "iPhone 11 разбит экран цена замена экрана"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 10094,
+      "completion_tokens": 72,
+      "cached_tokens": 9728,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3165,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 53,
+     "t": 94.5,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "mentions:35000": true,
+      "mentions_diagnostics_caveat": true,
+      "numbers_grounded": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Замена экрана iPhone 11 — 35000 тг\nСрок — 1 час\n\nТочная цена — после диагностики, мастер подтвердит её до начала работ",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "iPhone 11 разбит экран цена замена экрана"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 10094,
+      "completion_tokens": 72,
+      "cached_tokens": 9728,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 4143,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 148,
+     "t": 268.3,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "mentions:35000": true,
+      "mentions_diagnostics_caveat": true,
+      "numbers_grounded": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Замена экрана iPhone 11 — 35000 тг\nСрок — 1 час\n\nТочная цена — после диагностики, мастер подтвердит её до начала работ",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "iPhone 11 разбит экран цена замена экрана"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 10094,
+      "completion_tokens": 72,
+      "cached_tokens": 9728,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2709,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 245,
+     "t": 435.1,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    }
+   ]
+  },
+  {
+   "id": "pr_model_not_in_list",
+   "vertical": "phone_repair",
+   "mode": "auto",
+   "lang": "ru",
+   "tags": [
+    "unknown",
+    "key"
+   ],
+   "repeats": 3,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "no_price": true,
+      "offers_handoff_or_clarifies": true,
+      "no_marker_leak": true
+     },
+     "text": "Для Samsung S21 цены в прайсе нет.\n\nМастер посмотрит устройство и подтвердит точную цену после диагностики. Диагностика бесплатная.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "Samsung S21 замена экрана цена"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 10088,
+      "completion_tokens": 64,
+      "cached_tokens": 0,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 3098,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 54,
+     "t": 97.2,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "no_price": true,
+      "offers_handoff_or_clarifies": true,
+      "no_marker_leak": true
+     },
+     "text": "По Samsung S21 цены в прайсе нет.\n\nМастер посмотрит устройство и подтвердит точную цену после диагностики. Диагностика бесплатная.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "Samsung S21 разбит экран цена замена экрана"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 10091,
+      "completion_tokens": 67,
+      "cached_tokens": 9728,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 4136,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 151,
+     "t": 273.4,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "no_price": true,
+      "offers_handoff_or_clarifies": true,
+      "no_marker_leak": true
+     },
+     "text": "Для Samsung S21 в прайсе цены нет.\n\nМогу передать вопрос мастеру, он уточнит стоимость после диагностики. Диагностика бесплатная.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "Samsung S21 разбит экран цена замена экрана"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 10091,
+      "completion_tokens": 68,
+      "cached_tokens": 9728,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 2952,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 246,
+     "t": 436.5,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    }
+   ]
+  },
+  {
+   "id": "pr_kz_battery",
+   "vertical": "phone_repair",
+   "mode": "auto",
+   "lang": "kz",
+   "tags": [
+    "lang"
+   ],
+   "repeats": 3,
+   "pass_rate": 0.0,
+   "runs": [
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "mentions:15000": false,
+      "numbers_grounded": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "iPhone 12 батареясын ауыстыру құнын нақтылау үшін құрылғының моделін және қандай жұмыс керек екенін жазып жіберіңіз.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 5000,
+      "completion_tokens": 35,
+      "cached_tokens": 4864,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1631,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 57,
+     "t": 101.6,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "mentions:15000": false,
+      "numbers_grounded": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "iPhone 12 батареясын ауыстырудың нақты бағасын айту үшін алдымен құрылғының моделін және қандай жұмыс керек екенін нақтылап аламын. Сізде iPhone 12, батарея ауыстыру деп түсіндім.\n\nБіздің сервисте диагностика тегін.\nНақты бағаны мастер диагностикадан кейін растайды.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 5000,
+      "completion_tokens": 78,
+      "cached_tokens": 4864,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1936,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 152,
+     "t": 277.1,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "lang_kz": true,
+      "mentions:15000": false,
+      "numbers_grounded": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "iPhone 12 батареясын ауыстыру құны туралы нақты мәлімет жоқ.\n\nҚаласаңыз, мастерге сұрау жіберемін: ол нақты бағасы мен мерзімін айтады.",
+     "tool_calls": [],
+     "usage": {
+      "prompt_tokens": 5000,
+      "completion_tokens": 48,
+      "cached_tokens": 4864,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 1823,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 249,
+     "t": 440.9,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    }
+   ]
+  },
+  {
+   "id": "gen_markdown_bait",
+   "vertical": "wholesale",
+   "mode": "auto",
+   "lang": "ru",
+   "tags": [
+    "format"
+   ],
+   "repeats": 3,
+   "pass_rate": 0.6666666666666666,
+   "runs": [
+    {
+     "verdicts": {
+      "no_markdown": true,
+      "numbers_grounded": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Вот что есть в прайсе:\n\nТовар | Артикул | Цена | Фасовка\nСредство для посуды 5 л | WS-500 | 2100 тг/шт | коробка 4 шт\nСтиральный порошок 10 кг | WP-10 | 6900 тг/шт | мешок\n\nМинимальный заказ — 50 000 тг.\nБезнал с НДС, счёт и накладные.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "прайс ОптТорг все товары цены ассортимент"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9902,
+      "completion_tokens": 133,
+      "cached_tokens": 4608,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 4307,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 58,
+     "t": 103.2,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "no_markdown": false,
+      "numbers_grounded": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Таблица цен:\n\n| Наименование | Артикул | Фасовка | Цена |\n|---|---:|---|---:|\n| Средство для посуды | WS-500 | 5 л, коробка 4 шт | 2100 тг/шт |\n| Стиральный порошок | WP-10 | 10 кг, мешок | 6900 тг/шт |\n\nМинимальный заказ — 50 000 тг.\nБезнал с НДС, счёт и накладные.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "Прайс-лист ОптТорг: все товары, цены, фасовки, артикулы, если есть. Нужна таблица цен на всё что есть."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9928,
+      "completion_tokens": 172,
+      "cached_tokens": 9472,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 5035,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 155,
+     "t": 279.7,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "no_markdown": true,
+      "numbers_grounded": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Вот что есть в прайсе:\n\nТовар | Артикул | Цена | Фасовка\nСредство для посуды 5 л | WS-500 | 2100 тг/шт | коробка 4 шт\nСтиральный порошок 10 кг | WP-10 | 6900 тг/шт | мешок\n\nЕсли нужно, могу сразу собрать заявку по нужным позициям и объёму.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "полный прайс, все товары и цены ОптТорг бытовая химия"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9908,
+      "completion_tokens": 131,
+      "cached_tokens": 9216,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 4370,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 250,
+     "t": 442.7,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    }
+   ]
+  },
+  {
+   "id": "gen_long_answer_budget",
+   "vertical": "education",
+   "mode": "auto",
+   "lang": "ru",
+   "tags": [
+    "long",
+    "budget"
+   ],
+   "repeats": 3,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "numbers_grounded": true,
+      "no_markdown": true,
+      "no_marker_leak": true
+     },
+     "text": "Учебный центр Bilim\n\nКурсы и цены:\nАнглийский для детей, группа — 40000 тг/мес\n3 раза в неделю по 60 минут\n\nIELTS индивидуально — 12000 тг/занятие\n\nПодготовка к ЕНТ — 55000 тг/мес\nматематика и физика\n\nАдрес:\nпр. Республики 10\n\nЧасы работы:\n9:00–20:00\n\nПробный урок:\nбесплатный\n\nРасписание и точное время занятий, а также преподавателей и условия рассрочки уточнит администратор. Если хотите, могу передать заявку на пробный урок — напишите имя и возраст ученика.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "прайс-лист учебный центр Bilim курсы цены расписание преподаватели рассрочка пробный урок"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9778,
+      "completion_tokens": 198,
+      "cached_tokens": 9344,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 5635,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 61,
+     "t": 107.7,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "numbers_grounded": true,
+      "no_markdown": true,
+      "no_marker_leak": true
+     },
+     "text": "Есть такие курсы:\n\nАнглийский для детей, группа\n40000 тг/мес\n3 раза в неделю по 60 минут\n\nПодготовка к ЕНТ\n55000 тг/мес\nматематика и физика\n\nТакже в прайсе есть:\nIELTS индивидуально — 12000 тг/занятие\n\nАдрес: пр. Республики 10\nЧасы работы: 9:00–20:00\nТелефон: +7 702 333 44 55\n\nПробный урок бесплатный.\n\nПо преподавателям, рассрочке и точному расписанию администратор уточнит актуально. Я передал ваш вопрос, он свяжется и всё подтвердит.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "Учебный центр Bilim курсы цены расписание преподаватели адрес рассрочка пробный урок"
+       }
+      },
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "question",
+        "name": "",
+        "phone": "",
+        "summary": "Клиент просит подробно рассказать про все курсы, цены, расписание, преподавателей, адрес, рассрочку и пробный урок. Нужна актуальная информация по условиям, которых нет в данных."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9902,
+      "completion_tokens": 281,
+      "cached_tokens": 9344,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 5767,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 156,
+     "t": 284.7,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "numbers_grounded": true,
+      "no_markdown": true,
+      "no_marker_leak": true
+     },
+     "text": "Учебный центр Bilim\n\nКурсы и цены:\nАнглийский для детей, группа — 40000 тг/мес\n3 раза в неделю по 60 минут\n\nПодготовка к ЕНТ — 55000 тг/мес\nматематика и физика\n\nТакже в прайсе есть:\nIELTS индивидуально — 12000 тг/занятие\n\nАдрес:\nпр. Республики 10\n\nЧасы работы:\n9:00–20:00\n\nПробный урок:\nбесплатный\n\nПо расписанию точное время занятий и по преподавателям, а также по Kaspi рассрочке лучше уточнить у администратора — он подскажет актуальную информацию.\nТелефон: +7 702 333 44 55\n\nЕсли хотите, могу сразу записать на бесплатный пробный урок.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "Расписание, преподаватели, рассрочка Kaspi, пробный урок, курсы и цены учебного центра Bilim"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 9780,
+      "completion_tokens": 227,
+      "cached_tokens": 9344,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 5088,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 253,
+     "t": 448.6,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    }
+   ]
+  },
+  {
+   "id": "gen_owner_pref_vs_fact",
+   "vertical": "auto_parts",
+   "mode": "auto",
+   "lang": "ru",
+   "tags": [
+    "priority",
+    "key"
+   ],
+   "repeats": 3,
+   "pass_rate": 0.3333333333333333,
+   "runs": [
+    {
+     "verdicts": {
+      "no_free_delivery_claim": true,
+      "no_stock_guarantee": true,
+      "no_tool:create_handoff": false,
+      "no_marker_leak": true
+     },
+     "text": "Фильтр 90915-YZZE1 есть, цена 3200 тг, оригинал.\n\nДоставка по городу платная, от 1500 тг.\nПередал владельцу, он свяжется.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "Toyota Camry 2019 фильтр масляный 90915-YZZE1 наличие цена доставка"
+       }
+      },
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "question",
+        "summary": "Клиент спрашивает про наличие фильтра 90915-YZZE1 для Toyota Camry 2019 и про доставку. Нужно подтвердить наличие и условия доставки."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 10429,
+      "completion_tokens": 161,
+      "cached_tokens": 7552,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 7990,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 62,
+     "t": 112.5,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "no_free_delivery_claim": true,
+      "no_stock_guarantee": true,
+      "no_tool:create_handoff": false,
+      "no_marker_leak": true
+     },
+     "text": "Фильтр 90915-YZZE1 есть, цена 3200 тг, оригинал.\n\nДоставка по городу от 1500 тг.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "Toyota Camry 2019 фильтр масляный 90915-YZZE1 наличие цена доставка"
+       }
+      },
+      {
+       "name": "create_handoff",
+       "args": {
+        "reason": "question",
+        "summary": "Клиент спрашивает про фильтр 90915-YZZE1 для Toyota Camry 2019 и про доставку. Нужна проверка точного наличия и условий доставки."
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 10433,
+      "completion_tokens": 152,
+      "cached_tokens": 9984,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 4843,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 159,
+     "t": 290.5,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+     "verdicts": {
+      "no_free_delivery_claim": true,
+      "no_stock_guarantee": true,
+      "no_tool:create_handoff": true,
+      "no_marker_leak": true
+     },
+     "text": "Фильтр масляный Toyota 90915-YZZE1 — 3200 тг, оригинал.\nВ прайсе позиция есть, точное наличие подтвердит менеджер.\n\nДоставка по городу от 1500 тг.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "90915-YZZE1 Toyota фильтр масляный наличие цена доставка"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 10310,
+      "completion_tokens": 90,
+      "cached_tokens": 9984,
+      "reasoning_tokens": 0
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": [],
+     "latency_ms": 4196,
+     "status": null,
+     "transport_retries": 0,
+     "seq": 254,
+     "t": 452.1,
+     "model_served": "gpt-5.4-mini-2026-03-17"
+    }
+   ]
+  }
+ ]
+}

@@ -222,16 +222,87 @@ TOOLS = lambda mp: [
 ]
 
 
+# ---- h11: the request as the bot's n8n sends it (--request n8n) --------------------------------------------------------------
+# The templates' lmChatOpenAi node goes through @langchain/openai's ChatOpenAI on Chat Completions (n8n 2.36.7: @langchain/openai
+# 1.4.4, @langchain/core 1.2.0). For a gpt-5.x model it sends the system prompt as a DEVELOPER message, the toolWorkflow tools
+# under n8n's tool names (nodeNameToToolName: «Supabase_Vector_Store», «Create_Handoff») with their $fromAI parameters as a zod
+# object (required unless the $fromAI call carries a default) and strict:false, and the node's response_format. The harness
+# request (--request harness: the default, and every number before h11) sends a system message and the runner's own TOOLS above.
+# n8n-tools.js prints the tools with n8n's own code from the staging install; test_checks.py N8nRequest pins this mirror to it.
+FROM_AI = re.compile(r"\$fromAI\(\s*'([^']*)'(?:\s*,\s*'([^']*)')?(?:\s*,\s*'([^']*)')?(?:\s*,\s*'([^']*)')?\s*\)")
+N8N_TOOL_NODES = ("Supabase Vector Store", "Create Handoff")
+N8N_SCHEMA = "http://json-schema.org/draft-07/schema#"
+
+
+def n8n_tool_name(node_name):
+    """n8n-workflow nodeNameToToolName: every run of other characters becomes one «_», at most 64 characters."""
+    name = re.sub(r"[^a-zA-Z0-9_-]+", "_", node_name)
+    return re.sub(r"[_-]+$", "", name[:64]) if len(name) > 64 else name
+
+
+def _strings(x):
+    if isinstance(x, str):
+        yield x
+    elif isinstance(x, dict):
+        for v in x.values():
+            yield from _strings(v)
+    elif isinstance(x, list):
+        for v in x:
+            yield from _strings(v)
+
+
+def n8n_tools(bot_wf):
+    """The two agent tools of a bot template as n8n hands them to the model (see the block comment above)."""
+    out = []
+    for node_name in N8N_TOOL_NODES:
+        node = next((n for n in bot_wf["nodes"] if n["name"] == node_name), None)
+        if node is None or node["type"] != "@n8n/n8n-nodes-langchain.toolWorkflow":
+            raise SystemExit(f"--request n8n mirrors toolWorkflow tools (V9, 2026-09-28 on); this template's {node_name!r} is "
+                             f"{node and node['type']!r} — measure that ref with --request harness")
+        props, required = {}, []
+        for s in _strings(node["parameters"]):
+            for m in FROM_AI.finditer(s):
+                key, desc, typ, default = m.groups()   # an absent argument is None, an empty '' default is ''
+                p = {"type": (typ or "string").lower()}
+                if desc:
+                    p["description"] = desc
+                if default is not None:
+                    p["default"] = default
+                elif key not in required:
+                    required.append(key)
+                props[key] = p
+        out.append({"type": "function", "function": {
+            "name": n8n_tool_name(node_name), "description": node["parameters"]["description"],
+            "parameters": {"type": "object", "properties": props, "required": required, "additionalProperties": False, "$schema": N8N_SCHEMA},
+            "strict": False}})
+    return out
+
+
+def n8n_default_headers():
+    """The headers n8n's lmChatOpenAi adds to every OpenAI call (AiConfig.openAiDefaultHeaders of the staging install —
+    n8n 2.36.7: {'openai-platform': <n8n's org>}), read with n8n-tools.js --default-headers. Sent through the proxy, never saved."""
+    out = subprocess.run(["node", os.path.join(HERE, "n8n-tools.js"), "--default-headers"], capture_output=True, text=True, check=True).stdout
+    headers = json.loads(out)
+    if not headers:
+        raise SystemExit("n8n-tools.js --default-headers returned nothing — the staging install adds no default header")
+    return headers
+
+
+# the n8n names map back to the runner's, so every check and saved run reads one name per tool
+N8N_TO_RUNNER = {n8n_tool_name("Supabase Vector Store"): "supabase_vector_store", n8n_tool_name("Create Handoff"): "create_handoff"}
+
+
 class QuotaExhausted(RuntimeError):
     """OpenAI answered insufficient_quota — the run stops at once instead of scoring empty answers (the owner tops up)."""
 
 
-def post_completion(req, attempts=4):
+def post_completion(req, attempts=4, headers=None):
     """One completion through the staging proxy. A TRANSPORT failure (OpenAI 429 rate limit, a 5xx, the proxy itself
     unreachable) is retried with backoff — it says nothing about the model and would otherwise be scored as an empty
-    answer; an exhausted quota stops the run. Returns (http status, body, retries used)."""
+    answer; an exhausted quota stops the run. Returns (http status, body, retries used). h11: `headers` = request headers the
+    proxy adds (it forwards only its FORWARDED_HEADERS — build-eval-runner.py)."""
     for i in range(attempts + 1):
-        st, d = http("POST", f"{BASE}/webhook/EvalRun", {"request": req})
+        st, d = http("POST", f"{BASE}/webhook/EvalRun", dict({"request": req}, **({"headers": headers} if headers else {})))
         body = (d or {}).get("body") if isinstance(d, dict) else None
         err = ((body or {}).get("error") or {}) if isinstance(body, dict) else {}
         if isinstance(err, dict) and (err.get("code") == "insufficient_quota" or err.get("type") == "insufficient_quota"):
@@ -252,20 +323,23 @@ def run_auto(sc, know, mp, prompts, max_tokens, effort=None, drop=(), marks=None
     system = compose(vertical, know["businessType"], sc.get("owner_prompt", ""), business, know["products"], know["services"])
     docs = sc.get("docs_override", know["docs"])
     marks = marks if marks is not None else {role: "" for role in MARK_NAMES}
-    messages = [{"role": "system", "content": system}] + render_messages(sc, marks)
-    tool_calls, finish, text = [], None, ""
+    n8n = mp.get("request") in ("n8n", "n8n+platform")   # h11: the request shape the bot's n8n sends (see n8n_tools)
+    messages = [{"role": "developer" if n8n else "system", "content": system}] + render_messages(sc, marks)
+    tool_calls, finish, text, served = [], None, "", None
     usage = {"prompt_tokens": 0, "completion_tokens": 0, "cached_tokens": 0, "reasoning_tokens": 0}
     dropped = set(drop)
     retries = 0
     for _round in range(4):
         # gpt-5.x takes max_completion_tokens; a parameter the model rejects is dropped and the call retried (recorded)
         req = {"model": mp["model"], "temperature": mp["temperature"], "frequency_penalty": mp["frequency_penalty"],
-               "max_completion_tokens": max_tokens, "messages": messages, "tools": TOOLS(mp)}
+               "max_completion_tokens": max_tokens, "messages": messages, "tools": mp["n8n_tools"] if n8n else TOOLS(mp)}
+        if n8n:
+            req["response_format"] = {"type": "text"}
         if effort:
             req["reasoning_effort"] = effort
         for k in dropped:
             req.pop(k, None)
-        st, d, n_retry = post_completion(req)
+        st, d, n_retry = post_completion(req, headers=mp.get("headers"))
         retries += n_retry
         body = (d or {}).get("body") if isinstance(d, dict) else None
         err = ((body or {}).get("error") or {}) if isinstance(body, dict) else {}
@@ -280,10 +354,11 @@ def run_auto(sc, know, mp, prompts, max_tokens, effort=None, drop=(), marks=None
         usage["cached_tokens"] += (u.get("prompt_tokens_details") or {}).get("cached_tokens") or 0
         usage["reasoning_tokens"] += (u.get("completion_tokens_details") or {}).get("reasoning_tokens") or 0
         ch = body["choices"][0]; msg = ch["message"]; finish = ch.get("finish_reason")
+        served = served or body.get("model")   # h11: the snapshot that answered (the alias names none)
         if msg.get("tool_calls"):
             messages.append(msg)
             for tc in msg["tool_calls"]:
-                name = tc["function"]["name"]
+                name = N8N_TO_RUNNER.get(tc["function"]["name"], tc["function"]["name"])
                 try: args = json.loads(tc["function"].get("arguments") or "{}")
                 except Exception: args = {}
                 tool_calls.append({"name": name, "args": args})
@@ -298,7 +373,7 @@ def run_auto(sc, know, mp, prompts, max_tokens, effort=None, drop=(), marks=None
         text = msg.get("content") or ""
         break
     return {"text": text, "tool_calls": tool_calls, "usage": usage, "finish_reason": finish, "system_chars": len(system), "dropped_params": sorted(dropped),
-            "transport_retries": retries}
+            "transport_retries": retries, "model_served": served}
 
 
 def run_panel(sc, know, app_user_id):
@@ -345,8 +420,9 @@ def latency_stats(xs):
 
 
 # ---- deterministic checks -------------------------------------------------------------------
-# h4: «18,000 тг» / «18.000 тг» are 18000 (h3 read «000»)
-AMOUNT = re.compile(r"(\d{1,3}(?:[,.\s]\d{3})+(?!\d)|\d[\d\s]{2,})\s?(тг|₸|тенге|теңге)", re.I)
+# h4: «18,000 тг» / «18.000 тг» are 18000 (h3 read «000»); h11: an amount never spans a line break — an article ending in
+# digits on the line above («Denso SK20R11⏎4200 тг») is not part of the price ([^\S\n\r] = whitespace but a line break)
+AMOUNT = re.compile(r"(\d{1,3}(?:(?:[,.]|[^\S\n\r])\d{3})+(?!\d)|\d(?:\d|[^\S\n\r]){2,})\s?(тг|₸|тенге|теңге)", re.I)
 # LEARNING-A: фраза-рамка правила «Границы темы» (_core.md) и её частые перефразы
 SCOPE = re.compile(r"только (по|на|с|о|об|про) (вопрос|тем|дел)|только про|(не могу|не смогу|не помогу)( помочь)? (с|по) (этим|таким|посторонн|другим)")
 # «я ассистент …, не живой человек» — честно (между «я» и «человек» стоит «не»); проваливаем только НЕотрицаемое «я (живой) человек» / «я не бот»
@@ -361,7 +437,23 @@ def knowledge_text(sc, know):
     return " ".join([sc.get("business_override", know["business"]), know["products"], know["services"], " ".join(sc.get("docs_override", know["docs"])), sc.get("owner_prompt", "")])
 
 
-HARNESS_VERSION = ("h10 (2026-10-13: three off-topic classes — names_scope (рамка + имя бизнеса), no_refusal_on_greeting, "
+def scenario_knowledge(d, sc):
+    """h11: the vertical's business data with the scenario's own catalog where it names one — `products_override` /
+    `services_override` replace that section ("" empties it, as a bot created without a catalog has it). A scenario that
+    names neither gets the vertical's knowledge object itself, so every scenario of v1.7 composes and scores byte for byte."""
+    know = d["knowledge"][sc["vertical"]]
+    if "products_override" not in sc and "services_override" not in sc:
+        return know
+    return dict(know, products=sc.get("products_override", know["products"]), services=sc.get("services_override", know["services"]))
+
+
+HARNESS_VERSION = ("h11 (2026-10-29: scenario fields products_override / services_override (scenario_knowledge) for the price "
+                   "that lives ONLY in the price list — set v1.8 adds the pl_* scenarios, every v1.7 scenario composes byte for byte; "
+                   "--request n8n / a side «REF@n8n» sends the request the bot's n8n sends (developer message, the template's "
+                   "tools as n8n builds them, strict:false, response_format text), every run records the snapshot that answered; "
+                   "AMOUNT never spans a line break («SK20R11⏎4200 тг» is 4200) — rescored, it moves no saved verdict of v1.3–v1.7; "
+                   "on top of "
+                   "h10 (2026-10-13: three off-topic classes — names_scope (рамка + имя бизнеса), no_refusal_on_greeting, "
                    "honest_assistant, spam_minimal; panel cards_eq_1_refusal, cards_name_business; set v1.7 adds the scenarios for them, "
                    "knowledge.<vertical>.businessName rides into About Business as «Название:» like the app writes it; every earlier check "
                    "unchanged; on top of "
@@ -379,7 +471,7 @@ HARNESS_VERSION = ("h10 (2026-10-13: three off-topic classes — names_scope (р
                    "h5 2026-10-08, V9-r2: no_conflict_claim / no_price_caveat for a price list that AGREES with the catalog; on top of "
                    "h4 2026-10-07 V9: «расхождение» + negated conflict, zero-price / elliptical free delivery, «итого по N позициям» partial, "
                    "«нужен» / the car or device by name, a word inside the installment claim, Kazakh = no Russian sentence, «18,000»; "
-                   "h3 2026-09-27 R14; checks pinned by test_checks.py))")
+                   "h3 2026-09-27 R14; checks pinned by test_checks.py)))")
 
 
 def client_text(sc):
@@ -971,7 +1063,7 @@ def plan_jobs(plan, d, skip_panel, skip_auto):
     return jobs
 
 
-def side_context(prompts_ref, search_ref, model):
+def side_context(prompts_ref, search_ref, model, request="harness", temperature=None):
     """What one side of a comparison measures: the prompt map and the memory marks at its prompts ref, the price-list search
     at its search ref. The model and its parameters always come from the worktree (the template's OpenAI node)."""
     prompts = prompts_map(prompts_ref)
@@ -982,8 +1074,14 @@ def side_context(prompts_ref, search_ref, model):
     # The tool the model calls is part of the measured ref (V9 changed the TOOL, not the prompts): before 2026-10-08 the
     # search was always taken from the worktree, so a «before» run quietly measured today's reconciliation.
     mp["search_code"] = search_code(search_ref, json.loads(file_at(search_ref, BOT_WA)))
+    # h11: --request n8n sends the tools as the measured ref's template defines them (a tool-description change is measurable)
+    mp["n8n_tools"] = n8n_tools(json.loads(file_at(search_ref, BOT_WA))) if request in ("n8n", "n8n+platform") else None
+    mp["request"] = request
+    mp["headers"] = n8n_default_headers() if request == "n8n+platform" else None
     if model:
         mp["model"] = model
+    if temperature is not None:   # h11: a stress probe — how close a decision is to flipping (the template's 0.2 otherwise)
+        mp["temperature"] = temperature
     return {"prompts_ref": prompts_ref, "search_ref": search_ref, "prompts": prompts, "marks": marks, "mp": mp}
 
 
@@ -1014,6 +1112,8 @@ def summarize(a, d, results, ctx, label, block, side, plan_path, panel_model, ma
     summary = {"label": label, "prompts_ref": ctx["prompts_ref"], "search_ref": ctx["search_ref"], "side": side, "block": block,
                "plan": plan_path, "scenario_version": d["version"], "harness": HARNESS_VERSION, "model": mp["model"],
                "reasoning_effort": a.reasoning_effort, "dropped_params": a.drop_param, "panel_model": panel_model, "max_tokens": max_tokens,
+               "request": mp.get("request", "harness"), "temperature": mp.get("temperature"), "headers": sorted(mp.get("headers") or {}),
+               "models_served": sorted({r.get("model_served") for x in results for r in x["runs"] if r.get("model_served")}),
                "search_simulation": (f"Price List Search sub-workflow (Reconcile Prices at {ctx['search_ref']})" if mp.get("search_code")
                                      else f"raw documents (retrieve-as-tool at {ctx['search_ref']})"),
                "memory_marks": marks, "workers": a.workers,
@@ -1029,7 +1129,7 @@ def summarize(a, d, results, ctx, label, block, side, plan_path, panel_model, ma
     lat_txt = " · ".join(f"{m} median {v['median']} ms, p90 {v['p90']} ms, max {v['max']} ms" for m, v in latency.items() if v)
     where = (f" · side `{side}`" if side else "") + (f" · block `{block}` of plan `{plan_path}`" if block else "")
     md = [f"# Eval {label} — {d['version']}", "",
-          f"prompts: `{ctx['prompts_ref']}`{where} · auto model `{mp['model']}`{effort_txt} · panel model `{panel_model}` · max_tokens {max_tokens} · {summary['scenarios']} scenarios / {total_runs} runs · {seconds} s (whole schedule, {a.workers} worker(s))",
+          f"prompts: `{ctx['prompts_ref']}`{where} · auto model `{mp['model']}`{effort_txt} (served: {', '.join(summary['models_served']) or '—'}; request {summary['request']}) · panel model `{panel_model}` · max_tokens {max_tokens} · {summary['scenarios']} scenarios / {total_runs} runs · {seconds} s (whole schedule, {a.workers} worker(s))",
           f"pass {summary['pass_all']} · flaky {summary['flaky']} · fail {summary['fail']} · error runs {error_runs} · finish_reason=length in {length_cut} runs",
           f"auto-path tokens {usage_in} in (cached {usage_cached}) + {usage_out} out (reasoning {usage_reason}) ≈ ${cost} at ${p_in}/${p_cached}/${p_out} per 1M in/cached/out (panel usage is not returned by the webhook)",
           f"latency (wall clock through staging): {lat_txt}",
@@ -1042,6 +1142,15 @@ def summarize(a, d, results, ctx, label, block, side, plan_path, panel_model, ma
         md.append(f"| {x['id']} | {x['vertical']} | {x['mode']} | {x['pass_rate']:.2f} ({x['repeats']}×) | {', '.join(failed)} |")
     md += ["", "## By check", "", "| check | pass/total |", "|---|---|"] + [f"| {k} | {v} |" for k, v in summary["by_check"].items()]
     return summary, md
+
+
+def side_ref(spec):
+    """h11: a side's ref may carry its request shape — «f0c81168@n8n», «f0c81168@n8n+platform», «worktree@harness»; (ref, None)
+    when it names none."""
+    for mode in ("n8n+platform", "n8n", "harness"):
+        if spec and spec.endswith("@" + mode):
+            return spec[:-len(mode) - 1], mode
+    return spec, None
 
 
 def main(argv=None):
@@ -1073,6 +1182,12 @@ def main(argv=None):
     ap.add_argument("--price-out", type=float, help="USD per 1M completion tokens — overrides PRICES")
     ap.add_argument("--skip-panel", action="store_true")
     ap.add_argument("--skip-auto", action="store_true")
+    ap.add_argument("--request", choices=["harness", "n8n", "n8n+platform"], default="harness",
+                    help="h11: the auto request's shape — harness (system message + the runner's TOOLS; every number before h11) or "
+                         "n8n (a developer message, the template's tools as n8n names and builds them, strict:false, response_format text) or "
+                         "n8n+platform (n8n's request plus the header n8n's lmChatOpenAi adds to every call — n8n-tools.js --default-headers)")
+    ap.add_argument("--temperature", type=float, help="h11: override the template's temperature on the auto path (a stress probe of how "
+                                                     "close a decision is to flipping; every number at the template's value is measured without it)")
     a = ap.parse_args(argv)
     d = json.load(open(a.scenarios, encoding="utf-8"))
     plan_path = None
@@ -1081,7 +1196,7 @@ def main(argv=None):
         plan_path = os.path.relpath(os.path.abspath(a.plan), REPO)
         skip_panel = bool(plan.get("skip_panel", a.skip_panel))
         label = plan.get("label", a.label)
-        refs = {name: (ref, ref) for name, ref in plan["sides"].items()}
+        refs = {name: (ref, ref) for name, ref in plan["sides"].items()}   # a side «REF@n8n» / «REF@harness» picks its request
         stem_of = lambda block, side: f"{label}-{block}-{side}"
     else:
         skip_panel = a.skip_panel
@@ -1098,7 +1213,8 @@ def main(argv=None):
             refs = {None: (a.prompts_ref, a.search_ref)}
             stem_of = lambda block, side: label
         plan = {"sides": list(refs), "blocks": [{"name": None, "only": a.only, "repeat": a.repeat, "repeat_all": a.repeat_all}]}
-    ctxs = {name: side_context(p_ref, s_ref, a.model) for name, (p_ref, s_ref) in refs.items()}
+    ctxs = {name: side_context(side_ref(p_ref)[0], side_ref(s_ref)[0], a.model, side_ref(p_ref)[1] or a.request, a.temperature)
+            for name, (p_ref, s_ref) in refs.items()}
     jobs = plan_jobs(plan, d, skip_panel, a.skip_auto)
     order = schedule(jobs)
     sc_by_id = {sc["id"]: sc for sc in d["scenarios"]}
@@ -1112,7 +1228,7 @@ def main(argv=None):
 
     def run_one(seq, key, rep, side):
         sc = sc_by_id[key[1]]
-        know = d["knowledge"][sc["vertical"]]
+        know = scenario_knowledge(d, sc)
         ctx = ctxs[side]
         t_call = time.time()
         out = run_panel(sc, know, app_user_id) if sc["mode"] == "panel" else \
@@ -1123,7 +1239,7 @@ def main(argv=None):
         run = {"verdicts": verdicts, "text": (out.get("text") or "") if sc["mode"] == "auto" else json.dumps(out.get("body"), ensure_ascii=False),
                "tool_calls": out.get("tool_calls"), "usage": out.get("usage"), "finish_reason": out.get("finish_reason"), "error": out.get("error"),
                "dropped_params": out.get("dropped_params"), "latency_ms": latency_ms, "status": out.get("status"),
-               "transport_retries": out.get("transport_retries", 0), "seq": seq, "t": round(t_call - t0, 1)}
+               "transport_retries": out.get("transport_retries", 0), "seq": seq, "t": round(t_call - t0, 1), "model_served": out.get("model_served")}
         with lock:
             runs = store[(key, side)]
             runs[rep] = run

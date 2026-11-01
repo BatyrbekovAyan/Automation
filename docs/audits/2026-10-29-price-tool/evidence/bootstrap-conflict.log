@@ -1,0 +1,49 @@
+start 01:48:10
+2. server up at http://localhost:5678 (pid 14910, log /Users/ayan/.n8n-staging/n8n.log)
+3. API key already present
+   canon: f0c81168 (git archive -> /var/folders/65/d93rj7qn5csdsm10l1l8t4jm0000gn/T/canon-ref-ybnzoslb/Tools/n8n/workflows)
+   staging isolation: KoTuIlk4LMrlvnWI-Upload_File.json: ['Supabase Vector Store (+3 sub-nodes)', 'Store Original File']
+   staging isolation: ZTqpumOpL1rNDOp6-Delete_File.json: ['Delete Stored Original']
+   staging price search: crPriceSearch001-Price_List_Search.json: ['Search Price Lists (+1 sub-nodes)']
+   staging isolation: lmjYsdNcQA2IE5rl-Delete_Bot_Files.json: ['Delete Stored Original']
+   31 workflows + 2 staging bots -> /Users/ayan/Projects/Automation/.claude/worktrees/friendly-elion-21cc7d/Tools/n8n/workflows-staging
+   n8n base http://localhost:5678; Wappi -> http://127.0.0.1:8765; postgres -> 'Postgres Staging' (stgPostgres000001)
+   note: left dangling on purpose (isolation): ['Support Bot']
+   Skipping invalid workflow file: /Users/ayan/Projects/Automation/.claude/worktrees/friendly-elion-21cc7d/Tools/n8n/workflows-staging/_manifest.json
+   Importing 33 workflows...
+   Deactivating workflow "Set Workflow State".
+   Deactivating workflow "Dashboard Outcomes".
+   Deactivating workflow "Delete Orphan Profiles".
+   Deactivating workflow "Edit Whatsapp Workflow".
+   Deactivating workflow "Suggest Replies".
+   Deactivating workflow "Upload File".
+   Deactivating workflow "Set Reply Mode".
+   Deactivating workflow "Edit Telegram Workflow".
+   Deactivating workflow "CreateTelegramWorkflow".
+   Deactivating workflow "CreateWhatsappWorkflow".
+   Deactivating workflow "RevenueCat Events".
+   Deactivating workflow "Delete File".
+   Deactivating workflow "Auth Session".
+   Deactivating workflow "Channel Watch".
+   Deactivating workflow "Handoff Request (dry)".
+   Deactivating workflow "Handoff Notifier".
+   Deactivating workflow "Handoff Request".
+   Deactivating workflow "Handoffs".
+   Deactivating workflow "Price List Search".
+   Deactivating workflow "Set Schedule".
+   Deactivating workflow "Test Dialog".
+   Deactivating workflow "Verify Identity".
+   Deactivating workflow "Wappi Proxy".
+   Deactivating workflow "Profile Lifecycle Sweep".
+   Deactivating workflow "Landing Lead".
+   Deactivating workflow "Get Usage".
+   Deactivating workflow "Delete Bot Files".
+   Deactivating workflow "Support Message".
+   Deactivating workflow "STAGING Eval Runner".
+   Deactivating workflow "STAGING TG stgtg001".
+   Deactivating workflow "STAGING WA stgwa001".
+   Successfully imported 33 workflows.
+5. imported 31 workflows + 2 staging bots; published 31
+2. server up at http://localhost:5678 (pid 15401, log /Users/ayan/.n8n-staging/n8n.log)
+staging ready: http://localhost:5678
+exit 0 01:50:06

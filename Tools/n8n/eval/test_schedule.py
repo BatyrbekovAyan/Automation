@@ -249,7 +249,7 @@ class MainRunsTheSchedule(unittest.TestCase):
         self.main(["--label", "t", "--only", f"{A6},{U1}", "--repeat", "2", "--repeat-all", "--skip-panel", "--results-dir", self.tmp])
         self.assertEqual([s for s, _ in self.seen()], [A6, U1, A6, U1])
         J = json.load(open(os.path.join(self.tmp, "t.json"), encoding="utf-8"))
-        self.assertTrue(J["summary"]["harness"].startswith("h10"))   # h10 (2026-10-13, learning A) adds the off-topic checks; the schedule is h8's
+        self.assertTrue(J["summary"]["harness"].startswith("h11"))   # h11 (2026-10-29) adds products/services overrides; the schedule is h8's
         self.assertEqual([x["id"] for x in J["results"]], [A6, U1], "result files keep the scenario-file order")
         self.assertEqual([r["seq"] for r in J["results"][0]["runs"]], [0, 2])
 
@@ -273,6 +273,38 @@ class MainRunsTheSchedule(unittest.TestCase):
             self.assertEqual(J["summary"]["runs"], 4)
             self.assertEqual([len(x["runs"]) for x in J["results"]], [2, 2])
             self.assertTrue(all(r["verdicts"]["mentions:15"] for r in J["results"][0]["runs"]))
+
+    def test_a_side_can_carry_its_request_shape(self):
+        """h11: «REF@harness» / «REF@n8n» — the same prompts in both request shapes, in one interleaved schedule."""
+        shapes = []
+
+        def spy(method, url, body=None, timeout=120):
+            req = body["request"]
+            shapes.append((req["messages"][0]["role"], req["tools"][0]["function"]["name"], "response_format" in req))
+            return self.fake(method, url, body, timeout)
+        M.http = spy
+        self.main(["--label", "t", "--side", "h=worktree@harness", "--side", "n=worktree@n8n", "--only", A6, "--repeat", "2",
+                   "--repeat-all", "--skip-panel", "--results-dir", self.tmp])
+        self.assertEqual(sorted(set(shapes)), [("developer", "Supabase_Vector_Store", True), ("system", "supabase_vector_store", False)])
+        self.assertEqual(len(shapes), 4)
+        for side, mode in (("h", "harness"), ("n", "n8n")):
+            J = json.load(open(os.path.join(self.tmp, f"t-{side}.json"), encoding="utf-8"))
+            self.assertEqual((J["summary"]["prompts_ref"], J["summary"]["request"], J["summary"]["runs"]), ("worktree", mode, 2))
+
+    def test_temperature_override_reaches_the_request(self):
+        """h11 --temperature: a stress probe; without it every request carries the template's value."""
+        temps = []
+
+        def spy(method, url, body=None, timeout=120):
+            temps.append(body["request"]["temperature"])
+            return self.fake(method, url, body, timeout)
+        M.http = spy
+        self.main(["--label", "t", "--only", A6, "--skip-panel", "--results-dir", self.tmp, "--temperature", "1.0"])
+        self.main(["--label", "u", "--only", A6, "--skip-panel", "--results-dir", self.tmp])
+        template = M.model_params("worktree")["temperature"]
+        self.assertEqual(temps, [1.0, template])
+        J = json.load(open(os.path.join(self.tmp, "t.json"), encoding="utf-8"))
+        self.assertEqual(J["summary"]["temperature"], 1.0)
 
     def test_a_plan_writes_one_file_per_block_and_side(self):
         plan = {"label": "p", "sides": {"pre": PRE_T6, "now": "worktree"}, "skip_panel": True,

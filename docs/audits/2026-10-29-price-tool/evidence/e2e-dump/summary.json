@@ -1,0 +1,83 @@
+{
+ "note": "the e2e-auth retired_bot_reconnects_after_purchase model steps of 2026-10-29 23:49–23:57 (e2e-dump.py), canon main f0c81168; one row per model-step execution — every first call: the same input (tokens, messages hash), misses and hits differ only in the model's answer. Two raw executions kept (one miss, one hit), the org id of n8n's default header redacted.",
+ "executions": [
+  {
+   "file": "run1/exec-02-48291.json",
+   "execution": "48291",
+   "searched": true,
+   "openai_calls": 2,
+   "first_prompt_tokens": 4795,
+   "first_finish": "tool_calls",
+   "model": "gpt-5.4-mini-2026-03-17",
+   "service_tier": "default",
+   "system_fingerprint": null,
+   "first_call_messages_sha256": "21671a360d5a03d1",
+   "reply": "Букет «Нежность» — 18 500 ₸.\n\nПо времени в пятницу к 18:00 я уже зафиксировал пожелание, точное время доставки подтвердит флорист."
+  },
+  {
+   "file": "run1/exec-04-48310.json",
+   "execution": "48310",
+   "searched": false,
+   "openai_calls": 1,
+   "first_prompt_tokens": 4795,
+   "first_finish": "stop",
+   "model": "gpt-5.4-mini-2026-03-17",
+   "service_tier": "default",
+   "system_fingerprint": null,
+   "first_call_messages_sha256": "21671a360d5a03d1",
+   "reply": "В пятницу к 18:00.\n\nПо цене подскажу после уточнения у флориста: наличие и стоимость букета «Нежность» он подтвердит при оформлении."
+  },
+  {
+   "file": "run2/exec-02-48334.json",
+   "execution": "48334",
+   "searched": false,
+   "openai_calls": 1,
+   "first_prompt_tokens": 4795,
+   "first_finish": "stop",
+   "model": "gpt-5.4-mini-2026-03-17",
+   "service_tier": "default",
+   "system_fingerprint": null,
+   "first_call_messages_sha256": "21671a360d5a03d1",
+   "reply": "Во сколько именно привезут в пятницу, флорист подтвердит при оформлении.\n\nПо цене букета «Нежность» сейчас уточню у флориста — если хотите, могу сразу передать заказ."
+  },
+  {
+   "file": "run2/exec-04-48350.json",
+   "execution": "48350",
+   "searched": true,
+   "openai_calls": 2,
+   "first_prompt_tokens": 4795,
+   "first_finish": "tool_calls",
+   "model": "gpt-5.4-mini-2026-03-17",
+   "service_tier": "default",
+   "system_fingerprint": null,
+   "first_call_messages_sha256": "21671a360d5a03d1",
+   "reply": "Букет «Нежность» — 18 500 ₸\n\nПо пятнице время доставки подтвердит флорист, точное время я не назначаю."
+  },
+  {
+   "file": "run3/exec-02-48375.json",
+   "execution": "48375",
+   "searched": false,
+   "openai_calls": 1,
+   "first_prompt_tokens": 4795,
+   "first_finish": "stop",
+   "model": "gpt-5.4-mini-2026-03-17",
+   "service_tier": "default",
+   "system_fingerprint": null,
+   "first_call_messages_sha256": "21671a360d5a03d1",
+   "reply": "В пятницу к 18:00.\n\nПо цене подскажу после уточнения у флориста — наличие и стоимость букета «Нежность» он подтвердит при оформлении."
+  },
+  {
+   "file": "run3/exec-04-48391.json",
+   "execution": "48391",
+   "searched": false,
+   "openai_calls": 1,
+   "first_prompt_tokens": 4795,
+   "first_finish": "stop",
+   "model": "gpt-5.4-mini-2026-03-17",
+   "service_tier": "default",
+   "system_fingerprint": null,
+   "first_call_messages_sha256": "21671a360d5a03d1",
+   "reply": "В пятницу к 18:00.\n\nПо цене подскажет флорист при оформлении — наличие и точную стоимость подтвердит он."
+  }
+ ]
+}

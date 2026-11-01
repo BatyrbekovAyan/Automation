@@ -35,7 +35,7 @@ PASS, FAIL = True, False
 def verdict(name, scenario_id, text, tool_calls=(), **scenario_patch):
     sc = copy.deepcopy(SC[scenario_id])
     sc.update(scenario_patch)
-    know = DATA["knowledge"][sc["vertical"]]
+    know = M.scenario_knowledge(DATA, sc)
     return M.check(name, sc, know, {"text": text, "tool_calls": list(tool_calls)})
 
 
@@ -490,6 +490,22 @@ class NoPriceCaveat(Table, unittest.TestCase):
         self.assertEqual(M.simulate_search(sc["docs_override"], system, M.model_params("worktree")), {"documents": sc["docs_override"]})
 
 
+class NumbersGrounded(Table, unittest.TestCase):
+    """h11 (2026-10-29): an amount never spans a line break. Until h11 `AMOUNT` let a number run over «\\n», so an article
+    that ENDS in digits on the line above the price glued onto it: «Denso SK20R11⏎4200 тг/шт» was read as 114200 тг and
+    failed (pt-now-pl-n8n, 3 of 8 runs of pl_spark_plugs_auto_parts — the answers were right)."""
+    check_name = "numbers_grounded"
+    PL = "pl_spark_plugs_auto_parts"
+    rows = [
+        (PL, "Да, есть.\n\nСвечи зажигания Denso SK20R11\n4200 тг/шт", SEARCH, PASS, "the article on the line above the price (pt-now-pl-n8n)"),
+        (PL, "Свечи зажигания Denso SK20R11 — 4200 тг/шт", SEARCH, PASS, "one line"),
+        (PL, "Свечи зажигания Denso SK20R11\n4 200 тг/шт", SEARCH, PASS, "a space-grouped price on its own line"),
+        (PL, "Свечи зажигания Denso SK20R11\n4900 тг/шт", SEARCH, FAIL, "an invented price on its own line stays invented"),
+        (PL, "Свечи — 4 900 тг/шт", SEARCH, FAIL, "an invented space-grouped price"),
+        ("ws_list_of_items", "Средство для посуды 5 л — 2100 тг/шт\n20 шт = 42 000 тг", SEARCH, PASS, "qty × price is still grounded"),
+    ]
+
+
 class PanelChecks(unittest.TestCase):
     """h4 (V9, 2026-09-28): «18,000 тг» is 18000 (h3 read «000»), and the panel's Kazakh check reads sentences too."""
     rows = [
@@ -655,9 +671,11 @@ class ScenarioSetV14(unittest.TestCase):
     def test_version(self):
         # v1.5 (T11b) keeps every v1.4 role and adds checks only (ScenarioSetV15 below); v1.6 (2026-10-13) adds four panel
         # scenarios only (PanelConditionChecks below) — an auto number of v1.5 and v1.6 is the same set, a panel number is not;
-        # v1.7 (2026-10-13, learning A) adds the 20 off-topic scenarios (ot_*/hb_*/pn_ot_*) — numbers of v1.6 and v1.7 differ on both sides
-        self.assertTrue(DATA["version"].startswith("v1.7"), DATA["version"])
-        self.assertFalse(DATA["version"].startswith(("v1.4", "v1.5", "v1.6")), "the set changed — compare numbers within one version")
+        # v1.7 (2026-10-13, learning A) adds the 20 off-topic scenarios (ot_*/hb_*/pn_ot_*) — numbers of v1.6 and v1.7 differ on both sides;
+        # v1.8 (2026-10-29) adds the 8 auto pl_* scenarios only (ScenarioSetV18 below) — a per-scenario number of a v1.7 scenario is
+        # the same in v1.8, a whole-set number is not
+        self.assertTrue(DATA["version"].startswith("v1.8"), DATA["version"])
+        self.assertFalse(DATA["version"].startswith(("v1.4", "v1.5", "v1.6", "v1.7")), "the set changed — compare numbers within one version")
 
     def test_q1_business_turns_are_owner_turns(self):
         for sc in DATA["scenarios"]:
@@ -923,6 +941,12 @@ NO_HANDOFF = {
     "ot_spam_auto_parts": "спам: одно слово, не заявка", "ot_spam_flowers": "спам: одно слово, не заявка",
     "ot_spam_education": "спам: одно слово, не заявка",
     "hb_human_auto_parts": "вопрос «вы бот?»: честный ответ, не заявка", "hb_human_flowers": "вопрос «вы бот?»: честный ответ, не заявка",
+    # v1.8 (2026-10-29): a price that lives only in the price list — the search answers it, nothing for the owner to do
+    "pl_51_roses_flowers": "price in the price list", "pl_51_roses_kz_flowers": "price in the price list",
+    "pl_iphone13_screen_phone_repair": "model and repair named, price in the price list",
+    "pl_ielts_individual_education": "who and the goal named, price in the price list",
+    "pl_spark_plugs_auto_parts": "the car named, price in the price list", "pl_empty_plain_flowers": "price in the price list",
+    "pl_empty_memory_flowers": "price in the price list", "pl_empty_reask_flowers": "re-ask of the agreed time + price in the price list",
 }
 HANDOFF_IN_DESIGN = {
     # the scenario requires the request (tool_called)
@@ -1066,12 +1090,178 @@ class RescoreV13UnderH7(unittest.TestCase):
         self.assertGreaterEqual(files, 40, "the saved v1.3 runs (q1a-/q1b-/q1c-/v9r3-) are the material")
 
 
+class ScenarioSetV18(unittest.TestCase):
+    """Set v1.8 (2026-10-29): the price that lives ONLY in the price list. Until v1.7 every price an auto scenario asked was
+    also in the manual catalog, so the price-list search was optional in all of them and no scenario could see the bot
+    skipping it — which e2e-auth's retired_bot_reconnects_after_purchase did on 2026-10-29 (6 of 6 runs: «цену уточнит
+    флорист» instead of 18 500 from the price list)."""
+    V17_REF = "45b08d62"   # the last commit that carries scenarios v1.7
+    PL = ("pl_51_roses_flowers", "pl_51_roses_kz_flowers", "pl_iphone13_screen_phone_repair", "pl_ielts_individual_education",
+          "pl_spark_plugs_auto_parts", "pl_empty_plain_flowers", "pl_empty_memory_flowers", "pl_empty_reask_flowers")
+
+    def test_v17_scenarios_and_their_knowledge_are_unchanged(self):
+        v17 = json.loads(M.file_at(self.V17_REF, "Tools/n8n/eval/scenarios.v1.json"))
+        self.assertTrue(v17["version"].startswith("v1.7"))
+        self.assertEqual(v17["knowledge"], DATA["knowledge"])
+        self.assertEqual(v17["scenarios"], DATA["scenarios"][:len(v17["scenarios"])])
+        for sc in v17["scenarios"]:
+            self.assertIs(M.scenario_knowledge(DATA, sc), DATA["knowledge"][sc["vertical"]], sc["id"])
+
+    def test_the_new_scenarios(self):
+        new = [s["id"] for s in DATA["scenarios"][len(json.loads(M.file_at(self.V17_REF, "Tools/n8n/eval/scenarios.v1.json"))["scenarios"]):]]
+        self.assertEqual(tuple(new), self.PL)
+        for sid in self.PL:
+            with self.subTest(scenario=sid):
+                self.assertEqual(SC[sid]["mode"], "auto")
+                self.assertIn("price_list", SC[sid]["tags"])
+                self.assertIn(sid, NO_HANDOFF)
+
+    def test_the_price_lives_only_in_the_price_list(self):
+        """The premise: the asked price is in the scenario's documents and nowhere in the data the system message carries
+        (About Business, Products, Services) — so an answer that states it either searched or invented it (numbers_grounded)."""
+        for sid in self.PL:
+            sc = SC[sid]
+            know = M.scenario_knowledge(DATA, sc)
+            price = next(int(e.split(":", 1)[1]) for e in sc["expect"] if e.startswith("mentions:") and ":" not in e.split(":", 1)[1])
+            docs = "\n".join(sc.get("docs_override", know["docs"]))
+            prompt_data = "\n".join([sc.get("business_override", know["business"]), know["products"], know["services"]])
+            with self.subTest(scenario=sid):
+                self.assertIn(price, M.numbers(docs))
+                self.assertNotIn(price, M.numbers(prompt_data))
+
+    def test_the_e2e_replica_is_verbatim(self):
+        """pl_empty_reask_flowers IS the model step of e2e-auth retired_bot_reconnects_after_purchase: the bot is created with an
+        empty About Business and catalog (line_create), the moved memory and price row are seed_line's defaults, the question is
+        the scenario's own. The two siblings change one thing each (no memory / no «Напомните»)."""
+        src = open(os.path.join(os.path.dirname(HERE), "staging", "e2e-auth.py"), encoding="utf-8").read()
+        seed = src.split("def seed_line(", 1)[1].split('"""', 1)[0]
+        row = seed.split('price_row="', 1)[1].split('"', 1)[0]
+        dialog = [x.split('"', 1)[0] for x in seed.split('("human", "', 1)[1:]] + [x.split('"', 1)[0] for x in seed.split('("ai", "', 1)[1:]]
+        question = src.split("def s_line_reconnect(", 1)[1].split('q = "', 1)[1].split('"', 1)[0]
+        create = src.split("def line_create(", 1)[1].split("\ndef ", 1)[0]
+        for field in ('"Business": ""', '"ProductsList": ""', '"ServicesList": ""', '"BusinessTypeId": "flowers"'):
+            self.assertIn(field, create)
+        rep = SC["pl_empty_reask_flowers"]
+        self.assertEqual(rep["docs_override"], [row])
+        self.assertEqual(rep["messages"], [["client", dialog[0]], ["business", dialog[1]], ["client", question]])
+        for sid in ("pl_empty_plain_flowers", "pl_empty_memory_flowers", "pl_empty_reask_flowers"):
+            with self.subTest(scenario=sid):
+                sc = SC[sid]
+                self.assertEqual((sc["business_override"], sc["products_override"], sc["services_override"], sc["docs_override"]), ("", "", "", [row]))
+        self.assertEqual(SC["pl_empty_memory_flowers"]["messages"][:2], rep["messages"][:2])
+        self.assertEqual(len(SC["pl_empty_plain_flowers"]["messages"]), 1)
+
+    def test_an_empty_catalog_composes_like_the_e2e_bot(self):
+        """The system message tail of a bot created with Business = ProductsList = ServicesList = "" (Set Fields)."""
+        sc = SC["pl_empty_reask_flowers"]
+        know = M.scenario_knowledge(DATA, sc)
+        system = M.compose("<prompt>", know["businessType"], sc.get("owner_prompt", ""), sc["business_override"], know["products"], know["services"])
+        self.assertTrue(system.endswith("Additional Instructions:   \n\nAbout Business: \n\nProducts:\n\n\nServices:\n"), repr(system[-90:]))
+
+
+class N8nRequest(unittest.TestCase):
+    """h11 --request n8n: the request the bot's n8n sends (n8n 2.36.7, @langchain/openai 1.4.4) — a developer message, the
+    template's tools under n8n's names with strict:false, response_format text. The harness request stays the default."""
+    BOT = os.path.join(os.path.dirname(HERE), "workflows", "4wYitz5ek30SVNlT-WhatsApp_Bot.json")
+    # n8n-tools.js against the bot template, n8n 2.36.7 staging install, 2026-10-29 — n8n's own code, not the mirror
+    SEARCH = {"type": "function", "function": {
+        "name": "Supabase_Vector_Store",
+        "description": "Retrieve product details, prices, services, and any uploaded catalog or document content for this business. Use whenever the customer asks about products, pricing, availability, or specifics that may be in uploaded documents.",
+        "parameters": {"type": "object", "properties": {"input": {"type": "string", "description": "Query to search for. Required"}}, "required": ["input"],
+                       "additionalProperties": False, "$schema": "http://json-schema.org/draft-07/schema#"}, "strict": False}}
+
+    def template(self):
+        with open(self.BOT, encoding="utf-8") as fh:
+            return json.load(fh)
+
+    def test_the_mirror_is_what_n8n_builds(self):
+        tools = M.n8n_tools(self.template())
+        self.assertEqual(tools[0], self.SEARCH)
+        h = tools[1]["function"]
+        self.assertEqual((h["name"], h["parameters"]["required"], list(h["parameters"]["properties"])),
+                         ("Create_Handoff", ["summary"], ["reason", "name", "phone", "summary"]))
+        self.assertEqual([h["parameters"]["properties"][k].get("default") for k in ("reason", "name", "phone", "summary")], ["question", "", "", None])
+        self.assertIs(h["strict"], False)
+
+    def test_the_mirror_matches_n8n_own_code(self):
+        nm = os.path.join(os.path.expanduser(os.environ.get("N8N_STAGING_HOME", "~/.n8n-staging")), "app", "node_modules")
+        if not os.path.isdir(nm):
+            self.skipTest("no staging n8n install to build the tools with")
+        import subprocess
+        out = subprocess.run(["node", os.path.join(HERE, "n8n-tools.js"), self.BOT], capture_output=True, text=True, check=True).stdout
+        theirs = [json.loads(line) for line in out.splitlines() if line.strip()]
+        self.assertEqual(json.dumps(M.n8n_tools(self.template()), ensure_ascii=False), json.dumps(theirs, ensure_ascii=False))
+
+    def capture(self, request, replies, headers=None):
+        sent, sent_headers = [], []
+        real = M.post_completion
+
+        def fake(req, attempts=4, headers=None):
+            sent.append(copy.deepcopy(req))
+            sent_headers.append(headers)
+            return 200, {"status": 200, "body": replies.pop(0)}, 0
+        M.post_completion = fake
+        try:
+            mp = dict(M.model_params("worktree"), request=request, headers=headers,
+                      n8n_tools=M.n8n_tools(self.template()) if request in ("n8n", "n8n+platform") else None)
+            sc = SC["pl_empty_reask_flowers"]
+            out = M.run_auto(sc, M.scenario_knowledge(DATA, sc), mp, {"flowers": "<prompt>"}, 200)
+        finally:
+            M.post_completion = real
+        self.sent_headers = sent_headers
+        return sent, out
+
+    def test_platform_mode_is_the_n8n_request_plus_the_header(self):
+        answer = lambda: {"choices": [{"finish_reason": "stop", "message": {"role": "assistant", "content": "x"}}], "usage": {}}
+        n8n, _ = self.capture("n8n", [answer()])
+        plat, _ = self.capture("n8n+platform", [answer()], headers={"openai-platform": "org-test"})
+        self.assertEqual(plat, n8n, "the same request body")
+        self.assertEqual(self.sent_headers, [{"openai-platform": "org-test"}])
+        self.assertEqual(M.side_ref("f0c81168@n8n+platform"), ("f0c81168", "n8n+platform"))
+
+    def test_the_proxy_forwards_only_client_identity_headers(self):
+        """The bot's transport headers (n8n's openai-platform + the @langchain/openai SDK's identity headers) — never a credential."""
+        spec = importlib.util.spec_from_file_location("build_eval_runner", os.path.join(HERE, "build-eval-runner.py"))
+        B = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(B)
+        self.assertIn("openai-platform", B.FORWARDED_HEADERS)
+        self.assertIn("user-agent", B.FORWARDED_HEADERS)
+        self.assertTrue(all(h == h.lower() for h in B.FORWARDED_HEADERS))
+        self.assertFalse({"authorization", "openai-organization", "openai-project", "cookie", "x-n8n-api-key"} & set(B.FORWARDED_HEADERS))
+        with open(os.path.join(os.path.dirname(HERE), "staging", "workflows", "stgEvalRunner001-Eval_Runner.json"), encoding="utf-8") as fh:
+            fwd = next(n for n in json.load(fh)["nodes"] if n["name"] == "Forward")["parameters"]
+        self.assertEqual((fwd["sendHeaders"], fwd["specifyHeaders"], fwd["jsonHeaders"]), (True, "json", B.JSON_HEADERS),
+                         "the committed staging workflow is the builder's output — re-run build-eval-runner.py")
+
+    def test_n8n_request_shape(self):
+        call = {"choices": [{"finish_reason": "tool_calls", "message": {"role": "assistant", "content": None, "tool_calls": [
+            {"id": "c1", "type": "function", "function": {"name": "Supabase_Vector_Store", "arguments": "{\"input\": \"Нежность цена\"}"}}]}}],
+                "model": "gpt-5.4-mini-2026-03-17", "usage": {}}
+        answer = {"choices": [{"finish_reason": "stop", "message": {"role": "assistant", "content": "Букет «Нежность» — 18 500 ₸."}}],
+                  "model": "gpt-5.4-mini-2026-03-17", "usage": {}}
+        sent, out = self.capture("n8n", [call, answer])
+        first = sent[0]
+        self.assertEqual(first["messages"][0]["role"], "developer")
+        self.assertEqual(first["response_format"], {"type": "text"})
+        self.assertEqual([t["function"]["name"] for t in first["tools"]], ["Supabase_Vector_Store", "Create_Handoff"])
+        self.assertEqual([c["name"] for c in out["tool_calls"]], ["supabase_vector_store"], "the n8n name maps back to the runner's")
+        self.assertEqual(out["model_served"], "gpt-5.4-mini-2026-03-17")
+        self.assertEqual(sent[1]["messages"][-1]["role"], "tool")
+
+    def test_the_harness_request_is_unchanged(self):
+        answer = {"choices": [{"finish_reason": "stop", "message": {"role": "assistant", "content": "x"}}], "usage": {}}
+        sent, _ = self.capture("harness", [answer])
+        self.assertEqual(sent[0]["messages"][0]["role"], "system")
+        self.assertNotIn("response_format", sent[0])
+        self.assertEqual(sent[0]["tools"], M.TOOLS(M.model_params("worktree")))
+
+
 class EveryExpectedCheckExists(unittest.TestCase):
     def test_no_scenario_names_an_unknown_check(self):
         # an unknown name returns None, which the runner counts as «not failed» — a typo would pass silently forever
         missing = []
         for sc in DATA["scenarios"]:
-            know = DATA["knowledge"][sc["vertical"]]
+            know = M.scenario_knowledge(DATA, sc)
             for name in sc["expect"]:
                 if sc["mode"] == "panel":
                     v = M.check_panel(name, sc, know, {"status": 200, "body": {"suggestions": [{"text": "x", "label": "x", "move": "Ответ"}]}})

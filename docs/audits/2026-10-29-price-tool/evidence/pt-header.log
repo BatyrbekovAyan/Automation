@@ -1,0 +1,84 @@
+start 23:36:58
+PASS  ap_price_without_car                 1.00  b24/platform  
+PASS  ap_price_without_car                 1.00  b24/n8n  
+PASS  ap_price_with_car                    1.00  b24/n8n  
+PASS  ap_sku_exact_kz                      1.00  b24/platform  
+PASS  ap_price_with_car                    1.00  b24/platform  
+PASS  ap_sku_exact_kz                      1.00  b24/n8n  
+PASS  ap_unknown_part                      1.00  b24/n8n  
+PASS  ap_unknown_part                      1.00  b24/platform  
+PASS  ap_handoff_fail                      1.00  b24/platform  
+PASS  ap_handoff_fail                      1.00  b24/n8n  
+PASS  ap_source_conflict                   1.00  b24/n8n  
+PASS  ap_source_conflict                   1.00  b24/platform  
+PASS  ap_price_agrees_analogues            1.00  b24/platform  
+PASS  ap_price_agrees_analogues            1.00  b24/n8n  
+FAIL  ws_list_of_items                     0.00  b24/n8n  failed: no_tool:create_handoff
+FLAKY ws_list_of_items                     0.50  b24/platform  failed: no_tool:create_handoff
+PASS  ws_mixed_lang                        1.00  b24/platform  
+PASS  ws_mixed_lang                        1.00  b24/n8n  
+PASS  fl_absent_item                       1.00  b24/n8n  
+PASS  fl_absent_item                       1.00  b24/platform  
+FLAKY fl_kz_price                          0.50  b24/platform  failed: lang_kz
+FLAKY fl_kz_price                          0.50  b24/n8n  failed: lang_kz
+PASS  fl_installment_unknown               1.00  b24/n8n  
+PASS  fl_installment_unknown               1.00  b24/platform  
+PASS  ks_installment_terms                 1.00  b24/platform  
+PASS  ks_installment_terms                 1.00  b24/n8n  
+PASS  ks_variant_clarify                   1.00  b24/n8n  
+PASS  ks_variant_clarify                   1.00  b24/platform  
+PASS  ks_kz_availability                   1.00  b24/platform  
+PASS  ks_kz_availability                   1.00  b24/n8n  
+PASS  ed_schedule_unknown                  1.00  b24/n8n  
+FLAKY ed_kz_parent                         0.50  b24/platform  failed: lang_kz, no_tool:create_handoff
+PASS  ed_schedule_unknown                  1.00  b24/platform  
+FAIL  ed_kz_parent                         0.00  b24/n8n  failed: lang_kz, no_tool:create_handoff
+PASS  pr_price_no_model                    1.00  b24/n8n  
+FAIL  pr_price_no_model                    0.00  b24/platform  failed: asks_model, no_price
+PASS  pr_price_with_model                  1.00  b24/platform  
+PASS  pr_price_with_model                  1.00  b24/n8n  
+PASS  pr_model_not_in_list                 1.00  b24/n8n  
+PASS  pr_model_not_in_list                 1.00  b24/platform  
+FAIL  pr_kz_battery                        0.00  b24/platform  failed: mentions:15000
+PASS  pr_kz_battery                        1.00  b24/n8n  
+PASS  gen_markdown_bait                    1.00  b24/n8n  
+FAIL  gen_markdown_bait                    0.00  b24/platform  failed: no_markdown
+PASS  gen_long_answer_budget               1.00  b24/platform  
+PASS  gen_long_answer_budget               1.00  b24/n8n  
+PASS  gen_owner_pref_vs_fact               1.00  b24/n8n  
+PASS  gen_owner_pref_vs_fact               1.00  b24/platform  
+PASS  pl_51_roses_flowers                  1.00  pl/platform  
+PASS  pl_51_roses_flowers                  1.00  pl/n8n  
+PASS  pl_51_roses_kz_flowers               1.00  pl/platform  
+PASS  pl_51_roses_kz_flowers               1.00  pl/n8n  
+PASS  pl_iphone13_screen_phone_repair      1.00  pl/n8n  
+PASS  pl_iphone13_screen_phone_repair      1.00  pl/platform  
+PASS  pl_ielts_individual_education        1.00  pl/n8n  
+PASS  pl_ielts_individual_education        1.00  pl/platform  
+PASS  pl_spark_plugs_auto_parts            1.00  pl/n8n  
+PASS  pl_spark_plugs_auto_parts            1.00  pl/platform  
+PASS  pl_empty_plain_flowers               1.00  pl/n8n  
+PASS  pl_empty_plain_flowers               1.00  pl/platform  
+PASS  pl_empty_memory_flowers              1.00  pl/platform  
+PASS  pl_empty_memory_flowers              1.00  pl/n8n  
+FLAKY pl_empty_reask_flowers               0.88  reask/n8n  failed: mentions:18:00, no_tool:create_handoff
+PASS  pl_empty_reask_flowers               1.00  reask/platform  
+
+pt-header-reask-n8n: pass 0 · flaky 1 · fail 0 · runs 16 · errors 0 · retries 0 · $0.0199
+wrote Tools/n8n/eval/results/pt-header-reask-n8n.md
+
+pt-header-reask-platform: pass 1 · flaky 0 · fail 0 · runs 16 · errors 0 · retries 0 · $0.0189
+wrote Tools/n8n/eval/results/pt-header-reask-platform.md
+
+pt-header-pl-n8n: pass 7 · flaky 0 · fail 0 · runs 28 · errors 0 · retries 0 · $0.0375
+wrote Tools/n8n/eval/results/pt-header-pl-n8n.md
+
+pt-header-pl-platform: pass 7 · flaky 0 · fail 0 · runs 28 · errors 0 · retries 0 · $0.0343
+wrote Tools/n8n/eval/results/pt-header-pl-platform.md
+
+pt-header-b24-n8n: pass 21 · flaky 1 · fail 2 · runs 48 · errors 0 · retries 0 · $0.0692
+wrote Tools/n8n/eval/results/pt-header-b24-n8n.md
+
+pt-header-b24-platform: pass 18 · flaky 3 · fail 3 · runs 48 · errors 0 · retries 0 · $0.0678
+wrote Tools/n8n/eval/results/pt-header-b24-platform.md
+exit 0 23:42:22

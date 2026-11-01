@@ -1,0 +1,14 @@
+{
+  "label": "pt-fix-focus",
+  "note": "2026-10-30, follow-up of pt-fix (docs/audits/2026-10-29-price-tool/README.md): the scenarios whose verdicts moved by 3 of 3 between the sides — the Kazakh set (ap_sku_exact_kz lost its Kazakh stock hedge 3/3 → 0/3, so lang_kz failed) and the handoff movers (ws_discount_policy_known 0 → 3 spurious handoffs, ws_list_of_items 3 → 0) — repeated to tell a shift from noise. Same sides (f0c81168@n8n vs worktree@n8n, the tool description the only difference), one interleaved schedule, harness h11, set v1.8.",
+  "sides": {
+    "before": "f0c81168@n8n",
+    "after": "worktree@n8n"
+  },
+  "skip_panel": true,
+  "blocks": [
+    {"name": "kz", "only": "ap_sku_exact_kz,ws_kz_min_order,fl_kz_price,ks_kz_availability,ed_kz_parent,pr_kz_battery,gen_kz_pure_greeting,pl_51_roses_kz", "repeat": 6},
+    {"name": "discount", "only": "ws_discount_policy_known", "repeat": 10},
+    {"name": "wslist", "only": "ws_list_of_items", "repeat": 6}
+  ]
+}
