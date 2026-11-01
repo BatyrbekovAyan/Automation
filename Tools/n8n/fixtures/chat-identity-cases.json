@@ -1,0 +1,17 @@
+{
+  "cases": [
+    {"name": "whatsapp, the chat's @lid code", "channel": "whatsapp", "chatId": "77001112233@c.us", "code": "100000000000123@lid", "expectCode": "100000000000123@lid", "expectNames": {"77001112233@c.us": true, "100000000000123@lid": true, "100000000000999@lid": false, "77009998877@c.us": false, "": false}},
+    {"name": "whatsapp, no code", "channel": "whatsapp", "chatId": "77001112233@c.us", "code": "", "expectCode": "", "expectNames": {"77001112233@c.us": true, "100000000000123@lid": false}},
+    {"name": "whatsapp, the code not given", "channel": "whatsapp", "chatId": "77001112233@c.us", "code": null, "expectCode": "", "expectNames": {"77001112233@c.us": true, "100000000000123@lid": false}},
+    {"name": "whatsapp, a code that is not a string", "channel": "whatsapp", "chatId": "77001112233@c.us", "code": 100000000000123, "expectCode": "", "expectNames": {"77001112233@c.us": true, "100000000000123@lid": false}},
+    {"name": "whatsapp, digits without the @lid suffix", "channel": "whatsapp", "chatId": "77001112233@c.us", "code": "100000000000123", "expectCode": "", "expectNames": {"77001112233@c.us": true, "100000000000123": false}},
+    {"name": "whatsapp, the suffix alone", "channel": "whatsapp", "chatId": "77001112233@c.us", "code": "@lid", "expectCode": "", "expectNames": {"77001112233@c.us": true, "@lid": false}},
+    {"name": "whatsapp, the suffix in another case", "channel": "whatsapp", "chatId": "77001112233@c.us", "code": "100000000000123@LID", "expectCode": "", "expectNames": {"100000000000123@LID": false}},
+    {"name": "whatsapp, a number is no code", "channel": "whatsapp", "chatId": "77001112233@c.us", "code": "77009998877@c.us", "expectCode": "", "expectNames": {"77001112233@c.us": true, "77009998877@c.us": false}},
+    {"name": "whatsapp, the code is the chat id itself", "channel": "whatsapp", "chatId": "77001112233@c.us", "code": "77001112233@c.us", "expectCode": "", "expectNames": {"77001112233@c.us": true, "100000000000123@lid": false}},
+    {"name": "whatsapp, a chat known only by its code", "channel": "whatsapp", "chatId": "100000000000123@lid", "code": "100000000000123@lid", "expectCode": "", "expectNames": {"100000000000123@lid": true, "100000000000999@lid": false}},
+    {"name": "telegram has no code", "channel": "telegram", "chatId": "5550001112", "code": "100000000000123@lid", "expectCode": "", "expectNames": {"5550001112": true, "100000000000123@lid": false}},
+    {"name": "an unknown channel", "channel": "sms", "chatId": "77001112233@c.us", "code": "100000000000123@lid", "expectCode": "", "expectNames": {"77001112233@c.us": true, "100000000000123@lid": false}},
+    {"name": "the channel spelled otherwise", "channel": "WhatsApp", "chatId": "77001112233@c.us", "code": "100000000000123@lid", "expectCode": "", "expectNames": {"100000000000123@lid": false}}
+  ]
+}

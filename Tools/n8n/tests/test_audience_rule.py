@@ -7,6 +7,9 @@ One home for the rule: Tools/n8n/audience.py — the constants and RULE_JS, a si
 n8n Decide Audience Code node embeds verbatim and that the app's C# ChatAudienceRule repeats. One contract:
 Tools/n8n/fixtures/audience-cases.json — {constants, cases}; the server tests here and the app's EditMode tests run the SAME
 rows (the way fixtures/schedule-cases.json feeds bot_schedule.py and ScheduleModel).
+The chat's own rows have a contract of their own: Tools/n8n/fixtures/chat-identity-cases.json — {cases: [{name, channel,
+chatId, code, expectCode, expectNames}]}, `code: null` = the code not given (the runner leaves it out). CHAT_IDENTITY_JS runs
+every row here; the app's C# twin ChatIdentity runs the SAME rows (ChatIdentityTests) — a new row goes into that file only.
 
 What runs — the REAL RULE_JS in node, through harness.code as a Code body (the way test_set_schedule.py runs a Validate
 body). No database, no n8n server, no network, never prod.
@@ -24,6 +27,8 @@ body). No database, no n8n server, no network, never prod.
                                      earlier one wins — so a twin that orders the steps differently fails the table
   rule_js_carries_the_modules_constants   the suffix list, the service ids and the Telegram chat types in RULE_JS are the module's
   missing_facts_fail_closed          a fact that is not given is unknown, never a known «no»; an unknown channel is not decided
+  chat_identity_cases_have_six_keys_and_unique_names
+                                     the second contract's shape: one top-level key, six keys per row, no duplicate name
   chat_identity_truth_table          CHAT_IDENTITY_JS: a messages/get row names the chat by its id or, on WhatsApp only, by its
                                      @lid code (something before the suffix, not the chat id itself); any other id is another chat
   chat_identity_js_is_pure           ASCII, no clock / n8n global, no placeholder, the module's suffix, one top-level name
@@ -226,24 +231,14 @@ with Case('missing_facts_fail_closed: a fact that is not given reads as unknown,
             c.check(g == unknown, f'{title}: expected personal/unknown, got {g}')
 
 # ---------------------------------------------------------------------------------------------- the chat's own rows
-WA_CHAT, WA_CODE, OTHER_CODE, TG_CHAT = '77001112233@c.us', '100000000000123@lid', '100000000000999@lid', '5550001112'
-# (title, channel, chat id, the code given, the code that counts, {id: names this chat?})
-IDENTITY = (
-    ('whatsapp, the chat\'s @lid code', 'whatsapp', WA_CHAT, WA_CODE, WA_CODE,
-     {WA_CHAT: True, WA_CODE: True, OTHER_CODE: False, '77009998877@c.us': False, '': False}),
-    ('whatsapp, no code', 'whatsapp', WA_CHAT, '', '', {WA_CHAT: True, WA_CODE: False}),
-    ('whatsapp, the code not given', 'whatsapp', WA_CHAT, None, '', {WA_CHAT: True, WA_CODE: False}),
-    ('whatsapp, a code that is not a string', 'whatsapp', WA_CHAT, 100000000000123, '', {WA_CHAT: True, WA_CODE: False}),
-    ('whatsapp, digits without the @lid suffix', 'whatsapp', WA_CHAT, '100000000000123', '', {WA_CHAT: True, '100000000000123': False}),
-    ('whatsapp, the suffix alone', 'whatsapp', WA_CHAT, '@lid', '', {WA_CHAT: True, '@lid': False}),
-    ('whatsapp, the suffix in another case', 'whatsapp', WA_CHAT, '100000000000123@LID', '', {'100000000000123@LID': False}),
-    ('whatsapp, a number is no code', 'whatsapp', WA_CHAT, '77009998877@c.us', '', {WA_CHAT: True, '77009998877@c.us': False}),
-    ('whatsapp, the code is the chat id itself', 'whatsapp', WA_CHAT, WA_CHAT, '', {WA_CHAT: True, WA_CODE: False}),
-    ('whatsapp, a chat known only by its code', 'whatsapp', WA_CODE, WA_CODE, '', {WA_CODE: True, OTHER_CODE: False}),
-    ('telegram has no code', 'telegram', TG_CHAT, WA_CODE, '', {TG_CHAT: True, WA_CODE: False}),
-    ('an unknown channel', 'sms', WA_CHAT, WA_CODE, '', {WA_CHAT: True, WA_CODE: False}),
-    ('the channel spelled otherwise', 'WhatsApp', WA_CHAT, WA_CODE, '', {WA_CODE: False}),
-)
+# The truth table lives in ONE file both twins read: this test runs CHAT_IDENTITY_JS over it, the app's ChatIdentityTests run
+# the C# ChatIdentity over the same rows. A row: (title, channel, chat id, the code given — null = not given, the code that
+# counts, {id: names this chat?}).
+IDENTITY_FIXTURE = N8N / 'fixtures' / 'chat-identity-cases.json'
+IDENTITY_DOC = json.loads(IDENTITY_FIXTURE.read_text(encoding='utf-8'))
+IDENTITY_KEYS = ('name', 'channel', 'chatId', 'code', 'expectCode', 'expectNames')
+IDENTITY = tuple((c['name'], c['channel'], c['chatId'], c['code'], c['expectCode'], c['expectNames'])
+                 for c in IDENTITY_DOC.get('cases', []) if isinstance(c, dict) and set(c) == set(IDENTITY_KEYS))
 
 
 def identity(rows):
@@ -256,9 +251,27 @@ def identity(rows):
     return [o['json'] for o in code(w, 'Identity', items=items)]
 
 
+with Case('chat_identity_cases_have_six_keys_and_unique_names: one top-level key (cases), six keys per row, no duplicate name, '
+          'an answer of the right type — the contract the app\'s ChatIdentityTests read too') as c:
+    rows = IDENTITY_DOC.get('cases')
+    c.check(set(IDENTITY_DOC) == {'cases'}, f'top-level keys {sorted(IDENTITY_DOC)}: the contract is {{cases}}')
+    c.check(isinstance(rows, list) and len(rows) >= 13, 'the truth table collapsed — every check below would pass vacuously')
+    for x in rows if isinstance(rows, list) else []:
+        title = x.get('name') if isinstance(x, dict) else repr(x)
+        c.check(isinstance(x, dict) and set(x) == set(IDENTITY_KEYS), f'{title}: the keys must be exactly {IDENTITY_KEYS}')
+        if isinstance(x, dict) and set(x) == set(IDENTITY_KEYS):
+            c.check(isinstance(x['expectCode'], str), f'{title}: expectCode must be a string («» = no code counts)')
+            c.check(isinstance(x['expectNames'], dict) and x['expectNames']
+                    and all(isinstance(v, bool) for v in x['expectNames'].values()),
+                    f'{title}: expectNames must map at least one id to true / false')
+    names = [x.get('name') for x in rows if isinstance(x, dict)] if isinstance(rows, list) else []
+    c.check(len(names) == len(set(names)), 'case names must be unique')
+    c.check(isinstance(rows, list) and len(IDENTITY) == len(rows), 'every row of the file must reach the truth table')
+
 with Case('chat_identity_truth_table: a row names the chat by its id or, on WhatsApp only, by its @lid code (a string ending in '
           'the suffix with something before it, not the chat id itself); any other id is another chat') as c:
     c.check(AUD is not None, NO_MODULE)
+    c.check(len(IDENTITY) >= 13, f'{IDENTITY_FIXTURE.name}: {len(IDENTITY)} rows read — the table collapsed')
     if AUD is not None:
         got = identity([(ch, chat, code_, ids) for _, ch, chat, code_, _, ids in IDENTITY])
         for (title, _, _, _, want_code, ids), g in zip(IDENTITY, got):
