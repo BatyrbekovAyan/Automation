@@ -163,6 +163,27 @@ public class PersonalChatSheetsWiringTests
     }
 
     [Test]
+    public void ThePill_FindsTheOpenTelegramChatsNewestMessage_WhenTheChatWasOpenedByTheTwinFormOfItsId()
+    {
+        // The «Сводка» deep link may open a Telegram chat by the server's id in its twin form, while the pill asks by the row's
+        // canonical id: both resolve to one chat, so the sheet reads the open chat, not the lagging row.
+        ChatManager manager = BareChatManager(TestBot, hosts);
+        typeof(ChatManager).GetProperty(nameof(ChatManager.ActiveChannel)).SetValue(manager, ChatChannel.Telegram);
+        OpenChat(manager, "5510000312@c.us");
+        var newest = new MessageViewModel { messageId = "new", type = MessageType.Chat, isIncoming = false, timestamp = 200 };
+        FieldInfo cache = typeof(ChatManager).GetField("_activeChatCache", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.IsNotNull(cache, "ChatManager._activeChatCache moved — update this test");
+        cache.SetValue(manager, new List<MessageViewModel> { newest });
+        Assert.AreSame(newest, manager.NewestOpenChatMessage("5510000312"), "the row's canonical id names the chat opened by its twin");
+        Assert.AreSame(newest, manager.NewestOpenChatMessage("5510000312@c.us"), "…and so does the twin itself");
+        Assert.IsNull(manager.NewestOpenChatMessage("5510000313"), "another chat: nothing");
+
+        typeof(ChatManager).GetProperty(nameof(ChatManager.ActiveChannel)).SetValue(manager, ChatChannel.WhatsApp);
+        OpenChat(manager, "77000000314@c.us");
+        Assert.IsNull(manager.NewestOpenChatMessage("77000000314"), "WhatsApp keeps its ids verbatim: a bare number is another chat");
+    }
+
+    [Test]
     public void MakeBusiness_Yes_MovesTheChat_AndCloses()
     {
         ChatViewModel chat = Chat("77000000302@c.us", "Сауле", 1, ownerLast: false);

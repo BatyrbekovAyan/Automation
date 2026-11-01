@@ -552,7 +552,8 @@ public partial class ChatManager : MonoBehaviour
     /// The open chat's live poll looks once a second (<see cref="OpenChatLivePollRoutine"/>): while an incoming message
     /// waits for the server's verdict, a read is asked again on the <see cref="OpenChatVerdictWatch"/> schedule — at most
     /// <see cref="OpenChatVerdictWatch.MaxAsks"/> asks per message — and the watch stops at once when the chat is decided
-    /// (or the owner's move is mirrored), closed or replaced by another, or another profile is active.
+    /// (or the owner's move is mirrored), closed or replaced by another, or another profile is active. The open chat is named
+    /// by its row's id, the one the watch was armed with: a Telegram chat may be open under its id's twin form.
     /// </summary>
     private void TickOpenChatVerdictWatch(bool chatIsOpen, float now)
     {
@@ -560,7 +561,7 @@ public partial class ChatManager : MonoBehaviour
         string profileId = GetActiveProfileId();
         ChatViewModel chat = string.IsNullOrEmpty(currentChatId) ? null : GetChat(currentChatId);
         bool awaits = chat != null && !string.IsNullOrEmpty(profileId) && AwaitsOpenChatVerdict(profileId, chat);
-        if (_verdictWatch.ShouldAsk(profileId, currentChatId, chatIsOpen, awaits, now))
+        if (_verdictWatch.ShouldAsk(profileId, chat?.ChatId, chatIsOpen, awaits, now))
             ChatAudienceSyncService.RequestListSoon();
     }
 

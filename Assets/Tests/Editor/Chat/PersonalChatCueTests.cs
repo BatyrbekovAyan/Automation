@@ -30,6 +30,7 @@ public class PersonalChatCueTests
 {
     private const string TestBot = "PersonalChatCueTestBot";
     private const string Profile = "cue-wa-profile";
+    private const string TelegramProfile = "cue-tg-profile";
     private const string Before = "2026-10-01T10:00:00Z";   // before the connection
     private const string After = "2026-10-21T10:00:00Z";    // after it
     private const string Later = "2026-10-21T10:05:00Z";
@@ -266,6 +267,30 @@ public class PersonalChatCueTests
         Assert.AreEqual(4, readRequests, "the verdict is mirrored: nothing more is asked");
     }
 
+    [Test]
+    public void TheOpenTelegramChat_AsksAgain_WhenItWasOpenedByTheTwinFormOfItsId()
+    {
+        // A Telegram chat may be opened by an id in its twin form (the «Сводка» deep link carries the server's id): the list keys
+        // the row by the canonical id, and the watch must follow the open chat by that same resolved id, or it stops at its first
+        // tick and the chat is asked only once.
+        const string chat = "5510000330";
+        const string twin = chat + "@c.us";
+        Manager.Instance.FindBotByName(TestBot).telegramProfileId = TelegramProfile;
+        ChatAudienceStore.ApplyConnected(TelegramProfile, MomentMs);
+        ChatManager manager = NewChatManager();
+        typeof(ChatManager).GetProperty(nameof(ChatManager.ActiveChannel)).SetValue(manager, ChatChannel.Telegram);
+        Parse(manager, List(TelegramRow(chat, "T1", After)), isInitialLoad: true);
+        Assert.AreEqual(chat, manager.GetChat(twin)?.ChatId, "premise: the twin form resolves to the row's canonical id");
+        OpenChat(manager, twin);
+
+        ArrivedAt(manager, twin, 100f, Message("T2", incoming: true));
+        Assert.AreEqual(1, readRequests, "the message's own ask");
+        Tick(manager, true, 107f);
+        Assert.AreEqual(2, readRequests, "seven seconds on, the chat opened by its twin id is asked again");
+        Tick(manager, true, 115f);
+        Assert.AreEqual(3, readRequests, "and fifteen seconds on");
+    }
+
     [TestCase("closed", TestName = "TheOpenChatsAsks_Stop_WhenTheChatCloses")]
     [TestCase("another chat", TestName = "TheOpenChatsAsks_Stop_WhenAnotherChatOpens")]
     [TestCase("another bot", TestName = "TheOpenChatsAsks_Stop_WhenTheBotSwitches")]
@@ -386,6 +411,18 @@ public class PersonalChatCueTests
         last_message_data = "text " + lastId,
         last_timestamp = time,
         last_message_sender = new { isMe = mine, pushname = "" },
+    };
+
+    // A Telegram chats/get row of a person who is not a saved contact (the user card's flags all false).
+    private static object TelegramRow(string id, string lastId, string time) => new
+    {
+        id,
+        name = "Chat " + id,
+        type = "user",
+        user = new { Contact = false, Bot = false, Support = false, Self = false },
+        unread_count = 0,
+        last_message_id = lastId,
+        last_timestamp = time,
     };
 
     private static string List(params object[] dialogs) => JsonConvert.SerializeObject(new { status = "done", dialogs });

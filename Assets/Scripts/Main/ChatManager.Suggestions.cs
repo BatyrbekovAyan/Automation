@@ -13,10 +13,14 @@ public partial class ChatManager
     /// <summary>
     /// «Личные и рабочие чаты»: the open chat's newest message as its live list holds it (newest first — the app's own sends
     /// are put in at once, the live poll adds what it finds), or null when <paramref name="chatId"/> is not the open chat or
-    /// nothing is loaded. «Сделать чат рабочим?» reads who wrote last from it: the chat row lags behind the open chat.
+    /// nothing is loaded. «Сделать чат рабочим?» reads who wrote last from it: the chat row lags behind the open chat. Both
+    /// ids are compared as <see cref="GetChat"/> resolves them (<see cref="ChatIdFormat.CanonicalKey"/>): a Telegram chat may be
+    /// open under its id's twin form while the sheet asks by the row's id.
     /// </summary>
     public MessageViewModel NewestOpenChatMessage(string chatId) =>
-        !string.IsNullOrEmpty(chatId) && chatId == currentChatId && _activeChatCache != null && _activeChatCache.Count > 0
+        !string.IsNullOrEmpty(chatId) && !string.IsNullOrEmpty(currentChatId)
+        && ChatIdFormat.CanonicalKey(chatId, ActiveChannel) == ChatIdFormat.CanonicalKey(currentChatId, ActiveChannel)
+        && _activeChatCache != null && _activeChatCache.Count > 0
             ? _activeChatCache[0]
             : null;
 
