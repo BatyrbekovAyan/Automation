@@ -56,7 +56,8 @@ using Object = UnityEngine.Object;
 ///     right before the avatar; hidden; ChatItemView.selectCheck / selectChecked;
 ///   • Main.unity — <see cref="EnsureFolderPanel"/>: Screen_Messanger/PersonalChatsPanel, right after the chat list and before
 ///     the open chat, over the tab bar like it; hidden; every PersonalChatsFolderView part wired. The chat list's delete card
-///     moves up beside it, over it — a folder row's «Удалить» asks through it.
+///     moves up beside it, over it — a folder row's «Удалить» asks through it — its backdrop over the folder's whole rect, so
+///     nothing of the folder takes a tap while it is up; the card itself stays where it stood.
 ///
 /// The bot settings' «ЛИЧНЫЕ ЧАТЫ» section (spec §5.7; sketch 009 screen 7) — PersonalChatsBuilder.Settings.cs:
 ///   • BotSettings.prefab — <see cref="EnsureSettingsSection"/>: in the Основное tab, right above «РАСПИСАНИЕ РАБОТЫ», the

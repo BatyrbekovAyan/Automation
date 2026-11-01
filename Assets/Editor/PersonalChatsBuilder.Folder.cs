@@ -458,18 +458,44 @@ public static partial class PersonalChatsBuilder
     }
 
     // The chat list's delete card, moved up beside the folder and over it: a folder row's «Удалить» asks through the chat
-    // list's own RequestDelete — the card must not stand under the folder. It still covers the chats screen as before.
+    // list's own RequestDelete — the card must not stand under the folder. Its backdrop covers the folder's rect — the open
+    // chat's, over the tab bar — so the card is modal over the whole folder (on the chats screen's own rect the folder's
+    // footer, a strip of its rows and its swipe-back strip stayed live under it), and the card itself stands where it stood.
     private static void EnsureDeleteCardOverFolder(ChatListView list, RectTransform panel, ref bool modified)
     {
         var card = new SerializedObject(list).FindProperty("deleteConfirm")?.objectReferenceValue as ChatDeleteConfirm;
         if (card == null) return;   // no card: the list deletes without asking
-        Transform root = card.transform;
+        var root = (RectTransform)card.transform;
         if (root.parent != panel.parent)
         {
             root.SetParent(panel.parent, false);   // the same local rect: the chats panel fills its screen
             modified = true;
         }
         modified |= PlaceAfter(root, panel);
+        modified |= CoverTheFolder(root, panel);
+    }
+
+    // The backdrop takes the folder's rect once; the card face, hung from a point of the backdrop, is moved back by exactly how
+    // far that point moved — so it stays put (a later hand-made move of the card is left alone: the rect already matches).
+    // Only for a backdrop anchored like the folder: then the parent's size cancels out of the move.
+    private static bool CoverTheFolder(RectTransform backdrop, RectTransform folder)
+    {
+        if (backdrop.anchorMin == folder.anchorMin && backdrop.anchorMax == folder.anchorMax && backdrop.pivot == folder.pivot
+            && backdrop.anchoredPosition == folder.anchoredPosition && backdrop.sizeDelta == folder.sizeDelta)
+            return false;
+        if (backdrop.anchorMin != folder.anchorMin || backdrop.anchorMax != folder.anchorMax)
+            throw new InvalidOperationException($"{Tag} {backdrop.name} is not anchored like {folder.name} — stretch it over the folder by hand.");
+        var face = PopupUI.FindCard(backdrop) as RectTransform;
+        if (face != null)
+        {
+            if (face.anchorMin != face.anchorMax)
+                throw new InvalidOperationException($"{Tag} {backdrop.name}/{face.name} is stretched — it would resize with the backdrop.");
+            Vector2 before = backdrop.anchoredPosition - Vector2.Scale(backdrop.sizeDelta, backdrop.pivot) + Vector2.Scale(face.anchorMin, backdrop.sizeDelta);
+            Vector2 after = folder.anchoredPosition - Vector2.Scale(folder.sizeDelta, folder.pivot) + Vector2.Scale(face.anchorMin, folder.sizeDelta);
+            face.anchoredPosition -= after - before;
+        }
+        SetRect(backdrop, folder.anchorMin, folder.anchorMax, folder.pivot, folder.anchoredPosition, folder.sizeDelta);
+        return true;
     }
 
     // ---- part makers ----

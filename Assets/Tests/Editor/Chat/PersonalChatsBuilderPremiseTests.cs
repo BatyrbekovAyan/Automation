@@ -671,8 +671,23 @@ public class PersonalChatsBuilderPremiseTests
             "«Удалить» in the folder asks through the chat list's card — it must stand over the folder, not under it");
         string thread = scene.RectOf(scene.Ref(scene.Single(ScriptGuid(typeof(ChatManager)), "ChatManager"), "MessageListPanel"));
         Assert.Less(System.Array.IndexOf(screen, confirm), System.Array.IndexOf(screen, thread), "…and under the open chat, as before");
-        foreach ((string field, string value) in new[] { ("m_AnchorMin", "{x: 0, y: 0}"), ("m_AnchorMax", "{x: 1, y: 1}"), ("m_SizeDelta", "{x: 0, y: 0}") })
-            Assert.AreEqual(value, scene.Field(confirm, field), $"it still covers the chats screen ({field})");
+
+        // Its backdrop covers the open chat's rect — the folder's, over the tab bar — so no tap reaches the folder while the card
+        // is up (the chats screen's own rect left the folder's footer, a strip of rows and the swipe-back strip live).
+        foreach (string field in new[] { "m_AnchorMin", "m_AnchorMax", "m_Pivot", "m_AnchoredPosition", "m_SizeDelta" })
+            Assert.AreEqual(scene.Field(thread, field), scene.Field(confirm, field), $"the backdrop covers the open chat's rect ({field})");
+        Assert.AreEqual("{x: 0, y: 0}", scene.Field(confirm, "m_AnchorMin"));
+        Assert.AreEqual("{x: 1, y: 1}", scene.Field(confirm, "m_AnchorMax"), "stretched over the screen like the open chat");
+
+        // …while the card stays where it stood over the chats screen: anchored at the backdrop's centre, it is moved back by
+        // exactly how far that centre moved.
+        string card = scene.Children(confirm).Single(r => scene.NameOf(scene.GameObjectOf(r)) == "Content");
+        Assert.AreEqual(Centre(), scene.Vec(card, "m_AnchorMin"), "the card hangs from the backdrop's centre");
+        Assert.AreEqual(Centre(), scene.Vec(card, "m_AnchorMax"));
+        Vector2 backdropCentre = scene.Vec(confirm, "m_AnchoredPosition")
+                                 + Vector2.Scale(scene.Vec(confirm, "m_SizeDelta"), Centre() - scene.Vec(confirm, "m_Pivot"));
+        Assert.AreEqual(Vector2.zero, backdropCentre + scene.Vec(card, "m_AnchoredPosition"),
+            "the card stands at the chats screen's centre, as before the backdrop grew");
     }
 
     [Test]
@@ -717,6 +732,12 @@ public class PersonalChatsBuilderPremiseTests
         Assert.AreSame(screen, confirm.transform.parent, "the delete card moved up beside the folder…");
         Assert.AreEqual(panels[0].GetSiblingIndex() + 1, confirm.transform.GetSiblingIndex(), "…right over it");
         Assert.Less(confirm.transform.GetSiblingIndex(), thread.GetSiblingIndex(), "…and still under the open chat");
+        var backdrop = (RectTransform)confirm.transform;
+        Assert.AreEqual((thread.anchorMin, thread.anchorMax, thread.pivot, thread.anchoredPosition, thread.sizeDelta),
+            (backdrop.anchorMin, backdrop.anchorMax, backdrop.pivot, backdrop.anchoredPosition, backdrop.sizeDelta),
+            "…its backdrop over the open chat's rect: the whole folder, over the tab bar");
+        Assert.AreEqual(new Vector2(0f, 104f), ((RectTransform)confirm.transform.Find("Content")).anchoredPosition,
+            "the card moved back by how far the backdrop's centre moved — it stands where it stood");
         Assert.IsFalse(panels[0].gameObject.activeSelf, "authored hidden");
 
         var view = panels[0].GetComponent<PersonalChatsFolderView>();
@@ -753,6 +774,7 @@ public class PersonalChatsBuilderPremiseTests
         CodeBuiltSearchBar(content);
 
         confirm = Rect("DeleteChatConfirmPanel", panel, Vector2.zero, Vector2.one, Centre(), Vector2.zero, Vector2.zero).gameObject;
+        Rect("Content", confirm.transform, Centre(), Centre(), Centre(), Vector2.zero, new Vector2(820f, 460f));   // the card face
         var card = confirm.AddComponent<ChatDeleteConfirm>();
         var listRefs = new SerializedObject(list);
         listRefs.FindProperty("deleteConfirm").objectReferenceValue = card;
