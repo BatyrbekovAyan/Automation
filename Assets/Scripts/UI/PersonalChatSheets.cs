@@ -107,10 +107,11 @@ public static class PersonalChatSheets
     /// «Сделать чат рабочим?» for <paramref name="chat"/> of the bot's <paramref name="profileId"/>. <paramref name="autoOn"/>
     /// — «Авто» would hold in the chat once it is working (its own mode, the schedule, the quota); <paramref name="channelOn"/>
     /// — the bot's settings left the chat's channel on (off, nobody answers there by itself). Whether the client waits, for
-    /// how long and whether the server would hand that message on at all is read off the chat's last message.
+    /// how long and whether the server would hand that message on at all is read off the chat's last message — the newer of
+    /// the chat row's and <paramref name="openChatNewest"/>, the open chat's newest message (<see cref="MakeBusinessCopy.LastMessage"/>).
     /// </summary>
     public static void AskMakeBusiness(string botName, string profileId, ChatViewModel chat, bool autoOn, bool channelOn,
-        TMP_FontAsset regular, TMP_FontAsset semibold)
+        TMP_FontAsset regular, TMP_FontAsset semibold, MessageViewModel openChatNewest = null)
     {
         if (chat == null) return;
         CancelMakePersonal();
@@ -118,8 +119,9 @@ public static class PersonalChatSheets
         businessTarget = new Target(botName, profileId, chat.ChatId);
 
         long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-        (string body, string note) = MakeBusinessCopy.For(autoOn, channelOn, !chat.IsLastMessageMine,
-            MakeBusinessCopy.IsReplayable(chat.LastMessageType), MakeBusinessCopy.AgeHours(chat.LastMessageTime, now));
+        MakeBusinessCopy.LastMessageFacts last = MakeBusinessCopy.LastMessage(chat, openChatNewest);
+        (string body, string note) = MakeBusinessCopy.For(autoOn, channelOn, last.IsClient, last.Replayable,
+            MakeBusinessCopy.AgeHours(last.UnixSec, now));
         Stamp(semibold, businessTitle, businessYes);
         Stamp(regular, businessBody, businessNote, businessNo);
         businessTitle.text = PersonalChatsCopy.MakeBusinessTitle;

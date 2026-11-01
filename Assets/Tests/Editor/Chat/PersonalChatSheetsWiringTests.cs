@@ -118,6 +118,50 @@ public class PersonalChatSheetsWiringTests
         Assert.AreEqual(PersonalChatsCopy.MakeBusinessNo, TextOf(Find(panel, "Secondary"), "Label"));
     }
 
+    [TestCase(false, 0.05, PersonalChatsCopy.MakeBusinessAutoNoFresh, false,
+        TestName = "MakeBusiness_AfterTheOwnerWroteInTheOpenChat_PromisesNoAnswer")]
+    [TestCase(true, 0.02, PersonalChatsCopy.MakeBusinessAutoFresh, true,
+        TestName = "MakeBusiness_AClientsMessageTheOpenChatFound_IsAnswered")]
+    public void MakeBusiness_ReadsTheOpenChatsNewestMessage_WhenTheRowLags(bool newestIsClient, double newestAgeHours, string body,
+        bool note)
+    {
+        // The row lags behind the open chat: it says the client wrote two hours ago (the owner has since written from the app
+        // or the phone), or that the owner wrote a day and more ago (the client has since replied while the chat was open).
+        ChatViewModel chat = newestIsClient
+            ? Chat("77000000311@c.us", "Сауле", 30.0, ownerLast: true)
+            : Chat("77000000311@c.us", "Сауле", 2.0, ownerLast: false);
+        var newest = new MessageViewModel
+        {
+            messageId = "newest", type = MessageType.Chat, isIncoming = newestIsClient,
+            timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds() - (long)(newestAgeHours * 3600),
+        };
+        PersonalChatSheets.AskMakeBusiness(TestBot, Profile, chat, true, true, null, null, newest);
+
+        Transform panel = PersonalChatSheets.MakeBusinessPanelForTests.transform;
+        Assert.AreEqual(body, TextOf(panel, "Body"), "the sheet reads the open chat's newest message, not the lagging row");
+        Assert.AreEqual(note, Find(panel, "Note").gameObject.activeSelf);
+    }
+
+    [Test]
+    public void ThePill_HandsTheSheetTheOpenChatsNewestMessage()
+    {
+        ChatManager manager = BareChatManager(TestBot, hosts);
+        OpenChat(manager, "77000000312@c.us");
+        var newest = new MessageViewModel { messageId = "new", type = MessageType.Chat, isIncoming = false, timestamp = 200 };
+        var older = new MessageViewModel { messageId = "old", type = MessageType.Chat, isIncoming = true, timestamp = 100 };
+        FieldInfo cache = typeof(ChatManager).GetField("_activeChatCache", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.IsNotNull(cache, "ChatManager._activeChatCache moved — update this test");
+        cache.SetValue(manager, new List<MessageViewModel> { newest, older });          // newest first, as the live list keeps it
+        Assert.AreSame(newest, manager.NewestOpenChatMessage("77000000312@c.us"), "the open chat's live list, newest first");
+        Assert.IsNull(manager.NewestOpenChatMessage("77000000313@c.us"), "another chat than the open one: nothing");
+        cache.SetValue(manager, new List<MessageViewModel>());
+        Assert.IsNull(manager.NewestOpenChatMessage("77000000312@c.us"), "nothing loaded: nothing");
+
+        StringAssert.Contains("PersonalChatSheets.AskMakeBusiness(botName, profileId, chat, autoOn, channelOn, RegularFont, SemiboldFont,\n"
+                              + "            ChatManager.Instance.NewestOpenChatMessage(chat.ChatId));",
+            MethodBody(Read(HeaderPath), "private void HandlePersonalPillTapped()"), "the pill hands the sheet the open chat's newest message");
+    }
+
     [Test]
     public void MakeBusiness_Yes_MovesTheChat_AndCloses()
     {
@@ -503,9 +547,10 @@ public class PersonalChatSheetsWiringTests
         StringAssert.Contains("\"isOnTelegram\"", channel, "the open chat's own channel");
         StringAssert.Contains(", 1) == 1", channel, "read as the bot card reads it: on unless it was switched off");
         string ask = MethodBody(Read(SheetsPath), "public static void AskMakeBusiness(");
-        StringAssert.Contains("!chat.IsLastMessageMine", ask, "the client's message last…");
-        StringAssert.Contains("MakeBusinessCopy.IsReplayable(chat.LastMessageType)", ask, "…of a type the server hands on…");
-        StringAssert.Contains("MakeBusinessCopy.AgeHours(chat.LastMessageTime", ask, "…and how old it is");
+        StringAssert.Contains("MakeBusinessCopy.LastMessage(chat, openChatNewest)", ask,
+            "the chat's last message: the newer of the row's and the open chat's newest (MakeBusinessCopyTests)");
+        StringAssert.Contains("last.IsClient, last.Replayable", ask, "the client's message last, of a type the server hands on…");
+        StringAssert.Contains("MakeBusinessCopy.AgeHours(last.UnixSec", ask, "…and how old it is");
         StringAssert.Contains("MakeBusinessCopy.For(", ask);
         string name = MethodBody(Read(HeaderPath), "private void HandleNameTapped()");
         StringAssert.Contains("PersonalChatSheets.AskMakePersonal(", name);

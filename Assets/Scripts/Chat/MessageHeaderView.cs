@@ -243,7 +243,10 @@ public class MessageHeaderView : MonoBehaviour
         // whether anyone answers at all: the bot's settings may have switched the chat's channel off.
         bool autoOn = suggestions != null && !suggestions.WouldSuggestIgnoringAudience();
         bool channelOn = ChannelSwitchedOn(botName, ChatManager.Instance.ActiveChannel);
-        PersonalChatSheets.AskMakeBusiness(botName, profileId, chat, autoOn, channelOn, RegularFont, SemiboldFont);
+        // Who wrote last is read off the open chat too: the chat row follows only the chat list's syncs, so after the owner
+        // wrote here (from the app or the phone) it would still name the client and promise an answer.
+        PersonalChatSheets.AskMakeBusiness(botName, profileId, chat, autoOn, channelOn, RegularFont, SemiboldFont,
+            ChatManager.Instance.NewestOpenChatMessage(chat.ChatId));
     }
 
     // The bot's channel is switched on in its settings — read as the bot card reads it: on unless it was switched off.

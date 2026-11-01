@@ -49,6 +49,46 @@ public static class MakeBusinessCopy
         return false;
     }
 
+    /// <summary>
+    /// Whether the server would hand the open chat's newest message to the assistant again, by the type its live list holds
+    /// (<see cref="MessageTypeParser"/> reads the same messages/get words): text and the media the server replays. A voice
+    /// message, a reaction and a type the app does not know (a location, a contact card among them) promise nothing.
+    /// </summary>
+    public static bool IsReplayable(MessageType type) =>
+        type == MessageType.Chat || type == MessageType.Image || type == MessageType.Video || type == MessageType.Audio
+        || type == MessageType.Sticker || type == MessageType.Document;
+
+    /// <summary>The chat's last message as the sheet judges it: the client's or the owner's, one the server hands on, when.</summary>
+    public readonly struct LastMessageFacts
+    {
+        public LastMessageFacts(bool isClient, bool replayable, long unixSec)
+        {
+            IsClient = isClient;
+            Replayable = replayable;
+            UnixSec = unixSec;
+        }
+
+        public bool IsClient { get; }
+        public bool Replayable { get; }
+        public long UnixSec { get; }
+    }
+
+    /// <summary>
+    /// The chat's last message: the newer of the chat list ROW's last message and the open chat's newest message
+    /// (<paramref name="openChatNewest"/>, null when the chat is not open). The row follows the chat list's syncs only, while
+    /// the open chat's live list also holds the app's own sends (put in at once) and what its live poll found — the owner's
+    /// messages from the phone, the client's replies — so after the owner wrote in the open chat the row would still name
+    /// the client and promise an answer the server never gives. On the same second, the open chat's.
+    /// </summary>
+    public static LastMessageFacts LastMessage(ChatViewModel row, MessageViewModel openChatNewest)
+    {
+        var fromRow = row == null
+            ? new LastMessageFacts(false, false, 0)
+            : new LastMessageFacts(!row.IsLastMessageMine, IsReplayable(row.LastMessageType), row.LastMessageTime);
+        if (openChatNewest == null || openChatNewest.timestamp < fromRow.UnixSec) return fromRow;
+        return new LastMessageFacts(openChatNewest.isIncoming, IsReplayable(openChatNewest.type), openChatNewest.timestamp);
+    }
+
     /// <summary>The sheet's body and its note (null — no note).</summary>
     public static (string Body, string Note) For(bool autoOn, bool channelOn, bool lastIsClient, bool lastReplayable, double lastAgeHours)
     {
