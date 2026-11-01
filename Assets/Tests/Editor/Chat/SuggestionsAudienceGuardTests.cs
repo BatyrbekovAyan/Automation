@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
+using System.Text.RegularExpressions;
 using NUnit.Framework;
 using UnityEngine;
 using static OpenChatFixture;
@@ -109,6 +110,24 @@ public class SuggestionsAudienceGuardTests
         int dismissGate = dismiss.IndexOf("AllowsAssistant(", StringComparison.Ordinal);
         Assert.GreaterOrEqual(dismissGate, 0, "the chip's quiet dismiss is the capsule's tap too");
         Assert.Less(dismissGate, dismiss.IndexOf("_fallbackDismissed = true", StringComparison.Ordinal));
+    }
+
+    // The chat-open heal re-sends the chat's own reply-mode choice — it re-creates the chat's reply_mode_flags row on the
+    // server. In a chat that is not a decided working chat that row is the two-day wipe's to delete; the heal never writes it.
+    [Test]
+    public void TheChatOpenHeal_RunsOnlyInAWorkingChat()
+    {
+        string restore = MethodBody(Read(ControllerPath), "private void RestoreForActiveChat()");
+        int heal = restore.IndexOf("ReassertReplyModeForActiveChat(", StringComparison.Ordinal);
+        Assert.GreaterOrEqual(heal, 0, "the chat-open heal is still there");
+        int condition = restore.LastIndexOf("if (", heal, StringComparison.Ordinal);
+        Assert.GreaterOrEqual(condition, 0, "the heal runs under a condition");
+        string guard = restore.Substring(condition, heal - condition);
+        int working = guard.IndexOf("OpenChatAllowsAssistant()", StringComparison.Ordinal);
+        Assert.GreaterOrEqual(working, 0, "the heal asks whether the open chat is a working chat");
+        Assert.Less(working, guard.IndexOf("SemiAutoStore.TryGetOverride(", StringComparison.Ordinal),
+            "…before it reads the chat's stored choice");
+        Assert.AreEqual(1, Regex.Matches(restore, Regex.Escape("ReassertReplyModeForActiveChat(")).Count, "one heal per chat open");
     }
 
     [Test]

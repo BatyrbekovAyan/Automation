@@ -372,7 +372,10 @@ public class SuggestionsController : MonoBehaviour
         // would turn a mere chat-open into a sticky per-chat server row (WR-01). R4: the heal
         // REPEATS the decision (original version), it never makes a new one — the server reads an
         // applied chat «Авто» as the owner's resume and would close a handoff the owner never saw.
-        if (SemiAutoStore.TryGetOverride(ChatManager.Instance.CurrentBotId, ChatManager.Instance.CurrentChatId, out bool overrideOn))
+        // «Личные и рабочие чаты»: only in a decided working chat — the heal re-creates the chat's own
+        // server row, which in a personal chat the two-day wipe deletes and nothing may bring back.
+        if (OpenChatAllowsAssistant()
+            && SemiAutoStore.TryGetOverride(ChatManager.Instance.CurrentBotId, ChatManager.Instance.CurrentChatId, out bool overrideOn))
             ReassertReplyModeForActiveChat(overrideOn);
         if (_slotKey != null) _slotKey.SetVisible(_semiAutoOn);
         if (_semiAutoOn)
