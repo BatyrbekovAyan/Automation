@@ -8,8 +8,11 @@
   - 12 workflow пакета: граф «до» (= прод) и «после» (= рабочая копия) — ровно таблица README «Что меняется на сервере»;
   - остальные workflow канона: граф и ключи настроек, которые задаёт канон, одинаковы на обеих сторонах (в пакет не входят);
   - других новых или пропавших файлов нет;
-  - штампы шаблонов для живых клонов (update-clones.template_stamp) — «до» и «после», как в шаге 6.1.
-Код 0 и PACKAGE OK — канон рабочей копии и есть отрепетированный пакет; иначе FAIL и код 1 — СТОП (не выкладывать).
+  - штампы шаблонов для живых клонов (update-clones.template_stamp) — «до» и «после», как в шаге 6.1;
+  - свои скрипты и SQL пакета (*.py / *.sql этой папки) — ровно те версии, по которым написан README: id объекта git
+    каждого (`git hash-object`, тот же id показывает `git ls-tree`) = таблица OWN ниже; нет ни пропавших, ни лишних. Свой
+    собственный id этот файл нести не может (id — хэш этого самого текста): его закрепляет README, шаг 0.1 (c), до запуска.
+Код 0 и PACKAGE OK — рабочая копия и есть отрепетированный пакет; иначе FAIL и код 1 — СТОП (не выкладывать).
 
   package_check.py
 """
@@ -47,6 +50,24 @@ PACKAGE = {
 }
 # channel → (template stamp at PROD_REF = the live clones' graph today, the stamp after update-clones)
 TEMPLATE_STAMPS = {"whatsapp": ("c0a7c5186fb2", "5c4c33e27468"), "telegram": ("62e09511fc94", "cc77e05b537a")}
+# The package's own scripts and SQL (this folder) → their git blob id, the versions the README is written for: a later
+# commit or an uncommitted edit of one of them, a missing one or a new *.py / *.sql here is a FAIL. This file is not in the
+# table — it cannot carry its own id; the README pins it (step 0.1 (c)) before it runs.
+OWN = {
+    "canary-baseline.sql": "42266c2c0b69eb86d8d468db24e3cb79cf068831",
+    "canary.py": "bb809c2de00cfc61ccdda3c2cee6002af2bd8e36",
+    "canary.sql": "a5fe107635e15db0869820ada693829150770771",
+    "health.sql": "7eb8efe1e5b6a2ffb690160d9d77b893dc55ddc4",
+    "newwf.py": "8ffbcc8f9dfc915b804bd0c1c6ecfbcef03d647c",
+    "postcheck.sql": "d8804a1cc48a9abed257d5c0761b61a5055a7fd9",
+    "precheck.sql": "a1cf93cb7c79f2a606690bbce8dd8fc2f4b015c4",
+    "readback.py": "7e546273ac349796ccb79d96776f744fc322de31",
+    "rollback.py": "c1ddccf87189b544f97423af936268b9a3a2089f",
+    "smoke.py": "931f0be7dfaa53b7ee41f357b40b2616cb3724be",
+    "stand-canary.py": "31e312eb9c3da540ca92e6bf00483398609f04f3",
+    "watch.py": "4a1118c0a94da2c5e54c393f275e29ef172f0706",
+}
+SELF = os.path.basename(os.path.abspath(__file__))
 
 
 def canon_at(ref):
@@ -75,6 +96,21 @@ def wid_of(name):
 def settings_of(wf):
     s = (wf or {}).get("settings") or {}
     return {k: s[k] for k in vd.CANONICAL_SETTINGS if k in s}
+
+
+def own_ids():
+    """{file: git blob id} of every *.py / *.sql in this folder except this script — the README, the rehearsal, the deploy's
+    own outputs and other docs are not code. `git hash-object` reads the files and writes nothing."""
+    names = sorted(f for f in os.listdir(HERE)
+                   if f.endswith((".py", ".sql")) and f != SELF and os.path.isfile(os.path.join(HERE, f)))
+    if not names:
+        return {}
+    try:
+        out = subprocess.run(["git", "-C", HERE, "hash-object", "--", *names], capture_output=True, check=True,
+                             text=True).stdout.split()
+    except (OSError, subprocess.CalledProcessError) as e:
+        sys.exit(f"FAIL — cannot hash the package's own files with git in {HERE}: {e}")
+    return dict(zip(names, out))
 
 
 def main():
@@ -112,7 +148,14 @@ def main():
         good = s_old == want_old and s_new == want_new
         ok &= good
         print(f"  {'OK  ' if good else 'FAIL'} clones [{ch}] template stamp {s_old} -> {s_new}  (README {want_old} -> {want_new})")
-    print("PACKAGE OK" if ok else "FAIL — the working copy's canon is not the rehearsed package: STOP, do not deploy")
+    have = own_ids()
+    for name in sorted(set(have) | set(OWN)):
+        got, want = have.get(name), OWN.get(name)
+        good = got is not None and got == want
+        ok &= good
+        print(f"  {'OK  ' if good else 'FAIL'} own        {name}  {got or 'missing'}"
+              + ("" if good else f"  (want {want or 'nothing: not a file of the package'})"))
+    print("PACKAGE OK" if ok else "FAIL — the working copy is not the rehearsed package: STOP, do not deploy")
     sys.exit(0 if ok else 1)
 
 

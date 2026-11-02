@@ -1594,3 +1594,148 @@ FAIL — the working copy's canon is not the rehearsed package: STOP, do not dep
 после git checkout -- (оба файла): Tools/n8n clean, package_check.py -> PACKAGE OK.
 (Первый прогон контроля показал, что счётчик «unchanged» считал файлы, а не равные графы — 20 при одном расхождении; исправлено до
 коммита: теперь 19, как выше.)
+
+=== §H. Правки после второго ревью пакета (2026-11-02, 00:49–00:58Z): без стенда — n8n стенда, мок и основной Postgres стенда не
+запускались, к проду и в сеть ни одного запроса ===
+
+Что изменилось: canary.sql судит историю и журнал ответа личного чата по времени решения по этому чату (память — по-прежнему от
+отметки 9.0); шаг 0.1 (a) исключает по имени пять файлов, которые пишет сам пакет, и 0.1 повторяется перед шагом 5 и после 6.3;
+package_check.py закрепляет свои скрипты и SQL пакета по id объекта git (таблица OWN), а README — сам package_check.py; откат
+каноном 40bbf80b — из временной копии без LFS (GIT_LFS_SKIP_SMUDGE=1), с PYTHONDONTWRITEBYTECODE=1 и `worktree remove --force`;
+Set Workflow State в откате — самым последним; 9.2 / 9.3 — какая проверка что доказывает.
+
+### H1 canary.sql по времени решения — временный кластер Postgres (Tools/n8n/staging/pg.sh с STAGING_PGDATA = черновая папка,
+### STAGING_PGPORT=5499: initdb, роли, все миграции ветки — последняя 2026-10-25-chat-audience.sql), три сценария, каждый в
+### транзакции с откатом. Текст — canary.py из ответа 9.0 (файл отметки); «прежний» — canary.py + canary.sql из HEAD 2eca59cf.
+### Строки — одни признаки (профиль proof-wa, чаты a/b/c/e, тела «x» / «y»); время — UTC.
+pg.sh init -> «migrations applied to choosereply_staging@127.0.0.1:5499»
+сценарий (одна линия времени): 2026-11-05 — прежний сервер записывает каждый чат один на один (строки до выкладки, id памяти <= 200);
+2026-11-06 10:00 — шаг 1.3; 10:20 — прежний клон (до шага 6.2) записывает сообщение контакта A («Выбрать»: история + память, id 201);
+12:00 — A пишет снова, новый граф решает его личным (contact), ничего не пишет; 13:00 — новый человек E: рабочий, ответ, записан
+(id памяти 301-302); 2026-11-07 08:00 — владелец делает E личным; 2026-11-08 10:00 — отметка 9.0 (memory_max_id 1000); 10:05 — 9.1
+(B: рабочий, ответ, id 1001-1002); 10:10 — 9.2 (C: контакт со строками до выкладки, решён личным, ничего не записано).
+=== S1: a correct deploy (pre-deploy rows, the old clone writing during the deploy, a business chat made personal, 9.1, 9.2)
+--- canary.sql NOW (personal chats against their own decision; memory from the 9.0 mark)
+decisions = [{"profile_id":"proof-wa","kind":"business","source":"default","reason":"new","chats":1,"newest":"2026-11-08T10:05:00Z"},
+ {"profile_id":"proof-wa","kind":"personal","source":"default","reason":"contact","chats":1,"newest":"2026-11-08T10:10:00Z"}]
+connections = [{"profile_id" : "proof-wa", "number_known" : false, "previous_number_known" : false, "connected_at" : "2026-10-28T13:03Z"}]
+personal_after = {"history" : 0, "memory" : 0, "ledger" : 0}
+business_after = {"history" : 2, "memory" : 2}
+ledger_after = { "sent" : 1 }
+personal_rows_before = {"history" : 7, "memory" : 7, "ledger" : 3}
+--- canary.sql at HEAD 2eca59cf (everything from the 9.0 mark)
+decisions = [{"profile_id":"proof-wa","kind":"business","source":"default","reason":"new","chats":1,"newest":"2026-11-08T10:05:00Z"},
+ {"profile_id":"proof-wa","kind":"personal","source":"default","reason":"contact","chats":1,"newest":"2026-11-08T10:10:00Z"}]
+connections = [{"profile_id" : "proof-wa", "number_known" : false, "previous_number_known" : false, "connected_at" : "2026-10-28T13:03Z"}]
+personal_after = {"history" : 0, "memory" : 0, "ledger" : 0}
+business_after = {"history" : 2, "memory" : 2}
+ledger_after = { "sent" : 1 }
+personal_rows_before = {"history" : 7, "memory" : 7, "ledger" : 3}
+--- canary.sql at HEAD 2eca59cf with the mark taken at step 1.3 (the other option)
+decisions = [{"profile_id":"proof-wa","kind":"business","source":"default","reason":"new","chats":1,"newest":"2026-11-08T10:05:00Z"},
+ {"profile_id":"proof-wa","kind":"personal","source":"default","reason":"contact","chats":2,"newest":"2026-11-08T10:10:00Z"},
+ {"profile_id":"proof-wa","kind":"personal","source":"owner","reason":"owner","chats":1,"newest":"2026-11-07T08:00:00Z"}]
+connections = [{"profile_id" : "proof-wa", "number_known" : false, "previous_number_known" : false, "connected_at" : "2026-10-28T13:03Z"}]
+personal_after = {"history" : 3, "memory" : 3, "ledger" : 1}
+business_after = {"history" : 2, "memory" : 2}
+ledger_after = { "sent" : 2 }
+personal_rows_before = {"history" : 4, "memory" : 4, "ledger" : 2}
+(отметка шага 1.3 считает запись прежнего клона во время выкладки и рабочий период чата E — 9.5 остановил бы верную выкладку)
+=== S2: S1 + a leak written into a personal chat AFTER its decision but BEFORE the 9.0 mark
+--- canary.sql NOW
+decisions = [{"profile_id":"proof-wa","kind":"business","source":"default","reason":"new","chats":1,"newest":"2026-11-08T10:05:00Z"},
+ {"profile_id":"proof-wa","kind":"personal","source":"default","reason":"contact","chats":1,"newest":"2026-11-08T10:10:00Z"}]
+connections = [{"profile_id" : "proof-wa", "number_known" : false, "previous_number_known" : false, "connected_at" : "2026-10-28T13:03Z"}]
+personal_after = {"history" : 1, "memory" : 0, "ledger" : 1}
+business_after = {"history" : 2, "memory" : 2}
+ledger_after = { "sent" : 1 }
+personal_rows_before = {"history" : 7, "memory" : 8, "ledger" : 3}
+--- canary.sql at HEAD 2eca59cf
+decisions = [{"profile_id":"proof-wa","kind":"business","source":"default","reason":"new","chats":1,"newest":"2026-11-08T10:05:00Z"},
+ {"profile_id":"proof-wa","kind":"personal","source":"default","reason":"contact","chats":1,"newest":"2026-11-08T10:10:00Z"}]
+connections = [{"profile_id" : "proof-wa", "number_known" : false, "previous_number_known" : false, "connected_at" : "2026-10-28T13:03Z"}]
+personal_after = {"history" : 0, "memory" : 0, "ledger" : 0}
+business_after = {"history" : 2, "memory" : 2}
+ledger_after = { "sent" : 1 }
+personal_rows_before = {"history" : 8, "memory" : 8, "ledger" : 4}
+(запись между решением и отметкой: нынешний видит её по истории и журналу ответа — СТОП; прежний её пропускал)
+=== S3: S1 + a leak written into a personal chat AFTER the 9.0 mark (the stand canary control)
+--- canary.sql NOW
+decisions = [{"profile_id":"proof-wa","kind":"business","source":"default","reason":"new","chats":1,"newest":"2026-11-08T10:05:00Z"},
+ {"profile_id":"proof-wa","kind":"personal","source":"default","reason":"contact","chats":1,"newest":"2026-11-08T10:10:00Z"}]
+connections = [{"profile_id" : "proof-wa", "number_known" : false, "previous_number_known" : false, "connected_at" : "2026-10-28T13:03Z"}]
+personal_after = {"history" : 1, "memory" : 1, "ledger" : 1}
+business_after = {"history" : 2, "memory" : 2}
+ledger_after = { "claimed" : 1, "sent" : 1 }
+personal_rows_before = {"history" : 7, "memory" : 7, "ledger" : 3}
+--- canary.sql at HEAD 2eca59cf
+decisions = [{"profile_id":"proof-wa","kind":"business","source":"default","reason":"new","chats":1,"newest":"2026-11-08T10:05:00Z"},
+ {"profile_id":"proof-wa","kind":"personal","source":"default","reason":"contact","chats":1,"newest":"2026-11-08T10:10:00Z"}]
+connections = [{"profile_id" : "proof-wa", "number_known" : false, "previous_number_known" : false, "connected_at" : "2026-10-28T13:03Z"}]
+personal_after = {"history" : 1, "memory" : 1, "ledger" : 1}
+business_after = {"history" : 2, "memory" : 2}
+ledger_after = { "claimed" : 1, "sent" : 1 }
+personal_rows_before = {"history" : 7, "memory" : 7, "ledger" : 3}
+=== after the three rollbacks: rows left in the four tables (want 0 0 0 0)
+audience = history = memory = ledger
+0 = 0 = 0 = 0
+pg.sh stop -> «server stopped» (00:49Z); слушателей на 5433 и 5499 нет. В тексте, который canary.py собирает из ответа 9.0,
+по-прежнему ни одного `$` и `{{` (sql-oneoff.py отправляет его через Postgres-узел n8n); обе метки — ровно по одному разу.
+
+### H2 шаг 0.1 (c): самозакрепление и свои файлы пакета
+git hash-object docs/audits/2026-10-25-personal-chats/package_check.py -> 72a8c381b8f8a83875f89d3f626765224492cb54 (= README 0.1 (c));
+форма README `[ "$(…)" = <id> ] && echo OK … || echo FAIL …` проверена в zsh и bash: тот же id -> OK, другой -> FAIL.
+package_check.py на этой копии (вывод — после строк графов, они как в G2):
+  OK   clones [whatsapp] template stamp c0a7c5186fb2 -> 5c4c33e27468  (README c0a7c5186fb2 -> 5c4c33e27468)
+  OK   clones [telegram] template stamp 62e09511fc94 -> cc77e05b537a  (README 62e09511fc94 -> cc77e05b537a)
+  OK   own        canary-baseline.sql  42266c2c0b69eb86d8d468db24e3cb79cf068831
+  OK   own        canary.py  bb809c2de00cfc61ccdda3c2cee6002af2bd8e36
+  OK   own        canary.sql  a5fe107635e15db0869820ada693829150770771
+  OK   own        health.sql  7eb8efe1e5b6a2ffb690160d9d77b893dc55ddc4
+  OK   own        newwf.py  8ffbcc8f9dfc915b804bd0c1c6ecfbcef03d647c
+  OK   own        postcheck.sql  d8804a1cc48a9abed257d5c0761b61a5055a7fd9
+  OK   own        precheck.sql  a1cf93cb7c79f2a606690bbce8dd8fc2f4b015c4
+  OK   own        readback.py  7e546273ac349796ccb79d96776f744fc322de31
+  OK   own        rollback.py  c1ddccf87189b544f97423af936268b9a3a2089f
+  OK   own        smoke.py  931f0be7dfaa53b7ee41f357b40b2616cb3724be
+  OK   own        stand-canary.py  31e312eb9c3da540ca92e6bf00483398609f04f3
+  OK   own        watch.py  4a1118c0a94da2c5e54c393f275e29ef172f0706
+PACKAGE OK
+exit=0
+контроль (модуль загружен из этой копии, его HERE указывает на черновую копию *.py / *.sql пакета; копия этой не касается):
+(1) the copy as is: exit 0 | PACKAGE OK
+(2) health.sql changed by one byte: exit 1 | FAIL — the working copy is not the rehearsed package: STOP, do not deploy
+   FAIL own        health.sql  2c381d62c8096790c3caae6cb2fca2869d54a2d5  (want 7eb8efe1e5b6a2ffb690160d9d77b893dc55ddc4)
+(3) a stray zz-stray.sql: exit 1 | FAIL — the working copy is not the rehearsed package: STOP, do not deploy
+   FAIL own        zz-stray.sql  ab290eb4c1f6e10ef89c4d95c1ede4471c4cad69  (want nothing: not a file of the package)
+ALL AS EXPECTED
+
+### H3 шаг 0.1 (a): команда README на этой копии (git -C — рабочая копия ветки), в папке пакета — пять файлов-заменителей вывода
+### шагов 1.1 / 1.2 / 1.3 / 6.3 / 9.0 и один лишний zz-stray.txt; ` M` — незакоммиченные правки этого коммита
+ M docs/audits/2026-10-25-personal-chats/README.md
+ M docs/audits/2026-10-25-personal-chats/canary-baseline.sql
+ M docs/audits/2026-10-25-personal-chats/canary.py
+ M docs/audits/2026-10-25-personal-chats/canary.sql
+ M docs/audits/2026-10-25-personal-chats/package_check.py
+?? docs/audits/2026-10-25-personal-chats/zz-stray.txt
+--- end (a) with the exclusions
+прежняя команда (без исключений) — те же ` M` и шесть `??`: canary-baseline.txt, deploy-start.txt, prod-after.json,
+prod-before.json, rollback-pointers.txt, zz-stray.txt; исключённый изменённый файл (canary.sql) пропадает из вывода так же.
+Заменители удалены; `git status` снова показывает только правки этого коммита.
+
+### H4 откат каноном: временная копия без LFS и её удаление (черновая папка вместо /tmp/cr-rollback-40bbf80b; инструменты 40bbf80b
+### против n8n не запускались — это G7)
+GIT_LFS_SKIP_SMUDGE=1 git -C <рабочая копия> worktree add --detach <черновая папка>/cr-rollback-40bbf80b 40bbf80b
+Preparing worktree (detached HEAD 40bbf80b)
+Updating files: 100% (5927/5927), done.
+HEAD is now at 40bbf80b docs(deploy): C2 «поиск в прайсе перед ценой» выложен на прод 2026-11-01
+exit=0
+Assets/Images/Icon.png в копии: «version https://git-lfs.github.com/spec/v1 …» — указатель LFS, не картинка; git status копии — пусто;
+Tools/n8n/deploy-canonical.py и update-clones.py на месте; размер копии 108M
+в копию положен заменитель Tools/n8n/__pycache__/update_clones.cpython-313.pyc, затем:
+git -C <рабочая копия> worktree remove <копия>
+fatal: '<копия>' contains modified or untracked files, use --force to delete it
+exit=128
+git -C <рабочая копия> worktree remove --force <копия>
+exit=0
+git worktree list — копии больше нет.
