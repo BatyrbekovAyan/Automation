@@ -1,0 +1,69 @@
+~ 2htWSV5IHO8E2CgB 'Dashboard Outcomes' active=True nodes 16 → 16 (+0 -0)
+    rollback pointer: versionId c27b3009-1ec4-411f-820c-d331e06271ab (activeVersionId c27b3009-1ec4-411f-820c-d331e06271ab)
+= 2islisFH7jjLoPQM 'Delete Orphan Profiles' up to date (stored and published)
+= 3qax5J9u2qsT9Vao 'Edit Whatsapp Workflow' up to date (stored and published)
+~ 4VN3gsFaC2HUYmcc 'Telegram Bot' active=False nodes 60 → 64 (+4 -0)
+    settings: saveDataSuccessExecution None → 'none'
+    rollback pointer: versionId 61634ebb-0255-4afc-b047-481c103d800b (activeVersionId None); settings before: {"saveDataSuccessExecution": null}
+~ 4wYitz5ek30SVNlT 'WhatsApp Bot' active=False nodes 60 → 64 (+4 -0)
+    settings: saveDataSuccessExecution None → 'none'
+    rollback pointer: versionId 0668f809-fd8a-4a23-8ab8-3f842e251f74 (activeVersionId None); settings before: {"saveDataSuccessExecution": null}
+~ 9PTyYcelRQI7bGDb 'Suggest Replies' active=True nodes 26 → 26 (+0 -0)
+    settings: saveDataSuccessExecution None → 'none'
+    rollback pointer: versionId 59935e95-f767-4cca-9b58-78eb10f30965 (activeVersionId 59935e95-f767-4cca-9b58-78eb10f30965); settings before: {"saveDataSuccessExecution": null}
+= KoTuIlk4LMrlvnWI 'Upload File' up to date (stored and published)
+= SCLcpn6DMDG3Z4VN 'Set Reply Mode' up to date (stored and published)
+= TwWPW3gIyjZS3foR 'Edit Telegram Workflow' up to date (stored and published)
+~ Uz6HBBUpAiUqVysB 'CreateTelegramWorkflow' active=True nodes 52 → 52 (+0 -0)
+    rollback pointer: versionId 0399583b-af96-4b38-81e2-182eb97d41e2 (activeVersionId 0399583b-af96-4b38-81e2-182eb97d41e2)
+~ XuvOp7TxOImOAmlj 'CreateWhatsappWorkflow' active=True nodes 52 → 52 (+0 -0)
+    rollback pointer: versionId 69114fef-b10e-4842-bc7b-2e697a7e0662 (activeVersionId 69114fef-b10e-4842-bc7b-2e697a7e0662)
+= ZGYr6srzS3rSSXHp 'RevenueCat Events' up to date (stored and published)
+= ZTqpumOpL1rNDOp6 'Delete File' up to date (stored and published)
+MISSING crAudienceDec001 crAudienceDec001-Decide_Audience.json — import it with n8n import:workflow, not here
+= crAuthSession001 'Auth Session' up to date (stored and published)
+= crChannelWatch001 'Channel Watch' up to date (stored and published)
+MISSING crChatAudience01 crChatAudience01-Chat_Audience.json — import it with n8n import:workflow, not here
+= crHandoffDry0001 'Handoff Request (dry)' up to date (stored and published)
+= crHandoffNtfy001 'Handoff Notifier' up to date (stored and published)
+= crHandoffReq0001 'Handoff Request' up to date (stored and published)
+= crHandoffsApi001 'Handoffs' up to date (stored and published)
+= crPriceSearch001 'Price List Search' up to date (stored and published)
+= crSetSchedule001 'Set Schedule' up to date (stored and published)
+= crTestDialog0001 'Test Dialog' up to date (stored and published)
+= crVerifyIdent001 'Verify Identity' up to date (stored and published)
+~ crWappiProxy0001 'Wappi Proxy' active=True nodes 24 → 24 (+0 -0)
+    rollback pointer: versionId d6e6fb67-2de3-44e3-819e-62a272d28103 (activeVersionId d6e6fb67-2de3-44e3-819e-62a272d28103)
+~ fXYpCXPKw92EzRz8 'Profile Lifecycle Sweep' active=True nodes 41 → 42 (+1 -0)
+    rollback pointer: versionId 0b4e5507-6d9c-4d5e-bb77-291bbd7cb894 (activeVersionId 0b4e5507-6d9c-4d5e-bb77-291bbd7cb894)
+= hHwvfOvTCS42pXnq 'Landing Lead' up to date (stored and published)
+= jtbssfzXbOxwTK4k 'Get Usage' up to date (stored and published)
+~ lmjYsdNcQA2IE5rl 'Delete Bot Files' active=True nodes 19 → 19 (+0 -0)
+    rollback pointer: versionId 46a8f87e-ca0a-49dc-b432-9b1b7bf0d28c (activeVersionId 46a8f87e-ca0a-49dc-b432-9b1b7bf0d28c)
+{"considered": 30, "missing": 2, "up_to_date": 19, "would_update": 9, "updated": 0, "would_publish": 0, "republished": 0, "inactive_must_run": 0, "failed": 0}
+~ 0DP79STI3pafXO9B 'Set Workflow State' active=True nodes 20 → 20 (+0 -0)
+    rollback pointer: versionId a2bdc048-98f0-4756-8a89-c4aaa9560a5c (activeVersionId a2bdc048-98f0-4756-8a89-c4aaa9560a5c)
+{"considered": 1, "missing": 0, "up_to_date": 0, "would_update": 1, "updated": 0, "would_publish": 0, "republished": 0, "inactive_must_run": 0, "failed": 0}
+base https://n8n.choosereply.com · mode APPLY · template stamps {'whatsapp': '5c4c33e27468', 'telegram': 'cc77e05b537a'}
+prompt map applied: Create/Edit Vertical Prompt as introduced in fce9987b (sha256 e027b4b39537) — deploy the matching Create/Edit BEFORE this run, or the next owner save would put an older head back
+~ TbQaKxJaBJkKN2nA '2' [telegram] active=True → +4 -0 ~9 conn=changed
+    add: ['Audience Known?', 'Business?', 'Decide Audience', 'Decided Business?']
+    remove: []
+    change: ['Acquire Send Lease', 'Cancel Label', 'Final Check', 'Latest+Combine', 'Outcome', 'Read Reply Mode', 'Reconcile Check', 'Record Outgoing', 'Suppressed?']
+    prompt: at_canonical/auto_parts — kept
+    settings: saveDataSuccessExecution None → 'none' (the template's)
+    keep: path='f18ea658-0f94' label line + owner tail, creds=['httpHeaderAuth', 'openAiApi', 'postgres']
+    rollback pointer: versionId ddab2b3a-173a-4b98-92a9-eacb34af8ea4 (activeVersionId ddab2b3a-173a-4b98-92a9-eacb34af8ea4) before the update
+    published by the PUT (served version = the update) — no deactivate/activate window
+    read-back: ok
+~ aND1y2ktZoNlszAW '2' [whatsapp] active=False → +4 -0 ~9 conn=changed
+    add: ['Audience Known?', 'Business?', 'Decide Audience', 'Decided Business?']
+    remove: []
+    change: ['Acquire Send Lease', 'Cancel Label', 'Final Check', 'Latest+Combine', 'Outcome', 'Read Reply Mode', 'Reconcile Check', 'Record Outgoing', 'Suppressed?']
+    prompt: at_canonical/auto_parts — kept
+    settings: saveDataSuccessExecution None → 'none' (the template's)
+    keep: path='7d9d7ef5-7669' label line + owner tail, creds=['httpHeaderAuth', 'openAiApi', 'postgres']
+    rollback pointer: versionId c62d3bbd-955d-4a95-a0c0-c0ddc5cfa4c0 (activeVersionId None) before the update
+    read-back: ok
+- tqGXmiT6aJu7vUIG '13' archived — skipped (n8n refuses PUT on an archived workflow; the owner retired this bot)
+{"clones": 2, "up_to_date": 0, "would_update": 0, "updated": 2, "failed": 0, "archived": 1}
