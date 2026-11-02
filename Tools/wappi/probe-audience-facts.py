@@ -113,6 +113,24 @@ def filled(obj, key):
     return "yes"
 
 
+def json_type(obj, key):
+    """The value's JSON type, never the value: - (no such key), null, blank (a string of spaces or nothing), string,
+    number, bool, object, array. The server's backfill counts a task id as an API mark only when it is a non-blank STRING
+    (audience.py, the outgoing-API test), so «there is a value» is not enough to tell."""
+    if not isinstance(obj, dict) or key not in obj:
+        return "-"
+    value = obj[key]
+    if value is None:
+        return "null"
+    if isinstance(value, bool):
+        return "bool"
+    if isinstance(value, str):
+        return "string" if value.strip() else "blank"
+    if isinstance(value, (int, float)):
+        return "number"
+    return "object" if isinstance(value, dict) else "array" if isinstance(value, list) else "other"
+
+
 def keys_of(obj):
     return ",".join(sorted(shape(k) if re.search(r"\d", k) else k for k in obj)) if isinstance(obj, dict) else "<not an object>"
 
@@ -230,7 +248,7 @@ def describe_message(message, reference, unit="min"):
             f"  contact_name={filled(message, 'contact_name')}"
             f"  senderName={filled(message, 'senderName')}  chat_type={cat(message.get('chat_type'))}"
             f"  is_bot={cat(message.get('is_bot'))}  wh_type={cat(message.get('wh_type'))}"
-            f"  from_where={cat(message.get('from_where'))}  task_id={filled(message, 'task_id')}")
+            f"  from_where={cat(message.get('from_where'))}  task_id={json_type(message, 'task_id')}")
 
 
 def key_labels(rows, prefix):
@@ -553,7 +571,8 @@ def list_match(args, chat_id, cache):
 
 # ---- selftest ----
 
-SENTINELS = ("Сауле", "Темирова", "Secret", "СЕКРЕТ", "секрет", "7701234567", "FL00D", "caption-text", "Петров", "T-9f8e7d")
+SENTINELS = ("Сауле", "Темирова", "Secret", "СЕКРЕТ", "секрет", "7701234567", "FL00D", "caption-text", "Петров", "T-9f8e7d",
+             "918273645")
 
 
 def cmd_selftest(_args):
@@ -575,6 +594,8 @@ def cmd_selftest(_args):
                "chat_type": "dialog", "is_bot": False, "phone": "77012345678", "to": "77019876543@c.us"}
     tg_message = {"id": 55, "type": "text", "body": "секрет", "from": "FL00D", "chatId": "7701234567", "time": 1761400100}
     api_send = dict(message, fromMe=True, from_where="api", task_id="T-9f8e7d")    # a send through the API, as tapi marks it
+    numeric_task = dict(message, fromMe=True, task_id=918273645)                    # a task id that is not a string: no mark
+    blank_task = dict(message, fromMe=True, task_id="  ")                           # a blank one: no mark either
     webhook = {"messages": [dict(message, wh_type="incoming_message")]}
 
     at = 1761400200.0
@@ -583,7 +604,7 @@ def cmd_selftest(_args):
         emit(describe_wa_dialog(dialog, at))
     for dialog in (tg_dialog, tg_service):
         emit(describe_tg_dialog(dialog, at))
-    for row in (message, tg_message, api_send):
+    for row in (message, tg_message, api_send, numeric_task, blank_task):
         emit(describe_message(row, at, "s"))
         emit(keys_of(row))
     for row in webhook_messages(webhook):
@@ -603,8 +624,9 @@ def cmd_selftest(_args):
         "a stranger's profile name is told apart from the book name": "contact.PushName=yes" in output,
         "the dialog's other ids are told by format": "chat.ids=id=NNNNNNNNNNN@c.us,lid=NNNNNNNNNNNNNNN@lid" in output,
         "a message's phone is told by its digit count": "phone=11d" in output,
-        "an API send's marks are told (the value of from_where, task_id only as present)":
-            "from_where=api" in output and "task_id=yes" in output and "from_where=<none>" in output and "task_id=-" in output,
+        "an API send's marks are told (the value of from_where, task_id only by its JSON type)":
+            "from_where=api" in output and "task_id=string" in output and "from_where=<none>" in output and "task_id=-" in output
+            and "task_id=number" in output and "task_id=blank" in output,
         "the WhatsApp card is filtered by the chat id's digits":
             card_request("wa", wa_dialog["id"]) == ("sync/chats/filter", {"client_name": "77012345678"}),
         "the Telegram card is the first chats/get page":
@@ -628,7 +650,9 @@ def main():
         command.add_argument("--profile", required=True)
         command.add_argument("--source", choices=("get", "filter"), default="get",
                              help="Telegram chat list: chats/get (default) or chats/filter")
-        command.add_argument("--limit", type=int, default=20 if name == "chats" else 10)
+        command.add_argument("--limit", type=int, default=20 if name == "chats" else 10,
+                             help="chats: how many chats; chat: rows of the chat's newest page — raise it (e.g. 50) when the "
+                                  "row you look for is older than the newest 10")
         if name == "chat":
             target = command.add_mutually_exclusive_group(required=True)
             target.add_argument("--chat")
