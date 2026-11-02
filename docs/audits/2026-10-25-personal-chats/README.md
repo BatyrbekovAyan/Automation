@@ -14,7 +14,8 @@
 ## Что меняется для владельца сразу после выкладки
 
 - ИИ-сотрудник молчит в личных чатах — контакты из телефона, переписки, начатые до подключения, группы, каналы, боты, 777000,
-  «Избранное» — и ничего о них не хранит; с новыми людьми и с клиентами, которых отметил владелец, работает как раньше.
+  «Избранное» — и с выкладки ничего нового о них не записывает; с новыми людьми и с клиентами, которых отметил владелец, работает
+  как раньше. Сохранённое о таких чатах ДО выкладки остаётся на сервере — раздел «Сохранённое до выкладки».
 - Решение по чату принимается один раз, по его первому входящему после выкладки; до этого чат ничего не получает. Первое сообщение
   такого чата ждёт ответа дольше на **≈ 5–8 с** (два чтения Wappi и два-три узла Postgres по ≈ 1,9 с) — только пока у чата нет
   решения.
@@ -22,6 +23,16 @@
 - Через 2 дня после того, как рабочий чат стал личным, сохранённое о нём удаляется (шаг Sweep раз в 6 часов).
 - Успешные выполнения шаблонов, клонов, Suggest Replies и двух новых workflow в журнал n8n больше не попадают (раньше хранились
   7 дней вместе с текстом сообщения); ошибочные — как прежде.
+
+## Сохранённое до выкладки
+
+До выкладки сервер записывал каждый чат ИИ-сотрудника один на один: историю (`chat_history_events`), память (`n8n_chat_histories`),
+журнал ответа (`reply_events`), итоги «Сводки». На проде сейчас живой только тестовый ИИ-сотрудник «2» — значит, это его чаты
+(появятся к выкладке другие — то же и с их чатами). После выкладки чат, решённый личным, не получает ничего нового, но **то, что о
+нём сохранено ДО выкладки, остаётся на сервере**: такой чат никогда не был рабочим по решению сервера, поэтому часы удаления
+(2 дня) для него не запускаются — они идут только у чата, который стал личным после рабочего периода. Убрать это сохранённое
+владелец может, удалив ИИ-сотрудника в приложении: Delete Bot Files стирает память, историю, журнал ответа и итоги «Сводки» всей
+его линии. Canary (шаг 9) это сохранённое не судит — только то, что записано после его отметки.
 
 ## Решения владельца, которые несёт пакет
 
@@ -62,7 +73,7 @@ Create/Edit WA/TG; журнал `docs/audits/implementation-progress.md`, раз
 | Create TG | `Uz6HBBUpAiUqVysB` | то же | то же | `fed4629fee42` → `80e93626bd01` |
 | Delete Bot Files | `lmjYsdNcQA2IE5rl` | +2 id; `Delete Chat Memory` удаляет решения и подключения линии (`deletedAudience` / `deletedConnections` читают `Deletion Settled?` и `Respond`) | `apply-auth-gate.py` + `apply-history-handoff.py` | `ab64a6555282` → `95b6407aa939` |
 | Profile Lifecycle Sweep | `fXYpCXPKw92EzRz8` | +2 id; новая ветка «Wipe Personal Chats» — ПЕРВАЯ ветка `Every 6 Hours`, один узел Postgres (`audience.WIPE_SQL`), без флага пробного прогона, идёт дальше при ошибке | `apply-personal-wipe.py` + `apply-sweep-clone-deactivate.py` | `35be6f37abeb` → `6abfa98ea38c` |
-| Wappi Proxy | `crWappiProxy0001` | `Record Owner Send` пишет только рабочие чаты (`business: false` иначе) | `apply-history-handoff.py` | `c8bba5e407f4` → `21204c214a4a` |
+| Wappi Proxy | `crWappiProxy0001` | `Record Owner Send` пишет только рабочие чаты (`business: false` иначе) | `build-auth-workflows.py` (условие «рабочий чат» — `audience.BUSINESS_SQL`; метка «Владелец: » — константа `apply-history-handoff.py`) | `c8bba5e407f4` → `21204c214a4a` |
 | Suggest Replies | `9PTyYcelRQI7bGDb` | `Suggestion Gate` отказывает чату, который не рабочий (`personal_chat`; сбой базы — отказ, а не пропуск); `saveDataSuccessExecution: "none"` | `apply-suggest-v2.py` | `fc2f19c5c996` → `84d59c9c26bb` |
 | Dashboard Outcomes | `2htWSV5IHO8E2CgB` | только рабочие чаты — и во входе классификатора, и в ответе | `apply-history-handoff.py` | `5f4cd7fb634d` → `13b0fa2cca2e` |
 | WhatsApp Bot (шаблон) | `4wYitz5ek30SVNlT` | вход: `Read Reply Mode` (тот же один узел) читает решение и подключение → `Audience Known?` → `Business?` / `Decide Audience` → `Decided Business?`; запись истории — только рабочих чатов; lease отменяет ответ чату, ставшему личным (`cancelled_personal`); строку `messages/get`, где чат WhatsApp назван своим кодом `@lid`, проверки ответа считают строкой этого чата (раньше такой чат «Авто» не отвечал); `saveDataSuccessExecution: "none"`; 60 → 64 узла | `apply-history-handoff.py`, `apply-reply-pipeline-v2.py`, `apply-outcome-stamps.py` | `60aa43640382` → `3c53710fa0b6` |
@@ -112,17 +123,42 @@ Create/Edit WA/TG; журнал `docs/audits/implementation-progress.md`, раз
 `N8N_API_KEY="$(cat /Users/ayan/Projects/Automation/Tools/n8n/.secrets/prod-api-key.txt)" python3 …` (в `.secrets/` рабочей копии
 ветки ключа прода нет).
 
+**Сайт из `main` — не раньше шага 11.** Влитая в `main` ветка приносит в `docs/legal/privacy.html` абзац «Личные чаты», а сборка
+сайта копирует этот файл как есть. Выложенный до шагов 1–9 сайт пообещал бы то, чего прод ещё не делает (сегодняшний прод отвечает
+контактам и хранит их переписку), поэтому **до шага 11 сайт из `main` не выкладывать** — ни этим пакетом, ни другой задачей.
+
 **Позже изменился только шаблон?** Тогда достаточно шагов 5–7 (только его строки шага 5, затем 6 и 7): точка отката печатается в
 выводе шага 5.
 
 ### Шаг 0. Подготовка (ничего не меняет)
 
-0.1. Канон рабочей копии = пакет:
+0.1. **Рабочая копия = отрепетированный пакет** (офлайн, только чтение). Инструменты выкладки читают РАБОЧУЮ КОПИЮ, а не коммит:
+`deploy-canonical.py` выкладывает каждый `Tools/n8n/workflows/*.json` из неё, `update-clones.py` берёт из неё шаблоны, а основной
+копией пользуются и другие сессии. Поэтому проверяется рабочая копия — канон, миграции, промпты, сами инструменты выкладки и папка
+пакета; каждая проверка — отдельным блоком.
+
+(a) Ни правок, ни лишних файлов:
 ```bash
-git -C /Users/ayan/Projects/Automation diff --stat f67fca8b HEAD -- Tools/n8n/workflows Tools/n8n/sql
+git -C /Users/ayan/Projects/Automation status --porcelain --untracked-files=all -- Tools/n8n/workflows Tools/n8n/sql Tools/n8n/prompts Tools/n8n/deploy-canonical.py Tools/n8n/update-clones.py Tools/n8n/verify-deployed.py Tools/n8n/verify-sql-comments.py Tools/n8n/inject-prompts.py docs/audits/2026-10-25-personal-chats
 ```
-Ожидание: пусто. Не пусто — в main не влита ветка или на main лёг другой канон: **СТОП** (влить ветку; если на main новый канон —
-пакет проверить заново).
+Ожидание: пусто. Любая строка — ` M` (правка) или `??` (новый файл: `deploy-canonical.py` выложил бы и его) — **СТОП**: в копии
+идёт чья-то работа; выяснить, до того ничего не выкладывать.
+
+(b) Рабочая копия — не только HEAD — несёт ровно канон и инструменты, на которых пакет отрепетирован (`f67fca8b`):
+```bash
+git -C /Users/ayan/Projects/Automation diff --stat f67fca8b -- Tools/n8n/workflows Tools/n8n/sql Tools/n8n/prompts Tools/n8n/deploy-canonical.py Tools/n8n/update-clones.py Tools/n8n/verify-deployed.py Tools/n8n/verify-sql-comments.py Tools/n8n/inject-prompts.py
+```
+Ожидание: пусто. Не пусто — в `main` не влита ветка, или на `main` легло другое изменение канона или инструментов: **СТОП** (влить
+ветку; если на `main` новый канон — пакет проверить заново).
+
+(c) Графы рабочей копии = таблица «Что меняется на сервере» (против канона `40bbf80b`, которым прод обслуживается; читает только
+файлы и git):
+```bash
+python3 /Users/ayan/Projects/Automation/docs/audits/2026-10-25-personal-chats/package_check.py
+```
+Ожидание: 12 строк `OK   package …` с графами «до -> после» ровно как в таблице; `unchanged (…): 20`; две строки `OK   clones …
+template stamp` (`c0a7c5186fb2 -> 5c4c33e27468`, `62e09511fc94 -> cc77e05b537a` — штампы шага 6.1); `PACKAGE OK`, код 0. Любой
+`FAIL` — **СТОП**.
 
 0.2. На проде есть обе учётки, на которые будет перепривязана копия (только чтение: id / тип / имя):
 ```bash
@@ -133,9 +169,10 @@ python3 /Users/ayan/Projects/Automation/docs/audits/2026-10-25-personal-chats/ne
 
 0.3. **Строка WhatsApp, отправленная через API** (только чтение, одни признаки; нужно отдельное «да» владельца — читается его чат в
 Wappi). Начало разговора, которое сервер дописывает в память, когда чат становится рабочим, отличает отправку ИИ-сотрудника от
-сообщения владельца по меткам API у строки `messages/get` (`from_where: "api"`, непустой `task_id`). У Telegram они есть; у строк
-WhatsApp живая проверка ключей их не видела. Нужна ОДНА строка WhatsApp, отправленная через API: ответ «2» в «Авто» или сообщение
-владельца из приложения — в любом чате WhatsApp «2», кроме того, с которого пойдёт canary шага 9. Затем (токен Wappi —
+сообщения владельца по меткам API у строки `messages/get` (`from_where: "api"`, непустой строкой `task_id`). У Telegram они есть; у
+строк WhatsApp живая проверка ключей их не видела. Нужна ОДНА строка WhatsApp, отправленная через API: сообщение владельца из
+приложения (это тоже отправка через API; «Авто» ради неё не включать) или прежний ответ «2» в «Авто» — в любом чате WhatsApp «2»,
+кроме тех, с которых пойдёт canary шага 9. Затем (токен Wappi —
 `~/.config/choosereply/wappi-token`, вне репозитория; печатаются только признаки):
 ```bash
 python3 /Users/ayan/Projects/Automation/Tools/wappi/probe-audience-facts.py profiles
@@ -146,9 +183,11 @@ python3 /Users/ayan/Projects/Automation/Tools/wappi/probe-audience-facts.py chat
 ```bash
 python3 /Users/ayan/Projects/Automation/Tools/wappi/probe-audience-facts.py chat --ch wa --profile <тот же id> --handle <метка этого чата из вывода выше>
 ```
-Смотреть строку отправки (`fromMe=1`, `t=` — её время): `from_where=api` или `task_id=yes` — метка есть, правило начала разговора на
-WhatsApp держится. `from_where=<none>` и `task_id=-` — метки нет: тогда на WhatsApp действует остаток «Начало разговора на WhatsApp»
-(раздел «Остатки»). Выкладку это не блокирует; результат — в журнал выкладки.
+Смотреть строку отправки (`fromMe=1`, `t=` — её время). Метка есть, если у неё `from_where=api`, `wh_type=outgoing_message_api` или
+`task_id=string`: тогда правило начала разговора на WhatsApp держится. `task_id` печатается своим типом JSON, а не «есть / нет»:
+сервер считает меткой только непустую СТРОКУ, поэтому `task_id=number`, `blank`, `null` или `-` метки не дают. Ни одной метки —
+на WhatsApp действует остаток «Начало разговора на WhatsApp» (раздел «Остатки»). Строки отправки нет среди 10 новейших сообщений
+чата — повторить последнюю команду с `--limit 50`. Выкладку это не блокирует; результат (одни признаки) — в журнал выкладки.
 
 0.4. Бэкап n8n (утренний ночной архив того же дня не затирать):
 ```bash
@@ -168,6 +207,11 @@ python3 /Users/ayan/Projects/Automation/Tools/n8n/verify-deployed.py --base http
 WA/TG среди них). Клоны: два клона «2» — `BEHIND SETTINGS-BEHIND (saveDataSuccessExecution None, the template 'none')`,
 `prompt=at_canonical/auto_parts`; архивный «13» не считается. Клонов 0 (владелец удалил «2») — допустимо. Другие клоны (ИИ-сотрудники
 новой сборки) — допустимо, записать их число: их обновит шаг 6. Любое другое расхождение — СТОП.
+
+**Исключение — расхождение только в настройках** (`SETTINGS differ …`) у workflow ВНЕ пакета, то есть бывшее на проде ещё до этой
+выкладки. Его не чинить заодно: записать id и строку в журнал выкладки и спросить владельца — дальше только по его слову. Пакет
+такой workflow не тронет: шаг 5 выкладывает каждый workflow отдельно, через `--only`. Сводный dry-run 1.2 покажет его лишней строкой
+`would_update` (ожидаемо, не применять), а 6.3 — той же строкой DIFF (тогда там `diff 1`, код 2 — тоже ожидаемо).
 
 1.2. Dry-run = ровно пакет, точки отката:
 ```bash
@@ -214,7 +258,7 @@ python3 /Users/ayan/Projects/Automation/Tools/n8n/deploy-canonical.py --base htt
 ```
 Ожидание: `published by the PUT (served version = the update) — no publish call, no deactivate window`, `read-back: ok`, `updated 1`,
 `failed 0` (`__HDR_CRED__` инструмент привязывает к учётке `n8n Admin API` живого Set Workflow State).
-Откат: `POST /workflows/0DP79STI3pafXO9B/activate {"versionId": "<точка отката из rollback-pointers.txt>"}`.
+Откат: `rollback.py publish … --id 0DP79STI3pafXO9B --version <точка отката из rollback-pointers.txt>` (раздел «Откат»).
 
 ### Шаг 4. Два новых workflow: временная копия → импорт → GET → публикация
 
@@ -331,7 +375,8 @@ deactivate/activate window`, `read-back: ok`; `failed 0`. Затем блок 6.
 ```bash
 python3 /Users/ayan/Projects/Automation/Tools/n8n/verify-deployed.py --base https://n8n.choosereply.com --json /Users/ayan/Projects/Automation/docs/audits/2026-10-25-personal-chats/prod-after.json
 ```
-Ожидание: код 0, `canonical 32 (diff 0)`, хэши «после» = таблица; клоны `AT-CANONICAL`; `settings=True` у всех.
+Ожидание: код 0, `canonical 32 (diff 0)`, хэши «после» = таблица; клоны `AT-CANONICAL`; `settings=True` у всех (кроме
+расхождения в настройках вне пакета, записанного в 1.1 по слову владельца, — тогда `diff 1` и та же строка).
 
 6.4. Настройки — явным чтением, по одному workflow:
 ```bash
@@ -356,6 +401,8 @@ smoke выкладки 2026-09-24); без `--session` не пишется ни�
 ```bash
 python3 /Users/ayan/Projects/Automation/Tools/n8n/.secrets/sql-oneoff.py "with r as (update installs set revoked_at = now() where platform = 'smoke' and app_version = 'personal-chats-pkg' and revoked_at is null returning 1) select count(*) as revoked from r"
 ```
+Ожидание: `200 {"revoked":"1"}` — по одной на каждый прогон с `--session` (на стенде запрос отработал через Postgres-узел n8n —
+`rehearsal.txt` §G).
 **`list` = 200** отвечает только установке, у которой есть ИИ-сотрудник: это проверяет canary (шаг 9, п. 9.6) — и **без него сборку
 не выпускать**.
 
@@ -366,12 +413,17 @@ python3 /Users/ayan/Projects/Automation/Tools/n8n/.secrets/sql-oneoff.py "with r
 ```bash
 python3 /Users/ayan/Projects/Automation/docs/audits/2026-10-25-personal-chats/watch.py --base https://n8n.choosereply.com
 ```
-Ожидание: `GET 200 | error executions since …: []` ×10 и `whole instance … []`. Иначе — СТОП: прочитать ошибку
-(`GET /executions/<id>?includeData=true`), до разбора ничего не менять.
+Ожидание: `GET 200 | error executions since …: []` ×10 и `whole instance … []`. Иначе — СТОП, до разбора ничего не менять. У
+каждого ошибочного выполнения скрипт печатает строку `error execution <id> … | node <узел> (<тип>) | error <вид ошибки> | level
+<уровень>` — **в журнал выкладки пишется только это**: узел и вид ошибки. Текст ошибки может нести текст чата, а журнал лежит в публичном
+репозитории; полный текст читать в интерфейсе n8n (Executions), он остаётся на сервере.
+
+Журнал контейнера — с момента начала выкладки (`deploy-start.txt`, шаг 1.3), а не за последние полчаса: выкладка может идти дольше.
 ```bash
-ssh choosereply 'cd ~/choosereply && docker compose logs --since 30m n8n | grep -iE "error|insights" | tail -20'
+ssh choosereply "cd ~/choosereply && docker compose logs --since $(cat /Users/ayan/Projects/Automation/docs/audits/2026-10-25-personal-chats/deploy-start.txt) n8n | grep -iE 'error|insights' | tail -20"
 ```
-Ожидание: пусто (временные workflow `sql-oneoff` ждут 35 с перед удалением — цикл insights не возникает).
+Ожидание: пусто (временные workflow `sql-oneoff` ждут 35 с перед удалением — цикл insights не возникает). Строки есть — в журнал
+выкладки только их число и вид (например, «Error while saving insights»), без текста.
 
 8.2. Здоровье Decide Audience — его сбой не оставляет следа (вызов из шаблона идёт дальше при ошибке, успешные выполнения не
 сохраняются): каждый новый клиент молча остался бы без ответа.
@@ -388,48 +440,89 @@ python3 /Users/ayan/Projects/Automation/Tools/n8n/.secrets/sql-oneoff.py "$(cat 
 python3 /Users/ayan/Projects/Automation/docs/audits/2026-10-25-personal-chats/watch.py --base https://n8n.choosereply.com --sweep
 ```
 Ожидание: `execution … status success | Wipe Personal Chats: [{"wiped_chats": 0, "deleted_rows": 0}] | OK` (личных чатов старше
-2 дней ещё нет). Ошибка узла (`{"error": …}`) или `did not run` — СТОП и разбор: ветка идёт дальше при ошибке, поэтому видна только
-здесь. До тика — «no execution yet»: повторить после него.
+2 дней ещё нет). Ошибка узла (`{"error": "<вид>"}` или `{"keys": […]}` — текст ошибки скрипт не печатает) или `did not run` — СТОП и
+разбор: ветка идёт дальше при ошибке, поэтому видна только здесь. До тика — «no execution yet»: повторить после него.
 
 ### Шаг 9. Canary на тестовом ИИ-сотруднике «2» — до выпуска любой сборки
 
 Это первый вызов подпроцесса клоном, созданным через публичный API, на проде (у «2» клоны создал Create) — он и проверяется.
-Действия на телефонах — владелец; чтение — запросы ниже (одни признаки: ни номеров, ни имён, ни текстов).
-- 9.1. «Авто» у «2» включено. Со второго телефона — номера, которого НИКОГДА не было в контактах телефона «2» и который раньше этому
-  WhatsApp не писал, — написать «2». Ожидание: «2» отвечает.
-- 9.2. Написать «2» с номера, сохранённого в контактах телефона «2». Ожидание: ответа нет.
+Действия на телефонах — владелец; чтение — запросы ниже (одни признаки: ни номеров, ни имён, ни текстов). Canary судит только то,
+что записано ПОСЛЕ его отметки (9.0): всё, что «2» сохранил до выкладки, остаётся на сервере и сюда не входит (раздел «Сохранённое
+до выкладки»). Почему отметка, а не время решения по чату: у памяти (`n8n_chat_histories`) нет колонки времени, и «записано после»
+для неё узнаётся только по id, взятому заранее; одна отметка — одно правило для истории, памяти и журнала ответа.
+
+**Условия — проверить в день canary:**
+- **«2» может отвечать.** В приложении: «Подписка» — не «Истекла», диалогов осталось больше нуля; на карточке «2» нет «Канал
+  отключён» и «Отключён · …». План «2» мог быть только пробным или купленным в песочнице TestFlight — оба живут дни, а когда план
+  кончается, Profile Lifecycle Sweep отключает ИИ-сотрудника. Без диалогов 9.1 закончится `quota_denied` (видно в 9.5) — это не сбой
+  функции.
+- **«2» нет** (удалён или отключён) — нужен тестовый ИИ-сотрудник из НОВОЙ сборки (TestFlight): подключить канал и выждать 30 минут
+  после подключения — первые 30 минут чат без решения не получает ничего. Дальше всё то же с ним вместо «2»; у его строки подключения
+  в 9.5 `number_known: true`.
+- **«Авто» — только на время 9.1.** «2» подключён к настоящему аккаунту и в «Авто» ответил бы любому новому человеку, а рабочее
+  правило — ИИ-сотрудник вне проверки сам не отвечает. Поэтому «Авто» включается прямо перед 9.1 и выключается («Выбрать») сразу,
+  как пришёл ответ.
+- **Отправитель 9.1** — номер, которого НИКОГДА не было в контактах телефона «2» и который раньше этому аккаунту не писал (второй
+  телефон). **Отправитель 9.2** — номер из контактов телефона «2», который не писал «2» с начала выкладки (`deploy-start.txt`): чат,
+  решённый раньше, нового решения не получит и в 9.5 не появится. Писал ли он «2» до выкладки — не важно.
+
+- 9.0. Отметка начала — прямо перед 9.1 (только чтение: момент и последний id памяти; команда идёт ≈ 40 с — временный workflow
+  удаляется через 35 с):
+```bash
+python3 /Users/ayan/Projects/Automation/Tools/n8n/.secrets/sql-oneoff.py "$(cat /Users/ayan/Projects/Automation/docs/audits/2026-10-25-personal-chats/canary-baseline.sql)" | tee /Users/ayan/Projects/Automation/docs/audits/2026-10-25-personal-chats/canary-baseline.txt
+```
+Ожидание: `200 {"baseline_at":"<время>Z","memory_max_id":"<число>"}`.
+- 9.1. В приложении включить «Авто» у «2». Со второго телефона (см. условия) написать «2». Ожидание: «2» отвечает. Как только ответ
+  пришёл — выключить «Авто» (режим «Выбрать»).
+- 9.2. Уже в «Выбрать» — написать «2» с номера из контактов (см. условия). Ожидание: ответа нет. В «Выбрать» ответа не было бы и у
+  рабочего чата — доказательство здесь в 9.5: сообщение рабочего чата в «Выбрать» легло бы в историю и память, а о личном не
+  записывается ничего.
 - 9.3. В приложении на телефоне владельца открыть чат из 9.2 и запросить подсказки. Ожидание: подсказок нет (сборка с main без этой
   функции покажет «Не удалось загрузить» — это отказ сервера `personal_chat`; новая сборка панель в личном чате не показывает).
-- 9.4. (по желанию) То же в Telegram «2».
-- 9.5. Чтение:
+- 9.4. (по желанию) То же в Telegram «2» — 9.1 в «Авто», затем «Выбрать» и 9.2 — до 9.5.
+- 9.5. Чтение. Текст запроса собирает `canary.py` из отметки 9.0 (без неё запрос не выполняется):
 ```bash
-python3 /Users/ayan/Projects/Automation/Tools/n8n/.secrets/sql-oneoff.py "$(cat /Users/ayan/Projects/Automation/docs/audits/2026-10-25-personal-chats/canary.sql)"
+SQL="$(python3 /Users/ayan/Projects/Automation/docs/audits/2026-10-25-personal-chats/canary.py /Users/ayan/Projects/Automation/docs/audits/2026-10-25-personal-chats/canary-baseline.txt)" && python3 /Users/ayan/Projects/Automation/Tools/n8n/.secrets/sql-oneoff.py "$SQL"
 ```
-Ожидание: в `decisions` у профиля WhatsApp «2» — `business | default | new` (9.1) и `personal | default | contact` (9.2), `chats` 1 у
-каждой; в `connections` — его строка (`number_known: false`: сборка с main о подключении не сообщает, строку создал Decide Audience);
-`personal_history_rows`, `personal_memory_rows`, `personal_ledger_rows` — `"0"`; в `ledger_last_day` есть `sent`. Затем 8.2 ещё раз —
-`suspicious "0"`.
-- 9.6. **Ворота выпуска сборки: `list` = 200.** Новая сборка на устройстве владельца (device pass §6а): после запуска чат из 9.1 — в
-  рабочем списке, чат из 9.2 — в «Личных». Так приложение показывает только то, что вернул `list` с токеном его установки. Пока это не
-  подтверждено — **сборку не выпускать**.
+Ожидание (всё — после отметки 9.0):
+  - `decisions` — у профиля WhatsApp «2» есть `business | default | new` (9.1) и `personal | default | contact` (9.2), `chats` ≥ 1 у
+    каждой. Лишние строки или чаты — за время canary «2» писали и другие люди: ожидаемо;
+  - `connections` — строка профиля «2» (`number_known: false`: сборка с main о подключении не сообщает, строку создал Decide
+    Audience; у ИИ-сотрудника новой сборки — `true`);
+  - `personal_after` — `{"history": 0, "memory": 0, "ledger": 0}`: о личных чатах после отметки не записано ничего — **главное
+    правило**;
+  - `business_after` — `history` и `memory` больше 0: рабочий чат 9.1 записывается, как прежде;
+  - `ledger_after` — есть `sent` (ответ 9.1); `quota_denied` вместо него — у плана «2» кончились диалоги (см. условия);
+  - `personal_rows_before` — любые числа: это сохранённое о нынешних личных чатах ДО отметки; canary его не судит.
+
+  `personal_after` не нули — СТОП и разбор (что-то записало личный чат после его решения). Затем 8.2 ещё раз — `suspicious "0"`.
+- 9.6. **Ворота выпуска сборки: `list` = 200.** Новая сборка на устройстве владельца (device pass §6а), после запуска. Решающий
+  признак — открыть чат из 9.1: **в шапке есть переключатель «Авто»**. Он появляется только у чата, который сервер решил рабочим, а это
+  решение приложение узнаёт только из `list`. По спискам видно не всё: чат без решения приложение раскладывает своим правилом. У «2»
+  решающим будет и список — чат 9.1 в рабочем списке: «2» подключён до этой сборки и о подключении не сообщает, поэтому момент
+  подключения к нему тоже приходит только из `list`, а без момента приложение считает историю чата неизвестной и кладёт его в
+  «Личные». Чат 9.2 в «Личных» сам по себе не доказывает ничего: контакт приложение кладёт туда и без сервера. Пока признак не
+  подтверждён — **сборку не выпускать**.
 
 ### Шаг 10. Журнал и отметки «DEPLOYED»
 
 - `docs/audits/implementation-progress.md` — новый раздел «Развёртывание <дата> — «Личные и рабочие чаты»» (таблица шагов, снимки
-  `prod-before.json` / `prod-after.json`, `rollback-pointers.txt`, `deploy-start.txt`, результат 0.3, smoke, canary).
+  `prod-before.json` / `prod-after.json`, `rollback-pointers.txt`, `deploy-start.txt`, `canary-baseline.txt`, результат 0.3, smoke,
+  canary).
 - Отметки «in canon, NOT deployed» → «DEPLOYED to prod <дата>»: `grep -n "NOT deployed" /Users/ayan/Projects/Automation/CLAUDE.md
   /Users/ayan/Projects/Automation/Tools/n8n/README.md` — каждая строка «Личных и рабочих чатов» (на коммите пакета — CLAUDE.md 141,
   149 ×3, 151, 153, 200, 215, 216, 221, 259, 260, 261, 276; Tools/n8n/README.md 140 ×2, 147, 155, 156, 158, 159, 162, 165, 171, 172 — если
-  строки сдвинулись, по выводу grep); `docs/audits/2026-10-19-device-pass-new-build.md` §0 и заголовок §6а («сервер на прод НЕ
-  выложен» → «выложен <дата>»); строка «Статус» этого файла. Отметки «client, new build» остаются до сборки. Коммит
-  `deploy(prod): …` (точечные пути).
+  строки сдвинулись, по выводу grep); `docs/audits/2026-10-19-device-pass-new-build.md` — §0 («сервер на прод НЕ выложен (на
+  2026-11-02)» → «сервер выложен <дата>») и заголовок §6а («сервер ещё не выложен» → «сервер выложен <дата>»); строка «Статус» этого
+  файла. Отметки «client, new build» остаются до сборки. В журнал — только признаки: ни текстов чатов, ни номеров, ни имён (у ошибок —
+  узел и вид, шаг 8.1). Коммит `deploy(prod): …` (точечные пути).
 
 ### Шаг 11 (по желанию). Сайт: абзац «Личные чаты» в политике конфиденциальности
 
 Абзац в `docs/legal/privacy.html` описывает поведение сервера — опубликованный ДО выкладки, он был бы неправдой (сегодняшний прод
 отвечает контактам и хранит их). Публикуется только после шагов 1–9 и **после одобрения владельцем формулировки** (черновик уже в
-файле). Вопрос владельцу: поднять ли строку «Действует с 27 августа 2026 г. · Версия 1.0» (§10 политики обещает сообщать об изменениях
-там).
+файле); до этого шага сайт из `main` не выкладывается вовсе (абзац «Сайт из `main` — не раньше шага 11» в начале чек-листа).
+Вопрос владельцу: поднять ли строку «Действует с 27 августа 2026 г. · Версия 1.0» (§10 политики обещает сообщать об изменениях там).
 ```bash
 cd /Users/ayan/Projects/Automation/Tools/landing && node tools/build.mjs && node tools/check.mjs
 ```
@@ -445,18 +538,70 @@ cd /Users/ayan/Projects/Automation/Tools/landing && node tools/build.mjs && node
 
 ## Откат
 
-- **Обновлённые АКТИВНЫЕ workflow** (Set Workflow State, Create WA/TG, Delete Bot Files, Sweep, Wappi Proxy, Suggest Replies, Dashboard
-  Outcomes) — по точке отката, публикацией прежней версии на месте (без окна, когда вебхука нет):
-  `POST /api/v1/workflows/<id>/activate {"versionId": "<точка отката>"}`; сохранённая версия остаётся новой — verify-deployed покажет
-  DIFF, пока канон не возвращён. Либо канон `40bbf80b`: `git show 40bbf80b:Tools/n8n/workflows/<файл> > Tools/n8n/workflows/<файл>` →
-  `deploy-canonical.py --base https://n8n.choosereply.com --only <id> --apply --yes` (для Set Workflow State `--include-placeholders`)
-  → вернуть канон (`git checkout -- Tools/n8n/workflows/<файл>`). Настройка журнала не версионируется: откат версии оставляет
-  `saveDataSuccessExecution: "none"` — это безопасно.
-- **Шаблоны (НЕАКТИВНЫ) — только каноном** `40bbf80b` тем же путём, никогда `POST /activate` с их точкой (это ВКЛЮЧИЛО бы шаблон).
-  Затем клоны: `update-clones.py --base … --apply --yes`, пока в дереве старый шаблон, или точка отката каждого клона из
-  `rollback-pointers.txt` (клоны активны — публикация прежней версии годится).
-- **Новые workflow — откатываются ПОСЛЕДНИМИ**, после шаблонов и клонов: клон, который зовёт отсутствующий Decide Audience, оставляет
-  без ответа каждый чат без решения. `POST /workflows/<id>/deactivate`, ≥ 35 с, `DELETE /workflows/<id>` (правило insights).
+Порядок — обратный выкладке: шаблоны и клоны → изменённые включённые workflow → новые workflow ПОСЛЕДНИМИ; миграция остаётся.
+`<id>` и `<точка отката>` — из `rollback-pointers.txt` (строки `rollback pointer: versionId …` шагов 1.2 и 6.2). Каждая команда —
+отдельный блок, по одной, как при выкладке; `rollback.py` без явного `--base` не работает, ключ берёт так же, как остальные скрипты
+пакета.
+
+**По точке — быстро** (секунды; без окна, когда вебхука нет: n8n сначала проверяет версию, при отказе продолжает служить прежняя).
+Для ВКЛЮЧЁННОГО workflow — Set Workflow State, Create WA/TG, Delete Bot Files, Sweep, Wappi Proxy, Suggest Replies, Dashboard
+Outcomes, живые клоны:
+```bash
+python3 /Users/ayan/Projects/Automation/docs/audits/2026-10-25-personal-chats/rollback.py publish --base https://n8n.choosereply.com --id <id> --version <точка отката>
+```
+Ожидание: `<id> publish 200 | active True | served <точка отката> | stored <новая версия> | published graph <граф «до» из таблицы; у
+клона — прежний> | OK`. Сохранённой остаётся новая версия: verify-deployed покажет DIFF (опубликованный граф не канон), а следующий
+`deploy-canonical.py --apply` с каноном пакета опубликует её снова. У клона откат по точке недолог: сохранение настроек ИИ-сотрудника
+в приложении (Edit WA/TG читает сохранённую версию клона и записывает её назад) опубликует новую версию — за точкой у клона следует
+откат каноном (ниже). Шаблоны по точке НЕ откатываются: они выключены по контракту, и публикация ВКЛЮЧИЛА бы шаблон — `rollback.py`
+такой вызов отклоняет (как и вызов для любого выключенного workflow). Настройка журнала не версионируется: откат версии оставляет
+`saveDataSuccessExecution: "none"` — это безопасно.
+
+**Каноном `40bbf80b` — надёжно** (и сохранённая, и опубликованная версии — прежние). Из отдельной временной копии на этом коммите:
+основная копия не трогается, а инструменты — те, которыми прод выкладывался 2026-11-01. Ключ прода — из окружения (в новой копии
+папки `.secrets/` нет).
+```bash
+git -C /Users/ayan/Projects/Automation worktree add --detach /tmp/cr-rollback-40bbf80b 40bbf80b
+```
+Шаблон (`4wYitz5ek30SVNlT`, `4VN3gsFaC2HUYmcc`) или любой изменённый workflow — по одному, `--only <id>` (для Set Workflow State ещё
+`--include-placeholders`):
+```bash
+N8N_API_KEY="$(cat /Users/ayan/Projects/Automation/Tools/n8n/.secrets/prod-api-key.txt)" python3 /tmp/cr-rollback-40bbf80b/Tools/n8n/deploy-canonical.py --base https://n8n.choosereply.com --only <id> --apply --yes
+```
+Ожидание: как в шаге 5 — `read-back: ok`, `updated 1`, `failed 0` (шаблон сохраняется без публикации). Затем клоны — по шаблонам
+`40bbf80b`:
+```bash
+N8N_API_KEY="$(cat /Users/ayan/Projects/Automation/Tools/n8n/.secrets/prod-api-key.txt)" python3 /tmp/cr-rollback-40bbf80b/Tools/n8n/update-clones.py --base https://n8n.choosereply.com --apply --yes
+```
+Ожидание: у каждого клона `published by the PUT …`, `read-back: ok`; `failed 0`. Настройка журнала у шаблонов и клонов остаётся
+`'none'`: n8n сливает настройки при PUT, а канон `40bbf80b` её не называет — это безопасно. Почему не из основной копии с каноном
+пакета и подменённым шаблоном: её `update-clones.py` сверяет настройку журнала с шаблоном, а шаблон `40bbf80b` её не задаёт — граф
+откатится, но у каждого клона будет `read-back: settings differ from the template's: saveDataSuccessExecution 'none' (want None)` и
+`failed` (код 1), а следующий dry-run снова покажет клоны со строкой `settings: saveDataSuccessExecution 'none' → None (the
+template's)`. Чинить там нечего — это та же безопасная `'none'`.
+После отката убрать временную копию:
+```bash
+git -C /Users/ayan/Projects/Automation worktree remove /tmp/cr-rollback-40bbf80b
+```
+
+**Новые workflow — ПОСЛЕДНИМИ**, после шаблонов и клонов: клон, который зовёт отсутствующий Decide Audience, оставляет без ответа
+каждый чат без решения. По одному блоку, в этом порядке:
+```bash
+python3 /Users/ayan/Projects/Automation/docs/audits/2026-10-25-personal-chats/rollback.py deactivate --base https://n8n.choosereply.com --id crChatAudience01
+```
+```bash
+python3 /Users/ayan/Projects/Automation/docs/audits/2026-10-25-personal-chats/rollback.py deactivate --base https://n8n.choosereply.com --id crAudienceDec001
+```
+```bash
+python3 /Users/ayan/Projects/Automation/docs/audits/2026-10-25-personal-chats/rollback.py delete --base https://n8n.choosereply.com --id crChatAudience01
+```
+```bash
+python3 /Users/ayan/Projects/Automation/docs/audits/2026-10-25-personal-chats/rollback.py delete --base https://n8n.choosereply.com --id crAudienceDec001
+```
+Ожидание: `<id> deactivate 200 | active False | OK`; `delete` выжидает 36 с (правило insights: ≥ 35 с после последнего выполнения),
+затем `<id> DELETE 200 | GET 404 | OK`; включённый workflow `delete` не удаляет. Set Workflow State откатывать не обязательно
+(защита двух id, которых больше нет, ничего не делает); если откатывать — после удаления новых workflow.
+
 - **Миграция остаётся** (старый канон таблиц не читает). **Обратный оператор** (в конце файла миграции) — только когда ни один
   выложенный workflow не читает таблицы и ни одна строка `reply_events` не в `cancelled_personal`; на свежем кластере он вернул схему
   прода байт в байт (`rehearsal.txt` §B).
@@ -494,6 +639,8 @@ cd /Users/ayan/Projects/Automation/Tools/landing && node tools/build.mjs && node
 - **Начало разговора на WhatsApp** (до результата 0.3). Если строки WhatsApp, отправленные через API, не несут меток, сервер не
   отличит прежний ответ ИИ-сотрудника, ещё лежащий на странице Wappi, от сообщения владельца с телефона: в чате, который снова стал
   рабочим после удаления через 2 дня, такой ответ может лечь в память как «Владелец: …». На Telegram метки есть.
+- **Сохранённое до выкладки** о чатах, решённых личными, остаётся на сервере до удаления ИИ-сотрудника (раздел «Сохранённое до
+  выкладки»): часы удаления идут только у чата, который был рабочим.
 - **Задержка** первого сообщения чата без решения — ≈ 5–8 с на проде.
 - **Окно первых 30 минут** после подключения нового канала: чат без решения не получает ни ответа, ни подсказок. Остаток — контакт,
   который WhatsApp догрузил позже окна, при первом сообщении станет рабочим (спека §6).
@@ -533,12 +680,33 @@ cd /Users/ayan/Projects/Automation/Tools/landing && node tools/build.mjs && node
 | R13 шаг 7 | `smoke.py --session` 14/14: 7.5 bootstrap 200, 7.6 `[400] bad_request / profileIds` |
 | R14 шаг 8 | ошибочных выполнений с начала выкладки — 0 (10 id и весь инстанс); `--sweep` на пробе с производным узлом «Wipe Personal Chats» → `[{"wiped_chats": 0, "deleted_rows": 0}] \| OK` (свой тик стенда — в 06:00 Алматы, после репетиции) |
 | R16 шаг 9 на стенде | `stand-canary.py` **2/2** (WA, TG): ИИ-сотрудник из Create (публичный API) зовёт подпроцесс, импортированный CLI и опубликованный через API: новый человек → business / default / new, ответ ровно один; контакт → personal / default / contact, ответа нет, о чате не хранится ничего; панель → `personal_chat`, модель не запускалась; `list` → **200**, оба решения и момент подключения |
-| R17 SQL шагов 8–9 | `health.sql` → `{"suspicious":"0","profiles":[]}`; положительный контроль — в списке ровно «немой» профиль (не тот, у кого решение, и не свежий); `canary.sql` выполняется через Postgres-узел |
+| R17 SQL шагов 8–9 | `health.sql` → `{"suspicious":"0","profiles":[]}`; положительный контроль — в списке ровно «немой» профиль (не тот, у кого решение, и не свежий); его строки убраны — проверено по базе стенда перед повторным прогоном: `stg-health-*` — 0 в `audience_connections` и 0 в `chat_audience`. `canary.sql` здесь — прежний, без отметки (на пустом состоянии); нынешний — в таблице ниже |
 | e2e | `derive-staging.py` (без импорта) → **e2e-audience 42/42** (22:17–22:29Z); после — `verify-deployed` diff 0, exit 0; ошибочных выполнений по инстансу — 0; строк «Error while saving insights» — 0 |
 | Гейты | генераторы `--check` 24/24 (без `inject-prompts.py`: на этой машине нет tiktoken; карты промптов равны main), верификаторы 19/19 (`verify-sql-comments` — 109 Postgres-узлов в 33 файлах), `probe-audience-facts.py selftest` |
 | После | `bootstrap.py --bot wa:stgwa001 --bot tg:stgtg001` (рабочий канон) → `verify-deployed` diff 0, exit 0; n8n, мок и Postgres остановлены (последний прогон на стенде закончился ≈ 22:33Z) |
 
+**Повторный прогон после ревью пакета (2026-11-02, 04:36–05:01 по Алматы = 23:36–00:01Z)** — то, что ревью изменило: шаг 0.1, canary, наблюдение, откат,
+отзыв `installs`; вывод — `rehearsal.txt` §G. Канон и инструменты выкладки после первой репетиции не менялись
+(`git diff --stat f67fca8b -- Tools/n8n` — только `Tools/n8n/README.md`), поэтому e2e-audience и гейты генераторов не повторялись.
+
+| Шаг | Результат |
+|---|---|
+| G1 стенд из прод-состояния заново | `bootstrap.py --canon-ref 40bbf80b` → стенд = прод (два новых workflow удалены, таблицы сняты обратным оператором) → `verify-deployed` diff 12 → dry-run = ровно пакет (точки отката записаны) → миграция через Postgres-узел (дважды, те же пред- и пост-проверки) → Set Workflow State → два новых (копии, CLI, GET, публикация) → smoke 12/12 → 9 workflow → update-clones 2 → `verify-deployed` diff 0 → `READ-BACK OK` → `smoke.py --session` 14/14 |
+| G2 шаг 0.1 | (a) и (b) — пусто, (c) `package_check.py` — 12 × `OK` (графы = таблица), `unchanged …: 20`, штампы клонов, `PACKAGE OK`. Контроль: незакоммиченная правка одного параметра в файле пакета (Dashboard Outcomes) и в файле вне пакета (Delete Orphan Profiles) — (a) показывает обе ` M`, (b) — обе в diff, (c) — `FAIL` на обеих, код 1; после `git checkout` — снова `PACKAGE OK` |
+| G3 шаг 7, отзыв `installs` | запрос README через Postgres-узел → `200 {"revoked":"2"}` (две smoke-установки двух прогонов стенда; на проде после одного smoke — `"1"`) |
+| G4 шаг 8, наблюдение | `watch.py` с начала выкладки (`deploy-start.txt`) — 0 ошибок. Проба с ошибкой, текст которой несёт «текст чата» и «номер»: строка `node Throw Probe (n8n-nodes-base.code) \| error Error \| level info`, ни текста, ни номера в выводе. `--sweep` на пробе с производным «Wipe Personal Chats» → `[{"wiped_chats": 0, "deleted_rows": 0}] \| OK`; тот же узел с намеренно сломанным запросом (идёт дальше при ошибке) → `[{"keys": ["error", "message"]}] \| LOOK`, текст ошибки не напечатан |
+| G5 шаг 9, canary | `stand-canary.py` **2/2** (WA, TG): у контакта лежат строки «до выкладки» (2 истории, 2 памяти, 1 журнала, сутки назад); отметка 9.0 сохранена файлом; 9.1 в «Авто» → business / default / new, один ответ; переключение в «Выбрать» (`allApplied`); 9.2 в «Выбрать» → personal / default / contact, ни ответа, ни новой строки; 9.5 (`canary.py` → Postgres-узел): решения после отметки — ровно эти два, `personal_after` 0 / 0 / 0, `personal_rows_before` ≥ 2 / 2 / 1, `business_after` 2 / 2, `ledger_after` `sent` 1; контрольная запись истории, памяти и журнала личного чата после решения → `personal_after` 1 / 1 / 1 — увидена |
+| G6 прежний canary на тех же строках | чат, решённый личным после выкладки, с перепиской, сохранённой до неё: `canary.sql` прежней редакции пакета → `personal_*_rows` 2 / 2 / 1 — его 9.5 остановил бы верную выкладку; нынешний → `personal_after` 0 / 0 / 0, сохранённое — в `personal_rows_before` |
+| G7 откат | `rollback.py publish` точкой Dashboard Outcomes → служит прежняя версия (граф «до» `5f4cd7fb634d`), сохранённой остаётся новая, `verify-deployed` — DIFF; `deploy-canonical.py --apply` публикует сохранённую на месте — снова OK. Отказы: шаблон, удаление включённого workflow, `deactivate` чужого id. Точка клона → служит прежняя (`verify-deployed`: UNPUBLISHED). Инструменты `40bbf80b` (файлы из `git archive 40bbf80b`, история git — этой копии): шаблоны → `updated 1` ×2, клоны → `updated 2`, `failed 0`, повторный dry-run — up to date 2. Новые workflow: `deactivate` ×2, `delete` ×2 (36 с, `GET 404`) |
+| После | `bootstrap.py --bot wa:stgwa001 --bot tg:stgtg001` → `verify-deployed` diff 0, exit 0 (00:00:21Z); n8n (SIGTERM), мок и Postgres остановлены, порты свободны — 00:00:57Z |
+
 **Не проверено (остатки репетиции):** `docker compose`-путь импорта на проде (та же форма, что выполнена 2026-10-15 и 2026-10-19);
 перепривязка WappiAuthToken (на стенде у этой учётки уже id прода — поймать расхождение может только 4a/4c на проде); Postgres 17
 прода (стенд — 16; миграция — обычный DDL и два блока `do`); первый тик Sweep на проде (8.3); строка WhatsApp, отправленная через API
-(0.3); живой canary и ворота выпуска (шаг 9).
+(0.3); живой canary и ворота выпуска (шаг 9); запись настройки журнала `'none'` там, где её не было, — у шаблонов, Suggest Replies и
+клонов: производные копии стенда хранят успешные выполнения, поэтому на стенде тот же переход «ключа нет → ключ есть» прошёл со
+значением `'all'`, а `'none'` на проде проверяет только 6.4; бэкап (0.4) — только VPS прода; запрос отзыва `installs` (шаг 7) —
+только на стенде; `docker compose logs --since <время из deploy-start.txt>` (8.1) — на стенде нет docker, форма времени — RFC 3339,
+которую `--since` принимает по документации docker; отказ «не из основной копии» при откате клонов (`settings differ … (want None)`)
+взят из кода `update-clones.py` (сборка цели и чтение назад), на стенде он не виден — производный шаблон стенда задаёт `'all'`;
+выключение `crAudienceDec001`, пока его ещё зовёт опубликованный workflow, — порядок отката этого не допускает и не проверялся.

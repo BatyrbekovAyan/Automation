@@ -1,4 +1,4 @@
-Task 18 — репетиция пакета выкладки «Личные и рабочие чаты» на стенде из прод-состояния (2026-11-02)
+Репетиция пакета выкладки «Личные и рабочие чаты» на стенде из прод-состояния (2026-11-02)
 
 Только стенд: n8n 2.36.7 (task runners) http://localhost:5678, Postgres pg.sh (5433; PG 16.2 — на проде 17), Wappi-мок
 127.0.0.1:8765 из этой ветки. Прод — ни одного запроса: его состояние подтверждено офлайн (§A). Инструменты — те же, что пойдут
@@ -6,6 +6,8 @@ Task 18 — репетиция пакета выкладки «Личные и �
 все с явным --base http://localhost:5678); миграция и SQL-файлы пакета — как есть, через Postgres-узел n8n (staging-двойник
 .secrets/sql-oneoff.py: тот же харнес, удаление временного workflow через 35 с; отличаются база, ключ и учётка «Postgres Staging»).
 Сырые журналы шагов: Tools/test-output/task18/ (gitignored). Время — UTC (Алматы = UTC+5).
+§A–§F — первая репетиция (2026-11-01 21:41–22:33Z); §G — повторный прогон после ревью пакета (2026-11-01 23:36Z – 2026-11-02
+00:01Z): шаг 0.1 по рабочей копии, canary по отметке, наблюдение без текстов ошибок, откат готовыми командами, отзыв installs.
 
 === §A. Прод сейчас: офлайн-сверка (без единого запроса к проду) и состав пакета ===
 
@@ -215,7 +217,7 @@ rc=0
 11|6|3|t|0|3|t|1|t|0
 ### reply_events CHECK constraints after (contype = 'c'; expect exactly one, with 'cancelled_personal')
 reply_events_state_check | CHECK ((state = ANY (ARRAY['claimed'::text, 'generated'::text, 'send_pending'::text, 'sent'::text, 'send_failed'::text, 'send_unknown'::text, 'superseded'::text, 'cancelled_owner'::text, 'cancelled_mode'::text, 'cancelled_busy'::text, 'cancelled_fetch'::text, 'generation_failed'::text, 'quota_denied'::text, 'suppressed'::text, 'cancelled_personal'::text])))
-### the Task 9e columns (expect decided_phone, prev_phone, prev_connected_at — nullable, last)
+### the three restore columns (expect decided_phone, prev_phone, prev_connected_at — nullable, last)
 audience_connections.prev_phone text nullable=YES position=5
 audience_connections.prev_connected_at timestamp with time zone nullable=YES position=6
 chat_audience.decided_phone text nullable=YES position=11
@@ -399,7 +401,7 @@ GET /credentials 200 | rows 10 | wanted [('httpHeaderAuth', 'ZowntFGvApDJ7UzQ', 
 200 {"audience_cols":"11","connection_cols":"6","restore_cols":"3","rls":true,"client_grants":"0","indexes":"3","wipe_idx":true,"state_checks":"1","personal_state":true,"rows":"0"}
 --- psql: the reply ledger's CHECK constraints (contype = 'c')
 1 | reply_events_state_check
---- psql: the Task 9e columns
+--- psql: the three restore columns
 audience_connections.prev_connected_at nullable=YES position=6
 audience_connections.prev_phone nullable=YES position=5
 chat_audience.decided_phone nullable=YES position=11
@@ -1132,3 +1134,420 @@ pg.sh stop rc=0 at 22:33:24Z
 listeners on 5678:        0
 listeners on 8765:        0
 pg_ctl: no server running
+
+=== §G. Повторный прогон после ревью пакета (стенд 2026-11-01 23:36:07Z – 2026-11-02 00:00:57Z): что правка изменила — то и проверено ===
+
+Канон и инструменты выкладки после первой репетиции не менялись (git diff --stat f67fca8b -- Tools/n8n: только Tools/n8n/README.md),
+поэтому e2e-audience и гейты генераторов не повторялись. Изменились: шаг 0.1 (проверка РАБОЧЕЙ копии + package_check.py), canary
+(отметка 9.0 + canary.sql по ней + canary.py), наблюдение (watch.py печатает у ошибки только узел и вид), откат (rollback.py,
+инструменты 40bbf80b из временной копии), пробник 0.3 (тип JSON у task_id). Стенд: тот же n8n 2.36.7 / pg.sh / мок этой ветки;
+SQL пакета — через Postgres-узел n8n (двойник sql-oneoff.py). Сырые журналы — Tools/test-output/task18/fix1-*.
+
+### G0 база стенда до прогона (23:36Z, сразу после pg.sh start): строки положительного контроля health.sql из R17b
+audience_connections stg-health rows: 0 | chat_audience stg-health rows: 0 | audience_connections total: 0 | chat_audience total: 0
+(R17b печатал только audience_connections; убраны обе таблицы.)
+
+### G0b офлайн: canary.py — текст canary.sql из ответа 9.0; всё прочее — отказ без вывода (scratchpad test_canary_py.py)
+PASS ok: rc=0 stdout=4472 chars stderr=''
+PASS ok-no-fraction: rc=0 stdout=4461 chars stderr=''
+PASS create-failed: rc=1 stdout=0 chars stderr='canary.py: в <tmp>/create-failed.txt нет ровно одной ст'
+PASS non-200: rc=1 stdout=0 chars stderr='canary.py: в <tmp>/non-200.txt нет ровно одной строки о'
+PASS bad-time: rc=1 stdout=0 chars stderr="canary.py: baseline_at не того вида: '2026-11-02 10:00' — canary НЕ выполнять: сначала шаг 9.0 (отметка), зате"
+PASS injection: rc=1 stdout=0 chars stderr='canary.py: baseline_at не того вида: "2026-11-02T10:00:00Z\'; drop table x; --" — canary НЕ выполнять: сначала '
+PASS number-not-text: rc=1 stdout=0 chars stderr='canary.py: memory_max_id не того вида: 12 — canary НЕ выполнять: сначала шаг 9.0 (отметка), затем этот шаг'
+PASS extra-key: rc=1 stdout=0 chars stderr="canary.py: в ответе отметки не те поля: ['baseline_at', 'memory_max_id', 'x'] — canary НЕ выполнять: сначала ш"
+PASS two-answers: rc=1 stdout=0 chars stderr='canary.py: в <tmp>/two-answers.txt нет ровно одной стро'
+PASS empty: rc=1 stdout=0 chars stderr='canary.py: в <tmp>/empty.txt нет ровно одной строки отв'
+PASS absent file: rc=1 stderr='canary.py: нет файла отметки <tmp>/absent.txt — canary '
+ALL PASS
+
+### G0c офлайн: probe-audience-facts.py selftest — task_id печатается типом JSON (string / number / blank / -)
+from_where=<none>  task_id=-
+from_where=<none>  task_id=-
+from_where=api  task_id=string
+from_where=<none>  task_id=number
+from_where=<none>  task_id=blank
+from_where=<none>  task_id=-
+selftest: no name / text / number in the output | every sign present
+
+### G1 стенд из прод-состояния заново: bootstrap.py --canon-ref 40bbf80b --bot wa:stgwa001 --bot tg:stgtg001 (23:36:28Z -> 23:38:22Z)
+2. server up at http://localhost:5678 (pid 61455, log /Users/ayan/.n8n-staging/n8n.log)
+   canon: 40bbf80b (git archive -> /var/folders/65/d93rj7qn5csdsm10l1l8t4jm0000gn/T/canon-ref-im405qjd/Tools/n8n/workflows)
+   Successfully imported 33 workflows.
+5. imported 31 workflows + 2 staging bots; published 33
+2. server up at http://localhost:5678 (pid 61770, log /Users/ayan/.n8n-staging/n8n.log)
+staging ready: http://localhost:5678
+
+### G1b стенд = прод (scratchpad t18/r2_emulate_prod.py): два новых workflow удалены (>= 36 с), таблицы сняты обратным оператором
+crAudienceDec001 on the stand: GET 200 active True
+crChatAudience01 on the stand: GET 200 active True
+crAudienceDec001 deactivate 200
+crChatAudience01 deactivate 200
+waiting 36 s before deleting (insights rule)
+crAudienceDec001 delete 200 -> GET 404
+crChatAudience01 delete 200 -> GET 404
+reply_events rows in 'cancelled_personal' (staging test data left by e2e-audience): 0
+decision / connection rows before the drop: 0|0
+dropped both tables, the reply ledger's CHECK restored without 'cancelled_personal' (the migration file's reverse operator)
+precheck (psql; expect t|t|1|t|f): t|t|1|t|f 
+
+### G1c verify-deployed (ожидание: canonical 32, diff 12 = DIFF x10 + MISSING x2)
+base http://localhost:5678: canonical 32 (diff 12), clones 2 (behind template 2, of them prompt head behind 0; custom prompts 2, not counted), archived clones 0 (not counted), other 2
+  DIFF    0DP79STI3pafXO9B 0DP79STI3pafXO9B-Set_Workflow_State.json  active=True names=True graph=False published=False settings=True  (stored graph differs; PUBLISHED graph differs)
+  DIFF    2htWSV5IHO8E2CgB 2htWSV5IHO8E2CgB-Dashboard_Outcomes.json  active=True names=True graph=False published=False settings=True  (stored graph differs; PUBLISHED graph differs)
+  DIFF    4VN3gsFaC2HUYmcc 4VN3gsFaC2HUYmcc-Telegram_Bot.json  active=False names=False graph=False published=None settings=True  (node set differs; stored graph differs)
+  DIFF    4wYitz5ek30SVNlT 4wYitz5ek30SVNlT-WhatsApp_Bot.json  active=False names=False graph=False published=None settings=True  (node set differs; stored graph differs)
+  DIFF    9PTyYcelRQI7bGDb 9PTyYcelRQI7bGDb-Suggest_Replies.json  active=True names=True graph=False published=False settings=True  (stored graph differs; PUBLISHED graph differs)
+  DIFF    Uz6HBBUpAiUqVysB Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json  active=True names=True graph=False published=False settings=True  (stored graph differs; PUBLISHED graph differs)
+  DIFF    XuvOp7TxOImOAmlj XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json  active=True names=True graph=False published=False settings=True  (stored graph differs; PUBLISHED graph differs)
+  MISSING crAudienceDec001 crAudienceDec001-Decide_Audience.json  active=None names=None graph=None published=None settings=None
+  MISSING crChatAudience01 crChatAudience01-Chat_Audience.json  active=None names=None graph=None published=None settings=None
+  DIFF    crWappiProxy0001 crWappiProxy0001-Wappi_Proxy.json  active=True names=True graph=False published=False settings=True  (stored graph differs; PUBLISHED graph differs)
+  DIFF    fXYpCXPKw92EzRz8 fXYpCXPKw92EzRz8-Profile_Lifecycle_Sweep.json  active=True names=False graph=False published=False settings=True  (node set differs; stored graph differs; PUBLISHED graph differs)
+  DIFF    lmjYsdNcQA2IE5rl lmjYsdNcQA2IE5rl-Delete_Bot_Files.json  active=True names=True graph=False published=False settings=True  (stored graph differs; PUBLISHED graph differs)
+  clone   stgtg40da979c774 'STAGING TG stgtg001' [telegram] active=True nodes=60 graph=e9532e7b4139 published=e9532e7b4139 sticky=None BEHIND  prompt=custom (custom prompt — kept verbatim by update-clones, not counted: no Create/Edit grammar (Business Type line + Additional Instructions marker))
+  clone   stgwab77f282533c 'STAGING WA stgwa001' [whatsapp] active=True nodes=60 graph=4943da220c3f published=4943da220c3f sticky=None BEHIND  prompt=custom (custom prompt — kept verbatim by update-clones, not counted: no Create/Edit grammar (Business Type line + Additional Instructions marker))
+OK rows: 20
+
+### G1d dry-run = ровно пакет; точки отката (stand-local rollback-pointers: Tools/test-output/task18/fix1-rollback-pointers.txt)
+~ 2htWSV5IHO8E2CgB 'Dashboard Outcomes' active=True nodes 16 → 16 (+0 -0)
+    rollback pointer: versionId c85beffc-b667-4d4d-b295-49a41c28d50a (activeVersionId c85beffc-b667-4d4d-b295-49a41c28d50a)
+~ 4VN3gsFaC2HUYmcc 'Telegram Bot' active=False nodes 60 → 64 (+4 -0)
+    rollback pointer: versionId 363a4ca5-d3dd-493b-b68d-f83a150ef7bf (activeVersionId None)
+~ 4wYitz5ek30SVNlT 'WhatsApp Bot' active=False nodes 60 → 64 (+4 -0)
+    rollback pointer: versionId 998a7f09-593c-4b0f-98dc-bdc1f3407add (activeVersionId None)
+~ 9PTyYcelRQI7bGDb 'Suggest Replies' active=True nodes 26 → 26 (+0 -0)
+    rollback pointer: versionId 1e422f0b-47c8-486a-8377-7381e0612be4 (activeVersionId 1e422f0b-47c8-486a-8377-7381e0612be4)
+~ Uz6HBBUpAiUqVysB 'CreateTelegramWorkflow' active=True nodes 52 → 52 (+0 -0)
+    rollback pointer: versionId 352f59e9-d363-428a-91f9-e6f4dc0c683d (activeVersionId 352f59e9-d363-428a-91f9-e6f4dc0c683d)
+~ XuvOp7TxOImOAmlj 'CreateWhatsappWorkflow' active=True nodes 52 → 52 (+0 -0)
+    rollback pointer: versionId 9997baf6-06fd-4ca0-8af3-0d28c35a28e5 (activeVersionId 9997baf6-06fd-4ca0-8af3-0d28c35a28e5)
+MISSING crAudienceDec001 crAudienceDec001-Decide_Audience.json — import it with n8n import:workflow, not here
+MISSING crChatAudience01 crChatAudience01-Chat_Audience.json — import it with n8n import:workflow, not here
+~ crWappiProxy0001 'Wappi Proxy' active=True nodes 24 → 24 (+0 -0)
+    rollback pointer: versionId a7e3dae8-5d98-42fd-8903-c945fa119203 (activeVersionId a7e3dae8-5d98-42fd-8903-c945fa119203)
+~ fXYpCXPKw92EzRz8 'Profile Lifecycle Sweep' active=True nodes 41 → 42 (+1 -0)
+    rollback pointer: versionId a05b3fe5-7823-4325-90d8-9779ebc7f7c4 (activeVersionId a05b3fe5-7823-4325-90d8-9779ebc7f7c4)
+~ lmjYsdNcQA2IE5rl 'Delete Bot Files' active=True nodes 19 → 19 (+0 -0)
+    rollback pointer: versionId d0c08f09-7dbd-4cb0-a35d-485191cab526 (activeVersionId d0c08f09-7dbd-4cb0-a35d-485191cab526)
+{"considered": 30, "missing": 2, "up_to_date": 19, "would_update": 9, "updated": 0, "would_publish": 0, "republished": 0, "inactive_must_run": 0, "failed": 0}
+~ 0DP79STI3pafXO9B 'Set Workflow State' active=True nodes 20 → 20 (+0 -0)
+    rollback pointer: versionId a3d96c9d-2547-4172-aed6-21a1f0d3cd65 (activeVersionId a3d96c9d-2547-4172-aed6-21a1f0d3cd65)
+{"considered": 1, "missing": 0, "up_to_date": 0, "would_update": 1, "updated": 0, "would_publish": 0, "republished": 0, "inactive_must_run": 0, "failed": 0}
+deploy-start (README 1.3, файл рядом с README; после прогона удалён): 2026-11-01T23:39:33Z
+
+### G1e шаг 2 — миграция через Postgres-узел n8n (scratchpad t18/r5_migration.sh)
+--- docs/audits/2026-10-25-personal-chats/precheck.sql  (23:39:41Z)
+200 {"no_audience":true,"no_connections":true,"state_checks":"1","state_check_named":true,"personal_state":false}
+--- Tools/n8n/sql/2026-10-25-chat-audience.sql  (23:40:18Z)
+200 {"success":true}
+--- docs/audits/2026-10-25-personal-chats/postcheck.sql  (23:40:55Z)
+200 {"audience_cols":"11","connection_cols":"6","restore_cols":"3","rls":true,"client_grants":"0","indexes":"3","wipe_idx":true,"state_checks":"1","personal_state":true,"rows":"0"}
+--- Tools/n8n/sql/2026-10-25-chat-audience.sql  (23:41:32Z)
+200 {"success":true}
+--- docs/audits/2026-10-25-personal-chats/postcheck.sql  (23:42:09Z)
+200 {"audience_cols":"11","connection_cols":"6","restore_cols":"3","rls":true,"client_grants":"0","indexes":"3","wipe_idx":true,"state_checks":"1","personal_state":true,"rows":"0"}
+--- psql: the reply ledger's CHECK constraints (contype = 'c')
+1 | reply_events_state_check
+--- psql: the three restore columns
+audience_connections.prev_connected_at nullable=YES position=6
+audience_connections.prev_phone nullable=YES position=5
+chat_audience.decided_phone nullable=YES position=11
+
+### G1f шаг 3 — Set Workflow State
+~ 0DP79STI3pafXO9B 'Set Workflow State' active=True nodes 20 → 20 (+0 -0)
+    rollback pointer: versionId a3d96c9d-2547-4172-aed6-21a1f0d3cd65 (activeVersionId a3d96c9d-2547-4172-aed6-21a1f0d3cd65)
+    published by the PUT (served version = the update) — no publish call, no deactivate window
+    read-back: ok
+{"considered": 1, "missing": 0, "up_to_date": 0, "would_update": 0, "updated": 1, "would_publish": 0, "republished": 0, "inactive_must_run": 0, "failed": 0}
+
+### G1g шаг 4 — копии (стенд), CLI-импорт, GET, публикация
+crAudienceDec001-Decide_Audience.json [('httpHeaderAuth', 'ZowntFGvApDJ7UzQ', 'WappiAuthToken'), ('postgres', 'stgPostgres000001', 'Postgres Staging')] graph d63052ace385 (canon 4e3736a6bc7e) id crAudienceDec001 active False saveDataSuccessExecution 'none' -> OK
+crChatAudience01-Chat_Audience.json [('httpHeaderAuth', 'ZowntFGvApDJ7UzQ', 'WappiAuthToken'), ('postgres', 'stgPostgres000001', 'Postgres Staging')] graph 53cd0623d38e (canon 30f1fc89207c) id crChatAudience01 active False saveDataSuccessExecution 'none' -> OK
+copies in /private/tmp/claude-501/-Users-ayan-Projects-Automation/bfafad35-f3fe-444e-8f96-9f057ad0019e/scratchpad/fix1/import-stand
+server before import: 200
+Importing 1 workflows...
+Successfully imported 1 workflow.
+import crAudienceDec001-Decide_Audience rc=0
+Importing 1 workflows...
+Successfully imported 1 workflow.
+import crChatAudience01-Chat_Audience rc=0
+server after import: 200
+crAudienceDec001 GET 200 | active False | creds ['ZowntFGvApDJ7UzQ', 'stgPostgres000001'] | OK
+crChatAudience01 GET 200 | active False | creds ['ZowntFGvApDJ7UzQ', 'stgPostgres000001'] | OK
+crAudienceDec001 activate 200 | active True | published=stored True | published graph d63052ace385 (canon d63052ace385) | creds ['ZowntFGvApDJ7UzQ', 'stgPostgres000001'] | OK
+crChatAudience01 activate 200 | active True | published=stored True | published graph 53cd0623d38e (canon 53cd0623d38e) | creds ['ZowntFGvApDJ7UzQ', 'stgPostgres000001'] | OK
+
+### G1h шаг 4f — smoke.py
+7.1 GET /webhook/ChatAudience -> [404] Did you mean to make a POST request?  OK
+7.1 GET /webhook/CreateWhatsappWorkflow -> [404] Did you mean to make a POST request?  OK
+7.1 GET /webhook/CreateTelegramWorkflow -> [404] Did you mean to make a POST request?  OK
+7.1 GET /webhook/DeleteBotFiles -> [404] Did you mean to make a POST request?  OK
+7.1 GET /webhook/SuggestReplies -> [404] Did you mean to make a POST request?  OK
+7.1 GET /webhook/DashboardOutcomes -> [404] Did you mean to make a POST request?  OK
+7.1 GET /webhook/WappiProxy -> [404] Did you mean to make a POST request?  OK
+7.1 GET /webhook/SetWorkflowState -> [404] Did you mean to make a POST request?  OK
+7.2 POST ChatAudience {} (no token) -> [401] {"success": false, "error": "unauthorized", "reason": "unauthorized:missing"}  OK
+7.3 POST ChatAudience {} (forged token) -> [401] {"success": false, "error": "unauthorized", "reason": "unauthorized:bad_signature"}  OK
+7.4 POST SetWorkflowState activate crChatAudience01 (no token) -> [400] {"success": false, "error": "protected_workflow"}  OK
+7.4 POST SetWorkflowState activate crAudienceDec001 (no token) -> [400] {"success": false, "error": "protected_workflow"}  OK
+SMOKE OK
+
+### G1i шаг 5 — 9 workflow по одному
+### 23:43:25Z deploy-canonical --base http://localhost:5678 --only XuvOp7TxOImOAmlj --apply --yes
+    published by the PUT (served version = the update) — no publish call, no deactivate window
+    read-back: ok
+{"considered": 1, "missing": 0, "up_to_date": 0, "would_update": 0, "updated": 1, "would_publish": 0, "republished": 0, "inactive_must_run": 0, "failed": 0}
+### 23:43:25Z deploy-canonical --base http://localhost:5678 --only Uz6HBBUpAiUqVysB --apply --yes
+    published by the PUT (served version = the update) — no publish call, no deactivate window
+    read-back: ok
+{"considered": 1, "missing": 0, "up_to_date": 0, "would_update": 0, "updated": 1, "would_publish": 0, "republished": 0, "inactive_must_run": 0, "failed": 0}
+### 23:43:26Z deploy-canonical --base http://localhost:5678 --only lmjYsdNcQA2IE5rl --apply --yes
+    published by the PUT (served version = the update) — no publish call, no deactivate window
+    read-back: ok
+{"considered": 1, "missing": 0, "up_to_date": 0, "would_update": 0, "updated": 1, "would_publish": 0, "republished": 0, "inactive_must_run": 0, "failed": 0}
+### 23:43:26Z deploy-canonical --base http://localhost:5678 --only fXYpCXPKw92EzRz8 --apply --yes
+    published by the PUT (served version = the update) — no publish call, no deactivate window
+    read-back: ok
+{"considered": 1, "missing": 0, "up_to_date": 0, "would_update": 0, "updated": 1, "would_publish": 0, "republished": 0, "inactive_must_run": 0, "failed": 0}
+### 23:43:27Z deploy-canonical --base http://localhost:5678 --only crWappiProxy0001 --apply --yes
+    published by the PUT (served version = the update) — no publish call, no deactivate window
+    read-back: ok
+{"considered": 1, "missing": 0, "up_to_date": 0, "would_update": 0, "updated": 1, "would_publish": 0, "republished": 0, "inactive_must_run": 0, "failed": 0}
+### 23:43:27Z deploy-canonical --base http://localhost:5678 --only 9PTyYcelRQI7bGDb --apply --yes
+    published by the PUT (served version = the update) — no publish call, no deactivate window
+    read-back: ok
+{"considered": 1, "missing": 0, "up_to_date": 0, "would_update": 0, "updated": 1, "would_publish": 0, "republished": 0, "inactive_must_run": 0, "failed": 0}
+### 23:43:28Z deploy-canonical --base http://localhost:5678 --only 2htWSV5IHO8E2CgB --apply --yes
+    published by the PUT (served version = the update) — no publish call, no deactivate window
+    read-back: ok
+{"considered": 1, "missing": 0, "up_to_date": 0, "would_update": 0, "updated": 1, "would_publish": 0, "republished": 0, "inactive_must_run": 0, "failed": 0}
+### 23:43:28Z deploy-canonical --base http://localhost:5678 --only 4wYitz5ek30SVNlT --apply --yes
+    read-back: ok
+{"considered": 1, "missing": 0, "up_to_date": 0, "would_update": 0, "updated": 1, "would_publish": 0, "republished": 0, "inactive_must_run": 0, "failed": 0}
+### 23:43:28Z deploy-canonical --base http://localhost:5678 --only 4VN3gsFaC2HUYmcc --apply --yes
+    read-back: ok
+{"considered": 1, "missing": 0, "up_to_date": 0, "would_update": 0, "updated": 1, "would_publish": 0, "republished": 0, "inactive_must_run": 0, "failed": 0}
+
+### G1j шаг 6.1–6.2 — update-clones --apply --yes, затем dry-run
+~ stgtg40da979c774 'STAGING TG stgtg001' [telegram] active=True → +4 -0 ~9 conn=changed
+    rollback pointer: versionId 265888b2-0eb0-4257-bb47-3ee2b78cdaa5 (activeVersionId 265888b2-0eb0-4257-bb47-3ee2b78cdaa5) before the update
+    published by the PUT (served version = the update) — no deactivate/activate window
+    read-back: ok
+~ stgwab77f282533c 'STAGING WA stgwa001' [whatsapp] active=True → +4 -0 ~9 conn=changed
+    rollback pointer: versionId 88121e58-b8ee-44e1-81a7-9e7398a42d57 (activeVersionId 88121e58-b8ee-44e1-81a7-9e7398a42d57) before the update
+    published by the PUT (served version = the update) — no deactivate/activate window
+    read-back: ok
+{"clones": 2, "up_to_date": 0, "would_update": 0, "updated": 2, "failed": 0}
+{"clones": 2, "up_to_date": 2, "would_update": 0, "updated": 0, "failed": 0}
+
+### G1k шаг 6.3–6.4 — verify-deployed и readback.py
+base http://localhost:5678: canonical 32 (diff 0), clones 2 (behind template 0, of them prompt head behind 0; custom prompts 2, not counted), archived clones 0 (not counted), other 2
+  clone   stgtg40da979c774 'STAGING TG stgtg001' [telegram] active=True nodes=64 graph=838d71744efa published=838d71744efa sticky=838d71744efa AT-CANONICAL  prompt=custom (custom prompt — kept verbatim by update-clones, not counted: no Create/Edit grammar (Business Type line + Additional Instructions marker))
+  clone   stgwab77f282533c 'STAGING WA stgwa001' [whatsapp] active=True nodes=64 graph=fda0c72318a8 published=fda0c72318a8 sticky=fda0c72318a8 AT-CANONICAL  prompt=custom (custom prompt — kept verbatim by update-clones, not counted: no Create/Edit grammar (Business Type line + Additional Instructions marker))
+OK rows: 32
+4wYitz5ek30SVNlT 4wYitz5ek30SVNlT-WhatsApp_Bot.json: saveDataSuccessExecution = 'all' (want 'all') OK
+4VN3gsFaC2HUYmcc 4VN3gsFaC2HUYmcc-Telegram_Bot.json: saveDataSuccessExecution = 'all' (want 'all') OK
+9PTyYcelRQI7bGDb 9PTyYcelRQI7bGDb-Suggest_Replies.json: saveDataSuccessExecution = 'all' (want 'all') OK
+9PTyYcelRQI7bGDb 9PTyYcelRQI7bGDb-Suggest_Replies.json: executionTimeout = 20 (want 20) OK
+crAudienceDec001 crAudienceDec001-Decide_Audience.json: saveDataSuccessExecution = 'none' (want 'none') OK
+crChatAudience01 crChatAudience01-Chat_Audience.json: saveDataSuccessExecution = 'none' (want 'none') OK
+crWappiProxy0001 crWappiProxy0001-Wappi_Proxy.json: saveDataSuccessExecution = 'none' (want 'none') OK
+clone stgtg40da979c774 'STAGING TG stgtg001' [telegram] active=True: saveDataSuccessExecution = 'all' (want 'all') OK
+clone stgwab77f282533c 'STAGING WA stgwa001' [whatsapp] active=True: saveDataSuccessExecution = 'all' (want 'all') OK
+clones read: 2
+READ-BACK OK
+
+### G1l шаг 7 — smoke.py --session
+7.1 GET /webhook/ChatAudience -> [404] Did you mean to make a POST request?  OK
+7.1 GET /webhook/CreateWhatsappWorkflow -> [404] Did you mean to make a POST request?  OK
+7.1 GET /webhook/CreateTelegramWorkflow -> [404] Did you mean to make a POST request?  OK
+7.1 GET /webhook/DeleteBotFiles -> [404] Did you mean to make a POST request?  OK
+7.1 GET /webhook/SuggestReplies -> [404] Did you mean to make a POST request?  OK
+7.1 GET /webhook/DashboardOutcomes -> [404] Did you mean to make a POST request?  OK
+7.1 GET /webhook/WappiProxy -> [404] Did you mean to make a POST request?  OK
+7.1 GET /webhook/SetWorkflowState -> [404] Did you mean to make a POST request?  OK
+7.2 POST ChatAudience {} (no token) -> [401] {"success": false, "error": "unauthorized", "reason": "unauthorized:missing"}  OK
+7.3 POST ChatAudience {} (forged token) -> [401] {"success": false, "error": "unauthorized", "reason": "unauthorized:bad_signature"}  OK
+7.4 POST SetWorkflowState activate crChatAudience01 (no token) -> [400] {"success": false, "error": "protected_workflow"}  OK
+7.4 POST SetWorkflowState activate crAudienceDec001 (no token) -> [400] {"success": false, "error": "protected_workflow"}  OK
+7.5 AuthSession bootstrap (one anonymous install) -> [200] {"success": true, "installId": "2b4f58a0-cfc0-4d5f-a931-21172a3a7ab9", "token": "<hidden>"}  OK
+7.6 POST ChatAudience list [] (that session's token) -> [400] {"success": false, "error": "bad_request", "reason": "profileIds"}  OK
+SMOKE OK
+
+### G3 шаг 7 — запрос отзыва installs из README через Postgres-узел n8n (до: 2 smoke-установки двух прогонов стенда, не отозваны)
+200 {"revoked":"2"}
+после: 2 smoke install(s), not revoked: 0
+
+### G4 шаг 8.1 — watch.py с начала выкладки (deploy-start.txt по умолчанию)
+crAudienceDec001 GET 200 | error executions since 2026-11-01T23:39:33Z: []
+crChatAudience01 GET 200 | error executions since 2026-11-01T23:39:33Z: []
+0DP79STI3pafXO9B GET 200 | error executions since 2026-11-01T23:39:33Z: []
+XuvOp7TxOImOAmlj GET 200 | error executions since 2026-11-01T23:39:33Z: []
+Uz6HBBUpAiUqVysB GET 200 | error executions since 2026-11-01T23:39:33Z: []
+lmjYsdNcQA2IE5rl GET 200 | error executions since 2026-11-01T23:39:33Z: []
+fXYpCXPKw92EzRz8 GET 200 | error executions since 2026-11-01T23:39:33Z: []
+crWappiProxy0001 GET 200 | error executions since 2026-11-01T23:39:33Z: []
+9PTyYcelRQI7bGDb GET 200 | error executions since 2026-11-01T23:39:33Z: []
+2htWSV5IHO8E2CgB GET 200 | error executions since 2026-11-01T23:39:33Z: []
+whole instance GET 200 | error executions since 2026-11-01T23:39:33Z: []
+
+### G4b derive-staging.py (без импорта): workflows-staging = канон пакета (пробы ниже читают производные узлы с диска)
+staging isolation: KoTuIlk4LMrlvnWI-Upload_File.json: ['Supabase Vector Store (+3 sub-nodes)', 'Store Original File']
+staging isolation: ZTqpumOpL1rNDOp6-Delete_File.json: ['Delete Stored Original']
+staging price search: crPriceSearch001-Price_List_Search.json: ['Search Price Lists (+1 sub-nodes)']
+staging isolation: lmjYsdNcQA2IE5rl-Delete_Bot_Files.json: ['Delete Stored Original']
+33 workflows + 2 staging bots -> /Users/ayan/Projects/Automation/.claude/worktrees/personal-chats/Tools/n8n/workflows-staging
+n8n base http://localhost:5678; Wappi -> http://127.0.0.1:8765; postgres -> 'Postgres Staging' (stgPostgres000001)
+note: left dangling on purpose (isolation): ['Support Bot']
+
+### G4c watch.py печатает только признаки (scratchpad fix1/watch_probes.py): (a) ошибка, чей текст несёт «текст чата» и «номер»;
+### (b) производный «Wipe Personal Chats» — как в тике Sweep; (c) тот же узел с намеренно сломанным запросом (идёт дальше при ошибке)
+### (a) watch.py — errors since 2026-11-01T23:47:49Z (an error probe ran)
+crAudienceDec001 GET 200 | error executions since 2026-11-01T23:47:49Z: []
+crChatAudience01 GET 200 | error executions since 2026-11-01T23:47:49Z: []
+0DP79STI3pafXO9B GET 200 | error executions since 2026-11-01T23:47:49Z: []
+XuvOp7TxOImOAmlj GET 200 | error executions since 2026-11-01T23:47:49Z: []
+Uz6HBBUpAiUqVysB GET 200 | error executions since 2026-11-01T23:47:49Z: []
+lmjYsdNcQA2IE5rl GET 200 | error executions since 2026-11-01T23:47:49Z: []
+fXYpCXPKw92EzRz8 GET 200 | error executions since 2026-11-01T23:47:49Z: []
+crWappiProxy0001 GET 200 | error executions since 2026-11-01T23:47:49Z: []
+9PTyYcelRQI7bGDb GET 200 | error executions since 2026-11-01T23:47:49Z: []
+2htWSV5IHO8E2CgB GET 200 | error executions since 2026-11-01T23:47:49Z: []
+whole instance GET 200 | error executions since 2026-11-01T23:47:49Z: [('J9THj0fadTFBCzA2', '53137', '2026-11-01T23:47:51.965Z')]
+  error execution 53137 2026-11-01T23:47:51.965Z workflow J9THj0fadTFBCzA2 | node Throw Probe (n8n-nodes-base.code) | error Error | level info
+exit 1 | detail lines 1 | sentinels printed: none | PASS
+
+### (b) watch.py --sweep on a probe with the derived «Wipe Personal Chats» node
+gZz4pzFPRb9StkwH GET 200 | executions since 2026-11-01T23:47:56Z: 1
+  execution 53138 2026-11-01T23:47:57.569Z status success | Wipe Personal Chats: [{"wiped_chats": 0, "deleted_rows": 0}] | OK
+exit 0 | PASS
+
+### (c) watch.py --sweep when «Wipe Personal Chats» fails (query broken on purpose in the probe)
+BcAp1TZz4cQ4e3no GET 200 | executions since 2026-11-01T23:47:58Z: 1
+  execution 53139 2026-11-01T23:47:59.552Z status success | Wipe Personal Chats: [{"keys": ["error", "message"]}] | LOOK
+(the node's raw item keys, for the record: [['error', 'message']]; its text is not printed here either)
+exit 1 | error text printed: none | PASS
+   waiting 35s before deleting 3 workflow(s) that ran (n8n insights flush, ≥ 35 s rule)
+
+probes switched off and deleted (>= 35 s after their runs): 3
+ALL PASS
+
+### G5 шаг 9 — stand-canary.py (отметка 9.0 файлом; 9.1 в «Авто» → «Выбрать» → 9.2; у контакта строки «до выкладки»; 9.5 через
+### canary.py и Postgres-узел; контрольная запись после решения)
+PASS  canary_api_clone[wa] (42s)
+      {"create": [200, true, "VzeF4Fy8RseL2TDY"], "baseline": "200 {\"baseline_at\":\"2026-11-01T23:51:40.923948Z\",\"memory_max_id\":\"10389306\"}", "mode_vybrat": [200, true, [true]], "profile": "profile-000005", "new": {"webhook": 200, "execution": "53181", "mode_suppressed": false, "outcome": "sent", "decide_ran": true, "decide": {"audience": "business", "outcome": "business"}, "decision": "business|default|new", "sends": 1}, "contact": {"webhook": 200, "execution": "53185", "mode_suppressed": true, "outcome": "personal_contact", "decide_ran": true, "decide": {"audience": "personal", "outcome": "personal_contact"}, "decision": "personal|default|contact", "sends": 0, "stored": {"history": 2, "memory": 2, "outcomes": 0, "handoffs": 0, "ledger": 1, "state": 0, "sets": 0, "flags": 0}}, "contact stored before 9.0 / after the canary": [{"history": 2, "memory": 2, "outcomes": 0, "handoffs": 0, "ledger": 1, "state": 0, "sets": 0, "flags": 0}, {"history": 2, "memory": 2, "outcomes": 0, "handoffs": 0, "ledger": 1, "state": 0, "sets": 0, "flags": 0}], "panel": {"http": 200, "error": "personal_chat", "cards": 0, "llm_ran": false, "gate": "personal_chat"}, "list": [200, [["contact", "personal", "default", "contact"], ["new", "business", "default", "new"]], 1793569899471], "connection(moment-created s, phone)": ["0", "-"], "canary.sql (9.5)": {"status": "200", "decisions of this profile": [["business", "default", "new", 1], ["personal", "default", "contact", 1]], "connection": [{"profile_id": "profile-000005", "number_known": false, "previous_number_known": false, "connected_at": "2026-11-01T21:51Z"}], "personal_after": {"history": 0, "memory": 0, "ledger": 0}, "business_after": {"history": 2, "memory": 2}, "ledger_after": {"sent": 1}, "personal_rows_before": {"history": 2, "memory": 2, "ledger": 1}, "verdict": "OK"}, "canary.sql after a leak written after the decision": {"status": "200", "personal_after": {"history": 1, "memory": 1, "ledger": 1}, "verdict": "SEEN"}}
+PASS  canary_api_clone[tg] (41s)
+      {"create": [200, true, "PxAVcEiv8yhDyiBd"], "baseline": "200 {\"baseline_at\":\"2026-11-01T23:52:22.444960Z\",\"memory_max_id\":\"10389311\"}", "mode_vybrat": [200, true, [true]], "profile": "profile-000007", "new": {"webhook": 200, "execution": "53198", "mode_suppressed": false, "outcome": "sent", "decide_ran": true, "decide": {"audience": "business", "outcome": "business"}, "decision": "business|default|new", "sends": 1}, "contact": {"webhook": 200, "execution": "53202", "mode_suppressed": true, "outcome": "personal_contact", "decide_ran": true, "decide": {"audience": "personal", "outcome": "personal_contact"}, "decision": "personal|default|contact", "sends": 0, "stored": {"history": 2, "memory": 2, "outcomes": 0, "handoffs": 0, "ledger": 1, "state": 0, "sets": 0, "flags": 0}}, "contact stored before 9.0 / after the canary": [{"history": 2, "memory": 2, "outcomes": 0, "handoffs": 0, "ledger": 1, "state": 0, "sets": 0, "flags": 0}, {"history": 2, "memory": 2, "outcomes": 0, "handoffs": 0, "ledger": 1, "state": 0, "sets": 0, "flags": 0}], "panel": {"http": 200, "error": "personal_chat", "cards": 0, "llm_ran": false, "gate": "personal_chat"}, "list": [200, [["contact", "personal", "default", "contact"], ["new", "business", "default", "new"]], 1793569941005], "connection(moment-created s, phone)": ["0", "-"], "canary.sql (9.5)": {"status": "200", "decisions of this profile": [["business", "default", "new", 1], ["personal", "default", "contact", 1]], "connection": [{"profile_id": "profile-000007", "number_known": false, "previous_number_known": false, "connected_at": "2026-11-01T21:52Z"}], "personal_after": {"history": 0, "memory": 0, "ledger": 0}, "business_after": {"history": 2, "memory": 2}, "ledger_after": {"sent": 1}, "personal_rows_before": {"history": 4, "memory": 4, "ledger": 2}, "verdict": "OK"}, "canary.sql after a leak written after the decision": {"status": "200", "personal_after": {"history": 1, "memory": 1, "ledger": 1}, "verdict": "SEEN"}}
+   cleanup: deleted rows: 1
+   cleanup: 2 owner fixture(s)
+   waiting 30s before deleting 8 workflow(s) that ran (n8n insights flush, ≥ 35 s rule)
+
+2 pass, 0 fail
+
+### G6 прежний canary.sql (редакция 068553e3) и нынешний — на одних и тех же строках (scratchpad fix1/canary_before_after.py)
+demo: one chat decided personal now; stored before the deploy (a day ago): {'history': 2, 'memory': 2, 'outcomes': 0, 'handoffs': 0, 'ledger': 1, 'state': 0, 'sets': 0, 'flags': 0}
+9.0 baseline: 200 {"baseline_at":"2026-11-01T23:54:13.309172Z","memory_max_id":"10389316"}
+canary.sql of 068553e3 (as reviewed): {'personal_history_rows': '2', 'personal_memory_rows': '2', 'personal_ledger_rows': '1'} -> its 9.5 expects "0" for each: STOP on a correct deploy
+canary.sql now (composed by canary.py from the 9.0 file): {'personal_after': {'history': 0, 'memory': 0, 'ledger': 0}, 'personal_rows_before': {'history': 2, 'memory': 2, 'ledger': 1}} -> OK
+demo rows removed; left: {'history': 0, 'memory': 0, 'outcomes': 0, 'handoffs': 0, 'ledger': 0, 'state': 0, 'sets': 0, 'flags': 0} | decision rows: 0
+   waiting 35s before deleting 3 workflow(s) that ran (n8n insights flush, ≥ 35 s rule)
+
+### G7 откат (раздел «Откат» README)
+--- rollback.py publish: точка Dashboard Outcomes из G1d
+2htWSV5IHO8E2CgB publish 200 | active True | served c85beffc-b667-4d4d-b295-49a41c28d50a | stored b2148444-7737-4bd6-a2be-0d7f7ec6faca | published graph 5f4cd7fb634d | OK
+base http://localhost:5678: canonical 32 (diff 1), clones 2 (behind template 0, of them prompt head behind 0; custom prompts 2, not counted), archived clones 0 (not counted), other 2
+  DIFF    2htWSV5IHO8E2CgB 2htWSV5IHO8E2CgB-Dashboard_Outcomes.json  active=True names=True graph=True published=False settings=True  (PUBLISHED graph differs)
+--- вперёд снова: deploy-canonical (dry-run, затем --apply) публикует сохранённую версию на месте
+^ 2htWSV5IHO8E2CgB 'Dashboard Outcomes' stored graph is canonical, but n8n SERVES another version: activeVersionId c85beffc-b667-4d4d-b295-49a41c28d50a (published graph 5f4cd7fb634d) != stored versionId b2148444-7737-4bd6-a2be-0d7f7ec6faca
+    rollback pointer: activeVersionId c85beffc-b667-4d4d-b295-49a41c28d50a (POST /workflows/2htWSV5IHO8E2CgB/activate {"versionId": "c85beffc-b667-4d4d-b295-49a41c28d50a"} serves it again)
+    would publish the stored versionId b2148444-7737-4bd6-a2be-0d7f7ec6faca in place (no PUT, no deactivate)
+{"considered": 1, "missing": 0, "up_to_date": 0, "would_update": 0, "updated": 0, "would_publish": 1, "republished": 0, "inactive_must_run": 0, "failed": 0}
+^ 2htWSV5IHO8E2CgB 'Dashboard Outcomes' stored graph is canonical, but n8n SERVES another version: activeVersionId c85beffc-b667-4d4d-b295-49a41c28d50a (published graph 5f4cd7fb634d) != stored versionId b2148444-7737-4bd6-a2be-0d7f7ec6faca
+    rollback pointer: activeVersionId c85beffc-b667-4d4d-b295-49a41c28d50a (POST /workflows/2htWSV5IHO8E2CgB/activate {"versionId": "c85beffc-b667-4d4d-b295-49a41c28d50a"} serves it again)
+    publishing the stored versionId b2148444-7737-4bd6-a2be-0d7f7ec6faca in place (POST /workflows/2htWSV5IHO8E2CgB/activate — n8n validates it before it swaps the served version; no deactivate window)
+    read-back: ok — serving the stored versionId b2148444-7737-4bd6-a2be-0d7f7ec6faca, published graph canonical
+{"considered": 1, "missing": 0, "up_to_date": 0, "would_update": 0, "updated": 0, "would_publish": 0, "republished": 1, "inactive_must_run": 0, "failed": 0}
+--- отказы rollback.py: шаблон; удаление включённого; deactivate не нового id
+4wYitz5ek30SVNlT: REFUSED — a template is inactive by contract; publishing a version would switch it ON. Roll a template back by its canon (README «Откат»)
+crChatAudience01: GET 200 active True — REFUSED: deactivate it first
+usage: rollback.py deactivate [-h] --base BASE --id
+                              {crAudienceDec001,crChatAudience01}
+rollback.py deactivate: error: argument --id: invalid choice: '2htWSV5IHO8E2CgB' (choose from 'crAudienceDec001', 'crChatAudience01')
+--- rollback.py publish: точка клона WA из G1j
+stgwab77f282533c publish 200 | active True | served 88121e58-b8ee-44e1-81a7-9e7398a42d57 | stored 7d122ed5-7607-486d-8642-8643659c0397 | published graph 52d758ed5e8b | OK
+base http://localhost:5678: canonical 32 (diff 0), clones 2 (behind template 1, of them prompt head behind 0; custom prompts 2, not counted), archived clones 0 (not counted), other 2
+  clone   stgtg40da979c774 'STAGING TG stgtg001' [telegram] active=True nodes=64 graph=838d71744efa published=838d71744efa sticky=838d71744efa AT-CANONICAL  prompt=custom (custom prompt — kept verbatim by update-clones, not counted: no Create/Edit grammar (Business Type line + Additional Instructions marker))
+  clone   stgwab77f282533c 'STAGING WA stgwa001' [whatsapp] active=True nodes=64 graph=fda0c72318a8 published=4943da220c3f sticky=fda0c72318a8 UNPUBLISHED (stored graph canonical, published is not)  prompt=custom (custom prompt — kept verbatim by update-clones, not counted: no Create/Edit grammar (Business Type line + Additional Instructions marker))
+--- каноном 40bbf80b: инструменты 40bbf80b (файлы — git archive 40bbf80b Tools/n8n в scratchpad; история git — этой копии через
+--- GIT_DIR; ключ стенда — в N8N_API_KEY, не печатается: scratchpad fix1/old_tool.py) — так README запускает их из git worktree 40bbf80b
+~ 4wYitz5ek30SVNlT 'WhatsApp Bot' active=False nodes 64 → 60 (+0 -4)
+    rollback pointer: versionId ab198721-281e-471c-b29b-1f3078ec7acc (activeVersionId None)
+{"considered": 1, "missing": 0, "up_to_date": 0, "would_update": 1, "updated": 0, "would_publish": 0, "republished": 0, "inactive_must_run": 0, "failed": 0}
+~ 4wYitz5ek30SVNlT 'WhatsApp Bot' active=False nodes 64 → 60 (+0 -4)
+    rollback pointer: versionId ab198721-281e-471c-b29b-1f3078ec7acc (activeVersionId None)
+    read-back: ok
+{"considered": 1, "missing": 0, "up_to_date": 0, "would_update": 0, "updated": 1, "would_publish": 0, "republished": 0, "inactive_must_run": 0, "failed": 0}
+~ 4VN3gsFaC2HUYmcc 'Telegram Bot' active=False nodes 64 → 60 (+0 -4)
+    rollback pointer: versionId ee702555-4948-4c46-914d-333b08569329 (activeVersionId None)
+    read-back: ok
+{"considered": 1, "missing": 0, "up_to_date": 0, "would_update": 0, "updated": 1, "would_publish": 0, "republished": 0, "inactive_must_run": 0, "failed": 0}
+base http://localhost:5678 · mode dry-run · template stamps {'whatsapp': '4943da220c3f', 'telegram': 'e9532e7b4139'}
+~ stgtg40da979c774 'STAGING TG stgtg001' [telegram] active=True → +0 -4 ~9 conn=changed
+~ stgwab77f282533c 'STAGING WA stgwa001' [whatsapp] active=True → +0 -4 ~9 conn=changed
+{"clones": 2, "up_to_date": 0, "would_update": 2, "updated": 0, "failed": 0}
+~ stgtg40da979c774 'STAGING TG stgtg001' [telegram] active=True → +0 -4 ~9 conn=changed
+    rollback pointer: versionId e9574b92-fc62-4ad0-ad3a-cb396029c6d2 (activeVersionId e9574b92-fc62-4ad0-ad3a-cb396029c6d2) before the update
+    published by the PUT (served version = the update) — no deactivate/activate window
+    read-back: ok
+~ stgwab77f282533c 'STAGING WA stgwa001' [whatsapp] active=True → +0 -4 ~9 conn=changed
+    rollback pointer: versionId 7d122ed5-7607-486d-8642-8643659c0397 (activeVersionId 88121e58-b8ee-44e1-81a7-9e7398a42d57) before the update
+    published by the PUT (served version = the update) — no deactivate/activate window
+    read-back: ok
+{"clones": 2, "up_to_date": 0, "would_update": 0, "updated": 2, "failed": 0}
+{"clones": 2, "up_to_date": 2, "would_update": 0, "updated": 0, "failed": 0}
+--- новые workflow — последними
+crChatAudience01 deactivate 200 | active False | OK
+crAudienceDec001 deactivate 200 | active False | OK
+crChatAudience01: inactive; waiting 36 s before DELETE (n8n insights flush, ≥ 35 s rule)
+crChatAudience01 DELETE 200 | GET 404 | OK
+crAudienceDec001: inactive; waiting 36 s before DELETE (n8n insights flush, ≥ 35 s rule)
+crAudienceDec001 DELETE 200 | GET 404 | OK
+--- состояние после частичного отката: verify-deployed нынешними инструментами и инструментами 40bbf80b
+base http://localhost:5678: canonical 32 (diff 4), clones 2 (behind template 2, of them prompt head behind 0; custom prompts 2, not counted), archived clones 0 (not counted), other 2
+  DIFF    4VN3gsFaC2HUYmcc 4VN3gsFaC2HUYmcc-Telegram_Bot.json  active=False names=False graph=False published=None settings=True  (node set differs; stored graph differs)
+  DIFF    4wYitz5ek30SVNlT 4wYitz5ek30SVNlT-WhatsApp_Bot.json  active=False names=False graph=False published=None settings=True  (node set differs; stored graph differs)
+  MISSING crAudienceDec001 crAudienceDec001-Decide_Audience.json  active=None names=None graph=None published=None settings=None
+  MISSING crChatAudience01 crChatAudience01-Chat_Audience.json  active=None names=None graph=None published=None settings=None
+  clone   stgtg40da979c774 'STAGING TG stgtg001' [telegram] active=True nodes=60 graph=e9532e7b4139 published=e9532e7b4139 sticky=e9532e7b4139 BEHIND  prompt=custom (custom prompt — kept verbatim by update-clones, not counted: no Create/Edit grammar (Business Type line + Additional Instructions marker))
+  clone   stgwab77f282533c 'STAGING WA stgwa001' [whatsapp] active=True nodes=60 graph=4943da220c3f published=4943da220c3f sticky=4943da220c3f BEHIND  prompt=custom (custom prompt — kept verbatim by update-clones, not counted: no Create/Edit grammar (Business Type line + Additional Instructions marker))
+base http://localhost:5678: canonical 30 (diff 8), clones 2 (behind template 0, of them prompt head behind 0; custom prompts 2, not counted), archived clones 0 (not counted), other 2
+  DIFF    0DP79STI3pafXO9B 0DP79STI3pafXO9B-Set_Workflow_State.json  active=True names=True graph=False published=False  (stored graph differs; PUBLISHED graph differs)
+  DIFF    2htWSV5IHO8E2CgB 2htWSV5IHO8E2CgB-Dashboard_Outcomes.json  active=True names=True graph=False published=False  (stored graph differs; PUBLISHED graph differs)
+  DIFF    9PTyYcelRQI7bGDb 9PTyYcelRQI7bGDb-Suggest_Replies.json  active=True names=True graph=False published=False  (stored graph differs; PUBLISHED graph differs)
+  DIFF    Uz6HBBUpAiUqVysB Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json  active=True names=True graph=False published=False  (stored graph differs; PUBLISHED graph differs)
+  DIFF    XuvOp7TxOImOAmlj XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json  active=True names=True graph=False published=False  (stored graph differs; PUBLISHED graph differs)
+  DIFF    crWappiProxy0001 crWappiProxy0001-Wappi_Proxy.json  active=True names=True graph=False published=False  (stored graph differs; PUBLISHED graph differs)
+  DIFF    fXYpCXPKw92EzRz8 fXYpCXPKw92EzRz8-Profile_Lifecycle_Sweep.json  active=True names=False graph=False published=False  (node set differs; stored graph differs; PUBLISHED graph differs)
+  DIFF    lmjYsdNcQA2IE5rl lmjYsdNcQA2IE5rl-Delete_Bot_Files.json  active=True names=True graph=False published=False  (stored graph differs; PUBLISHED graph differs)
+  clone   stgtg40da979c774 'STAGING TG stgtg001' [telegram] active=True nodes=60 graph=e9532e7b4139 published=e9532e7b4139 sticky=e9532e7b4139 AT-CANONICAL  prompt=custom (custom prompt — kept verbatim by update-clones, not counted: no Create/Edit grammar (Business Type line + Additional Instructions marker))
+  clone   stgwab77f282533c 'STAGING WA stgwa001' [whatsapp] active=True nodes=60 graph=4943da220c3f published=4943da220c3f sticky=4943da220c3f AT-CANONICAL  prompt=custom (custom prompt — kept verbatim by update-clones, not counted: no Create/Edit grammar (Business Type line + Additional Instructions marker))
+
+### G8 журнал n8n с последнего старта сервера (scratchpad t18/r19_after.sh)
+### n8n log since the current server start (line 62386 of    62532)
+'Error while saving insights' lines: 0
+error / exception lines: 3 — все три от намеренных проб G4c и пробы формы ошибки (Code-узел бросает ошибку); их синтетический текст
+здесь не повторяется
+
+### G9 стенд возвращён на рабочий канон и остановлен
+2. server up at http://localhost:5678 (pid 65063, log /Users/ayan/.n8n-staging/n8n.log)
+   Successfully imported 35 workflows.
+5. imported 33 workflows + 2 staging bots; published 33
+2. server up at http://localhost:5678 (pid 65398, log /Users/ayan/.n8n-staging/n8n.log)
+staging ready: http://localhost:5678
+base http://localhost:5678: canonical 32 (diff 0), clones 2 (behind template 0, of them prompt head behind 0; custom prompts 2, not counted), archived clones 0 (not counted), other 2
+  clone   stgtg40da979c774 'STAGING TG stgtg001' [telegram] active=True nodes=64 graph=838d71744efa published=838d71744efa sticky=None AT-CANONICAL  prompt=custom (custom prompt — kept verbatim by update-clones, not counted: no Create/Edit grammar (Business Type line + Additional Instructions marker))
+  clone   stgwab77f282533c 'STAGING WA stgwa001' [whatsapp] active=True nodes=64 graph=fda0c72318a8 published=fda0c72318a8 sticky=None AT-CANONICAL  prompt=custom (custom prompt — kept verbatim by update-clones, not counted: no Create/Edit grammar (Business Type line + Additional Instructions marker))
+кроме канона и клонов на стенде — только его собственные STAGING Eval Runner и STAGING Crypto Probe (временных workflow не осталось)
+00:00:46Z bootstrap.py --stop -> stopped (SIGTERM); мок (pid 61416) остановлен; pg.sh stop -> server stopped;
+00:00:57Z порты 5678 / 8765 / 5433 свободны, pg_ctl: no server running. Последний прогон на стенде — чтение списка workflow ≈ 00:00:40Z.
