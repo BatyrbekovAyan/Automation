@@ -1551,3 +1551,46 @@ base http://localhost:5678: canonical 32 (diff 0), clones 2 (behind template 0, 
 кроме канона и клонов на стенде — только его собственные STAGING Eval Runner и STAGING Crypto Probe (временных workflow не осталось)
 00:00:46Z bootstrap.py --stop -> stopped (SIGTERM); мок (pid 61416) остановлен; pg.sh stop -> server stopped;
 00:00:57Z порты 5678 / 8765 / 5433 свободны, pg_ctl: no server running. Последний прогон на стенде — чтение списка workflow ≈ 00:00:40Z.
+
+### G2 шаг 0.1 (после коммита пакета 4c5b31ee; те же три команды README, `git -C` — эта рабочая копия ветки, как в запасном пути «Где выполнять»)
+### 0.1a 00:07:37Z — git status --porcelain --untracked-files=all (HEAD 4c5b31ee)
+(end of 0.1a output)
+### 0.1b — git diff --stat f67fca8b (working tree, no HEAD)
+(end of 0.1b output)
+### 0.1c — package_check.py
+canon at 40bbf80b: 30 files; working copy /Users/ayan/Projects/Automation/.claude/worktrees/personal-chats/Tools/n8n/workflows: 32 files
+  OK   package    0DP79STI3pafXO9B-Set_Workflow_State.json  graph dcce761854bd -> 2a2b9eb5eba7  (README dcce761854bd -> 2a2b9eb5eba7)  settings {}
+  OK   package    2htWSV5IHO8E2CgB-Dashboard_Outcomes.json  graph 5f4cd7fb634d -> 13b0fa2cca2e  (README 5f4cd7fb634d -> 13b0fa2cca2e)  settings {}
+  OK   package    4VN3gsFaC2HUYmcc-Telegram_Bot.json  graph 2433180b00c9 -> a1e3c21f0e79  (README 2433180b00c9 -> a1e3c21f0e79)  settings {"saveDataSuccessExecution": "none"}
+  OK   package    4wYitz5ek30SVNlT-WhatsApp_Bot.json  graph 60aa43640382 -> 3c53710fa0b6  (README 60aa43640382 -> 3c53710fa0b6)  settings {"saveDataSuccessExecution": "none"}
+  OK   package    9PTyYcelRQI7bGDb-Suggest_Replies.json  graph fc2f19c5c996 -> 84d59c9c26bb  (README fc2f19c5c996 -> 84d59c9c26bb)  settings {"executionTimeout": 20, "saveDataSuccessExecution": "none"}
+  OK   package    Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json  graph fed4629fee42 -> 80e93626bd01  (README fed4629fee42 -> 80e93626bd01)  settings {}
+  OK   package    XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json  graph 789086fca8ff -> 58f80a16aafb  (README 789086fca8ff -> 58f80a16aafb)  settings {}
+  OK   package    crAudienceDec001-Decide_Audience.json  graph — -> 4e3736a6bc7e  (README — -> 4e3736a6bc7e)  settings {"saveDataErrorExecution": "all", "saveDataSuccessExecution": "none"}
+  OK   package    crChatAudience01-Chat_Audience.json  graph — -> 30f1fc89207c  (README — -> 30f1fc89207c)  settings {"saveDataErrorExecution": "all", "saveDataSuccessExecution": "none"}
+  OK   package    crWappiProxy0001-Wappi_Proxy.json  graph c8bba5e407f4 -> 21204c214a4a  (README c8bba5e407f4 -> 21204c214a4a)  settings {"saveDataErrorExecution": "all", "saveDataSuccessExecution": "none"}
+  OK   package    fXYpCXPKw92EzRz8-Profile_Lifecycle_Sweep.json  graph 35be6f37abeb -> 6abfa98ea38c  (README 35be6f37abeb -> 6abfa98ea38c)  settings {}
+  OK   package    lmjYsdNcQA2IE5rl-Delete_Bot_Files.json  graph ab64a6555282 -> 95b6407aa939  (README ab64a6555282 -> 95b6407aa939)  settings {}
+  unchanged (graph and canonical settings equal at 40bbf80b and in the working copy): 20
+  OK   clones [whatsapp] template stamp c0a7c5186fb2 -> 5c4c33e27468  (README c0a7c5186fb2 -> 5c4c33e27468)
+  OK   clones [telegram] template stamp 62e09511fc94 -> cc77e05b537a  (README 62e09511fc94 -> cc77e05b537a)
+PACKAGE OK
+exit=0
+
+### G2b контроль шага 0.1 (до коммита, на тех же путях): незакоммиченная правка одного параметра в файле пакета (Dashboard Outcomes, узел
+### Prep) и в файле вне пакета (Delete Orphan Profiles, узел List WA Profiles) — scratchpad fix1/touch_canon.py; затем git checkout обоих
+0.1a:
+ M Tools/n8n/workflows/2htWSV5IHO8E2CgB-Dashboard_Outcomes.json
+ M Tools/n8n/workflows/2islisFH7jjLoPQM-Delete_Orphan_Profiles.json
+0.1b:
+ Tools/n8n/workflows/2htWSV5IHO8E2CgB-Dashboard_Outcomes.json     | 6 ++++--
+ Tools/n8n/workflows/2islisFH7jjLoPQM-Delete_Orphan_Profiles.json | 6 ++++--
+ 2 files changed, 8 insertions(+), 4 deletions(-)
+0.1c (exit=1):
+  FAIL package    2htWSV5IHO8E2CgB-Dashboard_Outcomes.json  graph 5f4cd7fb634d -> 6aed7ceabe27  (README 5f4cd7fb634d -> 13b0fa2cca2e)  settings {}
+  FAIL not in the package but differs: 2islisFH7jjLoPQM-Delete_Orphan_Profiles.json  graph d617975779c3 -> 3f733f330e03  settings {} -> {}
+  unchanged (graph and canonical settings equal at 40bbf80b and in the working copy): 19
+FAIL — the working copy's canon is not the rehearsed package: STOP, do not deploy
+после git checkout -- (оба файла): Tools/n8n clean, package_check.py -> PACKAGE OK.
+(Первый прогон контроля показал, что счётчик «unchanged» считал файлы, а не равные графы — 20 при одном расхождении; исправлено до
+коммита: теперь 19, как выше.)
